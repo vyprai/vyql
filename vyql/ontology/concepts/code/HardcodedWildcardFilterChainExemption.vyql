@@ -1,0 +1,11 @@
+module code;
+
+concept HardcodedWildcardFilterChainExemption : issue {
+  cwe: [CWE_862, CWE_863]
+  reviewAssumption: "handlers exist under the exempted prefix that the control replacing the skipped filters does not guard"
+  reviewCategory: access_control
+  reviewCondition: "a security filter-chain exemption is matched by a hardcoded whole-prefix wildcard pattern, so every path under the prefix skips the security filters, while the control that replaces them guards only the paths it discovers at runtime"
+  reviewConfidence: high
+  reviewEvidence: "security exemption {pattern} skips the security filter chain for every path under one hardcoded whole-prefix wildcard"
+  vulnerableTo: [access_control.MissingAuthorization, access_control.IncorrectAuthorization]
+}

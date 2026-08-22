@@ -1,0 +1,7 @@
+module code;
+
+review code.RawPointerFromTemporary {
+  category: memory
+  kind: attention
+  text: "review whether this raw pointer's pointee is a temporary dropped at the end of the statement; bind the value to a local before taking the pointer"
+}

@@ -1,0 +1,439 @@
+# Rank 1768 / CVE-2026-33151 (CWE-400/CWE-770): the socket.io wire protocol
+# frames a packet that carries binary payloads as a short text header followed
+# by that many separate frames -- `5` (binary event), the attachment count, `-`,
+# then the JSON payload with each payload replaced by a
+# `{"_placeholder":true,"num":N}` marker. The count is typed by the peer. On the
+# receiving side the built-in parser's documented job is to hold every arriving
+# frame until it has that many of them, so the count the client typed becomes
+# the number of buffers the server retains:
+#
+#   function decodeString(str) {                    // socket.io-parser index.js
+#     ...
+#     while (str.charAt(++i) !== '-' && i != str.length) {}
+#     var buf = str.substring(start, i);
+#     if (buf != Number(buf) || str.charAt(i) !== '-') {
+#       throw new Error('Illegal attachments');
+#     }
+#     p.attachments = Number(buf);                  // <-- the peer's count, stored
+#   }
+#
+#   BinaryReconstructor.prototype.takeBinaryData = function(binData) {
+#     this.buffers.push(binData);
+#     if (this.buffers.length === this.reconPack.attachments) {  // <-- the bound
+#       ...
+#   Decoder.prototype.add = function(obj) {
+#       ...
+#       this.reconstructor = new BinaryReconstructor(packet);
+#
+# Nothing anywhere compares the count to a ceiling. The pre-existing
+# `buf != Number(buf)` test only rejects text that is not numeric at all: it
+# passes `-5` and `1e9` alike, so a header of a few bytes asks the server to
+# retain an arbitrary number of frames, each of arbitrary size, for as long as
+# the client cares to leave the packet half-finished. The advisory's own
+# regression test in the fixing commit builds the attack as
+# `"5" + 1e9 + '-["ev"]'`.
+#
+# 719f9eba ("fix(parser): add a limit to the number of binary attachments")
+# adds that ceiling three ways at once: the `Decoder` constructor takes an
+# options object (`maxAttachments`, default 10), `decodeString` receives it as
+# a second parameter, and the count is checked before it is stored --
+# `!isInteger(n) || n < 0` for the malformed cases and `n > maxAttachments`
+# for the unbounded one, with the packet now taking the checked local
+# (`p.attachments = n`) rather than the coercion. The row's SHA sits on
+# `socket.io-parser/3.4.x` inside the socket.io monorepo, which is the 2.x
+# CommonJS prototype-style parser; the same fix landed on `main` as b25738c41
+# over the 4.x TypeScript class-based parser at packages/socket.io-parser, and
+# the two files share the vulnerable line verbatim.
+#
+# What fires without this change. `timeout 180 ./bin/vyql scan --cache off --max-ram
+# 6GB` over the whole checkout at `<fix>^` reports 3 findings, all
+# VYQL-INJ-013 on binary.js's `_deconstructPacket`/`_reconstructPacket`
+# placeholder walks, and nothing at all on index.js. `vyql match` labels 4
+# `code.Import` nodes and three `code.DomInput` params; the attachment count,
+# the reconstructor and the completion test are unlabelled. Findings in the
+# package are not coverage.
+#
+# code.UnboundedAllocationReview is reused rather than minted, and this is the
+# concept's own language -- "review allocation sizes derived from parsed
+# counts" -- where the parsed count is the attachment count read out of the
+# packet header and the allocation is the frame list held until it is met.
+# Ranks 1381 (a client picks a GraphQL selection set's nesting depth) and 1412
+# (a client picks a form field name's bracket depth) established it as the home
+# for exactly this judgement; here a client picks the retention bound. Also
+# considered and rejected: code.UnboundedResourceOperation reads "long-lived
+# resource operation ... timeouts, message limits, cancellation", which a
+# bounded-wait accumulation is not; code.UnderboundedProtocolCountLimit is
+# about a limit that exists but is set too low, and here there is no limit at
+# all; code.OversizedWebsocketPayloadDefault is socket.io's *payload size*
+# default (rank 755), a different axis -- the frame size is capped elsewhere
+# and does not help, because the count is what is unbounded. No new concept and
+# no new rule ID; the binding emits into VYQL-DOS-041.
+#
+# The binding is module-scope, which is where the vocabulary is: the header
+# decode, the reconstructor and the completion test live in three different
+# functions, and a ceiling is configured on the decoder's constructor, a fourth
+# scope. The coercion is the load-bearing positive -- `attachments =
+# Number(buf)` is the point where text the peer typed becomes the integer that
+# sizes the retention, and it is shared verbatim by the 2.x CommonJS and 4.x
+# TypeScript implementations of the protocol, so the binding reports both
+# pre-fix revisions and neither fixed one. Measured on the extracted files:
+# 1/0 on 2.x across the fixed revision and 1/0 on 4.x across b25738c41, for the identical
+# reason.
+#
+# The fixed revision's own vocabulary is not the discriminator, tested by renaming rather
+# than argued. Rewriting the patched 2.x revision with `maxAttachments`
+# renamed to `zzQuantum` still reports 0, because `p.attachments = n` does not
+# stores the coercion directly; dropping the coercion clause from the binding
+# makes that same renamed revision report 1, so the coercion clause is what
+# carries it. The negations carry the other direction: a revision that keeps
+# `p.attachments = Number(buf)` and adds a named ceiling (`attachmentLimit`,
+# `frameCap`, any local spelling `max*`/`*limit*`/`*cap*`) does not report,
+# whether the ceiling arrives as a member read, a local, or an operand of the
+# comparison that applies it. The honest limit in both directions: a ceiling
+# named with none of those words and applied to a re-coerced copy
+# (`var n = Number(buf); if (n > 10) throw; p.attachments = Number(buf)`) still
+# reports -- no real revision of this parser is written that way, both actual
+# fixes store the checked local -- and a module that merely *mentions* a
+# ceiling-shaped word for an unrelated reason is silenced, which costs recall
+# and is the safe direction.
+#
+# Collateral is enumerated rather than sampled, because a three-file library
+# gives a vacuous zero. `attachments` as a property read together with a
+# `.length ===` completion test and an `attachments = Number(` assignment
+# appears in exactly one JavaScript or TypeScript file across every repository
+# cloned for this campaign: this one.
+#
+# Measurement note. `vyql match` reads the persistent scan cache and cannot
+# take `--cache off`, and a stale entry served a label set from an earlier
+# definition state -- `containsAny(node.context.identifier, ...)` read as
+# never-matching on this file until `vyql cache clear`, after which it matched
+# the real identifier and rejected an absent one. Every count above is taken
+# after `vyql cache clear`.
+
+test "rank1768: the socket.io decoder stores the peer's attachment count straight from the coercion and buffers until it is met"
+  lang javascript
+  file index.js
+  expect VYQL-DOS-041
+  expect_review code.UnboundedAllocationReview
+  code
+  ```
+  var Emitter = require('component-emitter');
+
+  exports.BINARY_EVENT = 5;
+  exports.BINARY_ACK = 6;
+
+  exports.Decoder = Decoder;
+
+  function Decoder() {
+    this.reconstructor = null;
+  }
+
+  Emitter(Decoder.prototype);
+
+  Decoder.prototype.add = function(obj) {
+    var packet;
+    if (typeof obj === 'string') {
+      if (this.reconstructor) {
+        throw new Error("got plaintext data when reconstructing a packet");
+      }
+      packet = decodeString(obj);
+      if (exports.BINARY_EVENT === packet.type || exports.BINARY_ACK === packet.type) {
+        this.reconstructor = new BinaryReconstructor(packet);
+
+        if (this.reconstructor.reconPack.attachments === 0) {
+          this.emit('decoded', packet);
+        }
+      } else {
+        this.emit('decoded', packet);
+      }
+    } else if (isBuf(obj) || obj.base64) {
+      if (!this.reconstructor) {
+        throw new Error('got binary data when not reconstructing a packet');
+      } else {
+        packet = this.reconstructor.takeBinaryData(obj);
+        if (packet) {
+          this.reconstructor = null;
+          this.emit('decoded', packet);
+        }
+      }
+    } else {
+      throw new Error('Unknown type: ' + obj);
+    }
+  };
+
+  function isBuf(obj) {
+    return obj instanceof Buffer;
+  }
+
+  function decodeString(str) {
+    var i = 0;
+    var p = {
+      type: Number(str.charAt(0))
+    };
+
+    if (exports.BINARY_EVENT === p.type || exports.BINARY_ACK === p.type) {
+      var start = i + 1;
+      while (str.charAt(++i) !== '-' && i != str.length) {}
+      var buf = str.substring(start, i);
+      if (buf != Number(buf) || str.charAt(i) !== '-') {
+        throw new Error('Illegal attachments');
+      }
+      p.attachments = Number(buf);
+    }
+
+    if ('/' === str.charAt(i + 1)) {
+      p.nsp = '/';
+    } else {
+      p.nsp = '/';
+    }
+
+    return p;
+  }
+
+  function BinaryReconstructor(packet) {
+    this.reconPack = packet;
+    this.buffers = [];
+  }
+
+  BinaryReconstructor.prototype.takeBinaryData = function(binData) {
+    this.buffers.push(binData);
+    if (this.buffers.length === this.reconPack.attachments) {
+      var packet = this.reconPack;
+      this.finishedReconstruction();
+      return packet;
+    }
+    return null;
+  };
+
+  BinaryReconstructor.prototype.finishedReconstruction = function() {
+    this.reconPack = null;
+    this.buffers = [];
+  };
+  ```
+
+test "rank1768: the same decoder bounding the count against a configured ceiling before storing it"
+  lang javascript
+  file index.js
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  var Emitter = require('component-emitter');
+
+  exports.BINARY_EVENT = 5;
+  exports.BINARY_ACK = 6;
+
+  exports.Decoder = Decoder;
+
+  function Decoder(opts) {
+    this.reconstructor = null;
+    opts = opts || {};
+    this.opts = {
+      maxAttachments: opts.maxAttachments || 10,
+    };
+  }
+
+  Emitter(Decoder.prototype);
+
+  Decoder.prototype.add = function(obj) {
+    var packet;
+    if (typeof obj === 'string') {
+      if (this.reconstructor) {
+        throw new Error("got plaintext data when reconstructing a packet");
+      }
+      packet = decodeString(obj, this.opts.maxAttachments);
+      if (exports.BINARY_EVENT === packet.type || exports.BINARY_ACK === packet.type) {
+        this.reconstructor = new BinaryReconstructor(packet);
+
+        if (this.reconstructor.reconPack.attachments === 0) {
+          this.emit('decoded', packet);
+        }
+      } else {
+        this.emit('decoded', packet);
+      }
+    } else if (isBuf(obj) || obj.base64) {
+      if (!this.reconstructor) {
+        throw new Error('got binary data when not reconstructing a packet');
+      } else {
+        packet = this.reconstructor.takeBinaryData(obj);
+        if (packet) {
+          this.reconstructor = null;
+          this.emit('decoded', packet);
+        }
+      }
+    } else {
+      throw new Error('Unknown type: ' + obj);
+    }
+  };
+
+  function isBuf(obj) {
+    return obj instanceof Buffer;
+  }
+
+  function decodeString(str, maxAttachments) {
+    var i = 0;
+    var p = {
+      type: Number(str.charAt(0))
+    };
+
+    if (exports.BINARY_EVENT === p.type || exports.BINARY_ACK === p.type) {
+      var start = i + 1;
+      while (str.charAt(++i) !== '-' && i != str.length) {}
+      var buf = str.substring(start, i);
+      if (buf != Number(buf) || str.charAt(i) !== '-') {
+        throw new Error('Illegal attachments');
+      }
+      var n = Number(buf);
+      if (!isInteger(n) || n < 0) {
+        throw new Error("Illegal attachments");
+      } else if (n > maxAttachments) {
+        throw new Error("too many attachments");
+      }
+      p.attachments = n;
+    }
+
+    if ('/' === str.charAt(i + 1)) {
+      p.nsp = '/';
+    } else {
+      p.nsp = '/';
+    }
+
+    return p;
+  }
+
+  function BinaryReconstructor(packet) {
+    this.reconPack = packet;
+    this.buffers = [];
+  }
+
+  BinaryReconstructor.prototype.takeBinaryData = function(binData) {
+    this.buffers.push(binData);
+    if (this.buffers.length === this.reconPack.attachments) {
+      var packet = this.reconPack;
+      this.finishedReconstruction();
+      return packet;
+    }
+    return null;
+  };
+
+  BinaryReconstructor.prototype.finishedReconstruction = function() {
+    this.reconPack = null;
+    this.buffers = [];
+  };
+  ```
+
+test "rank1768: the same bound applied through a ceiling named without the usual spellings"
+  lang javascript
+  file index.js
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  var Emitter = require('component-emitter');
+
+  exports.BINARY_EVENT = 5;
+  exports.BINARY_ACK = 6;
+
+  exports.Decoder = Decoder;
+
+  function Decoder(opts) {
+    this.reconstructor = null;
+    opts = opts || {};
+    this.opts = {
+      allowed: opts.allowed || 10,
+    };
+  }
+
+  Emitter(Decoder.prototype);
+
+  Decoder.prototype.add = function(obj) {
+    var packet;
+    if (typeof obj === 'string') {
+      if (this.reconstructor) {
+        throw new Error("got plaintext data when reconstructing a packet");
+      }
+      packet = decodeString(obj, this.opts.allowed);
+      if (exports.BINARY_EVENT === packet.type || exports.BINARY_ACK === packet.type) {
+        this.reconstructor = new BinaryReconstructor(packet);
+
+        if (this.reconstructor.reconPack.attachments === 0) {
+          this.emit('decoded', packet);
+        }
+      } else {
+        this.emit('decoded', packet);
+      }
+    }
+  };
+
+  function decodeString(str, allowed) {
+    var i = 0;
+    var p = {
+      type: Number(str.charAt(0))
+    };
+
+    if (exports.BINARY_EVENT === p.type || exports.BINARY_ACK === p.type) {
+      var start = i + 1;
+      while (str.charAt(++i) !== '-' && i != str.length) {}
+      var buf = str.substring(start, i);
+      if (buf != Number(buf) || str.charAt(i) !== '-') {
+        throw new Error('Illegal attachments');
+      }
+      var n = Number(buf);
+      if (!isInteger(n) || n < 0) {
+        throw new Error("Illegal attachments");
+      } else if (n > allowed) {
+        throw new Error("too many attachments");
+      }
+      p.attachments = n;
+    }
+
+    return p;
+  }
+
+  function BinaryReconstructor(packet) {
+    this.reconPack = packet;
+    this.buffers = [];
+  }
+
+  BinaryReconstructor.prototype.takeBinaryData = function(binData) {
+    this.buffers.push(binData);
+    if (this.buffers.length === this.reconPack.attachments) {
+      var packet = this.reconPack;
+      this.finishedReconstruction();
+      return packet;
+    }
+    return null;
+  };
+
+  BinaryReconstructor.prototype.finishedReconstruction = function() {
+    this.reconPack = null;
+    this.buffers = [];
+  };
+  ```
+
+test "rank1768: an attachment list the application fills itself, with no count read off the wire"
+  lang javascript
+  file attachments.js
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  var attachments = [];
+  var expected = 0;
+
+  function setExpected(count) {
+    expected = count;
+  }
+
+  function addAttachment(file) {
+    attachments.push(file);
+    if (attachments.length === expected) {
+      return attachments;
+    }
+    return null;
+  }
+
+  function packetFor(count) {
+    var p = { type: 5 };
+    p.attachments = count;
+    return p;
+  }
+  ```

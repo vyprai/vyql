@@ -1,0 +1,335 @@
+# snapd confined snaps with a seccomp allow-list. The default profile is a
+# plain-text syscall list held in a Go raw string, and it mediated ioctl()
+# with exactly one exception:
+#
+#     ioctl - !TIOCSTI
+#
+# meaning "allow ioctl() unless the request is TIOCSTI". TIOCSTI is the
+# request that pushes a character back onto a terminal's input queue, so a
+# snap that held CAP_SYS_ADMIN could type into another user's terminal. The
+# console analogue TIOCLINUX (man ioctl_console) does the same for the
+# virtual consoles, and the allow-rule admits it, so a malicious snap could
+# inject input into the controlling terminal and have commands run outside
+# the sandbox after the snap exits. The companion global blacklist
+# (cmd/snap-seccomp-blacklist, C) had the same single-constant omission: it
+# installs one seccomp_rule_add masked-equality rule for TIOCSTI and none for
+# TIOCLINUX.
+#
+# The pool SHA d7b49dd6f59 is the last commit of fix PR canonical/snapd#12849
+# ("many: add a bunch of TODO/FIXME for a followup :)"), which edits two
+# comments and comments out one spread-test line -- no security logic. The
+# advisory references only the PR, so the SHA is never verified against it
+# The metadata flags no commit. The fixing changes are on release/2.59, present on master:
+# dddcfd6ac8daa84feb80eb6fd88f852ced70629c adds the explicit denies
+#
+#     ~ioctl - TIOCSTI
+#     ~ioctl - TIOCLINUX
+#
+# to the template (the ~ prefix is the explicit-deny form e4681c57b
+# introduced, because a second `ioctl - !CONST` allow-rule would let each
+# rule admit the other's constant), and 52af545f3c0d8b086500ab86f1617039056
+# adds the second seccomp_rule_add with datum_b = TIOCLINUX. Remediation
+# verified present at both, and at master today (template.go:254-258).
+# Recorded CWE-74 is the impact, not the mechanism: nothing is injected in
+# this repository, the defect is a confinement filter that admits a request
+# it should deny (CWE-284).
+#
+# ATTENTION, authorization-by-configuration family (1514, 1535, 1540, 1556,
+# 1557, 1593), and the purest form of it: the control is a static policy
+# blob and the remediation is a policy entry. There is no dataflow -- the
+# attacker is a program outside this codebase and the sink is a filter
+# compiled at runtime -- so `vyql match` on interfaces/seccomp/template.go
+# reports no source, no sink and no control label at all. Measured over
+# three --cache off runs per side, stable: interfaces/seccomp 1 finding,
+# cmd/snap-seccomp-blacklist 2, cmd/snap-seccomp 0, identical on dddcfd6ac^
+# and at the fixes. The only rows nearby are a VYQL-RES-001 in backend_test.go
+# and two VYQL-MEM-006 NullableDerefs on the arch_set loop in the C file --
+# findings in the file, not coverage of the omission.
+#
+# The 1380 counterweight fails. The fixed revision leaves no API-documented call inside
+# the region it guards: in template.go there is no region, only a const
+# string, and in the C program seccomp_rule_add is present at the
+# parent for TIOCSTI -- the fixed revision duplicates it under a different datum, so
+# the only token that separates the revisions is the constant the fixed revision
+# itself introduces. That is the discriminator AGENTS.md forbids keying on,
+# and it fails the genericity test: neither libseccomp's documentation nor
+# snapd's states that a terminal-mediation policy must deny TIOCLINUX --
+# the inference is this advisory's (and flatpak's twin CVE-2023-28100).
+# Reachable set, enumerated by grep across the 383 sibling clones under
+# /tmp/cve-work/rank*/: the `ioctl - !` allow-rule spelling occurs nowhere
+# but snapd's template, and seccomp_rule_add occurs in eight files of six
+# other repos (memcached, nix, and the vendored libseccomp-golang in nomad,
+# runc and singularity, plus qemu), all building deny rules correctly. A
+# binding for this shape has a reachable set of one repository and no true
+# positive to generalise to.
+#
+# Vocabulary considered and rejected: code.NetworkFilteringDisabled is the
+# nearest CWE-284 filter-omission issue and is what the pins below use, but
+# it is scoped to network packet filters (nftables/iptables chains, a
+# WireGuard device without an input filter); core.AllowlistValidation is a
+# path check neutralising command injection and SSRF; code.IncompleteIpDenylist
+# is the SSRF-shaped sibling, a denylist of addresses a request target is
+# checked against; code.SandboxFacadeWholesaleMemberCopy is a JS host-object
+# facade shape; code.TrustBoundary and code.ClientControlledSecurityDecision
+# are taint sinks and need a source this code does not have. A syscall-filter
+# sibling would be a new concept for a class with one reachable instance,
+# which is the repro-shaped patch, so it is not minted.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "snapd: default seccomp template allows ioctl with every request except TIOCSTI"
+  lang go
+  file template.go
+  reject VYQL-CFG-015
+  code
+  ```
+  package seccomp
+
+  // defaultTemplate contains default seccomp template.
+  // It can be overridden for testing using MockTemplate().
+  var defaultTemplate = []byte(`
+  # Description: Allows access to app-specific directories and basic runtime
+  #
+  # The default seccomp policy is default deny with a whitelist of allowed
+  # syscalls. The default policy is intended to be safe for any application to
+  # use and should be evaluated in conjunction with other security backends (eg
+  # AppArmor). For example, a few particularly problematic syscalls that are left
+  # out are: mount, ptrace, pivot_root, ...
+
+  accept4
+  access
+  acct
+  arch_prctl
+
+  inotify_add_watch
+  inotify_init
+  inotify_init1
+  inotify_rm_watch
+
+  # ioctl() mediation currently primarily relies on Linux capabilities as well as
+  # the initial syscall for the fd to pass to ioctl(). See 'man capabilities'
+  # and 'man ioctl_list'. TIOCSTI requires CAP_SYS_ADMIN but allows for faking
+  # input (man tty_ioctl), so we disallow it to prevent snaps plugging interfaces
+  # with 'capability sys_admin' from interfering with other snaps or the
+  # unconfined user's terminal.
+  # TODO: this should be scaled back even more
+  ioctl - !TIOCSTI
+
+  io_cancel
+  io_destroy
+  io_getevents
+  io_pgetevents
+  io_pgetevents_time64
+  io_setup
+  io_submit
+  ioprio_get
+
+  kill
+  link
+  linkat
+
+  lseek
+  llseek
+  _llseek
+  `)
+
+  // MockTemplate makes the seccomp code use a different template than the
+  // default one for testing.
+  func MockTemplate(tpl string) {
+      defaultTemplate = []byte(tpl)
+  }
+  ```
+
+test "snapd: template denies ioctl with TIOCSTI and TIOCLINUX explicitly"
+  lang go
+  file template.go
+  reject VYQL-CFG-015
+  code
+  ```
+  package seccomp
+
+  // defaultTemplate contains default seccomp template.
+  // It can be overridden for testing using MockTemplate().
+  var defaultTemplate = []byte(`
+  # Description: Allows access to app-specific directories and basic runtime
+  #
+  # The default seccomp policy is default deny with a whitelist of allowed
+  # syscalls. The default policy is intended to be safe for any application to
+  # use and should be evaluated in conjunction with other security backends (eg
+  # AppArmor). For example, a few particularly problematic syscalls that are left
+  # out are: mount, ptrace, pivot_root, ...
+
+  accept4
+  access
+  acct
+  arch_prctl
+
+  inotify_add_watch
+  inotify_init
+  inotify_init1
+  inotify_rm_watch
+
+  # ioctl() mediation currently primarily relies on Linux capabilities as well as
+  # the initial syscall for the fd to pass to ioctl(). See 'man capabilities'
+  # and 'man ioctl_list'. TIOCSTI requires CAP_SYS_ADMIN but allows for faking
+  # input (man tty_ioctl), so we disallow it to prevent snaps plugging interfaces
+  # with 'capability sys_admin' from interfering with other snaps or the
+  # unconfined user's terminal.
+  # similarly, TIOCLINUX allows to fake input as well (man ioctl_console) so
+  # disallow that too
+  # TODO: this should be scaled back even more
+  ~ioctl - TIOCSTI
+  ~ioctl - TIOCLINUX
+  # restrict argument otherwise will match all uses of ioctl() and allow the rules
+  # that are disallowed above
+  ioctl - !TIOCSTI
+
+  io_cancel
+  io_destroy
+  io_getevents
+  io_pgetevents
+  io_pgetevents_time64
+  io_setup
+  io_submit
+  ioprio_get
+
+  kill
+  link
+  linkat
+
+  lseek
+  llseek
+  _llseek
+  `)
+
+  // MockTemplate makes the seccomp code use a different template than the
+  // default one for testing.
+  func MockTemplate(tpl string) {
+      defaultTemplate = []byte(tpl)
+  }
+  ```
+
+test "snapd: global blacklist filter installs a single ioctl rule for TIOCSTI"
+  lang c
+  file snap-seccomp-blacklist.c
+  reject VYQL-CFG-015
+  code
+  ```
+  #include <errno.h>
+  #include <inttypes.h>
+  #include <seccomp.h>
+  #include <sys/ioctl.h>
+
+  static int populate_filter(scmp_filter_ctx ctx)
+  {
+      int sc_err;
+
+      /* Resolve the name of "ioctl" on this architecture. */
+      int sys_ioctl_nr;
+      sys_ioctl_nr = seccomp_syscall_resolve_name("ioctl");
+      if (sys_ioctl_nr == __NR_SCMP_ERROR) {
+          showerr("cannot resolve ioctl system call number");
+          return -ESRCH;
+      }
+
+      const struct scmp_arg_cmp no_tty_inject = {
+          /* When faced with ioctl(fd, request); refuse to proceed when
+           * request&0xffffffff == TIOCSTI. This specific way to encode the
+           * filter has the following important properties:
+           *
+           * - it blocks ioctl(fd, TIOCSTI, ptr).
+           * - it also blocks ioctl(fd, (1UL<<32) | TIOCSTI, ptr).
+           * - it doesn't block ioctl(fd, (1UL<<32) | (request not equal to TIOCSTI), ptr); */
+          .arg = 1,
+          .op = SCMP_CMP_MASKED_EQ,
+          .datum_a = 0xffffffffUL,
+          .datum_b = TIOCSTI,
+      };
+      sc_err = seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), sys_ioctl_nr, 1, no_tty_inject);
+
+      if (sc_err < 0) {
+          showerr("cannot add rule preventing the use high bits in ioctl");
+          return sc_err;
+      }
+      return 0;
+  }
+  ```
+
+test "snapd: blacklist filter adds a second ioctl rule for TIOCLINUX"
+  lang c
+  file snap-seccomp-blacklist.c
+  reject VYQL-CFG-015
+  code
+  ```
+  #include <errno.h>
+  #include <inttypes.h>
+  #include <seccomp.h>
+  #include <sys/ioctl.h>
+
+  static int populate_filter(scmp_filter_ctx ctx)
+  {
+      int sc_err;
+
+      /* Resolve the name of "ioctl" on this architecture. */
+      int sys_ioctl_nr;
+      sys_ioctl_nr = seccomp_syscall_resolve_name("ioctl");
+      if (sys_ioctl_nr == __NR_SCMP_ERROR) {
+          showerr("cannot resolve ioctl system call number");
+          return -ESRCH;
+      }
+
+      struct scmp_arg_cmp no_tty_inject = {
+          /* When faced with ioctl(fd, request); refuse to proceed when
+           * request&0xffffffff == TIOCSTI. This specific way to encode the
+           * filter has the following important properties:
+           *
+           * - it blocks ioctl(fd, TIOCSTI, ptr).
+           * - it also blocks ioctl(fd, (1UL<<32) | TIOCSTI, ptr).
+           * - it doesn't block ioctl(fd, (1UL<<32) | (request not equal to TIOCSTI), ptr); */
+          .arg = 1,
+          .op = SCMP_CMP_MASKED_EQ,
+          .datum_a = 0xffffffffUL,
+          .datum_b = TIOCSTI,
+      };
+      sc_err = seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), sys_ioctl_nr, 1, no_tty_inject);
+
+      /* also block use of TIOCLINUX */
+      no_tty_inject.datum_b = TIOCLINUX;
+      sc_err = seccomp_rule_add(ctx, SCMP_ACT_ERRNO(EPERM), sys_ioctl_nr, 1, no_tty_inject);
+
+      if (sc_err < 0) {
+          showerr("cannot add rule preventing the use high bits in ioctl");
+          return sc_err;
+      }
+      return 0;
+  }
+  ```
+
+test "snapd: a seccomp profile that simply does not list a syscall denies it"
+  lang go
+  file template.go
+  reject VYQL-CFG-015
+  code
+  ```
+  package seccomp
+
+  // defaultTemplate contains default seccomp template.
+  // It can be overridden for testing using MockTemplate().
+  var defaultTemplate = []byte(`
+  # The default seccomp policy is default deny with a whitelist of allowed
+  # syscalls.
+
+  accept4
+  access
+  acct
+  arch_prctl
+
+  # ptrace is left out on purpose, as are mount and pivot_root.
+  `)
+
+  // MockTemplate makes the seccomp code use a different template than the
+  // default one for testing.
+  func MockTemplate(tpl string) {
+      defaultTemplate = []byte(tpl)
+  }
+  ```

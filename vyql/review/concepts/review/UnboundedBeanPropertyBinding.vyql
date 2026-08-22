@@ -1,0 +1,7 @@
+module code;
+
+review code.UnboundedBeanPropertyBinding {
+  category: mass_assignment
+  kind: attention
+  text: "review name-indexed java.beans property descriptor maps for a bound on the type a resolved name can reach"
+}

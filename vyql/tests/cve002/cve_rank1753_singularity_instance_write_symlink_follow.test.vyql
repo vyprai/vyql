@@ -1,0 +1,163 @@
+# CVE-2019-11328: Singularity's setuid starter stores instance state under
+# /run/singularity/instances/sing/<user>/<instance>, a directory the same
+# code path creates with os.MkdirAll(0755) and then hands to the instance's
+# unprivileged owner with os.Chown(path, pw.UID, 0) (instance_linux.go,
+# (*File).Update). An owner can relax the mode of a directory they own, so the
+# reported user-writable instance directory is attacker-controlled ground: the
+# owner replaces the ns subdirectory with symlinks into /proc/1/ns/ that the
+# setuid join path follows, and plants a symlink at <instance>.json that the
+# root-side os.OpenFile(i.Path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+# follows to create and truncate an arbitrary root-owned file.
+#
+# Fixed in 618c9d56802399adb329c23ea2b70598eaff4a31, which moves instance
+# files into the user home directory, stops trusting the instance file's
+# content on the join path, and adds syscall.O_NOFOLLOW to the instance-file
+# and log-file opens. The write-side remediation that a scanner can see is the
+# flag: the create-or-truncate open gained O_NOFOLLOW.
+#
+# The class is wider than the incident: any privileged writer that delegates
+# ownership of the directory it writes through (os.Chown to a looked-up uid)
+# and then opens a file for creation there without no-follow protection is
+# exposed to the new owner planting a symlink at the target name, because
+# os.OpenFile follows links unless O_NOFOLLOW refuses them. The binding
+# goDelegatedDirectoryCreateWithoutNoFollow in
+# vyql/bindings/go/delegatedDirectoryWriteWithoutNoFollow.vyql keys on the
+# documented semantics of the two stdlib calls, not on Singularity's names.
+
+test "rank1753: privileged instance-file write through a directory handed to the instance owner"
+  lang go
+  file internal/pkg/instance/instance_linux.go
+  expect VYQL-PATH-076
+  code
+  ```
+  package instance
+
+  import (
+  	"encoding/json"
+  	"os"
+  	"path/filepath"
+  	"syscall"
+  )
+
+  type userRecord struct{ UID int }
+
+  func getPwNam(name string) (*userRecord, error)
+
+  // File represents an instance file storing instance information
+  type File struct {
+  	Path       string `json:"-"`
+  	Pid        int    `json:"pid"`
+  	Name       string `json:"name"`
+  	User       string `json:"user"`
+  	Config     []byte `json:"config"`
+  }
+
+  // Update stores instance information in associated instance file
+  func (i *File) Update() error {
+  	b, err := json.Marshal(i)
+  	if err != nil {
+  		return err
+  	}
+
+  	path := filepath.Dir(i.Path)
+
+  	oldumask := syscall.Umask(0)
+  	defer syscall.Umask(oldumask)
+
+  	if err := os.MkdirAll(path, 0755); err != nil {
+  		return err
+  	}
+  	if i.Path[:24] == "/var/run/singularity/ins" {
+  		pw, err := getPwNam(i.User)
+  		if err != nil {
+  			return err
+  		}
+  		if err := os.Chmod(path, 0550); err != nil {
+  			return err
+  		}
+  		if err := os.Chown(path, int(pw.UID), 0); err != nil {
+  			return err
+  		}
+  	}
+  	file, err := os.OpenFile(i.Path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+  	if err != nil {
+  		return err
+  	}
+  	defer file.Close()
+
+  	if _, err := file.Write(append(b, '\n')); err != nil {
+  		return err
+  	}
+
+  	return file.Sync()
+  }
+  ```
+
+test "rank1753: the same write refusing to follow a symlink at the target name"
+  lang go
+  file internal/pkg/instance/instance_linux.go
+  reject VYQL-PATH-076
+  code
+  ```
+  package instance
+
+  import (
+  	"encoding/json"
+  	"os"
+  	"path/filepath"
+  	"syscall"
+  )
+
+  type userRecord struct{ UID int }
+
+  func getPwNam(name string) (*userRecord, error)
+
+  // File represents an instance file storing instance information
+  type File struct {
+  	Path       string `json:"-"`
+  	Pid        int    `json:"pid"`
+  	Name       string `json:"name"`
+  	User       string `json:"user"`
+  	Config     []byte `json:"config"`
+  }
+
+  // Update stores instance information in associated instance file
+  func (i *File) Update() error {
+  	b, err := json.Marshal(i)
+  	if err != nil {
+  		return err
+  	}
+
+  	path := filepath.Dir(i.Path)
+
+  	oldumask := syscall.Umask(0)
+  	defer syscall.Umask(oldumask)
+
+  	if err := os.MkdirAll(path, 0755); err != nil {
+  		return err
+  	}
+  	if i.Path[:24] == "/var/run/singularity/ins" {
+  		pw, err := getPwNam(i.User)
+  		if err != nil {
+  			return err
+  		}
+  		if err := os.Chmod(path, 0550); err != nil {
+  			return err
+  		}
+  		if err := os.Chown(path, int(pw.UID), 0); err != nil {
+  			return err
+  		}
+  	}
+  	file, err := os.OpenFile(i.Path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY|syscall.O_NOFOLLOW, 0644)
+  	if err != nil {
+  		return err
+  	}
+  	defer file.Close()
+
+  	if _, err := file.Write(append(b, '\n')); err != nil {
+  		return err
+  	}
+
+  	return file.Sync()
+  }
+  ```

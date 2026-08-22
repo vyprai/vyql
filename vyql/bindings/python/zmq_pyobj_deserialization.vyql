@@ -1,0 +1,21 @@
+module bindings.python.zmq_pyobj_deserialization;
+
+// pyzmq's Socket.recv_pyobj() is a receive and an unpickle in one call: it takes
+// the next message from whatever peer the socket is bound or connected to and
+// hands back `pickle.loads` of those bytes, so the stream the peer sent decides
+// which classes are reconstructed and their code runs inside this process.
+// pyzmq's own documentation states the pickle step and warns that these methods
+// must not be used with untrusted peers, and the library offers no filter hook
+// on this path -- the documented safe alternative is the byte receive
+// (recv/recv_multipart) plus an explicit decode, which never instantiates
+// attacker-named classes. That is the unrestricted form of the same weakness
+// the other arms of this concept cover: the stream may name any class, with no
+// filter standing between it and the unpickler. Whether the peer is in fact
+// trusted is the rule's question, not this binding's; `recv_json` and
+// `recv_string` are deliberately not labelled because JSON and text decode to
+// primitives, the same distinction the json.loads check draws.
+
+binding zmqRecvPyobjUnrestrictedDeserialization {
+  query pattern callExpr where callee.method == "recv_pyobj"
+  emit issue code.UnrestrictedClassDeserialization at call
+}

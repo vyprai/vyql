@@ -1,0 +1,198 @@
+# Rank 1785 / CVE-2025-62168: Squid's error-page and TRACE outputs packed
+# the full HTTP request without the credential mask. HttpHeader::packInto
+# (src/HttpHeader.h:99) takes a documented boolean, mask_sensitive_info,
+# that elides AUTHORIZATION and PROXY_AUTHORIZATION values, and
+# 0951a0681011dfca3d78c84fd7f1e19c78a4443f threads it through
+# HttpRequest::pack as well. At the parent, three externally visible
+# outputs build without it: ErrorState::Dump (src/errorpage.cc:890)
+# packed the whole request into the %W mailto body emailed to the
+# administrator, possibly over insecure SMTP; the %R error-page code
+# (src/errorpage.cc:1158-1161) fell back to ErrorState::request_hdrs, a
+# char* the constructor path filled with xstrdup(unparsedrequest) -- the
+# raw, unparsed client bytes, credentials intact -- whenever the request
+# failed to parse; and clientReplyContext::traceReply
+# (src/client_side_reply.cc:1001-1012) echoed the request through
+# swapOut, which packs unmasked, into the TRACE response. The fixed revision passes
+# true at all three, deletes the request_hdrs bypass field, and flips the
+# email_err_data directive default to off. Remediation confirmed present
+# at the fixed revision; all three constructs confirmed at its parent.
+#
+# ATTENTION, the redaction-decided-by-wiring family of ranks
+# 1514/1535/1540/1556/1557/1593, first C++ instance: the control is a
+# default-false boolean threaded through internal plumbing, so no taint
+# path differs between the revisions. Measured, not assumed. The mask
+# argument itself is engine-visible -- on a graph dump of a minimal
+# repro, request->pack(&r) lowers to Call path=request.pack with one Arg
+# and request->pack(&r, true) to the same Call with a Const Arg, so a
+# binding could in principle key on the missing second argument. That
+# binding cannot discriminate, because an unmasked request pack is not
+# itself the weakness: the fixed tree still calls request->pack(&mb) at
+# src/servers/FtpServer.cc:1313 (a debug-level dump the fixed revision does not
+# touch) and request->pack(p) inside httpRequestPack
+# (src/HttpRequest.cc:364, the debugObj serializer for the forwarding-
+# loop warning at src/client_side_request.cc:993), and the same callee
+# shape serialises Ipc, SNMP, HTCP and cache messages across ~70
+# pack/packInto/swapOut sites in the tree. The discriminator left is the
+# output context -- error page, mailto link, TRACE reply -- which exists
+# only as Squid's own control flow: the anchors a binding could use are
+# the fixed revision's own layout (the Dump/compileLegacyCode/traceReply function
+# names, the "HTTP Request:" literal) or MemBuf::append, the common
+# serialisation buffer for wire writes, logs and IPC, where a sink label
+# is a false-positive machine. The %R raw-buffer path would additionally
+# need a source on setReplyToError's unparsedrequest parameter and the
+# socket-read-into-member-buffer chain (the rank 1206 read-fills-buffer
+# gap) and still lands in that unbindable sink. The 1380 counterweight
+# does not apply: the fixed revision leaves no documented API call inside the
+# guarded functions, it changes the existing call's argument. A/B on the
+# real checkout, whole src subtree (1406 files, ~10s per run), three
+# --cache off runs per side: 5326 finding lines at the parent and 5326
+# at the fixed revision, byte-identical, and zero rows at errorpage.cc:886-890,
+# errorpage.cc:1158-1161 or client_side_reply.cc:1001-1012 at either
+# revision -- the only movement is NullableDeref noise shifting by the
+# nine deleted lines. vyql match after a cache clear labels nothing on
+# pack, packInto, swapOut, request_hdrs or Dump. Spec pins the miss:
+# both revisions reject VYQL-SEC-034 (VerboseHttpErrorObjectDisclosure,
+# "HTTP error construction formats full request", the nearest shipped
+# rule to this shape) and VYQL-SEC-044; when a request-serialisation
+# sink with a mask control is bound for C++, the unmasked forms must
+# flip to expect while the masked form stays reject.
+
+test "error page and TRACE outputs pack the request without the credential mask"
+  lang cpp
+  file src/errorpage.cc
+  reject VYQL-SEC-034
+  reject VYQL-SEC-044
+  code
+  ```
+  class Packable { public: virtual void append(const char *, int) {} };
+
+  class HttpHeader {
+  public:
+      // packs all the entries; mask_sensitive_info elides
+      // AUTHORIZATION and PROXY_AUTHORIZATION values
+      void packInto(Packable *p, bool mask_sensitive_info = false) const;
+  };
+
+  class MemBuf {
+  public:
+      void init() {}
+      void append(const char *buf, int len) { (void) buf; (void) len; }
+      const char *content() { return buf; }
+      char buf[4096];
+  };
+
+  class HttpRequest {
+  public:
+      // packs request-line and headers, appends the terminator
+      void pack(Packable *p) const;
+      HttpHeader header;
+  };
+
+  class ErrorState {
+  public:
+      char *request_hdrs = nullptr;
+      HttpRequest *request = nullptr;
+
+      void Dump(MemBuf &body);          // the %W mailto body
+      void compileLegacyCode(MemBuf &mb, char *&p);   // the %R page code
+  };
+
+  // emailed to the administrator for %W, possibly over insecure SMTP
+  void
+  ErrorState::Dump(MemBuf &body)
+  {
+      body.append("HTTP Request:\r\n", 15);
+      MemBuf r;
+      r.init();
+      request->pack(&r);
+      body.append(r.content(), 0);
+  }
+
+  // rendered into the error page shown to the client
+  void
+  ErrorState::compileLegacyCode(MemBuf &mb, char *&p)
+  {
+      if (request) {
+          request->header.packInto(&mb, true); // hide authorization data
+      } else if (request_hdrs) {
+          p = request_hdrs;   // raw unparsed request bytes, credentials intact
+      } else {
+          p = "[no request]";
+      }
+  }
+
+  // TRACE method reply: echoes the stored request back to the client
+  void
+  clientReplyContext_traceReply(HttpRequest *request, MemBuf &content)
+  {
+      content.init();
+      request->pack(&content);
+  }
+  ```
+
+test "the fixed revision threads the mask through every externally visible pack"
+  lang cpp
+  file src/errorpage.cc
+  reject VYQL-SEC-034
+  reject VYQL-SEC-044
+  code
+  ```
+  class Packable { public: virtual void append(const char *, int) {} };
+
+  class HttpHeader {
+  public:
+      // packs all the entries; mask_sensitive_info elides
+      // AUTHORIZATION and PROXY_AUTHORIZATION values
+      void packInto(Packable *p, bool mask_sensitive_info = false) const;
+  };
+
+  class MemBuf {
+  public:
+      void init() {}
+      void append(const char *buf, int len) { (void) buf; (void) len; }
+      const char *content() { return buf; }
+      char buf[4096];
+  };
+
+  class HttpRequest {
+  public:
+      // packs request-line and headers, appends the terminator;
+      // maskSensitiveInfo elides credential headers
+      void pack(Packable *p, bool maskSensitiveInfo = false) const;
+      HttpHeader header;
+  };
+
+  class ErrorState {
+  public:
+      HttpRequest *request = nullptr;
+
+      void Dump(MemBuf &body);
+      void compileLegacyCode(MemBuf &mb, char *&p);
+  };
+
+  void
+  ErrorState::Dump(MemBuf &body)
+  {
+      body.append("HTTP Request:\r\n", 15);
+      MemBuf r;
+      r.init();
+      request->pack(&r, true /* hide authorization data */);
+      body.append(r.content(), 0);
+  }
+
+  void
+  ErrorState::compileLegacyCode(MemBuf &mb, char *&p)
+  {
+      if (request)
+          request->pack(&mb, true /* hide authorization data */);
+      else
+          p = "[no request]";
+  }
+
+  void
+  clientReplyContext_traceReply(HttpRequest *request, MemBuf &content)
+  {
+      content.init();
+      request->pack(&content, true /* hide authorization data */);
+  }
+  ```

@@ -1,0 +1,230 @@
+# Smartstore's import controller takes the whole ImportProfileModel from the
+# request body, so TempFileName is attacker-chosen. Create joins it onto the
+# tenant temp directory with Path.Combine and, when the resulting path exists,
+# copies the file into the new profile's import folder and deletes the source
+# (FileSystemHelper.CopyFile(importFile, importFileDestination, true, true)
+# forwards to File.Copy followed by DeleteFile when deleteSource is set). A
+# TempFileName carrying .. segments therefore reads, copies and deletes outside
+# the directory the name is meant to confine to. The fixed revision rejects the name
+# up front:
+#
+#     if (PathHelper.HasInvalidFileNameChars(model.TempFileName))
+#     {
+#         return new HttpStatusCodeResult(HttpStatusCode.BadRequest, "Invalid file name.");
+#     }
+#
+# The taint side is covered: csharp.input@syntactic labels the
+# model-bound parameter and csharp.sinks@resolved labels File.Exists, so
+# VYQL-PATH-001 reported the vulnerable action before any change here. What is
+# missing is the check side -- no C# binding recognised a filename-character
+# rejection, so the patched action reported identically.
+#
+# The .NET-documented idiom for that check is Path.GetInvalidFileNameChars() /
+# Path.GetInvalidPathChars(), consumed as name.IndexOfAny(<that array>).
+# PathHelper.HasInvalidFileNameChars and HasInvalidPathChars are the wrapper
+# spellings of the same idiom (fileName.IndexOfAny over the invalid-character
+# array, which carries both path separators and the wildcard pair, so the guard
+# rejects the traversal characters themselves). pathAccessCheck403 binds the raw
+# BCL spelling, keyed on the function carrying both an IndexOfAny call and a
+# Path.GetInvalid*Chars call; pathAccessCheck401 and pathAccessCheck402 bind the
+# two wrapper spellings. All three emit core.PathAccessCheck anchored at the
+# call, which is the endpoint guard VYQL-PATH-001, ArchiveExtractionTraversal
+# and FileInclusion look for -- the only three rules that consume that
+# concept.
+#
+# Measured, union over three `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` runs per revision with the counts identical inside each
+# revision:
+#
+#   vulnerable (5ab1e37d^): 1354 -> 1348 findings, 476 -> 470 at or above high.
+#       The Create finding survives (ImportController.cs:383 -> :389).
+#   fixed (5ab1e37d):       1354 -> 1347 findings, 476 -> 469 at or above high.
+#       The Create finding is gone.
+#
+# Every row the change removes is an endpoint that carried the guard at
+# the vulnerable revision and is reported anyway: DownloadImportFile
+# (ImportController.cs:743 -> sinks :760/:765/:769, guard at :751) and
+# DownloadExportFile (ExportController.cs:1301 -> sinks :1332/:1339/:1343, guard
+# at :1304). Six false positives clear on the vulnerable tree and the same six
+# plus the CVE's own site on the fixed one, with the true positive retained.
+#
+# Collateral, enumerated by grep over the 382 clones under /tmp/cve-work/rank*/
+# and then scanned both ways: HasInvalidFileNameChars / HasInvalidPathChars
+# occur only in this repository; the raw BCL shape occurs additionally in
+# ICSharpCode.SharpZipLib and NuGet.Client. SharpZipLib scans 277 findings / 87
+# high before and after, NuGet.Client/src 1642 / 233 before and after -- no
+# movement on either. The check is a suppression, so the residual risk runs the
+# other way: a function that computes the invalid-character array and also
+# contains an unrelated IndexOfAny is credited with the guard. That needs both
+# calls in one function, which the enumeration bounds to the three files above.
+#
+# The pool row's commit b1f535a0409de6e6dec96619f3d9180b686e3a70 is not this
+# fix -- it replaces MiniMapper.Map with explicit property assignments in
+# ExportController.Create and touches ImportController.cs not at all. The
+# advisory's own reference names 5ab1e37dc8d6415d04354e1a116f3d82e9555f5c
+# ("Resolves #2112 Path traversal vulnerability") as the change.
+#
+# verify_current_expected: fixed, 1 -> 0 on the real revisions.
+
+test "rank1758: a model-bound import file name joined onto the tenant temp directory reaches the file probe"
+  lang csharp
+  file src/Presentation/SmartStore.Web/Administration/Controllers/ImportController.cs
+  expect VYQL-PATH-001
+  code
+  ```
+  using System.IO;
+  using System.Web.Mvc;
+  using SmartStore.Core.IO;
+  using SmartStore.Core.Utilities;
+  using SmartStore.Admin.Models.DataExchange;
+
+  namespace SmartStore.Admin.Controllers
+  {
+      public class ImportController : AdminControllerBase
+      {
+          [HttpPost]
+          [Permission(Permissions.Configuration.Import.Create)]
+          public ActionResult Create(ImportProfileModel model)
+          {
+              var importFile = Path.Combine(FileSystemHelper.TempDirTenant(), model.TempFileName.EmptyNull());
+
+              if (System.IO.File.Exists(importFile))
+              {
+                  var profile = _importProfileService.InsertImportProfile(model.TempFileName, model.Name, model.EntityType);
+
+                  if (profile != null && profile.Id != 0)
+                  {
+                      var importFileDestination = Path.Combine(profile.GetImportFolder(true, true), model.TempFileName);
+
+                      FileSystemHelper.CopyFile(importFile, importFileDestination, true, true);
+
+                      return RedirectToAction("Edit", new { id = profile.Id });
+                  }
+              }
+
+              return RedirectToAction("List");
+          }
+      }
+  }
+  ```
+
+test "rank1758: the same action with the filename-character rejection the fixed revision installs"
+  lang csharp
+  file src/Presentation/SmartStore.Web/Administration/Controllers/ImportController.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  using System.IO;
+  using System.Net;
+  using System.Web.Mvc;
+  using SmartStore.Core.IO;
+  using SmartStore.Core.Utilities;
+  using SmartStore.Admin.Models.DataExchange;
+
+  namespace SmartStore.Admin.Controllers
+  {
+      public class ImportController : AdminControllerBase
+      {
+          [HttpPost]
+          [Permission(Permissions.Configuration.Import.Create)]
+          public ActionResult Create(ImportProfileModel model)
+          {
+              if (PathHelper.HasInvalidFileNameChars(model.TempFileName))
+              {
+                  return new HttpStatusCodeResult(HttpStatusCode.BadRequest, "Invalid file name.");
+              }
+
+              var importFile = Path.Combine(FileSystemHelper.TempDirTenant(), model.TempFileName.EmptyNull());
+
+              if (System.IO.File.Exists(importFile))
+              {
+                  var profile = _importProfileService.InsertImportProfile(model.TempFileName, model.Name, model.EntityType);
+
+                  if (profile != null && profile.Id != 0)
+                  {
+                      var importFileDestination = Path.Combine(profile.GetImportFolder(true, true), model.TempFileName);
+
+                      FileSystemHelper.CopyFile(importFile, importFileDestination, true, true);
+
+                      return RedirectToAction("Edit", new { id = profile.Id });
+                  }
+              }
+
+              return RedirectToAction("List");
+          }
+      }
+  }
+  ```
+
+test "rank1758: the path-character spelling of the same rejection over a request-supplied directory name"
+  lang csharp
+  file src/Presentation/SmartStore.Web/Administration/Controllers/ExportController.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  using System.IO;
+  using System.Web.Mvc;
+  using SmartStore.Core.Utilities;
+  using SmartStore.Admin.Models.DataExchange;
+
+  namespace SmartStore.Admin.Controllers
+  {
+      public class ExportController : AdminControllerBase
+      {
+          [HttpPost]
+          public ActionResult Create(ExportProfileModel model)
+          {
+              if (PathHelper.HasInvalidPathChars(model.FolderName))
+              {
+                  return new HttpStatusCodeResult(400, "Invalid folder name.");
+              }
+
+              var folder = Path.Combine(FileSystemHelper.WebRoot(), model.FolderName.EmptyNull());
+
+              if (System.IO.File.Exists(Path.Combine(folder, model.FileNamePattern.EmptyNull())))
+              {
+                  return RedirectToAction("List");
+              }
+
+              return RedirectToAction("List");
+          }
+      }
+  }
+  ```
+
+test "rank1758: the raw BCL spelling of the filename check, IndexOfAny over Path.GetInvalidFileNameChars"
+  lang csharp
+  file src/Presentation/SmartStore.Web/Administration/Controllers/ImportController.cs
+  reject VYQL-PATH-001
+  code
+  ```
+  using System.IO;
+  using System.Web.Mvc;
+  using SmartStore.Core.IO;
+  using SmartStore.Core.Utilities;
+  using SmartStore.Admin.Models.DataExchange;
+
+  namespace SmartStore.Admin.Controllers
+  {
+      public class ImportController : AdminControllerBase
+      {
+          [HttpPost]
+          public ActionResult Create(ImportProfileModel model)
+          {
+              if (model.TempFileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+              {
+                  return new HttpStatusCodeResult(400, "Invalid file name.");
+              }
+
+              var importFile = Path.Combine(FileSystemHelper.TempDirTenant(), model.TempFileName.EmptyNull());
+
+              if (System.IO.File.Exists(importFile))
+              {
+                  FileSystemHelper.CopyFile(importFile, Path.Combine(profile.GetImportFolder(true, true), model.TempFileName), true, true);
+              }
+
+              return RedirectToAction("List");
+          }
+      }
+  }
+  ```

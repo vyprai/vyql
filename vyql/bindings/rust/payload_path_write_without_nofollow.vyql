@@ -1,0 +1,38 @@
+module bindings.rust.payload_path_write_without_nofollow;
+
+// A filesystem write whose target the caller names is the one place where
+// following a link is a boundary problem, and the standard library documents
+// both halves of it. Value::get reads a key out of a parsed object, so a
+// "path" key arrives from whoever produced the payload. fs::write,
+// fs::create_dir_all, File::create and write_all all address the filesystem
+// by name, which is to say they resolve every component at the moment they
+// use it and follow whatever they find. Neither half says anything about the
+// other: a path that was checked against a root earlier binds a different
+// resolution than the one the write uses, and a component that did not exist
+// when the check walked the path is exactly where a planted or swapped link
+// lands.
+//
+// The standard library also documents the primitives that do anchor the
+// resolution, and the negation below is only that family: O_NOFOLLOW refuses
+// to follow the final component, symlink_metadata and lstat read a path's own
+// metadata without following it, read_link returns the target without
+// resolving it, nlink reads the link count off an already open handle,
+// create_new and O_EXCL refuse an existing final component, and an
+// openat-style relative open resolves against a held directory descriptor
+// rather than the name. A canonicalization is deliberately not in the family:
+// it resolves the name at the moment it runs and says nothing about the
+// moment the write runs, which is the same window the fix closes by
+// re-inspecting after each component it creates.
+//
+// The payload read is what separates this from the ordinary save idiom.
+// create-parents-then-write at a path the process chose itself is the
+// documented way to persist state and is not reportable, so the binding
+// requires the path to arrive as a key read out of a parsed value. Every
+// clause is exact-token over the writing function's own context tokens, so a
+// sibling function's anchor cannot clear the write and prose in a comment
+// satisfies neither side.
+
+binding payloadPathWriteWithoutNoFollow {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["get"] and containsAny(node.context.literal, ["\"path\""]) and node.context.call in ["write", "write_all", "create", "create_dir", "create_dir_all"] and not (containsAny(node.context.identifier, ["O_NOFOLLOW", "nofollow", "symlink_metadata", "lstat", "read_link", "nlink", "create_new", "O_EXCL", "openat", "dirfd"])) and not (node.context.call in ["symlink_metadata", "lstat", "read_link", "is_symlink", "create_new"])
+  emit issue code.PayloadPathWriteWithoutNoFollow at node
+}

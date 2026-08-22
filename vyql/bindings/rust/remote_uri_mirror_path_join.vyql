@@ -32,3 +32,38 @@ binding remoteUriMirrorPathJoin {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call == "join" and containsAny(node.context.selector, ["uri.as_str", "url.as_str", "uri.path", "url.path"]) and containsAny(node.context.callPath, ["File.create", "create_dir_all", "create_dir", "fs.write", "fs.copy", "fs.rename", "fs.hard_link", "fs.symlink"]) and not (containsAny(node.context.call, ["starts_with", "strip_prefix", "components", "canonicalize", "is_absolute", "sanitize"])) and not (containsAny(node.context.callPath, ["ParentDir", "CurDir"])) and not (node.token contains "\"..\"") and not (node.token contains "\".\"")
   emit issue code.RemoteListingDownloadPath at node
 }
+
+// The same mirroring weakness where the remote never hands the client a
+// uri/url value at all: the names arrive inside a fetched and parsed
+// document -- a package or update repository's manifest, a listing feed, an
+// index -- so the crate holds them as plain strings and fetches each one
+// through its own transport. A TUF client, for instance, learns every
+// target name and delegated role name from the repository's signed JSON,
+// then caches the repository by joining those names onto the local output
+// directory and writing through them: the repository decides the path
+// components, and a name carrying `..` walks the join out of the cache
+// directory with the caching process's privileges. The names are remote
+// data, but they are deserialized out of a dependency's parser, so no
+// source label can meet the write inside the caching function -- the same
+// reason the uri sibling above reads the shape instead of the taint path.
+//
+// The remote marker here is the function's own retrieval: a fetch- or
+// download-named call that receives the name in string form (the as_str
+// borrow accessor, the same idiom the uri sibling uses for the joined
+// operand) and the Path::join onto a local base, with the write through an
+// OpenOptions builder chain (write/append/create/truncate then open) or a
+// plain create/copy/rename. The fetch and the join are co-located in one
+// function but their arguments are not unified -- the language has no
+// unification -- so a function fetching one remote name while storing a
+// locally built path can still match; that residual is shared with the uri
+// sibling, which likewise reads the join's operand and not the fetch's.
+// std's atomic read-modify-write family is excluded by name (fetch_add and
+// siblings) so a counter tick next to a local join is not read as a
+// retrieval. Neutralising markers are std's containment and traversal
+// vocabulary exactly as in the uri sibling, so an in-place starts_with or
+// components check is honoured and a fix that moves the checked join into
+// a helper takes the join out of the storing function.
+binding fetchedNameMirrorPathJoin {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call == "join" and containsAny(node.context.call, ["fetch", "download"]) and not (containsAny(node.context.call, ["fetch_add", "fetch_sub", "fetch_or", "fetch_and", "fetch_xor", "fetch_update", "fetch_max", "fetch_min"])) and containsAny(node.context.callArg, ["as_str"]) and containsAny(node.context.callPath, ["File.create", "create_dir_all", "create_dir", "fs.write", "fs.copy", "fs.rename", "fs.hard_link", "fs.symlink", "write.open", "append.open", "create.open", "truncate.open"]) and not (containsAny(node.context.call, ["starts_with", "strip_prefix", "components", "canonicalize", "is_absolute", "sanitize"])) and not (containsAny(node.context.callPath, ["ParentDir", "CurDir"])) and not (node.token contains "\"..\"") and not (node.token contains "\".\"")
+  emit issue code.RemoteListingDownloadPath at node
+}

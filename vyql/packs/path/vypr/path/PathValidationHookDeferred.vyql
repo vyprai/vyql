@@ -1,0 +1,10 @@
+module vypr.path;
+
+rule PathValidationHookDeferred {
+  meta {
+    cwe: [CWE_22]
+    id: "VYQL-PATH-084"
+    severity: medium
+  }
+  query concept as first where first.concept == code.FileCheck reaches concept as second where second.concept == code.PathValidationHookDeferred select second
+}

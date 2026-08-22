@@ -1,0 +1,36 @@
+module bindings.python.unbounded_concurrent_operations;
+
+// A protocol handler that spawns one asyncio task per incoming message and
+// files it into an instance collection keyed by message data holds every
+// operation live for as long as the peer keeps it open: a subscription
+// task never finishes until the peer says so, so a client that keeps
+// sending new operation ids grows the registry and its task set without
+// limit — one connection exhausts the process (CWE-400). asyncio's own
+// documentation names the bounds for exactly this shape: compare the
+// collection against a limit, or admit operations through a semaphore.
+// The anchor is structural and spelling-neutral: a create_task /
+// ensure_future spawn, an assignment into a keyed target, an instance
+// collection subscripted in the same function, and the message
+// destructuring that says the entries are per-message rather than
+// once-per-connection bookkeeping — the common spellings of the incoming
+// object as a subscript base. The negations are the language idioms for
+// a count bound, not any one library's parameter name: a len() call
+// anywhere in the handler (the size comparison a cap spells) or an
+// acquire() call (semaphore- or pool-gated admission, the constructor
+// living in another function) suppresses, so a limit spelled with any
+// other name still clears the finding. Residuals, all recall- or
+// one-directional: a cap kept as an explicit counter rather than a len()
+// comparison stays flagged; an `async with semaphore:` admission emits no
+// call token and stays flagged; and the assign and index clauses are
+// separate existentials, so the keyed write and the instance collection
+// need not be the same object. Function-local throughout: a len() in a
+// sibling method does not suppress.
+binding unboundedConcurrentOperationRegistration {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python"
+    and node.context.call in ["create_task", "ensure_future"]
+    and node.context.assign contains "[]="
+    and node.context.indexBase startsWith "self."
+    and node.context.indexBase in ["message", "msg", "payload", "data", "event", "frame", "packet", "envelope", "request", "body"]
+    and not (node.context.call in ["len", "acquire"])
+  emit issue code.UnboundedResourceOperation at node
+}

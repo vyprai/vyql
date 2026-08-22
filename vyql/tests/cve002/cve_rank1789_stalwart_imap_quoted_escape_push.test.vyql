@@ -1,0 +1,372 @@
+# Rank 1789 / CVE-2025-61600: the IMAP/ManageSieve command receiver
+# parsed quoted arguments one byte at a time, and every arm of the
+# quoted-argument state that appends to the accumulator carried the
+# 4096-byte bound except the escaped-backslash arm -- `b'\\' => { if
+# escaped { self.buf.push(ch); } ... }` pushed with no comparison at
+# all, so a peer sending a quoted argument made of escaped
+# backslashes grew the buffer past the cap without limit
+# (unbounded per-connection accumulation, CWE-400; fix commit
+# a8e631e88 "IMAP: Check buf size before pushing escape sequences
+# within quoted literals"). The fixed revision wraps that one push in the same
+# `self.buf.len() < QUOTED_ARG_MAX_LEN` test its sibling arms
+# carry, lifting the literal into a named constant; the
+# sibling arms' bounds and the rest of the state machine are
+# unchanged, which is what makes the defect an arm-local omission
+# rather than a missing global cap.
+#
+# ATTENTION, engine gap: branch regions inside a Rust loop. The
+# discriminating fact is per-arm -- "this append is dominated by a
+# size comparison" -- and the engine has the machinery for
+# exactly that relation (`unless X.dominates coveredBy <check>` over
+# the structured control regions). It is unusable here because the
+# Rust frontend lowers no loop at all: `while let`/`while`/`for`/
+# `loop` have no case in `rsConv.stmtH` (internal/extract/frontend/
+# treesitter/rust.go:126) nor in `expr`, so the whole loop falls
+# through to the catch-all `nir.Seq` and every node inside lands in
+# one flat function region. With flat regions `Dominates` degenerates
+# to source order, so the bound sitting in the `b'"'` arm three arms
+# away "dominates" the unguarded push and suppresses it. Measured
+# with a throwaway pair of bindings (a `push` call labelled as an
+# unbounded-accumulation issue, a `len` call labelled as the size
+# check, joined by `unless p.dominates coveredBy`): on the identical
+# arm structure with the match in statement position the rule
+# reports exactly one finding, on the unguarded push, and nothing on
+# the form whose arm carries its own bound; the same two functions
+# inside a `while let` loop report nothing at either revision. On the
+# real tree (crates/imap-proto scanned with --cache off, three runs
+# per revision) the shipped definitions report 7 findings at the
+# parent and 7 at the fixed revision, all VYQL-MEM-006 NullableDeref noise, none
+# on receiver.rs. No definition change shipped: a rule emitted today
+# would fire only where a function carries no bound of its own -- the
+# 78 of 797 Rust files in this tree with a loop, a push and a length
+# comparison are the precision surface, and the inconsistent-bound
+# signal that narrows them is the half the engine cannot currently
+# express. ENGINE-GAPS.md entry filed for the loop lowering; the
+# binding and rule are the data half that follows it.
+#
+# Spec cve_rank1789 records the unbounded arm and the bounded arm,
+# both asserting reject VYQL-DOS-042: when the loop lowering lands
+# branch regions and an unbounded-accumulation binding ships, cases
+# one and three must flip to expect.
+
+test "rank1789: the escaped-backslash arm appends without the bound its siblings carry"
+  lang rust
+  file crates/imap-proto/src/receiver.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  const QUOTED_ARG_MAX_LEN: usize = 4096;
+
+  enum State {
+      Argument { last_ch: u8 },
+      ArgumentQuoted { escaped: bool },
+  }
+
+  struct Receiver {
+      buf: Vec<u8>,
+      state: State,
+  }
+
+  impl Receiver {
+      fn error_reset(&mut self, _: &str) -> Error {
+          self.buf.clear();
+          Error::TooLong
+      }
+
+      pub fn parse(&mut self, bytes: &mut std::slice::Iter<'_, u8>) -> Result<(), Error> {
+          #[allow(clippy::while_let_on_iterator)]
+          while let Some(&ch) = bytes.next() {
+              match self.state.clone() {
+                  State::Argument { last_ch } => match ch {
+                      b'"' if last_ch.is_ascii_whitespace() => {
+                          self.state = State::ArgumentQuoted { escaped: false };
+                      }
+                      _ => {
+                          if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                              self.buf.push(ch);
+                              self.state = State::Argument { last_ch: ch };
+                          } else {
+                              return Err(self.error_reset("Quoted argument too long."));
+                          }
+                      }
+                  },
+                  State::ArgumentQuoted { escaped } => match ch {
+                      b'"' => {
+                          if !escaped {
+                              self.buf.clear();
+                              self.state = State::Argument { last_ch: b' ' };
+                          } else if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                              self.buf.push(ch);
+                              self.state = State::ArgumentQuoted { escaped: false };
+                          } else {
+                              return Err(self.error_reset("Quoted argument too long."));
+                          }
+                      }
+                      b'\\' => {
+                          if escaped {
+                              self.buf.push(ch);
+                          }
+                          self.state = State::ArgumentQuoted { escaped: !escaped };
+                      }
+                      b'\n' => {
+                          return Err(self.error_reset("Unterminated quoted argument."));
+                      }
+                      _ => {
+                          if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                              if escaped {
+                                  self.buf.push(b'\\');
+                              }
+                              self.buf.push(ch);
+                              self.state = State::ArgumentQuoted { escaped: false };
+                          } else {
+                              return Err(self.error_reset("Quoted argument too long."));
+                          }
+                      }
+                  },
+              }
+          }
+          Ok(())
+      }
+  }
+
+  enum Error {
+      TooLong,
+  }
+  ```
+
+test "rank1789: the fixed revision bounds the escaped-backslash arm like its siblings"
+  lang rust
+  file crates/imap-proto/src/receiver.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  const QUOTED_ARG_MAX_LEN: usize = 4096;
+
+  enum State {
+      Argument { last_ch: u8 },
+      ArgumentQuoted { escaped: bool },
+  }
+
+  struct Receiver {
+      buf: Vec<u8>,
+      state: State,
+  }
+
+  impl Receiver {
+      fn error_reset(&mut self, _: &str) -> Error {
+          self.buf.clear();
+          Error::TooLong
+      }
+
+      pub fn parse(&mut self, bytes: &mut std::slice::Iter<'_, u8>) -> Result<(), Error> {
+          #[allow(clippy::while_let_on_iterator)]
+          while let Some(&ch) = bytes.next() {
+              match self.state.clone() {
+                  State::Argument { last_ch } => match ch {
+                      b'"' if last_ch.is_ascii_whitespace() => {
+                          self.state = State::ArgumentQuoted { escaped: false };
+                      }
+                      _ => {
+                          if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                              self.buf.push(ch);
+                              self.state = State::Argument { last_ch: ch };
+                          } else {
+                              return Err(self.error_reset("Quoted argument too long."));
+                          }
+                      }
+                  },
+                  State::ArgumentQuoted { escaped } => match ch {
+                      b'"' => {
+                          if !escaped {
+                              self.buf.clear();
+                              self.state = State::Argument { last_ch: b' ' };
+                          } else if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                              self.buf.push(ch);
+                              self.state = State::ArgumentQuoted { escaped: false };
+                          } else {
+                              return Err(self.error_reset("Quoted argument too long."));
+                          }
+                      }
+                      b'\\' => {
+                          if escaped {
+                              if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                                  self.buf.push(ch);
+                              } else {
+                                  return Err(self.error_reset("Quoted argument too long."));
+                              }
+                          }
+                          self.state = State::ArgumentQuoted { escaped: !escaped };
+                      }
+                      b'\n' => {
+                          return Err(self.error_reset("Unterminated quoted argument."));
+                      }
+                      _ => {
+                          if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                              if escaped {
+                                  self.buf.push(b'\\');
+                              }
+                              self.buf.push(ch);
+                              self.state = State::ArgumentQuoted { escaped: false };
+                          } else {
+                              return Err(self.error_reset("Quoted argument too long."));
+                          }
+                      }
+                  },
+              }
+          }
+          Ok(())
+      }
+  }
+
+  enum Error {
+      TooLong,
+  }
+  ```
+
+test "rank1789: the same arms in statement position expose the arm boundary"
+  lang rust
+  file crates/imap-proto/src/receiver.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  const QUOTED_ARG_MAX_LEN: usize = 4096;
+
+  enum State {
+      Argument { last_ch: u8 },
+      ArgumentQuoted { escaped: bool },
+  }
+
+  struct Receiver {
+      buf: Vec<u8>,
+      state: State,
+  }
+
+  impl Receiver {
+      fn error_reset(&mut self, _: &str) -> Error {
+          self.buf.clear();
+          Error::TooLong
+      }
+
+      // The identical arm structure with the match in statement position and
+      // no enclosing loop: this is the form the solver already gives nested
+      // regions to, and the form on which a dominance-suppressed accumulation
+      // rule separates the unguarded arm from the bounded ones.
+      pub fn parse(&mut self, ch: u8) -> Result<(), Error> {
+          match self.state.clone() {
+              State::ArgumentQuoted { escaped } => match ch {
+                  b'"' => {
+                      if !escaped {
+                          self.buf.clear();
+                          self.state = State::Argument { last_ch: b' ' };
+                      } else if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                          self.buf.push(ch);
+                          self.state = State::ArgumentQuoted { escaped: false };
+                      } else {
+                          return Err(self.error_reset("Quoted argument too long."));
+                      }
+                  }
+                  b'\\' => {
+                      if escaped {
+                          self.buf.push(ch);
+                      }
+                      self.state = State::ArgumentQuoted { escaped: !escaped };
+                  }
+                  b'\n' => {
+                      return Err(self.error_reset("Unterminated quoted argument."));
+                  }
+                  _ => {
+                      if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                          if escaped {
+                              self.buf.push(b'\\');
+                          }
+                          self.buf.push(ch);
+                          self.state = State::ArgumentQuoted { escaped: false };
+                      } else {
+                          return Err(self.error_reset("Quoted argument too long."));
+                      }
+                  }
+              },
+              _ => {}
+          }
+          Ok(())
+      }
+  }
+
+  enum Error {
+      TooLong,
+  }
+  ```
+
+test "rank1789: the bounded arm stays silent in statement position"
+  lang rust
+  file crates/imap-proto/src/receiver.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  const QUOTED_ARG_MAX_LEN: usize = 4096;
+
+  enum State {
+      Argument { last_ch: u8 },
+      ArgumentQuoted { escaped: bool },
+  }
+
+  struct Receiver {
+      buf: Vec<u8>,
+      state: State,
+  }
+
+  impl Receiver {
+      fn error_reset(&mut self, _: &str) -> Error {
+          self.buf.clear();
+          Error::TooLong
+      }
+
+      pub fn parse(&mut self, ch: u8) -> Result<(), Error> {
+          match self.state.clone() {
+              State::ArgumentQuoted { escaped } => match ch {
+                  b'"' => {
+                      if !escaped {
+                          self.buf.clear();
+                          self.state = State::Argument { last_ch: b' ' };
+                      } else if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                          self.buf.push(ch);
+                          self.state = State::ArgumentQuoted { escaped: false };
+                      } else {
+                          return Err(self.error_reset("Quoted argument too long."));
+                      }
+                  }
+                  b'\\' => {
+                      if escaped {
+                          if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                              self.buf.push(ch);
+                          } else {
+                              return Err(self.error_reset("Quoted argument too long."));
+                          }
+                      }
+                      self.state = State::ArgumentQuoted { escaped: !escaped };
+                  }
+                  b'\n' => {
+                      return Err(self.error_reset("Unterminated quoted argument."));
+                  }
+                  _ => {
+                      if self.buf.len() < QUOTED_ARG_MAX_LEN {
+                          if escaped {
+                              self.buf.push(b'\\');
+                          }
+                          self.buf.push(ch);
+                          self.state = State::ArgumentQuoted { escaped: false };
+                      } else {
+                          return Err(self.error_reset("Quoted argument too long."));
+                      }
+                  }
+              },
+              _ => {}
+          }
+          Ok(())
+      }
+  }
+
+  enum Error {
+      TooLong,
+  }
+  ```

@@ -1,0 +1,7 @@
+module code;
+
+review code.HostHeaderPortAccessCondition {
+  category: auth
+  kind: attention
+  text: "review request gates that branch on the port carried in the client-supplied Host header rather than the connection's local endpoint"
+}

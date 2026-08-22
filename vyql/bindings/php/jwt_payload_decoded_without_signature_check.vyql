@@ -1,0 +1,17 @@
+module bindings.php.jwt_payload_decoded_without_signature_check;
+
+// A JWT is header.payload.signature, three dot-separated base64url parts.
+// Splitting a token on '.', base64-decoding a segment and json-decoding the
+// result reads the claims without ever touching the signature, so every
+// claim (sub, exp, aud, nonce) is chosen by whoever produced the token --
+// the hand-rolled spelling of an unverified decode. The library spellings
+// (jwt.decode with verify_signature disabled, JWT::decode pinned to alg
+// "none") already carry bindings; this one catches the decode that never
+// calls a verification API at all. Any signature check in the same function
+// neutralises it: Firebase's JWT::decode (which verifies before returning
+// claims), openssl_verify, a ->verify()/verifySignature() call on a key
+// object, libsodium's sign verify, or hash_equals over a computed MAC.
+binding jwtPayloadDecodedWithoutSignatureCheck1 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.token, ["call_arg_method:explode:'.'", "call_arg_method:explode:\".\""]) and node.context.assignCall in ["base64_decode", "JWT.urlsafeB64Decode"] and node.context.assignCall in ["json_decode"] and not (node.context.call in ["decode", "verify", "verifySignature", "openssl_verify", "sodium_crypto_sign_verify", "sodium_crypto_sign_verify_detached", "hash_equals"])
+  emit issue code.UnverifiedJwt at node
+}

@@ -1,0 +1,180 @@
+# slack-morphism's hyper connector computes a redacted URI for sensitive
+# requests but interpolates the raw one into the debug event's message.
+# `SlackClientHyperConnector::send_http_request`
+# (src/hyper_tokio/connector.rs:75 at 48a1da2dc2ad^) guards with
+# `context.is_sensitive_url`: a webhook URL embeds its token in the path, so
+# `uri_str` collapses it to "{}://{}/-redacted-". The `debug!` event passes
+# `uri_str` as the structured `slack_uri` field yet formats `request.uri()`
+# into the human-readable message, so the token-bearing URI reaches debug
+# logs verbatim. The fixed revision formats `uri_str.as_str()` instead (and hashes the
+# path into the redacted form for correlation).
+#
+# The Rust frontend lowers `debug!(...)` to a call node whose argument tokens
+# are the macro's identifier atoms, re-exposed as `call_arg_method:debug:<atom>`.
+# The vulnerable event carries the bare `uri` atom from `request.uri()`; the
+# patched one only `uri_str`/`as_str`, so an exact-token match on the macro's
+# own arguments discriminates the two without seeing through the redaction
+# (a flow-based operand route cannot: `uri_str` derives from `request.uri()`).
+
+test "rank1755: debug event formats the raw request URI of a sensitive call"
+  lang rust
+  file src/hyper_tokio/connector.rs
+  expect VYQL-SEC-029
+  code
+  ```
+  use hyper::{Body, Request};
+  use tracing::*;
+
+  pub struct SlackClientApiCallContext<'a> {
+      pub is_sensitive_url: bool,
+      pub tracing_span: &'a Span,
+  }
+
+  async fn send_http_request<RS>(
+      request: Request<Body>,
+      context: SlackClientApiCallContext<'_>,
+  ) -> String {
+      let uri_str = if context.is_sensitive_url {
+          format!(
+              "{}://{}/-redacted-",
+              request
+                  .uri()
+                  .scheme()
+                  .map(|scheme| scheme.to_string())
+                  .unwrap_or_else(|| "unknown-scheme".to_string()),
+              request
+                  .uri()
+                  .host()
+                  .map(|host| host.to_string())
+                  .unwrap_or_else(|| "unknown-host".to_string())
+          )
+      } else {
+          request.uri().to_string()
+      };
+
+      context.tracing_span.in_scope(|| {
+          debug!(
+              slack_uri = uri_str.as_str(),
+              "Sending HTTP request to {}",
+              request.uri()
+          );
+      });
+
+      uri_str
+  }
+  ```
+
+test "rank1755: the fixed revision formats the redacted URI instead"
+  lang rust
+  file src/hyper_tokio/connector.rs
+  reject VYQL-SEC-029
+  code
+  ```
+  use hyper::{Body, Request};
+  use tracing::*;
+
+  pub struct SlackClientApiCallContext<'a> {
+      pub is_sensitive_url: bool,
+      pub tracing_span: &'a Span,
+  }
+
+  async fn send_http_request<RS>(
+      request: Request<Body>,
+      context: SlackClientApiCallContext<'_>,
+  ) -> String {
+      let uri_str = if context.is_sensitive_url {
+          format!(
+              "{}://{}/-redacted-",
+              request
+                  .uri()
+                  .scheme()
+                  .map(|scheme| scheme.to_string())
+                  .unwrap_or_else(|| "unknown-scheme".to_string()),
+              request
+                  .uri()
+                  .host()
+                  .map(|host| host.to_string())
+                  .unwrap_or_else(|| "unknown-host".to_string())
+          )
+      } else {
+          request.uri().to_string()
+      };
+
+      context.tracing_span.in_scope(|| {
+          debug!(
+              slack_uri = uri_str.as_str(),
+              "Sending HTTP request to {}",
+              uri_str.as_str()
+          );
+      });
+
+      uri_str
+  }
+  ```
+
+test "rank1755: a response event without any URI argument stays clean"
+  lang rust
+  file src/hyper_tokio/connector.rs
+  reject VYQL-SEC-029
+  code
+  ```
+  use hyper::{Body, Request, StatusCode};
+  use tracing::*;
+
+  pub struct SlackClientApiCallContext<'a> {
+      pub is_sensitive_url: bool,
+      pub tracing_span: &'a Span,
+  }
+
+  async fn send_http_request<RS>(
+      request: Request<Body>,
+      context: SlackClientApiCallContext<'_>,
+  ) -> String {
+      let uri_str = request.uri().to_string();
+      let http_status = StatusCode::OK;
+
+      context.tracing_span.in_scope(|| {
+          debug!(
+              slack_uri = uri_str.as_str(),
+              slack_http_status = http_status.as_u16(),
+              "Received HTTP response {}",
+              http_status
+          );
+      });
+
+      uri_str
+  }
+  ```
+
+test "rank1755: the redaction helper itself is not a log event"
+  lang rust
+  file src/hyper_tokio/connector.rs
+  reject VYQL-SEC-029
+  code
+  ```
+  use hyper::{Body, Request};
+
+  pub struct SlackClientApiCallContext<'_> {
+      pub is_sensitive_url: bool,
+  }
+
+  fn redacted_uri(request: &Request<Body>, context: &SlackClientApiCallContext<'_>) -> String {
+      if context.is_sensitive_url {
+          format!(
+              "{}://{}/-redacted-",
+              request
+                  .uri()
+                  .scheme()
+                  .map(|scheme| scheme.to_string())
+                  .unwrap_or_else(|| "unknown-scheme".to_string()),
+              request
+                  .uri()
+                  .host()
+                  .map(|host| host.to_string())
+                  .unwrap_or_else(|| "unknown-host".to_string())
+          )
+      } else {
+          request.uri().to_string()
+      }
+  }
+  ```

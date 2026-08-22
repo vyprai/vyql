@@ -1,0 +1,159 @@
+# A Spring MVC handler that answers with markup-servable text.
+#
+# `@ResponseBody` on a handler method is Spring's documented switch for "the
+# return value is the response body" -- no view resolution, the value goes to
+# the client as-is. Shopizer's reference controller leans on exactly that:
+# `/shop/reference/countryName` and `/shop/reference/zoneName` take a
+# `@RequestParam String`, look the code up, and return the parameter itself
+# when the lookup comes back empty, so the raw query string is the response
+# body of an endpoint a browser will render. The fixed revision wraps every return of the
+# parameter in `StringEscapeUtils.escapeHtml4(...)`; the address and review
+# beans that persist the same values get the same treatment in their setters.
+#
+# Two facts decide the shape and both are library documentation, not incident:
+#
+#   - the body annotation. `@ResponseBody` on the method, or `@RestController`
+#     on its class (the composed annotation, "a convenience annotation that is
+#     itself annotated with @Controller and @ResponseBody").
+#   - the declared return type. A bare `String` return is written verbatim by
+#     StringHttpMessageConverter; a `ReadableOrder` return is serialized by
+#     Jackson to JSON, which is not a render. Without the type, the label
+#     lands on every REST handler in the application: measured on the
+#     vulnerable tree, the ungated form added 90 findings, 84 of them on
+#     object-returning JSON endpoints.
+#
+# The last case is the minimal pair on the second fact: the same request
+# parameter, the same endpoint, the same taint, one returning a String and one
+# returning a bean. Only the declared return type differs.
+#
+# Residual, stated rather than hidden. The `produces` element of a mapping
+# annotation is Spring's documented way to narrow the response content type,
+# and `core.SafeResponseContentType` is the concept that models it -- but the
+# Java frontend exposes no annotation-argument token, and the reachable
+# spelling (a function-context literal) carries `application/json` in 99 of
+# the 228 `@ResponseBody` occurrences on this tree, most of them header sets
+# rather than mapping declarations. Keying a neutralising control on that
+# literal would clear XSS findings on endpoints that only mention JSON in
+# passing, so it is not done here and the JSON-declared endpoint stays
+# reported.
+
+test "rank1737: @ResponseBody handler returning a @RequestParam value unescaped"
+  lang java
+  file ReferenceController.java
+  expect VYQL-INJ-004
+  code
+  ```
+  package com.salesmanager.shop.controller;
+
+  import org.springframework.stereotype.Controller;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.bind.annotation.RequestParam;
+  import org.springframework.web.bind.annotation.ResponseBody;
+
+  @Controller
+  public class ReferenceController {
+
+      @RequestMapping(value = "/shop/reference/countryName")
+      public @ResponseBody String countryName(@RequestParam String countryCode) {
+          try {
+              Language language = languageUtils.getRequestLanguage(request, response);
+              if (language == null) {
+                  return countryCode;
+              }
+              Country c = countriesMap.get(countryCode);
+              if (c != null) {
+                  return c.getName();
+              }
+          } catch (ServiceException e) {
+              LOGGER.error("Error while looking up country " + countryCode);
+          }
+          return countryCode;
+      }
+  }
+  ```
+
+test "rank1737: handler escaping the parameter before returning it is safe"
+  lang java
+  file ReferenceController.java
+  reject VYQL-INJ-004
+  code
+  ```
+  package com.salesmanager.shop.controller;
+
+  import org.apache.commons.lang3.StringEscapeUtils;
+  import org.springframework.stereotype.Controller;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.bind.annotation.RequestParam;
+  import org.springframework.web.bind.annotation.ResponseBody;
+
+  @Controller
+  public class ReferenceController {
+
+      @RequestMapping(value = "/shop/reference/countryName")
+      public @ResponseBody String countryName(@RequestParam String countryCode) {
+          try {
+              Language language = languageUtils.getRequestLanguage(request, response);
+              if (language == null) {
+                  return StringEscapeUtils.escapeHtml4(countryCode);
+              }
+              Country c = countriesMap.get(countryCode);
+              if (c != null) {
+                  return StringEscapeUtils.escapeHtml4(c.getName());
+              }
+          } catch (ServiceException e) {
+              LOGGER.error("Error while looking up country " + countryCode);
+          }
+          return StringEscapeUtils.escapeHtml4(countryCode);
+      }
+  }
+  ```
+
+test "rank1737: @RestController carries the body annotation for every handler"
+  lang java
+  file Api.java
+  expect VYQL-INJ-004
+  code
+  ```
+  package com.salesmanager.shop.api;
+
+  import org.springframework.web.bind.annotation.RestController;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.bind.annotation.RequestParam;
+
+  @RestController
+  public class Api {
+
+      @RequestMapping(value = "/note")
+      public String note(@RequestParam String note) {
+          return note;
+      }
+  }
+  ```
+
+test "rank1737: the same parameter returned as a serialized bean is not a render"
+  lang java
+  file Api.java
+  reject VYQL-INJ-004
+  code
+  ```
+  package com.salesmanager.shop.api;
+
+  import org.springframework.web.bind.annotation.RestController;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.bind.annotation.RequestParam;
+
+  public class ReadableOrder {
+      public String reference;
+  }
+
+  @RestController
+  public class Api {
+
+      @RequestMapping(value = "/order")
+      public ReadableOrder order(@RequestParam String reference) {
+          ReadableOrder o = new ReadableOrder();
+          o.reference = reference;
+          return o;
+      }
+  }
+  ```

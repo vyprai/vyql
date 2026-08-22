@@ -1,0 +1,307 @@
+# spring-framework's CachedIntrospectionResults is the cache behind
+# BeanWrapperImpl, which is what every Spring data binder resolves property
+# names against. Its constructor walks the BeanInfo descriptor array of the
+# bean class and indexes each descriptor into `propertyDescriptors` under the
+# descriptor's own name; a second walk, introspectInterfaces, does the same for
+# every interface the bean class implements. Whatever survives either walk is
+# reachable by name from the binder.
+#
+# At the parent of the change the only exclusion in either walk is
+#
+#   if (Class.class == beanClass &&
+#           ("classLoader".equals(pd.getName()) || "protectionDomain".equals(pd.getName()))) {
+#     continue;
+#   }
+#
+# -- two property names, and only when the bean class is exactly
+# java.lang.Class. JDK 9 gave `Class` a `module` property whose own
+# `classLoader` property belongs to the bean class `Module`, so
+# `class.module.classLoader` resolved through a bean class the guard never
+# looked at; and any property whose type is a loader subclass (a container's
+# `WebappClassLoader`) is likewise admitted, on every bean class. 002546b3e4
+# replaces the name-keyed exclusion with a type-keyed one and applies it in
+# both walks:
+#
+#   if (pd.getPropertyType() != null && (ClassLoader.class.isAssignableFrom(pd.getPropertyType())
+#           || ProtectionDomain.class.isAssignableFrom(pd.getPropertyType()))) {
+#     continue;
+#   }
+#
+# so `isAssignableFrom` -- the subclass-aware form, which is what makes the
+# bound cover a container's loader subclass -- is the control that separates
+# the revisions. It is absent from the whole file at the parent and present at
+# the fixed revision, in both walks.
+#
+# Detection is code.UnboundedBeanPropertyBinding, emitted by
+# bindings/java/bean_introspection_property_binding.vyql on a function that
+# takes descriptors from the java.beans introspection entry point and indexes
+# every one by its own name with no subclass-aware bound on the type a
+# resolved name reaches. Measured on the two real revisions,
+# spring-beans/src/main/java/org/springframework/beans/CachedIntrospectionResults.java,
+# three `--cache off` runs each: 2 review flags at the parent (the constructor
+# and introspectInterfaces), 0 at the fixed revision. On the wider candidate set -- every
+# Java file under /tmp/cve-work/rank*/ whose text mentions `getPropertyDescriptors`,
+# `put` and `getName` together, 54 files across ~100 clones -- the same binding
+# labels five functions in four trees: the two here, plus Resteasy's
+# AbstractURITemplateAnnotationResolver:75, Solr's ParseContextConfig:62 and
+# OpenAM's JavaBeanAdapter:79, each an unbounded name-indexed descriptor map of
+# the same shape. nifi's DtoFactory and two sibling files also match on method
+# names alone because `org.apache.nifi.components.PropertyDescriptor` is an
+# unrelated class that shares the name; the `getBeanInfo` clause is what keeps
+# the label off them.
+#
+# The `getPropertyType` residual, measured rather than assumed: the vulnerable
+# constructor does call `pd.getPropertyType()`, inside its own trace-logging
+# branch, so putting `getPropertyType` in the negation suppresses the primary
+# hunk (2 flags to 1) while leaving the entirely unguarded interface walk
+# reported. It is therefore not in the negation. Consequence, stated rather
+# than hidden: a type bound spelled another way (`==` against the class rather
+# than `isAssignableFrom`, `instanceof`) or a bound on accessor shape
+# (`getWriteMethod() != null`) is not recognised, so a function bounded that way
+# is still reported. That is the false-positive direction; the false-negative
+# direction is only a commented-out `isAssignableFrom` call, which emits no
+# node.
+
+test "java: a BeanInfo descriptor walk indexed by name with only a two-name exclusion on one bean class admits the loader property of every other bean class"
+  lang java
+  file spring-beans/src/main/java/org/springframework/beans/CachedIntrospectionResults.java
+  expect_review code.UnboundedBeanPropertyBinding
+  code
+  ```
+  package org.springframework.beans;
+
+  import java.beans.BeanInfo;
+  import java.beans.IntrospectionException;
+  import java.beans.Introspector;
+  import java.beans.PropertyDescriptor;
+  import java.lang.reflect.Method;
+  import java.util.HashSet;
+  import java.util.LinkedHashMap;
+  import java.util.Map;
+  import java.util.Set;
+
+  public final class CachedIntrospectionResults {
+
+    private final BeanInfo beanInfo;
+    private final Map<String, PropertyDescriptor> propertyDescriptors;
+
+    private CachedIntrospectionResults(Class<?> beanClass) throws IntrospectionException {
+      this.beanInfo = getBeanInfo(beanClass);
+      this.propertyDescriptors = new LinkedHashMap<>();
+      Set<String> readMethodNames = new HashSet<>();
+
+      PropertyDescriptor[] pds = this.beanInfo.getPropertyDescriptors();
+      for (PropertyDescriptor pd : pds) {
+        if (Class.class == beanClass &&
+                ("classLoader".equals(pd.getName()) || "protectionDomain".equals(pd.getName()))) {
+          // Ignore Class.getClassLoader() and getProtectionDomain() methods - nobody needs to bind to those
+          continue;
+        }
+        pd = buildGenericTypeAwarePropertyDescriptor(beanClass, pd);
+        this.propertyDescriptors.put(pd.getName(), pd);
+        Method readMethod = pd.getReadMethod();
+        if (readMethod != null) {
+          readMethodNames.add(readMethod.getName());
+        }
+      }
+
+      Class<?> currClass = beanClass;
+      while (currClass != null && currClass != Object.class) {
+        introspectInterfaces(beanClass, currClass, readMethodNames);
+        currClass = currClass.getSuperclass();
+      }
+    }
+
+    private void introspectInterfaces(Class<?> beanClass, Class<?> currClass, Set<String> readMethodNames)
+            throws IntrospectionException {
+
+      for (Class<?> ifc : currClass.getInterfaces()) {
+        if (!isJavaLanguageInterface(ifc)) {
+          for (PropertyDescriptor pd : getBeanInfo(ifc).getPropertyDescriptors()) {
+            PropertyDescriptor existingPd = this.propertyDescriptors.get(pd.getName());
+            if (existingPd == null ||
+                    (existingPd.getReadMethod() == null && pd.getReadMethod() != null)) {
+              pd = buildGenericTypeAwarePropertyDescriptor(beanClass, pd);
+              this.propertyDescriptors.put(pd.getName(), pd);
+              Method readMethod = pd.getReadMethod();
+              if (readMethod != null) {
+                readMethodNames.add(readMethod.getName());
+              }
+            }
+          }
+          introspectInterfaces(ifc, ifc, readMethodNames);
+        }
+      }
+    }
+
+    private static BeanInfo getBeanInfo(Class<?> beanClass) throws IntrospectionException {
+      return Introspector.getBeanInfo(beanClass);
+    }
+
+    private static boolean isJavaLanguageInterface(Class<?> ifc) { return false; }
+
+    private static PropertyDescriptor buildGenericTypeAwarePropertyDescriptor(Class<?> beanClass, PropertyDescriptor pd) {
+      return pd;
+    }
+  }
+  ```
+
+test "java: the descriptor walks bound by the descriptor's property type, so no name resolves into a loader"
+  lang java
+  file spring-beans/src/main/java/org/springframework/beans/CachedIntrospectionResults.java
+  reject_review code.UnboundedBeanPropertyBinding
+  code
+  ```
+  package org.springframework.beans;
+
+  import java.beans.BeanInfo;
+  import java.beans.IntrospectionException;
+  import java.beans.Introspector;
+  import java.beans.PropertyDescriptor;
+  import java.lang.reflect.Method;
+  import java.security.ProtectionDomain;
+  import java.util.HashSet;
+  import java.util.LinkedHashMap;
+  import java.util.Map;
+  import java.util.Set;
+
+  public final class CachedIntrospectionResults {
+
+    private final BeanInfo beanInfo;
+    private final Map<String, PropertyDescriptor> propertyDescriptors;
+
+    private CachedIntrospectionResults(Class<?> beanClass) throws IntrospectionException {
+      this.beanInfo = getBeanInfo(beanClass);
+      this.propertyDescriptors = new LinkedHashMap<>();
+      Set<String> readMethodNames = new HashSet<>();
+
+      PropertyDescriptor[] pds = this.beanInfo.getPropertyDescriptors();
+      for (PropertyDescriptor pd : pds) {
+        if (Class.class == beanClass && (!"name".equals(pd.getName()) && !pd.getName().endsWith("Name"))) {
+          // Only allow all name variants of Class properties
+          continue;
+        }
+        if (pd.getPropertyType() != null && (ClassLoader.class.isAssignableFrom(pd.getPropertyType())
+                || ProtectionDomain.class.isAssignableFrom(pd.getPropertyType()))) {
+          // Ignore ClassLoader and ProtectionDomain types - nobody needs to bind to those
+          continue;
+        }
+        pd = buildGenericTypeAwarePropertyDescriptor(beanClass, pd);
+        this.propertyDescriptors.put(pd.getName(), pd);
+        Method readMethod = pd.getReadMethod();
+        if (readMethod != null) {
+          readMethodNames.add(readMethod.getName());
+        }
+      }
+
+      Class<?> currClass = beanClass;
+      while (currClass != null && currClass != Object.class) {
+        introspectInterfaces(beanClass, currClass, readMethodNames);
+        currClass = currClass.getSuperclass();
+      }
+    }
+
+    private void introspectInterfaces(Class<?> beanClass, Class<?> currClass, Set<String> readMethodNames)
+            throws IntrospectionException {
+
+      for (Class<?> ifc : currClass.getInterfaces()) {
+        if (!isJavaLanguageInterface(ifc)) {
+          for (PropertyDescriptor pd : getBeanInfo(ifc).getPropertyDescriptors()) {
+            PropertyDescriptor existingPd = this.propertyDescriptors.get(pd.getName());
+            if (existingPd == null ||
+                    (existingPd.getReadMethod() == null && pd.getReadMethod() != null)) {
+              pd = buildGenericTypeAwarePropertyDescriptor(beanClass, pd);
+              if (pd.getPropertyType() != null && (ClassLoader.class.isAssignableFrom(pd.getPropertyType())
+                      || ProtectionDomain.class.isAssignableFrom(pd.getPropertyType()))) {
+                // Ignore ClassLoader and ProtectionDomain types - nobody needs to bind to those
+                continue;
+              }
+              this.propertyDescriptors.put(pd.getName(), pd);
+              Method readMethod = pd.getReadMethod();
+              if (readMethod != null) {
+                readMethodNames.add(readMethod.getName());
+              }
+            }
+          }
+          introspectInterfaces(ifc, ifc, readMethodNames);
+        }
+      }
+    }
+
+    private static BeanInfo getBeanInfo(Class<?> beanClass) throws IntrospectionException {
+      return Introspector.getBeanInfo(beanClass);
+    }
+
+    private static boolean isJavaLanguageInterface(Class<?> ifc) { return false; }
+
+    private static PropertyDescriptor buildGenericTypeAwarePropertyDescriptor(Class<?> beanClass, PropertyDescriptor pd) {
+      return pd;
+    }
+  }
+  ```
+
+test "java: a descriptor walk from another project's own PropertyDescriptor class, with no java.beans introspection in the body, is not the java.beans property surface"
+  lang java
+  file spring-beans/src/main/java/org/springframework/beans/DtoFactory.java
+  reject_review code.UnboundedBeanPropertyBinding
+  code
+  ```
+  package org.springframework.beans;
+
+  import java.util.Map;
+  import java.util.TreeMap;
+
+  public class DtoFactory {
+
+    private final Map<Object, String> sortedProperties = new TreeMap<>();
+
+    public Map<Object, String> createProcessorConfigDto(Object procNode) {
+      // sort a copy of the properties; org.apache.nifi.components.PropertyDescriptor
+      // is a component configuration type, not a java.beans descriptor
+      for (Object pd : procNode.getClass().getMethods()) {
+        String name = pd.toString();
+        if (name != null) {
+          sortedProperties.put(pd, name);
+        }
+      }
+      for (final java.beans.PropertyDescriptor legacy : new java.beans.PropertyDescriptor[0]) {
+        sortedProperties.put(legacy, legacy.getName());
+      }
+      return sortedProperties;
+    }
+  }
+  ```
+
+test "java: a descriptor map that bounds the admitted set by the descriptor's type under a different project's own name-indexed walk is not reported"
+  lang java
+  file spring-beans/src/main/java/org/springframework/beans/JavaBeanAdapter.java
+  reject_review code.UnboundedBeanPropertyBinding
+  code
+  ```
+  package org.springframework.beans;
+
+  import java.beans.BeanInfo;
+  import java.beans.IntrospectionException;
+  import java.beans.Introspector;
+  import java.beans.PropertyDescriptor;
+  import java.util.LinkedHashMap;
+  import java.util.Map;
+
+  public class JavaBeanAdapter {
+
+    private final Map<String, PropertyDescriptor> writable = new LinkedHashMap<>();
+
+    private void initialise(Class<?> beanClass) throws IntrospectionException {
+      BeanInfo beanInfo = Introspector.getBeanInfo(beanClass);
+      for (PropertyDescriptor pd : beanInfo.getPropertyDescriptors()) {
+        if (pd.getReadMethod() != null && pd.getWriteMethod() != null) {
+          Class<?> propertyType = pd.getPropertyType();
+          if (ClassLoader.class.isAssignableFrom(propertyType) || propertyType == null) {
+            continue;
+          }
+          writable.put(pd.getName(), pd);
+        }
+      }
+    }
+  }
+  ```

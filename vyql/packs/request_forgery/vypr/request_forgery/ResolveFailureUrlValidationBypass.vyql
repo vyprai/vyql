@@ -1,0 +1,10 @@
+module vypr.request_forgery;
+
+rule ResolveFailureUrlValidationBypass {
+  meta {
+    cwe: [CWE_918]
+    id: "VYQL-RF-054"
+    severity: high
+  }
+  issue code.ResolveFailureUrlValidationBypass as guard
+}

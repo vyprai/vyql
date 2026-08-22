@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule RequestBodyParseMissingContentTypeCheck {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_352]
+    id: "VYQL-RF-052"
+    severity: high
+  }
+  issue code.RequestBodyParseMissingContentTypeCheck as body
+}

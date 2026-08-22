@@ -1,0 +1,8 @@
+module code;
+
+review code.SessionAuthStateOwnerBindingMissing {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review the login path: the authentication state resolved through the session is credited with a credential verified for the request's own principal while the state's owner is never compared to that principal, so a credential for any valid account completes another account's login -- require the state's owner and the requested principal to match before crediting the credential"
+}

@@ -70,6 +70,16 @@
         ],
         "min_safe": "1.6.2"
       }
+    ],
+    "org.kohsuke:groovy-sandbox": [
+      {
+        "version": "*",
+        "id": "CVE-2020-2279",
+        "cwe": [
+          "CWE-693"
+        ],
+        "min_safe": "1.27"
+      }
     ]
   }
 }

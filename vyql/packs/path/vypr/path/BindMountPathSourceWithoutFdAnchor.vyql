@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule BindMountPathSourceWithoutFdAnchor {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_61, CWE_367]
+    id: "VYQL-PATH-086"
+    severity: high
+  }
+  issue code.BindMountPathSourceWithoutFdAnchor as sink
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept ArgvTrustedOnEmptyGet : issue {
+  cwe: [CWE_807, CWE_20]
+  reviewAssumption: "the script can run under a web SAPI with register_argc_argv enabled, where PHP builds argv from the raw query string"
+  reviewCategory: validation
+  reviewCondition: "a function decides it is not serving a web request from the parsed $_GET channel and then consumes argv-backed console input as trusted CLI arguments"
+  reviewConfidence: medium
+  reviewEvidence: "argv consumer context {pattern} tests $_GET emptiness or isset while reading argv, with no QUERY_STRING or SAPI check"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

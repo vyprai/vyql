@@ -1,0 +1,8 @@
+module code;
+
+review code.ResolveFailureUrlValidationBypass {
+  category: request_forgery
+  expected: [core.AllowlistValidation]
+  kind: target
+  text: "review URL host validation for rejection when the resolver reports failure, rather than a falsy sentinel the validation continues past"
+}

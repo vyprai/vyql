@@ -1,0 +1,151 @@
+# Rank 1776 / CVE-2018-18855: spray-json's recursive-descent JSON
+# parser recursed into nested objects and arrays with no depth limit,
+# so a deeply nested JSON document threw a StackOverflowError and took
+# the parsing thread down (denial of service through unbounded
+# recursion, CWE-674/CWE-400; PR #284). `value` in
+# src/main/scala/spray/json/JsonParser.scala dispatched on the cursor
+# character to `object`/`array`, whose member and element loops called
+# `value` again -- the nesting depth is bounded only by the input's
+# own nesting. The fixing commit d56d7f42134 (the merge
+# "fix-uncontrolled-recursion"): a new JsonParserSettings.maxDepth
+# (default 1000), a remainingNesting parameter threaded through
+# `value`/`object`/`array`, and a ParsingException thrown once the
+# remaining nesting reaches zero. The row's merge parent reads in
+# full via git diff; the fixing commit inside it, a558753, names the CVE
+# in its own message ("CVE-2018-18855 Fix uncontrolled recursion in
+# the JsonParser ... fixes #286"). .
+#
+# ATTENTION, recursion depth budgets: the same cross-iteration budget
+# family as rank 1586 (Play's JSON form binding, also scala -- a JSON
+# walk whose depth is unbounded while sibling budgets exist), rank
+# 1559 (a wire-length accumulator threaded through recursion), and
+# rank 1612 (a reflective dispatch bypassing the depth counter): the
+# corpus's CWE-400 rules judge per-iteration progress, not a depth
+# carried through recursion, so nothing can ask "does the JSON parse
+# stop at a depth cap". The nearest existing concept,
+# code.GsonObjectTypeAdapterRecursiveRead (VYQL-DOS-016), names its
+# library in its own condition and is fed by a binding keyed on
+# Gson's own identifiers with negations on the fixed revision's own method
+# names -- a per-library instance of this weakness, not the
+# vocabulary for it; a sibling binding on spray-json's own JsonParser
+# would likewise detect this library rather than the weakness, and
+# its discriminator (recursion carrying no depth argument) is a
+# judgement no binding layer may encode. Measured on the real code:
+# the full tree (28 scala files) reports zero findings at both
+# revisions, three --cache off runs each, and
+# src/main/scala/spray/json/JsonParser.scala scanned alone reports
+# zero at both. No ENGINE-GAPS.md entry: the piece is depth-budget
+# vocabulary, not a localised construct. No definition change
+# shipped. Spec cve_rank1776 records the mutually recursive parser
+# and the depth-capped form, both asserting reject VYQL-DOS-029:
+# when depth-budget vocabulary lands, the unbounded form must flip to
+# expect.
+
+test "rank1776: the json parser recurses without a depth cap"
+  lang scala
+  file src/main/scala/spray/json/JsonParser.scala
+  reject VYQL-DOS-029
+  code
+  ```
+  package spray.json
+
+  class JsonParser(input: ParserInput) {
+    private var jsValue: JsValue = _
+
+    def parseJsValue(): JsValue = {
+      `value`()
+      jsValue
+    }
+
+    private def `value`(): Unit = {
+      (cursorChar: @switch) match {
+        case 'f' => `false`()
+        case 'n' => `null`()
+        case 't' => `true`()
+        case '{' => advance(); `object`()
+        case '[' => advance(); `array`()
+        case '"' => `string`()
+        case _ => fail("JSON Value")
+      }
+    }
+
+    private def `object`(): Unit = {
+      if (cursorChar != '}') {
+        @tailrec def members(): Unit = {
+          `string`()
+          require(':')
+          `value`()
+          if (ws(',')) members()
+        }
+        members()
+      }
+    }
+
+    private def `array`(): Unit = {
+      if (cursorChar != ']') {
+        @tailrec def values(): Unit = {
+          `value`()
+          if (ws(',')) values()
+        }
+        values()
+      }
+    }
+  }
+  ```
+
+test "rank1776: the fixed revision threads a nesting budget through the recursion"
+  lang scala
+  file src/main/scala/spray/json/JsonParser.scala
+  reject VYQL-DOS-029
+  code
+  ```
+  package spray.json
+
+  class JsonParser(input: ParserInput, settings: JsonParserSettings) {
+    private var jsValue: JsValue = _
+
+    def parseJsValue(): JsValue = {
+      `value`(settings.maxDepth)
+      jsValue
+    }
+
+    private def `value`(remainingNesting: Int): Unit =
+      if (remainingNesting == 0)
+        throw new ParsingException(
+          "JSON input nested too deeply",
+          s"JSON input was nested more deeply than the configured limit of maxNesting = ${settings.maxDepth}")
+      else {
+        (cursorChar: @switch) match {
+          case 'f' => `false`()
+          case 'n' => `null`()
+          case 't' => `true`()
+          case '{' => advance(); `object`(remainingNesting)
+          case '[' => advance(); `array`(remainingNesting)
+          case '"' => `string`()
+          case _ => fail("JSON Value")
+        }
+      }
+
+    private def `object`(remainingNesting: Int): Unit = {
+      if (cursorChar != '}') {
+        @tailrec def members(): Unit = {
+          `string`()
+          require(':')
+          `value`(remainingNesting - 1)
+          if (ws(',')) members()
+        }
+        members()
+      }
+    }
+
+    private def `array`(remainingNesting: Int): Unit = {
+      if (cursorChar != ']') {
+        @tailrec def values(): Unit = {
+          `value`(remainingNesting - 1)
+          if (ws(',')) values()
+        }
+        values()
+      }
+    }
+  }
+  ```

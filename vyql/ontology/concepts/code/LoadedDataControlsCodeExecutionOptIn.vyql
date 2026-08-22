@@ -1,0 +1,11 @@
+module code;
+
+concept LoadedDataControlsCodeExecutionOptIn : issue {
+  cwe: [CWE_829, CWE_94]
+  reviewAssumption: "the configuration object is built from a remotely fetched artifact, and a malicious artifact sets the opt-in flag that the loading API reserves for the caller's explicit trust decision"
+  reviewCategory: command
+  reviewCondition: "a loading call that can execute the loaded artifact's own code takes its opt-in flag from the artifact's data rather than from a caller-supplied literal or parameter"
+  reviewConfidence: high
+  reviewEvidence: "loading call {pattern} passes a code-execution opt-in read back from the object being loaded, so the artifact grants itself the consent the API reserves for the caller"
+  vulnerableTo: [injection.UnsafeDynamicLoading]
+}

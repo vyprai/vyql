@@ -1,0 +1,361 @@
+# Rank 1702 / CVE-2021-31162 (GHSA-fjcw-72x2-rmmv, recorded CWE-415):
+# rust-lang/rust's in-place collection specialization. `Vec::from_iter(iter)`
+# where `iter` is a chain rooted at a `vec.into_iter()` reuses the source
+# buffer: library/alloc/src/vec/source_iter_marker.rs copies the pipeline's
+# items forward over the same allocation the source iterator is draining and
+# then hands `dst_buf`/`len`/`cap` to `Vec::from_raw_parts`. The teardown at
+# issue ran, at the vulnerable revision,
+#
+#   // drop any remaining values at the tail of the source
+#   src.drop_remaining();          // into_iter.rs:88-93
+#   // but prevent drop of the allocation itself once IntoIter goes out of scope
+#   src.forget_allocation();       // into_iter.rs:96-101
+#
+# where `drop_remaining` is `unsafe { ptr::drop_in_place(self.as_mut_slice()) }`
+# followed by `self.ptr = self.end`, and `forget_allocation` is the field
+# relinquish `self.cap = 0; self.buf = RawVec::NEW.ptr(); ...`. The order is
+# the defect. `drop_in_place` runs arbitrary user `T::drop` while `src` still
+# owns the allocation -- `cap` is nonzero and `ptr` has not been advanced past
+# the remaining elements, because both of those writes sit *after* the
+# destructor call. A `T::drop` that panics therefore unwinds with `src`
+# unmodified, and `IntoIter`'s own destructor (into_iter.rs:231) re-enters on
+# that same buffer: `DropGuard::drop` calls
+# `RawVec::from_raw_parts_in(self.0.buf.as_ptr(), self.0.cap, alloc)`, freeing
+# the allocation that backs the `Vec::from_raw_parts(dst_buf, len, cap)`
+# being constructed, and `ptr::drop_in_place(guard.0.as_raw_mut_slice())`
+# drops the remaining elements a second time. Double free and destructor
+# re-entry from one ordering.
+#
+# The fixed revision (836fef0, cherry-picked from 421f5d28) merges the two helpers into
+# `forget_allocation_drop_remaining`, which saves the raw slice, resets
+# `cap`/`buf`/`ptr`/`end` to an empty zero-capacity state *first*, and only
+# then runs `ptr::drop_in_place(remaining)`. A panicking drop now finds the
+# iterator relinquished, so its destructor drops nothing and frees
+# nothing; the documented trade-off is that items collected leak.
+# The same discipline is applied correctly elsewhere in the file -- mod.rs:1449
+# reads `// Advance early to avoid double drop if drop_in_place panicked.` --
+# which is what marks this as an ordering bug rather than a missing check.
+#
+# Pool row note: f97769a2 is the bors merge of the beta backport PR #84603 and
+# backports two unrelated advisories; the readable sibling for this CVE is
+# 836fef0, whose parent 6ed66eb is the vulnerable state. The merge's other
+# parent cc6d66f is equally vulnerable. .
+#
+# ATTENTION, engine gap, three absences stack, and the one binding that
+# discriminates is the fixing commit's own layout.
+#
+# Nothing is labelled at the defect site. `vyql match` on
+# source_iter_marker.rs reports only code.UnsafeMutableAlias on the pointer
+# *read* block at :28 (VYQL-MEM-009, firing identically on both revisions);
+# into_iter.rs, where the change lands, reports nothing at all. Scanning the
+# extracted library/alloc/src/vec subtree gives 13 findings on the vulnerable
+# revision and 13 on the fixed one, every one of them a LOW VYQL-MEM-006 on
+# mod.rs or set_len_on_drop.rs -- findings in the neighbourhood, none on the
+# drop sequence.
+#
+# No label or pair of labels discriminates, because the reachable shape is
+# identical on both sides: 8 `drop_in_place` calls, 1 `self.cap = 0` site, 1
+# `RawVec::from_raw_parts_in` site, 1 `Vec::from_raw_parts` site. The fixed revision moves
+# a `drop_in_place` from one function into another and reverses its order
+# against a field write; it removes nothing and adds no API call. The only
+# ordering fact that distinguishes the revisions is spread across two functions
+# joined at a call site -- and `vyql resolve` on source_iter_marker.rs lists
+# both `src.drop_remaining` (:81) and `src.forget_allocation` (:83) as
+# UNRESOLVED, so no relation can cross them. That is the Rust delegated-call
+# resolution gap recorded at rank 1364, not a new one.
+#
+# The candidate that does discriminate is built and measured, and rejected:
+# a function-scoped presence binding on the relinquish helper
+# (`assign contains "self.cap=0" and not call contains "drop_in_place"`)
+# emitting the existing CWE-415 concept code.ClosureUnwindStaleLength moves
+# this tree 13 -> 14 on the vulnerable revision and 13 -> 13 on the fixed one.
+# It is also measured against an equally-correct alternative fix that simply
+# swaps the two calls at the call site and keeps both helpers separate -- and
+# it still reports 14. It keys on the fact that the fixed revision *merged two functions
+# into one body*, not on the weakness: `self.cap = 0` is a `pub(super)` field
+# write inside std, present in no library documentation, so the genericity test
+# fails outright. Pinned below as case (c) so that binding cannot land silently.
+#
+# Closing this properly needs three things the engine does not have:
+# resolution of delegated Rust method calls (1364), a destructor-invocation
+# label for `ptr::drop_in_place` (Rust has no code.PointerFree or
+# code.PointerUse binding at all, so VYQL-MEM-008 and VYQL-MEM-007 can never
+# fire in Rust), and -- decisively -- a panic-unwind relation expressing "if
+# this call panics, the following statements do not run and the owner's
+# destructor re-enters." That last is a new control-flow/dataflow relation, not
+# a localized correction, so this is not a mechanical fix. It is the Rust
+# instance of the native memory-lifetime family (1509, 1511, 1516, 1527, 1528,
+# 1530, 1543, 1547, 1561, 1576, 1590).
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1702: (a) the in-place collect specialization drops the source tail before relinquishing the allocation it shares with the destination"
+  lang rust
+  file src/vec/source_iter_marker.rs
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-052
+  code
+  ```
+  use core::mem::ManuallyDrop;
+  use core::ptr::{self, NonNull};
+
+  pub struct RawVec<T> {
+      ptr: NonNull<T>,
+      cap: usize,
+  }
+
+  impl<T> RawVec<T> {
+      pub const NEW: Self = Self { ptr: unsafe { NonNull::new_unchecked(1 as *mut T) }, cap: 0 };
+  }
+
+  pub struct IntoIter<T> {
+      pub buf: NonNull<T>,
+      pub cap: usize,
+      pub ptr: *const T,
+      pub end: *const T,
+  }
+
+  impl<T> IntoIter<T> {
+      fn len(&self) -> usize {
+          self.end as usize - self.ptr as usize
+      }
+
+      fn as_mut_slice(&mut self) -> &mut [T] {
+          unsafe { &mut *ptr::slice_from_raw_parts_mut(self.ptr as *mut T, self.len()) }
+      }
+
+      fn as_raw_mut_slice(&mut self) -> *mut [T] {
+          ptr::slice_from_raw_parts_mut(self.ptr as *mut T, self.len())
+      }
+
+      // the vulnerable form: destructor code runs on the tail while `self`
+      // still owns the allocation -- `self.ptr = self.end` sits *after* the
+      // drop, and `forget_allocation` is a separate call that never happens
+      // if a user Drop panics here.
+      pub(super) fn drop_remaining(&mut self) {
+          unsafe {
+              ptr::drop_in_place(self.as_mut_slice());
+          }
+          self.ptr = self.end;
+      }
+
+      // relinquishes the backing allocation, but only if reached
+      pub(super) fn forget_allocation(&mut self) {
+          self.cap = 0;
+          self.buf = unsafe { NonNull::new_unchecked(RawVec::NEW.ptr.as_ptr()) };
+          self.ptr = self.buf.as_ptr();
+          self.end = self.buf.as_ptr();
+      }
+  }
+
+  impl<T> Drop for IntoIter<T> {
+      fn drop(&mut self) {
+          struct DropGuard<'a, T>(&'a mut IntoIter<T>);
+
+          impl<T> Drop for DropGuard<'_, T> {
+              fn drop(&mut self) {
+                  // RawVec handles deallocation
+                  let _ = RawVec::from_raw_parts_in(self.0.buf.as_ptr(), self.0.cap);
+              }
+          }
+
+          let guard = DropGuard(self);
+          // destroy the remaining elements -- a second time, on unwind
+          unsafe {
+              ptr::drop_in_place(guard.0.as_raw_mut_slice());
+          }
+      }
+  }
+
+  // the ordering that is the defect: the tail is destroyed while the source
+  // still holds the allocation the destination was built in
+  fn from_iter_in_place<T>(mut src: IntoIter<T>) -> Vec<T> {
+      let dst_buf = src.buf.as_ptr() as *mut T;
+      let dst_end = src.end as *const T;
+      let cap = src.cap;
+
+      let mut dst = dst_buf;
+      // ... pipeline writes items forward through dst ...
+
+      // drop any remaining values at the tail of the source
+      src.drop_remaining();
+      // but prevent drop of the allocation itself once IntoIter goes out of scope
+      src.forget_allocation();
+
+      let len = unsafe { dst.offset_from(dst_buf) as usize };
+      let vec = unsafe { Vec::from_raw_parts(dst_buf, len, cap) };
+      let _ = ManuallyDrop::new(dst_end);
+      vec
+  }
+  ```
+
+test "rank1702: (b) the fixed revision relinquishes the allocation first and drops the tail through a raw slice saved beforehand"
+  lang rust
+  file src/vec/source_iter_marker.rs
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-052
+  code
+  ```
+  use core::ptr::{self, NonNull};
+
+  pub struct RawVec<T> {
+      ptr: NonNull<T>,
+      cap: usize,
+  }
+
+  impl<T> RawVec<T> {
+      pub const NEW: Self = Self { ptr: unsafe { NonNull::new_unchecked(1 as *mut T) }, cap: 0 };
+  }
+
+  pub struct IntoIter<T> {
+      pub buf: NonNull<T>,
+      pub cap: usize,
+      pub ptr: *const T,
+      pub end: *const T,
+  }
+
+  impl<T> IntoIter<T> {
+      fn len(&self) -> usize {
+          self.end as usize - self.ptr as usize
+      }
+
+      fn as_raw_mut_slice(&mut self) -> *mut [T] {
+          ptr::slice_from_raw_parts_mut(self.ptr as *mut T, self.len())
+      }
+
+      // the patched form: the owner is empty and zero-capacity *before* any
+      // destructor runs, so a panicking drop finds nothing to re-drop and
+      // nothing to free.
+      pub(super) fn forget_allocation_drop_remaining(&mut self) {
+          let remaining = self.as_raw_mut_slice();
+
+          self.cap = 0;
+          self.buf = unsafe { NonNull::new_unchecked(RawVec::NEW.ptr.as_ptr()) };
+          self.ptr = self.buf.as_ptr();
+          self.end = self.buf.as_ptr();
+
+          unsafe {
+              ptr::drop_in_place(remaining);
+          }
+      }
+  }
+
+  impl<T> Drop for IntoIter<T> {
+      fn drop(&mut self) {
+          struct DropGuard<'a, T>(&'a mut IntoIter<T>);
+
+          impl<T> Drop for DropGuard<'_, T> {
+              fn drop(&mut self) {
+                  let _ = RawVec::from_raw_parts_in(self.0.buf.as_ptr(), self.0.cap);
+              }
+          }
+
+          let guard = DropGuard(self);
+          unsafe {
+              ptr::drop_in_place(guard.0.as_raw_mut_slice());
+          }
+      }
+  }
+
+  fn from_iter_in_place<T>(mut src: IntoIter<T>) -> Vec<T> {
+      let dst_buf = src.buf.as_ptr() as *mut T;
+      let mut dst = dst_buf;
+      let cap = src.cap;
+
+      // if the drop panics then we also leak any elements collected into dst_buf
+      src.forget_allocation_drop_remaining();
+
+      let len = unsafe { dst.offset_from(dst_buf) as usize };
+      unsafe { Vec::from_raw_parts(dst_buf, len, cap) }
+  }
+  ```
+
+test "rank1702: (c) the same two helpers called in the safe order are an equally correct fix, and a binding keying on the helpers' co-location would flag it"
+  lang rust
+  file src/vec/source_iter_marker.rs
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-052
+  code
+  ```
+  use core::ptr::{self, NonNull};
+
+  pub struct RawVec<T> {
+      ptr: NonNull<T>,
+      cap: usize,
+  }
+
+  impl<T> RawVec<T> {
+      pub const NEW: Self = Self { ptr: unsafe { NonNull::new_unchecked(1 as *mut T) }, cap: 0 };
+  }
+
+  pub struct IntoIter<T> {
+      pub buf: NonNull<T>,
+      pub cap: usize,
+      pub ptr: *const T,
+      pub end: *const T,
+  }
+
+  impl<T> IntoIter<T> {
+      fn len(&self) -> usize {
+          self.end as usize - self.ptr as usize
+      }
+
+      fn as_mut_slice(&mut self) -> &mut [T] {
+          unsafe { &mut *ptr::slice_from_raw_parts_mut(self.ptr as *mut T, self.len()) }
+      }
+
+      fn as_raw_mut_slice(&mut self) -> *mut [T] {
+          ptr::slice_from_raw_parts_mut(self.ptr as *mut T, self.len())
+      }
+
+      pub(super) fn drop_remaining(&mut self) {
+          unsafe {
+              ptr::drop_in_place(self.as_mut_slice());
+          }
+          self.ptr = self.end;
+      }
+
+      pub(super) fn forget_allocation(&mut self) {
+          self.cap = 0;
+          self.buf = unsafe { NonNull::new_unchecked(RawVec::NEW.ptr.as_ptr()) };
+          self.ptr = self.buf.as_ptr();
+          self.end = self.buf.as_ptr();
+      }
+  }
+
+  impl<T> Drop for IntoIter<T> {
+      fn drop(&mut self) {
+          struct DropGuard<'a, T>(&'a mut IntoIter<T>);
+
+          impl<T> Drop for DropGuard<'_, T> {
+              fn drop(&mut self) {
+                  let _ = RawVec::from_raw_parts_in(self.0.buf.as_ptr(), self.0.cap);
+              }
+          }
+
+          let guard = DropGuard(self);
+          unsafe {
+              ptr::drop_in_place(guard.0.as_raw_mut_slice());
+          }
+      }
+  }
+
+  // the helpers are left separate, but the relinquish now runs first: a
+  // panicking drop finds an empty, zero-capacity iterator. This is a correct
+  // remediation, and a function-scoped binding that fires on
+  // `self.cap = 0` without a `drop_in_place` in the same body reports on it.
+  fn from_iter_in_place<T>(mut src: IntoIter<T>) -> Vec<T> {
+      let dst_buf = src.buf.as_ptr() as *mut T;
+      let mut dst = dst_buf;
+      let cap = src.cap;
+
+      src.forget_allocation();
+      src.drop_remaining();
+
+      let len = unsafe { dst.offset_from(dst_buf) as usize };
+      unsafe { Vec::from_raw_parts(dst_buf, len, cap) }
+  }
+  ```

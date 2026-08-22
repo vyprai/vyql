@@ -1,0 +1,252 @@
+# Snyk's IntelliJ plugin auto-ran its project scan the moment a project is
+# opened: SnykTaskQueueService.scan() queues a Task.Backgroundable whose run()
+# body saves the documents and then unconditionally fans out into
+# scheduleSnykCodeScan / scheduleOssScan / scheduleIacScan / scheduleContainerScan.
+# Those scans drive the Snyk CLI over the opened project, and analyzing a
+# project executes the project's own build tooling and metadata files, so a
+# user who clones a malicious repository gets code execution the moment the IDE
+# opens it (CWE-78 / CWE-94 as recorded by the advisory; the injection itself
+# lives in the snyk CLI npm package, this repository's share of the defect is
+# that the scan is launched with no notion of whether the project is trusted).
+#
+# The fixed revision (56682f4b, GHSA-4vrv-93c7-m92j) adds a workspace-trust gate at the
+# very top of run():
+#     project.basePath?.let {
+#         if (!confirmScanningAndSetWorkspaceTrustedStateIfNeeded(Paths.get(it))) return
+#     }
+# backed by three new files in a private snyk.trust package: a
+# WorkspaceTrustSettings persistent component holding a trusted-path list, a
+# WorkspaceTrustService consulting it, and TrustedProjects.kt showing a modal
+# MessageDialogBuilder.yesNo dialog and recording the answer.
+#
+# Nothing here is a dataflow defect and nothing in the remediation is
+# nameable through a documented API, so no binding can separate the two
+# revisions. Measured (three --cache off runs per side, stable):
+#   * `vyql match` on the vulnerable SnykTaskQueueService.kt labels nothing at
+#     all -- no source, no sink, no control. project.basePath is the IDE's own
+#     configuration, not attacker text, and the fan-out calls are the plugin's
+#     own private methods.
+#   * The whole repository scans to 9 findings at 56682f4b^ and the identical
+#     9 at 56682f4b (the sorted finding lists are byte-identical), every one of
+#     them on test fixtures -- kubernetes-deployment.yaml, package.json,
+#     requirements.txt, ConsoleCommandRunnerTest.kt -- and none in src/main,
+#     none on the trust feature, none on SnykTaskQueueService.kt. The fixed revision moves
+#     the scanner's output not at all, in either direction.
+#   * The counterweight test fails. The new trust files import only generic
+#     IntelliJ platform APIs -- MessageDialogBuilder, Messages,
+#     SimplePersistentStateComponent, @Service, Logger -- plus java.nio.file.
+#     None of those carries the security meaning; the IntelliJ SDK's own
+#     documented trust surface is not used at all. A binding keyed on
+#     MessageDialogBuilder would be keying on the fixing commit's own
+#     vocabulary: across every clone under /tmp/cve-work/rank*/ that identifier
+#     appears in exactly one Kotlin file, the fixed revision itself, so renaming the helper
+#     it sits behind loses the flag entirely. project.basePath, the other
+#     candidate, appears in 55 Kotlin files across the same corpus and in 5
+#     unrelated files in this repository alone, and is semantically just "where
+#     the project lives".
+#   * A "scan scheduled with no trust signal in its body" shape is the
+#     measured-unshippable handler-without-authorization family: every variant
+#     scores identically on the vulnerable and the patched tree because the
+#     control lands in named helpers and framework hooks.
+#
+# A separately filed Kotlin lowering defect hides the patched form's
+# guard from any callee-path binding, though it is not what blocks this rank
+# (the vulnerable form has no guard to name): tree-sitter-kotlin parses
+# `!guard(it)` as a call_expression whose CALLEE is a unary_expression, and
+# ktConv.dotted has no case for that kind, so the call lowers with Path "?"
+# instead of "guard" -- while the unnegated `if (guard(it)) return` on the next
+# line lowers normally. That is the callee-side face of the engine gap recorded
+# against rank 1214 (unary_expression absent from kotlin.go's expr() switch);
+# naming the family here rather than filing it anew.
+#
+# The spec pins the miss: neither revision of the auto-scan may fire the
+# command-injection rule of the advisory's own class, the trust-boundary
+# misconfig rule, or the missing-authentication rule. Nothing is `expect`ed,
+# because nothing is labelled -- a positive assertion here would fail rather
+# than document.
+
+test "rank1767: the auto-scan launched on project open, with no trust gate"
+  lang kotlin
+  file src/main/kotlin/io/snyk/plugin/services/SnykTaskQueueService.kt
+  reject VYQL-INJ-002
+  reject VYQL-CFG-014
+  reject VYQL-AUTH-001
+  code
+  ```
+  package io.snyk.plugin.services
+
+  import com.intellij.openapi.application.ApplicationManager
+  import com.intellij.openapi.components.Service
+  import com.intellij.openapi.fileEditor.FileDocumentManager
+  import com.intellij.openapi.progress.BackgroundTaskQueue
+  import com.intellij.openapi.progress.ProgressIndicator
+  import com.intellij.openapi.progress.Task
+  import com.intellij.openapi.project.Project
+  import io.snyk.plugin.getSnykCachedResults
+  import io.snyk.plugin.isIacEnabled
+  import io.snyk.plugin.isContainerEnabled
+  import io.snyk.plugin.pluginSettings
+
+  @Service
+  class SnykTaskQueueService(val project: Project) {
+      private val taskQueue = BackgroundTaskQueue(project, "Snyk")
+      private val taskQueueIac = BackgroundTaskQueue(project, "Snyk: Iac")
+      private val taskQueueContainer = BackgroundTaskQueue(project, "Snyk: Container")
+
+      private val settings
+          get() = pluginSettings()
+
+      fun scan() {
+          taskQueue.run(object : Task.Backgroundable(project, "Snyk wait for changed files to be saved on disk", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  ApplicationManager.getApplication().invokeAndWait {
+                      FileDocumentManager.getInstance().saveAllDocuments()
+                  }
+                  indicator.checkCanceled()
+
+                  if (settings.snykCodeSecurityIssuesScanEnable || settings.snykCodeQualityIssuesScanEnable) {
+                      scheduleSnykCodeScan()
+                  }
+
+                  waitUntilCliDownloadedIfNeeded(indicator)
+                  indicator.checkCanceled()
+
+                  if (settings.ossScanEnable) {
+                      scheduleOssScan()
+                  }
+                  if (isIacEnabled() && settings.iacScanEnabled) {
+                      scheduleIacScan()
+                  }
+                  if (isContainerEnabled() && settings.containerScanEnabled) {
+                      scheduleContainerScan()
+                  }
+              }
+          })
+      }
+
+      private fun waitUntilCliDownloadedIfNeeded(indicator: ProgressIndicator) {
+          if (!isCliInstalled()) return
+          Thread.sleep(waitForDownloadMillis)
+      }
+
+      private fun scheduleOssScan() {
+          taskQueue.run(object : Task.Backgroundable(project, "Snyk is running...", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  val cliAdapter = CliAdapter(project)
+                  cliAdapter.scan()
+              }
+          })
+      }
+
+      private fun scheduleIacScan() {
+          taskQueueIac.run(object : Task.Backgroundable(project, "Snyk IaC is scanning...", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  val iacService = getIacService(project)
+                  iacService?.scan()
+              }
+          })
+      }
+
+      private fun scheduleContainerScan() {
+          taskQueueContainer.run(object : Task.Backgroundable(project, "Snyk Container is scanning...", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  val containerResult = getContainerService(project)?.scan()
+              }
+          })
+      }
+
+      private fun scheduleSnykCodeScan() {}
+      private fun isCliInstalled() = true
+      private fun getIacService(project: Project) = null
+      private fun getContainerService(project: Project) = null
+
+      companion object {
+          var waitForDownloadMillis = 100L
+      }
+  }
+  ```
+
+test "rank1767: the trust gate added at the top of the auto-scan body"
+  lang kotlin
+  file src/main/kotlin/io/snyk/plugin/services/SnykTaskQueueService.kt
+  reject VYQL-INJ-002
+  reject VYQL-CFG-014
+  reject VYQL-AUTH-001
+  code
+  ```
+  package io.snyk.plugin.services
+
+  import com.intellij.openapi.application.ApplicationManager
+  import com.intellij.openapi.components.Service
+  import com.intellij.openapi.fileEditor.FileDocumentManager
+  import com.intellij.openapi.progress.BackgroundTaskQueue
+  import com.intellij.openapi.progress.ProgressIndicator
+  import com.intellij.openapi.progress.Task
+  import com.intellij.openapi.project.Project
+  import io.snyk.plugin.pluginSettings
+  import io.snyk.plugin.isIacEnabled
+  import io.snyk.plugin.isContainerEnabled
+  import snyk.trust.confirmScanningAndSetWorkspaceTrustedStateIfNeeded
+  import java.nio.file.Paths
+
+  @Service
+  class SnykTaskQueueService(val project: Project) {
+      private val taskQueue = BackgroundTaskQueue(project, "Snyk")
+      private val taskQueueIac = BackgroundTaskQueue(project, "Snyk: Iac")
+      private val taskQueueContainer = BackgroundTaskQueue(project, "Snyk: Container")
+
+      private val settings
+          get() = pluginSettings()
+
+      fun scan() {
+          taskQueue.run(object : Task.Backgroundable(project, "Snyk wait for changed files to be saved on disk", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  project.basePath?.let {
+                      if (!confirmScanningAndSetWorkspaceTrustedStateIfNeeded(Paths.get(it))) return
+                  }
+
+                  ApplicationManager.getApplication().invokeAndWait {
+                      FileDocumentManager.getInstance().saveAllDocuments()
+                  }
+                  indicator.checkCanceled()
+
+                  if (settings.snykCodeSecurityIssuesScanEnable || settings.snykCodeQualityIssuesScanEnable) {
+                      scheduleSnykCodeScan()
+                  }
+
+                  waitUntilCliDownloadedIfNeeded(indicator)
+                  indicator.checkCanceled()
+
+                  if (settings.ossScanEnable) {
+                      scheduleOssScan()
+                  }
+                  if (isIacEnabled() && settings.iacScanEnabled) {
+                      scheduleIacScan()
+                  }
+              }
+          })
+      }
+
+      private fun waitUntilCliDownloadedIfNeeded(indicator: ProgressIndicator) {
+          if (!isCliInstalled()) return
+          Thread.sleep(waitForDownloadMillis)
+      }
+
+      private fun scheduleOssScan() {
+          taskQueue.run(object : Task.Backgroundable(project, "Snyk is running...", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  val cliAdapter = CliAdapter(project)
+                  cliAdapter.scan()
+              }
+          })
+      }
+
+      private fun scheduleIacScan() {}
+      private fun scheduleSnykCodeScan() {}
+      private fun isCliInstalled() = true
+
+      companion object {
+          var waitForDownloadMillis = 100L
+      }
+  }
+  ```

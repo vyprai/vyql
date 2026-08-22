@@ -1,8 +1,0 @@
-module code;
-
-review code.LeadingDotSegmentOnlyRouteFilter {
-  category: path
-  expected: [core.InputValidation, core.PathAccessCheck]
-  kind: attention
-  text: "review route path filters that block only leading dot segments but allow nested dot-segment traversal"
-}

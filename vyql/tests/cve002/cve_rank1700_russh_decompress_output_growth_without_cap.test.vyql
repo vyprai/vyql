@@ -1,0 +1,184 @@
+# Rank 1700 / CVE-2026-46702: russh's Decompress::Zlib path decompressed a
+# received SSH packet with flate2's streaming push API into a caller-grown
+# Vec, and the retry loop grew that Vec by blind doubling --
+# output.resize(output.len() * 2, 0) -- with no ceiling anywhere. The
+# compressed bytes are peer-controlled and the SSH wire caps only the
+# compressed size, so a few-kilobyte packet expands into an unbounded
+# allocation on the receiving side: a decompression bomb against any
+# russh server or client with compression negotiated (the fixed revision's own test
+# asserts a 33 KB payload compresses under the 256 KB wire cap while its
+# expansion target exceeds the packet limit). A second half of the same
+# defect: an empty compressed packet returned flate2::Status::Ok with no
+# progress possible, so the loop kept doubling until the stream errored.
+# Both are CWE-400/CWE-772 resource consumption.
+#
+# Pool row verified in every field: 2692a6f6 is the advisory's own merge
+# from the private fork ("Merge commit from fork ... Cap decompression
+# output like OpenSSH / Handle empty compressed packets without
+# spinning"); the parent 93bc2c9 carries the unbounded doubling at
+# russh/src/compression.rs:282-289, and the remediation is present at the
+# fix in the same function -- output growth clamped through
+# input.len().clamp(1, max_output_len) and
+# output.len().checked_mul(2).map(|len| len.min(max_output_len)), plus a
+# post-loop n_out_ > MAXIMUM_DECOMPRESSED_PACKET_LEN rejection. No pool
+# correction.
+#
+# FIXED by a new binding in
+# vyql/bindings/rust/streaming_decompression_output_without_cap.vyql,
+# emitting the existing code.UnboundedResourceOperation (VYQL-DOS-042,
+# CWE-400/772) -- the same concept the NTS-cookie and OPC UA limits
+# bindings in this directory use for peer-chosen resource cost.
+# The anchor is the streaming decompressor step (flate2/brotli/bzip2/
+# miniz_oxide all spell it "decompress", the inflate crate "inflate",
+# zstd "decode_all") together with the buffer-growth call that step's
+# retry loop needs (resize/reserve/with_capacity/extend_from_slice/push/
+# read_to_end/read_to_string), and the discriminator is the bound itself:
+# any min/clamp/take/truncate on the pipeline in the same function
+# suppresses, because the finding is about the output being unbounded
+# rather than about which construct bounds it. Every spelling is std or
+# decompressor-API vocabulary, none of it this fix's own names (the cap
+# constant is never named), so a capped implementation written
+# differently -- saturating_mul(2).min(limit) -- suppresses the same way.
+# The reader-style bomb (GzDecoder over read_to_end) is a different
+# anchor shape and stays out: read_to_end on a trusted local file is
+# ordinary code, and a presence binding cannot see the trust boundary.
+#
+# Measured on the real revision pair over three --cache off runs each:
+# the vulnerable parent reports VYQL-DOS-042 at
+# russh/src/compression.rs:249 (Decompress::decompress's function
+# context) in every run, alongside the one pre-existing
+# unbounded_next_await finding at keys/agent/server.rs:62; the fixed revision
+# commit reports only the pre-existing one. Rename check: a capped
+# rewrite under wholly different identifiers (CAP, limit, a restructured
+# loop) stays suppressed, because the neutraliser is the std bounding
+# method, not any name. Collateral: an exhaustive grep for
+# decompress/inflate across every corpus clone shows the anchor+growth
+# shape exists only in russh here and in callers without a caller-side
+# growth call (mongo-rust-driver's decompress_zlib/zstd copy_decode and
+# qdrant's decompress_sorted all grow inside the library); the four
+# decompression-carrying trees measure an identical DOS-042 count
+# before and after -- mongo-rust-driver 25->25, its before-tree 25->25,
+# qdrant 1->1, apollo-router 75->75.
+
+test "rank1700: rust streaming decompression retries with unbounded output growth"
+  lang rust
+  file compression.rs
+  expect VYQL-DOS-042
+  expect_review code.UnboundedResourceOperation
+  code
+  ```
+  use crate::Error;
+
+  pub enum Decompress {
+      None,
+      Zlib(flate2::Decompress),
+  }
+
+  impl Decompress {
+      pub fn decompress<'a>(
+          &mut self,
+          input: &'a [u8],
+          output: &'a mut Vec<u8>,
+      ) -> Result<&'a [u8], Error> {
+          match *self {
+              Decompress::None => Ok(input),
+              Decompress::Zlib(ref mut z) => {
+                  output.clear();
+                  let n_in = z.total_in() as usize;
+                  let n_out = z.total_out() as usize;
+                  output.resize(input.len(), 0);
+                  let flush = flate2::FlushDecompress::None;
+                  loop {
+                      let n_in_ = z.total_in() as usize - n_in;
+                      let n_out_ = z.total_out() as usize - n_out;
+                      #[allow(clippy::indexing_slicing)]
+                      let d = z.decompress(&input[n_in_..], &mut output[n_out_..], flush);
+                      match d? {
+                          flate2::Status::Ok => {
+                              output.resize(output.len() * 2, 0);
+                          }
+                          _ => break,
+                      }
+                  }
+                  let n_out_ = z.total_out() as usize - n_out;
+                  #[allow(clippy::indexing_slicing)]
+                  Ok(&output[..n_out_])
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1700: rust streaming decompression clamps output growth to the packet ceiling"
+  lang rust
+  file compression.rs
+  reject VYQL-DOS-042
+  reject_review code.UnboundedResourceOperation
+  code
+  ```
+  use crate::Error;
+
+  const MAXIMUM_DECOMPRESSED_PACKET_LEN: usize = 32773;
+
+  pub enum Decompress {
+      None,
+      Zlib(flate2::Decompress),
+  }
+
+  impl Decompress {
+      pub fn decompress<'a>(
+          &mut self,
+          input: &'a [u8],
+          output: &'a mut Vec<u8>,
+      ) -> Result<&'a [u8], Error> {
+          match *self {
+              Decompress::None => Ok(input),
+              Decompress::Zlib(ref mut z) => {
+                  output.clear();
+                  let n_in = z.total_in() as usize;
+                  let n_out = z.total_out() as usize;
+                  let max_output_len = MAXIMUM_DECOMPRESSED_PACKET_LEN
+                      .checked_add(1)
+                      .ok_or(Error::PacketSize(usize::MAX))?;
+                  output.resize(input.len().clamp(1, max_output_len), 0);
+                  let flush = flate2::FlushDecompress::None;
+                  loop {
+                      let n_in_ = z.total_in() as usize - n_in;
+                      let n_out_ = z.total_out() as usize - n_out;
+                      #[allow(clippy::indexing_slicing)]
+                      let d = z.decompress(&input[n_in_..], &mut output[n_out_..], flush);
+                      match d? {
+                          flate2::Status::Ok | flate2::Status::BufError => {
+                              let consumed_all_input = n_in_ == input.len();
+                              let output_full = n_out_ == output.len();
+
+                              if !output_full && consumed_all_input {
+                                  break;
+                              }
+
+                              if output_full {
+                                  if output.len() == max_output_len {
+                                      break;
+                                  }
+                                  let next_len = output
+                                      .len()
+                                      .checked_mul(2)
+                                      .map(|len| len.min(max_output_len))
+                                      .ok_or(Error::PacketSize(usize::MAX))?;
+                                  output.resize(next_len, 0);
+                              }
+                          }
+                          _ => break,
+                      }
+                  }
+                  let n_out_ = z.total_out() as usize - n_out;
+                  if n_out_ > MAXIMUM_DECOMPRESSED_PACKET_LEN {
+                      return Err(Error::PacketSize(n_out_));
+                  }
+                  #[allow(clippy::indexing_slicing)]
+                  Ok(&output[..n_out_])
+              }
+          }
+      }
+  }
+  ```

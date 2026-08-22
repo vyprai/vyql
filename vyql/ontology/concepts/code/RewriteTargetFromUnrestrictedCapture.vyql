@@ -1,0 +1,11 @@
+module code;
+
+concept RewriteTargetFromUnrestrictedCapture : issue {
+  cwe: [CWE_918, CWE_20]
+  reviewAssumption: "the rewrite engine forwards the matched request to the assembled destination server-side and returns the response, and the server can reach network targets the requester cannot"
+  reviewCategory: request_forgery
+  reviewCondition: "a declarative request-rewrite rule assembles its outbound target by interpolating a request-matched capture whose matcher regex accepts any character, so the requester chooses the target's authority and path"
+  reviewConfidence: high
+  reviewEvidence: "rewrite rule context {pattern} declares an absolute-URL destination beside a request matcher that captures with a regex accepting any character"
+  vulnerableTo: [request_forgery.Ssrf, validation.ImproperInputValidation]
+}

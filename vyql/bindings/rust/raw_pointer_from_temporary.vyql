@@ -1,0 +1,36 @@
+module bindings.rust.raw_pointer_from_temporary;
+
+// A raw pointer taken from a value that the same statement created and then
+// dropped. The Rust shape is a borrow-style pointer accessor -- as_ptr or
+// as_mut_ptr -- called on the result of a try expression:
+//
+//     let ptr = make_thing(arg)?.as_ptr();
+//     use_later(ptr);
+//
+// The `?` unwraps the Result or Option into a temporary whose drop runs when
+// the let statement ends, and the raw pointer handed to the later use points
+// into freed memory. Raw pointers carry no lifetime, so the borrow checker
+// cannot object; this is the class clippy pins for its one notorious spelling
+// (temporary_cstring_as_ptr) and it recurs with any owned buffer type whose
+// constructor returns Result. Returning the pointer to a caller, or passing it
+// to a foreign function after the statement, is use after free.
+//
+// The fix is to bind the value to a local first, so the pointee outlives the
+// pointer's uses; every as_ptr in the function then reads a named, still-live
+// binding.
+//
+// The discriminator is the try operator directly in front of the borrow, read
+// from the function's compacted body text. The call tokens cannot carry it:
+// the frontend lowers as_ptr on any receiver that is not a name to the same
+// `?.as_ptr` call path whether the receiver is a dropped temporary or
+// compile-time constant data (`concat!(file!(), "\0").as_ptr()` points at
+// static storage and is safe), and a pointer consumed inside its own
+// statement -- passed as an argument before the semicolon -- is safe too,
+// because Rust keeps the temporary alive until the statement completes. The
+// `?.as_ptr` spelling narrows to the one receiver form whose pointee is always
+// a fresh temporary: the try expression materializes a new value, so a pointer
+// kept past the statement always dangles.
+binding rawPointerFromTemporary {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.token, [")?.as_ptr(", ")?.as_mut_ptr("])
+  emit issue code.RawPointerFromTemporary at node
+}

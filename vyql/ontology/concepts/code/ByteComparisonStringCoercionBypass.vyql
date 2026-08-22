@@ -1,0 +1,11 @@
+module code;
+
+concept ByteComparisonStringCoercionBypass : issue {
+  cwe: [CWE_697, CWE_670]
+  reviewAssumption: "the routine decides a secret or credential that an attacker can submit candidates for, and its result gates trust"
+  reviewCategory: auth
+  reviewCondition: "a byte-wise string comparison XORs raw string offset reads into a numeric accumulator, so the string result of the XOR coerces to zero and every equal-length pair compares equal"
+  reviewConfidence: high
+  reviewEvidence: "byte comparison context {pattern} XORs string offset reads without converting them to integer byte values"
+  vulnerableTo: [authentication.AuthenticationBypass]
+}

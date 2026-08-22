@@ -1,0 +1,404 @@
+# Rank 1762 / CVE-2025-63601 (CWE-434): grokability/snipe-it's
+# `snipeit:restore` command (app/Console/Commands/RestoreFromBackup.php) copies
+# entries out of an administrator-supplied backup archive into the live upload
+# trees. The directory-destined branch of the entry loop admitted ANY entry
+# whose name merely contains `public/uploads/<dir>/` or
+# `storage/private_uploads/<dir>/` -- no file-type check ran on that branch at
+# all. The extension allowlist (`in_array($extension, $good_extensions)`) is
+# evaluated only in the adjacent fixed-file-list loop of the same handle()
+# method, and the copy loop wrote whatever had been collected with
+# `$za->getStream()` + `fopen(..., 'w')` + `fwrite`, so a crafted backup
+# restores arbitrary extensions into web-served directories and stores SVG
+# entries with their script content intact. The fixed revision (merge a6ded20e of PR
+# #17966, "fix_filetype_validation") hoists the extension computation to the
+# top of the entry loop, applies a per-destination allowlist
+# (`$public_extensions = array_diff($good_extensions, ["xml"])`,
+# private gets csv/key added) to BOTH the directory branch and the file-list
+# branch, and routes `.svg` entries through
+# `enshrined\svgSanitize\Sanitizer->sanitize()` before
+# `file_put_contents`. The pool row is correct: the merge's first parent
+# 2ac36cdf carries the type-blind branch and the remediation is present at the
+# merge itself.
+#
+# What fires today, union over three `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` runs per revision: 909 findings / 783 at or above high on the
+# vulnerable tree (2ac36cdf) and the identical 909/783 on the fixed tree
+# (a6ded20e) -- zero rows touch RestoreFromBackup.php at either revision, so
+# the fixed revision moves nothing the scanner can see.
+#
+# ATTENTION, both an engine gap and a measured-unshippable judgement, both
+# revisions pinned as misses.
+#
+# Blocker 1 -- the discriminating control is a same-function sibling-loop
+# placement, invisible to every scope the binding surface offers. The
+# vulnerable parent carries `strtolower(pathinfo($raw_path,
+# PATHINFO_EXTENSION))` and `in_array($extension, $good_extensions)` inside
+# the file-list loop of the very same handle() method; the fixed revision adds the
+# equivalent check to the directory loop and hoists the computation. No PHP
+# predicate is region- or loop-scoped (loops are not functions; the graph's
+# region paths like fn/loop30/loop37/if39.t are internal), so a function- or
+# class-scope binding sees the extension tokens in BOTH revisions. The only
+# fixed-only tokens are the fixed revision's own vocabulary (`$allowed_extensions`,
+# `$public_extensions`, `match ($purpose)`) and its incidental API choices
+# (`getFromIndex`, `file_put_contents`, `strcasecmp(".svg")`, `array_diff`) --
+# keying on any of those encodes the fixing commit's own layout and dies on
+# the rename test. The vulnerable revision contains no svg or type literal at
+# all (type-blindness IS the bug), so a type-anchored binding cannot see it;
+# the word "sanitize" appears in the vulnerable file only as the unrelated
+# `--sanitize-with-prefix` SQL options.
+#
+# Blocker 2 -- the generic write sink is measured unshippable. Labelling
+# `fwrite`/`file_put_contents` arguments as `code.UnsafeUpload` (feeding
+# VYQL-INJ-015 `taint core.UserControlledData -> code.UnsafeUpload`) takes
+# mybb from 1 to 13 VYQL-INJ-015 findings (theme CSS writes in
+# admin/inc/functions_themes.php, diff-engine writes in
+# inc/3rdparty/diff/Diff/Engine/Shell.php, admin user-page writes) while
+# limesurvey stays 0 -> 0 and snipe-it stays 0 -> 0: twelve collateral rows of
+# ordinary file writing for a route that still cannot see the vulnerable
+# revision.
+#
+# Blocker 3 -- the engine severs the vulnerable content path and, with
+# throwaway `statIndex`/`getStream`/`getFromIndex` sources plus those
+# write sinks, the taint route comes out INVERTED: the fixed tree gains one
+# VYQL-INJ-015 on the sanitized `.svg` branch (getFromIndex string content
+# through `Sanitizer->sanitize()` into `file_put_contents` -- taint survives
+# the sanitizer call) while the vulnerable tree gains none, because its
+# content reaches the write as `while (($buffer = fgets($fp, N)) !== false)
+# fwrite($migrated_file, $buffer);` and taint does not cross that loop
+# condition. Cases 5-7 below pin the minimal pair with shipped vocabulary
+# only: a straight-line tainted-handle read rendered through `print` reports
+# VYQL-INJ-004 (as do the same read in a `while (true)` body, in a `foreach`
+# body, under an `if`, with a length argument, and past a conditional
+# `break`), while the same read assigned inside the `while` condition
+# reports nothing -- with or without the `!== false` comparison, with or
+# without the wrapping parentheses, so the severed construct is the
+# condition-assignment itself. That streaming-copy shape is the standard
+# PHP idiom for copying a resource, so the severance blocks taint routes
+# beyond this archive-restore case; the fixed revision's change belongs in the loop-condition
+# lowering, and closing it still would not discriminate this pair (the
+# fixed revision streams its allowlisted files through the identical loop).
+#
+# verify_current_expected: attention-engine-gap; cases 4 and 5 expected,
+# cases 1-3, 6 and 7 pinned.
+
+test "rank1762: backup-archive entries restored by directory match with the extension allowlist only in the sibling file-list loop"
+  lang php
+  file app/Console/Commands/RestoreFromBackup.php
+  reject VYQL-INJ-015
+  reject_review code.IncompleteFileExtensionValidation
+  code
+  ```
+  <?php
+
+  namespace App\Console\Commands;
+
+  use Illuminate\Console\Command;
+  use ZipArchive;
+
+  class RestoreFromBackup extends Command
+  {
+      protected $signature = 'snipeit:restore {--backup-file=}';
+
+      public function handle()
+      {
+          $za = new ZipArchive();
+          $za->open('/backups/latest.zip');
+
+          $private_dirs = [
+              'storage/private_uploads/accessories',
+              'storage/private_uploads/assets',
+          ];
+          $public_dirs = [
+              'public/uploads/avatars',
+              'public/uploads/assets',
+          ];
+          $public_files = [
+              'public/uploads/favicon-uploaded.*',
+          ];
+
+          $interesting_files = [];
+          $unsafe_files = [];
+
+          for ($i = 0; $i < $za->numFiles; $i++) {
+              $raw_path = $za->statIndex($i)['name'];
+
+              // directory-destined entries: admitted on name containment
+              // alone, whatever extension they carry
+              foreach (array_merge($private_dirs, $public_dirs) as $dir) {
+                  $last_pos = strrpos($raw_path, $dir . '/');
+                  if ($last_pos !== false) {
+                      $interesting_files[$raw_path] = ['dest' => $dir, 'index' => $i];
+                      continue 2;
+                  }
+              }
+
+              // the fixed-file list is the only branch an extension check
+              // guards, in this same method
+              $good_extensions = config('filesystems.allowed_upload_extensions_array');
+              foreach ($public_files as $file) {
+                  $has_wildcard = (strpos($file, '*') !== false);
+                  if ($has_wildcard) {
+                      $file = substr($file, 0, -1);
+                  }
+                  $last_pos = strrpos($raw_path, $file);
+                  if ($last_pos !== false) {
+                      $extension = strtolower(pathinfo($raw_path, PATHINFO_EXTENSION));
+                      if (!in_array($extension, $good_extensions)) {
+                          $unsafe_files[] = $raw_path;
+                          continue 2;
+                      }
+                      $interesting_files[$raw_path] = ['dest' => dirname($file), 'index' => $i];
+                      continue 2;
+                  }
+              }
+          }
+
+          foreach ($interesting_files as $pretty_file_name => $file_details) {
+              $ugly_file_name = $za->statIndex($file_details['index'])['name'];
+              $fp = $za->getStream($ugly_file_name);
+              if (!is_dir($file_details['dest'])) {
+                  mkdir($file_details['dest'], 0755, true);
+              }
+              $migrated_file = fopen($file_details['dest'] . '/' . basename($pretty_file_name), 'w');
+              while (($buffer = fgets($fp, 4096)) !== false) {
+                  fwrite($migrated_file, $buffer);
+              }
+              fclose($migrated_file);
+              fclose($fp);
+          }
+      }
+  }
+  ```
+
+test "rank1762: the same restore copying an svg entry, which carries no svg or type literal anywhere in the handler"
+  lang php
+  file app/Console/Commands/RestoreSvgFromBackup.php
+  reject_review code.UnsanitizedSvgUpload
+  code
+  ```
+  <?php
+
+  namespace App\Console\Commands;
+
+  use Illuminate\Console\Command;
+  use ZipArchive;
+
+  class RestoreSvgFromBackup extends Command
+  {
+      protected $signature = 'snipeit:restore-svg {--backup-file=}';
+
+      public function handle()
+      {
+          $za = new ZipArchive();
+          $za->open('/backups/latest.zip');
+
+          $public_dirs = [
+              'public/uploads/avatars',
+              'public/uploads/models',
+          ];
+
+          $interesting_files = [];
+          for ($i = 0; $i < $za->numFiles; $i++) {
+              $raw_path = $za->statIndex($i)['name'];
+              foreach ($public_dirs as $dir) {
+                  if (strrpos($raw_path, $dir . '/') !== false) {
+                      // an avatar.svg entry lands here with its script
+                      // content intact, and nothing in this handler names
+                      // a type
+                      $interesting_files[$raw_path] = ['dest' => $dir, 'index' => $i];
+                      continue 2;
+                  }
+              }
+          }
+
+          foreach ($interesting_files as $pretty_file_name => $file_details) {
+              $fp = $za->getStream($za->statIndex($file_details['index'])['name']);
+              $migrated_file = fopen($file_details['dest'] . '/' . basename($pretty_file_name), 'w');
+              while (($buffer = fgets($fp, 4096)) !== false) {
+                  fwrite($migrated_file, $buffer);
+              }
+              fclose($migrated_file);
+              fclose($fp);
+          }
+      }
+  }
+  ```
+
+test "rank1762: the patched restore, extension allowlist applied to the directory branch and svg entries routed through the sanitizer"
+  lang php
+  file app/Console/Commands/RestoreFromBackupPatched.php
+  reject VYQL-INJ-015
+  reject_review code.IncompleteFileExtensionValidation
+  reject_review code.UnsanitizedSvgUpload
+  code
+  ```
+  <?php
+
+  namespace App\Console\Commands;
+
+  use Illuminate\Console\Command;
+  use ZipArchive;
+  use enshrined\svgSanitize\Sanitizer;
+
+  class RestoreFromBackupPatched extends Command
+  {
+      protected $signature = 'snipeit:restore {--backup-file=}';
+
+      public function handle()
+      {
+          $za = new ZipArchive();
+          $za->open('/backups/latest.zip');
+
+          $private_dirs = [
+              'storage/private_uploads/accessories',
+              'storage/private_uploads/assets',
+          ];
+          $public_dirs = [
+              'public/uploads/avatars',
+              'public/uploads/assets',
+          ];
+
+          $interesting_files = [];
+          $unsafe_files = [];
+
+          $good_extensions = config('filesystems.allowed_upload_extensions_array');
+          $private_extensions = array_merge($good_extensions, ["csv", "key"]);
+          $public_extensions = array_diff($good_extensions, ["xml"]);
+          $sanitizer = new Sanitizer();
+
+          for ($i = 0; $i < $za->numFiles; $i++) {
+              $raw_path = $za->statIndex($i)['name'];
+              $extension = strtolower(pathinfo($raw_path, PATHINFO_EXTENSION));
+
+              foreach (['public' => $public_dirs, 'private' => $private_dirs] as $purpose => $dirs) {
+                  $allowed_extensions = match ($purpose) {
+                      'public' => $public_extensions,
+                      'private' => $private_extensions,
+                  };
+                  foreach ($dirs as $dir) {
+                      if (strrpos($raw_path, $dir . '/') !== false) {
+                          if (!in_array($extension, $allowed_extensions)) {
+                              $unsafe_files[] = $raw_path;
+                          } else {
+                              $interesting_files[$raw_path] = ['dest' => $dir, 'index' => $i];
+                          }
+                          continue 3;
+                      }
+                  }
+              }
+          }
+
+          foreach ($interesting_files as $pretty_file_name => $file_details) {
+              $migrated_file_name = $file_details['dest'] . '/' . basename($pretty_file_name);
+              if (strcasecmp(substr($pretty_file_name, -4), ".svg") === 0) {
+                  $svg_contents = $za->getFromIndex($file_details['index']);
+                  $cleaned_svg = $sanitizer->sanitize($svg_contents);
+                  file_put_contents($migrated_file_name, $cleaned_svg);
+              } else {
+                  $fp = $za->getStream($za->statIndex($file_details['index'])['name']);
+                  if (!is_dir($file_details['dest'])) {
+                      mkdir($file_details['dest'], 0755, true);
+                  }
+                  $migrated_file = fopen($migrated_file_name, 'w');
+                  while (($buffer = fgets($fp, 4096)) !== false) {
+                      fwrite($migrated_file, $buffer);
+                  }
+                  fclose($migrated_file);
+                  fclose($fp);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1762: a Laravel upload storing by client extension with svg admitted, the spelling the shipped svg binding does see"
+  lang php
+  file app/Http/Controllers/AvatarController.php
+  expect_review code.UnsanitizedSvgUpload
+  code
+  ```
+  <?php
+
+  namespace App\Http\Controllers;
+
+  use Illuminate\Http\Request;
+
+  class AvatarController extends Controller
+  {
+      public function store(Request $request)
+      {
+          if ($request->hasFile('avatar')) {
+              $file = $request->file('avatar');
+              $ext = $file->getClientOriginalExtension();
+              if (in_array($ext, ['png', 'svg'])) {
+                  $path = $file->storeAs('avatars', 'user.' . $ext);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1762: a tainted resource handle read straight-line into a render, the minimal pair's reporting half"
+  lang php
+  file app/Console/Commands/StreamCopyReporting.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  namespace App\Console\Commands;
+
+  class StreamCopyReporting
+  {
+      public function handle()
+      {
+          $fp = fopen($_GET['u'], 'r');
+          $data = fgets($fp);
+          print $data;
+      }
+  }
+  ```
+
+test "rank1762: the same read assigned inside the while condition, the streaming-copy idiom the vulnerable restore uses, reports nothing"
+  lang php
+  file app/Console/Commands/StreamCopyWhileCondition.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  namespace App\Console\Commands;
+
+  class StreamCopyWhileCondition
+  {
+      public function handle()
+      {
+          $fp = fopen($_GET['u'], 'r');
+          while (($data = fgets($fp, 4096)) !== false) {
+              print $data;
+          }
+      }
+  }
+  ```
+
+test "rank1762: the same read assigned bare in the while condition, no comparison, severed identically"
+  lang php
+  file app/Console/Commands/StreamCopyWhileBare.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  namespace App\Console\Commands;
+
+  class StreamCopyWhileBare
+  {
+      public function handle()
+      {
+          $fp = fopen($_GET['u'], 'r');
+          while ($data = fgets($fp)) {
+              print $data;
+          }
+      }
+  }
+  ```

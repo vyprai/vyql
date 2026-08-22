@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedRouteIdentifier : issue {
+  cwe: [CWE_20, CWE_158, CWE_248]
+  reviewAssumption: "remote callers control the route path identifier and downstream request or repository construction assumes the identifier's documented format"
+  reviewCategory: input_validation
+  reviewCondition: "a request-supplied standard-identifier route parameter is forwarded into request processing without the ecosystem's documented format validator in the handling function"
+  reviewConfidence: medium
+  reviewEvidence: "route-identifier context {pattern} reads a standard-identifier route parameter and forwards it with no identifier format validator in the function"
+  vulnerableTo: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+}

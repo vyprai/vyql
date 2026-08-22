@@ -3,5 +3,5 @@ module code;
 review code.ClosureUnwindStaleLength {
   category: memory
   kind: attention
-  text: "review whether a panic in the caller-supplied closure leaves this buffer with a stale length; zero the length before the loop or restore it from a drop guard"
+  text: "review whether a panic in the caller-supplied closure or trait method leaves this buffer with a length claiming unwritten elements; zero the length before the loop, advance it per element, or restore it from a drop guard"
 }

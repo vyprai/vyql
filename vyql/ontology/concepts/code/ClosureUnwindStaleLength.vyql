@@ -2,9 +2,9 @@ module code;
 
 concept ClosureUnwindStaleLength : issue {
   cwe: [CWE_415]
-  reviewAssumption: "the caller-supplied closure can unwind while the buffer still carries its pre-compaction length"
+  reviewAssumption: "the caller-supplied closure or trait method can unwind while the buffer still carries a length claiming elements that were not written"
   reviewCategory: memory
-  reviewCondition: "a raw buffer compaction runs caller code before the collection length is restored"
+  reviewCondition: "a raw buffer fill or compaction runs caller code before the collection length matches what was written"
   reviewConfidence: medium
   reviewEvidence: "closure-unwind buffer lifecycle {pattern} is present"
   vulnerableTo: [memory.DoubleFree, memory.UseAfterFree]

@@ -1,0 +1,24 @@
+module bindings.javascript.corsMiddlewareDefaultWildcardOrigin;
+
+// The `cors` npm package documents its default configuration as
+// `"origin": "*"`, and its own "Simple Usage (Enable All CORS Requests)"
+// example is `app.use(cors())`. So a `cors(...)` call whose options carry no
+// `origin` builds a middleware that reflects every requester's origin back in
+// `Access-Control-Allow-Origin`. On a server that also serves local files that
+// is a cross-origin read of the developer's machine from any page they visit.
+//
+// The check is the option name, not an argument count: `cors({ methods: [...] })`
+// still leaves `origin` at its documented default, and passing the options
+// object by variable is read the same way as passing it inline. Restricting the
+// origin -- to a callback, a fixed list, or a single configured origin -- is the
+// documented way to leave the default, and that is what the `not` clause reads.
+//
+// `callee.path == "cors"` is exact, so `something.cors()` is not reported: only
+// the package's own default export, called as the README spells it.
+binding jsCorsMiddlewareDefaultWildcardOrigin {
+  requires {
+    dependency("cors")
+  }
+  query pattern callExpr where callee.path == "cors" and not (args.any.literal contains "origin")
+  emit issue code.PermissiveCors at call
+}

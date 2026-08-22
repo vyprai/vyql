@@ -1,0 +1,167 @@
+# CVE-2020-5216: secure_headers assembled each Content-Security-Policy
+# directive by joining the configured source list into the header value, and
+# escaped only the semicolon -- the character that would start another
+# directive on the same line:
+#
+#   def build_source_list_directive(directive)
+#     source_list = @config.directive_value(directive)
+#     if source_list != OPT_OUT && source_list && source_list.any?
+#       minified_source_list = minify_source_list(directive, source_list).join(" ")
+#       if minified_source_list.include?(";")
+#         Kernel.warn("#{directive} contains a ; in '#{minified_source_list}' which will raise an error in future versions. It has been replaced with a blank space.")
+#       end
+#
+#       escaped_source_list = minified_source_list.gsub(";", " ")
+#       [symbol_to_hyphen_case(directive), escaped_source_list].join(" ").strip
+#     end
+#   end
+#
+# SecureHeaders::Configuration#generate_headers writes the result into the Rack
+# response header hash:
+#
+#   header_name, value = klass.make_header(instance_variable_get("@#{attr}"))
+#   headers[header_name] = value
+#
+# A newline inside a source-list value survives the semicolon-only escape, and
+# the server splits the emitted Content-Security-Policy header on it: Rails
+# silently emits a second header for the text after the newline, and a policy
+# set is enforced as the intersection of every policy, so an injected
+# `default-src 'none'; report-uri evil.com` weakens or reports on the site's
+# CSP (CWE-113). The advisory's entry point is the public append/override API,
+# whose directive values are caller-supplied.
+#
+# The fixed revision widens the escape to a character class that also carries the newline:
+# `minified_source_list.gsub(/[\n;]/, " ")`. It landed as the single commit
+# 3a2b548 inside the advisory's merge, whose combined diff is empty; read it as
+# `git diff 1298905 3a2b548`.
+#
+# The header write is an element assignment on the response header hash, which
+# Rack and Rails document as the way to set a header; the sink is
+# code.ResponseHeaderWrite (VYQL-INJ-010). That sink now declares the line
+# terminator as its excluded character, so a filter that provably strips
+# newlines is credited as a sanitizer while the semicolon-only escape is
+# reported with the incomplete-filter advisory. A bare `gsub("\n", " ")` --
+# the workaround the advisory suggests -- is a plain string pattern rather than
+# a character class, so the character-effect analysis cannot prove it and the
+# finding stands; only class-shaped and allowlist-shaped filters are provable.
+
+test "rank1720: a request-supplied source list reaches the CSP header with only the semicolon escaped"
+  lang ruby
+  expect VYQL-INJ-010
+  code
+  ```
+  module SecureHeaders
+    class ContentSecurityPolicy
+      def build_source_list_directive(directive, source_list)
+        minified_source_list = source_list.join(" ")
+        escaped_source_list = minified_source_list.gsub(";", " ")
+        [directive, escaped_source_list].join(" ").strip
+      end
+    end
+  end
+
+  class ApplicationController
+    def set_policy
+      policy = SecureHeaders::ContentSecurityPolicy.new
+      headers = {}
+      headers["Content-Security-Policy"] = policy.build_source_list_directive("script-src", [params[:host]])
+      headers
+    end
+  end
+  ```
+
+test "rank1720: the patched escape strips the newline as well as the semicolon"
+  lang ruby
+  reject VYQL-INJ-010
+  code
+  ```
+  module SecureHeaders
+    class ContentSecurityPolicy
+      def build_source_list_directive(directive, source_list)
+        minified_source_list = source_list.join(" ")
+        escaped_source_list = minified_source_list.gsub(/[\n;]/, " ")
+        [directive, escaped_source_list].join(" ").strip
+      end
+    end
+  end
+
+  class ApplicationController
+    def set_policy
+      policy = SecureHeaders::ContentSecurityPolicy.new
+      headers = {}
+      headers["Content-Security-Policy"] = policy.build_source_list_directive("script-src", [params[:host]])
+      headers
+    end
+  end
+  ```
+
+test "rank1720: the Rails response.headers spelling reports the same unescaped join"
+  lang ruby
+  expect VYQL-INJ-010
+  code
+  ```
+  module SecureHeaders
+    class ContentSecurityPolicy
+      def build_source_list_directive(directive, source_list)
+        minified_source_list = source_list.join(" ")
+        escaped_source_list = minified_source_list.gsub(";", " ")
+        [directive, escaped_source_list].join(" ").strip
+      end
+    end
+  end
+
+  class ApplicationController
+    def set_policy
+      policy = SecureHeaders::ContentSecurityPolicy.new
+      response.headers["Content-Security-Policy"] = policy.build_source_list_directive("script-src", [params[:host]])
+    end
+  end
+  ```
+
+test "rank1720: the Rails response.headers spelling is also cleared by the patched escape"
+  lang ruby
+  reject VYQL-INJ-010
+  code
+  ```
+  module SecureHeaders
+    class ContentSecurityPolicy
+      def build_source_list_directive(directive, source_list)
+        minified_source_list = source_list.join(" ")
+        escaped_source_list = minified_source_list.gsub(/[\n;]/, " ")
+        [directive, escaped_source_list].join(" ").strip
+      end
+    end
+  end
+
+  class ApplicationController
+    def set_policy
+      policy = SecureHeaders::ContentSecurityPolicy.new
+      response.headers["Content-Security-Policy"] = policy.build_source_list_directive("script-src", [params[:host]])
+    end
+  end
+  ```
+
+test "rank1720: a configured source list is not an injection site"
+  lang ruby
+  reject VYQL-INJ-010
+  code
+  ```
+  module SecureHeaders
+    class ContentSecurityPolicy
+      def build_source_list_directive(directive, source_list)
+        minified_source_list = source_list.join(" ")
+        escaped_source_list = minified_source_list.gsub(";", " ")
+        [directive, escaped_source_list].join(" ").strip
+      end
+    end
+  end
+
+  class ApplicationController
+    def set_policy
+      policy = SecureHeaders::ContentSecurityPolicy.new
+      headers = {}
+      headers["Content-Security-Policy"] = policy.build_source_list_directive("script-src", ["https://cdn.example.com"])
+      headers
+    end
+  end
+  ```

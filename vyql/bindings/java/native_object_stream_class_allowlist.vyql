@@ -58,3 +58,24 @@ binding safeDeserialization903 {
     }
   }
 }
+
+// The other place the class set runs unbounded is the serialization hook
+// itself. java.io.Serializable's contract names the JVM-invoked private
+// readObject(ObjectInputStream) (and Externalizable's readExternal(ObjectInput)),
+// and every value such a hook reads with s.readObject() is attacker-chosen
+// whenever the stream is. A hook that resolves one of those values as a class
+// name with Class.forName and instantiates the result -- newInstance directly
+// or through a Constructor -- runs the constructor of whatever class the
+// stream named, which is the same unrestricted-class-set obligation the blob
+// decoders above carry, reached through reflection instead of through the
+// stream's own class resolution. Class.isAssignableFrom, Class.isInstance and
+// Class.asSubclass are the documented ways to bound the set before
+// instantiating; a check applied to the constructed object does not bound it,
+// because its constructor has already run, so only the Class-level checks
+// neutralise this binding. Whether the bound is narrow enough is the rule's
+// question, and the filter controls above are what the rule consumes.
+
+binding unrestrictedClassDeserialization905 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["readObject", "readExternal"]) and node.context.paramType contains "ObjectInput" and node.context.callPath contains "Class.forName" and node.context.callPath contains "newInstance" and not (containsAny(node.context.call, [isAssignableFrom, isInstance, asSubclass]))
+  emit issue code.UnrestrictedClassDeserialization at node
+}

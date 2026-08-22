@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnsanitizedEditorContentHtmlRender {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_79]
+    id: "VYQL-INJ-278"
+    severity: high
+  }
+  issue code.UnsanitizedEditorContentHtmlRender as sink
+}

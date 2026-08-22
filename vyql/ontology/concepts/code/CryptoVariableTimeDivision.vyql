@@ -1,0 +1,11 @@
+module code;
+
+concept CryptoVariableTimeDivision : issue {
+  cwe: [CWE_200, CWE_203, CWE_208]
+  reviewAssumption: "an attacker can request repeated private-key operations and observe the timing of each one"
+  reviewCategory: crypto
+  reviewCondition: "modular field arithmetic divides a secret-dependent value with the hardware division or remainder operator instead of a constant-time reduction"
+  reviewConfidence: medium
+  reviewEvidence: "variable-time division context {pattern} applies compound division or remainder inside modular reduction without an observed constant-time alternative"
+  vulnerableTo: [crypto.ObservableDiscrepancy]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept IndexOperatorWithoutBoundsCheck : issue {
+  cwe: [CWE_125, CWE_129, CWE_787]
+  reviewAssumption: "the indexing entrypoint trusts the index to be in range"
+  reviewCategory: memory
+  reviewCondition: "an Index or IndexMut implementation computes the element address from the index with raw-pointer arithmetic and its body compares the index against nothing"
+  reviewConfidence: medium
+  reviewEvidence: "the indexing method dereferences through pointer arithmetic on the index with no bounds comparison in its body"
+  vulnerableTo: [memory.OobRead, memory.OobWrite]
+}

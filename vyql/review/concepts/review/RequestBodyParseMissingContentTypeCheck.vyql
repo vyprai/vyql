@@ -1,0 +1,8 @@
+module code;
+
+review code.RequestBodyParseMissingContentTypeCheck {
+  category: csrf
+  expected: [core.CsrfProtection, core.AuthenticationCheck]
+  kind: attention
+  text: "review request handlers that read a body for an enforced content type before parsing it"
+}

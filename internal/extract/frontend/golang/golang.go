@@ -402,6 +402,7 @@ func (c *conv) typeContextStmts(g *ast.GenDecl, methods map[string]map[string]bo
 		for _, f := range fields {
 			tokens = append(tokens, "field:"+f)
 		}
+		tokens = append(tokens, c.structFieldTags(ts.Type)...)
 		var ms []string
 		for m := range methods[ts.Name.Name] {
 			ms = append(ms, m)
@@ -429,6 +430,55 @@ func (c *conv) structFieldNames(expr ast.Expr) []string {
 			}
 			seen[n.Name] = true
 			out = append(out, n.Name)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// structFieldTags emits one `field_tag:<Name>=<tag>` token per tagged struct field. A Go
+// struct tag is where a declarative constraint lives -- a validator's rule set, a
+// serializer's redaction directive, a configuration loader's variable name -- so a control
+// stated only in a tag is otherwise invisible to every binding. The tag text is carried as
+// written, minus the whitespace between keys as every other Go context token drops it,
+// rather than parsed into keys: which key means what is a per-library convention and
+// belongs in a binding, and the value quotes are what lets a binding anchor the end of a
+// value, so that `env:"JWT_SECRET"` does not read as a prefix of `env:"JWT_SECRET_FILE"`.
+//
+// A needle against those quotes has to spell them `\\\"`, not `\\"`, and that is a
+// property of the node rather than of this token: analysisCall carries every token as a
+// nir.Const whose Value is strconv.Quote(tok), and unquoteLit
+// (extract/lowering/lowering.go:4119) strips only the outer quote pair, so the inner
+// escapes survive into str_args. Tokens that reach a binding through
+// analysis.function.context instead -- assign:, binary:, call_path: -- are handed to the
+// lowerer as raw strings and take a single backslash. The two spellings are not
+// interchangeable.
+func (c *conv) structFieldTags(expr ast.Expr) []string {
+	st, ok := expr.(*ast.StructType)
+	if !ok || st.Fields == nil {
+		return nil
+	}
+	var out []string
+	for _, f := range st.Fields.List {
+		if f.Tag == nil {
+			continue
+		}
+		tag, err := strconv.Unquote(f.Tag.Value)
+		if err != nil {
+			continue
+		}
+		tag = goCompactWhitespaceReplacer.Replace(tag)
+		if tag == "" {
+			continue
+		}
+		if len(tag) > 512 {
+			tag = tag[:512]
+		}
+		for _, n := range f.Names {
+			if n == nil || n.Name == "_" {
+				continue
+			}
+			out = append(out, "field_tag:"+n.Name+"="+tag)
 		}
 	}
 	sort.Strings(out)

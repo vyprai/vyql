@@ -1,0 +1,11 @@
+module code;
+
+concept PayloadPathWriteWithoutNoFollow : issue {
+  cwe: [CWE_22, CWE_59, CWE_367]
+  reviewAssumption: "the path field is read from a value the caller supplied, so a caller can name a component that already is or can become a link"
+  reviewCategory: path
+  reviewCondition: "a path field read from a parsed payload is used to create directories or write a file by name, with no link-anchored primitive in the same function"
+  reviewConfidence: medium
+  reviewEvidence: "payload-sourced write context {pattern} reads a path key from a parsed value and creates or writes the filesystem by name with no no-follow open, lstat of the target, or exclusive create"
+  vulnerableTo: [path.LinkFollowing, path.PathTraversal, concurrency.Toctou]
+}

@@ -1,0 +1,387 @@
+# static-web-server through 2.40.0 (GHSA-459f-x8vq-xjjm, CVE-2025-67487,
+# CWE-59/CWE-22) serves a directory tree whose entries may be symbolic links,
+# and the advisory names both exploitation routes: a link planted inside the
+# served root is followed when its path is requested directly, and again when
+# the directory listing walks it. The fixture the fixing commit ships pins the
+# shape -- tests/fixtures/public/readme.md is a symlink to ../../../README.md,
+# three directories above the root, and requesting /readme.md returned the
+# project README.
+#
+# The listing half, src/directory_listing.rs read_dir_entries at the fixed revision
+# parent dd43d065, resolves the link and then reads through it:
+#
+#     } else if !opt.disable_symlinks && meta.file_type().is_symlink() {
+#         let symlink = dir_entry.path();
+#         let symlink = match symlink.canonicalize() { Ok(v) => v, ... };
+#         let symlink_meta = match std::fs::symlink_metadata(&symlink) { ... };
+#
+# canonicalize is called only to learn whether the target is a directory, and
+# symlink_metadata only to read its size for the listing row. Neither result is
+# ever compared against the root, so the row is rendered for a target anywhere
+# on the filesystem. The direct-request half lives in static_files.rs
+# get_composed_file_metadata and is the same omission with the resolution
+# delegated to a helper: it tests file_path.is_symlink() behind the
+// disable-symlinks flag and then hands the path to try_metadata, which calls
+# std::fs::metadata and follows the link.
+#
+# 308f0d26ceb9c2c8bd219315d0f53914763357f2 repairs both halves the same way.
+# read_dir_entries gains a root_path, canonicalizes it once, and skips any
+# entry whose resolved target escapes it:
+#
+#     let root_path_abs = opt.root_path.canonicalize()?;
+#     ...
+#     if !symlink_path.starts_with(&root_path_abs) { continue; }
+#
+# and handle resolves the requested path and the base path and refuses the
+# request when the target does not start with the base.
+#
+# What fires without this change: nothing on the defect. `scan --cache off` over the
+# vulnerable checkout reports 31 findings, none in directory_listing.rs. After
+# at the fixed revision the same tree reports 30 findings and the difference is exactly the
+# symlink row. Three runs per side, identical each time.
+#
+# Vocabulary checked for reuse before minting. code.RecursiveDeleteWithoutSymlinkCheck
+# is the delete-driven sibling and its remediation is no-follow resolution, not
+# containment; code.DelegatedDirectoryWriteWithoutNoFollow is the privileged
+// write behind an O_NOFOLLOW flag; code.UncanonicalizedPathContainmentCheck is
+// the inverse defect, a containment comparison that exists but does not
+# canonicalize; the DecodedRequestStaticPathTraversal family keys on decoding,
+# which is not how a link escapes. None covers "the target is resolved and
+# never compared against a base", so code.SymlinkFollowedWithoutBaseContainment
+# is minted for that class. It is bound in Rust, where the standard library
+// documents both halves of the idiom separately: is_symlink, canonicalize and
+# symlink_metadata report and resolve a link and say nothing about where the
+# target lands, while starts_with, strip_prefix, components and ancestors are
+# the component-wise comparisons a rooted tree needs.
+#
+# Deliberately uncovered, and why: the direct-request half. Its only visible
+# atom is the is_symlink test, and that atom is shared with the two refusal
+# forms that are the correct way to handle a link when links are not allowed --
+# qdrant's find_symlink returns the link for its caller to refuse and rzup's
+# find_version_dir_inner filters link entries out of a directory walk. Measured
+# across every tree under /tmp/cve-work/rank* whose Rust files carry
+# is_symlink, keying on the bare test reports those two correct functions and
+# nothing else beside them, so the direct-request half is not separable from
+# the refusal forms at the token level and stays unpinned rather than bought
+# with those two false positives.
+
+test "static-web-server: directory listing resolves a symlink entry and never compares the target against the root"
+  lang rust
+  file src/directory_listing.rs
+  expect VYQL-PATH-083
+  expect_review code.SymlinkFollowedWithoutBaseContainment
+  code
+  ```
+  use std::fs;
+  use std::path::PathBuf;
+
+  struct DirEntryOpts {
+      dir_reader: fs::ReadDir,
+      ignore_hidden_files: bool,
+      disable_symlinks: bool,
+  }
+
+  enum FileType { Directory, File }
+
+  struct FileEntry { name: std::ffi::OsString, size: Option<u64>, r#type: FileType }
+
+  fn read_dir_entries(mut opt: DirEntryOpts) -> Vec<FileEntry> {
+      let mut file_entries: Vec<FileEntry> = vec![];
+
+      for dir_entry in opt.dir_reader {
+          let dir_entry = match dir_entry {
+              Ok(entry) => entry,
+              Err(_) => continue,
+          };
+          let meta = match dir_entry.metadata() {
+              Ok(m) => m,
+              Err(_) => continue,
+          };
+
+          let name = dir_entry.file_name();
+
+          if opt.ignore_hidden_files && name.as_encoded_bytes().first().is_some_and(|c| *c == b'.') {
+              continue;
+          }
+
+          let (r#type, size) = if meta.is_dir() {
+              (FileType::Directory, None)
+          } else if meta.is_file() {
+              (FileType::File, Some(meta.len()))
+          } else if !opt.disable_symlinks && meta.file_type().is_symlink() {
+              // NOTE: we resolve the symlink path below to just know if is a directory or not.
+              // However, we are still showing the symlink name but not the resolved name.
+
+              let symlink = dir_entry.path();
+              let symlink = match symlink.canonicalize() {
+                  Ok(v) => v,
+                  Err(_) => {
+                      continue;
+                  }
+              };
+
+              let symlink_meta = match fs::symlink_metadata(&symlink) {
+                  Ok(v) => v,
+                  Err(_) => {
+                      continue;
+                  }
+              };
+
+              if symlink_meta.is_dir() {
+                  (FileType::Directory, None)
+              } else {
+                  (FileType::File, Some(symlink_meta.len()))
+              }
+          } else {
+              continue;
+          };
+
+          file_entries.push(FileEntry { name, size, r#type });
+      }
+
+      file_entries
+  }
+  ```
+
+test "static-web-server: patched listing skips an entry whose resolved target escapes the canonicalized root"
+  lang rust
+  file src/directory_listing/dir.rs
+  reject VYQL-PATH-083
+  code
+  ```
+  use std::fs;
+  use std::path::{Path, PathBuf};
+
+  struct DirEntryOpts<'a> {
+      dir_reader: fs::ReadDir,
+      root_path: &'a Path,
+      ignore_hidden_files: bool,
+      disable_symlinks: bool,
+  }
+
+  enum FileType { Directory, File }
+
+  struct FileEntry { name: std::ffi::OsString, size: Option<u64>, r#type: FileType }
+
+  fn read_dir_entries(mut opt: DirEntryOpts<'_>) -> Vec<FileEntry> {
+      let mut file_entries: Vec<FileEntry> = vec![];
+      let root_path_abs = opt.root_path.canonicalize().unwrap();
+
+      for dir_entry in opt.dir_reader {
+          let dir_entry = match dir_entry {
+              Ok(entry) => entry,
+              Err(_) => continue,
+          };
+          let meta = match dir_entry.metadata() {
+              Ok(m) => m,
+              Err(_) => continue,
+          };
+
+          let name = dir_entry.file_name();
+
+          if opt.ignore_hidden_files && name.as_encoded_bytes().first().is_some_and(|c| *c == b'.') {
+              continue;
+          }
+
+          let (r#type, size) = if meta.is_dir() {
+              (FileType::Directory, None)
+          } else if meta.is_file() {
+              (FileType::File, Some(meta.len()))
+          } else if !opt.disable_symlinks && meta.file_type().is_symlink() {
+              let symlink_path = dir_entry.path();
+              let symlink_path = match symlink_path.canonicalize() {
+                  Ok(v) => v,
+                  Err(_) => {
+                      continue;
+                  }
+              };
+              if !symlink_path.starts_with(&root_path_abs) {
+                  continue;
+              }
+              let symlink_meta = match fs::symlink_metadata(&symlink_path) {
+                  Ok(v) => v,
+                  Err(_) => {
+                      continue;
+                  }
+              };
+
+              if symlink_meta.is_dir() {
+                  (FileType::Directory, None)
+              } else {
+                  (FileType::File, Some(symlink_meta.len()))
+              }
+          } else {
+              continue;
+          };
+
+          file_entries.push(FileEntry { name, size, r#type });
+      }
+
+      file_entries
+  }
+  ```
+
+test "static-web-server: patched request handler refuses a resolved target outside the base"
+  lang rust
+  file src/static_files.rs
+  reject VYQL-PATH-083
+  code
+  ```
+  use std::path::{Path, PathBuf};
+
+  struct HandleOpts<'a> {
+      base_path: &'a Path,
+      disable_symlinks: bool,
+  }
+
+  fn handle(opts: &HandleOpts<'_>, uri_path: &str) -> Result<PathBuf, u16> {
+      let mut file_path = sanitize_path(opts.base_path, uri_path)?;
+
+      // Prevent symlinks access if option is enabled
+      if file_path.is_symlink() {
+          if opts.disable_symlinks {
+              return Err(403);
+          }
+
+          let symlink_file_path = file_path.canonicalize().map_err(|_| 404)?;
+          let base_path = opts.base_path.canonicalize().map_err(|_| 404)?;
+
+          if !symlink_file_path.starts_with(base_path) {
+              return Err(404);
+          }
+      }
+
+      Ok(file_path)
+  }
+
+  fn sanitize_path(base: &Path, uri_path: &str) -> Result<PathBuf, u16> {
+      let mut p = base.to_path_buf();
+      p.push(uri_path.trim_start_matches('/'));
+      Ok(p)
+  }
+  ```
+
+test "refusal form: a walk that reports the link for the caller to refuse never resolves it"
+  lang rust
+  file lib.rs
+  reject VYQL-PATH-083
+  code
+  ```
+  use std::fs;
+  use std::path::{Path, PathBuf};
+
+  /// Finds the first symlink in the directory tree and returns its path.
+  pub fn find_symlink(directory: &Path) -> Option<PathBuf> {
+      let entries = match fs::read_dir(directory) {
+          Ok(entries) => entries,
+          Err(_) => return None,
+      };
+
+      for entry in entries {
+          let entry = match entry {
+              Ok(entry) => entry,
+              Err(_) => continue,
+          };
+
+          let path = entry.path();
+
+          if path.is_dir() {
+              if let Some(path) = find_symlink(&path) {
+                  return Some(path);
+              }
+          } else if path.is_symlink() {
+              return Some(path);
+          }
+      }
+
+      None
+  }
+  ```
+
+test "refusal form: a filter that skips link entries out of a directory walk"
+  lang rust
+  file lib.rs
+  reject VYQL-PATH-083
+  code
+  ```
+  use std::fs;
+  use std::path::{Path, PathBuf};
+
+  pub fn find_version_dir_inner(component_dir: &Path) -> Option<PathBuf> {
+      let matching_path = fs::read_dir(component_dir)
+          .ok()?
+          .filter_map(|entry| entry.ok())
+          .filter(|entry| entry.path().is_dir() && !entry.metadata().unwrap().is_symlink())
+          .find_map(|entry| Some(entry.path()));
+
+      matching_path
+  }
+  ```
+
+test "containment spelled as strip_prefix against the base also clears the report"
+  lang rust
+  file src/directory_listing/dir.rs
+  reject VYQL-PATH-083
+  code
+  ```
+  use std::fs;
+  use std::path::{Path, PathBuf};
+
+  struct DirEntryOpts<'a> {
+      dir_reader: fs::ReadDir,
+      root_path: &'a Path,
+      disable_symlinks: bool,
+  }
+
+  enum FileType { Directory, File }
+
+  struct FileEntry { name: std::ffi::OsString, size: Option<u64>, r#type: FileType }
+
+  fn read_dir_entries(opt: DirEntryOpts<'_>) -> Vec<FileEntry> {
+      let mut file_entries: Vec<FileEntry> = vec![];
+
+      for dir_entry in opt.dir_reader {
+          let dir_entry = match dir_entry {
+              Ok(entry) => entry,
+              Err(_) => continue,
+          };
+          let meta = match dir_entry.metadata() {
+              Ok(m) => m,
+              Err(_) => continue,
+          };
+
+          let (r#type, size) = if meta.is_dir() {
+              (FileType::Directory, None)
+          } else if !opt.disable_symlinks && meta.file_type().is_symlink() {
+              let symlink_path = dir_entry.path();
+              let symlink_path = match symlink_path.canonicalize() {
+                  Ok(v) => v,
+                  Err(_) => {
+                      continue;
+                  }
+              };
+              if symlink_path.strip_prefix(opt.root_path).is_err() {
+                  continue;
+              }
+              let symlink_meta = match fs::symlink_metadata(&symlink_path) {
+                  Ok(v) => v,
+                  Err(_) => {
+                      continue;
+                  }
+              };
+
+              if symlink_meta.is_dir() {
+                  (FileType::Directory, None)
+              } else {
+                  (FileType::File, Some(symlink_meta.len()))
+              }
+          } else {
+              continue;
+          };
+
+          file_entries.push(FileEntry { name: dir_entry.file_name(), size, r#type });
+      }
+
+      file_entries
+  }
+  ```

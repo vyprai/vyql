@@ -1,0 +1,124 @@
+# Rank 1710 / CVE-2026-35401: Saleor's GraphQL view accepted a JSON
+# body that is a list of operations (query batching) and executed every
+# entry, so one HTTP call carrying thousands of aliased or chained
+# operations forced the server to parse and execute them all (resource
+# exhaustion, CWE-770; GHSA-gqqv-xwx3-jj4h). _handle_query in
+# saleor/graphql/views.py did `data = self.parse_body(request)` then
+# `if isinstance(data, list): responses = [self.get_response(request,
+# entry) for entry in data]` -- nothing caps the operation count; the
+# per-operation cost validator (GRAPHQL_QUERY_MAX_COMPLEXITY)
+# ran inside each entry and never bounded the batch. The pool row's
+# commit e11a5557ef is the peeled 3.23.0 release tag (version bumps
+# only) and the fixing change is its ancestor e42aa4d6 ("Merge commit from
+# fork", full SHA e42aa4d6e588982e78942b033af051c8ec8f43fa, single
+# parent), so the parent commit carries the
+# remediation: the row is repointed. The fixed revision adds three caps --
+# GRAPHQL_BATCH_MAX_COUNT
+# rejects `len(data) > limit` with a 400 before the batch loop (the
+# snippet below), and two new graphql-core validation rules
+# (AliasCountLimitRule counting aliased fields, MutationCountLimitRule
+# counting root mutation selections) run inside the existing
+# graphql.validation.validate call alongside the cost validator.
+#
+# ATTENTION, request-batch amplification budget. The defect is a
+# dispatch loop whose only bound is the attacker's operation count --
+# the cross-iteration budget family of ranks 1534 (header
+# accumulation), 1554 (route combination explosion), 1559 (wire
+# length) and 1586 (recursion depth), here over a request-supplied
+# list rather than parsed members: the corpus's CWE-400 rules judge
+# per-iteration progress (VYQL-DOS-029 parsers, VYQL-DOS-028 buffered
+# reads), not a budget charged across request items, so nothing can
+# ask "does the batch dispatch stop at an operation-count cap". A
+# binding on the view's own batch branch would have to key on the
+# absence of the changeed revision's own construct: the vulnerable and patched
+# functions differ only by `len(data) > settings.GRAPHQL_BATCH_MAX_
+# COUNT`, and a negation on `len(` stops discriminating the moment a
+# cap arrives by slicing, a helper, or an upstream-style `self.batch`
+# gate (the rename test); the framework-API route is closed because
+# the generated graphene-django bindings are dependency-gated and
+# inert here -- saleor declares its dependencies in pyproject.toml,
+# which the scanner does not parse, and carries no requirements.txt.
+# Measured on the real code: scanning saleor/graphql/views.py reports
+# one VYQL-AUTH-099 mass-assignment finding at the vulnerable revision and the
+# same finding at the fixed revision -- the batch loop is on the taint path but
+# nothing about the count fires, and the finding does not
+# discriminate. No ENGINE-GAPS.md entry: the piece is batch-budget
+# vocabulary, not a localised construct. No definition change
+# shipped. Spec cve_rank1710 records the unbounded batch loop and the
+# count-capped form, both asserting reject VYQL-DOS-029: when
+# batch-budget vocabulary lands, the unbounded form must flip to
+# expect.
+
+test "rank1710: every batched operation executes with no count cap"
+  lang python
+  file saleor/graphql/views.py
+  reject VYQL-DOS-029
+  code
+  ```
+  class GraphQLView(View):
+      def _handle_query(self, request: HttpRequest) -> JsonResponse:
+          try:
+              data = self.parse_body(request)
+          except ValueError:
+              return JsonResponse(
+                  data={
+                      "errors": [
+                          self.format_error(GraphQLError("Unable to parse query."))
+                      ]
+                  },
+                  status=400,
+              )
+
+          result: GraphQLOperationResult | None | list[GraphQLOperationResult | None]
+          if isinstance(data, list):
+              responses = [self.get_response(request, entry) for entry in data]
+              result = [response for response, code in responses]
+              status_code = max((code for response, code in responses), default=200)
+          else:
+              result, status_code = self.get_response(request, data)
+          return JsonResponse(data=result, status=status_code, safe=False)
+  ```
+
+test "rank1710: the fixed revision rejects batches over the operation cap"
+  lang python
+  file saleor/graphql/views.py
+  reject VYQL-DOS-029
+  code
+  ```
+  from django.conf import settings
+
+
+  class GraphQLView(View):
+      def _handle_query(self, request: HttpRequest) -> JsonResponse:
+          try:
+              data = self.parse_body(request)
+          except ValueError:
+              return JsonResponse(
+                  data={
+                      "errors": [
+                          self.format_error(GraphQLError("Unable to parse query."))
+                      ]
+                  },
+                  status=400,
+              )
+
+          result: GraphQLOperationResult | None | list[GraphQLOperationResult | None]
+          if isinstance(data, list):
+              if len(data) > settings.GRAPHQL_BATCH_MAX_COUNT:
+                  return JsonResponse(
+                      data={
+                          "errors": [
+                              self.format_error(
+                                  GraphQLError("Number of batch queries exceeded.")
+                              )
+                          ]
+                      },
+                      status=400,
+                  )
+              responses = [self.get_response(request, entry) for entry in data]
+              result = [response for response, code in responses]
+              status_code = max((code for response, code in responses), default=200)
+          else:
+              result, status_code = self.get_response(request, data)
+          return JsonResponse(data=result, status=status_code, safe=False)
+  ```

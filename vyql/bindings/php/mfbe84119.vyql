@@ -2438,13 +2438,21 @@ binding csrfProtection429 {
   }
 }
 
+// The review facts for a disabled cURL certificate check are derived from the
+// enclosing scope's text, so they only mean what the scope means when that
+// scope is the function holding the call: at class or file scope the option
+// name and the disabling value can come from statements that have nothing to
+// do with each other -- a constant array enabling verification next to an
+// ini_get() comparison on a boolean -- and the fact then reports a handle
+// that is verifying. The per-call bindings below carry the array spelling
+// whose options are written inline, so top-level code keeps its finding.
 binding certValidationDisabled430 {
-  query pattern presenceNode where node.context.language == "php" and node.context.phpReview == "curl_ssl_verifypeer_disabled"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "curl_ssl_verifypeer_disabled"
   emit issue code.CertValidationDisabled at node
 }
 
 binding certValidationDisabled431 {
-  query pattern presenceNode where node.context.language == "php" and node.context.phpReview == "curl_ssl_verifyhost_disabled"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "curl_ssl_verifyhost_disabled"
   emit issue code.CertValidationDisabled at node
 }
 
@@ -2875,4 +2883,211 @@ binding roundcubeSimpleString593 {
       to: call
     }
   }
+}
+
+// The workflow engine's operation interface declares per-scope
+// availability (isAvailableForScope, scope constants in IManager):
+// operations report whether they may be used at admin or user scope.
+// A validator that resolves an operation class from the container and
+// accepts it on type alone, without consulting that gate, persists
+// admin-only operations into user scopes.
+binding workflowOperationScopeValidation700 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.callPath contains "container.query" and node.context.identifier == "IOperation" and not (node.context.callPath contains "isAvailableForScope")
+  emit issue code.AccessPolicyReview at node
+}
+
+// ThinkPHP's I() helper is the framework's documented request-input
+// reader: I("post.uid") returns the raw POST field, so its result is
+// user-controlled data. The type modifiers are covered by the sibling
+// numeric-modifier binding below.
+binding thinkphpInputRead731 {
+  query pattern callExpr where callee.path == "I"
+  emit source code.HttpInput at call.result
+}
+
+// The /d and /f modifiers on ThinkPHP's I() reader force the returned
+// request value to an integer or a float, so the value leaving the
+// call can no longer carry SQL text -- the same value transform, at
+// the same call, as mysqli_real_escape_string above.
+binding thinkphpInputNumericModifier732 {
+  query pattern callExpr where callee.path == "I" and (args.any.literal contains "/d" or args.any.literal contains "/f")
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+// Query builders that accept a condition string (ThinkPHP's where(),
+// Laravel's, Yii's) splice that first argument into the statement's
+// WHERE clause as raw SQL; a value interpolated into it is not
+// parameterised. The builder's own parameterised forms pass the value
+// in a later argument or a map, never inside the condition string.
+binding queryBuilderWhereCondition733 {
+  query pattern callExpr where callee.method == "where"
+  emit sink code.SqlExecution at args[0]
+}
+
+// intval()/floatval() force a value to an integer or a float, so the
+// result can no longer carry SQL text -- the PHP form of the parseInt
+// check binding, and of ThinkPHP's /d and /f request modifiers above.
+binding numericCastParameterization734 {
+  query pattern callExpr where (callee.path ~= "intval" or callee.path ~= "floatval")
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+// SQLite3's object API spells its escaper escapeString(); the
+// snake_case spellings are covered by the bindings above.
+binding sqliteEscapeStringParameterization735 {
+  query pattern callExpr where callee.method == "escapeString"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+// PHP's cURL binding takes its TLS options one call at a time as well as in
+// the single array curl_setopt_array() accepts, and the manual states what
+// each costs: CURLOPT_SSL_VERIFYPEER "TRUE to verify the peer's certificate",
+// CURLOPT_SSL_VERIFYHOST "2 to verify that a Common Name exists and matches
+// to the provided host name ... 0 to not check the names". A curl_setopt()
+// whose option is one of those two and whose value atom is false or 0 is a
+// handle told not to check the peer it is about to talk to, whatever else the
+// surrounding code does. Each call carries only its own three arguments, so a
+// disabling value belonging to CURLOPT_TIMEOUT or CURLOPT_RETURNTRANSFER in a
+// neighbouring call does not satisfy the option clause, and the enabled
+// spellings -- true, and 2 for the host check -- are different atoms. The
+// option's own name contains no digit, so the 0 needle cannot be satisfied by
+// the option argument itself.
+binding certValidationDisabled741 {
+  query pattern callExpr where callee.path == "curl_setopt" and args.any.literal contains "CURLOPT_SSL_VERIFYPEER" and containsAny(args.any.literal, ["false", "0"])
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled742 {
+  query pattern callExpr where callee.path == "curl_setopt" and args.any.literal contains "CURLOPT_SSL_VERIFYHOST" and containsAny(args.any.literal, ["false", "0"])
+  emit issue code.CertValidationDisabled at call
+}
+
+// The same two options written inline in the array curl_setopt_array()
+// takes, which is how the call is spelled wherever it is not built up in a
+// variable first -- including top-level code, where no function exists to
+// carry the scope route above. Only the boolean spelling is matched: the
+// numeric one would let a timeout of 10 or 30 satisfy the clause while the
+// certificate option reads a config flag. Residual, and stated rather than
+// hidden: the two atoms only have to be in the same array, so an unrelated
+// CURLOPT_HEADER => false beside an enabled certificate option also matches.
+// An array held in a variable is the function-scoped route above, which sees
+// the assignment and the call in one scope.
+binding certValidationDisabled743 {
+  query pattern callExpr where callee.path == "curl_setopt_array" and args.any.literal contains "CURLOPT_SSL_VERIFYPEER" and args.any.literal contains "false"
+  emit issue code.CertValidationDisabled at call
+}
+
+binding certValidationDisabled744 {
+  query pattern callExpr where callee.path == "curl_setopt_array" and args.any.literal contains "CURLOPT_SSL_VERIFYHOST" and args.any.literal contains "false"
+  emit issue code.CertValidationDisabled at call
+}
+
+// MeekroDB's query helpers take the statement as their first argument
+// exactly like DB::query(), which the generic `query` method binding
+// above already labels. PHP method lookup is case-insensitive, so the
+// lowercase spellings real code uses are listed beside the documented
+// camelCase ones.
+binding meekrodbQueryFamily812 {
+  query pattern callExpr where callee.method in ["queryFirstRow", "queryfirstrow", "queryFirstOne", "queryfirstone", "queryFirstList", "queryfirstlist", "queryOneCol", "queryonecol", "queryFullLists", "queryfulllists", "queryFirstObject", "queryfirstobject"]
+  emit sink code.SqlExecution at args[0]
+}
+
+// The deprecated mysql extension spells its escaper without the i;
+// the mysqli form is sqlParameterization330 above and the snake_case
+// method form is sqlParameterization331.
+binding mysqlEscapeStringParameterization813 {
+  query pattern callExpr where callee.path ~= "mysql_real_escape_string"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+// intval()/floatval() coerce their argument to an integer or a float,
+// and a number carries no markup, so a cast neutralises reflected and
+// stored HTML injection the same way an encoder does: printing
+// intval($_GET['id']) emits a number, not an unescaped reflection. The
+// numeric-cast binding above (numericCastParameterization734) already
+// credits these calls for SQL injection; this covers the markup threat
+// on the same path shape htmlspecialchars takes (htmlEscape306).
+binding numericCastHtmlEscape860 {
+  query pattern callExpr where (callee.path ~= "intval" or callee.path ~= "floatval")
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+// WordPress documents esc_sql() as preparing data for use as an SQL
+// query: it escapes the text so the returned value can no longer carry
+// SQL syntax, the same value transform as mysqli_real_escape_string
+// above. The wpdb method form of the same escaper is deprecated, and
+// plugin code overwhelmingly spells it as the global function.
+binding sqlEscapeParameterization920 {
+  query pattern callExpr where callee.path == "esc_sql"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+// Yii's BaseYii::createObject() is the framework's object factory: given a
+// configuration array it takes the class to instantiate from the 'class'
+// element (a bare string names the class) and passes the rest to the
+// constructor, so whoever chooses the argument chooses the class that gets
+// instantiated. The class-selection argument is the reflection-invoke
+// position: untrusted configuration reaching it is unsafe reflection
+// (CWE-470), whether it arrives as a behavior spec, a validator type or a
+// component definition.
+binding yiiCreateObjectReflection1121 {
+  query pattern callExpr where callee.path == "Yii.createObject"
+  emit sink code.ReflectionInvoke at args[0]
+}
+
+// is_subclass_of() and is_a() are the PHP builtins that type-check a
+// dynamically chosen class: each asks whether the given object or class
+// name denotes the expected class or a subtype of it, so a factory call
+// they guard can only instantiate the checked type. Dominance coverage,
+// not a path transform: the call tests its argument, it does not clean it,
+// and the rule decides a dominating check neutralises the instantiation
+// (the same shape as roundcubeSimpleString593).
+binding classTypeValidation1122 {
+  query pattern callExpr where callee.path in ["is_subclass_of", "is_a"]
+  emit check core.ClassTypeValidation at call {
+    covers dominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+// ZoneMinder's database API: dbQuery($sql, $params) prepares and
+// executes the statement text it is handed, so the first argument is
+// the statement, exactly like the db_query spelling above. The
+// camelCase form is the project's own; PHP names are case-insensitive
+// so the lowercase spelling a caller might use is listed beside it.
+binding sqlExecution1900 {
+  query pattern callExpr where callee.path in ["dbQuery", "dbquery"]
+  emit sink code.SqlExecution at args[0]
 }

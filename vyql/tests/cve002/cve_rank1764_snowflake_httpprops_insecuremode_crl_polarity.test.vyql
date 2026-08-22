@@ -1,0 +1,287 @@
+# Rank 1764 / CVE-2023-51662 (GHSA-hwcc-4cv8-cf3h, CWE-295):
+# snowflakedb/snowflake-connector-net wires its connection-string option into
+# the HTTP client's certificate-revocation check with the polarity inverted.
+# SFSessionHttpClientProperties.BuildHttpClientConfig
+# (Snowflake.Data/Core/Session/SFSessionHttpClientProperties.cs:75) passes the
+# permissive-polarity field straight through:
+#
+#   internal HttpClientConfig BuildHttpClientConfig()
+#   {
+#       return new HttpClientConfig(
+#           insecureMode,          // <- param 1 is `crlCheckEnabled`
+#           proxyProperties.proxyHost,
+#           ...
+#
+# HttpClientConfig's first parameter is `crlCheckEnabled`
+# (Snowflake.Data/Core/HttpUtil.cs:22), consumed one hop later as
+#
+#   httpHandler = new HttpClientHandler()
+#   {
+#       CheckCertificateRevocationList = config.CrlCheckEnabled,
+#
+# The option and the setting assert opposite polarities: `insecureMode == true`
+# means "relax verification" while `crlCheckEnabled == true` means "perform the
+# check". Joining them without negation inverts the setting both ways -- the
+# default connection (`insecureMode` unset, false) ran with
+# CheckCertificateRevocationList = false, so every connection skipped the CRL
+# check and a MITM holding a revoked certificate for the account's host is
+# accepted, reading credentials off the wire; explicitly requesting insecure
+# mode is the only spelling that turns the check on. Nothing in the
+# application is misused and no untrusted data flows anywhere; the application
+# asked for the secure default and got the insecure one.
+#
+# 49cb77ddd6e18c110eca35aa580e89d73c46cc33 (SNOW-961434, PR #832) changes the
+# one argument to `!insecureMode` and extends the property tests to assert the
+# polarity in both directions. The remediation is present at the commit, the
+# bare `insecureMode` at its parent, so both halves of the 1390 check hold; the
+# pool row is correct in every field and needs no correction.
+#
+# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+# both real checkouts reports byte-identical output: 117 findings each, the same
+# per-rule split (VYQL-CFG-014 x60, VYQL-DOS-001 x10, VYQL-SEC-002 x9,
+# VYQL-NUM-005 x9, VYQL-PATH-001 x8, VYQL-RES-001 x7, singletons below), stable
+# over three runs per side, and `scan -flags only` likewise identical at 152
+# flags each. SFSessionHttpClientProperties.cs carries no label beyond the
+# generic library param-source; the only rows in HttpUtil.cs are a
+# WeakRandomValue at :523 and an UncheckedEncodedLengthArithmetic at :341, the
+# retry backoff and the URL encoder -- findings in the file are not coverage.
+#
+# This is the C# instance of the weakness class rank 1405 filed for Rust
+# (CVE-2025-11695, mongo-rust-driver `tlsInsecure` negated into
+# `allow_invalid_certificates`): a security setting assigned the logical
+# negation -- or here the non-negation -- of the option that requests it.
+# code.CertValidationDisabled (VYQL-CFG-004, CWE-295) is the right existing home
+# and nothing else in the CWE-295 set fits: core.CertificateValidation is the
+# neutralising control, and the ProxyRedirectCertVerificationBypass /
+# CertValidationDependency / SnsCertificateUrlTrustBypass /
+# JavaMailSmtpSslIdentityVerificationMissing shapes are other protocols or
+# redirect hops. No concept or rule is minted here, because the measurements
+# below say nothing that would discriminate can be built on one.
+#
+# ATTENTION, and the blocker is a frontend fact gap plus a destination that is
+# not an API. Both are measured on this rank, not inherited from 1405:
+#
+# (1) The C# walk emits no token for a negation. csStructuredContextTokens
+#     (internal/extract/frontend/treesitter/csharp.go:455) has cases for
+#     assignments, declarations, invocations, object creations, member accesses,
+#     identifiers, element accesses, binary/cast/checked expressions and
+#     literals -- no prefix_unary_expression -- so `!insecureMode` contributes
+#     exactly the tokens `insecureMode` alone would, and csExprShape (:599)
+#     returns "" for the unary kind as well. Measured with probe bindings on a
+#     minimal repro: `node.context.identifier contains "insecureMode"` and
+#     `callee.path == "HttpClientConfig"` both match BOTH revisions; the
+#     function-context token streams are the same list.
+# (2) No argument-position predicate reaches an object-creation call's
+#     arguments. `args.any.literal contains "proxy"` fires on an
+#     invocation_expression carrying that literal and not on
+#     `new HttpClientConfig(..., "proxy.example.com", ...)` -- the arg routes
+#     are live for invocations and inert for object creation -- and there is no
+#     args[N] shape or kind predicate at all, so "argument 0 is a bare field
+#     read, not a unary" is not a statement the binding language can make.
+# (3) The graph keeps the distinction and nothing can read it: the vulnerable
+#     form lowers to `Elem --FLOWS--> Arg --FLOWS--> ...#param#crlCheckEnabled`
+#     and the fixed one to `Unary path=__unary.not` feeding the same parameter
+#     (vyql graph over the pair, case (d)). The discriminating fact exists at
+#     the node level and dies between the USG and the binding layer.
+# (4) Even with (1)-(3) fixed, the destination's polarity is only knowable from
+#     a private class's own parameter name: HttpClientConfig is Snowflake's
+#     `internal class`, undocumented, so a binding keyed on it answers to this
+#     incident rather than to any API documentation -- the genericity test
+#     fails outright. The documented .NET surface one hop down,
+#     HttpClientHandler.CheckCertificateRevocationList, is assigned
+#     `config.CrlCheckEnabled` at BOTH revisions (HttpUtil.cs:143, untouched by
+#     the fixed revision), so a sink binding there scores 1 -> 1; and .NET's documented
+#     default for the property is false, so "not forced to literal true" is the
+#     platform norm rather than a defect signal -- flagging it would fire on
+#     every configurable client and still not separate these revisions.
+# (5) The 1380 counterweight is negative: the patched method's only content is
+#     the constructor call itself, no API-documented control remains inside it,
+#     and no check moved anywhere -- the change is one token in the same function,
+#     so this is not the delegated-check family either.
+#
+# Not judged mechanical. A prefix_unary_expression case in the walk and shape
+# function would be small, but it is a new fact class shared by every C# scan,
+# and it does not by itself unlock the rank: the polarity of the destination
+# parameter is not data in any layer, and correlating "unnegated flag" with
+# "strict-polarity parameter" would be a rule over private identifier
+# spellings, the shape AGENTS.md assigns to neither layer. The Rust sibling of
+# this gap (1405) is judged not mechanical for the same reach reason.
+#
+# The four cases: (a) and (b) are the two real revisions and record the double
+# miss. (c) is the correct conversion at the documented API -- the strict
+# setting derived by negating the permissive flag -- and must stay unflagged.
+# (d) is the frontend pair for (3): the same constructor fed the bare field and
+# the negated field, and a plain method call carrying a literal, showing the arg
+# route live for invocations and absent for object creation.
+#
+# verify_current_expected: attention-engine-gap, all four cases rejected. (c)
+# and (d) are correct code and must remain rejects; (a) flips to expect once a
+# negation fact and an argument-position predicate exist together.
+
+test "rank1764: (a) a permissive-polarity connection option is passed un-negated into the strict-polarity certificate-check parameter, so the default connection skips the CRL check"
+  lang csharp
+  file Snowflake.Data/Core/Session/SFSessionHttpClientProperties.cs
+  reject VYQL-CFG-004
+  reject VYQL-CFG-023
+  code
+  ```
+  namespace Snowflake.Data.Core
+  {
+      internal class HttpClientConfig
+      {
+          public HttpClientConfig(
+              bool crlCheckEnabled,
+              string proxyHost,
+              string proxyPort,
+              string proxyUser,
+              string proxyPassword,
+              string noProxyList,
+              bool disableRetry,
+              bool forceRetryOn404,
+              int maxHttpRetries,
+              bool includeRetryReason = true)
+          {
+              CrlCheckEnabled = crlCheckEnabled;
+          }
+
+          public readonly bool CrlCheckEnabled;
+      }
+
+      internal class SFSessionHttpClientProperties
+      {
+          internal bool insecureMode;
+          internal string proxyHost;
+          internal string proxyPort;
+
+          internal HttpClientConfig BuildHttpClientConfig()
+          {
+              return new HttpClientConfig(
+                  insecureMode,
+                  proxyHost,
+                  proxyPort,
+                  null,
+                  null,
+                  null,
+                  false,
+                  false,
+                  7,
+                  true);
+          }
+      }
+  }
+  ```
+
+test "rank1764: (b) the fixed revision negates the option on the way into the strict-polarity parameter"
+  lang csharp
+  file Snowflake.Data/Core/Session/SFSessionHttpClientProperties.cs
+  reject VYQL-CFG-004
+  reject VYQL-CFG-023
+  code
+  ```
+  namespace Snowflake.Data.Core
+  {
+      internal class HttpClientConfig
+      {
+          public HttpClientConfig(
+              bool crlCheckEnabled,
+              string proxyHost,
+              string proxyPort,
+              string proxyUser,
+              string proxyPassword,
+              string noProxyList,
+              bool disableRetry,
+              bool forceRetryOn404,
+              int maxHttpRetries,
+              bool includeRetryReason = true)
+          {
+              CrlCheckEnabled = crlCheckEnabled;
+          }
+
+          public readonly bool CrlCheckEnabled;
+      }
+
+      internal class SFSessionHttpClientProperties
+      {
+          internal bool insecureMode;
+          internal string proxyHost;
+          internal string proxyPort;
+
+          internal HttpClientConfig BuildHttpClientConfig()
+          {
+              return new HttpClientConfig(
+                  !insecureMode,
+                  proxyHost,
+                  proxyPort,
+                  null,
+                  null,
+                  null,
+                  false,
+                  false,
+                  7,
+                  true);
+          }
+      }
+  }
+  ```
+
+test "rank1764: (c) a strict-polarity documented setting derived by negating a permissive option is the correct conversion and must not be flagged"
+  lang csharp
+  file Snowflake.Data/Core/HttpUtil.cs
+  reject VYQL-CFG-004
+  reject VYQL-CFG-023
+  code
+  ```
+  using System.Net.Http;
+
+  namespace Snowflake.Data.Core
+  {
+      internal class HandlerFactory
+      {
+          internal bool insecureMode;
+
+          internal HttpMessageHandler SetupCustomHttpHandler()
+          {
+              return new HttpClientHandler()
+              {
+                  // The strict-polarity setting, negated from the permissive option
+                  CheckCertificateRevocationList = !insecureMode,
+                  UseCookies = false,
+                  UseProxy = false
+              };
+          }
+      }
+  }
+  ```
+
+test "rank1764: (d) the frontend pair: the same constructor fed the bare field and the negated field, plus a plain invocation whose argument route is live -- the negation and the argument position are both invisible on the object-creation call"
+  lang csharp
+  file Snowflake.Data/Core/Pair.cs
+  reject VYQL-CFG-004
+  reject VYQL-CFG-023
+  code
+  ```
+  using System;
+
+  namespace Snowflake.Data.Core
+  {
+      internal class Pair
+      {
+          internal bool insecureMode;
+
+          internal HttpClientConfig BareField()
+          {
+              return new HttpClientConfig(insecureMode, null, null, null, null, null, false, false, 7, true);
+          }
+
+          internal HttpClientConfig NegatedField()
+          {
+              return new HttpClientConfig(!insecureMode, null, null, null, null, null, false, false, 7, true);
+          }
+
+          internal void InvocationWithLiteral()
+          {
+              Console.WriteLine("proxy.example.com");
+          }
+      }
+  }
+  ```

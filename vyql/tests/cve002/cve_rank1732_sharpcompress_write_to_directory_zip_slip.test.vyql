@@ -1,0 +1,275 @@
+# Rank 1732 / CVE-2018-1002206 (adamhathcock/sharpcompress, fix merge 42b1205fb435de523e6ef8ac5b7bafbe712997f6,
+# "prevent extracting archived files outside of target path"). The archive entry's
+# name -- `IArchiveEntry.Key`, read straight out of the archive -- builds the
+# extraction destination with no containment check:
+#
+#   src/SharpCompress/Archives/IArchiveEntryExtensions.cs (WriteToDirectory)
+#     string file = Path.GetFileName(entry.Key);
+#     if (options.ExtractFullPath)
+#     {
+#         string folder = Path.GetDirectoryName(entry.Key);
+#         string destdir = Path.Combine(destinationDirectory, folder);
+#         if (!Directory.Exists(destdir)) { Directory.CreateDirectory(destdir); }
+#         destinationFileName = Path.Combine(destdir, file);
+#     }
+#     else { destinationFileName = Path.Combine(destinationDirectory, file); }
+#     if (!entry.IsDirectory) { entry.WriteToFile(destinationFileName, options); }
+#
+# `Path.GetFileName` keeps only the final segment, so the flat branch cannot
+# carry `..`; the traversal lives in `Path.GetDirectoryName(entry.Key)`, whose
+# result is joined under the destination and written unchecked. An entry keyed
+# `..\..\evil.txt` escapes the destination directory. The fixed revision resolves the
+# destination once with `Path.GetFullPath`, re-resolves both the directory and
+# the final file name, and throws unless each starts with the resolved
+# destination -- the classic zip-slip containment remediation.
+#
+# Step 0: no metadata flag; the merge commit's diff reads in full against its
+# first parent and matches the advisory. Recorded CWE-22 (zip-slip), correct.
+#
+# Diagnosis. Nothing is labelled: C# had no source for an archive entry's name
+# (`code.ArchiveEntryName` existed for python, powershell, java, javascript and
+# php only) and no sink for the SharpCompress extraction call
+# (`archiveEntryWrite77` bound `ExtractToFile`, the System.IO.Compression
+# spelling, but not `WriteToFile`). Fixed at the binding layer: `IEntry`/`IArchiveEntry`
+# `.Key` and `ZipArchiveEntry` `.FullName`/`.Name` read as
+# `code.ArchiveEntryName`, and `WriteToFile`/`ExtractToFile` args[0] as
+# `code.ArchiveEntryWrite` -- both spelled from the libraries' documentation,
+# receiver-type constrained for the sources like the Java `ZipEntry.getName`
+# binding. The rule is the existing VYQL-PATH-004
+# (`taint core.UserControlledData -> code.ArchiveEntryWrite`); `Path.GetFullPath`
+# is `core.PathCanonicalization`, which is what holds the reject
+# direction. The sibling `IReaderExtensions.WriteEntryToDirectory` carries the
+# same shape through `reader.Entry.Key`, but that receiver is an untyped
+# property chain and outside this fix's scope; the advisory's commit touched
+# the Archive path only.
+#
+# Measured. The vulnerable function reports VYQL-PATH-004 at the
+# `entry.WriteToFile` call when its file is scanned with its own directory
+# (1 finding, union of three `--cache off` runs), and 0 on the patched form, 0
+# on the flat GetFileName form. Collateral over the whole clone set: the only
+# `.WriteToFile(`/`.ExtractToFile(` C# call sites outside this repository are
+# six NuGet files; NuGetGallery/src scans identically before and after (1600
+# findings a side, union of three runs each), and every NuGet.Client subtree
+# holding a reachable site reports 0 -- the 1474 test-helper
+# `entry.ExtractToFile(destinationPath)` sites, the zero-argument MSBuild
+# `ProjectFactoryTest` `link.WriteToFile()` calls and the static
+# `PackageSpecWriter.WriteToFile(spec, path)` sites produce nothing. The one
+# remaining real site, Validation.Symbols.Core/ZipArchiveService.cs:120, is
+# the contained form and is not silent: it carries a pre-existing
+# VYQL-PATH-004 from the older `ExtractToFile` binding, the same finding on
+# both sides, because its `Path.GetFullPath`/`StartsWith` containment sits in
+# the calling `Extract` method while the sink is in `OnExtract` -- the
+# function-local-guard attribution family.
+#
+# Residual, an engine gap and not a data fix: on a whole-tree scan the same
+# file lowers into one cross-file module and `Path.Combine(...)` at line 61
+# resolves by unique short name to the tree's only other `Combine` --
+# `CRC32.Combine` in Compressors/Deflate/CRC32.cs -- so the entry-name taint
+# routes into CRC32's `length` parameter and dies there instead of reaching the
+# extraction call. The cross-file unique-name fallback in
+# `resolveTargets` (internal/extract/lowering/lowering.go) exists to connect
+# dynamically-typed receivers to helpers in other files and is shared by every
+# frontend, so narrowing it for qualified static calls like `Path.Combine` is a
+# language-wide resolution tradeoff, not a local correction. The spec below
+# pins the construct with the single-file expect/reject pair, which is the
+# minimal pair for that gap: identical shape, differing only in scan scope.
+
+test "rank1732: an archive entry name builds the extraction destination with no containment check"
+  lang csharp
+  file src/SharpCompress/Archives/IArchiveEntryExtensions.cs
+  expect VYQL-PATH-004
+  code
+  ```
+  using System.IO;
+  using SharpCompress.Archives;
+  using SharpCompress.Common;
+
+  namespace SharpCompress.Archives
+  {
+      public static class IArchiveEntryExtensions
+      {
+          public static void WriteToDirectory(this IArchiveEntry entry, string destinationDirectory,
+                                              ExtractionOptions options = null)
+          {
+              string destinationFileName;
+              string file = Path.GetFileName(entry.Key);
+
+              options = options ?? new ExtractionOptions()
+                                   {
+                                       Overwrite = true
+                                   };
+
+              if (options.ExtractFullPath)
+              {
+                  string folder = Path.GetDirectoryName(entry.Key);
+                  string destdir = Path.Combine(destinationDirectory, folder);
+                  if (!Directory.Exists(destdir))
+                  {
+                      Directory.CreateDirectory(destdir);
+                  }
+                  destinationFileName = Path.Combine(destdir, file);
+              }
+              else
+              {
+                  destinationFileName = Path.Combine(destinationDirectory, file);
+              }
+              if (!entry.IsDirectory)
+              {
+                  entry.WriteToFile(destinationFileName, options);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1732: resolving the destination and requiring the prefix contains the entry"
+  lang csharp
+  file src/SharpCompress/Archives/IArchiveEntryExtensions.cs
+  reject VYQL-PATH-004
+  code
+  ```
+  using System.IO;
+  using SharpCompress.Archives;
+  using SharpCompress.Common;
+
+  namespace SharpCompress.Archives
+  {
+      public static class IArchiveEntryExtensions
+      {
+          public static void WriteToDirectory(this IArchiveEntry entry, string destinationDirectory,
+                                              ExtractionOptions options = null)
+          {
+              string destinationFileName;
+              string file = Path.GetFileName(entry.Key);
+              string fullDestinationDirectoryPath = Path.GetFullPath(destinationDirectory);
+
+              options = options ?? new ExtractionOptions()
+                                   {
+                                       Overwrite = true
+                                   };
+
+              if (options.ExtractFullPath)
+              {
+                  string folder = Path.GetDirectoryName(entry.Key);
+                  string destdir = Path.GetFullPath(
+                                      Path.Combine(fullDestinationDirectoryPath, folder)
+                                   );
+
+                  if (!Directory.Exists(destdir))
+                  {
+                      if (!destdir.StartsWith(fullDestinationDirectoryPath))
+                      {
+                          throw new ExtractionException("Entry is trying to create a directory outside of the destination directory.");
+                      }
+
+                      Directory.CreateDirectory(destdir);
+                  }
+                  destinationFileName = Path.Combine(destdir, file);
+              }
+              else
+              {
+                  destinationFileName = Path.Combine(fullDestinationDirectoryPath, file);
+              }
+
+              if (!entry.IsDirectory)
+              {
+                  destinationFileName = Path.GetFullPath(destinationFileName);
+
+                  if (!destinationFileName.StartsWith(fullDestinationDirectoryPath))
+                  {
+                      throw new ExtractionException("Entry is trying to write a file outside of the destination directory.");
+                  }
+
+                  entry.WriteToFile(destinationFileName, options);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1732: a flat extraction that keeps only the final name segment cannot traverse"
+  lang csharp
+  file src/SharpCompress/Archives/FlatEntryExtensions.cs
+  reject VYQL-PATH-004
+  code
+  ```
+  using System.IO;
+  using SharpCompress.Archives;
+
+  namespace SharpCompress.Archives
+  {
+      public static class FlatEntryExtensions
+      {
+          public static void ExtractFlat(this IArchiveEntry entry, string destinationDirectory)
+          {
+              string file = Path.GetFileName(entry.Key);
+              string destinationFileName = Path.Combine(destinationDirectory, file);
+              if (!entry.IsDirectory)
+              {
+                  entry.WriteToFile(destinationFileName);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1732: a base-class-library entry name joined under a destination with no containment check"
+  lang csharp
+  file src/Validation.Symbols.Core/Extractor.cs
+  expect VYQL-PATH-004
+  code
+  ```
+  using System.IO;
+  using System.IO.Compression;
+
+  namespace Validation.Symbols
+  {
+      public static class Extractor
+      {
+          public static void ExtractOne(ZipArchiveEntry entry, string dest)
+          {
+              string path = Path.Combine(dest, entry.FullName);
+              entry.ExtractToFile(path);
+          }
+      }
+  }
+  ```
+
+test "rank1732: the contained base-class-library form resolves and prefix-checks before extracting"
+  lang csharp
+  file src/Validation.Symbols.Core/ZipArchiveService.cs
+  reject VYQL-PATH-004
+  code
+  ```
+  using System;
+  using System.IO;
+  using System.IO.Compression;
+
+  namespace Validation.Symbols
+  {
+      public abstract class ZipArchiveService
+      {
+          protected string Extract(ZipArchive archive, string targetDirectory, ZipArchiveEntry e)
+          {
+              string destinationPath = Path.GetFullPath(Path.Combine(targetDirectory, e.FullName));
+              string fullTargetDirectory = Path.GetFullPath(targetDirectory + Path.DirectorySeparatorChar);
+              if (!destinationPath.StartsWith(fullTargetDirectory))
+              {
+                  throw new InvalidDataException($"Invalid zip entry '{e.FullName}'.");
+              }
+              OnExtract(e, destinationPath, targetDirectory);
+              return e.FullName;
+          }
+
+          public virtual void OnExtract(ZipArchiveEntry entry, string destinationPath, string targetDirectory)
+          {
+              string destinationDirectory = Path.GetDirectoryName(destinationPath);
+              if (!Directory.Exists(destinationDirectory))
+              {
+                  Directory.CreateDirectory(destinationDirectory);
+              }
+              entry.ExtractToFile(destinationPath);
+          }
+      }
+  }
+  ```

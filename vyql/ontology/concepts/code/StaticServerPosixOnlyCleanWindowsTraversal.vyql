@@ -1,0 +1,11 @@
+module code;
+
+concept StaticServerPosixOnlyCleanWindowsTraversal : issue {
+  cwe: [CWE_22]
+  reviewAssumption: "the static file server can run on Windows and receive URL paths containing backslash parent-directory segments"
+  reviewCategory: path
+  reviewCondition: "a static-file handler URL-decodes request paths, resolves them under a filesystem root, and normalizes with a cleaner that only understands slash separators -- Go's path.Clean instead of filepath.Clean, or a hand-rolled dot-segment remover -- before serving files, so backslash-delimited parent segments survive to the filesystem"
+  reviewConfidence: high
+  reviewEvidence: "static-file context {pattern} decodes a URL path, normalizes it with a slash-only cleaner, and resolves it under a filesystem root without canonicalizing the backslash separator"
+  vulnerableTo: [path.PathTraversal]
+}

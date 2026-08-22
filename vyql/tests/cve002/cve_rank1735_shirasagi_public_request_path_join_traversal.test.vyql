@@ -1,0 +1,213 @@
+# Rank 1735 / CVE-2024-46898: SHIRASAGI's public page controller resolved the
+# request path to a file under the site's public directory and sent it, with no
+# canonicalisation between the two (CWE-22). ApplicationController#request_path
+# is the raw value:
+#
+#   def request_path
+#     request.env["REQUEST_PATH"] || request.path
+#   end
+#
+# and Cms::PublicFilter, mixed into Cms::PublicController, threads it through
+# three before_action methods into the send:
+#
+#   def set_request_path
+#     @cur_path ||= request_path
+#     ...
+#   end
+#   def parse_path
+#     @cur_main_path.sub!(/\/$/, "/index.html")
+#     @file = File.join(@cur_site.path, @cur_main_path)
+#   end
+#   def x_sendfile(file = @file)
+#     return unless Fs.file?(file)
+#     ss_send_file(file, type: Fs.content_type(file), disposition: :inline)
+#   end
+#
+# File.join keeps the `..` components, so a request path of
+# `docs/../../../../<rails-root>/README.md` escapes the site directory and the
+# file is served inline. The fixed revision 5ac4685d7e4330f949f13219069107fc5d768934 adds
+# SS.request_path(request), which runs the path through
+# `Addressable::URI.parse(...).normalize.request_uri` — normalisation resolves
+# the dot segments, so the joined path stays under the site root — and routes
+# every request.path use through it.
+#
+# Both ends are labelled: `request.env` is code.HttpInput (binding
+# httpInput12) and `send_file` is code.FilePathAccess (binding filePathAccess143),
+# so VYQL-PATH-001 needs only a taint path between them. Four independent Ruby
+# frontend gaps sit on that path, and the first test below pins the resulting
+# miss. None of the four is a binding problem.
+#
+# 1. `@cur_path ||= request_path` bind nothing. `operator_assignment`
+#    in internal/extract/frontend/treesitter/ruby.go's rbConv.stmt accepted only
+#    an `identifier` left side and dropped every other target kind to a bare
+#    ExprStmt — the value is evaluated and bound to nothing, exactly the defect
+#    the multiple-assignment case in the same switch documents. It now
+#    accepts the same target kinds as the plain assignment case beside it, and
+#    the fourth test pins the recovered flow. Ruby memoises with
+#    `@x ||= expr` everywhere, so this is the widest of the four.
+# 2. A receiverless, paren-less call names no callee the resolver can match.
+#    `request_path` in Ruby is an `identifier` node, indistinguishable from a
+#    local variable read without scope tracking, so no Call node exists and the
+#    trace dead-ends at `analysis.function.return`. `self.request_path` does
+#    produce a Call, but with path `?.request_path` — the `self` receiver is
+#    dropped rather than substituted with the enclosing class, the same gap
+#    PHP's `dotted()` fixed for `self::`/`static::`. `request_path()` (parens,
+#    no receiver) resolves and carries taint, which is why the third test's
+#    inlined form reports.
+# 3. An instance variable written in one method is not read in another.
+#    `@cur_main_path` is assigned in `set_request_path` and consumed in
+#    `parse_path`; a two-method pair with nothing else on the path reports
+#    nothing, while the same assignment and read inside one method reports.
+#    Ruby has no field-sensitive interprocedural summary, and Rails controller
+#    concerns are built almost entirely out of exactly this shape.
+# 4. A defaulted parameter does not see its default. `def x_sendfile(file = @file)`
+#    lowers the body with `file` unbound to `@file`.
+#
+# Gaps 2 to 4 are not mechanical: 2 needs scope tracking to tell a call from a
+# variable read, 3 is a new interprocedural dataflow relation, 4 needs default
+# substitution wired into parameter lowering. Fixing gap 1 alone does not make
+# the real shape detectable — the first test still reports nothing — so this
+# rank is recorded as an engine gap rather than a fix.
+#
+# Scanning app/controllers at the vulnerable revision (1184 Ruby files) gives
+# 453 findings, 27 of them VYQL-PATH-001, none on concerns/cms/public_filter.rb
+# or on ApplicationController#request_path. The same tree after the op-assign fix
+# is still 453 with identical per-rule counts; the only change is that one
+# VYQL-PATH-001's source attribution moves from an unrelated controller into the
+# memoising file that actually feeds its sink.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1735: the request path joined onto the site directory and served inline"
+  lang ruby
+  file app/controllers/application_controller.rb
+  code
+  ```
+  class ApplicationController < ActionController::Base
+    private
+
+    def request_path
+      request.env["REQUEST_PATH"] || request.path
+    end
+
+    def ss_send_file(file_or_path, opts = {})
+      send_file file_or_path, opts
+    end
+  end
+  ```
+  file app/controllers/concerns/cms/public_filter.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  module Cms::PublicFilter
+    extend ActiveSupport::Concern
+
+    included do
+      before_action :set_request_path
+      before_action :parse_path
+      before_action :x_sendfile
+    end
+
+    def set_request_path
+      @cur_path ||= request_path
+      @cur_main_path = @cur_path.dup
+    end
+
+    def parse_path
+      @cur_path.sub!(/\/$/, "/index.html")
+      @cur_main_path.sub!(/\/$/, "/index.html")
+      @file = File.join(@cur_site.path, @cur_main_path)
+    end
+
+    def x_sendfile(file = @file)
+      return unless Fs.file?(file)
+      ss_send_file(file, type: Fs.content_type(file), disposition: :inline)
+    end
+  end
+  ```
+
+test "rank1735: the path is normalised before it is joined onto the site directory"
+  lang ruby
+  file app/controllers/application_controller.rb
+  code
+  ```
+  module SS
+    def request_path(request)
+      Addressable::URI.parse(request.env["REQUEST_PATH"] || request.path).normalize.request_uri
+    end
+  end
+
+  class ApplicationController < ActionController::Base
+    include SS
+
+    private
+
+    def request_path
+      @request_path ||= SS.request_path(request)
+    end
+
+    def ss_send_file(file_or_path, opts = {})
+      send_file file_or_path, opts
+    end
+  end
+  ```
+  file app/controllers/concerns/cms/public_filter.rb
+  reject VYQL-PATH-001
+  code
+  ```
+  module Cms::PublicFilter
+    extend ActiveSupport::Concern
+
+    included do
+      before_action :set_request_path
+      before_action :parse_path
+      before_action :x_sendfile
+    end
+
+    def set_request_path
+      @cur_path ||= request_path
+      @cur_main_path = @cur_path.dup
+    end
+
+    def parse_path
+      @cur_path.sub!(/\/$/, "/index.html")
+      @cur_main_path.sub!(/\/$/, "/index.html")
+      @file = File.join(@cur_site.path, @cur_main_path)
+    end
+
+    def x_sendfile(file = @file)
+      return unless Fs.file?(file)
+      ss_send_file(file, type: Fs.content_type(file), disposition: :inline)
+    end
+  end
+  ```
+
+test "rank1735: the same join and send report once the request path is read inline"
+  lang ruby
+  file app/controllers/concerns/cms/public_filter.rb
+  expect VYQL-PATH-001
+  code
+  ```
+  module Cms::PublicFilter
+    def index
+      cur_path = request.env["REQUEST_PATH"] || request.path
+      cur_main_path = cur_path.sub(/\/$/, "/index.html")
+      file = File.join(@cur_site.path, cur_main_path)
+      send_file file, type: "text/html", disposition: :inline
+    end
+  end
+  ```
+
+test "rank1735: a memoised request path keeps its taint through the op-assign"
+  lang ruby
+  file app/controllers/cms/public_controller.rb
+  expect VYQL-PATH-001
+  code
+  ```
+  class Cms::PublicController < ApplicationController
+    def index
+      @cur_path ||= params[:path]
+      send_file File.join(@cur_site.path, @cur_path), disposition: :inline
+    end
+  end
+  ```

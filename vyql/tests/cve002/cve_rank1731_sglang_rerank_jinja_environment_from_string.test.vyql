@@ -1,0 +1,139 @@
+# Rank 1731 / CVE-2026-5760: SGLang's reranker rendered the tokenizer's
+# Jinja chat template in the default, unsandboxed environment. _get_jinja_env
+# in python/sglang/srt/entrypoints/openai/serving_rerank.py constructed
+# jinja2.Environment(loader=..., autoescape=False, undefined=...) and the
+# render helpers compiled the model's chat template with
+# env.from_string(chat_template) — chat_template being
+# self.tokenizer_manager.tokenizer.chat_template, a string the loaded model
+# supplies, so a model whose template carries template markup executes it in
+# the server's interpreter during model loading (server-side template
+# injection, CWE-1336). The fixing commit 1e14bd6f (flagged nocommit because the
+# advisory is unreviewed; the commit exists and its message names the CVE) is
+# the fixing change: it imports jinja2.sandbox.ImmutableSandboxedEnvironment and
+# returns that instead. .
+#
+# The compile function's body is identical before and at the fixed revision — only
+# the sibling factory changed — so the function-scoped
+# unsandboxedJinjaTemplateCompile binding (rank 1660's) cannot discriminate
+# this shape; it documented env.from_string as an uncovered residual because
+# the receiver never resolves. The two new module-scoped bindings read the
+# whole file: a file that constructs jinja2's default Environment (dotted or
+# from-import spelling) and compiles a template through from_string, with no
+# SandboxedEnvironment construction anywhere in the file, is the documented
+# untrusted-template shape; the fixed revision removes the jinja2.Environment call and
+# the negation recognises both the SandboxedEnvironment and
+# ImmutableSandboxedEnvironment spellings. All clauses read AST-derived
+# tokens, so comments cannot satisfy or silence either side.
+#
+# Measured, timeout 180 / --max-ram 6GB / --cache off: the vulnerable parent
+# reports VYQL-INJ-024 exactly once, at openai/serving_rerank.py:1 (the
+# module node), 49 findings on the srt/entrypoints subtree against 48 at the
+# fix — the sole delta in both directions, stable across three runs.
+# Collateral, enumerated exhaustively over the ~100-clone corpus by grep for
+# files carrying both an Environment construction and a dotted from_string
+# call: it fires on ragflow's rag/prompts/generator.py (user-defined prompt
+# templates compiled unsandboxed), salt's salt/auth/ldap.py in both salt
+# trees (auth config parameters compiled as templates), and nautobot's
+# core/cli/__init__.py (a file-read template compile, the form the
+# function-scoped binding reports deliberately); nova and pytorch
+# report zero because strutils.bool_from_string and _template_from_string
+# are not the from_string callee (exact last-segment match). False
+# positives: the vendored jinja2 under node's deps/v8_inspector/third_party
+# (four Python-2 example scripts compiling literal templates through an
+# unassigned print call, and jinja2's own environment.py self-reference),
+# the two simple_eval_common.py copies here (module-level literal templates
+# reached through a variable), and salt's tests/unit/serializers and
+# tests/unit/templates/test_jinja.py (whose env.from_string(source)
+# assertions compile a template through a variable) — the
+# unassigned-literal and literal-variable forms the assign token cannot
+# see, kept rather than switching the negation to raw file text, which
+# comments could silence in both directions. Recall residual: a module
+# context carries at most 512 structured tokens, so salt's
+# utils/templates.py (594 lines) and pytorch's codegen/common.py (2328
+# lines) construct their Environment past the cap and stay invisible.
+# BenchmarkPython contains no jinja2 at all, so the +0.90 gate cannot move.
+
+test "rank1731: reranker chat template compiled in the default jinja environment"
+  lang python
+  file srt/entrypoints/openai/serving_rerank.py
+  expect VYQL-INJ-024
+  code
+  ```
+  def _get_jinja_env():
+      try:
+          import jinja2  # Lazy import: server env should provide this dependency.
+      except ModuleNotFoundError as e:
+          raise ValueError("Rendering Qwen3 reranker prompts requires jinja2.") from e
+
+      return jinja2.Environment(
+          loader=jinja2.BaseLoader(),
+          autoescape=False,
+          undefined=jinja2.Undefined,
+      )
+
+
+  def _render_jinja_chat_template(chat_template, query, document, instruct):
+      env = _get_jinja_env()
+      template = env.from_string(chat_template)
+
+      render_kwargs = {
+          "messages": [
+              {"role": "user", "content": query},
+              {"role": "user", "content": document},
+          ]
+      }
+      if instruct:
+          render_kwargs["instruct"] = instruct
+      return template.render(**render_kwargs)
+  ```
+
+test "rank1731: the fixed revision returns a sandboxed environment from the factory"
+  lang python
+  file srt/entrypoints/openai/serving_rerank.py
+  reject VYQL-INJ-024
+  code
+  ```
+  def _get_jinja_env():
+      try:
+          import jinja2  # Lazy import: server env should provide this dependency.
+          from jinja2.sandbox import ImmutableSandboxedEnvironment
+      except ModuleNotFoundError as e:
+          raise ValueError("Rendering Qwen3 reranker prompts requires jinja2.") from e
+
+      # Using a sandboxed environment to stop malicious execution during model loading.
+      return ImmutableSandboxedEnvironment(
+          loader=jinja2.BaseLoader(),
+          autoescape=False,
+          undefined=jinja2.Undefined,
+      )
+
+
+  def _render_jinja_chat_template(chat_template, query, document, instruct):
+      env = _get_jinja_env()
+      template = env.from_string(chat_template)
+
+      render_kwargs = {
+          "messages": [
+              {"role": "user", "content": query},
+              {"role": "user", "content": document},
+          ]
+      }
+      if instruct:
+          render_kwargs["instruct"] = instruct
+      return template.render(**render_kwargs)
+  ```
+
+test "rank1731: a program-authored literal template is the quickstart form, not data"
+  lang python
+  file srt/entrypoints/openai/serving_rerank.py
+  reject VYQL-INJ-024
+  code
+  ```
+  import jinja2
+
+
+  def render_greeting(name):
+      env = jinja2.Environment(loader=jinja2.BaseLoader(), autoescape=False)
+      template = env.from_string("Hello {{ name }}!")
+      return template.render(name=name)
+  ```

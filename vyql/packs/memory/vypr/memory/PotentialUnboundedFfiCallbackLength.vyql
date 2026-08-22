@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule PotentialUnboundedFfiCallbackLength {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_125]
+    id: "VYQL-MEM-064"
+    severity: medium
+  }
+  issue code.UnboundedFfiCallbackLength as u
+}

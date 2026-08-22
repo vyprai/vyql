@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule HostHeaderPortAccessCondition {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_290, CWE_346]
+    id: "VYQL-AUTH-159"
+    severity: high
+  }
+  issue code.HostHeaderPortAccessCondition as sink
+}

@@ -1,0 +1,277 @@
+# Rank 1774 / CVE-2025-0509 (CWE-552): sparkle-project/Sparkle's Autoupdate
+# extracted a downloaded update archive into the directory that holds the
+# archive itself. Every unarchiver derived its destination from the input
+# path's own parent -- SUPipedUnarchiver.m:92
+#     NSString *destination = [_archivePath stringByDeletingLastPathComponent];
+#     ...
+#     [task setArguments:[args arrayByAddingObject:destination]];
+# SUDiskImageUnarchiver.m:174
+#     NSString *toPath = [[_archivePath stringByDeletingLastPathComponent]
+#                            stringByAppendingPathComponent:item];
+#     [manager copyItemAtPath:fromPath toPath:toPath error:&error];
+# and SUBinaryDeltaUnarchiver.m:97
+#     NSString *targetPath = [[_archivePath stringByDeletingLastPathComponent]
+#                            stringByAppendingPathComponent:[sourcePath lastPathComponent]];
+#     applyBinaryDelta(sourcePath, targetPath, _archivePath, NO, ..., &applyDiffError);
+# so extraction wrote into the very directory the downloaded, EdDSA-validated
+# archive lives in, and SUUpdateValidator's install-source scan
+# (SUInstaller installSourcePathInUpdateFolder:) then walked that same shared
+# directory. A local attacker with write access to the cache installation
+# directory replaces the input archive between validation and use, which is
+# the advisory's "replace an existing signed update with another payload,
+# bypassing Sparkle's (Ed)DSA signing checks". The fixed revision threads a dedicated
+# directory created by SPULocalCacheDirectory createUniqueDirectoryInDirectory:
+# through every unarchiver, copies flat packages into it, and makes the
+# install-source scan skip symlinks and aliases.
+#
+# The pool row's commit 0ef1ee0 is the 2.6.4 "Update Package management files"
+# version bump -- four package manifests, no code. The fixing change is
+# 31b462f860d7bb12039b5807a6b0673591d72d88 (PR #2550, shipped in 2.6.1), which
+# is the advisory's only GitHub reference and whose description names this
+# exact weakness. The GHSA's first_patched_version 2.6.4 disagrees; the
+# 2.6.4 release contains only the unrelated PR #2593 atomic-swap change, and
+# the change lands in Autoupdate/*.m, so the row's language is objc, not swift.
+#
+# What fires today, union over three `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` runs per revision: 330 findings / 11 at or above high on the
+# vulnerable tree (5264c01) and the identical 330/11 with an identical rule
+# mix on the fixed tree (31b462f) -- VYQL-MEM-006 x216, VYQL-RACE-002 x91,
+# VYQL-MEM-008 x11, VYQL-MEM-010 x4, VYQL-MOB-004 x3, VYQL-MEM-016 x3,
+# VYQL-RACE-001 x1, VYQL-CRY-003 x1. The only rows on the four unarchiver
+# files are code.LocklessSharedMutation on their dispatch_async blocks and
+# code.NullableDeref elsewhere in AppInstaller.m -- identical sets at both
+# revisions, line-shifted only. Nothing describes the destination choice.
+#
+# ATTENTION, a measured-unshippable judgement, both revisions pinned as
+# misses. The discriminator is not in the code shape:
+#
+# Blocker 1 -- deriving a sibling path from a parent directory is ordinary,
+# documented, and overwhelmingly benign. NSString
+# stringByDeletingLastPathComponent is a path-string utility with no security
+# semantics, and labelling it is measured directly: a throwaway
+# `callee.method == "stringByDeletingLastPathComponent"` binding emitted
+# through code.InsecureTempFile produced 17 VYQL-PATH-003 rows on the corpus's
+# 186 non-sparkle .m files plus sparkle, of which 3 are the vulnerable sites
+# and 3 are confirmed-benign resource-lookups-beside-the-binary in
+# llama.cpp/ollama ggml-metal-device.m:142/145 and qemu ui/cocoa.m:1382. The
+# remaining 11 are sparkle's own internal temporary-path derivations in
+# SUBinaryDeltaCreate.m/SUBinaryDeltaApply.m, which the same fix leaves
+# untouched. That is the settled 1-real-in-6 shape.
+#
+# Blocker 2 -- the vulnerable premise is invisible. What makes "extract beside
+# the archive" a vulnerability here is that the input artifact's EdDSA
+# signature is validated and the artifact is re-read afterwards, in a
+# directory another local party can write to. Neither premise appears at any
+# of the three sites: no tainted data reaches a sink, the archive path is
+# built internally, and the signature check lives in another class
+# (SUUpdateValidator) entirely. The generic idiom is the same code as the
+# benign `unzip x.zip -d .`, so a shape-keyed rule cannot separate them.
+#
+# Blocker 3 -- the only fixed-only tokens are the fixed revision's own vocabulary
+# (_extractionDirectory, the extractionDirectory: selector,
+# createUniqueDirectoryInDirectory) and its incidental API choices. No
+# API-documented call is added or removed inside the affected methods, so the
+# delegated-control counterweight does not apply: the entire diff at each sink
+# is `[_archivePath stringByDeletingLastPathComponent]` -> `_extractionDirectory`.
+#
+# verify_current_expected: attention-measured-unshippable; all five cases
+# rejected.
+
+test "rank1774: piped unarchiver extracts the downloaded archive into the archive's own directory"
+  lang objc
+  file Autoupdate/SUPipedUnarchiver.m
+  reject VYQL-PATH-003
+  reject_review code.InsecureTempFile
+  code
+  ```
+  #import <Foundation/Foundation.h>
+
+  @interface SUPipedUnarchiver : NSObject
+  {
+      NSString *_archivePath;
+  }
+  - (void)extractArchivePipingDataToCommand:(NSString *)command arguments:(NSArray *)args;
+  @end
+
+  @implementation SUPipedUnarchiver
+
+  - (void)extractArchivePipingDataToCommand:(NSString *)command arguments:(NSArray *)args
+  {
+      // the destination is the directory holding the input archive itself
+      NSString *destination = [_archivePath stringByDeletingLastPathComponent];
+
+      NSFileHandle *archiveInput = [NSFileHandle fileHandleForReadingAtPath:_archivePath];
+
+      NSPipe *pipe = [NSPipe pipe];
+      NSTask *task = [[NSTask alloc] init];
+      [task setStandardInput:pipe];
+      [task setLaunchPath:command];
+      [task setArguments:[args arrayByAddingObject:destination]];
+
+      if (![task launchAndReturnError:nil]) {
+          return;
+      }
+
+      NSFileHandle *archiveOutput = [pipe fileHandleForWriting];
+      NSData *data = [archiveInput readDataUpToLength:262144 error:nil];
+      [archiveOutput writeData:data];
+  }
+
+  @end
+  ```
+
+test "rank1774: disk image contents copied out into the archive's own directory"
+  lang objc
+  file Autoupdate/SUDiskImageUnarchiver.m
+  reject VYQL-PATH-003
+  reject_review code.InsecureTempFile
+  code
+  ```
+  #import <Foundation/Foundation.h>
+
+  @interface SUDiskImageUnarchiver : NSObject
+  {
+      NSString *_archivePath;
+  }
+  - (void)copyOutMountedContents:(NSString *)mountPoint;
+  @end
+
+  @implementation SUDiskImageUnarchiver
+
+  - (void)copyOutMountedContents:(NSString *)mountPoint
+  {
+      NSError *error = nil;
+      NSFileManager *manager = [[NSFileManager alloc] init];
+      NSArray *contents = [manager contentsOfDirectoryAtPath:mountPoint error:&error];
+
+      for (NSString *item in contents) {
+          NSString *fromPath = [mountPoint stringByAppendingPathComponent:item];
+          // each extracted item lands beside the input archive
+          NSString *toPath = [[_archivePath stringByDeletingLastPathComponent]
+                                  stringByAppendingPathComponent:item];
+
+          if (![manager isReadableFileAtPath:fromPath]) {
+              continue;
+          }
+
+          if (![manager copyItemAtPath:fromPath toPath:toPath error:&error]) {
+              return;
+          }
+      }
+  }
+
+  @end
+  ```
+
+test "rank1774: binary delta applied to a target inside the archive's own directory"
+  lang objc
+  file Autoupdate/SUBinaryDeltaUnarchiver.m
+  reject VYQL-PATH-003
+  reject_review code.InsecureTempFile
+  code
+  ```
+  #import <Foundation/Foundation.h>
+
+  @interface SUBinaryDeltaUnarchiver : NSObject
+  {
+      NSString *_archivePath;
+      NSString *_updateHostBundlePath;
+  }
+  - (BOOL)applyBinaryDeltaFrom:(NSString *)sourcePath to:(NSString *)targetPath usingArchive:(NSString *)archivePath error:(NSError **)error;
+  - (void)extractDelta;
+  @end
+
+  BOOL applyBinaryDeltaRun(NSString *source, NSString *target, NSString *archive, NSError **error);
+
+  @implementation SUBinaryDeltaUnarchiver
+
+  - (void)extractDelta
+  {
+      NSString *sourcePath = _updateHostBundlePath;
+      // the patched tree is written beside the input delta archive
+      NSString *targetPath = [[_archivePath stringByDeletingLastPathComponent]
+                                  stringByAppendingPathComponent:[sourcePath lastPathComponent]];
+
+      NSError *applyDiffError = nil;
+      if (!applyBinaryDeltaRun(sourcePath, targetPath, _archivePath, &applyDiffError)) {
+          NSLog(@"failed to apply delta: %@", applyDiffError);
+      }
+  }
+
+  @end
+  ```
+
+test "rank1774: the patched unarchivers extracting into a dedicated directory created for the run"
+  lang objc
+  file Autoupdate/SUPipedUnarchiverPatched.m
+  reject VYQL-PATH-003
+  reject_review code.InsecureTempFile
+  code
+  ```
+  #import <Foundation/Foundation.h>
+
+  @interface SPULocalCacheDirectory : NSObject
+  + (NSString *)createUniqueDirectoryInDirectory:(NSString *)directory;
+  @end
+
+  @interface SUPipedUnarchiver : NSObject
+  {
+      NSString *_archivePath;
+      NSString *_extractionDirectory;
+  }
+  - (void)extractArchivePipingDataToCommand:(NSString *)command arguments:(NSArray *)args;
+  @end
+
+  @implementation SUPipedUnarchiver
+
+  - (void)extractArchivePipingDataToCommand:(NSString *)command arguments:(NSArray *)args
+  {
+      // a freshly created unique directory, never the archive's own
+      NSString *destination = _extractionDirectory;
+
+      NSFileHandle *archiveInput = [NSFileHandle fileHandleForReadingAtPath:_archivePath];
+
+      NSPipe *pipe = [NSPipe pipe];
+      NSTask *task = [[NSTask alloc] init];
+      [task setStandardInput:pipe];
+      [task setLaunchPath:command];
+      [task setArguments:[args arrayByAddingObject:destination]];
+
+      if (![task launchAndReturnError:nil]) {
+          return;
+      }
+
+      NSFileHandle *archiveOutput = [pipe fileHandleForWriting];
+      NSData *data = [archiveInput readDataUpToLength:262144 error:nil];
+      [archiveOutput writeData:data];
+  }
+
+  @end
+
+  NSString *makeExtractionDirectory(NSString *cacheInstallationPath)
+  {
+      return [SPULocalCacheDirectory createUniqueDirectoryInDirectory:cacheInstallationPath];
+  }
+  ```
+
+test "rank1774: a resource looked up beside the running binary, the benign parent-derivation idiom a path-parent label would flag"
+  lang objc
+  file Autoupdate/ResourceLookup.m
+  reject VYQL-PATH-003
+  reject_review code.InsecureTempFile
+  code
+  ```
+  #import <Foundation/Foundation.h>
+
+  NSString *findLibraryBesideBinary(void)
+  {
+      NSString *binPath = [[NSProcessInfo processInfo] arguments][0];
+      NSString *binDir = [binPath stringByDeletingLastPathComponent];
+
+      NSString *pathLib = [NSString pathWithComponents:@[binDir, @"default.metallib"]];
+      if ([[NSFileManager defaultManager] isReadableFileAtPath:pathLib]) {
+          return pathLib;
+      }
+      return nil;
+  }
+  ```

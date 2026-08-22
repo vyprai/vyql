@@ -1,0 +1,25 @@
+module bindings.csharp.authCallbackAmbientPolicyReuse;
+
+// A WCF service that installs a ServiceAuthenticationManager answers one
+// question per message in Authenticate: which authorization policies does
+// this invocation authenticate under? The framework hands the callback the
+// ambient policy collection (documented parameter authPolicy, a
+// ReadOnlyCollection) and replaces the policies in force with whatever the
+// callback returns -- and caches that return value, passing the cache back in
+// on later invocations. Returning the parameter is therefore not a neutral
+// "keep the defaults": a login whose credential check failed hands back the
+// cached decision of the previous caller that did authenticate, so once
+// anyone is logged in, later logins succeed regardless of the credentials
+// entered. A callback that never references the parameter decides afresh on
+// every invocation and is not reported.
+//
+// Both anchors come from the documented signature of the hook -- a method
+// named Authenticate taking a ReadOnlyCollection policy parameter -- plus the
+// body's reference to the ambient policy parameter itself, so any
+// ServiceAuthenticationManager implementation reports whichever project ships
+// it. The parameter keeps its documented name here; an implementation that
+// renames it is out of reach of the token route.
+binding authCallbackAmbientPolicyReuse {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.functionName == "Authenticate" and node.context.paramType contains "ReadOnlyCollection" and node.context.identifier in ["authPolicy"]
+  emit issue code.AuthCallbackAmbientPolicyReuse at node
+}

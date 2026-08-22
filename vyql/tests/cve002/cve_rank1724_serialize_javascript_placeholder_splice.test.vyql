@@ -1,0 +1,199 @@
+# Rank 1724 / CVE-2020-7660: serialize-javascript renders functions, regexps,
+# dates, maps and sets as placeholder strings during JSON.stringify and splices
+# their source back into the serialized text afterwards:
+#
+#   var UID                 = Math.floor(Math.random() * 0x10000000000).toString(16);
+#   var PLACE_HOLDER_REGEXP = new RegExp('"@__(F|R|D|M|S|U|I)-' + UID + '-(\\d+)__@"', 'g');
+#   ...
+#   return str.replace(PLACE_HOLDER_REGEXP, function (match, type, valueIndex) {
+#       if (type === 'R') { return "new RegExp(" + ... + ")"; }
+#   });
+#
+# The placeholder pattern anchored on the opening quote without recognising an
+# escaped one, so placeholder-shaped text inside an attacker-controlled string
+# literal ("a\"@__R-<UID>-0__@") matched too, and the callback substituted
+# another property's serialized function/regexp source into that position --
+# splicing attacker-chosen JavaScript into output a consumer eval()s (CWE-74,
+# CWE-94). The guessability of the UID mattered as well: it came from
+# Math.random() with a keyspace of about 2^40, drawn once per process, so the
+# splice is reachable by an online guess. Fix f21a6fb3 does three things: the
+# pattern gains a (\\\\)? capture group, the replace callback takes the
+# backSlash match and returns it unchanged, and the UID comes from
+# randombytes(16) instead of Math.random().
+#
+# What fires today, measured on the real checkout (three --cache off runs per
+# revision, stable): the vulnerable tree reports 31 findings (30 VYQL-INJ-003 +
+# 1 VYQL-CRY-003) and the fixed tree 31 (31 VYQL-INJ-003, zero CRY-003) -- the
+# fix's own regression tests add another eval, so the injection-rule count is
+# higher on the fixed side at both revisions alike. The one label on the
+# vulnerable library file is code.WeakRandomValue on the Math.random UID
+# (index.js:10), which is real but covers only the guessable-delimiter factor:
+# it disappears at the fixed revision, where the UID comes from randombytes. The generated
+# corpus had mapped the randombytes package itself to code.WeakRandomValue
+# (callee.method == "randomBytes", gated on dependency("randombytes")), which
+# labelled the crypto-strength replacement -- and any require("crypto")
+# .randomBytes call in the same project -- as weak randomness and kept the UID
+# signal from discriminating; that binding is gone. randombytes wraps
+# crypto.randomBytes and its browser build throws rather than fall back to a
+# weak source, so no true positive is lost, and across the sibling clones only
+# two trees declare the package at all.
+#
+# Why nothing else can discriminate, measured: the sink of the actual
+# injection is the consumer's eval, not anything in this library -- in-library
+# the entry param is labelled code.ExternalEntryInput and the splice point
+# str.replace(PLACE_HOLDER_REGEXP, ...) is labelled threat.CharFilter, a
+# control, so there is no taint path to judge. The remaining revision facts
+# are the (\\\\)? group and the backSlash callback parameter, and a binding
+# keyed on either is the fixing commit's own layout: rename backSlash and the
+# discrimination dies, which is the rename test failing. A binding on
+# Math.random flowing into new RegExp() would restate VYQL-CRY-003 in this
+# incident's shape -- the library's documentation never says the UID is a
+# security delimiter, so the generic form is the Math.random label that
+# exists.
+#
+# verify_current_expected: the vulnerable form reports VYQL-CRY-003 on the
+# Math.random UID and the patched form reports nothing. When vocabulary for
+# escape-aware placeholder substitution (or weak-randomness-derived
+# delimiters) lands, the unguarded form must also expect that rule.
+
+test "rank1724: substitution-delimiter UID drawn from Math.random with no escape-aware pattern"
+  lang javascript
+  file index.js
+  expect VYQL-CRY-003
+  code
+  ```
+  'use strict';
+
+  // Generate an internal UID to make the regexp pattern harder to guess.
+  var UID                 = Math.floor(Math.random() * 0x10000000000).toString(16);
+  var PLACE_HOLDER_REGEXP = new RegExp('"@__(F|R|D|M|S|U|I)-' + UID + '-(\\d+)__@"', 'g');
+
+  var UNSAFE_CHARS_REGEXP = /[<>\/\u2028\u2029]/g;
+
+  var ESCAPED_CHARS = {
+      '<'     : '\\u003C',
+      '>'     : '\\u003E',
+      '/'     : '\\u002F'
+  };
+
+  function escapeUnsafeChars(unsafeChar) {
+      return ESCAPED_CHARS[unsafeChar];
+  }
+
+  module.exports = function serialize(obj, options) {
+      options || (options = {});
+
+      var regexps = [];
+
+      // Returns placeholders for regexps (identified by index) which are
+      // later replaced by their string representation.
+      function replacer(key, value) {
+          var origValue = this[key];
+
+          if (typeof origValue === 'object' && origValue instanceof RegExp) {
+              return '@__R-' + UID + '-' + (regexps.push(origValue) - 1) + '__@';
+          }
+
+          return value;
+      }
+
+      // Creates a JSON string representation of the value.
+      var str = JSON.stringify(obj, replacer);
+
+      if (options.unsafe !== true) {
+          str = str.replace(UNSAFE_CHARS_REGEXP, escapeUnsafeChars);
+      }
+
+      if (regexps.length === 0) {
+          return str;
+      }
+
+      // Replaces all occurrences of regexp placeholders in the JSON string
+      // with their string representations.
+      return str.replace(PLACE_HOLDER_REGEXP, function (match, type, valueIndex) {
+          if (type === 'R') {
+              return "new RegExp(" + serialize(regexps[valueIndex].source) + ", \"" + regexps[valueIndex].flags + "\")";
+          }
+      });
+  };
+  ```
+
+test "rank1724: fix draws the UID from randombytes and skips placeholders behind an escaped quote"
+  lang javascript
+  file index.js
+  reject VYQL-CRY-003
+  code
+  ```
+  'use strict';
+
+  var randomBytes = require('randombytes');
+
+  // Generate an internal UID to make the regexp pattern harder to guess.
+  var UID_LENGTH          = 16;
+  var UID                 = generateUID();
+  var PLACE_HOLDER_REGEXP = new RegExp('(\\\\)?"@__(F|R|D|M|S|U|I)-' + UID + '-(\\d+)__@"', 'g');
+
+  var UNSAFE_CHARS_REGEXP = /[<>\/\u2028\u2029]/g;
+
+  var ESCAPED_CHARS = {
+      '<'     : '\\u003C',
+      '>'     : '\\u003E',
+      '/'     : '\\u002F'
+  };
+
+  function escapeUnsafeChars(unsafeChar) {
+      return ESCAPED_CHARS[unsafeChar];
+  }
+
+  function generateUID() {
+      var bytes = randomBytes(UID_LENGTH);
+      var result = '';
+      for(var i=0; i<UID_LENGTH; ++i) {
+          result += bytes[i].toString(16);
+      }
+      return result;
+  }
+
+  module.exports = function serialize(obj, options) {
+      options || (options = {});
+
+      var regexps = [];
+
+      // Returns placeholders for regexps (identified by index) which are
+      // later replaced by their string representation.
+      function replacer(key, value) {
+          var origValue = this[key];
+
+          if (typeof origValue === 'object' && origValue instanceof RegExp) {
+              return '@__R-' + UID + '-' + (regexps.push(origValue) - 1) + '__@';
+          }
+
+          return value;
+      }
+
+      // Creates a JSON string representation of the value.
+      var str = JSON.stringify(obj, replacer);
+
+      if (options.unsafe !== true) {
+          str = str.replace(UNSAFE_CHARS_REGEXP, escapeUnsafeChars);
+      }
+
+      if (regexps.length === 0) {
+          return str;
+      }
+
+      // Replaces all occurrences of regexp placeholders in the JSON string
+      // with their string representations. The placeholder may not be
+      // preceded by a backslash: this is to prevent replacing things like
+      // "a\"@__R-<UID>-0__@" and thus outputting invalid JS.
+      return str.replace(PLACE_HOLDER_REGEXP, function (match, backSlash, type, valueIndex) {
+          if (backSlash) {
+              return match;
+          }
+
+          if (type === 'R') {
+              return "new RegExp(" + serialize(regexps[valueIndex].source) + ", \"" + regexps[valueIndex].flags + "\")";
+          }
+      });
+  };
+  ```

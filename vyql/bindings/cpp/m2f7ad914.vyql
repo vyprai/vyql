@@ -4,3 +4,8 @@ binding webSocketHandshakeAcceptMissingOriginCheck9412 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and containsAny(node.context.literal, ["Sec-WebSocket-Accept:", "sec-websocket-accept:"]) and not (containsAny(node.context.literal, ["Origin", "origin", "Host", "host"]))
   emit issue code.WebSocketUpgradeMissingOriginCheck at node
 }
+
+binding requestBodyReadMissingContentTypeCheck10607 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.selector in ["request.content", "request.content.rdbuf", "req.content", "req.content.rdbuf"] and not (containsAny(node.context.literal, ["content-type", "Content-Type", "application/json"]))
+  emit issue code.RequestBodyParseMissingContentTypeCheck at node
+}

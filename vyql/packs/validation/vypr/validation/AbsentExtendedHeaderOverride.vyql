@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule AbsentExtendedHeaderOverride {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_436, CWE_20]
+    id: "VYQL-VAL-035"
+    severity: medium
+  }
+  issue code.AbsentExtendedHeaderOverride as sink
+}

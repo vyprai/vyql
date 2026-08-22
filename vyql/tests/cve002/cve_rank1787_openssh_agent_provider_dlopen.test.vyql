@@ -1,0 +1,214 @@
+# Rank 1787 / CVE-2023-38408: ssh-agent dlopen()s a provider path that
+# arrives over the agent socket without verifying the file is a provider
+# library, so a forwarded agent turns a remote party's ADD_SMARTCARD_KEY /
+# sk-provider message into code execution in the agent process (constructors
+# run inside dlopen). The fixing commit f8f5a6b003981bb824329dc987d101977beda7ca
+# ("Ensure FIDO/PKCS11 libraries contain expected symbols", openbsd/src,
+# djm 2023-07-19) is the final piece of the change series: it adds
+# lib_contains_symbol(), an nlist(3) probe, in front of the two dlopen
+# sites -- pkcs11_register_provider (usr.bin/ssh/ssh-pkcs11.c:1511, over a
+# provider_id that has crossed process_add_smartcard_key's realpath plus
+# /usr/lib*,/usr/local/lib* glob allowlist) and sshsk_open
+# (usr.bin/ssh/ssh-sk.c:119). The SHA resolves in openbsd/src only; the
+# portable mirror re-commits it under a different SHA ("not our ref").
+#
+# The sink and the rule are present and live: dynamicCodeLoad44
+# (vyql/bindings/c/mce54b166.vyql) labels dlopen's first argument
+# code.DynamicCodeLoad, and VYQL-INJ-023 (taint core.UserControlledData ->
+# code.DynamicCodeLoad, CWE-829) reports it high -- the first test block is
+# that positive control. The miss is entirely on the wire side. The taint
+# chain from the agent socket to the dlopen argument is
+#
+#   read(sockets[socknum].fd, buf, sizeof(buf))          handle_conn_read
+#   sshbuf_put(sockets[socknum].input, buf, len)         container write
+#   sshbuf_get_stringb(e->input, e->request)             container move
+#   sshbuf_get_cstring(e->request, &provider, NULL)      process_add_*
+#   realpath(provider, canonical_provider)               out-param write
+#   pkcs11_add_provider -> pkcs11_register_provider      cross-file call
+#   dlopen(provider_id, RTLD_NOW)                        sink (labelled)
+#
+# and every hop before the sink is unmodelled. Measured on usr.bin/ssh
+# extracted at f8f5a6b003^ and at the commit: zero VYQL-INJ-023 /
+# code.DynamicCodeLoad findings on both revisions, three --cache off runs
+# each, 4745 total findings on each side, identical. Probes, each reverted:
+#
+# - read/pread carry no source binding (recv/recvfrom/fread do; read is in
+#   the cReaders lowering table but not in c.input). Adding one moves the
+#   tree 4745 -> 4746 findings with still zero on the loader rule: the
+#   source omission is not the blocker. It could not be anyway -- the real
+#   read sits in `if ((len = read(...)) <= 0)`, and the cReaders buffer
+#   redirection (internal/extract/frontend/treesitter/c.go exprStmt case)
+#   only fires on a bare expression statement; the assignment form taints
+#   the length, not the buffer.
+# - `emit source code.HttpInput at args[1]` on sshbuf_get_cstring labels
+#   the call node and reaches no sink: the out-param write into the
+#   caller's variable has no lowering (dst = <call> exists only for the
+#   eight cReaders names), so the label dead-ends on the Call node.
+# - the container hops (sshbuf_put, sshbuf_get_stringb) are custom-buffer
+#   writes no binding can express; the propagate action that would carries
+#   an unsupported compiled binding kind and kills every scan.
+#
+# A presence shape on the sink side is unshippable: 430 dlopen( call sites
+# across the sibling clones, 20 with a literal -- the other ~410 are
+# ordinary variable-path module loaders that carry no taint. The fixed revision's
+# guard is the commit's own new helper (misc.c lib_contains_symbol), not an
+# API-documented call, so there is no in-function documented call to key a
+# counterweight on.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+# When the engine models an out-param reader write (a binding-declared
+# reader whose result lands in a caller variable) or taint through a
+# custom container object, the second block must flip to expect and this
+# file becomes the regression spec for the chain.
+
+test "rank1787: a socket-read path straight into the dynamic loader"
+  lang c
+  file usr.bin/ssh/agent-load-direct.c
+  expect VYQL-INJ-023
+  code
+  ```
+  #include <dlfcn.h>
+  #include <sys/socket.h>
+
+  int load_provider_direct(int fd)
+  {
+	char path[512];
+
+	recv(fd, path, sizeof(path), 0);
+	return dlopen(path, RTLD_NOW) == NULL ? -1 : 0;
+  }
+  ```
+
+test "rank1787: the provider path crosses the agent's buffer container"
+  lang c
+  file usr.bin/ssh/ssh-pkcs11.c
+  reject VYQL-INJ-023
+  code
+  ```
+  struct sshbuf;
+
+  int sshbuf_get_cstring(struct sshbuf *buf, char **valp, unsigned int *lenp);
+  char *realpath(const char *pathname, char *resolved);
+
+  struct pkcs11_provider {
+	char *name;
+	void *handle;
+  };
+
+  struct pkcs11_provider *pkcs11_provider_lookup(const char *provider_id);
+  void *dlopen(const char *filename, int flags);
+  int dlsym(void *handle, const char *symbol);
+
+  #define RTLD_NOW 2
+
+  /* pkcs11_register_provider at f8f5a6b003^: no check that provider_id is
+     a PKCS11 library before the load. */
+  int
+  pkcs11_register_provider(char *provider_id, char *pin)
+  {
+	struct pkcs11_provider *p = NULL;
+	void *handle = NULL;
+
+	if (pkcs11_provider_lookup(provider_id) != NULL)
+		goto fail;
+	/* open shared pkcs11-library */
+	if ((handle = dlopen(provider_id, RTLD_NOW)) == NULL)
+		goto fail;
+	if (dlsym(handle, "C_GetFunctionList") == NULL)
+		goto fail;
+	p->name = provider_id;
+	p->handle = handle;
+	return 0;
+ fail:
+	return -1;
+  }
+
+  int
+  pkcs11_add_provider(char *provider_id, char *pin)
+  {
+	return pkcs11_register_provider(provider_id, pin);
+  }
+
+  /* process_add_smartcard_key, condensed: the provider name is one field
+     of the agent request buffer. */
+  void
+  process_add_smartcard_key(struct sshbuf *request)
+  {
+	char *provider = NULL, *pin = NULL, canonical_provider[4096];
+
+	if (sshbuf_get_cstring(request, &provider, NULL) != 0 ||
+	    sshbuf_get_cstring(request, &pin, NULL) != 0)
+		return;
+	if (realpath(provider, canonical_provider) == NULL)
+		return;
+	pkcs11_add_provider(canonical_provider, pin);
+  }
+  ```
+
+test "rank1787: the nlist symbol check gates the provider load"
+  lang c
+  file usr.bin/ssh/ssh-pkcs11.c
+  reject VYQL-INJ-023
+  code
+  ```
+  struct sshbuf;
+
+  int sshbuf_get_cstring(struct sshbuf *buf, char **valp, unsigned int *lenp);
+  char *realpath(const char *pathname, char *resolved);
+  int lib_contains_symbol(const char *path, const char *s);
+
+  struct pkcs11_provider {
+	char *name;
+	void *handle;
+  };
+
+  struct pkcs11_provider *pkcs11_provider_lookup(const char *provider_id);
+  void *dlopen(const char *filename, int flags);
+  int dlsym(void *handle, const char *symbol);
+
+  #define RTLD_NOW 2
+
+  /* pkcs11_register_provider at f8f5a6b003: lib_contains_symbol() probes
+     the candidate library with nlist(3) before dlopen() runs its
+     constructors. */
+  int
+  pkcs11_register_provider(char *provider_id, char *pin)
+  {
+	struct pkcs11_provider *p = NULL;
+	void *handle = NULL;
+
+	if (pkcs11_provider_lookup(provider_id) != NULL)
+		goto fail;
+	if (lib_contains_symbol(provider_id, "C_GetFunctionList") != 0)
+		goto fail;
+	/* open shared pkcs11-library */
+	if ((handle = dlopen(provider_id, RTLD_NOW)) == NULL)
+		goto fail;
+	if (dlsym(handle, "C_GetFunctionList") == NULL)
+		goto fail;
+	p->name = provider_id;
+	p->handle = handle;
+	return 0;
+ fail:
+	return -1;
+  }
+
+  int
+  pkcs11_add_provider(char *provider_id, char *pin)
+  {
+	return pkcs11_register_provider(provider_id, pin);
+  }
+
+  void
+  process_add_smartcard_key(struct sshbuf *request)
+  {
+	char *provider = NULL, *pin = NULL, canonical_provider[4096];
+
+	if (sshbuf_get_cstring(request, &provider, NULL) != 0 ||
+	    sshbuf_get_cstring(request, &pin, NULL) != 0)
+		return;
+	if (realpath(provider, canonical_provider) == NULL)
+		return;
+	pkcs11_add_provider(canonical_provider, pin);
+  }
+  ```

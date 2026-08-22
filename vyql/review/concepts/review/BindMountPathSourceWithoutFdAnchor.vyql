@@ -1,0 +1,7 @@
+module code;
+
+review code.BindMountPathSourceWithoutFdAnchor {
+  category: path
+  kind: attention
+  text: "review bind mounts that name a fixed source path for an fd-anchored source opened once and verified, because the kernel resolves the name a second time when the mount runs"
+}

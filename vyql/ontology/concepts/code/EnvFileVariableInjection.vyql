@@ -2,10 +2,10 @@ module code;
 
 concept EnvFileVariableInjection : issue {
   cwe: [CWE_15, CWE_74]
-  reviewAssumption: "the token or setting value can contain newline or quote characters that introduce additional environment variables"
+  reviewAssumption: "the token or setting value can contain newline or quote characters that introduce additional assignments or statements"
   reviewCategory: injection
-  reviewCondition: ".env update helper writes caller-supplied values into environment assignment lines without escaping newline or quote syntax"
+  reviewCondition: "environment file update helper writes caller-supplied values into assignment lines (dotenv KEY=value or PHP define()) without escaping newline or quote syntax"
   reviewConfidence: high
-  reviewEvidence: "environment file update context {pattern} interpolates update values into raw KEY=value lines before writeFileSync instead of using dotenv stringify or equivalent escaping"
+  reviewEvidence: "environment file update context {pattern} interpolates update values into raw assignment lines before writing the file back instead of using dotenv stringify or equivalent escaping"
   vulnerableTo: [injection.CodeInjection, validation.ImproperInputValidation]
 }

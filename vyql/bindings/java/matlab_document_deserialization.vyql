@@ -1,0 +1,25 @@
+module bindings.java.matlab_document_deserialization;
+
+// JMatIO's MatFileReader parses a MATLAB MAT file as it is constructed, and a
+// MAT file can embed a serialized Java object graph: reading it instantiates
+// attacker-named classes unless object deserialization is switched off. The
+// library's own switch for that is MatFileReader.setAllowObjectDeserialization
+// -- a static flag, documented to be set once before any reader is built,
+// typically from a static initializer of the class doing the parsing. So the
+// unit that either carries the obligation or has discharged it is the class:
+// a class that constructs a reader while never switching object
+// deserialization off hands every file it is given to unrestricted
+// deserialization, whatever named helper the construction sits in.
+//
+// The switch is static, so the call lands outside the methods it protects and
+// no function-scoped control can see it; the class context is the scope that
+// carries both facts. The flag is process-global while this is per-class, so a
+// second class in the same file that builds readers without its own switch is
+// still reported -- per-class is the smallest scope the class context supports,
+// and a shared switch in a sibling class is the shape a reviewer should see.
+binding unrestrictedDeserialization940 {
+  query pattern presenceNode where node.scope == "class"
+    and node.context.call == "MatFileReader"
+    and not (node.context.call == "setAllowObjectDeserialization")
+  emit issue code.UnrestrictedClassDeserialization at node
+}

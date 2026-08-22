@@ -1231,3 +1231,114 @@ binding catastrophicRegex300 {
   query pattern callExpr where callee.analysis ~= "dos.catastrophic_regex"
   emit issue code.CatastrophicRegex at call
 }
+binding htmlEscape340 {
+  requires {
+    dependency("servicestack")
+  }
+  query pattern callExpr where callee.method == "HtmlEncode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+binding regexEscape341 {
+  query pattern callExpr where callee.path ~= "Regex.Escape"
+  emit check core.RegexEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding archiveEntryName340 {
+  query pattern callExpr where callee.method == "Key" and callee.receiver.type in ["IArchiveEntry", "IEntry"]
+  emit source code.ArchiveEntryName at call.result
+}
+
+binding archiveEntryName341 {
+  query pattern callExpr where callee.method in ["FullName", "Name"] and callee.receiver.type == "ZipArchiveEntry"
+  emit source code.ArchiveEntryName at call.result
+}
+
+binding archiveEntryWrite342 {
+  query pattern callExpr where callee.method in ["WriteToFile", "ExtractToFile"]
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding htmlEscape380 {
+  query pattern callExpr where callee.path ~= "HtmlSanitizer.Sanitize"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathAccessCheck401 {
+  query pattern callExpr where callee.method == "HasInvalidFileNameChars"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathAccessCheck402 {
+  query pattern callExpr where callee.method == "HasInvalidPathChars"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathAccessCheck403 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.call == "IndexOfAny" and node.context.callPath contains "Path.GetInvalid"
+  emit check core.PathAccessCheck at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}
+
+binding csrfProtection420 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and (args.any.context.classAttribute contains "AutoValidateAntiforgeryToken" or args.any.context.methodAttribute contains "AutoValidateAntiforgeryToken") and not (args.any.context.methodAttribute contains "IgnoreAntiforgeryToken")
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection421 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and (args.any.context.classAttribute contains "ValidateAntiForgeryToken" or args.any.context.methodAttribute contains "ValidateAntiForgeryToken") and not (args.any.context.methodAttribute contains "IgnoreAntiforgeryToken")
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding hostHeaderPortAccessCondition460 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.expr contains "Request.Host.Port"
+  emit issue code.HostHeaderPortAccessCondition at node
+}
+
+binding filePathAccess590 {
+  query pattern callExpr where callee.path ~= "File.Create"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess591 {
+  query pattern callExpr where callee.path ~= "File.OpenWrite"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding resultStageAccessDecision620 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.functionName in ["OnResultExecutionAsync", "OnResultExecuting", "OnResultExecuted"] and node.context.assign contains ".Result="
+  emit issue code.ResultStageAccessDecision at node
+}

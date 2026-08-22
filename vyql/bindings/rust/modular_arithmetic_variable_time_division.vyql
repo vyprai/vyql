@@ -1,0 +1,33 @@
+module bindings.rust.modular_arithmetic_variable_time_division;
+
+// Hardware integer division and remainder are variable-time in their operands
+// on essentially every CPU, so applying either to a secret-dependent value
+// leaks that value through the operation's duration. Constant-time
+// arithmetic keeps every reduction on a fixed multiply-and-shift path --
+// Barrett or Montgomery reduction, or a dedicated constant-time division
+// helper -- which is the documented discipline of lattice and field
+// implementations (the same reasoning the module_lattice algebra in
+// RustCrypto/signatures states for its reduction moduli).
+//
+// The shape read here: a function that implements modular arithmetic and
+// then divides or takes the remainder of a computed value in place with the
+// compound operators /= or %= . The modular-arithmetic context is recognised
+// by reduction vocabulary that is standard across arithmetic crates (mod_*,
+// modulus, Barrett, Montgomery); a constant-time division helper named in
+// the same function (ct_div, ct_rem, ct_reduce) is the neutralising control,
+// because its presence is the shift-multiply replacement doing the work.
+//
+// Deliberately narrow in two directions. Only the compound operators carry
+// the finding: the in-place form divides a value the function accumulated,
+// while plain a / b in arithmetic code is overwhelmingly public bound and
+// constant computation -- the sibling hint code in the same module computes
+// public bounds with plain division and the module's own comment says so.
+// And the context gate keeps ordinary averages, digit counting and tree
+// index walks (size /= 2) out entirely: without reduction vocabulary the
+// division is not field arithmetic. Residual: the match is over the
+// function body, which carries comments, so a comment naming a constant-time
+// helper suppresses -- the false-negative direction only.
+binding modularArithmeticVariableTimeDivision {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.token, ["/=", "%="]) and containsAny(node.token, ["mod_", "modulus", "Modulus", "Barrett", "barrett", "Montgomery", "montgomery"]) and not (containsAny(node.context.scopeCall, ["ct_div", "ct_rem", "ct_reduce"]))
+  emit issue code.CryptoVariableTimeDivision at node
+}

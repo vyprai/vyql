@@ -1,0 +1,233 @@
+# Nextcloud Talk did not disassociate a deleted user from the one-to-one
+# conversations they had left, so an account later created with the
+# same user-id reattached to the previous holder's conversation and read its
+# history (incorrect authorization by identity lifecycle, CWE-284;
+# GHSA-xv6f-344w-895c, fixed in Talk 11.2.2). One-to-one rooms are keyed by
+# their two participant uids -- Manager::getRoomByParticipant / room creation
+# compute $name = json_encode($users) and look the room up with
+# ->eq('r.name', $query->createNamedParameter($name)) -- so the uid itself is
+# the join key. UserDeletedListener::handle (lib/Listener/UserDeletedListener.php:49
+# at 09fdce5d) reacted to UserDeletedEvent by walking only
+# $this->manager->getRoomsForUser($user->getUID()): rooms where the deleted
+# user is still a participant are deleted or left to the other party, but
+# one-to-one rooms the user had left keep type ONE_TO_ONE with the
+# dead uid inside the JSON name, and the exact-name lookup hands them to
+# whoever recycles the uid.
+#
+# Fix commit 75661785 (merge of PR #5633, "Reusable user ids one to one
+# chats") adds Manager::getLeftOneToOneRoomsForUser(), a LIKE query over the
+# same JSON name, and a second loop in handle() that rewrites each found room
+# with $room->setType(Room::GROUP_CALL, true) and $room->setName(
+# $user->getDisplayName(), ''); Room::setType grows a boolean escape hatch so
+# the ONE_TO_ONE guard can be switched off for exactly this rewrite, and the
+# system-message listener skips rooms whose old type is ONE_TO_ONE. The
+# remediation is present at <fix> and absent at <fix>^.
+#
+# ATTENTION, lifecycle decision-completeness, the user-deletion form of the
+# wiring family at 1514, 1535, 1540, 1541, 1556, 1557 and 1593. The defect is
+# the absence of a second cleanup loop in an event handler: the vulnerable
+# body contains no untrusted source (the UserDeletedEvent user is internal,
+# not caller input), no dangerous sink (deleteRoom / removeUser are
+# administrative teardown), and no control the fixed revision neutralises -- the change
+# only adds work. Which rooms reference a dead uid is a database-schema
+# relation (rooms the uid participates in vs rooms whose JSON name contains
+# the uid), not a fact anywhere, so "the handler decided incompletely" is not
+# expressible as a label, and a rule over labels cannot ask it.
+#
+# Measured here, not inherited. Three --cache off runs per side: 284
+# findings at 09fdce5d and 284 at 75661785, stable, and the two finding sets
+# are identical except that the fixed revision's 28 inserted lines in lib/Manager.php
+# shift two pre-existing code.StateChangingOp marks from Manager.php:858 and
+# :868 to :886 and :896. Zero findings in lib/Listener/UserDeletedListener.php
+# at either revision, and `vyql match` on that file reports no source, no
+# sink and no control at either revision. The 1380 counterweight fails: the
+# fix does leave calls inside handle() -- getLeftOneToOneRoomsForUser,
+# setType, setName -- but all three are the application's own methods and
+# their presence IS the remediation, not a library-documented API whose
+# absence the code reveals; getLeftOneToOneRoomsForUser exists only in the
+# fix, and setType is called at six other places in the tree
+# (lib/Command/Room/TRoomCommand.php:134, lib/Controller/RoomController.php:
+# 1085, 1202 and 1216, lib/Activity/Listener.php:154 and 199 on a different
+# object), so a `not setType` negation keys on nothing but this fix's layout
+# and any variant remediation (deleting the left rooms, a migration step,
+# checking participant existence at one-to-one creation) walks past it. A
+# negative-presence shape has no positive vocabulary to anchor on at all:
+# the tree carries 12 IEventListener::handle(Event) implementations, and
+# nothing distinguishes the one that must also rewrite rooms except the
+# application's own data model. The fixed revision's new LIKE query parameterises and
+# escapeLikeParameter()s its input, so no injection finding is owed either.
+#
+# No ENGINE-GAPS.md entry, as at 1760 and 1556 for this family: the missing
+# piece is ontology design (a relation from a user id to the rows referencing
+# it, and a lifecycle-completeness decision over that relation), not a
+# localised construct in one function. No definition change shipped.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1778: the deletion handler cleans only rooms the user still participates in"
+  lang php
+  file lib/Listener/UserDeletedListener.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  namespace OCA\Talk\Listener;
+
+  use OCA\Talk\Manager;
+  use OCA\Talk\Room;
+  use OCA\Talk\Service\ParticipantService;
+  use OCP\EventDispatcher\Event;
+  use OCP\EventDispatcher\IEventListener;
+  use OCP\User\Events\UserDeletedEvent;
+
+  class UserDeletedListener implements IEventListener {
+
+  	/** @var Manager */
+  	private $manager;
+  	/** @var ParticipantService */
+  	private $participantService;
+
+  	public function __construct(Manager $manager,
+  								ParticipantService $participantService) {
+  		$this->manager = $manager;
+  		$this->participantService = $participantService;
+  	}
+
+  	public function handle(Event $event): void {
+  		if (!($event instanceof UserDeletedEvent)) {
+  			// Unrelated
+  			return;
+  		}
+
+  		$user = $event->getUser();
+
+  		$rooms = $this->manager->getRoomsForUser($user->getUID());
+
+  		foreach ($rooms as $room) {
+  			if ($this->participantService->getNumberOfUsers($room) === 1) {
+  				$room->deleteRoom();
+  			} else {
+  				$this->participantService->removeUser($room, $user, Room::PARTICIPANT_REMOVED);
+  			}
+  		}
+  	}
+  }
+  ```
+
+test "rank1778: the fixed revision also rewrites the one-to-one rooms the user had left"
+  lang php
+  file lib/Listener/UserDeletedListener.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  namespace OCA\Talk\Listener;
+
+  use OCA\Talk\Manager;
+  use OCA\Talk\Room;
+  use OCA\Talk\Service\ParticipantService;
+  use OCP\EventDispatcher\Event;
+  use OCP\EventDispatcher\IEventListener;
+  use OCP\User\Events\UserDeletedEvent;
+
+  class UserDeletedListener implements IEventListener {
+
+  	/** @var Manager */
+  	private $manager;
+  	/** @var ParticipantService */
+  	private $participantService;
+
+  	public function __construct(Manager $manager,
+  								ParticipantService $participantService) {
+  		$this->manager = $manager;
+  		$this->participantService = $participantService;
+  	}
+
+  	public function handle(Event $event): void {
+  		if (!($event instanceof UserDeletedEvent)) {
+  			// Unrelated
+  			return;
+  		}
+
+  		$user = $event->getUser();
+
+  		$rooms = $this->manager->getRoomsForUser($user->getUID());
+  		foreach ($rooms as $room) {
+  			if ($this->participantService->getNumberOfUsers($room) === 1) {
+  				$room->deleteRoom();
+  			} else {
+  				$this->participantService->removeUser($room, $user, Room::PARTICIPANT_REMOVED);
+  			}
+  		}
+
+  		$leftRooms = $this->manager->getLeftOneToOneRoomsForUser($user->getUID());
+  		foreach ($leftRooms as $room) {
+  			// We are changing the room type and name so a potential follow up
+  			// user with the same user-id can not reopen the one-to-one conversation.
+  			$room->setType(Room::GROUP_CALL, true);
+  			$room->setName($user->getDisplayName(), '');
+  		}
+  	}
+  }
+  ```
+
+test "rank1778: one-to-one rooms are keyed by the JSON of both uids"
+  lang php
+  file lib/Manager.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  namespace OCA\Talk;
+
+  use OCA\Talk\Room;
+  use OCP\DB\QueryBuilder\IQueryBuilder;
+
+  class Manager {
+
+  	public function getRoomByParticipant(array $users): ?Room {
+  		$query = $this->db->getQueryBuilder();
+  		$helper = new SelectHelper();
+  		$helper->selectRoomsTable($query);
+  		$query->from('talk_rooms', 'r')
+  			->where($query->expr()->eq('r.type', $query->createNamedParameter(Room::ONE_TO_ONE_CALL, IQueryBuilder::PARAM_INT)))
+  			->andWhere($query->expr()->eq('r.name', $query->createNamedParameter(json_encode($users))));
+
+  		$result = $query->execute();
+  		$row = $result->fetch();
+  		$result->closeCursor();
+
+  		if ($row === false) {
+  			return null;
+  		}
+
+  		return $this->createRoomObject($row);
+  	}
+
+  	public function getLeftOneToOneRoomsForUser(string $userId): array {
+  		$query = $this->db->getQueryBuilder();
+  		$helper = new SelectHelper();
+  		$helper->selectRoomsTable($query);
+  		$query->from('talk_rooms', 'r')
+  			->where($query->expr()->eq('r.type', $query->createNamedParameter(Room::ONE_TO_ONE_CALL)))
+  			->andWhere($query->expr()->like('r.name', $query->createNamedParameter('%' . $this->db->escapeLikeParameter(json_encode($userId)) . '%')));
+
+  		$result = $query->execute();
+  		$rooms = [];
+  		while ($row = $result->fetch()) {
+  			if ($row['token'] === null) {
+  				continue;
+  			}
+
+  			$room = $this->createRoomObject($row);
+  			$rooms[] = $room;
+  		}
+  		$result->closeCursor();
+
+  		return $rooms;
+  	}
+  }
+  ```

@@ -1,0 +1,39 @@
+module bindings.javascript.mcpExpressEndpointMissingHostValidation;
+
+// The Model Context Protocol SDK's HTTP transports — `StreamableHTTPServerTransport`
+// and `SSEServerTransport` — are mounted on an ordinary web server, and the SDK
+// documents that a server reached that way needs Host-header validation to keep
+// DNS rebinding out: the transport options state that host validation "is
+// disabled" when `allowedHosts` is unspecified and that `enableDnsRebindingProtection`
+// defaults to false, and the server guide's DNS rebinding section offers the
+// `hostHeaderValidation`/`localhostHostValidation` middleware or the
+// `createMcpExpressApp` factory, which validates localhost by default. A page on
+// a hostname the attacker rebinds onto the listener's address reaches the
+// endpoint same-origin, Host header and all, so an Express module that serves
+// one of these transports without any of those protections publishes the
+// server's whole tool set to every page its operator visits (CWE-346, CWE-290).
+//
+// The module is the scope because that is the unit the SDK's own examples mount
+// in: the `express()` app, the route registrations and the transport construction
+// sit in one file, and the middleware that would protect them is installed in
+// that same file or not at all. Both the transport constructor and the app
+// factory call are read as whole `call:` tokens, so no receiver name is assumed
+// and no route spelling is required.
+//
+// The negations name the three documented protections, not the incident: the
+// factory (`createMcpExpressApp`), either validation middleware
+// (`hostHeaderValidation`, `localhostHostValidation`), or the transport-level
+// `enableDnsRebindingProtection` option, read by its property name as the option
+// docs spell it. Authentication is deliberately not a negation: the SDK names it
+// as the alternative protection, but an Express module that merely names an auth
+// middleware can still mount the endpoint unauthenticated on its default path —
+// the examples that motivated this carry an opt-in bearer middleware behind a
+// command-line flag — so the review text asks for either protection rather than
+// guessing which one the deployment has.
+binding jsMcpExpressEndpointMissingHostValidation {
+  requires {
+    dependency("express")
+  }
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.call in ["StreamableHTTPServerTransport", "SSEServerTransport"] and node.context.call == "express" and not (node.context.call in ["createMcpExpressApp", "hostHeaderValidation", "localhostHostValidation"]) and not (containsAny(node.context.prop, ["enableDnsRebindingProtection="]))
+  emit issue code.HttpEndpointMissingHostValidation at node
+}

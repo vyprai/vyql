@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule UnvalidatedHostHeaderDispatch {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_20, CWE_444]
+    id: "VYQL-VAL-037"
+    severity: medium
+  }
+  issue code.UnvalidatedHostHeaderDispatch as dispatch
+}

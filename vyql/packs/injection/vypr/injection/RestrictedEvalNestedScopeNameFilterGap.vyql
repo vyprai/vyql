@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule RestrictedEvalNestedScopeNameFilterGap {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_94, CWE_95]
+    id: "VYQL-INJ-274"
+    severity: high
+  }
+  issue code.RestrictedEvalNestedScopeNameFilterGap as namefilter
+}

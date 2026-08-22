@@ -1,0 +1,7 @@
+module code;
+
+review code.UnsanitizedEditorContentHtmlRender {
+  category: xss
+  kind: attention
+  text: "review content-getter markup rendered into innerHTML for a missing sanitizer pass"
+}

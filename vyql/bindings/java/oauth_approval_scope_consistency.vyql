@@ -1,0 +1,40 @@
+module bindings.java.oauth_approval_scope_consistency;
+
+// Spring Security OAuth2's user-approval flow is documented around three calls
+// an authorization server's endpoint makes on the submitted approval form:
+// AuthorizationRequest.setApprovalParameters(Map) hands the posted parameters
+// to the request, and UserApprovalHandler.updateAfterApproval then derives from
+// them what the resource owner granted -- in Spring's own handlers the granted
+// scope set is assembled from the posted `scope.` parameters, whose names
+// OAuth2Utils.SCOPE_PREFIX defines. Those names are client-chosen: the approval
+// form only renders the scopes of the original request, but nothing on the wire
+// constrains what the POST carries, so an endpoint that merges the parameters
+// without comparing the scope names against the original authorization request
+// (the server-side copy stored when the approval page was rendered) issues
+// grants for scopes the resource owner never saw.
+//
+// The judgement lives in the review concept; these bindings only recognise the
+// merge point -- both documented approval-flow calls in one handler -- and what
+// clears the flag is the handler consulting the original request's scope: the
+// SCOPE_PREFIX / SCOPE constants, a "scope" field name, or any parsing of the
+// prefixed parameters. Each negation is independently sufficient, so any one
+// spelling of the comparison clears the flag. All clauses are node-level and
+// function-confined, so a sibling method's scope handling (an equality check
+// over the session-held request, say) neither satisfies nor silences them.
+//
+// Residual, stated rather than hidden: a handler that delegates the scope
+// comparison to a helper sees none of the three signals here and still matches
+// (the delegated-check shape the campaign has measured across languages), and a
+// handler that parses unrelated strings with startsWith/substring/split reads
+// as if it parsed the parameters (recall direction, the safe one for a review
+// flag).
+
+binding oauthApprovalScopeParametersUnvalidated {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.call in ["setApprovalParameters"]
+    and node.context.call in ["updateAfterApproval"]
+    and not (node.context.identifier in ["SCOPE_PREFIX", "SCOPE"])
+    and not (containsAny(node.context.literal, ["scope"]))
+    and not (node.context.call in ["startsWith", "substring", "split"])
+  emit issue code.RequestScopePolicyReview at node
+}

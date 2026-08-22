@@ -1,0 +1,31 @@
+module bindings.python.webbrowser_navigation;
+
+// `webbrowser` is the standard-library module for handing a URL to the
+// user's default browser: open(), open_new() and open_new_tab() all
+// navigate that browser to exactly the URL they are given, and the module
+// performs no validation of it. The documentation's own note that unknown
+// schemes may fall back to platform handlers is the reason the argument is
+// a `code.RedirectTargetSink`: the browser (or whatever handler the OS
+// picks) treats the string as a destination, so a URL an attacker chose
+// sends the user there -- the same weakness a framework redirect or a
+// `location.assign` carries, and the same treatment those already get.
+//
+// `open` is bound by its full path only: a bare method-name match would
+// label the builtin `open()`, which is a file read. `open_new` and
+// `open_new_tab` are distinctive enough to bind by method, which also
+// covers the common `self._webbrowser.open_new(...)` indirection.
+
+binding webbrowserOpenRedirectTarget540 {
+  query pattern callExpr where callee.path ~= "webbrowser.open"
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding webbrowserOpenNewRedirectTarget541 {
+  query pattern callExpr where callee.method == "open_new"
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding webbrowserOpenNewTabRedirectTarget542 {
+  query pattern callExpr where callee.method == "open_new_tab"
+  emit sink code.RedirectTargetSink at args[0]
+}

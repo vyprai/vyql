@@ -1304,3 +1304,112 @@ binding uncheckedEncodedLengthArithmetic941 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.call in ["iconv"] and containsAny(node.context.assign, ["malloc", "calloc"]) and not (containsAny(node.context.binary, ["INT_MAX", "UINT_MAX", "LONG_MAX", "ULONG_MAX", "LLONG_MAX", "ULLONG_MAX", "SIZE_MAX", "SSIZE_MAX", "PTRDIFF_MAX", "INT8_MAX", "UINT8_MAX", "INT16_MAX", "UINT16_MAX", "INT32_MAX", "UINT32_MAX", "INT64_MAX", "UINT64_MAX", "MAX_LEN", "MAXLEN", "MAX_SIZE"]))
   emit issue code.UncheckedEncodedLengthArithmetic at node
 }
+
+// Samba's smbrunsecret() runs its command line through /bin/sh -c verbatim:
+// unlike smbrun() it applies no escape_shell_string(), and unlike
+// smbrun_no_sanitize() (reserved by its own doc comment for lines the caller
+// has already validated, i.e. printing) it carries no caveat at all -- the
+// doc only says a secret is sent on stdin, so the line is the caller's to
+// assemble. talloc_string_sub(), talloc_all_string_sub() and string_sub()
+// splice a value into a template string with no shell quoting of their own,
+// so a command assembled from them and handed to smbrunsecret() is injectable
+// through whatever the substituted value carries: the check password script's
+// %u takes a client-supplied account name that way. The masking variant
+// talloc_string_sub_unsafe() single-quotes and masks the inserted value, and
+// being a distinct exact name it does not satisfy the substitution clause.
+binding smbrunUnquotedSubstitution971 {
+  query pattern callExpr where callee.path == "smbrunsecret" and scope.call.path in ["talloc_string_sub", "talloc_all_string_sub", "string_sub"]
+  emit issue code.CommandLineAssemblyReview at call
+}
+
+// GnuTLS's gnutls_session_set_verify_cert(session, hostname, flags) is the
+// client-side certificate check, and its manual is explicit about what a
+// missing hostname costs: "if no hostname is provided, no hostname
+// verification will be performed". A NULL hostname therefore still verifies
+// the chain against the trusted CAs while accepting a certificate for any
+// peer -- the same CWE-295 shape as SSL_VERIFY_NONE or
+// CURLOPT_SSL_VERIFYPEER 0, already covered by sibling bindings. The forms
+// that do bind an identity are a different argument atom (a hostname string
+// or variable) or a different callee (gnutls_session_set_verify_cert2 taking
+// the expected identity as a gnutls_typed_vdata_st), so neither matches this
+// token.
+//
+// The argument text is reachable only through the structured context walk:
+// the C frontend lowers a NULL literal to a valueless constant, so a
+// callExpr binding's args.any.literal never sees it, while call_arg_at:
+// reads the argument atom straight off the syntax tree.
+binding certValidationDisabled1040 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and containsAny(node.context.callArgAt, ["gnutls_session_set_verify_cert:1:NULL"])
+  emit issue code.CertValidationDisabled at node
+}
+
+// libpcap's pcap_next()/pcap_next_ex() return a captured packet together
+// with a struct pcap_pkthdr whose caplen/len carry whatever the capture
+// source claims -- for a savefile, whatever the file says -- and libpcap
+// validates none of it. Wrappers therefore check the lengths themselves,
+// and a check against a maximum, or of len against caplen, still passes a
+// zero-length packet: consumers of such a wrapper read the buffer at fixed
+// offsets (a link-layer or IP header, pktdata[0], pktdata[ETHER_ADDR_LEN])
+// and a zero-length capture is an immediate out-of-bounds read. The zero
+// exclusion is the C idiom `!hdr->len` or a comparison against a zero
+// literal, and both are matched by shape, so the guard's variable names do
+// not matter: any of `!h->len || ...`, `if (hdr->len == 0)`, `len < 1`
+// suppresses, and a dereferenced header (`!(*pkthdr)->len`) carries its own
+// needle. Residual, in the false-positive direction: a zero test standing
+// alone as `if (!hdr->len)` -- no disjunction, no literal -- emits no binary
+// shape at all and is not recognised, the same residual the decompression
+// sibling's needle set carries for `!size` spellings.
+binding pcapPacketLengthMissingLowerBound1994 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.call in ["pcap_next", "pcap_next_ex"] and containsAny(node.context.binaryShape, ["ID.FIELD<ID.FIELD", "*ID.FIELD<*ID.FIELD", "ID.FIELD>ID", "ID.FIELD>NUM", "ID.FIELD>=NUM"]) and not (containsAny(node.context.binaryShape, ["!ID.FIELD", "!*ID.FIELD", "ID.FIELD==0", "0==ID.FIELD", "ID.FIELD<1", "1>ID.FIELD", "ID.FIELD<=0", "0<=ID.FIELD", "ID.FIELD>0", "0<ID.FIELD", "ID.FIELD>=1", "1<=ID.FIELD", "ID.FIELD!=0", "0!=ID.FIELD"]))
+  emit issue code.PcapPacketLengthMissingLowerBound at node
+}
+
+// The CPython C API's reference-counting contract, as its own documentation
+// states it: PyTuple_Pack, PyObject_GetAttr/String and PyObject_CallObject
+// each return a new reference the caller owns, and Py_DECREF/Py_XDECREF/
+// Py_CLEAR drop one. Those calls carry the resource-handle and
+// resource-release concepts so a function that acquires a reference and
+// never drops it on any path reports as a resource leak (VYQL-RES-001),
+// the same pairing ucsdet_open/ucsdet_close already carry.
+//
+// The acquisition table deliberately stops at these four. The container
+// constructors (PyDict_New, PyList_New, PySet_New, Py_BuildValue,
+// PyUnicode_FromString/DecodeUTF8, PyLong_FromLong...) are the standard
+// factory-transfer idiom -- `return PyDict_New();` hands the reference to
+// the caller, which is correct -- and labelling them reports the transfer
+// as a leak (measured: two such factory returns in ultrajson's own JSON
+// decoder callbacks). The four kept APIs name values the caller almost
+// always consumes within the function, so the pairing stays precise.
+//
+// Residual, shared with every language's ResourceHandle pairing: the
+// type-state rule asks whether a release post-dominates the acquisition
+// and does not pair the two by variable, so a reference transferred to
+// the caller by direct return is reported, and an error path that drops
+// some of a function's owned references while missing one is not: the
+// releases that do run satisfy the check for every acquisition.
+binding cpythonRefHandle2150 {
+  query pattern callExpr where callee.method in ["PyTuple_Pack", "PyObject_GetAttrString", "PyObject_GetAttr", "PyObject_CallObject"]
+  emit issue code.ResourceHandle at call
+}
+
+binding cpythonRefRelease2151 {
+  query pattern callExpr where callee.method in ["Py_DECREF", "Py_XDECREF", "Py_CLEAR"]
+  emit check core.ResourceRelease at call {
+    covers postDominates {
+      from: call
+      to: call
+    }
+  }
+}
+
+// The C command-assembly idiom: a snprintf that appends values after the
+// format string, in the same function as a system() or popen() launch whose
+// command argument is a variable rather than a literal. snprintf(3) documents
+// the format as taking further arguments, so a third argument is an appended
+// value; the launch-shape clause keeps constant command lines out. The
+// review concept carries the judgement; quoting cannot be observed here
+// because C has no shell-quoting API to name.
+binding commandLineAssemblyReview2260 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and containsAny(node.context.callArgAt, ["snprintf:3:"]) and node.context.call in ["system", "popen"] and containsAny(node.context.callArgShapeAt, ["system:0:ID", "system:0:ID.FIELD", "popen:0:ID", "popen:0:ID.FIELD"])
+  emit issue code.CommandLineAssemblyReview at node
+}

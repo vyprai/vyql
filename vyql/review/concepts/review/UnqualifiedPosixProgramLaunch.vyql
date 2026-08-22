@@ -1,0 +1,7 @@
+module code;
+
+review code.UnqualifiedPosixProgramLaunch {
+  category: path
+  kind: attention
+  text: "review unqualified launches of POSIX-only desktop utilities for a Windows platform guard before resolving the executable through the PATH"
+}

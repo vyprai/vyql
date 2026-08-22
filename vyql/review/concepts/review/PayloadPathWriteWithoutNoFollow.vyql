@@ -1,0 +1,7 @@
+module code;
+
+review code.PayloadPathWriteWithoutNoFollow {
+  category: path
+  kind: attention
+  text: "review payload-sourced path writes that create directories and open the target by name, because every link-anchored primitive is absent and a link planted or swapped at a component lands the write outside the intended root"
+}

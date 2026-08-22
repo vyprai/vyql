@@ -1,0 +1,223 @@
+# Rank 1711 / CVE-2018-15751: salt's rest_cherrypy Events endpoint
+# validated a client-supplied token with `int(auth_token, 16)` while
+# catching only ValueError, so a token that is not a string at all -- a
+# repeated query parameter reaches the handler as a list, and no token
+# reaches it as None -- raised TypeError straight out of the validator
+# instead of returning False (CWE-287; the guard escapes and the advisory
+# frames the impact as authentication bypass through salt-api).
+#
+# The guard matters because of where the token goes: Events.GET passes it
+# to `self.resolver.get_token(salt_token)`, an RPC to the master, where
+# salt/tokens/localfs.py's get_token builds
+# `t_path = os.path.join(opts['token_dir'], tok)` and opens it -- a
+# pathname token (the fixed revision's own regression tests use `etc/passwd` and
+# `tmp/doesnotexist`) is the advisory's bypass vector, and the hex guard
+# is what stops it. 4da2e0757 added that guard to both lowdata execution
+# (exec_lowstate, catching TypeError and ValueError from the start) and
+# Events._is_valid_token (ValueError only); the fixing commit ad0d83c6a
+# completes the second site with `except (TypeError, ValueError)` and
+# adds the pathname-token tests. Verified: the incomplete guard is
+# present at ad0d83c6a^ (app.py:2181 `except ValueError:`) and the
+# completed guard at ad0d83c6a; salt/tokens/localfs.py is identical
+# across the pair, so only the guard discriminates.
+#
+# ATTENTION, engine gap (not mechanical).
+#
+# 1. Nothing on the token path is labelled. `vyql match` on the real
+#    app.py shows python.input labelling cherrypy.request.headers,
+#    .body and .path_info as code.HttpInput, but not
+#    cherrypy.request.cookie and not the GET(token=...) handler
+#    parameters; int(), cherrypy.session.cache.get and
+#    self.resolver.get_token carry no label of any kind. There is no
+#    sink in the file to reach: the token's consumer is
+#    salt/tokens/localfs.py's join+fopen behind the zeromq RPC in
+#    Resolver.get_token, which no call edge bridges (same shape as the
+#    mpsc hop recorded for rank 1158). `vyql trace -from
+#    code.ExternalEntryInput -to code.FilePathAccess` on the snippet
+#    reports 0 sources.
+# 2. The discriminating line is invisible to every binding route. The
+#    fix's only change is the except clause's designator list, and the
+#    Python frontend drops it: python.go:524 lowers try_statement to
+#    nir.Try{Body: ...} alone, and collectBlocks (python.go:1758)
+#    flattens except_clause into plain blocks. lowering.go:3457 binds
+#    only the handler's parameter *name* to the analysis.exception
+#    node. Measured with `vyql graph` on a minimal pair differing only
+#    in the except tuple: neither ValueError nor TypeError appears as
+#    any node, path or token in either revision's graph (the patched
+#    form is +36 nodes, no labelable difference), and both forms scan
+#    to zero findings under the generic and the library profile.
+# 3. Discriminating at the text layer is the fixed revision's own layout. The
+#    idiomatic Python hex parse is exactly `int(x, 16)` under a bare
+#    `except ValueError`: 69 of 1510 salt files carry that form
+#    (measured), against one true site. A pythonReview-style fact
+#    keyed on the missing TypeError is the rejected layout-keyed
+#    discriminator, not a weakness-class fact.
+# 4. The sink half reports and does not discriminate.
+#    salt/tokens scanned under its resolved Library / SDK profile
+#    reports 3 VYQL-PATH-001 rows (get_token and rm_token: param tok
+#    -> os.path.join -> FilePathAccess), identically at both
+#    revisions, because the fixed revision never touches that file. The third
+#    test below pins that live half so the suite exercises a firing
+#    rule rather than only misses.
+# 5. Nearest shipped vocabulary does not fit: VYQL-AUTH-114 /
+#    code.NonStringCredentialCoercionAuthBypass (CWE-305/1287, "the
+#    caller chooses the credential's runtime type") is worded for a
+#    database equality lookup with a passwordless login; widening it
+#    is concept work the missing facts block in any case.
+#
+# What the engine would need, per ENGINE-GAPS.md: exception designators
+# (which types an except/catch clause names) as frontend facts, and
+# which types a call can raise, joined by a handler-coverage relation.
+# Every tree-sitter frontend shares the drop (python.go:524,
+# swift.go:292, dart.go:186, scala.go:137, powershell.go:167,
+# kotlin.go:158, groovy.go:162, solidity.go:139 lower Try bodies only;
+# java.go:385 and csharp.go:836 carry handler bodies and parameter
+# names but no designators) -- new classification and a new dataflow
+# relation, not a localized correction.
+#
+# On the real tree at ad0d83c6a^, salt/netapi/rest_cherrypy scanned
+# three times per revision with --cache off reports 24 findings each
+# run with an identical union (9 VYQL-INJ-009, 9 VYQL-AUTH-099, 2
+# VYQL-AUTH-106, 2 VYQL-CFG-014, 1 VYQL-AUTH-079); the fixed revision's one-line
+# change moves none of them.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1711: the events token guard catches only ValueError around the hex parse"
+  lang python
+  profile library
+  file salt/netapi/rest_cherrypy/app.py
+  reject VYQL-AUTH-114
+  code
+  ```
+  import cherrypy
+
+  import salt.auth
+
+
+  class Events(object):
+      exposed = True
+
+      def __init__(self):
+          self.opts = cherrypy.config['saltopts']
+          self.resolver = salt.auth.Resolver(self.opts)
+
+      def _is_valid_token(self, auth_token):
+          # Make sure that auth token is hex. If it's something other
+          # than hex, this will raise a ValueError.
+          try:
+              int(auth_token, 16)
+          except ValueError:
+              return False
+
+          # First check if the given token is in our session table; if
+          # so it's a salt-api token and we need to get the Salt token
+          # from there.
+          orig_session, _ = cherrypy.session.cache.get(auth_token, ({}, None))
+          # If it's not in the session table, assume it's a regular Salt token.
+          salt_token = orig_session.get('token', auth_token)
+
+          # The eauth system does not currently support perms for the
+          # event stream, so we're just checking if the token exists.
+          if salt_token and self.resolver.get_token(salt_token):
+              return True
+
+          return False
+
+      def GET(self, token=None, salt_token=None):
+          cookies = cherrypy.request.cookie
+          auth_token = token or salt_token or (
+              cookies['session_id'].value if 'session_id' in cookies else None)
+
+          if not self._is_valid_token(auth_token):
+              raise cherrypy.HTTPError(401)
+
+          cherrypy.session.release_lock()
+          return ''
+  ```
+
+test "rank1711: the patched guard also catches TypeError"
+  lang python
+  profile library
+  file salt/netapi/rest_cherrypy/app.py
+  reject VYQL-AUTH-114
+  code
+  ```
+  import cherrypy
+
+  import salt.auth
+
+
+  class Events(object):
+      exposed = True
+
+      def __init__(self):
+          self.opts = cherrypy.config['saltopts']
+          self.resolver = salt.auth.Resolver(self.opts)
+
+      def _is_valid_token(self, auth_token):
+          # Make sure that auth token is hex. If it's something other
+          # than hex, this will raise a ValueError.
+          try:
+              int(auth_token, 16)
+          except (TypeError, ValueError):
+              return False
+
+          # First check if the given token is in our session table; if
+          # so it's a salt-api token and we need to get the Salt token
+          # from there.
+          orig_session, _ = cherrypy.session.cache.get(auth_token, ({}, None))
+          # If it's not in the session table, assume it's a regular Salt token.
+          salt_token = orig_session.get('token', auth_token)
+
+          # The eauth system does not currently support perms for the
+          # event stream, so we're just checking if the token exists.
+          if salt_token and self.resolver.get_token(salt_token):
+              return True
+
+          return False
+
+      def GET(self, token=None, salt_token=None):
+          cookies = cherrypy.request.cookie
+          auth_token = token or salt_token or (
+              cookies['session_id'].value if 'session_id' in cookies else None)
+
+          if not self._is_valid_token(auth_token):
+              raise cherrypy.HTTPError(401)
+
+          cherrypy.session.release_lock()
+          return ''
+  ```
+
+test "rank1711: the master-side token lookup joins the token into a path and opens it"
+  lang python
+  profile library
+  file salt/tokens/localfs.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+
+  import salt.payload
+  import salt.utils.files
+
+
+  def get_token(opts, tok):
+      '''
+      Fetch the token data from the store.
+
+      :param opts: Salt master config options
+      :param tok: Token value to get
+      :returns: Token data if successful. Empty dict if failed.
+      '''
+      t_path = os.path.join(opts['token_dir'], tok)
+      if not os.path.isfile(t_path):
+          return {}
+      serial = salt.payload.Serial(opts)
+      try:
+          with salt.utils.files.fopen(t_path, 'rb') as fp_:
+              tdata = serial.loads(fp_.read())
+              return tdata
+      except (IOError, OSError):
+          return {}
+  ```

@@ -1,0 +1,168 @@
+# Rank 1751 / CVE-2017-12868: SimpleSAML\Utils\Crypto::secureCompare
+# (lib/SimpleSAML/Utils/Crypto.php) fell back, wherever hash_equals() is
+# unavailable, to a hand-rolled constant-time loop:
+#   $diff = 0;
+#   for ($i = 0; $i < $len; ++$i) {
+#       $diff |= $known[$i] ^ $user[$i];
+#   }
+#   return $diff === 0;
+# A string offset read in PHP is a one-character string, so the XOR yields a
+# string and the OR into the integer accumulator coerces it to 0: $diff never
+# differs, and every two strings of equal length compare equal. Session
+# auth-token cookies, password hashes, SSHA salts and htpasswd crypt output
+# all flow through it, so any attacker who can match the stored length is
+# authenticated. The fixed revision (4bc62965) wraps each offset in ord() so the XOR
+# operates on integer byte values.
+
+test "rank1751: constant-time compare xor-ing raw string offsets"
+  lang php
+  file lib/SimpleSAML/Utils/Crypto.php
+  expect VYQL-AUTH-151
+  expect_review code.ByteComparisonStringCoercionBypass
+  code
+  ```
+  <?php
+
+  namespace SimpleSAML\Utils;
+
+  class Crypto
+  {
+      /**
+       * Compare two strings securely in constant time.
+       * @param string $known A known string.
+       * @param string $user A user-provided string to compare with the known string.
+       */
+      public static function secureCompare($known, $user)
+      {
+          if (function_exists('hash_equals')) {
+              // use hash_equals() if available (PHP >= 5.6)
+              return hash_equals($known, $user);
+          }
+
+          // compare manually in constant time
+          $len = mb_strlen($known, '8bit'); // see mbstring.func_overload
+          if ($len !== mb_strlen($user, '8bit')) {
+              return false; // length differs
+          }
+          $diff = 0;
+          for ($i = 0; $i < $len; ++$i) {
+              $diff |= $known[$i] ^ $user[$i];
+          }
+          // if all the bytes in $a and $b are identical, $diff should be equal to 0
+          return $diff === 0;
+      }
+  }
+  ```
+
+test "rank1751: the same loop converting each offset with ord"
+  lang php
+  file lib/SimpleSAML/Utils/Crypto.php
+  reject VYQL-AUTH-151
+  reject_review code.ByteComparisonStringCoercionBypass
+  code
+  ```
+  <?php
+
+  namespace SimpleSAML\Utils;
+
+  class Crypto
+  {
+      public static function secureCompare($known, $user)
+      {
+          if (function_exists('hash_equals')) {
+              return hash_equals($known, $user);
+          }
+
+          $len = mb_strlen($known, '8bit');
+          if ($len !== mb_strlen($user, '8bit')) {
+              return false; // length differs
+          }
+          $diff = 0;
+          for ($i = 0; $i < $len; $i++) {
+              $diff |= ord($known[$i]) ^ ord($user[$i]);
+          }
+          return $diff === 0;
+      }
+  }
+  ```
+
+test "rank1751: galois-field xor over integer table entries"
+  lang php
+  file include/barcodes/qrcode.php
+  reject VYQL-AUTH-151
+  reject_review code.ByteComparisonStringCoercionBypass
+  code
+  ```
+  <?php
+
+  class QRcode
+  {
+      protected function encode_rs_char($rs, $data, $parity)
+      {
+          $INDEX_OF =& $rs['index_of'];
+          $NROOTS   =& $rs['nroots'];
+          $parity = array_fill(0, $NROOTS, 0);
+          for ($i = 0; $i < count($data); $i++) {
+              $feedback = $INDEX_OF[$data[$i] ^ $parity[0]];
+              if ($feedback != 0) {
+                  $feedback = $this->modnn($rs, $NROOTS - 1 - $i);
+              }
+          }
+          return $parity;
+      }
+  }
+  ```
+
+test "rank1751: bytewise xor stored into an offset rather than accumulated"
+  lang php
+  file core/model/lib/password.php
+  reject VYQL-AUTH-151
+  reject_review code.ByteComparisonStringCoercionBypass
+  code
+  ```
+  <?php
+
+  function salted_random_string($raw_salt_len)
+  {
+      $buffer = '';
+      $buffer_valid = false;
+      if (function_exists('openssl_random_pseudo_bytes')) {
+          $buffer = openssl_random_pseudo_bytes($raw_salt_len);
+          $buffer_valid = ($buffer !== false);
+      }
+      if (!$buffer_valid || strlen($buffer) < $raw_salt_len) {
+          $buffer_length = strlen($buffer);
+          for ($i = 0; $i < $raw_salt_len; $i++) {
+              if ($i < $buffer_length) {
+                  $buffer[$i] = $buffer[$i] ^ chr(mt_rand(0, 255));
+              } else {
+                  $buffer .= chr(mt_rand(0, 255));
+              }
+          }
+      }
+      return $buffer;
+  }
+  ```
+
+test "rank1751: comparison delegated to the constant-time builtin"
+  lang php
+  file lib/SimpleSAML/Utils/Crypto.php
+  reject VYQL-AUTH-151
+  reject_review code.ByteComparisonStringCoercionBypass
+  code
+  ```
+  <?php
+
+  namespace SimpleSAML\Utils;
+
+  class Crypto
+  {
+      public static function secureCompare($known, $user)
+      {
+          if (!function_exists('hash_equals')) {
+              throw new \SimpleSAML_Error_Exception('hash_equals is required');
+          }
+          return hash_equals($known, $user);
+      }
+  }
+  ```

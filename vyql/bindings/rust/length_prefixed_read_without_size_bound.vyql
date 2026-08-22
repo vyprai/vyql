@@ -1,0 +1,40 @@
+module bindings.rust.length_prefixed_read_without_size_bound;
+
+// A consensus deserializer for a fixed-size type must not hand the read to a
+// length-prefixed byte-vector deserializer and check the size afterwards:
+// the peer types the length prefix, and the generic read allocates from it
+// before a single payload byte is proven to exist. Zebra's ZcashDeserialize
+// is the documented instance of this contract -- its Vec<u8> implementation
+// sizes `vec![0u8; len]` straight from the wire CompactSize, bounded only by
+// the transport's loose MAX_U8_ALLOCATION, and the TrustedPreallocate
+// documentation the trait carries says "Blind preallocation of a generic
+// Vec<T> ... is a DOS vector", leaving tighter consensus bounds to the
+// calling type. A type whose encoding is a constant number of bytes (the
+// equihash solution is 1344 on mainnet) and whose deserializer delegates to
+// the generic read therefore lets a five-byte prefix claim a multi-megabyte
+// allocation per message, which the size match in the bytes-to-Self
+// conversion then rejects -- after the allocation.
+//
+// The clauses, each at function scope:
+//   - the length-prefixed read itself, named by the trait's own methods
+//     (zcash_deserialize_into / zcash_deserialize; the substring also covers
+//     the qualified spellings).
+//   - the Self-qualified bytes-to-Self conversion (Self::from_bytes,
+//     Self::try_from, Self::try_into, Self::from_slice) is what proves the
+//     field is fixed-size rather than legitimately variable-length, and the
+//     Self qualification keeps another type's constructor out of the shape:
+//     a backup reader that narrows with Amount::from_bytes off a local file
+//     is not this weakness, and a bare `from_bytes` needle would also
+//     substring-hit unrelated constructors like from_bytes_in_display_order.
+//   - the bound is policy-negated rather than name-matched: any lowered
+//     comparison in the function suppresses, and so does a min/clamp call,
+//     because the finding is about the read being unbounded rather than
+//     about which construct bounds it. The patched form of this shape reads
+//     the length, compares it against the consensus constant, and only then
+//     performs the counted read; a fix that instead reads into a stack array
+//     of constant size drops the length-prefixed read entirely and fails the
+//     first clause on its own.
+binding lengthPrefixedReadWithoutSizeBound {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.context.call, ["zcash_deserialize"]) and containsAny(node.context.callPath, ["Self.from_bytes", "Self.try_from", "Self.try_into", "Self.from_slice"]) and not (containsAny(node.context.binary, ["<", ">", "<=", ">=", "==", "!="])) and not (containsAny(node.context.call, ["min", "clamp"]))
+  emit issue code.LengthDerivedAllocation at node
+}

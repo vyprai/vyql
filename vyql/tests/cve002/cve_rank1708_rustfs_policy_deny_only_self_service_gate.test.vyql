@@ -1,0 +1,292 @@
+# Rank 1708 / CVE-2026-22043: RustFS's policy engine evaluated
+# `deny_only` requests by skipping the Allow pass and returning allowed.
+# `Policy::is_allowed` (crates/policy/src/policy/policy.rs:66 at 356dc7e^)
+# ran the Deny statements and then read
+# `if args.deny_only || args.is_owner { return true; }`, so any caller that
+# asked for a deny-only evaluation is granted access with no matching Allow
+# statement. Three admin handlers reached that path on a self-service
+# condition rather than on a permission: AddServiceAccount
+# (rustfs/src/admin/handlers/service_account.rs:115) derived the flag from
+# `constant_time_eq(&cred.access_key, &target_user) ||
+# constant_time_eq(&cred.parent_user, &target_user)`, and AddUser and
+# GetUserInfo (rustfs/src/admin/handlers/user.rs:121, :378) from
+# `ak == cred.access_key`. A restricted service account whose parent matches
+# the target therefore passed the gate without holding
+# CreateServiceAccountAdminAction / CreateUserAdminAction and minted an
+# unrestricted credential (CWE-269, reported by Positive Technologies as
+# PT-2026-2144).
+#
+# The row names a commit that a95e549430851f3c34ee4cc8dd7be60aa200e8c4
+# is the peeled commit of the 1.0.0-alpha.79 release tag the advisory names,
+# and it is not the fixing change -- it is an audit-registry and TCP-keepalive cleanup
+# whose parent contains the remediation (356dc7e is an ancestor of
+# a95e549, five commits earlier). The fixing change for the deny_only short-circuit is
+# 356dc7e0c2b4438ef3b447160003ea4571fb99ad ("feat: Add permission
+# verification for account creation", #1401): `is_allowed` splits the
+# disjunction so deny-only mode now returns false, and the three call sites
+# pass a literal `false` / `deny_only: false` instead of the identity
+# comparison. The vulnerable construct is present at 356dc7e^ and the
+# remediation at 356dc7e; at a95e549^ both are the patched form, so the row
+# as written has no vulnerable revision at all.
+#
+# ATTENTION, wiring-not-dataflow family (the 1514/1535/1540/1556/1557/1593
+# shape, "a flag defaulting open"). The defect is that a permission check is
+# skipped, so no tainted value reaches a sink and no taint rule can see it:
+# the request body's target_user is labelled
+# code.ObjectLookupByUserInput at the get_user lookup, and
+# new_service_account/create_user have no sink binding, but the escalation
+# happens in the gate's return value, not in any data that moves. The 1380
+# counterweight does not reach: the fixed revision does leave the API-documented gate
+# call (iam_store.is_allowed / validate_admin_request) inside every guarded
+# handler, but it is present verbatim at both revisions, so keying on the
+# call discriminates nothing -- the only thing that changed is which value
+# one argument carries. The discriminator is the vendor's own vocabulary:
+# `deny_only` appears in 10 files of rustfs and nowhere else across the 324
+# cloned target repositories (grep over /tmp/cve-work/rank*), so a binding
+# keyed on it can never fire on unrelated code and fails the genericity
+# test; and the engine-side discriminator would have to be the co-occurrence
+# of `deny_only` with `return true` in one statement, which is the fixing
+# commit's own layout. The caller-side shape ("an authorization gate
+# receives a boolean derived from an identity comparison") is likewise only
+# expressible by naming access_key/parent_user/target_user/constant_time_eq,
+# and the general form -- a function containing any `==` and any call with
+# arguments -- is close to universal in ordinary Rust. Rust emits no `assign:`
+# token for `let deny_only = <expr>` at all (probe-measured on the real
+# code: node.context.assign contains "deny_only" matches zero functions), so
+# the derivation is not linkable to the gate even in principle without
+# engine work. Measured on the real code: scanning the tree reports 591
+# findings at 356dc7e^ and 591 at 356dc7e, identical sets by fingerprint
+# diff (0 added, 0 removed), none on policy.rs, service_account.rs or
+# user.rs. No ENGINE-GAPS.md entry: nothing here is a localized engine
+# construct mishandled -- the token routes the caller shape needs do exist
+# (`call:`, `binary:`, `selector:`, the body token); what is missing is a
+# language-neutral concept for "an authorization gate relaxed by an
+# actor/target identity match", which is ontology design, and every spelling
+# of it that fits one repository names that repository. No definition change
+# shipped. Spec cve_rank1708 records the engine's deny-only grant and the
+# self-service caller, both forms, each asserting reject VYQL-AUTH-080: when
+# incorrect-authorization vocabulary gains a Rust emitter for a gate whose
+# permissive mode is caller-derived, the vulnerable forms must flip to
+# expect.
+
+test "rank1708: the policy engine grants access from deny-only mode"
+  lang rust
+  file crates/policy/src/policy/policy.rs
+  reject VYQL-AUTH-080
+  code
+  ```
+  use std::collections::HashMap;
+
+  pub enum Effect { Allow, Deny }
+
+  pub struct Statement {
+      pub effect: Effect,
+      pub action: String,
+  }
+
+  pub struct Policy {
+      pub statements: Vec<Statement>,
+  }
+
+  pub struct Args<'a> {
+      pub account: &'a str,
+      pub action: &'a str,
+      pub is_owner: bool,
+      pub deny_only: bool,
+      pub claims: &'a HashMap<String, String>,
+  }
+
+  impl Policy {
+      pub async fn is_allowed(&self, args: &Args<'_>) -> bool {
+          for statement in self.statements.iter() {
+              if matches!(statement.effect, Effect::Deny) && !statement.matches(args).await {
+                  return false;
+              }
+          }
+
+          if args.deny_only || args.is_owner {
+              return true;
+          }
+
+          for statement in self.statements.iter() {
+              if matches!(statement.effect, Effect::Allow) && statement.matches(args).await {
+                  return true;
+              }
+          }
+
+          false
+      }
+  }
+  ```
+
+test "rank1708: the fixed revision returns denied from deny-only mode"
+  lang rust
+  file crates/policy/src/policy/policy.rs
+  reject VYQL-AUTH-080
+  code
+  ```
+  use std::collections::HashMap;
+
+  pub enum Effect { Allow, Deny }
+
+  pub struct Statement {
+      pub effect: Effect,
+      pub action: String,
+  }
+
+  pub struct Policy {
+      pub statements: Vec<Statement>,
+  }
+
+  pub struct Args<'a> {
+      pub account: &'a str,
+      pub action: &'a str,
+      pub is_owner: bool,
+      pub deny_only: bool,
+      pub claims: &'a HashMap<String, String>,
+  }
+
+  impl Policy {
+      pub async fn is_allowed(&self, args: &Args<'_>) -> bool {
+          // First, check all Deny statements - if any Deny matches, deny the request
+          for statement in self.statements.iter() {
+              if matches!(statement.effect, Effect::Deny) && !statement.matches(args).await {
+                  return false;
+              }
+          }
+
+          // Owner has all permissions
+          if args.is_owner {
+              return true;
+          }
+
+          if args.deny_only {
+              return false;
+          }
+
+          // Check Allow statements
+          for statement in self.statements.iter() {
+              if matches!(statement.effect, Effect::Allow) && statement.matches(args).await {
+                  return true;
+              }
+          }
+
+          false
+      }
+  }
+  ```
+
+test "rank1708: a service account gate relaxed by an actor/target identity match"
+  lang rust
+  file rustfs/src/admin/handlers/service_account.rs
+  reject VYQL-AUTH-080
+  code
+  ```
+  use std::collections::HashMap;
+
+  pub struct Credentials {
+      pub access_key: String,
+      pub parent_user: String,
+      pub claims: Option<HashMap<String, String>>,
+  }
+
+  pub struct Args<'a> {
+      pub account: &'a str,
+      pub action: &'a str,
+      pub is_owner: bool,
+      pub deny_only: bool,
+      pub claims: &'a HashMap<String, String>,
+  }
+
+  pub struct IamStore;
+
+  impl IamStore {
+      pub async fn is_allowed(&self, args: &Args<'_>) -> bool {
+          let _ = args;
+          true
+      }
+
+      pub async fn new_service_account(&self, target_user: &str, opts: &str) -> Credentials {
+          Credentials { access_key: target_user.to_string(), parent_user: String::new(), claims: None }
+      }
+  }
+
+  fn constant_time_eq(a: &str, b: &str) -> bool {
+      a.as_bytes() == b.as_bytes()
+  }
+
+  pub async fn add_service_account(cred: &Credentials, target_user: &str, owner: bool, iam_store: &IamStore) {
+      let deny_only = constant_time_eq(&cred.access_key, target_user) || constant_time_eq(&cred.parent_user, target_user);
+
+      if !iam_store
+          .is_allowed(&Args {
+              account: &cred.access_key,
+              action: "CreateServiceAccountAdminAction",
+              is_owner: owner,
+              claims: &HashMap::new(),
+              deny_only,
+          })
+          .await
+      {
+          return;
+      }
+
+      let opts = "unrestricted";
+      let _ = iam_store.new_service_account(target_user, opts).await;
+  }
+  ```
+
+test "rank1708: the fixed revision always requires the explicit Allow permission"
+  lang rust
+  file rustfs/src/admin/handlers/service_account.rs
+  reject VYQL-AUTH-080
+  code
+  ```
+  use std::collections::HashMap;
+
+  pub struct Credentials {
+      pub access_key: String,
+      pub parent_user: String,
+      pub claims: Option<HashMap<String, String>>,
+  }
+
+  pub struct Args<'a> {
+      pub account: &'a str,
+      pub action: &'a str,
+      pub is_owner: bool,
+      pub deny_only: bool,
+      pub claims: &'a HashMap<String, String>,
+  }
+
+  pub struct IamStore;
+
+  impl IamStore {
+      pub async fn is_allowed(&self, args: &Args<'_>) -> bool {
+          let _ = args;
+          true
+      }
+
+      pub async fn new_service_account(&self, target_user: &str, opts: &str) -> Credentials {
+          Credentials { access_key: target_user.to_string(), parent_user: String::new(), claims: None }
+      }
+  }
+
+  pub async fn add_service_account(cred: &Credentials, target_user: &str, owner: bool, iam_store: &IamStore) {
+      // Always require explicit Allow permission
+      if !iam_store
+          .is_allowed(&Args {
+              account: &cred.access_key,
+              action: "CreateServiceAccountAdminAction",
+              is_owner: owner,
+              claims: &HashMap::new(),
+              deny_only: false,
+          })
+          .await
+      {
+          return;
+      }
+
+      let opts = "unrestricted";
+      let _ = iam_store.new_service_account(target_user, opts).await;
+  }
+  ```

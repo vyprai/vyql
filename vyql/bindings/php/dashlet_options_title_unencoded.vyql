@@ -1,0 +1,31 @@
+module bindings.php.dashlet_options_title_unencoded;
+
+// The SugarCRM/SuiteCRM dashlet framework persists a widget's saved options
+// through a documented hook: Dashlet::saveOptions(array $req) -- "the array to
+// pull options from", always the request at the call sites -- returns an
+// options array the framework stores in user preferences and feeds back into
+// the dashlet constructor. One option field is markup by contract: `title` is
+// copied to Dashlet::$title and the base class renders it straight into the
+// dashlet header HTML (get_form_header($this->title, ...) and the
+// form_title/DASHLET_TITLE template assigns), so a title stored unencoded is
+// stored HTML, rendered on every later page load for the user whose
+// preferences hold it.
+//
+// A saveOptions implementation that assigns the `title` option straight from
+// the request array -- $req['...'] per the hook's documented parameter, or a
+// request superglobal directly -- stores attacker markup through that
+// contract. Encoding the value first (htmlentities, htmlspecialchars,
+// strip_tags, the framework's own cleanHtml/securexss sanitizers) is the fix
+// shape. The clauses read the assignment token's compacted text, so any
+// request key and either quote style match, and the encoding clause reads
+// call tokens, which are AST-derived: a commented-out htmlentities does not
+// count as encoding and neither does prose naming one. The hook name confines
+// the binding to the framework's own save methods; assignments to `title`
+// elsewhere in the class do not reach it.
+binding dashletOptionsTitleUnencoded {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php"
+    and node.context.functionName == "saveOptions"
+    and containsAny(node.context.assign, ["['title']=$req[", "[\"title\"]=$req[", "['title']=$_REQUEST[", "[\"title\"]=$_REQUEST[", "['title']=$_POST[", "[\"title\"]=$_POST[", "['title']=$_GET[", "[\"title\"]=$_GET["])
+    and not containsAny(node.context.scopeCall, [htmlspecialchars, htmlentities, esc_html, esc_attr, strip_tags, stripTags, purify_html, securexss, cleanHtml, removeXSS, filter_var])
+  emit issue code.StoredHtmlWrite at node
+}

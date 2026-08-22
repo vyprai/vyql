@@ -1,0 +1,8 @@
+module code;
+
+review code.UnapprovedLoginArtifactAuthentication {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review the out-of-band login path: the resolved login artifact's access code is verified but its approval state or owner binding is never read, so whoever created the artifact authenticates as the account it names -- require the artifact's approval and owner match before issuing credentials"
+}

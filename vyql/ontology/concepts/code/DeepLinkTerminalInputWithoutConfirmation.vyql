@@ -1,0 +1,11 @@
+module code;
+
+concept DeepLinkTerminalInputWithoutConfirmation : issue {
+  cwe: [CWE_78, CWE_20]
+  reviewAssumption: "any document that can trigger the registered desktop URL scheme chooses the deep-link parameter values"
+  reviewCategory: command
+  reviewCondition: "a URL-scheme or command-line argument value is written into an interactive terminal session without an interactive confirmation"
+  reviewConfidence: high
+  reviewEvidence: "deep-link terminal context {pattern} reads an argv field and writes it through the terminal session input API with no confirmation dialog in the module"
+  vulnerableTo: [injection.CommandInjection, validation.ImproperInputValidation]
+}

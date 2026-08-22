@@ -1,0 +1,315 @@
+# Rank 1730 / CVE-2026-30914: SFTPGo's SFTP and FTP handlers routed the
+# client-supplied request path raw. Fileread, Filecmd, Filelist, Lstat and
+# StatVFS in internal/sftpd/handler.go (and every name-taking driver method
+# in internal/ftpd/handler.go) checked permissions against
+# `c.User.HasPerm(perm, path.Dir(request.Filepath))` and then handed the same
+# un-normalized string to GetFsAndResolvedPath, while each filesystem's
+# ResolvePath did its own backslash conversion and path.Clean -- after the
+# mount-point selection. A path such as `/s3\..\local\secret.txt` is
+# permission-checked against one virtual mount and resolved onto another
+# (the fixed revision's own TestGetFsAndResolvedPath case list names this shape), so the
+# authorization decision and the access decision read different strings
+# (CWE-22). Fix 2f092d12 hoists util.CleanPath into every handler entry point
+# before the permission check and the routing, reorders RealPath so the clean
+# precedes the check, and adds `path.Clean("/"+virtualPath)` before the
+# rootDir join in OsFs.ResolvePath; the row's metadata is right (parent
+# 6cef669 is vulnerable, the remediation is present at the fixed revision).
+#
+# ATTENTION, two independent blockers.
+#
+# 1. The change is invisible to a taint path, the character of the
+# authorization-by-wiring family (1514, 1535, 1540, 1556, 1557, 1593): the
+# source-to-sink flow is identical before and at the fixed revision -- the patched
+# handler still passes request.Filepath through the same resolver to the same
+# sinks, and the resolver's own filepath.Join/Clean ran in both revisions --
+# so no rule can discriminate. The only visible difference inside each
+# guarded function is a call to the project's own sanitizer
+# (util.CleanPath, or the updateRequestPaths helper that wraps it), and no
+# API-documented call remains inside the guarded functions (the 1380
+# counterweight does not apply): keying a negation on "Clean"/"CleanPath"
+# fails the rename test and the genericity test. Measured over full
+# --cache off scans of both revisions (three runs per side, stable: 1155
+# findings at the parent, 1158 at the fixed revision, rule/file/line compared rather
+# than totals): the only finding with no counterpart at the fixed revision is
+# VYQL-PATH-062 (code.UncanonicalizedPathContainmentCheck) at
+# internal/vfs/sftpfs.go:680, where the same commit replaces the vulnerable
+# `strings.HasPrefix(rel, fs.config.Prefix)` prefix containment with
+# strings.CutPrefix -- a real containment weakness in the reverse
+# physical-to-virtual mapping, but a rider hunk, not the CVE's
+# handler-routing defect. Five more signatures shift only by line (+1 to
+# +14, the fixed revision's own added lines; e.g. the PATH-062 on ftpd/handler.go:534
+# reappears at :548), and the four VYQL-CFG-008 rows that appear are the
+# fix's own new connection_test.go. Nothing reports on
+# internal/sftpd/handler.go or internal/common/connection.go in either
+# revision, and the one finding on internal/ftpd/handler.go is that shifted
+# PATH-062 on the getPathRelativeTo helper, identical in both revisions and
+# on no guarded driver method. `vyql match` labels no source there (pkg/sftp
+# has no Go binding, so request.Filepath is unlabelled, and the FTP driver
+# methods take plain strings no entry mechanism can distinguish).
+#
+# 2. Even with a source binding, the path dies in the engine. A throwaway
+# parameter-entry binding on `*sftp.Request` (the same shape as the shipped
+# http.Request one) labels the handlers, and the taint reaches
+# path.Dir/HasPerm arguments and logging -- and stops. The chain
+# handler -> BaseConnection.GetFsAndResolvedPath ->
+# c.User.GetFilesystemForPath -> fs.ResolvePath -> fs.Open -> (*OsFs).Open
+# -> os.OpenFile breaks at the struct-field receiver: `resolveTargets`'
+# `nir.Attr` case requires the receiver base to be a bare `nir.Name`
+# (lowering.go:5124, the check at :5138), so a call whose receiver is a
+# field selector (`c.User.GetFilesystemForPath(virtualPath, c.ID)`) returns
+# unresolved, the `fs` it yields carries no declared type, and
+# `fs.ResolvePath`/`fs.Open` then hit the ambiguous short-name fallback
+# (ResolvePath is defined on six filesystems) instead of routing into the
+# concrete implementation where the os.OpenFile sink lives. Interface
+# dispatch works when the receiver is a parameter, a declared local, or a
+# local typed by a call result -- the minimal pair below. The
+# ENGINE-GAPS.md entry (field-receiver dispatch) records the change shape: the
+# classFields table (lowering.go:72) exists for exactly this receiver in
+# class-based frontends, but the Go frontend lowers struct fields only as
+# analysis tokens (structFieldNames/structFieldTags), so populating it plus
+# walking a field-selector receiver is a new resolution relation across two
+# layers, not a localized correction.
+#
+# Spec cve_rank1730 pins all four directions: both handler forms assert
+# reject VYQL-PATH-001 (nothing can report them today); when field-receiver
+# dispatch lands, the field-receiver pair member must flip to expect, and
+# when request-path normalization vocabulary lands, the vulnerable handler
+# form must flip too.
+
+test "rank1730: the SFTP handler checks permissions on the raw request path and routes the same raw path"
+  lang go
+  file sftpgo/handler_vuln.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package sftpd
+
+  import (
+  	"io"
+  	"os"
+  	"path"
+
+  	"github.com/pkg/sftp"
+  )
+
+  type Fs interface {
+  	ResolvePath(virtualPath string) (string, error)
+  	Open(name string, flag int) (*os.File, error)
+  }
+
+  type OsFs struct {
+  	rootDir string
+  }
+
+  func (fs *OsFs) ResolvePath(virtualPath string) (string, error) {
+  	r := fs.rootDir + virtualPath
+  	return r, nil
+  }
+
+  func (fs *OsFs) Open(name string, flag int) (*os.File, error) {
+  	return os.OpenFile(name, flag, 0600)
+  }
+
+  type BaseConnection struct {
+  	Fs Fs
+  }
+
+  func (c *BaseConnection) GetFsAndResolvedPath(virtualPath string) (Fs, string, error) {
+  	fsPath, err := c.Fs.ResolvePath(virtualPath)
+  	if err != nil {
+  		return nil, "", err
+  	}
+  	return c.Fs, fsPath, nil
+  }
+
+  type Connection struct {
+  	BaseConnection
+  }
+
+  func (c *Connection) Fileread(request *sftp.Request) (io.ReaderAt, error) {
+  	if !c.User.HasPerm(path.Dir(request.Filepath)) {
+  		return nil, sftp.ErrSSHFxPermissionDenied
+  	}
+
+  	fs, p, err := c.GetFsAndResolvedPath(request.Filepath)
+  	if err != nil {
+  		return nil, err
+  	}
+
+  	file, r, err := fs.Open(p, 0)
+  	if err != nil {
+  		return nil, err
+  	}
+  	_ = file
+  	return r, nil
+  }
+  ```
+
+test "rank1730: the fixed revision canonicalizes the request path at the handler, before the check and the routing"
+  lang go
+  file sftpgo/handler_fixed.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package sftpd
+
+  import (
+  	"io"
+  	"os"
+  	"path"
+  	"strings"
+
+  	"github.com/drakkan/sftpgo/v2/internal/util"
+  	"github.com/pkg/sftp"
+  )
+
+  type Fs interface {
+  	ResolvePath(virtualPath string) (string, error)
+  	Open(name string, flag int) (*os.File, error)
+  }
+
+  type OsFs struct {
+  	rootDir string
+  }
+
+  func (fs *OsFs) ResolvePath(virtualPath string) (string, error) {
+  	r := fs.rootDir + virtualPath
+  	return r, nil
+  }
+
+  func (fs *OsFs) Open(name string, flag int) (*os.File, error) {
+  	return os.OpenFile(name, flag, 0600)
+  }
+
+  type BaseConnection struct {
+  	Fs Fs
+  }
+
+  func (c *BaseConnection) GetFsAndResolvedPath(virtualPath string) (Fs, string, error) {
+  	fsPath, err := c.Fs.ResolvePath(virtualPath)
+  	if err != nil {
+  		return nil, "", err
+  	}
+  	return c.Fs, fsPath, nil
+  }
+
+  type Connection struct {
+  	BaseConnection
+  }
+
+  func updateRequestPaths(request *sftp.Request) {
+  	if request.Method == "Symlink" {
+  		request.Filepath = path.Clean(strings.ReplaceAll(request.Filepath, "\\", "/"))
+  	} else {
+  		request.Filepath = util.CleanPath(request.Filepath)
+  	}
+
+  	if request.Target != "" {
+  		request.Target = util.CleanPath(request.Target)
+  	}
+  }
+
+  func (c *Connection) Fileread(request *sftp.Request) (io.ReaderAt, error) {
+  	updateRequestPaths(request)
+
+  	if !c.User.HasPerm(path.Dir(request.Filepath)) {
+  		return nil, sftp.ErrSSHFxPermissionDenied
+  	}
+
+  	fs, p, err := c.GetFsAndResolvedPath(request.Filepath)
+  	if err != nil {
+  		return nil, err
+  	}
+
+  	file, r, err := fs.Open(p, 0)
+  	if err != nil {
+  		return nil, err
+  	}
+  	_ = file
+  	return r, nil
+  }
+  ```
+
+test "rank1730: an interface value held directly dispatches into the implementation's sink"
+  lang go
+  file sftpgo/pair_direct.go
+  expect VYQL-PATH-001
+  code
+  ```
+  package sftpd
+
+  import (
+  	"net/http"
+  	"os"
+  )
+
+  type Fs interface {
+  	ResolvePath(p string) (string, error)
+  	Open(name string, flag int) (*os.File, error)
+  }
+
+  type OsFs struct {
+  	rootDir string
+  }
+
+  func (fs *OsFs) ResolvePath(p string) (string, error) {
+  	return fs.rootDir + p, nil
+  }
+
+  func (fs *OsFs) Open(name string, flag int) (*os.File, error) {
+  	return os.OpenFile(name, flag, 0600)
+  }
+
+  type Holder struct {
+  	Fs Fs
+  }
+
+  // DirectReceiver: the interface value is a parameter -- dispatch works.
+  func DirectReceiver(fs Fs, w http.ResponseWriter, r *http.Request) {
+  	p, _ := fs.ResolvePath(r.URL.Path)
+  	f, _ := fs.Open(p, 0)
+  	f.Close()
+  }
+  ```
+
+test "rank1730: the identical body through a struct-field receiver does not dispatch"
+  lang go
+  file sftpgo/pair_field.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package sftpd
+
+  import (
+  	"net/http"
+  	"os"
+  )
+
+  type Fs interface {
+  	ResolvePath(p string) (string, error)
+  	Open(name string, flag int) (*os.File, error)
+  }
+
+  type OsFs struct {
+  	rootDir string
+  }
+
+  func (fs *OsFs) ResolvePath(p string) (string, error) {
+  	return fs.rootDir + p, nil
+  }
+
+  func (fs *OsFs) Open(name string, flag int) (*os.File, error) {
+  	return os.OpenFile(name, flag, 0600)
+  }
+
+  type Holder struct {
+  	Fs Fs
+  }
+
+  // FieldReceiver: the interface value is a field of a struct -- dispatch is lost.
+  func FieldReceiver(h *Holder, w http.ResponseWriter, r *http.Request) {
+  	p, _ := h.Fs.ResolvePath(r.URL.Path)
+  	f, _ := h.Fs.Open(p, 0)
+  	f.Close()
+  }
+  ```

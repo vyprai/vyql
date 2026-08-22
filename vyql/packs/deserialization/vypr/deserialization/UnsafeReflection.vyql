@@ -7,4 +7,5 @@ rule UnsafeReflection {
     severity: high
   }
   taint core.UserControlledData -> code.ReflectionInvoke
+  unless v.dominates coveredBy core.ClassTypeValidation
 }
