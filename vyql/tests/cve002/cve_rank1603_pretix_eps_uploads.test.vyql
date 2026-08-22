@@ -1,0 +1,72 @@
+# Rank 1603 / CVE-2023-44464: pretix passed uploaded question
+# files to Pillow with format auto-detection, so a crafted EPS
+# upload reached Pillow's EPS plugin -- which shells out to
+# Ghostscript and executes postscript commands (code execution
+# through a dangerous parser, CWE-94; the extension whitelist alone
+# cannot stop content-based detection). The image questions in
+# src/pretix/base/forms/questions.py did `image = Image.open(file)`
+# -- Pillow sniffs the format from bytes, and an EPS payload opens
+# regardless of its filename. the fixing commit 8583bfb7d9 is the fixing change
+# ("[SECURITY] Do not allow Pillow to parse EPS
+# files"): every Image.open gains formats=settings.
+# PILLOW_FORMATS_QUESTIONS_IMAGE (a format allowlist without EPS),
+# and the scattered extension tuples centralise into settings.
+# FILE_UPLOAD_EXTENSIONS_*. .
+#
+# ATTENTION, parser-format allowlists at upload boundaries. The
+# decode call is the sink and its danger is the plugin it selects --
+# format auto-detection makes the extension whitelist irrelevant,
+# the same content-vs-name family as rank 1573's charset detection:
+# nothing can ask "does the parser restrict its format plugins to
+# an allowlist" -- plugin-selection vocabulary on a stdlib-adjacent
+# API (PILLOW_FORMATS settings are pretix's own). A binding on
+# pretix's own forms would detect this application rather than the
+# weakness. Measured on the real code: scanning questions.py
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1603 records the
+# auto-detecting open and the formats-allowlist form, both
+# asserting reject VYQL-INJ-003: when parser-plugin vocabulary
+# lands, the auto-detect form must flip to expect.
+
+test "rank1603: uploaded files are opened with format detection"
+  lang python
+  file src/pretix/base/forms/questions.py
+  reject VYQL-INJ-003
+  code
+  ```
+  from PIL import Image
+
+
+  class QuestionFileUpload(forms.Form):
+      def clean_upload(self):
+          file = self.cleaned_data.get('upload')
+
+          if file.name.lower().endswith(('.jpg', '.jpeg', '.png')):
+              image = Image.open(file)
+              if image.width > 8000 or image.height > 8000:
+                  raise ValidationError('Image is too large')
+
+          return file
+  ```
+
+test "rank1603: the fixed revision restricts the parser to safe formats"
+  lang python
+  file src/pretix/base/forms/questions.py
+  reject VYQL-INJ-003
+  code
+  ```
+  from django.conf import settings
+  from PIL import Image
+
+
+  class QuestionFileUpload(forms.Form):
+      def clean_upload(self):
+          file = self.cleaned_data.get('upload')
+
+          if file.name.lower().endswith(settings.FILE_UPLOAD_EXTENSIONS_QUESTION_IMAGE):
+              image = Image.open(file, formats=settings.PILLOW_FORMATS_QUESTIONS_IMAGE)
+              if image.width > 8000 or image.height > 8000:
+                  raise ValidationError('Image is too large')
+
+          return file
+  ```

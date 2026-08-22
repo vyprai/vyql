@@ -1,0 +1,64 @@
+# Rank 1615 / CVE-2022-1812: Publify stored the user display name
+# with no length bound -- the column is a text type, so a profile
+# edit could persist megabytes into the name that renders on every
+# page, feed and session the user touches (unbounded input to
+# resource exhaustion and cookie/session breakage, CWE-400/CWE-20;
+# the huntr bounty fixed by the length validation). The User model
+# in publify_core/app/models/user.rb validated the name's presence
+# but never its length. the fixing commit 29a5837c29 is the fixing change
+# (the advisory links this exact commit, "Validate
+# length of user's name attribute"): `validates :name, length: {
+# maximum: 2048 }` -- generous for any real name, bounded for the
+# column semantics.g
+# resolves as an umbrella layout: publify/publify contains
+# publify_core as a directory, and the pool row's repository holds
+# the commit the advisory names).
+
+#
+# ATTENTION, model-level length budgets. The unbounded attribute is
+# a storage/render exhaustion vector and no rule can ask "does every
+# user-editable attribute carry a length validation against its
+# column semantics" -- Rails model validation vocabulary. The
+# corpus's size-budget rules judge parser loops, not ORM attribute
+# declarations. A binding on Publify's own User model would detect
+# this application rather than the weakness. Measured on the real
+# code: scanning user.rb reports zero findings at both revisions.
+# No ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1615 records the unvalidated name and the length-bounded
+# form, both asserting reject VYQL-DOS-029: when attribute-budget
+# vocabulary lands, the unvalidated form must flip to expect.
+
+test "rank1615: the display name has no length bound"
+  lang ruby
+  file publify_core/app/models/user.rb
+  reject VYQL-DOS-029
+  code
+  ```
+  class User < ActiveRecord::Base
+    validates :name, presence: true
+    validates :login, presence: true, uniqueness: true
+    validates :email, presence: true, uniqueness: true
+
+    def display_name
+      name
+    end
+  end
+  ```
+
+test "rank1615: the fixed revision bounds the name length"
+  lang ruby
+  file publify_core/app/models/user.rb
+  reject VYQL-DOS-029
+  code
+  ```
+  class User < ActiveRecord::Base
+    validates :name, presence: true
+    validates :name, length: { maximum: 2048 }
+    validates :login, presence: true, uniqueness: true
+    validates :email, presence: true, uniqueness: true
+
+    def display_name
+      name
+    end
+  end
+  ```

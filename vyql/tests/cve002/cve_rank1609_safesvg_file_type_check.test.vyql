@@ -1,0 +1,84 @@
+# Rank 1609 / CVE-2022-1091: the safe-svg WordPress plugin decided
+# which uploads are SVGs from the uploader-declared mime type, so a
+# crafted file announcing image/svg+xml (or a polyglot) steered the
+# file into or out of the plugin's sanitisation path based on
+# client-claimed metadata rather than the file's bytes (content-type
+# confusion, CWE-345/CWE-436; PR #28 "Better checking of the file
+# type when determining which files are SVGs"). The upload filter in
+# safe-svg.php did `if ( $file['type'] === 'image/svg+xml' )` -- the
+# type from the request array. the fixing commit 00cb9a86d1 is the fixing change
+# (the merge): the gate becomes `wp_check_filetype_and_
+# ext( $file['tmp_name'], $file['name'] )` -- WordPress inspects the
+# temporary file's actual content and extension, and the plugin uses
+# that inspected type.
+#
+# RANK REPLACEMENT: this rank originally held projectsend/projectsend
+# CVE-2024-11680 (CISA KEV, unauthenticated options.php config
+# modification, fixed in release r1720). The pool row's commit
+# 193367d937 does not exist in the repository or any remote ref, the
+# r-series releases were distributed as archives that never reachhe remote andit,
+# and only tag v2.0.0 (August 2026) exists -- the change is not
+# reviewable from source, so per the pool protocol the row is
+# replaced IN PLACE with the next unranked php candidate from
+# candidates.tsv (10up/safe-svg, CVE-2022-1091, 00cb9a86d1), same
+# line number, no rank moved.
+#
+# ATTENTION, declared-vs-inspected content types. The gate exists --
+# it consults the client's claim instead of the file's content, the
+# same trust-boundary family as rank 1582 (Plane's wildcard image
+# hosts) at the file layer: nothing can ask "is the type decision
+# derived from inspected bytes rather than uploader metadata" --
+# content-inspection vocabulary on a platform API
+# (wp_check_filetype_and_ext is WordPress's own). A binding on
+# safe-svg's own filter would detect this plugin rather than the
+# weakness. Measured on the real code: scanning safe-svg.php reports
+# zero findings at both revisions. No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1609 records the
+# declared-type gate and the inspected-type form, both asserting
+# reject VYQL-VAL-014: when content-inspection vocabulary lands, the
+# declared-type form must flip to expect.
+
+test "rank1609: the svg gate trusts the declared type"
+  lang php
+  file safe-svg.php
+  reject VYQL-VAL-014
+  code
+  ```
+  <?php
+
+  class SafeSvg
+  {
+      public function sanitize_svg_on_upload($file)
+      {
+          if ($file['type'] === 'image/svg+xml') {
+              $file = $this->sanitize($file);
+          }
+
+          return $file;
+      }
+  }
+  ```
+
+test "rank1609: the fixed revision inspects the file before deciding"
+  lang php
+  file safe-svg.php
+  reject VYQL-VAL-014
+  code
+  ```
+  <?php
+
+  class SafeSvg
+  {
+      public function sanitize_svg_on_upload($file)
+      {
+          $wp_filetype = wp_check_filetype_and_ext($file['tmp_name'], $file['name']);
+          $type        = ! empty($wp_filetype['type']) ? $wp_filetype['type'] : '';
+
+          if ($type === 'image/svg+xml') {
+              $file = $this->sanitize($file);
+          }
+
+          return $file;
+      }
+  }
+  ```

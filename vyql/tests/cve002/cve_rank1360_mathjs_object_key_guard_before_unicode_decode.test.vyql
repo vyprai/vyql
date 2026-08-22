@@ -64,17 +64,6 @@
 # signature is `new Function(arg1, ..., argN, functionBody)` -- the body is the
 # LAST argument. A tainted body reported as VYQL-INJ-003 critical in the
 # one-argument form is invisible the moment the generated function declares a
-<<<<<<< HEAD
-# parameter, which is the form mathjs uses. Switching that binding to args.any
-# is measured and not kept: across ten JavaScript/TypeScript trees it adds
-# exactly one finding and no true positive. That one row is mathjs's own
-# Node.js:73, a correct sink reached from a pre-existing spurious
-# code.DomInput on DenseMatrix.js:269, and it appears at both revisions, so it
-# neither catches this weakness nor discriminates the revisions. The pair below pins
-# where the boundary sits today; the second test is expected to gain a finding
-# when that binding is corrected alongside the source that makes it cost
-# something.
-=======
 # parameter, which is the form mathjs uses. codeEval259 names every argument, so
 # both forms below report: the body reaches the sink whether it is the only
 # argument or follows a declared parameter name. The finding this adds on
@@ -83,7 +72,6 @@
 # still does not discriminate this fix -- the rank stays ATTENTION for the guard
 # question the CVE is actually about, which is the pre-decode spelling the
 # denylist reads.
->>>>>>> ea8cc69d2 (javascript: expect the function-constructor body to report past a parameter list)
 
 test "rank1360: object-literal compiler guards the raw key and emits its re-quoted spelling into generated source"
   lang javascript

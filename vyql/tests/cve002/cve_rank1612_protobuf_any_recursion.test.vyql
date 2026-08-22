@@ -1,0 +1,116 @@
+# Rank 1612 / CVE-2026-0994: protobuf's Python JSON parser expanded
+# nested google.protobuf.Any messages through a reflective method
+# dispatch that skipped the recursion-depth accounting, so deeply
+# nested Any input bypassed max_recursion_depth and overflowed the
+# stack (denial of service through a budget-bypassing branch,
+# CWE-400/CWE-1327; #25239, fixed with #25587). _ConvertAnyMessage
+# in python/google/protobuf/json_format.py handled well-known types
+# with `methodcaller(_WKTJSONMETHODS[full_name][1], value['value'],
+# sub_message, ...)(self)` -- the call re-enters the parser without
+# passing ConvertMessage, whose recursion_depth increment and
+# max_recursion_depth check are the only budget. The fixing commit
+# 5ebddcb1bc is the fixing change,"Fix Any recursion depth
+# bypass in Python json_format.ParseDict"): the well-known-type
+# branch calls `self.ConvertMessage(value['value'], sub_message,
+# '{0}.value'.format(path))` so every nested message -- Any included
+# -- is counted, with a regression test nesting five Anys under
+# max_recursion_depth=5. .
+#
+# ATTENTION, budget-bypassing dispatch. The depth counter exists
+# and the check runs on the main path -- one branch reaches the same
+# work through methodcaller and skips the accounting, the same
+# counter-bypass family as rank 1560 (a continue skipping its
+# increment) with reflective dispatch as the vehicle: no rule can
+# ask "does every re-entry into the parser pass the budget check" --
+# dispatch-path completeness over a recursive descent. A binding on
+# protobuf's own parser would detect this library rather than the
+# weakness. Measured on the real code: scanning json_format.py
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1612 records the
+# methodcaller bypass and the ConvertMessage-routed form, both
+# asserting reject VYQL-DOS-029: when budget-bypass vocabulary
+# lands, the bypassing form must flip to expect.
+
+test "rank1612: the well-known branch bypasses the depth budget"
+  lang python
+  file python/google/protobuf/json_format.py
+  reject VYQL-DOS-029
+  code
+  ```
+  from operator import methodcaller
+
+
+  _WKTJSONMETHODS = {
+      'google.protobuf.Any': ('', '_ConvertAnyMessage'),
+      'google.protobuf.Duration': ('', '_ConvertDurationMessage'),
+  }
+
+
+  class _Parser:
+      def __init__(self, max_recursion_depth):
+          self.max_recursion_depth = max_recursion_depth
+          self.recursion_depth = 0
+
+      def ConvertMessage(self, value, message, path):
+          self.recursion_depth += 1
+          if self.recursion_depth > self.max_recursion_depth:
+              raise ParseError('Message too deep.')
+          try:
+              return self._ConvertFieldValuePair(value, message, path)
+          finally:
+              self.recursion_depth -= 1
+
+      def _ConvertAnyMessage(self, value, message, path):
+          full_name = self._FindMessage(value['@type']).DESCRIPTOR.full_name
+          sub_message = message
+
+          if full_name in _WKTJSONMETHODS:
+              methodcaller(
+                  _WKTJSONMETHODS[full_name][1],
+                  value['value'],
+                  sub_message,
+                  '{0}.value'.format(path),
+              )(self)
+          else:
+              self._ConvertFieldValuePair(value, sub_message, path)
+  ```
+
+test "rank1612: the fixed revision routes the branch through the budget"
+  lang python
+  file python/google/protobuf/json_format.py
+  reject VYQL-DOS-029
+  code
+  ```
+  _WKTJSONMETHODS = {
+      'google.protobuf.Any': ('', '_ConvertAnyMessage'),
+      'google.protobuf.Duration': ('', '_ConvertDurationMessage'),
+  }
+
+
+  class _Parser:
+      def __init__(self, max_recursion_depth):
+          self.max_recursion_depth = max_recursion_depth
+          self.recursion_depth = 0
+
+      def ConvertMessage(self, value, message, path):
+          self.recursion_depth += 1
+          if self.recursion_depth > self.max_recursion_depth:
+              raise ParseError('Message too deep.')
+          try:
+              return self._ConvertFieldValuePair(value, message, path)
+          finally:
+              self.recursion_depth -= 1
+
+      def _ConvertAnyMessage(self, value, message, path):
+          full_name = self._FindMessage(value['@type']).DESCRIPTOR.full_name
+          sub_message = message
+
+          if full_name in _WKTJSONMETHODS:
+              # For well-known types (including nested Any), use ConvertMessage
+              # to ensure recursion depth is properly tracked
+              self.ConvertMessage(
+                  value['value'], sub_message, '{0}.value'.format(path)
+              )
+          else:
+              self._ConvertFieldValuePair(value, sub_message, path)
+  ```

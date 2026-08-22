@@ -1,0 +1,102 @@
+# Rank 1606 / CVE-2017-0909: the private_address_check gem decided
+# which hosts an outbound request may reach from a short list of
+# excluded ranges, so addresses in reserved ranges the list omitted
+# -- 0.0.0.0/8, the carrier-grade NAT block 100.64.0.0/10, the
+# documentation nets, IPv4-mapped IPv6 -- passed the check and
+# received requests (SSRF protection bypass through an incomplete
+# range list, CWE-284/CWE-918; PR #3 by EdOverflow, "Increase
+# exclusion list"). The PRIVATE_PREFIXES constant in
+# lib/private_address_check.rb carried loopback, link-local and
+# RFC1918 alone (::1/64 besides being the wrong mask). The fixing commit
+# 516ab853e7 is the fixing change,the merge): the list is
+# rebuilt from the Reserved_IP_addresses table -- every special-purpose
+# range, with per-entry comments and the correct ::1/128 mask. No
+
+#
+# ATTENTION, reserved-range completeness. The check exists and runs
+# -- its list misses ranges the address registry reserves: the same
+# enumeration-completeness family as ranks 1575 (picklescan's
+# globals) and 1522 (bracket-blind hosts), and nothing can ask "does
+# the excluded-range list cover every reserved allocation" -- that
+# is registry knowledge (IANA's special-purpose registry), not
+# code. A binding on the gem's own constant would detect this
+# library rather than the weakness. Measured on the real code:
+# scanning private_address_check.rb reports zero findings at both
+# revisions. No ENGINE-GAPS.md entry. No definition change shipped.
+# Spec cve_rank1606 records the short list and the complete form,
+# both asserting reject VYQL-RF-001: when range-completeness
+# vocabulary lands, the short list must flip to expect.
+
+test "rank1606: the exclusion list covers the common ranges only"
+  lang ruby
+  file lib/private_address_check.rb
+  reject VYQL-RF-001
+  code
+  ```
+  require "ipaddr"
+
+  module PrivateAddressCheck
+    PRIVATE_PREFIXES = [
+      # Loopback
+      IPAddr.new("127.0.0.0/8"),
+      IPAddr.new("::1/64"),
+
+      # Link Local
+      IPAddr.new("169.254.0.0/16"),
+
+      # RFC 1918
+      IPAddr.new("10.0.0.0/8"),
+      IPAddr.new("172.16.0.0/12"),
+      IPAddr.new("192.168.0.0/16"),
+
+      # RFC 4193
+      IPAddr.new("fc00::/7"),
+    ].freeze
+
+    def self.private_address?(ip)
+      PRIVATE_PREFIXES.any? { |prefix| prefix.include?(ip) }
+    end
+  end
+  ```
+
+test "rank1606: the fixed revision covers every reserved allocation"
+  lang ruby
+  file lib/private_address_check.rb
+  reject VYQL-RF-001
+  code
+  ```
+  require "ipaddr"
+
+  module PrivateAddressCheck
+    # https://en.wikipedia.org/wiki/Reserved_IP_addresses
+    PRIVATE_PREFIXES = [
+      IPAddr.new("127.0.0.0/8"),     # Loopback
+      IPAddr.new("::1/128"),         # Loopback
+      IPAddr.new("0.0.0.0/8"),       # Current network (only valid as source address)
+      IPAddr.new("169.254.0.0/16"),  # Link-local
+      IPAddr.new("10.0.0.0/8"),      # Private network
+      IPAddr.new("100.64.0.0/10"),   # Shared Address Space
+      IPAddr.new("172.16.0.0/12"),   # Private network
+      IPAddr.new("192.0.0.0/24"),    # IETF Protocol Assignments
+      IPAddr.new("192.0.2.0/24"),    # TEST-NET-1, documentation and examples
+      IPAddr.new("192.88.99.0/24"),  # IPv6 to IPv4 relay (includes 2002::/16)
+      IPAddr.new("192.168.0.0/16"),  # Private network
+      IPAddr.new("198.18.0.0/15"),   # Benchmarking
+      IPAddr.new("198.51.100.0/24"), # TEST-NET-2, documentation and examples
+      IPAddr.new("203.0.113.0/24"),  # TEST-NET-3, documentation and examples
+      IPAddr.new("224.0.0.0/4"),     # Multicast
+      IPAddr.new("240.0.0.0/4"),     # Reserved for future use
+      IPAddr.new("::/128"),          # Unspecified address
+      IPAddr.new("100::/64"),        # Discard prefix
+      IPAddr.new("2001::/32"),       # Teredo tunneling
+      IPAddr.new("2001:db8::/32"),   # Documentation
+      IPAddr.new("fc00::/7"),        # Unique local address
+      IPAddr.new("fe80::/10"),       # Link-local
+      IPAddr.new("ff00::/8"),        # Multicast
+    ].freeze
+
+    def self.private_address?(ip)
+      PRIVATE_PREFIXES.any? { |prefix| prefix.include?(ip) }
+    end
+  end
+  ```

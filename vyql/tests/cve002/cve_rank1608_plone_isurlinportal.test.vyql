@@ -1,0 +1,109 @@
+# Rank 1608 / CVE-2017-1000481: Plone's isURLInPortal decided
+# redirect targets with a literal blacklist and no scheme allowlist,
+# so URLs with disallowed schemes or double-escaped payloads passed
+# as "in the portal" (open redirect / script-url acceptance,
+# CWE-601/CWE-79; PloneHotfix20171128). The check in
+# Products/CMFPlone/URLTool.py rejected only five literal substrings
+# ('\\\\', '<script', '%3cscript', 'javascript:',
+# 'javascript%3a') and otherwise compared hosts -- data: and mailto:
+# and singly-escaped variants sailed through. The fixing commit 236b62b756
+# is the fixing change,the hotfix merge, "Improved
+# isURLInPortal according to PloneHotfix20171128"): an
+# ALLOWED_SCHEMAS whitelist (http/https only) rejects every other
+# scheme up front, and the URL is html-unescaped and recursively
+# re-validated when unescaping changes it (the blacklist refactored
+# to BAD_URL_PARTS stays as defense in depth). .
+#
+# ATTENTION, scheme-allowlist and escape-depth validation. The check
+# exists and runs -- it enumerated bad literals instead of allowing
+# good schemes, and never asked what the URL becomes after one more
+# unescape: the same normalization-depth family as rank 1522
+# (bracket-blind hosts) plus the allowlist-vs-blacklist inversion of
+# rank 1582 (the wildcard pattern). Nothing can ask "does the
+# redirect-target check allowlist schemes and validate the
+# fully-unescaped form" -- URL-grammar vocabulary. A binding on
+# Plone's own URLTool would detect this CMS rather than the
+# weakness. Measured on the real code: scanning URLTool.py reports
+# zero findings at both revisions. No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1608 records the
+# blacklist-only check and the allowlist-plus-unescape form, both
+# asserting reject VYQL-RF-002: when scheme-allowlist vocabulary
+# lands, the blacklist form must flip to expect.
+
+test "rank1608: the portal check blacklists five literals"
+  lang python
+  file Products/CMFPlone/URLTool.py
+  reject VYQL-RF-002
+  code
+  ```
+  from six.moves.urllib import parse
+
+
+  class URLTool:
+      def isURLInPortal(self, url, context=None):
+          cmp_url = url.lower()
+          if ('\\\\' in cmp_url or
+                  '<script' in cmp_url or
+                  '%3cscript' in cmp_url or
+                  'javascript:' in cmp_url or
+                  'javascript%3a' in cmp_url):
+              return False
+
+          _, u_host, u_path, _, _, _ = parse.urlparse(url)
+          if not u_host:
+              return True
+
+          portal_url = 'https://portal.example.com/plone'
+          p_host, p_path = parse.urlparse(portal_url)[1:3]
+          return u_host == p_host and u_path.startswith(p_path)
+  ```
+
+test "rank1608: the fixed revision allows only http and rechecks unescaped"
+  lang python
+  file Products/CMFPlone/URLTool.py
+  reject VYQL-RF-002
+  code
+  ```
+  from six.moves.html_parser import HTMLParser
+  from six.moves.urllib import parse
+
+  hp = HTMLParser()
+
+  ALLOWED_SCHEMAS = [
+      'https',
+      'http',
+  ]
+
+  BAD_URL_PARTS = [
+      '\\\\',
+      '<script',
+      '%3cscript',
+      'javascript:',
+      'javascript%3a',
+  ]
+
+
+  class URLTool:
+      def isURLInPortal(self, url, context=None):
+          cmp_url = url.lower()
+          for bad in BAD_URL_PARTS:
+              if bad in cmp_url:
+                  return False
+
+          schema, u_host, u_path, _, _, _ = parse.urlparse(url)
+          if schema and schema not in ALLOWED_SCHEMAS:
+              return False
+
+          # Someone may be doing tricks with escaped html code.
+          unescaped_url = hp.unescape(url)
+          if unescaped_url != url:
+              if not self.isURLInPortal(unescaped_url):
+                  return False
+
+          if not u_host:
+              return True
+
+          portal_url = 'https://portal.example.com/plone'
+          p_host, p_path = parse.urlparse(portal_url)[1:3]
+          return u_host == p_host and u_path.startswith(p_path)
+  ```

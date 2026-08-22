@@ -1,0 +1,103 @@
+# Rank 1611 / CVE-2026-22661: prompts.chat packaged uploaded skill
+# files into a ZIP using the user-supplied filenames verbatim, so an
+# entry named ../[..]/webhook.js traversed out of the extraction
+# directory when the archive's consumer writes attacker content
+# anywhere the process could reach (Zip Slip to remote code
+# execution, CWE-22/CWE-409; PR #1101 "fix-path-traversal-rce"; the
+# task list's commit? flag resolves to a merge that carries the change, ane
+# fix). The skill export in src/app/api/prompts/[id]/skill/route.ts
+# did `zip.file(file.filename, file.content)` -- the filename comes
+# from the uploaded skill definition. The fixing commit 7707781f0f
+# real fix: each filename is normalised (backslashes to slashes,
+# empty/./.. segments filtered) and passed through a new
+# sanitizeFilename (a server-side character allowlist returning null
+# for invalid names, documented "Use this on all server-side write
+# and read paths to prevent path traversal"), and null results skip
+# the entry. .
+#
+# ATTENTION, archive-entry sanitisation. The write happens where the
+# ZIP is consumed, not where it is built -- the defect is packaging
+# unsanitised entry names, and no rule can ask "does every archive
+# entry name reduce to a safe relative path" -- archive-materialisation
+# vocabulary, the same family as rank 1594 (Portainer's git
+# symlinks) at the entry-name layer. sanitizeFilename is the
+# project's own helper. A binding on prompts.chat's own route would
+# detect this application rather than the weakness. Measured on the
+# real code: scanning the route reports zero findings at both
+# revisions (the zip.file call is not a bound sink; the traversal
+# fires downstream at extraction, outside this codebase). No
+# ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1611 records the verbatim zip entry and the sanitised
+# form, both asserting reject VYQL-PATH-001: when archive-entry
+# vocabulary lands, the verbatim form must flip to expect.
+
+test "rank1611: skill filenames enter the zip verbatim"
+  lang javascript
+  file src/app/api/prompts/[id]/skill/route.ts
+  expect VYQL-PATH-001
+  code
+  ```
+  import JSZip from "jszip";
+  import { parseSkillFiles } from "@/lib/skill-files";
+
+  export async function GET(request, { params }) {
+    const { id } = await params;
+    const skill = await getSkill(id);
+
+    const zip = new JSZip();
+    const files = parseSkillFiles(skill.content);
+
+    // Add each file to the zip
+    for (const file of files) {
+      zip.file(file.filename, file.content);
+    }
+
+    const buffer = await zip.generateAsync({ type: "nodebuffer" });
+    return new Response(buffer, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="skill.zip"`,
+      },
+    });
+  }
+  ```
+
+test "rank1611: the fixed revision sanitises every entry name"
+  lang javascript
+  file src/app/api/prompts/[id]/skill/route.ts
+  reject VYQL-PATH-001
+  code
+  ```
+  import JSZip from "jszip";
+  import { parseSkillFiles, sanitizeFilename } from "@/lib/skill-files";
+
+  export async function GET(request, { params }) {
+    const { id } = await params;
+    const skill = await getSkill(id);
+
+    const zip = new JSZip();
+    const files = parseSkillFiles(skill.content);
+
+    // Add each file to the zip (sanitize filenames to prevent Zip Slip)
+    for (const file of files) {
+      const candidate = file.filename
+        .replace(/\\/g, "/")
+        .split("/")
+        .filter((segment) => segment && segment !== "." && segment !== "..")
+        .join("/");
+      const safeName = sanitizeFilename(candidate);
+      if (!safeName) {
+        continue;
+      }
+      zip.file(safeName, file.content);
+    }
+
+    const buffer = await zip.generateAsync({ type: "nodebuffer" });
+    return new Response(buffer, {
+      headers: {
+        "Content-Type": "application/zip",
+        "Content-Disposition": `attachment; filename="skill.zip"`,
+      },
+    });
+  }
+  ```

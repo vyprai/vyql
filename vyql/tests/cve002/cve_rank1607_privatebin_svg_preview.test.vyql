@@ -1,0 +1,85 @@
+# Rank 1607 / CVE-2022-24833: PrivateBin previewed SVG attachments
+# inline from a raw blob, so scripts embedded in a pasted SVG
+# executed in the instance's origin when the preview rendered
+# (stored cross-site scripting through unsanitized SVG, CWE-79).
+# The attachment preview in js/privatebin.js did `blobUrl =
+# getBlobUrl(decodedData, mimeType)` for every image type -- SVG
+# included -- and the preview element loaded the blob with its
+# scripts live. The fixing commit 2a4d572c1e (
+# "Sanitize SVG preview, preventing script execution in instance
+# context, while dropping support for attachment download in IE"):
+# image/svg mimetypes route through `DOMPurify.sanitize(decodedData,
+# {USE_PROFILES: {svg: true, svgFilters: true}})` before the blob is
+# built, with the templates' DOMPurify integration updated. No pool
+# correction.
+#
+# ATTENTION, content-type-conditional sanitisation. The preview
+# pipeline exists -- SVG specifically carries script semantics that
+# other image types lack, and the gap is the missing
+# per-type-sanitise branch: the same type-branch-completeness family
+# as rank 1564 (pgjdbc's unquoted bind types). DOMPurify is a
+# credited control vocabulary (referenced in the javascript
+# bindings), but the sink here is the blob URL consumed by an img
+# element -- no labelled path connects them (scanning the 4000-line
+# privatebin.js reports zero findings at both revisions). A binding
+# on PrivateBin's own preview would detect this application rather
+# than the weakness. No ENGINE-GAPS.md entry. No definition change
+# shipped. Spec cve_rank1607 records the raw blob preview and the
+# DOMPurify-routed form, both asserting reject VYQL-INJ-004: when
+# content-conditional-sanitise vocabulary lands, the raw form must
+# flip to expect.
+
+test "rank1607: svg attachments preview from a raw blob"
+  lang javascript
+  file js/privatebin.js
+  reject VYQL-INJ-004
+  code
+  ```
+  function AttachmentPreview(paste) {
+      this.show = function ($attachmentPreview, attachmentData, mimeType) {
+          const decodedData = paste.decodeAttachment(attachmentData);
+          let blobUrl = getBlobUrl(decodedData, mimeType);
+
+          handleBlobAttachmentPreview($attachmentPreview, blobUrl, mimeType);
+      };
+  }
+
+  function getBlobUrl(data, mimeType) {
+      return URL.createObjectURL(new Blob([data], { type: mimeType }));
+  }
+  ```
+
+test "rank1607: the fixed revision sanitizes svg before the blob"
+  lang javascript
+  file js/privatebin.js
+  reject VYQL-INJ-004
+  code
+  ```
+  const purifySvgConfig = {
+      USE_PROFILES: {
+          svg: true,
+          svgFilters: true
+      }
+  };
+
+  function AttachmentPreview(paste) {
+      this.show = function ($attachmentPreview, attachmentData, mimeType) {
+          const decodedData = paste.decodeAttachment(attachmentData);
+          let blobUrl;
+
+          // prevent script execution from SVG preview
+          if (mimeType.match(/image\/svg/i)) {
+              const sanitizedData = DOMPurify.sanitize(decodedData, purifySvgConfig);
+              blobUrl = getBlobUrl(sanitizedData, mimeType);
+          } else {
+              blobUrl = getBlobUrl(decodedData, mimeType);
+          }
+
+          handleBlobAttachmentPreview($attachmentPreview, blobUrl, mimeType);
+      };
+  }
+
+  function getBlobUrl(data, mimeType) {
+      return URL.createObjectURL(new Blob([data], { type: mimeType }));
+  }
+  ```
