@@ -1,0 +1,11 @@
+module code;
+
+concept UncaughtFfiUnwind : issue {
+  cwe: [CWE_248]
+  reviewAssumption: "a panic raised while a foreign-ABI callback proxy runs its Rust body unwinds into the foreign frames that invoked it"
+  reviewCategory: memory
+  reviewCondition: "a function declared with a non-unwinding foreign ABI runs Rust code with no panic containment at the boundary"
+  reviewConfidence: medium
+  reviewEvidence: "an extern ABI function body calls into Rust with no std::panic::catch_unwind"
+  vulnerableTo: [memory.OobWrite, memory.UseAfterFree]
+}

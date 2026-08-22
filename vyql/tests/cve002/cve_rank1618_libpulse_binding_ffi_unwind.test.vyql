@@ -33,21 +33,25 @@
 # mechanism for this, so the discriminator is API vocabulary, not the fixing
 # commit's: renaming nothing in the patched form can reintroduce the flag.
 #
-# Engine gap: the Rust frontend emits no token for a function's ABI -- the
-# signature's function_modifiers -> extern_modifier path is never read, and the
-# function context carries only body-derived tokens -- so no binding can scope
-# to `extern "C"` definitions. That scoping is the load-bearing fact for
+# Engine fact: the Rust frontend emitted no token for a function's ABI, so no
+# binding could scope to `extern "C"` definitions -- the load-bearing fact for
 # precision, since "calls a closure with no panic containment" describes
-# ordinary higher-order Rust everywhere. Every case below is therefore a
-# reject: this file pins the miss. The count that motivates the fact: the
-# parent carries 33 `extern "C"` function definitions (a brace-matched
-# extraction, not a line count) and the fixed revision wraps all 33 of them, so the ABI
-# declaration alone discriminates the revisions. Collateral across the 220
-# sibling rank clones (3156 Rust files): exactly one `extern "C"` function
-# definition outside this repository -- next.js
-# examples/with-webassembly/src/add.rs, a four-line `x + 1` demo -- and one
-# foreign-module block (matrix-sdk tracing.rs) that is a type position, not a
-# definition.
+# ordinary higher-order Rust everywhere. rsFunctionContext now records
+# `abi=<name>` from the grammar's function_modifiers -> extern_modifier path
+# ("C" when the literal is absent), and v2PresenceValuePrefix maps
+# node.context.abi onto it. The ABI name is also why case (d) is a reject:
+# `extern "C-unwind"` is the spelling that permits unwinding, the modern
+# remediation alongside catch_unwind.
+#
+# Measured: the parent reports VYQL-MEM-063 on all 33 `extern "C"` definitions
+# and the fixed revision reports zero, each count stable across three
+# `--cache off` runs; the fixed revision's total returns to the pre-change 119.
+# Collateral across the 220 sibling rank clones (3156 Rust files): exactly one
+# `extern "C"` function definition outside this repository -- next.js
+# examples/with-webassembly/src/add.rs, a four-line `x + 1` demo with no calls
+# and no containment -- which the flag reports; the only other extern mention
+# in the corpus is a foreign-module block (matrix-sdk tracing.rs), a type
+# position, and produces nothing.
 #
 # The four cases: (a) is the real proxy from context/subscribe.rs:212 with the
 # crate's own naming and helper shapes stripped to the language-level facts;
@@ -56,12 +60,13 @@
 # declaration and not on the closure call; (d) is the unwind-permitting ABI
 # spelling of the same body.
 #
-# verify_current_expected: attention-engine-gap, all four cases rejected.
+# verify_current_expected: caught-fixed, (a) expects VYQL-MEM-063, (b) (c)
+# and (d) reject it.
 
 test "rank1618: (a) an extern C callback proxy runs the retrieved closure with no panic containment at the boundary"
   lang rust
   file pulse-binding/src/context/subscribe.rs
-  reject VYQL-MEM-063
+  expect VYQL-MEM-063
   reject VYQL-MEM-014
   reject VYQL-RACE-003
   code

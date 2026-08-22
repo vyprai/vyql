@@ -820,3 +820,8 @@ binding secretComparisonReviewIntegrityCheck {
   query pattern presenceNode where node.kind == "binop" and node.op in ["==", "!="] and not (containsAny(node.context.scopeCall, [ct_eq, constant_time_eq, verify_slices, ConstantTimeEq])) and operand(node, where: operand.identifier is integrityCompareSensitiveIdentifier)
   emit issue code.SecretComparisonReview at node
 }
+
+binding uncaughtFfiUnwind200 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.abi == "C" and not (node.context.call == "catch_unwind")
+  emit issue code.UncaughtFfiUnwind at node
+}
