@@ -1,0 +1,140 @@
+# Rank 1913 / CVE-2020-26296 (GHSA-r2qc-w64x-6j54): a malicious Vega
+# visualization spec executed attacker JavaScript when rendered. A spec's
+# expression strings ("update", "filter", encode rules) are parsed to an
+# AST by packages/vega-expression, regenerated as JavaScript source by
+# its code generator, and the regenerated string is executed by the
+# Function constructor in packages/vega-runtime/src/expression.js:9,
+# `const fn = Function(...args.concat(code))`, reached from the exported
+# operator/parameter/event/handler/encode members whose `expr.code`
+# carries the spec-controlled generated source. The lexer accepted `/`
+# after an operand as division followed by a regex literal
+# (`1//x/` = `1 / /x/`), and the generator emitted binary expressions
+# unseparated (`'(' + visit(n.left) + n.operator + visit(n.right) + ')'`),
+# so the regenerated source contained `//` -- a line comment swallowing
+# the rest of the line, terminating the wrapper and running whatever the
+# attacker's regex body carried (CWE-94).
+#
+# The row's fix SHA eba3eba8 is a test-only commit
+# "Update parser tests to track codegen updates"; both fixing changes are its
+# ancestors -- dc20769 "Fix XSS vulnerability in expression parser"
+# (scanPunctuator throws on `//`) and 9325b6a "Prevent accidental codegen
+# comment creation" (spaces around the emitted operator). Either alone
+# closes the exploit; the row should point at dc20769, whose parent
+# fd381c4 is fully vulnerable.
+#
+# FIXED, sink anchor widened. VYQL-INJ-003 (taint -> code.CodeEval)
+# reported the sibling calls in the same file (expression.js:68, :88,
+# direct arguments) but is blind on line 9: the constructor's single
+# argument is a spread, `...args.concat(code)`, and a spread lowers as a
+# collection-typed argument which every plain `args.any` anchor skips
+# (bindings_apply.go:572). codeEval2901 in
+# vyql/bindings/javascript/mfb63017a.vyql adds the collection-form anchor
+# for the same documented signature -- with a spread, the spread array's
+# LAST element is the generated body. Measured on the vulnerable tree
+# (fd381c4), three --cache off runs, stable: the
+# vega-expression+vega-runtime scan goes 23 -> 24 findings, the added row
+# a CRITICAL VYQL-INJ-003 with source code.ExternalEntryInput at
+# operator#param#expr (src/expression.js:25, `expr.code`), full taint
+# path through expression#param#code, the concat and the spread, sink
+# code.CodeEval at src/expression.js:9 -- the CVE's own sink line,
+# silent. The finding is correct at both revisions of the change
+# and stays after it: the remediation removes the comment-fusion in the
+# generator (parser.js, codegen.js), not the Function construction, and
+# the discriminating signal -- which characters the emitted tokens fuse
+# into -- is lexical, not bindable without keying on the fixed revision's own
+# identifiers. Collateral: an exhaustive grep of the sibling rank clones
+# for `Function(...)` and `Function([...])` finds two trees -- typebot's
+# three `AsyncFunction(...)` sites (callee path AsyncFunction, which
+# `callee.path ~= "Function"` does not match) and a bundled yarn release
+# whose match is a function declaration -- so the widening adds nothing
+# there; `vyql match` on the typebot file confirms no CodeEval label.
+#
+# The first test is the vulnerable runtime shape; the second is the
+# interpreter form (the AST walked, nothing generated -- the shape the
+# pdf.js fix took); the third pins that the new anchor alone, fed only
+# constants, reports nothing.
+
+test "rank1913: spec expressions run through a spread into the Function constructor"
+  lang javascript
+  profile library
+  file expression.js
+  expect VYQL-INJ-003
+  code
+  ```
+  function expression(ctx, args, code) {
+    // wrap code in return statement if expression does not terminate
+    if (code[code.length - 1] !== ';') {
+      code = 'return(' + code + ');';
+    }
+    const fn = Function(...args.concat(code));
+    return ctx && ctx.functions ? fn.bind(ctx.functions) : fn;
+  }
+
+  export default {
+    operator: (ctx, expr) => expression(ctx, ['_'], expr.code),
+    parameter: (ctx, expr) => expression(ctx, ['datum', '_'], expr.code),
+    event: (ctx, expr) => expression(ctx, ['event'], expr.code),
+    handler: (ctx, expr) => {
+      const code = `var datum=event.item&&event.item.datum;return ${expr.code};`;
+      return expression(ctx, ['_', 'event'], code);
+    }
+  };
+  ```
+
+test "rank1913: the interpreter form evaluates the ast without generating source"
+  lang javascript
+  profile library
+  file expression_interpreter.js
+  reject VYQL-INJ-003
+  code
+  ```
+  const Functions = { max: Math.max, min: Math.min };
+
+  function binaryOp(op, left, right) {
+    switch (op) {
+      case '+': return left + right;
+      case '-': return left - right;
+      case '*': return left * right;
+      case '/': return left / right;
+    }
+    return null;
+  }
+
+  function evaluate(ast, _) {
+    switch (ast.type) {
+      case 'Literal':
+        return ast.value;
+      case 'Identifier':
+        return _[ast.name];
+      case 'BinaryExpression':
+        return binaryOp(ast.operator, evaluate(ast.left, _), evaluate(ast.right, _));
+      case 'CallExpression':
+        return Functions[ast.callee.name](...ast.arguments.map(a => evaluate(a, _)));
+    }
+    return null;
+  }
+
+  export default {
+    operator: (ctx, expr) => _ => evaluate(expr.ast, _),
+    parameter: (ctx, expr) => (datum, _) => evaluate(expr.ast, _),
+    event: (ctx, expr) => event => evaluate(expr.ast, { event })
+  };
+  ```
+
+test "rank1913: a spread of constants is not a generated body"
+  lang javascript
+  profile library
+  file expression_static.js
+  reject VYQL-INJ-003
+  code
+  ```
+  function compileOperator(ctx) {
+    const fn = Function(...['_', 'return 1 + 1;']);
+    return fn.bind(ctx && ctx.functions);
+  }
+
+  export default {
+    operator: compileOperator,
+    parameter: compileOperator
+  };
+  ```

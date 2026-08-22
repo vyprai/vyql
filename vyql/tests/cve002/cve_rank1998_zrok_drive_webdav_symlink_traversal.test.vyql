@@ -1,0 +1,423 @@
+# zrok's `drive` share mode serves a local directory over WebDAV: the
+# controller stores the target and a davServer handler answers PROPFIND/GET/
+# PUT/MKCOL/DELETE/COPY against it, so every request path component arrives
+# from the peer on the other end of the share. drives/davServer/file.go is a
+# vendored copy of golang.org/x/net/webdav's Dir filesystem, and its `resolve`
+# is the upstream one -- `filepath.Join(dir, slashClean(name))`. That join is
+# lexical only: it collapses `..` segments but never looks at what any
+# component *is* on disk, so a symlink placed inside the shared tree (by the
+# same WebDAV client, or by the local user who owns the drive) redirects the
+# walk anywhere the link points. `Dir.Stat`, `Dir.OpenFile`, `Dir.Mkdir`,
+# `Dir.RemoveAll` and `Dir.Rename` hand the joined path straight to the
+# matching os call, so /escape.txt -> /etc/shadow reads and
+# /escape/created.txt writes land outside the configured root (CWE-59, the
+# link-resolution form of CWE-22; GHSA-74m3-9qvm-rp9h). x/net/webdav documents
+# this exact exposure on its own Dir. The fixed revision (v2.0.2, the merge of the
+# drive_symlinks branch) adds `resolveBoundedPath`: walk one component at a
+# time, `os.Lstat` each, and when a component is a symlink read its target
+# with `os.Readlink`, require it to stay inside the root via `filepath.Rel`
+# (`isWithinRoot`), restart the walk from the root, and cap the chain at 255;
+# escapes return `os.ErrPermission`. Every mutating method now routes through
+# it and uses its return value at the sink.
+#
+# What fires today: VYQL-PATH-001 reports the vulnerability on the real
+# checkout with shipped vocabulary only -- `code.HttpInput` on the request
+# path read in the davServer handler, `code.FilePathAccess` on os.Mkdir,
+# os.OpenFile and os.RemoveAll (os.Rename, os.Stat and os.Chtimes have no Go
+# FilePathAccess binding). Bounded scans of drives/ (34 Go files; the full
+# tree exceeds timeout 180), three `--cache off` runs per revision, are
+# byte-stable: 13 findings and 3 HIGH VYQL-PATH-001 each on the vulnerable
+# revision (file.go:137, :144, :159 -- the three os calls, with the real
+# handler source) and the identical 3 on the fixed revision at the same
+# three operations (file.go:271, :279, :306 after the rewrite). The
+# vulnerable CVE is caught; the fixed code is a residual false positive.
+#
+# Why the fixed revision does not clear it, measured with the minimal pair below. The
+# containment lives entirely inside `resolveBoundedPath` -- one resolved call
+# away from every sink -- and its check is a *per-component predicate*, not a
+# transformer of the returned value: a walk with no symlink on the path flows
+# param -> filepath.Join -> current -> return without ever passing the
+# Readlink/Rel nodes, so `flowGuarded` finds no control on the value's chosen
+# flow ("nearest on a sibling path: core.PathCanonicalization @
+# file.go:247"), and `endpointGuarded` cannot see a control outside the
+# sink's own function. That is the filed attribution-gap family (1377 and
+# its span), refined on its value-returning half: 1377's case (f) measured a
+# helper returning the path as *clean* (the control is a whole-value
+# transformer, case (d) here -> 0), while the fixing change's per-component walk
+# still reports (case (b) -> 1). The 1380 counterweight is absent: the fixed revision
+# left no API-documented call inside the guarded methods -- Mkdir/OpenFile/
+# RemoveAll contain only the project-local resolveBoundedPath call and the
+# os sink, and their one pre-existing filepath.Clean is the unchanged
+# root-equality guard. Binding os.Lstat/os.Readlink/filepath.Rel as control
+# concepts is considered and rejected: they are raw stdlib file APIs with no
+# validation meaning of their own, so the binding would encode the judgement
+# and clear unrelated path findings (the 1402 direction); and 1377
+# measured that a `covers endpoint` check emitted at filepath.Rel suppresses
+# nothing from one resolved call away. No concept, binding or rule ships.
+#
+# Case (b) pins today's miss with an expect and must flip to a reject when
+# cross-function control attribution lands (1377's behaviour-to-add, which
+# this shape satisfies verbatim: the caller branches on the callee's error
+# before the sink). Cases (c) and (d) prove the rule itself discriminates --
+# the same containment inline in the sink's function clears, and a
+# value-returning helper whose control transforms the whole returned value
+# clears -- so the residual is attribution, not vocabulary.
+#
+# verify_current_expected: caught-with-residual. (a) is the catch; (b) pins
+# the residual; (c) and (d) are correct today and must stay that way.
+
+test "drive webdav dir serves request paths through a lexical join with no link resolution"
+  lang go
+  file drives/davServer/file.go
+  expect VYQL-PATH-001
+  code
+  ```
+  package davServer
+
+  import (
+  	"context"
+  	"net/http"
+  	"os"
+  	"path"
+  	"path/filepath"
+  	"strings"
+  )
+
+  func slashClean(name string) string {
+  	if name == "" || name[0] != '/' {
+  		name = "/" + name
+  	}
+  	return path.Clean(name)
+  }
+
+  type Dir string
+
+  func (d Dir) resolve(name string) string {
+  	if strings.Contains(name, "\x00") {
+  		return ""
+  	}
+  	dir := string(d)
+  	if dir == "" {
+  		dir = "."
+  	}
+  	return filepath.Join(dir, filepath.FromSlash(slashClean(name)))
+  }
+
+  func (d Dir) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
+  	if name = d.resolve(name); name == "" {
+  		return os.ErrNotExist
+  	}
+  	return os.Mkdir(name, perm)
+  }
+
+  func (d Dir) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (*os.File, error) {
+  	if name = d.resolve(name); name == "" {
+  		return nil, os.ErrNotExist
+  	}
+  	return os.OpenFile(name, flag, perm)
+  }
+
+  func (d Dir) RemoveAll(ctx context.Context, name string) error {
+  	if name = d.resolve(name); name == "" {
+  		return os.ErrNotExist
+  	}
+  	return os.RemoveAll(name)
+  }
+
+  func handlePut(w http.ResponseWriter, r *http.Request, fs Dir) {
+  	reqPath := slashClean(r.URL.Path)
+  	f, err := fs.OpenFile(r.Context(), reqPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+  	if err != nil {
+  		w.WriteHeader(http.StatusInternalServerError)
+  		return
+  	}
+  	f.Close()
+  }
+  ```
+
+test "drive webdav dir bounds each component against the root and rejects link escapes"
+  lang go
+  file drives/davServer/file.go
+  expect VYQL-PATH-001
+  code
+  ```
+  package davServer
+
+  import (
+  	"context"
+  	"net/http"
+  	"os"
+  	"path"
+  	"path/filepath"
+  	"strings"
+  )
+
+  func slashClean(name string) string {
+  	if name == "" || name[0] != '/' {
+  		name = "/" + name
+  	}
+  	return path.Clean(name)
+  }
+
+  func splitVirtualPath(name string) []string {
+  	switch name {
+  	case "", ".", "/":
+  		return nil
+  	}
+  	name = strings.TrimPrefix(name, "/")
+  	if name == "" {
+  		return nil
+  	}
+  	return strings.Split(name, "/")
+  }
+
+  func isWithinRoot(root, target string) bool {
+  	rel, err := filepath.Rel(root, target)
+  	if err != nil {
+  		return false
+  	}
+  	return rel == "." || (rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)))
+  }
+
+  type Dir string
+
+  func (d Dir) resolveBoundedPath(name string, followLeaf, allowMissingLeaf, allowMissingTail bool) (string, error) {
+  	dir := string(d)
+  	if dir == "" {
+  		dir = "."
+  	}
+  	root, err := filepath.Abs(dir)
+  	if err != nil {
+  		return "", err
+  	}
+
+  	current := root
+  	segments := splitVirtualPath(slashClean(name))
+  	symlinks := 0
+
+  	for len(segments) > 0 {
+  		segment := segments[0]
+  		segments = segments[1:]
+
+  		next := filepath.Join(current, filepath.FromSlash(segment))
+  		final := len(segments) == 0
+
+  		info, err := os.Lstat(next)
+  		if err != nil {
+  			if os.IsNotExist(err) && allowMissingTail {
+  				return filepath.Join(current, filepath.FromSlash(segment)), nil
+  			}
+  			return "", err
+  		}
+
+  		if info.Mode()&os.ModeSymlink == 0 {
+  			current = next
+  			continue
+  		}
+
+  		if !followLeaf && final {
+  			return next, nil
+  		}
+
+  		symlinks++
+  		if symlinks > 255 {
+  			return "", os.ErrInvalid
+  		}
+
+  		target, err := os.Readlink(next)
+  		if err != nil {
+  			return "", err
+  		}
+  		if !filepath.IsAbs(target) {
+  			target = filepath.Join(current, target)
+  		}
+  		target = filepath.Clean(target)
+
+  		if !isWithinRoot(root, target) {
+  			return "", os.ErrPermission
+  		}
+
+  		relTarget, err := filepath.Rel(root, target)
+  		if err != nil {
+  			return "", os.ErrPermission
+  		}
+  		current = root
+  		segments = append(splitVirtualPath(filepath.ToSlash(relTarget)), segments...)
+  	}
+
+  	return current, nil
+  }
+
+  func (d Dir) Mkdir(ctx context.Context, name string, perm os.FileMode) error {
+  	resolved, err := d.resolveBoundedPath(name, false, true, false)
+  	if err != nil {
+  		return err
+  	}
+  	return os.Mkdir(resolved, perm)
+  }
+
+  func (d Dir) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (*os.File, error) {
+  	resolved, err := d.resolveBoundedPath(name, true, flag&os.O_CREATE != 0, false)
+  	if err != nil {
+  		return nil, err
+  	}
+  	return os.OpenFile(resolved, flag, perm)
+  }
+
+  func (d Dir) RemoveAll(ctx context.Context, name string) error {
+  	resolved, err := d.resolveBoundedPath(name, false, false, true)
+  	if err != nil {
+  		return err
+  	}
+  	return os.RemoveAll(resolved)
+  }
+
+  func handlePut(w http.ResponseWriter, r *http.Request, fs Dir) {
+  	reqPath := slashClean(r.URL.Path)
+  	f, err := fs.OpenFile(r.Context(), reqPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+  	if err != nil {
+  		w.WriteHeader(http.StatusInternalServerError)
+  		return
+  	}
+  	f.Close()
+  }
+  ```
+
+test "the same containment written inline in the sink's own function clears the finding"
+  lang go
+  file drives/davServer/file.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package davServer
+
+  import (
+  	"context"
+  	"net/http"
+  	"os"
+  	"path"
+  	"path/filepath"
+  	"strings"
+  )
+
+  func slashClean(name string) string {
+  	if name == "" || name[0] != '/' {
+  		name = "/" + name
+  	}
+  	return path.Clean(name)
+  }
+
+  type Dir string
+
+  func (d Dir) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (*os.File, error) {
+  	dir := string(d)
+  	if dir == "" {
+  		dir = "."
+  	}
+  	root, err := filepath.Abs(dir)
+  	if err != nil {
+  		return nil, err
+  	}
+  	resolved := filepath.Join(root, filepath.FromSlash(slashClean(name)))
+  	cleaned := filepath.Clean(resolved)
+  	rel, err := filepath.Rel(root, cleaned)
+  	if err != nil {
+  		return nil, err
+  	}
+  	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+  		return nil, os.ErrPermission
+  	}
+  	info, err := os.Lstat(cleaned)
+  	if err != nil {
+  		return nil, err
+  	}
+  	if info.Mode()&os.ModeSymlink != 0 {
+  		target, err := os.Readlink(cleaned)
+  		if err != nil {
+  			return nil, err
+  		}
+  		if !filepath.IsAbs(target) {
+  			target = filepath.Join(root, target)
+  		}
+  		target = filepath.Clean(target)
+  		if r2, err := filepath.Rel(root, target); err != nil || r2 == ".." || strings.HasPrefix(r2, ".."+string(filepath.Separator)) {
+  			return nil, os.ErrPermission
+  		}
+  	}
+  	return os.OpenFile(cleaned, flag, perm)
+  }
+
+  func handlePut(w http.ResponseWriter, r *http.Request, fs Dir) {
+  	reqPath := slashClean(r.URL.Path)
+  	f, err := fs.OpenFile(r.Context(), reqPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+  	if err != nil {
+  		w.WriteHeader(http.StatusInternalServerError)
+  		return
+  	}
+  	f.Close()
+  }
+  ```
+
+test "a value-returning helper whose control transforms the whole returned path clears the finding"
+  lang go
+  file drives/davServer/file.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package davServer
+
+  import (
+  	"context"
+  	"net/http"
+  	"os"
+  	"path"
+  	"path/filepath"
+  )
+
+  func slashClean(name string) string {
+  	if name == "" || name[0] != '/' {
+  		name = "/" + name
+  	}
+  	return path.Clean(name)
+  }
+
+  type Dir string
+
+  func (d Dir) contained(name string) (string, error) {
+  	dir := string(d)
+  	if dir == "" {
+  		dir = "."
+  	}
+  	root, err := filepath.Abs(dir)
+  	if err != nil {
+  		return "", err
+  	}
+  	resolved := filepath.Clean(filepath.Join(root, filepath.FromSlash(slashClean(name))))
+  	rel, err := filepath.Rel(root, resolved)
+  	if err != nil {
+  		return "", err
+  	}
+  	if rel == ".." || (len(rel) >= 3 && rel[0:3] == ".."+string(filepath.Separator)) {
+  		return "", os.ErrPermission
+  	}
+  	return resolved, nil
+  }
+
+  func (d Dir) OpenFile(ctx context.Context, name string, flag int, perm os.FileMode) (*os.File, error) {
+  	resolved, err := d.contained(name)
+  	if err != nil {
+  		return nil, err
+  	}
+  	return os.OpenFile(resolved, flag, perm)
+  }
+
+  func handlePut(w http.ResponseWriter, r *http.Request, fs Dir) {
+  	reqPath := slashClean(r.URL.Path)
+  	f, err := fs.OpenFile(r.Context(), reqPath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+  	if err != nil {
+  		w.WriteHeader(http.StatusInternalServerError)
+  		return
+  	}
+  	f.Close()
+  }
+  ```

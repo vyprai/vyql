@@ -1,0 +1,191 @@
+# Rank 1925 / CVE-2025-58047 (GHSA-xjhf-7833-3pm5, CWE-755): Volto's dev
+# proxy registers a path filter with http-proxy-middleware v2
+# (packages/volto/src/express-middleware/devproxy.js at the vulnerable revision):
+#
+#     const filter = function (pathname, req) {
+#       return config.settings.devProxyToApiPath && pathname.startsWith('/++api++');
+#     };
+#     const devProxy = createProxyMiddleware(filter, { selfHandleResponse: true, ... });
+#
+# v2's context matcher calls the user callback as
+# `context(getUrlPathName(uri), req)` with `uri = req.originalUrl || req.url`,
+# and `getUrlPathName(uri)` is `uri && url.parse(uri).pathname` -- Node's
+# legacy url.parse, whose pathname is null for an absolute-form request
+# target such as `GET http://host HTTP/1.1` (url.parse('http://x') yields
+# pathname null, href 'http://x'). The TypeError from `pathname.startsWith`
+# fires inside the middleware's `async (req, res, next) =>` body ahead of its
+# try/catch (http-proxy-middleware@2.0.1 dist/http-proxy-middleware.js:17-19),
+# so the rejection escapes Express unhandled and Node exits the process: one
+# anonymous request stops the server. Fix 2789a287 wraps the dereference in
+# `if (pathname) { ... } else { return false; }`. The vulnerable form is
+# present at the vulnerable revision and the guard at the fixed revision itself; the advisory
+# references this commit directly. .
+#
+# ATTENTION, engine fact-attribution gap: a callback registered by call
+# argument is not joined to its registration. The only fact that makes
+# `pathname` request data is the `createProxyMiddleware(filter, ...)` call 40
+# lines below the filter, and no binding can read that join.
+#   - vyql match on the file reports no source at all; the dereference
+#     carries only a vyql.internal.NeutralizerAssumption advisory, because
+#     javascript.assumptions binds `callee.method == "startsWith"` as a
+#     filepath/trust-boundary validation check -- the safe-direction reading.
+#   - vyql resolve: `http-proxy-middleware.createProxyMiddleware` has no
+#     callee body (node_modules is absent from the checkout), so taint
+#     terminates at the registration call.
+#   - vyql graph: the argument is Name#filter --FLOWS--> Arg --FLOWS--> the
+#     createProxyMiddleware call, and the filter's region (fn1) with its
+#     `filter#param#pathname` Param node has no edge to that argument. The
+#     inline spelling `createProxyMiddleware(function (pathname, req) {...},
+#     {...})` changes only the region nesting -- still no join. The
+#     parameter does FLOWS to the `pathname.startsWith` call node, so a label
+#     on the parameter would reach the dereference; there is no way to put
+#     one there.
+#   - probe bindings: emitting at args[0] of the createProxyMiddleware
+#     callExpr labels nothing (JS emits no call-argument tokens, the 1360
+#     gap); emitting at call.result labels the registration call itself,
+#     which exists identically at both revisions.
+#   - the callback's own context is body-confined (jsFunctionContext,
+#     internal/extract/frontend/treesitter/javascript.go:2357 emits name,
+#     function_name, body text and structured body tokens), so the
+#     registration is invisible from the dereference; the two live in sibling
+#     scopes, so node.context.scopeCall cannot cross either (the 1380 Java
+#     measurement that sibling scopes are not nested scopes).
+#
+# Priced and rejected, the routes that need no join:
+#   - keying on the receiver name (`callee.path ~= "pathname.startsWith"`,
+#     optionally dependency-gated on http-proxy-middleware) is the rejected
+#     name-keyed shape: `pathname` is the app author's local name, not an API
+#     path. volto itself dereferences a local named `pathname` in 12 files /
+#     18 occurrences of the crash-capable method family (Toolbar.jsx
+#     `this.props.pathname.endsWith('/contents')`, Delete.jsx
+#     `pathname.replace('/delete', '')`, Sitemap.jsx `pathname.replace(...)`,
+#     Login.jsx `location.pathname.replace(...)`), all client-side
+#     react-router props a family-form binding would flag; the
+#     startsWith-only form hits exactly the one vulnerable site but still
+#     fires at the fixed revisioned revision, because the dereference survives inside the guard
+#     -- 1 -> 1, no discrimination. Negating the guard's own spelling
+#     (`if (pathname)`) is the fixing-commit-layout trap of rank 1394 and
+#     misses `if (!pathname) return`, `pathname && pathname.startsWith(...)`
+#     and optional chaining.
+#   - a module-scope text conjunction (registration text and dereference text
+#     co-present in one file) is whole-file co-membership, the rejected
+#     engine shape, and inherits the same guard-spelling negation.
+# A/B on the real checkout (bounded subtree packages/volto/src, 276 JS files,
+# timeout 180, --max-ram 6GB, --cache off, three runs per revision): 112
+# findings at or above high at the vulnerable revision and 112 at the fixed revision,
+# deterministic, none naming express-middleware/devproxy.js at either
+# revision. Exhaustive grep enumeration of the shape's reachable set: exactly
+# one createProxyMiddleware registration in the whole volto tree (the
+# vulnerable file), zero in the ~100 sibling rank checkouts, and 23
+# pathname.startsWith occurrences across those siblings in files with no
+# proxy at all. Concepts considered and not reachable: code.NullableDeref
+# (CWE-476, review condition "a pointer-like value is dereferenced without
+# an observed null exclusion", consumed by VYQL-MEM-006) and
+# code.UncheckedNullableResultDeref (VYQL-MEM-018) carry the judgement but
+# cannot be emitted at the filter's dereference without the join;
+# code.EmmettUnhandledCookieParseException and code.FoldedHeaderContinuationCrash
+# (the CWE-248/400 unhandled-remote-exception crash family) have the same
+# reachability and are vendor-shaped. What is missing is an engine fact, not
+# vocabulary: a USG edge (or context token) from a call argument that names a
+# local function to that function's definition, so a binding can label the
+# callback's parameters from the registration API. Adding it is a new
+# dataflow relation in the JS extractor/lowering (which arguments join, and
+# what the join licenses), not a missing switch case or off-by-one -- judged
+# not mechanical, so this rank records the gap rather than shipping a
+# workaround keyed on the fixed revision's own spelling.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+# When an argument-to-callback join lands together with a proxy-filter
+# binding, the first test flips to expect VYQL-MEM-006 and the second stays
+# reject.
+
+test "rank1925: the dev proxy filter dereferences the request pathname with no guard"
+  lang javascript
+  file packages/volto/src/express-middleware/devproxy.js
+  reject VYQL-MEM-006
+  reject VYQL-MEM-018
+  reject_review code.NullableDeref
+  code
+  ```
+  import { createProxyMiddleware } from 'http-proxy-middleware';
+
+  // Internal proxy to bypass CORS while developing.
+  const filter = function (pathname, req) {
+    // This is the proxy to the API in case the accept header is 'application/json'
+    return config.settings.devProxyToApiPath && pathname.startsWith('/++api++');
+  };
+
+  export default function devProxyMiddleware() {
+    const middleware = express.Router();
+    const devProxy = createProxyMiddleware(filter, {
+      selfHandleResponse: true,
+    });
+    middleware.all('*', devProxy);
+    middleware.id = 'devProxy';
+
+    return middleware;
+  }
+  ```
+
+test "rank1925: the patched filter guards the pathname before dereferencing it"
+  lang javascript
+  file packages/volto/src/express-middleware/devproxy-fixed.js
+  reject VYQL-MEM-006
+  reject VYQL-MEM-018
+  reject_review code.NullableDeref
+  code
+  ```
+  import { createProxyMiddleware } from 'http-proxy-middleware';
+
+  // Internal proxy to bypass CORS while developing.
+  const filter = function (pathname, req) {
+    // Check if pathname is defined, there are some corner cases that pathname is null
+    if (pathname) {
+      // This is the proxy to the API in case the accept header is 'application/json'
+      return config.settings.devProxyToApiPath && pathname.startsWith('/++api++');
+    } else {
+      return false;
+    }
+  };
+
+  export default function devProxyMiddleware() {
+    const middleware = express.Router();
+    const devProxy = createProxyMiddleware(filter, {
+      selfHandleResponse: true,
+    });
+    middleware.all('*', devProxy);
+    middleware.id = 'devProxy';
+
+    return middleware;
+  }
+  ```
+
+test "rank1925: a client-side pathname dereference is not the proxy filter even in a file that registers one"
+  lang javascript
+  file packages/volto/src/components/manage/Toolbar/Toolbar.jsx
+  reject VYQL-MEM-006
+  reject VYQL-MEM-018
+  reject_review code.NullableDeref
+  code
+  ```
+  import React from 'react';
+  import { createProxyMiddleware } from 'http-proxy-middleware';
+
+  // The project's proxy, guarded: registers a filter that checks first.
+  const apiFilter = function (pathname, req) {
+    if (pathname) {
+      return pathname.startsWith('/++api++');
+    }
+    return false;
+  };
+  const devProxy = createProxyMiddleware(apiFilter, {});
+
+  export default class Toolbar extends React.Component {
+    render() {
+      // A react-router prop named pathname, dereferenced on the client where
+      // the router guarantees a string: this is not a dereference of the
+      // proxy filter's request path, and must not report.
+      return this.props.pathname.endsWith('/contents') ? <span /> : null;
+    }
+  }
+  ```

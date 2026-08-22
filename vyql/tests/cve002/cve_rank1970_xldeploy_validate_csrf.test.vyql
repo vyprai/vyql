@@ -1,0 +1,96 @@
+# Rank 1970 / CVE-2021-21665: the XebiaLabs XL Deploy Jenkins plugin's
+# credential validation endpoint resolved a stored credential by the
+# caller-supplied credentialsId and opened a connection to the
+# caller-supplied server URL, and because the method imposed no POST
+# requirement a request forged against a logged-in browser session could
+# drive the connection with attacker-chosen target and credential
+# (CWE-352; SECURITY-1982, Jenkins advisory 2021-06-10).
+#
+# Credential.DescriptorImpl.doValidateCredential took deployitServerUrl,
+# secondaryServerUrl and credentialsId from @QueryParameter, called
+# lookupSystemCredentials(credentialsId), and passed the resolved secret
+# straight into validateConnection(serverUrl, proxyUrl,
+# credentials.getPassword().getPlainText()). The method carried a
+# Permission.CREATE check — the advisory's CVE-2021-21664 facet calls that
+# the wrong permission — but no @RequirePOST, so the endpoint stayed
+# reachable through forged GET requests.
+#
+# Pool flag nocommit is wrong: 79ae204d2e6 exists and reads fine, but it is
+# only the partial fix (7.5.9) that introduced the wrong-permission state.
+# The CSRF remediation — @RequirePOST plus Jenkins.ADMINISTER in place of
+# Permission.CREATE — lands in 0dbf787f1786 (10.0.2), so the row's SHA is
+# repointed there and the revision pair is 0dbf787^ against 0dbf787.
+#
+# FIXED. code.JenkinsRemoteValidationMissingPostPermission carries
+# this weakness (CWE_352 first among its three) and VYQL-RF-023
+# reports it for the doTest*/doCheck* connection-test family. The existing
+# bindings in that family key on each plugin's own connection call and
+# require that no checkPermission exists at all, which cannot fire here:
+# this method checks a permission, just the wrong one, and the forgery
+# window is the missing POST requirement. Added a sibling binding keyed on
+# the same doValidate*/doTest*/doCheck* + @QueryParameter + a stored
+# credential's plaintext reaching a connection call, cleared by
+# @POST/@RequirePOST, not by the presence of a permission check: a checked
+# permission does not stop a cross-site request.
+#
+# Deliberately not negated on checkPermission: the advisory's own fix shape
+# (correct permission, still no POST) would be re-reported as clean.
+#
+# verify_current_expected: current-behavior
+
+test "rank1970: credential validation endpoint drives a connection without a POST requirement"
+  lang java
+  file Credential.java
+  expect_review code.JenkinsRemoteValidationMissingPostPermission
+  code
+  ```
+  public class Credential {
+      public static class DescriptorImpl extends Descriptor<Credential> {
+
+          public FormValidation doValidateCredential(@QueryParameter String deployitServerUrl,
+                                                     @QueryParameter String secondaryServerUrl,
+                                                     @QueryParameter String credentialsId) throws IOException {
+              Jenkins.getInstance().checkPermission(Permission.CREATE);
+              try {
+                  String serverUrl = Strings.isNullOrEmpty(secondaryServerUrl) ? deployitServerUrl : secondaryServerUrl;
+                  StandardUsernamePasswordCredentials credentials = lookupSystemCredentials(credentialsId);
+                  if (credentials == null) {
+                      return FormValidation.error("Could not find credential with id '%s'", credentialsId);
+                  }
+                  return validateConnection(serverUrl, proxyUrl, credentials.getUsername(), credentials.getPassword().getPlainText());
+              } catch (Exception e) {
+                  return FormValidation.error("! %s", e.getMessage());
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1970: credential validation requiring POST and administer is clean"
+  lang java
+  file Credential.java
+  reject_review code.JenkinsRemoteValidationMissingPostPermission
+  code
+  ```
+  public class Credential {
+      public static class DescriptorImpl extends Descriptor<Credential> {
+
+          @RequirePOST
+          public FormValidation doValidateCredential(@QueryParameter String deployitServerUrl,
+                                                     @QueryParameter String secondaryServerUrl,
+                                                     @QueryParameter String credentialsId) throws IOException {
+              Jenkins.getInstance().checkPermission(Jenkins.ADMINISTER);
+              try {
+                  String serverUrl = Strings.isNullOrEmpty(secondaryServerUrl) ? deployitServerUrl : secondaryServerUrl;
+                  StandardUsernamePasswordCredentials credentials = lookupSystemCredentials(credentialsId);
+                  if (credentials == null) {
+                      return FormValidation.error("Could not find credential with id '%s'", credentialsId);
+                  }
+                  return validateConnection(serverUrl, proxyUrl, credentials.getUsername(), credentials.getPassword().getPlainText());
+              } catch (Exception e) {
+                  return FormValidation.error("! %s", e.getMessage());
+              }
+          }
+      }
+  }
+  ```

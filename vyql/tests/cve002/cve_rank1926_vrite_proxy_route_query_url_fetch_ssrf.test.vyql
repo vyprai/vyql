@@ -1,0 +1,172 @@
+module tests.cve.rank1926.vrite_proxy_route_query_url_fetch_ssrf;
+
+# Vrite's app service (apps/backend/app/src/app.ts) ships a public image
+# proxy: GET /proxy* takes the `url` query parameter, fetches it server-side
+# with axios and streams the response body back to the caller. The guard is
+# a blacklist regex over the raw parameter --
+#     /(localhost|\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(?::\d{0,4})?\b)/
+# -- backed by an origin-header check any browser request satisfies. The
+# regex rejects exactly two spellings, the word localhost and a dotted-quad
+# IPv4 literal; every other address dials where the caller points it --
+# 0x7f000001, 2130706433, 127.1, [::1], [::ffff:127.0.0.1], and any public
+# name that resolves to or redirects to an internal address -- so the
+# server fetches internal endpoints on the caller's behalf (CVE-2023-5572,
+# CWE-918). The v0.3 release commit deletes the route outright: the
+# plugin's remaining routes render pages and accept uploads, and the axios
+# import stays behind unused.
+#
+# Detection rides the flagship request-to-fetch rule: the query read
+# `request.query.url` is code.HttpInput (the `request.query` source anchor
+# httpInput39 in bindings/javascript/mfb63017a.vyql, whose segment-aware
+# path match reaches the deeper property chain), axios.get is code.UrlFetch
+# (urlFetch286 in the same file), and VYQL-RF-001
+# (packs/request_forgery/vypr/request_forgery/Ssrf.vyql) reports the flow.
+# The blacklist regex is present in the expected case and does not suppress
+# it: a RegExp.test over the raw parameter is not allowlist validation,
+# which is the correct read of this CVE -- the filter is bypassable, not
+# absent. Measured with the cache off, timeout 180, --max-ram 6GB, three
+# runs per side on the real checkout: the vulnerable parent reports
+# VYQL-RF-001 at apps/backend/app/src/app.ts:87 (source :84) in every run,
+# nine RF-001 rows on the tree; the fixed revision reports nothing on the file in any
+# of its three runs (seven RF-001 rows elsewhere, on the SDK client and the
+# dev/medium extension routes, whose URLs come from config or session state
+# rather than a request read). Two other findings share the :84 source, a
+# header write and the syntactic SQL sink over the same axios call; the
+# RF-001 row is the SSRF.
+#
+# verify_current_expected: caught, both real revisions separated
+
+test "rank1926 vrite: the proxy route fetches the query-parameter URL behind a blacklist regex"
+  lang javascript
+  file apps/backend/app/src/app.ts
+  expect VYQL-RF-001
+  code
+  ```
+  import axios from "axios";
+  import { FastifyReply } from "fastify";
+
+  const appService = async (fastify: any) => {
+    fastify.get<{ Querystring: { url: string } }>("/proxy*", async (request: any, reply: FastifyReply) => {
+      const filterOutRegex =
+        /(localhost|\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)(?::\d{0,4})?\b)/;
+
+      if (request.headers.origin) {
+        reply.header("Access-Control-Allow-Origin", fastify.config.PUBLIC_APP_URL);
+        reply.header("Access-Control-Allow-Methods", "GET");
+        reply.header(
+          "Access-Control-Allow-Headers",
+          request.headers["access-control-request-headers"]
+        );
+      } else if (
+        fastify.config.NODE_ENV !== "development" &&
+        !fastify.config.PUBLIC_APP_URL.includes("localhost")
+      ) {
+        // Prevent proxy abuse in production
+        return reply.status(400).send("Invalid Origin");
+      }
+
+      if (
+        filterOutRegex.test(request.query.url) &&
+        !request.query.url.includes(fastify.config.PUBLIC_ASSETS_URL)
+      ) {
+        return reply.status(400).send("Invalid URL");
+      }
+
+      if (request.method === "OPTIONS") {
+        // CORS Preflight
+        reply.send();
+      } else {
+        const targetURL = request.query.url;
+
+        try {
+          const response = await axios.get(targetURL, {
+            responseType: "arraybuffer"
+          });
+
+          if (!`${response.headers["content-type"]}`.includes("image")) {
+            return reply.status(400).send("Invalid Content-Type");
+          }
+
+          reply.header("content-type", response.headers["content-type"]);
+          reply.send(Buffer.from(response.data, "binary"));
+        } catch (error) {
+          return reply.status(500).send("Could not fetch");
+        }
+      }
+    });
+  };
+
+  export { appService };
+  ```
+
+test "rank1926 vrite: the patched app service renders pages and accepts uploads with no URL fetch"
+  lang javascript
+  file apps/backend/app/src/app.ts
+  reject VYQL-RF-001
+  code
+  ```
+  import axios from "axios";
+  import { FastifyReply } from "fastify";
+
+  // The v0.3 release deletes the /proxy* route wholesale: what remains
+  // renders the app and accepts uploads. The axios import stays behind
+  // unused, and no route reads a URL out of a request.
+  const appService = async (fastify: any) => {
+    const renderPage = async (reply: FastifyReply): Promise<void> => {
+      return reply.header("X-Frame-Options", "SAMEORIGIN").view("index.html", {
+        PUBLIC_APP_URL: fastify.config.PUBLIC_APP_URL,
+        PUBLIC_API_URL: fastify.config.PUBLIC_API_URL
+      });
+    };
+    fastify.get("/", async (_request, reply) => {
+      return renderPage(reply);
+    });
+    fastify.setNotFoundHandler(async (_request, reply) => {
+      return renderPage(reply);
+    });
+    fastify.post<{
+      Body: Buffer;
+    }>("/upload", async (req: any, res: FastifyReply) => {
+      if (req.headers.origin) {
+        res.header("Access-Control-Allow-Origin", fastify.config.PUBLIC_APP_URL);
+        res.header("Access-Control-Allow-Methods", "GET");
+      } else if (
+        fastify.config.NODE_ENV !== "development" &&
+        !fastify.config.PUBLIC_APP_URL.includes("localhost")
+      ) {
+        return res.status(400).send("Cannot upload from this origin");
+      }
+
+      const data = await req.file();
+      const buffer = await data?.toBuffer();
+      if (!buffer) throw new Error("badRequest");
+
+      return { key: buffer.byteLength };
+    });
+  };
+
+  export { appService };
+  ```
+
+test "rank1926 vrite: fetching the configured assets URL the blacklist whitelisted is not request-controlled"
+  lang javascript
+  file apps/backend/app/src/appAssets.ts
+  reject VYQL-RF-001
+  code
+  ```
+  import axios from "axios";
+
+  // Pins the source side: the rule needs the request read, not the axios
+  // call alone. PUBLIC_ASSETS_URL is the one host the vulnerable filter
+  // always let through, and it comes from deployment config, so a fetch
+  // of it reports nothing.
+  const fetchAsset = async (fastify: any) => {
+    const response = await axios.get(fastify.config.PUBLIC_ASSETS_URL, {
+      responseType: "arraybuffer"
+    });
+
+    return Buffer.from(response.data, "binary");
+  };
+
+  export { fetchAsset };
+  ```

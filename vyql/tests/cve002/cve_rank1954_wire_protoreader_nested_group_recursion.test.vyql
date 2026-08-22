@@ -1,0 +1,252 @@
+# CVE-2024-58103 (CWE-400/CWE-674): Wire's protobuf reader recursed into
+# nested groups without any depth budget. `skipGroup` walks a
+# START_GROUP/END_GROUP-delimited section of the input, and its
+# STATE_START_GROUP arm handles a nested group by calling itself:
+#
+#   STATE_START_GROUP -> skipGroup(tag) // Nested group.
+#
+# Each `0xa3 0x01` byte pair in the attacker's message opens one more
+# group, so 50KB of crafted input costs 25000 native stack frames and the
+# decoding process dies of a stack overflow. The same two files carry the
+# fix (b90e60c "Enforce recursion limit on nested groups",
+# ProtoReader.kt and ByteArrayProtoReader32.kt): the arm becomes a block
+# that increments `recursionDepth`, throws past `RECURSION_LIMIT`, and
+# decrements in a `finally`.
+#
+# The discriminating fact is not the recursion itself but its asymmetry
+# with the rest of the class. `ProtoReader` owns a depth budget:
+# `recursionDepth` is declared beside the cursors, `RECURSION_LIMIT = 100`
+# sits in the companion, and `beginMessage` enforces it with the very
+# same `if (++recursionDepth > RECURSION_LIMIT) throw IOException("Wire
+# recursion limit exceeded")` the fixed revision copies. A message's nesting is
+# budgeted; a group's nesting is not, and the group path is reached from
+# `nextTag` for every unknown field of that encoding. Both revisions
+# carry the budget and the self-call, so no fact naming either alone
+# separates them -- only "the self-recursive call site consults the
+# budget" does.
+#
+# ATTENTION. Nothing reports on either revision, and the first blocker is
+# an extraction defect the engine fix shipped with this spec removes:
+#
+# 1. A brace-less `when` arm had no lowering. `ktWhen` collected an
+#    entry's body only when it arrived as a `block`,
+#    `control_structure_body` or `statements` node, and tree-sitter-kotlin
+#    wraps a braced body in a `block` but leaves `1 -> skipGroup(tag)`
+#    as a bare `call_expression`. Every brace-less arm's code drops out
+#    -- including the self-call this CVE turns on, which produced no node
+#    at all (`vyql graph` on the vulnerable `skipGroup` showed the
+#    `internalReadVarint32` call and nothing inside the `when`). The
+#    fourth test holds the isolating pair: the same `FileInputStream`
+#    arm reported VYQL-RES-001 braced and nothing unbraced, and 262
+#    further brace-less statement-position arms across 70 Kotlin files in
+#    the reachable clones are equally invisible. `when` in expression
+#    position (`return when (x) { ... }`) is never affected -- `expr()`
+#    flattens it through a `Seq` and keeps the calls. Lowering a bare arm
+#    through `c.stmt` makes it reachable and is measured below.
+#
+# 2. With the arm lowered, the self-call exists and still reports
+#    nothing, which is the depth-budget family recorded for C
+#    (1320, libzmq), JS (1391, 1262 KaTeX), Rust (1697, rulex) and
+#    Kotlin's missing CWE-400 classifier (1255, kaml). Two facts are
+#    missing together. No predicate unifies two context values, so "this
+#    function calls itself" does not compile (`node.context.name ==
+#    node.context.call` is rejected because presence predicates take
+#    string literals only); and the Kotlin frontend emits no
+#    `analysis.function.context` node at all -- `kotlin.go` never sets
+#    `ContextTokens`, so there is no function- or class-scoped token set
+#    in which the question could even be asked. The budget asymmetry
+#    needs class-member scope (`beginMessage`'s check read against
+#    `skipGroup`'s arm), which the same omission makes unreachable.
+#
+# Naming `skipGroup` or `recursionDepth` in a binding would key on this
+# fix's own shape rather than on any documented API -- `skipGroup` is a
+# private implementation detail with no public surface, and the counter
+# is present at both revisions -- so no definition change shipped for the
+# finding itself.
+#
+# verify_current_expected: attention-engine-gap
+# Tests one and two stay quiet on both revisions until recursion-depth
+# budget vocabulary lands. Tests three and four both expect, now that a
+# brace-less when arm lowers like its braced form.
+
+test "rank1954: skipGroup re-enters itself for every nested group with no depth budget"
+  lang kotlin
+  file wire-runtime/src/commonMain/kotlin/com/squareup/wire/ProtoReader.kt
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  reject VYQL-DOS-045
+  code
+  ```
+  import okio.BufferedSource
+
+  open class ProtoReader(private val source: BufferedSource) {
+    private var pos: Long = 0
+    private var limit = Long.MAX_VALUE
+    private var state = STATE_LENGTH_DELIMITED
+
+    /** The current number of levels of message nesting. */
+    private var recursionDepth = 0
+
+    @Throws(IOException::class)
+    open fun beginMessage(): Long {
+      check(state == STATE_LENGTH_DELIMITED) { "Unexpected call to beginMessage()" }
+      if (++recursionDepth > RECURSION_LIMIT) {
+        throw IOException("Wire recursion limit exceeded")
+      }
+      state = STATE_TAG
+      return pushedLimit
+    }
+
+    open fun nextTag(): Int {
+      loop@ while (pos < limit && !source.exhausted()) {
+        val tagAndFieldEncoding = internalReadVarint32()
+        if (tagAndFieldEncoding == 0) throw ProtocolException("Unexpected tag 0")
+        tag = tagAndFieldEncoding shr TAG_FIELD_ENCODING_BITS
+        when (val groupOrFieldEncoding = tagAndFieldEncoding and FIELD_ENCODING_MASK) {
+          STATE_START_GROUP -> {
+            skipGroup(tag)
+            continue@loop
+          }
+          STATE_END_GROUP -> throw ProtocolException("Unexpected end group")
+          STATE_LENGTH_DELIMITED -> {
+            internalNextLengthDelimited()
+            return tag
+          }
+          else -> throw ProtocolException("Unexpected field encoding: $groupOrFieldEncoding")
+        }
+      }
+      return -1
+    }
+
+    /** Skips a section of the input delimited by START_GROUP/END_GROUP type markers. */
+    private fun skipGroup(expectedEndTag: Int) {
+      while (pos < limit && !source.exhausted()) {
+        val tagAndFieldEncoding = internalReadVarint32()
+        if (tagAndFieldEncoding == 0) throw ProtocolException("Unexpected tag 0")
+        val tag = tagAndFieldEncoding shr TAG_FIELD_ENCODING_BITS
+        when (val groupOrFieldEncoding = tagAndFieldEncoding and FIELD_ENCODING_MASK) {
+          STATE_START_GROUP -> skipGroup(tag) // Nested group.
+          STATE_END_GROUP -> {
+            if (tag == expectedEndTag) return // Success!
+            throw ProtocolException("Unexpected end group")
+          }
+          STATE_LENGTH_DELIMITED -> {
+            val length = internalReadVarint32()
+            pos += length.toLong()
+            source.skip(length.toLong())
+          }
+          else -> throw ProtocolException("Unexpected field encoding: $groupOrFieldEncoding")
+        }
+      }
+      throw EOFException("Expected a containing end group but reached the end of the input")
+    }
+
+    internal companion object {
+      internal const val RECURSION_LIMIT = 100
+    }
+  }
+  ```
+
+test "rank1954: the fixed revision bounds every nested group against the reader's own recursion limit"
+  lang kotlin
+  file wire-runtime/src/commonMain/kotlin/com/squareup/wire/ProtoReader.kt
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  reject VYQL-DOS-045
+  code
+  ```
+  import okio.BufferedSource
+
+  open class ProtoReader(private val source: BufferedSource) {
+    private var pos: Long = 0
+    private var limit = Long.MAX_VALUE
+    private var state = STATE_LENGTH_DELIMITED
+
+    /** The current number of levels of message nesting. */
+    private var recursionDepth = 0
+
+    @Throws(IOException::class)
+    open fun beginMessage(): Long {
+      check(state == STATE_LENGTH_DELIMITED) { "Unexpected call to beginMessage()" }
+      if (++recursionDepth > RECURSION_LIMIT) {
+        throw IOException("Wire recursion limit exceeded")
+      }
+      state = STATE_TAG
+      return pushedLimit
+    }
+
+    /** Skips a section of the input delimited by START_GROUP/END_GROUP type markers. */
+    private fun skipGroup(expectedEndTag: Int) {
+      while (pos < limit && !source.exhausted()) {
+        val tagAndFieldEncoding = internalReadVarint32()
+        if (tagAndFieldEncoding == 0) throw ProtocolException("Unexpected tag 0")
+        val tag = tagAndFieldEncoding shr TAG_FIELD_ENCODING_BITS
+        when (val groupOrFieldEncoding = tagAndFieldEncoding and FIELD_ENCODING_MASK) {
+          STATE_START_GROUP -> {
+            recursionDepth++
+            try {
+              if (recursionDepth > RECURSION_LIMIT) {
+                throw IOException("Wire recursion limit exceeded")
+              }
+              // Nested group.
+              skipGroup(tag)
+            } finally {
+              recursionDepth--
+            }
+          }
+          STATE_END_GROUP -> {
+            if (tag == expectedEndTag) return // Success!
+            throw ProtocolException("Unexpected end group")
+          }
+          STATE_LENGTH_DELIMITED -> {
+            val length = internalReadVarint32()
+            pos += length.toLong()
+            source.skip(length.toLong())
+          }
+          else -> throw ProtocolException("Unexpected field encoding: $groupOrFieldEncoding")
+        }
+      }
+      throw EOFException("Expected a containing end group but reached the end of the input")
+    }
+
+    internal companion object {
+      internal const val RECURSION_LIMIT = 100
+    }
+  }
+  ```
+
+test "rank1954: a braced when arm's call is analysed"
+  lang kotlin
+  file wire-runtime/src/commonMain/kotlin/com/squareup/wire/ProtoReader.kt
+  expect VYQL-RES-001
+  code
+  ```
+  import java.io.FileInputStream
+
+  class Importer {
+    fun open(kind: Int, name: String) {
+      when (kind) {
+        1 -> { FileInputStream(name) }
+        else -> 0
+      }
+    }
+  }
+  ```
+
+test "rank1954: the same when arm without braces"
+  lang kotlin
+  file wire-runtime/src/commonMain/kotlin/com/squareup/wire/ProtoReader.kt
+  expect VYQL-RES-001
+  code
+  ```
+  import java.io.FileInputStream
+
+  class Importer {
+    fun open(kind: Int, name: String) {
+      when (kind) {
+        1 -> FileInputStream(name)
+        else -> 0
+      }
+    }
+  }
+  ```

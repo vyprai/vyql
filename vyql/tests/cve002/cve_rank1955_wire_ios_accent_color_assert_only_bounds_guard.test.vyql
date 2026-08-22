@@ -1,0 +1,188 @@
+# Rank 1955 / CVE-2022-31009 (wireapp/wire-ios, swift; NVD: an invalid
+# accent color of a communication partner crashes the iOS client repeatedly
+# on launch -- the denial-of-service axis of CWE-617/129). A Wire user's
+# accent color is synced from the backend into ZMUser.accentColorValue, and
+# UIColor.nameColor(for:variant:) (Wire-iOS/Sources/Helpers/
+# ColorScheme.swift:320 at caa0e27^) renders a partner's name with it:
+#
+#     class func nameColor(for accentColor: ZMAccentColor, variant: ColorSchemeVariant) -> UIColor {
+#         assert(accentColor.rawValue <= ZMAccentColor.max.rawValue)
+#         let coefficientsArray = variant == .dark ? accentColorNameColorBlendingCoefficientsDark
+#                                                 : accentColorNameColorBlendingCoefficientsLight
+#         let coefficient = coefficientsArray[Int(accentColor.rawValue)]
+#         ...
+#     }
+#
+# The only bound on the externally-synced raw value is Swift's assert, which
+# the standard library documents as removed in release builds, and the array
+# subscript is documented to trap on an out-of-range index in every build:
+# a partner whose stored accent color is outside the eight-element
+# coefficient arrays crashes the client at startup, over and over. The fixed revision
+# caa0e27 removes the assert and normalises the value first --
+# `let accentColor = AccentColor(ZMAccentColor: accentColor) ?? .strongBlue`
+# -- so the subscript's index is in range by construction.
+#
+# Measured on the real checkout (timeout 180, --max-ram 6GB, --cache off,
+# three runs per revision, deterministic): scanning Wire-iOS/Sources reports
+# 395 findings (393 at or above high) at both revisions with byte-identical
+# finding sets (767 rule@line entries), and none of them falls on
+# ColorScheme.swift at either revision -- a double miss. vyql match on the
+# file labels nothing; vyql resolve shows the `assert` call itself
+# unresolved; vyql explain reports no findings. The graph does lower the
+# access to a code.Subscript node (`coefficientsArray.__subscript`) with
+# the parameter flowing into its key, but no binding can target it: the
+# binding surface is callExpr (code.Call) and presenceNode (the one
+# module-wide context node swift.go emits), and swStructuredContextTokens
+# produces no subscript:/index: tokens -- the filed Swift absence that
+# "no subscript, range expression or bound is observed" (ENGINE-GAPS 1049).
+# The assert call IS a code.Call node, so a callExpr binding on `assert`
+# could label it, but the discriminator -- the asserted identifier also
+# being the subscript's key, in the same function -- needs per-function
+# context facts Swift does not emit (ENGINE-GAPS 1792: `presenceNode where
+# node.scope == "function"` labels zero nodes in any .swift file).
+#
+# Precision wall, measured: the only file-wide discriminator between the
+# revisions is the presence of an `assert` call (every other token the fixed revision
+# touches -- AccentColor, strongBlue -- is the fixing commit's own
+# vocabulary, the shape rejected at rank 1394). Labelling every `assert`
+# call as code.ReachableAssertionReview measures 9 files on wire-ios
+# (1521 non-test swift files; exactly 2 carry an assert whose asserted
+# identifier is subscripted within twelve lines -- this file and
+# SketchColorPickerController.swift:70, a latent same-shape instance), but
+# 74 files on swift-nio (26 with a bounds-flavoured assert, every one the
+# project's documented deliberate-internal-invariant idiom), 16 on
+# swift-crypto, 12 on swift-corelibs-foundation and 12 on vapor -- a
+# hundred-plus high review rows across four idiomatic trees for one true
+# positive here. Narrowings that would separate the revisions
+# (rawValue, coefficientsArray, the function's own name) all fail the
+# genericity test.
+#
+# Reuse considered before concluding ATTENTION: code.ReachableAssertionReview
+# (VYQL-DOS-040, the exact CWE-617 class) is bound today only at the two
+# documented unconditional traps preconditionFailure/fatalError and cannot
+# express "a debug-only assert guards a trapping subscript";
+# code.IndexAccessSink (VYQL-MEM-005, the CWE-129 attacker-index class,
+# Swift-bound for moveWriterIndex) needs both a bindable subscript
+# node and a source for a partner-synced property -- the wire origin of
+# ZMAccentColor lives in the zmessaging dependency, and ZMUser property
+# reads are Wire-internal vocabulary, not a documented API (mobile_ios's
+# entrypoints would silence a new source anyway, per 1822);
+# code.FieldDerivedIndexAccess is the C-family shape behind the same
+# sink-side blocker.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+# When Swift gains per-function context facts with subscript observation
+# (1049 + 1792), case 1 and case 3 must flip to expect VYQL-DOS-040 while
+# the normalised case 2 and the trapped case 4 behave as written; case 4
+# passes today and is the non-vacuity proof that swift specs are scanned
+# and the DOS-040 vocabulary works.
+
+test "wire-ios: partner-synced accent color subscript bounded only by a release-stripped assert"
+  lang swift
+  file ColorScheme.swift
+  reject VYQL-DOS-040
+  code
+  ```
+  enum ZMAccentColor: UInt {
+      case undefined = 0, softBlue, softGreen, brightOrange, brightYellow, softPink, softPurple, brightRed
+      static let max = ZMAccentColor.brightRed
+  }
+
+  enum ColorSchemeVariant: UInt {
+      case light, dark
+  }
+
+  extension UIColor {
+      private static let accentColorNameColorBlendingCoefficientsDark: [CGFloat] = [0.8, 0.8, 0.72, 1.0, 0.8, 0.8, 0.8, 0.64]
+      private static let accentColorNameColorBlendingCoefficientsLight: [CGFloat] = [0.8, 0.8, 0.72, 1.0, 0.8, 0.8, 0.64, 1.0]
+
+      class func nameColor(for accentColor: ZMAccentColor, variant: ColorSchemeVariant) -> UIColor {
+          assert(accentColor.rawValue <= ZMAccentColor.max.rawValue)
+          let coefficientsArray = variant == .dark ? accentColorNameColorBlendingCoefficientsDark
+                                                  : accentColorNameColorBlendingCoefficientsLight
+          let coefficient = coefficientsArray[Int(accentColor.rawValue)]
+          let background: UIColor = variant == .dark ? .black : .white
+          return background.mix(UIColor(fromZMAccentColor: accentColor), amount: coefficient)
+      }
+  }
+  ```
+
+test "wire-ios: fixed nameColor normalises the accent color before the subscript"
+  lang swift
+  file ColorScheme.swift
+  reject VYQL-DOS-040
+  code
+  ```
+  enum AccentColor: UInt {
+      case strongBlue = 0, strongRed, brightOrange
+  }
+
+  enum ZMAccentColor: UInt {
+      case undefined = 0, softBlue, softGreen, brightOrange, brightYellow, softPink, softPurple, brightRed
+  }
+
+  enum ColorSchemeVariant: UInt {
+      case light, dark
+  }
+
+  extension UIColor {
+      private static let accentColorNameColorBlendingCoefficientsDark: [CGFloat] = [0.8, 0.8, 0.72]
+      private static let accentColorNameColorBlendingCoefficientsLight: [CGFloat] = [0.8, 0.8, 0.64]
+
+      class func nameColor(for accentColor: ZMAccentColor, variant: ColorSchemeVariant) -> UIColor {
+          let accentColor = AccentColor(ZMAccentColor: accentColor) ?? .strongBlue
+          let coefficientsArray = variant == .dark ? accentColorNameColorBlendingCoefficientsDark
+                                                  : accentColorNameColorBlendingCoefficientsLight
+          let coefficient = coefficientsArray[Int(accentColor.rawValue)]
+          let background: UIColor = variant == .dark ? .black : .white
+          return background.mix(UIColor(for: accentColor), amount: coefficient)
+      }
+  }
+  ```
+
+test "wire-ios: same shape without an enum -- a picker index asserted then subscripted"
+  lang swift
+  file Picker.swift
+  reject VYQL-DOS-040
+  code
+  ```
+  final class SketchColorPickerController {
+      private let sketchColors: [Int] = [0, 1, 2, 3, 4]
+      private var selectedColorIndex: Int = 0
+
+      var selectedColor: Int {
+          assert(sketchColors.indices.contains(selectedColorIndex), "Colors out of bounds")
+          return sketchColors[selectedColorIndex]
+      }
+  }
+  ```
+
+test "wire-ios: the same invariant reported through an unconditional trap is reported today"
+  lang swift
+  file ColorScheme.swift
+  expect VYQL-DOS-040
+  code
+  ```
+  enum ZMAccentColor: UInt {
+      case undefined = 0, softBlue, softGreen, brightOrange, brightYellow, softPink, softPurple, brightRed
+      static let max = ZMAccentColor.brightRed
+  }
+
+  enum ColorSchemeVariant: UInt {
+      case light, dark
+  }
+
+  extension UIColor {
+      private static let accentColorNameColorBlendingCoefficientsLight: [CGFloat] = [0.8, 0.8, 0.72, 1.0, 0.8, 0.8, 0.64, 1.0]
+
+      class func nameColor(for accentColor: ZMAccentColor, variant: ColorSchemeVariant) -> UIColor {
+          guard accentColor.rawValue <= ZMAccentColor.max.rawValue else {
+              preconditionFailure("invalid accent color for name rendering")
+          }
+          let coefficientsArray = accentColorNameColorBlendingCoefficientsLight
+          let coefficient = coefficientsArray[Int(accentColor.rawValue)]
+          let background: UIColor = variant == .dark ? .black : .white
+          return background.mix(UIColor(fromZMAccentColor: accentColor), amount: coefficient)
+      }
+  }
+  ```

@@ -1,0 +1,183 @@
+# Rank 1975 / CVE-2024-31996 (GHSA-hf43-47q4-fhq5, CWE-94, CWE-95): the
+# XWiki escaping tool's `html()` inherits Velocity Tools' HTML-entity
+# escaping, which covers `& < > " '` and nothing else
+# (xwiki-commons-core/xwiki-commons-velocity/src/main/java/org/xwiki/velocity/tools/EscapeTool.java
+# at fix parent b94142e2^):
+#
+#     public class EscapeTool extends org.apache.velocity.tools.generic.EscapeTool
+#     {
+#         @Override
+#         public String xml(Object content) { ... }   // overridden
+#         // no html() override: inherits escapeHtml4, entity-escaping only
+#     }
+#
+# XWiki wiki syntax treats `{{ ... }}` as a macro. A template that answers
+# with `$escapetool.html($request.place)` therefore passes the braces
+# through, and the advisory's PoC ships `{{/html}}{{velocity}}#evaluate(
+# $request.eval)` in the `place` parameter of `Panels.PanelLayoutUpdate`,
+# closing the enclosing HTML macro and evaluating attacker Velocity on the
+# server. Fix b94142e2 overrides `html()` with a translator that also maps
+# `{` to `&lcub;` and `}` to `&rcub;` -- the row's commit is the master
+# original and the advisory's other two commits (b080516, ed7ff51) are its
+# cherry-picks to the release branches, so the row is correct and the
+# remediation is present at the fixed revision. .
+#
+# ATTENTION, analysis gap, with an empty measurable set on the assigned tree.
+# Measured exhaustively at the vulnerable revision:
+#   - `grep -rn escapetool` over the whole checkout: 2 hits, the class's own
+#     `DEFAULT_KEY` constant and a `${escapetool.h}` literal in its test.
+#     Zero call sites of `html()` anywhere -- no `.vm`, no `.xml`, no Java.
+#   - 3 `.vm` files exist (license/XAR boilerplate), none call escapetool;
+#     the 4 xwikidoc XML fixtures that pass the config scope gate contain
+#     no escapetool either.
+#   - `vyql match` on EscapeTool.java labels nothing: no source, no sink,
+#     one unrelated `encodedURL.replaceAll` CharFilter at line 272.
+#   - bounded scan of the change-carrying subtree
+#     (xwiki-commons-core/xwiki-commons-velocity, java:54 config:1
+#     textpattern:54): 7 findings, all unrelated (2 WeakRandomValue in a
+#     test, 1 ResourceHandle in NIOTool, 1 CleartextChannel in a test URL).
+#   - `grep -rl escapetool.html` across every rank clone under /tmp/cve-work
+#     at the time of review: 0 hits. The only tree that carries the shape is
+#     xwiki-platform, whose sibling rank owns it.
+# So no A/B revision pair and no collateral baseline exist here.
+#
+# Why nothing is shipped for the shape either:
+#   - the Java side has no node to bind. At the parent there is no `html()`
+#     method in the file at all, so a discriminating binding must key on the
+#     *absence of an override* in a subclass of
+#     `org.apache.velocity.tools.generic.EscapeTool`. That is the fixing
+#     commit's own layout, and velocity-tools' documentation says nothing
+#     that would lead anyone to write it: the genericity test fails, and
+#     exactly one such class exists in the world.
+#   - the template side is line-regex extraction, not nodes. The
+#     `xwiki_velocity` config scope (bindings/config/m2b6375a9.vyql) emits
+#     one source (`template.xwiki_velocity.input` ->
+#     core.UserControlledData), one state-change sink and one CSRF check; it
+#     has no escape notion and no render sink. `vyql graph` on the PoC
+#     template below shows the whole document collapsing to a Const and an
+#     Arg flowing into that single source call -- the `$escapetool.html()`
+#     wrapper is text inside a matched line, not a node, so "escaped for
+#     HTML" and "escaped for wiki syntax" are indistinguishable in the IR.
+#     Representing them needs a new extraction fact (an escape call between
+#     the request read and the render), which is a dataflow relation, not a
+#     missing switch case. Judged not mechanical.
+#   - `.vm` files are not analysed by any frontend ("no supported source
+#     found" on a probe .vm holding `$escapetool.html($!request.x)`), so the
+#     artifact type where the shape lives is outside the scope that does
+#     exist.
+#
+# Kinship, for coordination with the xwiki-platform sibling rank: this is the
+# same "output encoding sufficient for one parser and not the receiving one"
+# family as code.JavaScriptTemplateHtmlEscapeMismatch (VYQL-INJ-171) and
+# code.ErbHrefUrlHtmlEscapeOnly, and it must not become a third per-shape
+# sibling. The vocabulary the family needs on the platform tree is one pair,
+# measured together there: `$escapetool.html` bound as a core.HtmlEscape
+# control (documentation-answerable -- the override's own javadoc is "Escapes
+# the HTML special characters ... using HTML entities") beside a wiki-render
+# sink, so the rule asks whether the escape covers the parser that reads the
+# value. Landing the HtmlEscape half alone would be unmeasurable on a tree
+# with no call sites and would suppress the very finding the sink half is
+# meant to raise, so it belongs with the sink, not before it.
+#
+# verify_current_expected: attention-analysis-gap, all four tests rejected.
+# The first two are the vulnerable and patched library forms; the third and
+# fourth are the template pair, differing only in the escape call.
+# When a wiki-render sink and an escape control land for this scope, the
+# third test must flip to expect VYQL-INJ-004 and the fourth must stay
+# reject -- they are the minimal pair, identical except for which escape
+# wraps the value.
+
+test "rank1975: the escaping tool inherits entity-only HTML escaping, braces unescaped"
+  lang java
+  file EscapeTool.java
+  reject VYQL-INJ-004
+  code
+  ```
+  package org.xwiki.velocity.tools;
+
+  import java.util.Objects;
+  import org.xwiki.xml.XMLUtils;
+
+  public class EscapeTool extends org.apache.velocity.tools.generic.EscapeTool
+  {
+      public static final String DEFAULT_KEY = "escapetool";
+
+      public EscapeTool()
+      {
+          setKey(DEFAULT_KEY);
+      }
+
+      @Override
+      public String xml(Object content)
+      {
+          return XMLUtils.escape(Objects.toString(content, null));
+      }
+  }
+  ```
+
+test "rank1975: the patched tool escapes the braces the wiki parser reads"
+  lang java
+  file EscapeToolFixed.java
+  reject VYQL-INJ-004
+  code
+  ```
+  package org.xwiki.velocity.tools;
+
+  import java.util.Map;
+  import org.apache.commons.text.StringEscapeUtils;
+  import org.apache.commons.text.translate.CharSequenceTranslator;
+  import org.apache.commons.text.translate.LookupTranslator;
+
+  public class EscapeTool extends org.apache.velocity.tools.generic.EscapeTool
+  {
+      public static final String DEFAULT_KEY = "escapetool";
+
+      private static final CharSequenceTranslator XWIKI_ESCAPE_HTML4 = StringEscapeUtils.ESCAPE_HTML4.with(
+          new LookupTranslator(Map.ofEntries(
+              Map.entry("{", "&lcub;"),
+              Map.entry("}", "&rcub;")
+          ))
+      );
+
+      @Override
+      public String html(Object content)
+      {
+          if (content == null) {
+              return null;
+          }
+          return XWIKI_ESCAPE_HTML4.translate(String.valueOf(content));
+      }
+  }
+  ```
+
+test "rank1975: a request parameter escaped for HTML only still reaches the render"
+  lang config
+  file PanelLayoutUpdate.xml
+  reject VYQL-INJ-004
+  code
+  ```
+  <xwikidoc>
+    <web>Panels</web>
+    <name>PanelLayoutUpdate</name>
+    <content><![CDATA[
+  #set ($layout = "$request.place")
+  $response.getWriter().print("$escapetool.html($layout)")
+    ]]></content>
+  </xwikidoc>
+  ```
+
+test "rank1975: the same template escaped for wiki syntax is clean"
+  lang config
+  file PanelLayoutUpdateFixed.xml
+  reject VYQL-INJ-004
+  code
+  ```
+  <xwikidoc>
+    <web>Panels</web>
+    <name>PanelLayoutUpdate</name>
+    <content><![CDATA[
+  #set ($layout = "$request.place")
+  $response.getWriter().print("$escapetool.xml($layout)")
+    ]]></content>
+  </xwikidoc>
+  ```

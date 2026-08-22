@@ -1,0 +1,127 @@
+# A subscription tracker's logo and payment-method image search reads its
+# outbound proxy from the request: `array_change_key_case($_SERVER,
+# CASE_LOWER)` case-folds the superglobal -- whose HTTP_* entries are the
+# request's own headers under every PHP SAPI -- and the folded
+# `$envVars['http_proxy']` lookup then matches the `Proxy:` request header
+# (exported as HTTP_PROXY), so the curl handle is tunnelled through a host
+# the request chose (endpoints/logos/search.php:14-23 and
+# endpoints/payments/search.php:14-23 at the parent of the change; twice per
+# file, the primary fetch and the backup). The fixed revision reads the proxy from
+# getenv() instead and allowlists the fetch hosts.
+#
+# Two binding gaps kept the shape silent, both fixed in
+# bindings/php/proxy_config_from_request_data.vyql by reusing existing
+# concepts -- no rule or concept is new:
+#
+# (a) source: the keyed php.input bindings label a $_SERVER subscript by
+#     its literal key, and only for the always-request-derived keys --
+#     server-configured keys such as DOCUMENT_ROOT deliberately stay
+#     unlabelled, the line the cecil 404 spec pins. A case-folded copy of
+#     the superglobal slips between those posts: the fold maps lowercase
+#     names onto the request's HTTP_ header values, so the folded copy is
+#     request data even though every key in it reads like server
+#     configuration. Taint survives the folded subscript and the ternary
+#     Phi to the option value (vyql trace: Call -> Subscript -> Phi ->
+#     Arg).
+#
+# (b) sink: curl_setopt had no proxy binding. CURLOPT_PROXY's value
+#     argument is the URL curl connects to first, the analogue of the
+#     python set's urllib3.ProxyManager sink, so it is a code.UrlFetch.
+#
+# VYQL-RF-001 judges the pair. Measured on the full tree, --cache off:
+# 5 RF-001 rows at the parent baseline, 13 with the bindings (all 8 new
+# are the proxy option: four per search file); 7 at the fixed revision (the 2 new
+# are the getenv residual below). No other rule moves on the tree, and
+# two unrelated PHP trees (767 files, 43 reading $_SERVER) show no
+# change at all.
+#
+# The fixed revision's own chain is `getenv('https_proxy') ?: getenv('HTTPS_PROXY')
+# ?: getenv('http_proxy') ?: getenv('HTTP_PROXY')`. Its https spellings
+# are process-environment names a request can never set, and case 2
+# models them as the remediated form. The http spellings are reported by
+# the pre-existing php.input getenv("HTTP_*") source and stay reported:
+# getenv('HTTP_PROXY') is the httpoxy spelling -- under CGI/FastCGI a
+# `Proxy:` request header is exported as HTTP_PROXY, and the python set
+# labels os.environ.get("HTTP_PROXY") with its own pinned coverage test
+# -- while getenv('http_proxy'), never request-derived, rides along
+# because literal matching is case-folded and cannot separate the
+# standard lowercase spelling from the header prefix. Case 3 pins that
+# pair as an expect, so touching either side later is a visible
+# decision, not a silent drift.
+
+test "rank1933: curl proxy option set from the case-folded request superglobal"
+  lang php
+  file search.php
+  expect VYQL-RF-001
+  code
+  ```
+  <?php
+  if (isset($_GET['search'])) {
+      $searchTerm = urlencode($_GET['search'] . " logo");
+
+      $ch = curl_init();
+      curl_setopt($ch, CURLOPT_URL, "https://www.google.com/search?q={$searchTerm}&tbm=isch");
+      curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+
+      // Convert all environment variable keys to lowercase
+      $envVars = array_change_key_case($_SERVER, CASE_LOWER);
+
+      // Check for http_proxy or https_proxy environment variables
+      $httpProxy = isset($envVars['http_proxy']) ? $envVars['http_proxy'] : null;
+      $httpsProxy = isset($envVars['https_proxy']) ? $envVars['https_proxy'] : null;
+
+      if (!empty($httpProxy)) {
+          curl_setopt($ch, CURLOPT_PROXY, $httpProxy);
+      } elseif (!empty($httpsProxy)) {
+          curl_setopt($ch, CURLOPT_PROXY, $httpsProxy);
+      }
+
+      $response = curl_exec($ch);
+  }
+  ```
+
+test "rank1933: proxy re-applied from the https environment spellings is clean"
+  lang php
+  file proxy.php
+  reject VYQL-RF-001
+  code
+  ```
+  <?php
+  function applyProxy($ch) {
+      $proxy = getenv('https_proxy')
+          ?: getenv('HTTPS_PROXY')
+          ?: null;
+
+      if ($proxy) {
+          curl_setopt($ch, CURLOPT_PROXY, $proxy);
+      }
+  }
+
+  $ch = curl_init();
+  applyProxy($ch);
+  $response = curl_exec($ch);
+  ```
+
+test "rank1933: env chain including the http proxy spellings still reports"
+  lang php
+  file proxy2.php
+  expect VYQL-RF-001
+  code
+  ```
+  <?php
+  function applyProxy($ch) {
+      $proxy = getenv('https_proxy')
+          ?: getenv('HTTPS_PROXY')
+          ?: getenv('http_proxy')
+          ?: getenv('HTTP_PROXY')
+          ?: null;
+
+      if ($proxy) {
+          curl_setopt($ch, CURLOPT_PROXY, $proxy);
+      }
+  }
+
+  $ch = curl_init();
+  applyProxy($ch);
+  $response = curl_exec($ch);
+  ```

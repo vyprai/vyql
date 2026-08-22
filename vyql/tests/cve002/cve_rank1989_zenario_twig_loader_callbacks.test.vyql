@@ -1,0 +1,189 @@
+# Rank 1989 / CVE-2024-34461: Zenario renders site markup that designers
+# and administrators author in the CMS -- the Twig Snippet plugin, the
+# site-wide <head>/<body> frameworks, email template bodies -- through two
+# shared Twig environments, one per zenario/autoload/twig.php (frameworks
+# loaded from the database) and one per zenario/autoload/phi.php (raw
+# source through Zenario_Twig_String_Loader, which returns the template
+# name as the source verbatim). Neither environment installs a sandbox;
+# phi.php whitelists functions but leaves every filter at Twig's stock
+# implementation, and twig.php adds no function or filter restriction at
+# all. Twig's array filters `filter`, `map`, `reduce` and `sort` accept an
+# arrow function or a PHP callable name as their argument, so template
+# markup reached arbitrary CLI execution through them (CWE-94, SSTI).
+#
+# Fix commit 72afb59d ("Critical security patch", release 9.5.58545) adds
+# a dummyFilter/blockFilter pair to both classes and calls
+# blockFilter('filter'), ('map'), ('reduce'), ('sort') from init():
+# `new \Twig\TwigFilter($name, ['\\ze\\twig', 'dummyFilter'])` re-registers
+# each callback-accepting filter name onto a stub that returns '', which is
+# Twig's documented override mechanism -- re-registering an existing name
+# replaces the built-in. The render path and the environment construction
+# are untouched; the remediation is entirely "the engine's filter table is
+# overridden", which is the same family as the guarded filter overrides
+# Grav shipped for its SSTI (rank 1144) and Shopware's allowlisted
+# SecurityExtension (rank 1585). ; the row's commit
+# resolves, its parent carries the vulnerable shape, and the remediation
+# is present at the fixed revision.
+#
+# The binding reused here is the unsandboxed-template-validation family
+# shipped for Jinja2 (rank 661), Kimai (rank 1271), October's
+# blocklist policy (rank 1481), Twig's spliced macro names (rank 1875) and
+# CubeCart's Smarty denylist (rank 1903): code.IncompleteTemplateValidation
+# / VYQL-INJ-024. The new Twig instance of the shape keys on the loader:
+# an environment on one of Twig's documented file/array loaders renders
+# templates the program shipped, while an environment on a loader of the
+# application's own serves template source that arrived from outside the
+# codebase, and Twig's own security documentation requires the sandbox for
+# exactly that case. Measured over the 23,497 PHP files under the 187
+# clones in /tmp/cve-work/rank*/: the full clause set matches exactly the
+# two Zenario files at the parent and nothing else (zero collateral), and
+# both are cleared at the fixed revision through the TwigFilter override clause.
+
+test "rank1989: database-backed Twig framework renderer leaves the callback filters live"
+  lang php
+  file twig.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+  namespace ze;
+
+  class twig {
+      private static $twig;
+
+      public static function init() {
+          self::$twig = new \Twig\Environment(new \Zenario_Twig_Loader(), [
+              'cache' => new \Zenario_Twig_Cache(),
+              'autoescape' => false,
+              'auto_reload' => true
+          ]);
+
+          self::$twig->addExtension(new \Twig_Extensions_Extension_I18n());
+
+          self::$twig->addFunction(new \Twig\TwigFunction('get', '\\ze\\get'));
+          self::$twig->addFunction(new \Twig\TwigFunction('post', '\\ze\\post'));
+          self::$twig->addFunction(new \Twig\TwigFunction('session', '\\ze\\session'));
+      }
+
+      public static function render($framework, $vars) {
+          return self::$twig->render($framework, $vars);
+      }
+  }
+  ```
+
+test "rank1989: re-registering the callback filters onto a stub clears it"
+  lang php
+  file twig.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+  namespace ze;
+
+  class twig {
+      private static $twig;
+
+      //A dummy filter, just used as a work-around to block other filters from working
+      public static function dummyFilter() {
+          return '';
+      }
+
+      protected static function blockFilter($name) {
+          $dummyFilter = new \Twig\TwigFilter($name, ['\\ze\\twig', 'dummyFilter']);
+          self::$twig->addFilter($dummyFilter);
+      }
+
+      public static function init() {
+          self::$twig = new \Twig\Environment(new \Zenario_Twig_Loader(), [
+              'cache' => new \Zenario_Twig_Cache(),
+              'autoescape' => false,
+              'auto_reload' => true
+          ]);
+
+          self::$twig->addExtension(new \Twig_Extensions_Extension_I18n());
+
+          self::blockFilter('filter');
+          self::blockFilter('map');
+          self::blockFilter('reduce');
+          self::blockFilter('sort');
+
+          self::$twig->addFunction(new \Twig\TwigFunction('get', '\\ze\\get'));
+          self::$twig->addFunction(new \Twig\TwigFunction('post', '\\ze\\post'));
+      }
+
+      public static function render($framework, $vars) {
+          return self::$twig->render($framework, $vars);
+      }
+  }
+  ```
+
+test "rank1989: an override spelled with a literal filter name clears it too"
+  lang php
+  file GravExtension.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+  class GravExtension extends AbstractExtension
+  {
+      public function getFilters()
+      {
+          return [
+              new TwigFilter('filter', [$this, 'filterFunc'], ['needs_environment' => true]),
+              new TwigFilter('map', [$this, 'mapFunc'], ['needs_environment' => true]),
+          ];
+      }
+  }
+  ```
+
+test "rank1989: a filesystem loader renders the program's own templates"
+  lang php
+  file TemplateEngine.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+  class TemplateEngine
+  {
+      protected $twig;
+
+      public function __construct()
+      {
+          $this->twigLoader = new \Twig\Loader\FilesystemLoader('./');
+          $this->twigLoader->addPath('custom/templates/', 'custom');
+          $this->twig = new \Twig\Environment($this->twigLoader, [
+              'cache' => '/tmp/templates',
+          ]);
+      }
+
+      public function render($templatePath, $data)
+      {
+          return $this->twig->render($templatePath, $data);
+      }
+  }
+  ```
+
+test "rank1989: a sandboxed custom loader is the documented form"
+  lang php
+  file SandboxRenderer.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+  class SandboxRenderer
+  {
+      private static $twig;
+
+      public static function init() {
+          self::$twig = new \Twig\Environment(new DatabaseTwigLoader(), [
+              'autoescape' => false,
+          ]);
+          $policy = new \Twig\Sandbox\SecurityPolicy(['if'], ['upper'], ['attribute'], [], ['range']);
+          self::$twig->addExtension(new \Twig\Sandbox\SandboxExtension($policy, true));
+      }
+
+      public static function render($source, $vars) {
+          return self::$twig->render($source, $vars);
+      }
+  }
+  ```

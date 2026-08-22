@@ -1,0 +1,171 @@
+# The mooncake KV-transfer pipe moves tensor metadata between the prefill and
+# decode processes over raw ZeroMQ PUSH/PULL sockets. At the parent of
+# a5450f11 (vllm/distributed/kv_transfer/kv_pipe/mooncake_pipe.py) both
+# directions of that channel are pickled object graphs:
+#
+#     def wait_for_ack(self, src_ptr: int, length: int) -> None:
+#         ack = self.sender_ack.recv_pyobj()
+#
+#     def recv_bytes(self) -> bytes:
+#         src_ptr, length = self.receiver_socket.recv_pyobj()
+#
+# recv_pyobj() is a receive and an unpickle in one call: the message handed
+# back is `pickle.loads` of whatever bytes the peer sent, so the peer's stream
+# decides which classes are reconstructed inside this process. The sockets are
+# bound to tcp://*:<port> (every interface, no authentication), so any host
+# that can reach the port supplies the pickle (CWE-502, arbitrary code
+# execution). The fixed revision replaces the pyobj calls with byte receives
+# (recv_multipart / recv) plus struct packing, and binds each socket to its
+# specific host instead of the wildcard -- raw bytes never instantiate
+# attacker-named classes.
+#
+# Coverage: pyzmq's Socket.recv_pyobj() is the unrestricted form of the
+# deserialization family code.UnrestrictedClassDeserialization covers
+# for a numpy wrapper defaulting allow_pickle=True and for Java byte[]-to-
+# ObjectInputStream helpers -- the stream may name any class, with no filter
+# standing between it and the unpickler, and pyzmq documents both the pickle
+# step and the warning against untrusted peers while offering no filter hook
+# on this path. The binding labels the call
+# (vyql/bindings/python/zmq_pyobj_deserialization.vyql,
+# callee.method == "recv_pyobj") and VYQL-DESER-023 judges it. send_pyobj is
+# the serialization side and is deliberately unlabelled; recv_json and
+# recv_string decode to primitives, the same distinction the json.loads
+# SafeDeserialization check draws.
+#
+# Measured on the real checkout (scan --cache off, bounded): the vulnerable
+# revision reports 2 findings, both VYQL-DESER-023 at mooncake_pipe.py:179
+# and :195 -- exactly the two recv_pyobj sites; the fixed revision reports 0.
+# The shape's reachable set across the sibling checkouts is empty and the
+# whole vllm tree carries exactly these four pyobj calls, so the label has no
+# collateral to trade.
+
+test "rank1923: the metadata pipe unpickles whatever the peer sends"
+  lang python
+  file mooncake_pipe.py
+  expect VYQL-DESER-023
+  code
+  ```
+  import zmq
+
+
+  class MooncakeTransferEngine:
+      """Handles the transfer of data using mooncake_vllm_adaptor and ZeroMQ."""
+
+      def __init__(self, kv_rank: int, local_rank: int):
+          self.local_rank = local_rank
+          self.context = zmq.Context()  # type: ignore[attr-defined]
+          self.sender_socket = self.context.socket(zmq.constants.PUSH)
+          self.receiver_socket = self.context.socket(zmq.constants.PULL)
+          self.sender_ack = self.context.socket(zmq.constants.PULL)
+          self.receiver_ack = self.context.socket(zmq.constants.PUSH)
+
+      def _setup_metadata_sockets(self, kv_rank: int, p_host: str, p_port: str,
+                                  d_host: str, d_port: str) -> None:
+          """Set up ZeroMQ sockets for sending and receiving data."""
+          p_rank_offset = int(p_port) + 8 + self.local_rank * 2
+          d_rank_offset = int(d_port) + 8 + self.local_rank * 2
+          if kv_rank == 0:
+              self.sender_socket.bind(f"tcp://*:{p_rank_offset + 1}")
+              self.receiver_socket.connect(f"tcp://{d_host}:{d_rank_offset + 1}")
+              self.sender_ack.connect(f"tcp://{d_host}:{d_rank_offset + 2}")
+              self.receiver_ack.bind(f"tcp://*:{p_rank_offset + 2}")
+          else:
+              self.receiver_socket.connect(f"tcp://{p_host}:{p_rank_offset + 1}")
+              self.sender_socket.bind(f"tcp://*:{d_rank_offset + 1}")
+              self.receiver_ack.bind(f"tcp://*:{d_rank_offset + 2}")
+              self.sender_ack.connect(f"tcp://{p_host}:{p_rank_offset + 2}")
+
+      def wait_for_ack(self, src_ptr: int, length: int) -> None:
+          """Asynchronously wait for ACK from the receiver."""
+          ack = self.sender_ack.recv_pyobj()
+          if ack != b'ACK':
+              raise RuntimeError("Failed to receive ACK from the receiver")
+
+      def send_bytes(self, user_data: bytes) -> None:
+          """Send bytes to the remote process."""
+          length = len(user_data)
+          src_ptr = self.allocate_managed_buffer(length)
+          self.write_bytes_to_buffer(src_ptr, user_data, length)
+          self.sender_socket.send_pyobj((src_ptr, length))
+
+      def recv_bytes(self) -> bytes:
+          """Receive bytes from the remote process."""
+          src_ptr, length = self.receiver_socket.recv_pyobj()
+          dst_ptr = self.allocate_managed_buffer(length)
+          self.transfer_sync(dst_ptr, src_ptr, length)
+          ret = self.read_bytes_from_buffer(dst_ptr, length)
+
+          # Buffer cleanup
+          self.receiver_ack.send_pyobj(b'ACK')
+          self.free_managed_buffer(dst_ptr, length)
+
+          return ret
+  ```
+
+test "rank1923: the byte-frame pipe decodes to integers and reports nothing"
+  lang python
+  file mooncake_pipe_fixed.py
+  reject VYQL-DESER-023
+  code
+  ```
+  import struct
+  import zmq
+
+
+  class MooncakeTransferEngine:
+      """Handles the transfer of data using mooncake_vllm_adaptor and ZeroMQ."""
+
+      def __init__(self, kv_rank: int, local_rank: int):
+          self.local_rank = local_rank
+          self.context = zmq.Context()  # type: ignore[attr-defined]
+          self.sender_socket = self.context.socket(zmq.constants.PUSH)
+          self.receiver_socket = self.context.socket(zmq.constants.PULL)
+          self.sender_ack = self.context.socket(zmq.constants.PULL)
+          self.receiver_ack = self.context.socket(zmq.constants.PUSH)
+
+      def _setup_metadata_sockets(self, kv_rank: int, p_host: str, p_port: str,
+                                  d_host: str, d_port: str) -> None:
+          """Set up ZeroMQ sockets for sending and receiving data."""
+          p_rank_offset = int(p_port) + 8 + self.local_rank * 2
+          d_rank_offset = int(d_port) + 8 + self.local_rank * 2
+          if kv_rank == 0:
+              self.sender_socket.bind(f"tcp://{p_host}:{p_rank_offset + 1}")
+              self.receiver_socket.connect(f"tcp://{d_host}:{d_rank_offset + 1}")
+              self.sender_ack.connect(f"tcp://{d_host}:{d_rank_offset + 2}")
+              self.receiver_ack.bind(f"tcp://{p_host}:{p_rank_offset + 2}")
+          else:
+              self.receiver_socket.connect(f"tcp://{p_host}:{p_rank_offset + 1}")
+              self.sender_socket.bind(f"tcp://{d_host}:{d_rank_offset + 1}")
+              self.receiver_ack.bind(f"tcp://{d_host}:{d_rank_offset + 2}")
+              self.sender_ack.connect(f"tcp://{p_host}:{p_rank_offset + 2}")
+
+      def wait_for_ack(self, src_ptr: int, length: int) -> None:
+          """Asynchronously wait for ACK from the receiver."""
+          ack = self.sender_ack.recv()
+          if ack != b'ACK':
+              raise RuntimeError("Failed to receive ACK from the receiver")
+
+      def send_bytes(self, user_data: bytes) -> None:
+          """Send bytes to the remote process."""
+          length = len(user_data)
+          src_ptr = self.allocate_managed_buffer(length)
+          self.write_bytes_to_buffer(src_ptr, user_data, length)
+          self.sender_socket.send_multipart(
+              [struct.pack("!Q", src_ptr),
+               struct.pack("!Q", length)])
+
+      def recv_bytes(self) -> bytes:
+          """Receive bytes from the remote process."""
+          data = self.receiver_socket.recv_multipart()
+          src_ptr = struct.unpack("!Q", data[0])[0]
+          length = struct.unpack("!Q", data[1])[0]
+          dst_ptr = self.allocate_managed_buffer(length)
+          self.transfer_sync(dst_ptr, src_ptr, length)
+          ret = self.read_bytes_from_buffer(dst_ptr, length)
+
+          # Buffer cleanup
+          self.receiver_ack.send(b'ACK')
+          self.free_managed_buffer(dst_ptr, length)
+
+          return ret
+  ```

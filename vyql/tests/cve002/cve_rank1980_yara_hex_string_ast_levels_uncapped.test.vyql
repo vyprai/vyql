@@ -1,0 +1,256 @@
+# CVE-2017-9438 (YARA, c; CWE-400/CWE-674, stack exhaustion): the
+# hex-string grammar built its AST with no depth budget. Every hex token
+# pair reduces to a `yr_re_node_create(RE_NODE_CONCAT, left, right)` and
+# every `|` alternative to a RE_NODE_ALT, so a rule holding a few
+# thousand `{ 01 02 03 ... }` bytes builds a left-leaning tree whose
+# depth is the attacker's token count, and the consumers that walk it
+# (`_yr_re_emit`, `yr_re_node_destroy` in re.c) recurse once per level
+# and exhaust the stack. The regexp grammar carried the budget:
+# limits.h documents `RE_MAX_AST_LEVELS 2000` as "Maximum number of
+# levels in regexp's AST", and re_grammar.y counts every CONCAT/ALT
+# reduction against it and aborts the parse past the cap. The fixed revision
+# (10e8bd3, "Fix issue #674 for hex strings") copies that counter into
+# hex_grammar.y: an `incr_ast_levels()` macro before each node creation
+# that bumps the parse's level count, sets the error code and YYABORTs
+# past RE_MAX_AST_LEVELS. The recursion itself is untouched -- the fixed revision
+# is entirely on the construction side, so no finding keyed on the
+# recursive consumers could ever separate the revisions.
+#
+# What the scanner can see is the generated parser, not the grammar:
+# hex_grammar.y is one of the ".y 3" files that match no frontend, and
+# the generated hex_grammar.c carries every action inside one giant
+# yyparse switch. Two facts are measured there:
+#
+# 1. The action code is invisible to node-level analysis. A `#line`
+#    directive sits between every `case N:` label and its action block,
+#    and with a preprocessor directive there the grammar closes the
+#    case_statement empty: the action block becomes an orphaned sibling
+#    directly under the switch body, which cSwitchCases never collects.
+#    `vyql graph` on the vulnerable hex_grammar.c emits no node at all
+#    between lines 1320 and 1670 -- all thirteen yr_re_node_create
+#    calls included. The minimal pair is cases three and four below:
+#    the same source-to-sink chain inside a case action reports
+#    VYQL-INJ-002 without the directive and nothing with it. The change is
+#    confined to cSwitch attributing orphaned switch-body statements to
+#    the most recent case label (fall-through semantics), but its blast
+#    radius is every generated parser in every C tree (7 of the 49 .c
+#    files in this repository alone carry the shape, including
+#    exec.c), so it is filed for a dedicated sweep rather than shipped
+#    here; case four pins it.
+#
+# 2. Module-scope facts survive the switch: ccStructuredContextTokens
+#    walks the parse tree directly, so the module context carries
+#    `call:yr_re_node_create` and the CONCAT/ALT argument tokens for
+#    the whole translation unit, and the module node's whole-file text
+#    token carries the level-check macro's body in the fixed revision.
+#    The shipped binding anchors there: a translation unit whose parser
+#    builds binary regexp AST nodes with no mention of the library's
+#    documented AST-level limit anywhere in the file emits
+#    code.UnboundedResourceOperation (VYQL-DOS-042). The constant is
+#    yara's own documented spelling in limits.h, present in the
+#    capped re_grammar.c at the vulnerable revision, so the
+#    control is the library's budget idiom rather than this fix's
+#    macro name -- renaming incr_ast_levels changes nothing. Measured,
+#    three `--cache off` runs per revision over the whole checkout:
+#    the vulnerable tree reports exactly one VYQL-DOS-042
+#    (hex_grammar.c:1) and 1208 findings; the fixed tree reports zero
+#    and 1207 -- the finding is the entire delta, and the capped
+#    sibling grammar stays silent at both. The symbol appears in no
+#    other clone under /tmp/cve-work/rank*, so the reachable set is
+#    these two generated files. Residual: the whole-file text keeps
+#    comments, so a comment naming the cap suppresses the finding --
+#    false-negative direction only.
+#
+# Cases three and four are the extraction-gap pair and assert the
+# current behaviour: three expects the finding the un-interrupted arm
+# produces today, four rejects the identical chain behind a `#line`.
+# When the orphaned-action lowering lands, case four must flip to
+# expect. Cases one and two hold the vulnerable and patched parser
+# forms and are module-scope, so they are stable either way.
+
+test "rank1980: hex string reductions build AST nodes with no level budget"
+  lang c
+  file hex_grammar.c
+  expect VYQL-DOS-042
+  code
+  ```
+  typedef struct RE_NODE RE_NODE;
+
+  extern RE_NODE* yr_re_node_create(int type, RE_NODE* left, RE_NODE* right);
+  extern void yr_re_node_destroy(RE_NODE* node);
+
+  typedef union YYSTYPE {
+    long integer;
+    RE_NODE* re_node;
+  } YYSTYPE;
+
+  extern YYSTYPE yyval;
+  extern YYSTYPE yyvsp[200];
+  extern int yyn;
+
+  int hex_yyparse(void* yyscanner, void* lex_env)
+  {
+    switch (yyn)
+      {
+      case 3:
+        yyval.re_node = yyvsp[0].re_node;
+        break;
+
+      case 4:
+  #line 119 "hex_grammar.y" /* yacc.c:1646  */
+        {
+          yyval.re_node = yr_re_node_create(RE_NODE_CONCAT, yyvsp[-1].re_node, yyvsp[0].re_node);
+
+          if (yyval.re_node == NULL)
+            yr_re_node_destroy(yyvsp[-1].re_node);
+          if (yyval.re_node == NULL)
+            yr_re_node_destroy(yyvsp[0].re_node);
+        }
+  #line 1351 "hex_grammar.c" /* yacc.c:1646  */
+        break;
+
+      case 18:
+  #line 347 "hex_grammar.y" /* yacc.c:1646  */
+        {
+          yyval.re_node = yr_re_node_create(RE_NODE_ALT, yyvsp[-2].re_node, yyvsp[0].re_node);
+
+          if (yyval.re_node == NULL)
+            yr_re_node_destroy(yyvsp[-2].re_node);
+          if (yyval.re_node == NULL)
+            yr_re_node_destroy(yyvsp[0].re_node);
+        }
+  #line 1627 "hex_grammar.c" /* yacc.c:1646  */
+        break;
+      }
+    return 0;
+  }
+  ```
+
+test "rank1980: the fixed revision counts every reduction against the AST level budget"
+  lang c
+  file hex_grammar.c
+  reject VYQL-DOS-042
+  code
+  ```
+  typedef struct RE_NODE RE_NODE;
+
+  extern RE_NODE* yr_re_node_create(int type, RE_NODE* left, RE_NODE* right);
+  extern void yr_re_node_destroy(RE_NODE* node);
+  extern void* yyget_extra(void* yyscanner);
+
+  typedef struct RE_AST {
+    long levels;
+    int flags;
+  } RE_AST;
+
+  typedef union YYSTYPE {
+    long integer;
+    RE_NODE* re_node;
+  } YYSTYPE;
+
+  extern YYSTYPE yyval;
+  extern YYSTYPE yyvsp[200];
+  extern int yyn;
+
+  #define incr_ast_levels() \
+      if (((RE_AST*) yyget_extra(yyscanner))->levels++ > RE_MAX_AST_LEVELS) \
+      { \
+        lex_env->last_error_code = ERROR_INVALID_HEX_STRING; \
+        YYABORT; \
+      }
+
+  int hex_yyparse(void* yyscanner, void* lex_env)
+  {
+    switch (yyn)
+      {
+      case 3:
+        yyval.re_node = yyvsp[0].re_node;
+        break;
+
+      case 4:
+  #line 119 "hex_grammar.y" /* yacc.c:1646  */
+        {
+          incr_ast_levels();
+
+          yyval.re_node = yr_re_node_create(RE_NODE_CONCAT, yyvsp[-1].re_node, yyvsp[0].re_node);
+
+          if (yyval.re_node == NULL)
+            yr_re_node_destroy(yyvsp[-1].re_node);
+          if (yyval.re_node == NULL)
+            yr_re_node_destroy(yyvsp[0].re_node);
+        }
+  #line 1351 "hex_grammar.c" /* yacc.c:1646  */
+        break;
+
+      case 18:
+  #line 347 "hex_grammar.y" /* yacc.c:1646  */
+        {
+          incr_ast_levels();
+
+          yyval.re_node = yr_re_node_create(RE_NODE_ALT, yyvsp[-2].re_node, yyvsp[0].re_node);
+
+          if (yyval.re_node == NULL)
+            yr_re_node_destroy(yyvsp[-2].re_node);
+          if (yyval.re_node == NULL)
+            yr_re_node_destroy(yyvsp[0].re_node);
+        }
+  #line 1627 "hex_grammar.c" /* yacc.c:1646  */
+        break;
+      }
+    return 0;
+  }
+  ```
+
+test "rank1980: a case action without a directive lowers its calls"
+  lang c
+  file hex_grammar.c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <stdlib.h>
+
+  extern char* getenv(const char* name);
+  extern int yyn;
+
+  int yyparse(void* yyscanner, const char* name)
+  {
+    switch (yyn)
+      {
+      case 4:
+        {
+          char* cmd = getenv(name);
+          system(cmd);
+        }
+        break;
+      }
+    return 0;
+  }
+  ```
+
+test "rank1980: the same action behind a #line directive is dropped"
+  lang c
+  file hex_grammar.c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <stdlib.h>
+
+  extern char* getenv(const char* name);
+  extern int yyn;
+
+  int yyparse(void* yyscanner, const char* name)
+  {
+    switch (yyn)
+      {
+      case 4:
+  #line 119 "hex_grammar.y" /* yacc.c:1646  */
+        {
+          char* cmd = getenv(name);
+          system(cmd);
+        }
+  #line 1351 "hex_grammar.c" /* yacc.c:1646  */
+        break;
+      }
+    return 0;
+  }
+  ```

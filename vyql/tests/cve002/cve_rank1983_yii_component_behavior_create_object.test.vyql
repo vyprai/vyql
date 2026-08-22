@@ -1,0 +1,155 @@
+# Rank 1983 / CVE-2024-4990 (CWE-470): the `as ` branch of
+# yii\base\Component::__set attaches a behavior by building it from the
+# written value --
+#
+#	$name = trim(substr($name, 3));
+#	$this->attachBehavior($name, $value instanceof Behavior ? $value : Yii::createObject($value));
+#
+# -- and Yii::createObject() instantiates whichever class the configuration
+# names (the 'class' element, or the string itself), so a property write
+# whose value an attacker influences selects the class that gets
+# instantiated: unsafe reflection through the framework's own factory. The
+# 2.0.49.4 fix (62d081f18) keeps the instantiation but guards it with the
+# PHP-builtin class type check:
+#
+#	} elseif (isset($value['class']) && is_subclass_of($value['class'], 'yii\base\Behavior', true)) {
+#	    $this->attachBehavior($name, Yii::createObject($value));
+#	} elseif (is_string($value) && is_subclass_of($value, 'yii\base\Behavior', true)) {
+#	    $this->attachBehavior($name, Yii::createObject($value));
+#	} else {
+#	    throw new InvalidConfigException('Class is not of type yii\base\Behavior or its subclasses');
+#	}
+#
+# The construct is present at the parent and the remediation at the fixed revision; no
+ CVE-2024-32877 (an
+# ENT_NOQUOTES -> ENT_QUOTES change in framework/web/ErrorHandler.php); this
+# spec covers only the Component half.
+#
+# Detection is a taint route in three pieces. The sink binding labels
+# Yii::createObject's first argument code.ReflectionInvoke: the class-
+# selection position of the documented factory. On the framework's own tree
+# the source arrives through the library profile (code.ExternalEntryInput on
+# __set's public parameters), which the spec harness cannot use -- parameter
+# sources fire only under a profile that lists the concept -- so the spec
+# injects the request the way an application would deliver it, the same
+# modelling rank 1548 used for its library parameter. The clearing side is
+# a check binding on is_subclass_of()/is_a(), the PHP builtins that ask
+# whether a dynamically chosen class name denotes the expected type, with
+# dominance coverage; core.ClassTypeValidation (new, the control for
+# deserialization.UnsafeReflection, which threats_without_controls.txt
+# held open) and VYQL-DESER-003's `unless v.dominates` consume it. The
+# guard sits in the enclosing elseif condition, so no call-node-anchored
+# negation can see it (scope.call looks same-or-nested only), which is why
+# the clearing runs through the rule's dominance clause rather than the
+# binding's query.
+#
+# Measured on the real checkout (framework/, 526 php files, timeout 180,
+# --max-ram 6GB, --cache off, three runs per revision, every count stable):
+# 467 findings / 23 VYQL-DESER-003 at the vulnerable parent and 466 / 22 at
+# the fixed revision -- the delta is exactly base/Component.php:175 -> :191, __set's
+# $value into Yii::createObject, cleared by the dominating is_subclass_of.
+# The one Component row that survives both revisions is
+# attachBehavior -> attachBehaviorInternal's own unguarded
+# Yii::createObject($behavior), which the fixed revision does not touch: the same
+# shape, still present upstream, not a regression. The other 21 rows are
+# the family's true surface under the library profile (Validator::
+# createValidator, Module::getModule, Controller::createAction and peers
+# forward public parameters into the factory); they appear only in
+# library-profile scans, and no other clone under /tmp/cve-work calls the
+# API at all. WordPress wp-admin A/B: 840 findings both sides, zero
+# VYQL-DESER-003.
+#
+# verify_current_expected: fixed, 1 -> 0.
+
+test "rank1983: Component::__set builds the attached behavior from request-chosen configuration"
+  lang php
+  expect VYQL-DESER-003
+  code
+  ```
+  <?php
+
+  namespace yii\base;
+
+  use Yii;
+
+  class Component extends BaseObject
+  {
+      public function __set($name, $value)
+      {
+          if (strncmp($name, 'as ', 3) === 0) {
+              // as behavior: attach behavior
+              $name = trim(substr($name, 3));
+              $value = isset($_POST['behavior']) ? $_POST['behavior'] : $value;
+              $this->attachBehavior($name, $value instanceof Behavior ? $value : Yii::createObject($value));
+
+              return;
+          }
+      }
+  }
+  ```
+
+test "rank1983: the behavior class is checked against the expected type before the factory builds it"
+  lang php
+  reject VYQL-DESER-003
+  code
+  ```
+  <?php
+
+  namespace yii\base;
+
+  use Yii;
+
+  class Component extends BaseObject
+  {
+      public function __set($name, $value)
+      {
+          if (strncmp($name, 'as ', 3) === 0) {
+              // as behavior: attach behavior
+              $name = trim(substr($name, 3));
+              $value = isset($_POST['behavior']) ? $_POST['behavior'] : $value;
+              if ($value instanceof Behavior) {
+                  $this->attachBehavior($name, $value);
+              } elseif (isset($value['class']) && is_subclass_of($value['class'], 'yii\base\Behavior', true)) {
+                  $this->attachBehavior($name, Yii::createObject($value));
+              } elseif (is_string($value) && is_subclass_of($value, 'yii\base\Behavior', true)) {
+                  $this->attachBehavior($name, Yii::createObject($value));
+              } else {
+                  throw new InvalidConfigException('Class is not of type yii\base\Behavior or its subclasses');
+              }
+
+              return;
+          }
+      }
+  }
+  ```
+
+test "rank1983: the is_a spelling of the same type check also clears the factory call"
+  lang php
+  reject VYQL-DESER-003
+  code
+  ```
+  <?php
+
+  namespace yii\base;
+
+  use Yii;
+
+  class Component extends BaseObject
+  {
+      public function __set($name, $value)
+      {
+          if (strncmp($name, 'as ', 3) === 0) {
+              // as behavior: attach behavior
+              $name = trim(substr($name, 3));
+              $value = isset($_POST['behavior']) ? $_POST['behavior'] : $value;
+              if (is_string($value) && is_a($value, 'yii\base\Behavior', true)) {
+                  $this->attachBehavior($name, Yii::createObject($value));
+              } else {
+                  throw new InvalidConfigException('Class is not of type yii\base\Behavior or its subclasses');
+              }
+
+              return;
+          }
+      }
+  }
+  ```

@@ -1,0 +1,190 @@
+# Rank 1996 / CVE-2024-51504: ZooKeeper's IP authentication scheme resolved
+# the identity it authenticates from the first entry of X-Forwarded-For
+# (CWE-287 / CWE-348):
+#
+#   public static String getClientIPAddress(final HttpServletRequest request) {
+#       final String xForwardedForHeader = request.getHeader(X_FORWARDED_FOR_HEADER_NAME);
+#       if (xForwardedForHeader == null) {
+#           return request.getRemoteAddr();
+#       }
+#       return new StringTokenizer(xForwardedForHeader, ",").nextToken().trim();
+#   }
+#
+# `handleAuthentication(HttpServletRequest, byte[])` feeds that string into
+# `new Id("ip", ip)` -- the identity every `ip:...` ACL entry in the Admin
+# Server is matched against. A proxy *appends* to X-Forwarded-For, so the
+# leading entry is whatever the client sent: a request carrying
+# `X-Forwarded-For: 127.0.0.1` authenticates as 127.0.0.1 and satisfies every
+# localhost ACL, no credential involved. Fix commit
+# 2c2b74c1c11b6531aabb1bf06782e859048d5983 installs the documented opt-out
+# for exactly this: a boolean system property that forces
+# `request.getRemoteAddr()` on the whole header path.
+#
+# FIXED. bindings/java/forwarded_header_first_token_client_ip.vyql binds
+# forwardedHeaderFirstTokenClientIpTokenizer (the StringTokenizer spelling
+# above) and forwardedHeaderFirstTokenClientIpSplit (`xff.split(",")[0]`,
+# chained or through a local indexed `[0]`), both function-scoped presence
+# matches on a `getHeader` call plus a forwarding-header name in either
+# spelling a codebase writes it -- inline literal or named constant -- plus
+# the leftmost-read construction. Reuses code.ProxyClientIpSpoofingBypass
+# (VYQL-AUTH-012), shipped for the CasaOS gateway hop, the Hono ALB
+# conn-info read, the Python leftmost-split recipe and the Go CIDR-allowlist
+# client-IP helper: the same weakness -- a spoofable forwarded header read
+# for an access-control identity -- in the servlet spelling. No new concept,
+# no new rule, first Java binding for the family. The safe forms are excluded
+# structurally: the last-entry read produces no `[0]` index token, a
+# tokenizer walk to the end carries `hasMoreTokens`, and the opt-out reads
+# its boolean through `Boolean.getBoolean`, the JDK's boolean-system-property
+# gate -- none of the exclusions names this fix's property key or helper.
+#
+# Measured over three `--cache off` runs per revision of the full checkout
+# (the whole tree finishes inside the 180s bound): exactly 1 VYQL-AUTH-012
+# each run at 2c2b74c^, at IPAuthenticationProvider.java:152, and 0 each run
+# at 2c2b74c, with no other rule count moving (512 findings at or above high
+# patched, 513 vulnerable). Reachable-set enumeration over the clone:
+# IPAuthenticationProvider.java is the only Java file in the tree mentioning
+# a forwarding header, and the other `getHeader` callers are transaction-log
+# header getters with no forwarding token. Cross-clone enumeration over the
+# 198 sibling rank checkouts: the non-test Java files carrying forwarding-
+# header vocabulary are Tomcat's RemoteIpValve/RemoteIpFilter (the trusted-
+# proxy right-walk), Undertow's ProxyPeerAddressHandler/ProxyHandler, Valtimo's
+# IpUtils (collects every comma entry plus the transport peer) and two XWiki
+# auth files; bounded module scans of all four repos report 0 VYQL-AUTH-012.
+# On Tomcat the header name is configured through a field, so the
+# identification clause declines there on its own -- the extraction
+# discrimination is what the last two reject cases pin. Renaming the gate's
+# property key on the patched form leaves it suppressed (`Boolean.getBoolean`
+# is the discriminator, not the key); a constant renamed so that no header
+# name appears in the method at all is a miss, the same residual the Python
+# and JavaScript bindings of this family carry. Full spec suite green. OWASP
+# Java +1.00 and Python +0.90 unchanged by the main-agent gate run.
+
+test "rank1996: ip scheme identity is the first X-Forwarded-For entry, read through a named constant"
+  lang java
+  file zookeeper-server/src/main/java/org/apache/zookeeper/server/auth/IPAuthenticationProvider.java
+  expect VYQL-AUTH-012
+  expect_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  package org.apache.zookeeper.server.auth;
+
+  import java.util.StringTokenizer;
+  import javax.servlet.http.HttpServletRequest;
+
+  public class IPAuthenticationProvider {
+      public static final String X_FORWARDED_FOR_HEADER_NAME = "X-Forwarded-For";
+
+      public static String getClientIPAddress(final HttpServletRequest request) {
+          // to handle the case that a HTTP(s) client connects via a proxy or load balancer
+          final String xForwardedForHeader = request.getHeader(X_FORWARDED_FOR_HEADER_NAME);
+          if (xForwardedForHeader == null) {
+              return request.getRemoteAddr();
+          }
+          // the format of the field is: X-Forwarded-For: client, proxy1, proxy2 ...
+          return new StringTokenizer(xForwardedForHeader, ",").nextToken().trim();
+      }
+  }
+  ```
+
+test "rank1996: the split spelling of the same first-entry read"
+  lang java
+  file zookeeper-server/src/main/java/org/apache/zookeeper/server/auth/IPAuthenticationProvider.java
+  expect VYQL-AUTH-012
+  expect_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  package org.apache.zookeeper.server.auth;
+
+  import javax.servlet.http.HttpServletRequest;
+
+  public class IPAuthenticationProvider {
+      public static String getClientIPAddress(final HttpServletRequest request) {
+          String xff = request.getHeader("X-Forwarded-For");
+          if (xff == null) {
+              return request.getRemoteAddr();
+          }
+          String[] entries = xff.split(",");
+          return entries[0].trim();
+      }
+  }
+  ```
+
+test "rank1996: the boolean system-property gate forces the transport peer"
+  lang java
+  file zookeeper-server/src/main/java/org/apache/zookeeper/server/auth/IPAuthenticationProvider.java
+  reject VYQL-AUTH-012
+  reject_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  package org.apache.zookeeper.server.auth;
+
+  import java.util.StringTokenizer;
+  import javax.servlet.http.HttpServletRequest;
+
+  public class IPAuthenticationProvider {
+      static final String SKIP_X_FORWARDED_FOR_KEY = "zookeeper.IPAuthenticationProvider.skipxforwardedfor";
+
+      public static String getClientIPAddress(final HttpServletRequest request) {
+          if (Boolean.getBoolean(SKIP_X_FORWARDED_FOR_KEY)) {
+              return request.getRemoteAddr();
+          }
+
+          final String xForwardedForHeader = request.getHeader(X_FORWARDED_FOR_HEADER_NAME);
+          if (xForwardedForHeader == null) {
+              return request.getRemoteAddr();
+          }
+          return new StringTokenizer(xForwardedForHeader, ",").nextToken().trim();
+      }
+  }
+  ```
+
+test "rank1996: reading the entry the proxy itself appended"
+  lang java
+  file zookeeper-server/src/main/java/org/apache/zookeeper/server/auth/IPAuthenticationProvider.java
+  reject VYQL-AUTH-012
+  reject_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  package org.apache.zookeeper.server.auth;
+
+  import javax.servlet.http.HttpServletRequest;
+
+  public class IPAuthenticationProvider {
+      public static String getClientIPAddress(final HttpServletRequest request) {
+          final String xForwardedForHeader = request.getHeader(X_FORWARDED_FOR_HEADER_NAME);
+          if (xForwardedForHeader == null) {
+              return request.getRemoteAddr();
+          }
+          String[] entries = xForwardedForHeader.split(",");
+          return entries[entries.length - 1].trim();
+      }
+  }
+  ```
+
+test "rank1996: a tokenizer walk to the last entry"
+  lang java
+  file zookeeper-server/src/main/java/org/apache/zookeeper/server/auth/IPAuthenticationProvider.java
+  reject VYQL-AUTH-012
+  reject_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  package org.apache.zookeeper.server.auth;
+
+  import java.util.StringTokenizer;
+  import javax.servlet.http.HttpServletRequest;
+
+  public class IPAuthenticationProvider {
+      public static String getClientIPAddress(final HttpServletRequest request) {
+          final String xForwardedForHeader = request.getHeader(X_FORWARDED_FOR_HEADER_NAME);
+          if (xForwardedForHeader == null) {
+              return request.getRemoteAddr();
+          }
+          StringTokenizer st = new StringTokenizer(xForwardedForHeader, ",");
+          String last = null;
+          while (st.hasMoreTokens()) {
+              last = st.nextToken();
+          }
+          return last;
+      }
+  }
+  ```

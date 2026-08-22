@@ -1,0 +1,186 @@
+# Rank 1947 / CVE-2023-46136: Werkzeug's sansio multipart decoder kept
+# every byte after the last line break in its buffer as a candidate
+# partial boundary, so a request part whose body contained no CR/LF
+# characters made the buffer grow monotonically while each event
+# rescanned the whole buffer -- unbounded retention with quadratic
+# re-scanning, denial of service through algorithmic complexity
+# (CWE-407/CWE-400). _parse_data in src/werkzeug/sansio/multipart.py
+# did `if self.buffer.find(b"--" + self.boundary) == -1: data_end =
+# del_index = self.last_newline(data[data_start:]) + data_start` --
+# the slice end is the last line break, and nothing bounds the
+# retained tail even though a partial boundary can never be longer
+# than the boundary plus one line break. The memory cap the decoder
+# does carry (receive_data's max_form_memory_size check) is optional
+# and defaults to None on Request, and even when set it does not stop
+# the re-scan cost; the slow parse is the defect. The fixing commit
+# f3c803b3ad is the merge of the 3.0.1 release whose fixing change is
+# b1916c0c08 ("Fix: slow multipart parsing for huge files with few
+# CR/LF characters"): the no-boundary branch now compares the residual
+# after the last newline against the longest possible partial
+# boundary, `if (len(data) - data_end) > len(b"\n" + boundary):
+# data_end = del_index = len(data)`, so a tail that cannot be a
+# boundary prefix is consumed. .
+#
+# ATTENTION, the measured unbounded-parse family (ranks 1517, 1534,
+# 1554, 1559, 1572, 1586, 1612: the discriminator is a budget, a
+# bound or a progress guarantee expressed as length arithmetic
+# between statements, which no binding vocabulary can carry without
+# encoding the fixed revision's own spelling). The slice-at-last-line-break
+# retention is the standard correct pattern for an incremental
+# delimiter parser; only the missing residual-length bound is the
+# bug, and its sole visible form is the fixing comparison itself --
+# keying a negation on `len(data) - data_end` or `len(b"\n" +
+# boundary)` is the fixing commit's own layout, and keying on
+# werkzeug's private last_newline helper would detect this library
+# rather than the weakness: an exhaustive grep over every sibling
+# clone under /tmp/cve-work/rank*/ finds no other tree carrying the
+# boundary-slice shape (`find(b"--" + boundary)` matches werkzeug
+# alone) and none carrying `rindex(b"\n")`. Measured on the real
+# checkout (full-tree scan, timeout 180, --max-ram 6GB, --cache off):
+# 96 findings at the vulnerable revision, none on the retention --
+# the only labels on sansio/multipart.py are the known re.compile ->
+# CodeEval/RegexCompileSink and .find -> NosqlQuery noise, identical
+# at both revisions; vyql match on both minimal forms reports the
+# same two sinks and no source, vyql explain reports no findings.
+# No ENGINE-GAPS.md entry: no taint path exists to stop -- the
+# attacker controls the absence of newlines, not a value that flows
+# to a sink. No definition change shipped. Spec cve_rank1947 records
+# the unbounded retention and the residual-bounded form, both
+# asserting reject VYQL-DOS-042 (the unbounded-step family the
+# streaming-decompression binding emits): when
+# retained-parse-tail vocabulary lands, the unbounded form must flip
+# to expect.
+
+test "rank1947: the decoder retains every byte after the last line break"
+  lang python
+  file src/werkzeug/sansio/multipart.py
+  reject VYQL-DOS-042
+  code
+  ```
+  class MultipartDecoder:
+      def __init__(self, boundary, max_form_memory_size=None):
+          self.buffer = bytearray()
+          self.boundary = boundary
+          self.max_form_memory_size = max_form_memory_size
+
+      def last_newline(self, data: bytes) -> int:
+          try:
+              last_nl = data.rindex(b"\n")
+          except ValueError:
+              last_nl = len(data)
+          try:
+              last_cr = data.rindex(b"\r")
+          except ValueError:
+              last_cr = len(data)
+          return min(last_nl, last_cr)
+
+      def receive_data(self, data: bytes | None) -> None:
+          if data is None:
+              self.complete = True
+          elif (
+              self.max_form_memory_size is not None
+              and len(self.buffer) + len(data) > self.max_form_memory_size
+          ):
+              raise RequestEntityTooLarge()
+          else:
+              self.buffer.extend(data)
+
+      def next_event(self) -> Event:
+          if self.state == State.DATA:
+              data, del_index, more_data = self._parse_data(self.buffer, start=False)
+              del self.buffer[:del_index]
+              if data or not more_data:
+                  return Data(data=data, more_data=more_data)
+          return NEED_DATA
+
+      def _parse_data(self, data: bytes, *, start: bool):
+          if start:
+              data_start = LINE_BREAK_RE.match(data).end()
+          else:
+              data_start = 0
+
+          if self.buffer.find(b"--" + self.boundary) == -1:
+              # No complete boundary in the buffer, but there may be
+              # a partial boundary at the end. As the boundary
+              # starts with either a nl or cr find the earliest and
+              # return up to that as data.
+              data_end = del_index = self.last_newline(data[data_start:]) + data_start
+              more_data = True
+          else:
+              match = self.boundary_re.search(data)
+              data_end = del_index = self.last_newline(data[data_start:]) + data_start
+              more_data = match is None
+
+          return bytes(data[data_start:data_end]), del_index, more_data
+  ```
+
+test "rank1947: the residual bound consumes a tail that cannot be a boundary"
+  lang python
+  file src/werkzeug/sansio/multipart.py
+  reject VYQL-DOS-042
+  code
+  ```
+  class MultipartDecoder:
+      def __init__(self, boundary, max_form_memory_size=None):
+          self.buffer = bytearray()
+          self.boundary = boundary
+          self.max_form_memory_size = max_form_memory_size
+
+      def last_newline(self, data: bytes) -> int:
+          try:
+              last_nl = data.rindex(b"\n")
+          except ValueError:
+              last_nl = len(data)
+          try:
+              last_cr = data.rindex(b"\r")
+          except ValueError:
+              last_cr = len(data)
+          return min(last_nl, last_cr)
+
+      def receive_data(self, data: bytes | None) -> None:
+          if data is None:
+              self.complete = True
+          elif (
+              self.max_form_memory_size is not None
+              and len(self.buffer) + len(data) > self.max_form_memory_size
+          ):
+              raise RequestEntityTooLarge()
+          else:
+              self.buffer.extend(data)
+
+      def next_event(self) -> Event:
+          if self.state == State.DATA:
+              data, del_index, more_data = self._parse_data(self.buffer, start=False)
+              del self.buffer[:del_index]
+              if data or not more_data:
+                  return Data(data=data, more_data=more_data)
+          return NEED_DATA
+
+      def _parse_data(self, data: bytes, *, start: bool):
+          if start:
+              data_start = LINE_BREAK_RE.match(data).end()
+          else:
+              data_start = 0
+
+          boundary = b"--" + self.boundary
+
+          if self.buffer.find(boundary) == -1:
+              # No complete boundary in the buffer, but there may be
+              # a partial boundary at the end. As the boundary
+              # starts with either a nl or cr find the earliest and
+              # return up to that as data.
+              data_end = del_index = self.last_newline(data[data_start:]) + data_start
+              # If amount of data after last newline is far from
+              # possible length of partial boundary, we should
+              # assume that there is no partial boundary in the buffer
+              # and return all pending data.
+              if (len(data) - data_end) > len(b"\n" + boundary):
+                  data_end = del_index = len(data)
+              more_data = True
+          else:
+              match = self.boundary_re.search(data)
+              data_end = del_index = self.last_newline(data[data_start:]) + data_start
+              more_data = match is None
+
+          return bytes(data[data_start:data_end]), del_index, more_data
+  ```

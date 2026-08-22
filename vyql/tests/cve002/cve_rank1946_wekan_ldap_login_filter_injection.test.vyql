@@ -1,0 +1,286 @@
+# An LDAP-backed login handler builds its search filter by interpolating the
+# login form's username straight into the filter text: the handler Meteor
+# registers with `Accounts.registerLoginHandler('ldap', function(loginRequest)
+# {...})` passes `loginRequest.username` to a search-users method whose filter
+# builder writes `(${item}=${username})` into the `filter` of the options
+# object handed to the ldapjs client's `search` (packages/wekan-ldap/server/
+# loginHandler.js:49/:52 and ldap.js:208/:483 at the parent of the change), and
+# the same username reaches the group-membership filters through
+# `filter.join('').replace(/#{username}/g, username)` (ldap.js:385/:433). A
+# username carrying `)(` rewrites the filter the directory evaluates, so the
+# client controls the query the authenticator runs (CWE-90).
+#
+# The fixed revision interpolates `escapedToHex(username)` instead, a module-local copy
+# of ldapjs's filter escaping (ldap.js:5 at the fixed revision). That copy is the fixing
+# commit's own helper: a binding keyed on its name dies to the rename test,
+# and its body is a single `str.replace(/\\(...)/gi, ...)` — a
+# threat.CharFilter the engine labels and reports as an
+# unproven filter in the finding's advisory ("this sink declares no
+# excluded_chars to verify against"), because a backslash-anchored rewrite
+# does not provably exclude the LDAP filter metacharacters from the value.
+# There is no library call left at the fixed sites to key a control on, so
+# the revision pair does not separate: measured on the wekan-ldap package at
+# both revisions, three `--cache off` runs each, 7 findings before and after
+# with VYQL-INJ-005 present at both (the sink line moves 483 -> 491 with the
+# added lines). What is missing is the source: nothing labelled the login
+# handler's parameter, so no rule could start a path from the login form.
+# The meteor_login_handler_request_input binding
+# (vyql/bindings/javascript/) labels every parameter of a handler
+# registered with Accounts.registerLoginHandler as code.HttpInput --
+# Meteor's own documentation states the handler receives the login request
+# object the client submitted over DDP, and clients may add arbitrary
+# fields to it.
+#
+# Measured with that binding, wekan/packages, three runs each: 182 -> 185
+# findings, the three new rows all real -- VYQL-INJ-005 (loginRequest ->
+# LdapQuery at ldap.js:483) and VYQL-INJ-011 (loginRequest -> FormatString
+# at ldap.js:433, the group-filter site the same fix escapes) on the LDAP
+# handler, and one P4 VYQL-INJ-009 on the tree's other login handler
+# (wekan-accounts-cas/cas_server.js:209 -> LogOutput :253, the CAS ticket
+# logged). The shape's reachable set is two call sites in this one tree: no
+# other corpus clone contains registerLoginHandler (grep over /tmp/cve-work/
+# rank*/).
+#
+# The bind DN the same fix escapes (`userDn = '${field}=${username},${base}'`
+# -> bindSync) has no sink at all: ldapjs's `bind` is not in the vocabulary
+# and the call is reached through Meteor.wrapAsync, so that half of the change
+# stays out of reach; the filter half is what the cases below model.
+#
+# Case 1 is the vulnerable shape; case 2 is the same filter built through
+# ldapjs's documented `escapeFilter`, which the existing core.LdapEscape
+# control and the rule's `unless` clause clear; case 3 is the fixed revision's own
+# form, the local escape copy, and pins that the flow through it still
+# reports today -- it flips only if the engine learns to prove the replace's
+# output alphabet, which is what the char-filter advisory flags on
+# the real tree.
+
+test "rank1946: a login handler's username interpolated into the ldapjs search filter"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "wekan",
+    "dependencies": {
+      "ldapjs": "^2.3.3"
+    }
+  }
+  ```
+  file ldap.js
+  code
+  ```
+  import ldapjs from 'ldapjs';
+
+  export default class LDAP {
+    constructor() {
+      this.ldapjs = ldapjs;
+      this.client = ldapjs.createClient({ url: 'ldap://localhost:389' });
+      this.options = { BaseDN: 'ou=users,dc=example,dc=com', User_Search_Field: 'uid' };
+    }
+
+    getUserFilter(username) {
+      const filter = [];
+      const usernameFilter = this.options.User_Search_Field.split(',').map((item) => `(${item}=${username})`);
+      if (usernameFilter.length === 1) {
+        filter.push(`${usernameFilter[0]}`);
+      }
+      return `(&${filter.join('')})`;
+    }
+
+    searchAllPaged(BaseDN, options, page) {
+      this.client.search(BaseDN, options, (error, res) => {
+        res.on('searchEntry', (entry) => { page(null, [entry]); });
+      });
+    }
+
+    searchUsersSync(username, page) {
+      const searchOptions = {
+        filter: this.getUserFilter(username),
+        scope: 'sub',
+      };
+      if (page) {
+        return this.searchAllPaged(this.options.BaseDN, searchOptions, page);
+      }
+      return this.searchAllSync(this.options.BaseDN, searchOptions);
+    }
+  }
+  ```
+  file loginHandler.js
+  code
+  ```
+  import LDAP from './ldap';
+
+  Accounts.registerLoginHandler('ldap', function(loginRequest) {
+    if (!loginRequest.ldap || !loginRequest.ldapOptions) {
+      return undefined;
+    }
+
+    const ldap = new LDAP();
+    const users = ldap.searchUsersSync(loginRequest.username);
+    if (users.length !== 1) {
+      throw new Error('User not Found');
+    }
+    return { userId: users[0].uid };
+  });
+  ```
+  expect VYQL-INJ-005
+
+test "rank1946: the same filter built through ldapjs's documented escapeFilter"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "wekan",
+    "dependencies": {
+      "ldapjs": "^2.3.3"
+    }
+  }
+  ```
+  file ldap.js
+  code
+  ```
+  import ldapjs from 'ldapjs';
+
+  export default class LDAP {
+    constructor() {
+      this.ldapjs = ldapjs;
+      this.client = ldapjs.createClient({ url: 'ldap://localhost:389' });
+      this.options = { BaseDN: 'ou=users,dc=example,dc=com', User_Search_Field: 'uid' };
+    }
+
+    getUserFilter(username) {
+      const escapedUsername = ldapjs.escapeFilter(username);
+      const filter = [];
+      const usernameFilter = this.options.User_Search_Field.split(',').map((item) => `(${item}=${escapedUsername})`);
+      if (usernameFilter.length === 1) {
+        filter.push(`${usernameFilter[0]}`);
+      }
+      return `(&${filter.join('')})`;
+    }
+
+    searchAllPaged(BaseDN, options, page) {
+      this.client.search(BaseDN, options, (error, res) => {
+        res.on('searchEntry', (entry) => { page(null, [entry]); });
+      });
+    }
+
+    searchUsersSync(username, page) {
+      const searchOptions = {
+        filter: this.getUserFilter(username),
+        scope: 'sub',
+      };
+      if (page) {
+        return this.searchAllPaged(this.options.BaseDN, searchOptions, page);
+      }
+      return this.searchAllSync(this.options.BaseDN, searchOptions);
+    }
+  }
+  ```
+  file loginHandler.js
+  code
+  ```
+  import LDAP from './ldap';
+
+  Accounts.registerLoginHandler('ldap', function(loginRequest) {
+    if (!loginRequest.ldap || !loginRequest.ldapOptions) {
+      return undefined;
+    }
+
+    const ldap = new LDAP();
+    const users = ldap.searchUsersSync(loginRequest.username);
+    if (users.length !== 1) {
+      throw new Error('User not Found');
+    }
+    return { userId: users[0].uid };
+  });
+  ```
+  reject VYQL-INJ-005
+
+test "rank1946: the fixed revision's local escape copy interpolated instead of the raw username"
+  lang javascript
+  file package.json
+  code
+  ```
+  {
+    "name": "wekan",
+    "dependencies": {
+      "ldapjs": "^2.3.3"
+    }
+  }
+  ```
+  file ldap.js
+  code
+  ```
+  import ldapjs from 'ldapjs';
+
+  // copied from ldapjs's filter escaping
+  function escapedToHex (str) {
+    if (str !== undefined) {
+      return str.replace(/\\([0-9a-f][^0-9a-f]|[0-9a-f]$|[^0-9a-f]|$)/gi, function (match, p1) {
+        if (!p1) {
+          return '\\5c';
+        }
+        const hexCode = p1.charCodeAt(0).toString(16);
+        const rest = p1.substring(1);
+        return '\\' + hexCode + rest;
+      });
+    } else {
+      return undefined;
+    }
+  }
+
+  export default class LDAP {
+    constructor() {
+      this.ldapjs = ldapjs;
+      this.client = ldapjs.createClient({ url: 'ldap://localhost:389' });
+      this.options = { BaseDN: 'ou=users,dc=example,dc=com', User_Search_Field: 'uid' };
+    }
+
+    getUserFilter(username) {
+      const escapedUsername = escapedToHex(username);
+      const filter = [];
+      const usernameFilter = this.options.User_Search_Field.split(',').map((item) => `(${item}=${escapedUsername})`);
+      if (usernameFilter.length === 1) {
+        filter.push(`${usernameFilter[0]}`);
+      }
+      return `(&${filter.join('')})`;
+    }
+
+    searchAllPaged(BaseDN, options, page) {
+      this.client.search(BaseDN, options, (error, res) => {
+        res.on('searchEntry', (entry) => { page(null, [entry]); });
+      });
+    }
+
+    searchUsersSync(username, page) {
+      const searchOptions = {
+        filter: this.getUserFilter(username),
+        scope: 'sub',
+      };
+      if (page) {
+        return this.searchAllPaged(this.options.BaseDN, searchOptions, page);
+      }
+      return this.searchAllSync(this.options.BaseDN, searchOptions);
+    }
+  }
+  ```
+  file loginHandler.js
+  code
+  ```
+  import LDAP from './ldap';
+
+  Accounts.registerLoginHandler('ldap', function(loginRequest) {
+    if (!loginRequest.ldap || !loginRequest.ldapOptions) {
+      return undefined;
+    }
+
+    const ldap = new LDAP();
+    const users = ldap.searchUsersSync(loginRequest.username);
+    if (users.length !== 1) {
+      throw new Error('User not Found');
+    }
+    return { userId: users[0].uid };
+  });
+  ```
+  expect VYQL-INJ-005

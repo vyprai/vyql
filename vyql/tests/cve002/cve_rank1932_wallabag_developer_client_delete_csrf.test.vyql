@@ -1,0 +1,137 @@
+# Rank 1932 / CVE-2023-4455: wallabag's developer API-client removal
+# action is a state-changing GET route with no CSRF token validation,
+# so a crafted page could make a logged-in user's browser delete one of
+# their API clients (cross-site request forgery, CWE-352; GHSA-gjvc-
+# 55fw-v6vq). deleteClientAction in src/Wallabag/ApiBundle/Controller/
+# DeveloperController.php took the route's {id} fragment converted to a
+# Client entity, checked ownership, then called $entityManager->remove()
+# and ->flush() -- reading nothing from the request body and validating
+# no token. The fixing commit ffcc5c90 (a GHSA private-fork
+# merge, readable via `git diff 78b0b55 ffcc5c90`; "Replace GET way to
+# POST way to delete API client"): the route gains methods={"POST"}, the
+# action takes the Request, and `if (!$this->isCsrfTokenValid(
+# 'delete-client', $request->request->get('token'))) { throw ... }`
+# precedes the ownership check; the twig template moves the link into a
+# POST form carrying the csrf_token. .
+#
+# ATTENTION, csrf-decision completeness: the same family as ranks 1567
+# (phpBB form key), 1581 (pkp forms), 1592 (oauth state) and 1601
+# (client token). The general rule VYQL-RF-003 (taint
+# core.UserControlledData -> code.StateChangingOpSink unless endpoint
+# coveredBy core.CsrfProtection) is the right consumer and its check
+# half works: csrfProtection426 binds Symfony's documented
+# isCsrfTokenValid to core.CsrfProtection (verified by `vyql match` on
+# the patched file). What cannot be expressed: the action's only
+# user-controlled input is the {id} route fragment materialised as the
+# ParamConverter entity parameter `Client $client` -- no request read
+# exists in the body for taint to start from, and a parameter-entry
+# source (the httpInput1/2 idiom over analysis.parameter.entry +
+# functionParamType) cannot generically tell an entity argument resolved
+# from the route apart from the DI service arguments sitting in the same
+# signature (EntityManagerInterface, TranslatorInterface); the class
+# token missing from phpParamEntries (the 1060/1322 gap) additionally
+# blocks scoping a source to controller actions. Measured on the real
+# checkout (timeout 180, --max-ram 6GB, --cache off): 72 findings at the
+# parent and 72 at the fixed revision, none on DeveloperController.php. A probe
+# binding Doctrine's documented remove/persist/flush as
+# code.StateChangingOpSink lights VYQL-RF-003 on four other wallabag
+# actions at BOTH revisions (4 -> 4, no discrimination) -- two
+# bearer-token JSON API controllers, a methods={"DELETE"} route and the
+# mass action -- because they read the request body next to the state
+# change, and stays dark on this action, so the sink half alone is not
+# shippable. No ENGINE-GAPS.md entry beyond the 1060/1322 row: the
+# missing piece is csrf-decision vocabulary (a state-changing routed
+# action with no token validation and no method assertion), not a
+# mechanical engine change. No definition change shipped. Spec
+# cve_rank1932 records the unvalidated action and the token-validated
+# form, both asserting reject VYQL-RF-003: when csrf-decision vocabulary
+# lands, the unvalidated action must flip to expect.
+
+test "rank1932: the delete action removes the client with no token validation"
+  lang php
+  file src/Wallabag/ApiBundle/Controller/DeveloperController.php
+  reject VYQL-RF-003
+  code
+  ```
+  <?php
+
+  namespace Wallabag\ApiBundle\Controller;
+
+  use Doctrine\ORM\EntityManagerInterface;
+  use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+  use Symfony\Component\HttpFoundation\RedirectResponse;
+  use Symfony\Contracts\Translation\TranslatorInterface;
+  use Wallabag\ApiBundle\Entity\Client;
+
+  class DeveloperController extends AbstractController
+  {
+      /**
+       * @Route("/developer/client/delete/{id}", requirements={"id" = "\d+"}, name="developer_delete_client")
+       *
+       * @return RedirectResponse
+       */
+      public function deleteClientAction(Client $client, EntityManagerInterface $entityManager, TranslatorInterface $translator)
+      {
+          if (null === $this->getUser() || $client->getUser()->getId() !== $this->getUser()->getId()) {
+              throw $this->createAccessDeniedException('You can not access this client.');
+          }
+
+          $entityManager->remove($client);
+          $entityManager->flush();
+
+          $this->addFlash(
+              'notice',
+              $translator->trans('flashes.developer.notice.client_deleted', ['%name%' => $client->getName()])
+          );
+
+          return $this->redirect($this->generateUrl('developer'));
+      }
+  }
+  ```
+
+test "rank1932: the fixed revision validates the csrf token before removing"
+  lang php
+  file src/Wallabag/ApiBundle/Controller/DeveloperController.php
+  reject VYQL-RF-003
+  code
+  ```
+  <?php
+
+  namespace Wallabag\ApiBundle\Controller;
+
+  use Doctrine\ORM\EntityManagerInterface;
+  use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+  use Symfony\Component\HttpFoundation\RedirectResponse;
+  use Symfony\Component\HttpFoundation\Request;
+  use Symfony\Contracts\Translation\TranslatorInterface;
+  use Wallabag\ApiBundle\Entity\Client;
+
+  class DeveloperController extends AbstractController
+  {
+      /**
+       * @Route("/developer/client/delete/{id}", requirements={"id" = "\d+"}, name="developer_delete_client", methods={"POST"})
+       *
+       * @return RedirectResponse
+       */
+      public function deleteClientAction(Request $request, Client $client, EntityManagerInterface $entityManager, TranslatorInterface $translator)
+      {
+          if (!$this->isCsrfTokenValid('delete-client', $request->request->get('token'))) {
+              throw $this->createAccessDeniedException('Bad CSRF token.');
+          }
+
+          if (null === $this->getUser() || $client->getUser()->getId() !== $this->getUser()->getId()) {
+              throw $this->createAccessDeniedException('You can not access this client.');
+          }
+
+          $entityManager->remove($client);
+          $entityManager->flush();
+
+          $this->addFlash(
+              'notice',
+              $translator->trans('flashes.developer.notice.client_deleted', ['%name%' => $client->getName()])
+          );
+
+          return $this->redirect($this->generateUrl('developer'));
+      }
+  }
+  ```

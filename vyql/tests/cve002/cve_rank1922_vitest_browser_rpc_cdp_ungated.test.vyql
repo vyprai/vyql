@@ -1,0 +1,174 @@
+# Rank 1922 / CVE-2026-53633 (GHSA-g8mr-85jm-7xhm): Vitest's browser-mode
+# WebSocket RPC registers its handlers with birpc's `createBirpc`, whose
+# documented contract makes every property of the handler object a method the
+# connected peer calls by name. Two of those handlers, `sendCdpEvent` and
+# `trackCdpEvent` in packages/browser/src/node/rpc.ts, resolved a raw Chrome
+# DevTools Protocol session (`globalServer.ensureCDPHandler(sessionId, rpcId)`)
+# and forwarded the caller's chosen method name straight into it
+# (`cdp.send(event, payload)`). The `browser.api.allowWrite` and
+# `browser.api.allowExec` flags that gate the sibling snapshot handlers -- via
+# the `canWrite(project)` helper -- said nothing about the CDP proxy, so a
+# client with API access reached `Page.evaluate` / `Runtime.evaluate` and with
+# it arbitrary JavaScript in the test browser, which the advisory chains into
+# remote code execution on the host through a reloaded vite.config.ts
+# (CVSS 9.8, CWE-862). The fixing commit,
+# 385a1aefd4c2bfa5e7d58bf7c6834c929969f2c7, adds an `assertCdpAllowed(project)`
+# call at the top of both handlers, which throws unless all four
+# allowWrite/allowExec flags are set, and reroutes the coverage provider's own
+# CDP use to server-side commands that send fixed profiler methods only.
+#
+# What fires. A function that registers birpc handlers and reaches one of the
+# documented raw-CDP session acquisitions (`ensureCDPHandler`,
+# `newCDPSession`, `createCDPSession`, `newBrowserCDPSession`) hands the
+# connected peer a client-driven proxy over the whole debugging protocol, and
+# the only thing that makes that safe is a permission gate the surface checks.
+# VYQL-AUTH-079 (code.SensitiveOperation) reports the registering function
+# when its scope carries no permission vocabulary. Sibling handlers' own
+# gates do not suppress -- `canWrite(project)` answers whether the snapshot
+# handler may write, not whether the CDP proxy is permitted -- which is what
+# separates the vulnerable file from the patched one inside the same
+# registration.
+#
+# Measured over three `--cache off` runs per revision, timeout 180 /
+# --max-ram 6GB, on packages/ of both revisions: the parent reports exactly
+# one VYQL-AUTH-079 on packages/browser/src/node/rpc.ts:131 in all three
+# runs, and the fixed revision reports zero -- the row is the only delta between the
+# revisions. Renaming the patched revision's `assertCdpAllowed` to a spelling
+# outside the suppression list (`verifyUsable`) brings the finding back, and a
+# generic `checkPermission(project)` gate also suppresses, so the
+# discrimination is on recognizing a permission gate, not on a token unique
+# to the fixed revision. Collateral: the conjunction of a birpc registration and a raw
+# CDP acquisition exists in no other tree under /tmp/cve-work -- the only
+# other `createBirpc` outside this repository is a Vite test spec with no CDP
+# vocabulary -- so the trigger's reachable set is the one repository measured.
+
+test "rank1922: birpc surface hands the peer raw CDP with no permission gate"
+  lang javascript
+  file packages/browser/src/node/rpc.ts
+  expect VYQL-AUTH-079
+  expect_review code.SensitiveOperation
+  code
+  ```
+  import { createBirpc } from 'birpc'
+
+  export function setupClient(project, rpcId, ws) {
+    const rpc = createBirpc(
+      {
+        async saveSnapshotFile(id, content) {
+          checkFileAccess(id)
+          if (!canWrite(project)) {
+            return
+          }
+          await fs.writeFile(id, content, 'utf-8')
+        },
+        async sendCdpEvent(sessionId, event, payload) {
+          const cdp = await globalServer.ensureCDPHandler(sessionId, rpcId)
+          return cdp.send(event, payload)
+        },
+        async trackCdpEvent(sessionId, type, event, listenerId) {
+          const cdp = await globalServer.ensureCDPHandler(sessionId, rpcId)
+          cdp[type](event, listenerId)
+        },
+      },
+      {
+        post: msg => ws.send(msg),
+        on: fn => ws.on('message', fn),
+      },
+    )
+    return rpc
+  }
+  ```
+
+test "rank1922: the CDP handlers assert the permission gate first"
+  lang javascript
+  file packages/browser/src/node/rpc.ts
+  reject VYQL-AUTH-079
+  reject_review code.SensitiveOperation
+  code
+  ```
+  import { createBirpc } from 'birpc'
+
+  export function setupClient(project, rpcId, ws) {
+    const rpc = createBirpc(
+      {
+        async saveSnapshotFile(id, content) {
+          checkFileAccess(id)
+          if (!canWrite(project)) {
+            return
+          }
+          await fs.writeFile(id, content, 'utf-8')
+        },
+        async sendCdpEvent(sessionId, event, payload) {
+          assertCdpAllowed(project)
+          const cdp = await globalServer.ensureCDPHandler(sessionId, rpcId)
+          return cdp.send(event, payload)
+        },
+        async trackCdpEvent(sessionId, type, event, listenerId) {
+          assertCdpAllowed(project)
+          const cdp = await globalServer.ensureCDPHandler(sessionId, rpcId)
+          cdp[type](event, listenerId)
+        },
+      },
+      {
+        post: msg => ws.send(msg),
+        on: fn => ws.on('message', fn),
+      },
+    )
+    return rpc
+  }
+  ```
+
+test "rank1922: a permission gate spelled from the wider ecosystem also suppresses"
+  lang javascript
+  file packages/browser/src/node/rpc.ts
+  reject VYQL-AUTH-079
+  reject_review code.SensitiveOperation
+  code
+  ```
+  import { createBirpc } from 'birpc'
+
+  export function setupClient(project, rpcId, ws) {
+    const rpc = createBirpc(
+      {
+        async sendCdpEvent(sessionId, event, payload) {
+          if (!checkPermission(project, 'cdp')) {
+            throw new Error('CDP is not allowed for this project')
+          }
+          const cdp = await globalServer.ensureCDPHandler(sessionId, rpcId)
+          return cdp.send(event, payload)
+        },
+      },
+      {
+        post: msg => ws.send(msg),
+      },
+    )
+    return rpc
+  }
+  ```
+
+test "rank1922: a birpc registration with no privileged protocol access reports nothing"
+  lang javascript
+  file packages/vitest/src/node/pools/threads.ts
+  reject VYQL-AUTH-079
+  reject_review code.SensitiveOperation
+  code
+  ```
+  import { createBirpc } from 'birpc'
+
+  export function setupMethodsRPC(project) {
+    const rpc = createBirpc(
+      {
+        async saveSnapshotFile(id, content) {
+          if (!canWrite(project)) {
+            return
+          }
+          await fs.writeFile(id, content, 'utf-8')
+        },
+      },
+      {
+        post: msg => process.send(msg),
+      },
+    )
+    return rpc
+  }
+  ```

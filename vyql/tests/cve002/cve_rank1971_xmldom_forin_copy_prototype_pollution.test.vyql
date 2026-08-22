@@ -1,0 +1,120 @@
+# An XML DOM parser's namespace bookkeeping copies plain objects with
+# `for (var n in source) { target[n] = source[n] }` (lib/sax.js `_copy`
+# seeded from `parse`'s `defaultNSMapCopy`, lib/dom.js `copy` and
+# `cloneNode` at the parent of the change). A for-in walk visits inherited
+# properties as well as own ones, and a computed write of a walked key
+# onto a plain object is exactly the assignment that reaches the
+# prototype machinery for a `__proto__` key, so whatever the parsed
+# document put on those maps propagates through the copy unchecked
+# (CWE-1321; the maps are built from namespace declarations, entity
+# declarations and attribute names of the parsed markup).
+#
+# The fixed revision wraps every walked write in the platform's own-property
+# predicate -- `Object.prototype.hasOwnProperty.call(source, n)` -- at
+# all three sites. The sink side reports: the computed writes
+# lower to `__js_dynamic_property_write` and a `parseFromString` result
+# reaching one reports VYQL-INJ-013. What is missing is the control:
+# no binding labelled the own-property predicate as
+# core.PrototypePollutionGuard, so the same finding reported the
+# patched loop, and lib/conventions.js `assign` -- which
+# carried the guard at the parent of the change -- reported too.
+#
+# These specs pin the vulnerable for-in copy (expect), the fixed revision's
+# guarded form, and the other documented spellings of the same
+# predicate -- the receiver form `source.hasOwnProperty(n)` the same
+# library uses in its ordered-set builder, and the ES2022
+# `Object.hasOwn(source, n)` -- all of which must not report.
+
+test "for-in copy of a parsed document's namespace map reports"
+  lang javascript
+  file lib/sax.js
+  expect VYQL-INJ-013
+  code
+  ```
+  function _copy (source, target) {
+  	for (var n in source) {
+  		target[n] = source[n]
+  	}
+  }
+
+  function parse (source, defaultNSMapCopy) {
+  	var currentNSMap = {}
+  	_copy(defaultNSMapCopy, currentNSMap)
+  	return currentNSMap
+  }
+
+  var doc = parser.parseFromString(source)
+  parse(source, doc._nsMap)
+  ```
+
+test "the own-property filter around the walked write is the discriminator"
+  lang javascript
+  file lib/sax.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function _copy (source, target) {
+  	for (var n in source) {
+  		if (Object.prototype.hasOwnProperty.call(source, n)) {
+  			target[n] = source[n]
+  		}
+  	}
+  }
+
+  function parse (source, defaultNSMapCopy) {
+  	var currentNSMap = {}
+  	_copy(defaultNSMapCopy, currentNSMap)
+  	return currentNSMap
+  }
+
+  var doc = parser.parseFromString(source)
+  parse(source, doc._nsMap)
+  ```
+
+test "the receiver spelling of the own-property check also guards"
+  lang javascript
+  file lib/sax.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function _copy (source, target) {
+  	for (var n in source) {
+  		if (source.hasOwnProperty(n)) {
+  			target[n] = source[n]
+  		}
+  	}
+  }
+
+  function parse (source, defaultNSMapCopy) {
+  	var currentNSMap = {}
+  	_copy(defaultNSMapCopy, currentNSMap)
+  	return currentNSMap
+  }
+
+  var doc = parser.parseFromString(source)
+  parse(source, doc._nsMap)
+  ```
+
+test "the ES2022 own-property check also guards"
+  lang javascript
+  file lib/sax.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function _copy (source, target) {
+  	for (var n in source) {
+  		if (Object.hasOwn(source, n)) {
+  			target[n] = source[n]
+  		}
+  	}
+  }
+
+  function parse (source, defaultNSMapCopy) {
+  	var currentNSMap = {}
+  	_copy(defaultNSMapCopy, currentNSMap)
+  	return currentNSMap
+  }
+
+  var doc = parser.parseFromString(source)
+  parse(source, doc._nsMap)
+  ```

@@ -1,0 +1,280 @@
+# Rank 1911 / CVE-2024-55225: vaultwarden's `/identity/connect/token` accepts
+# a passwordless login through an auth request. The auth request artifact is
+# created at the requester's initiative for an account the requester names --
+# `post_auth_request` stores the requester's IP and a randomly generated
+# access code the requester learns -- so the artifact's shared secret
+# authenticates the requester to the artifact, never the account holder to
+# the server. What turns the artifact into a credential is the account
+# holder's approval, recorded by `put_auth_request` in the model's `approved`
+# and `user_uuid` fields. The vulnerable `_password_login`
+# (src/api/identity.rs:142 at the parent of the change) resolves the artifact
+# with `AuthRequest::find_by_uuid` on a request-supplied identifier, verifies
+# only `check_access_code(password)`, and then issues tokens for the user the
+# *username* names: whoever can create an auth request for a victim's email
+# can log in as the victim, administrators included (CWE-287; the advisory
+# is GHSA-x7m9-mv49-fv73, "Vaultwarden vulnerable to user impersonation").
+#
+# The fixed revision (37c14c3c) keeps the same artifact branch but consults the state
+# the login skips: `auth_request.user_uuid != user.uuid`,
+# `!auth_request.approved.unwrap_or(false)` and a request-IP comparison join
+# the guard, the spent request is deleted, and the disabled-user check moves
+# ahead of the credential branch. The ownership and approval reads are the
+# discrimination; the deletion and reordering are not.
+#
+# Vocabulary: no existing concept covers a pending out-of-band login
+# artifact consumed at the credential check without its approval or owner
+# state. Considered and rejected: GatedSecretVerificationBypass (the
+# verification runs here; a second check is what is missing),
+# OAuthReauthenticationUserMismatch (session freshness after provider
+# resolution, not artifact approval), PasswordResetTokenReplay (a
+# self-describing token with no stored record; here a stored record exists
+# and is consulted), FidoRegistrationChallengeReplay and
+# EmptyVerifierAcceptance (replay and empty-value equality, not a missing
+# approval read), UnverifiedCredential (a source concept for unverified
+# claims, not an issue over a verified-but-unapproved artifact). This rank
+# mints code.UnapprovedLoginArtifactAuthentication (VYQL-AUTH-166) for the
+# class and binds the vaultwarden/Bitwarden AuthRequest instance of it.
+#
+# The binding recognises the model's own atoms -- the resolver, the access
+# code check, and the primary password check the artifact branch replaces --
+# and is cleared by a selector read of the artifact's approval or owner
+# fields in the same function. The field names are the model's, written by
+# the approval endpoint since at the vulnerable revision, not the fixing commit'ntroduced.
+# Both non-login consumers of the artifact stay unreported: the device
+# polling endpoint carries no primary credential check, and the approval
+# endpoint writes the state the login must read. Measured on the real
+# checkout, three `--cache off` runs per side: the parent reports
+# VYQL-AUTH-166 once, at src/api/identity.rs:142, and the fixed revision reports it
+# zero times, with 84 findings at-or-above high on the parent against 83 on
+# the fixed revision. `check_access_code` occurs in no other corpus clone. The
+# reachable set of the shape is this one function.
+
+test "rank1911: the auth-request branch of the password login verifies only the access code"
+  lang rust
+  file src/api/identity.rs
+  expect VYQL-AUTH-166
+  expect_review code.UnapprovedLoginArtifactAuthentication
+  code
+  ```
+  async fn _password_login(
+      data: ConnectData,
+      user_uuid: &mut Option<String>,
+      conn: &mut DbConn,
+      ip: &ClientIp,
+  ) -> JsonResult {
+      let scope = data.scope.as_ref().unwrap();
+      if scope != "api offline_access" {
+          err!("Scope not supported")
+      }
+
+      let username = data.username.as_ref().unwrap().trim();
+      let mut user = match User::find_by_mail(username, conn).await {
+          Some(user) => user,
+          None => err!("Username or password is incorrect. Try again"),
+      };
+      *user_uuid = Some(user.uuid.clone());
+
+      // Check password
+      let password = data.password.as_ref().unwrap();
+      if let Some(auth_request_uuid) = data.auth_request.clone() {
+          if let Some(auth_request) = AuthRequest::find_by_uuid(auth_request_uuid.as_str(), conn).await {
+              if !auth_request.check_access_code(password) {
+                  err!("Username or access code is incorrect. Try again")
+              }
+          } else {
+              err!("Auth request not found. Try again.")
+          }
+      } else if !user.check_valid_password(password) {
+          err!("Username or password is incorrect. Try again")
+      }
+
+      if !user.enabled {
+          err!("This user has been disabled")
+      }
+
+      let (access_token, expires_in) = device.refresh_tokens(&user, scope_vec);
+      Ok(Json(json!({ "access_token": access_token, "expires_in": expires_in })))
+  }
+  ```
+
+test "rank1911: the same login reading the artifact's approval and owner state"
+  lang rust
+  file src/api/identity.rs
+  reject VYQL-AUTH-166
+  reject_review code.UnapprovedLoginArtifactAuthentication
+  code
+  ```
+  async fn _password_login(
+      data: ConnectData,
+      user_uuid: &mut Option<String>,
+      conn: &mut DbConn,
+      ip: &ClientIp,
+  ) -> JsonResult {
+      if !user.enabled {
+          err!("This user has been disabled")
+      }
+
+      let password = data.password.as_ref().unwrap();
+      if let Some(ref auth_request_uuid) = data.auth_request {
+          let Some(auth_request) = AuthRequest::find_by_uuid(auth_request_uuid.as_str(), conn).await else {
+              err!("Auth request not found. Try again.")
+          };
+
+          auth_request.delete(conn).await?;
+
+          if auth_request.user_uuid != user.uuid
+              || !auth_request.approved.unwrap_or(false)
+              || ip.ip.to_string() != auth_request.request_ip
+              || !auth_request.check_access_code(password)
+          {
+              err!("Username or access code is incorrect. Try again")
+          }
+      } else if !user.check_valid_password(password) {
+          err!("Username or password is incorrect. Try again")
+      }
+
+      let (access_token, expires_in) = device.refresh_tokens(&user, scope_vec);
+      Ok(Json(json!({ "access_token": access_token, "expires_in": expires_in })))
+  }
+  ```
+
+test "rank1911: an owner-binding comparison alone is the same control"
+  lang rust
+  file src/api/identity.rs
+  reject VYQL-AUTH-166
+  reject_review code.UnapprovedLoginArtifactAuthentication
+  code
+  ```
+  async fn _password_login(
+      data: ConnectData,
+      user_uuid: &mut Option<String>,
+      conn: &mut DbConn,
+      ip: &ClientIp,
+  ) -> JsonResult {
+      let password = data.password.as_ref().unwrap();
+      if let Some(auth_request_uuid) = data.auth_request.clone() {
+          if let Some(auth_request) = AuthRequest::find_by_uuid(auth_request_uuid.as_str(), conn).await {
+              if auth_request.user_uuid != user.uuid || !auth_request.check_access_code(password) {
+                  err!("Username or access code is incorrect. Try again")
+              }
+          }
+      } else if !user.check_valid_password(password) {
+          err!("Username or password is incorrect. Try again")
+      }
+
+      let (access_token, expires_in) = device.refresh_tokens(&user, scope_vec);
+      Ok(Json(json!({ "access_token": access_token, "expires_in": expires_in })))
+  }
+  ```
+
+test "rank1911: the device polling endpoint answers the requester, it does not log in"
+  lang rust
+  file src/api/core/accounts.rs
+  reject VYQL-AUTH-166
+  reject_review code.UnapprovedLoginArtifactAuthentication
+  code
+  ```
+  #[get("/auth-requests/<uuid>/response?<code>")]
+  async fn get_auth_request_response(
+      uuid: &str,
+      code: &str,
+      client_headers: ClientHeaders,
+      mut conn: DbConn,
+  ) -> JsonResult {
+      let auth_request = match AuthRequest::find_by_uuid(uuid, &mut conn).await {
+          Some(auth_request) => auth_request,
+          None => err!("AuthRequest doesn't exist", "User not found"),
+      };
+
+      if auth_request.device_type != client_headers.device_type
+          || auth_request.request_ip != client_headers.ip.ip.to_string()
+          || !auth_request.check_access_code(code)
+      {
+          err!("AuthRequest doesn't exist", "Invalid device, IP or code")
+      }
+
+      let response_date_utc = auth_request.response_date.map(|response_date| format_date(&response_date));
+
+      Ok(Json(json!({ "id": uuid, "key": auth_request.enc_key, "requestApproved": auth_request.approved })))
+  }
+  ```
+
+test "rank1911: a comment claiming the approval check does not clear the login"
+  lang rust
+  file src/api/identity.rs
+  expect VYQL-AUTH-166
+  expect_review code.UnapprovedLoginArtifactAuthentication
+  code
+  ```
+  async fn _password_login(
+      data: ConnectData,
+      user_uuid: &mut Option<String>,
+      conn: &mut DbConn,
+      ip: &ClientIp,
+  ) -> JsonResult {
+      let password = data.password.as_ref().unwrap();
+      // The auth request is checked against the approved access code before
+      // the user_uuid of the requesting device, so this branch is safe.
+      if let Some(auth_request_uuid) = data.auth_request.clone() {
+          if let Some(auth_request) = AuthRequest::find_by_uuid(auth_request_uuid.as_str(), conn).await {
+              if !auth_request.check_access_code(password) {
+                  err!("Username or access code is incorrect. Try again")
+              }
+          }
+      } else if !user.check_valid_password(password) {
+          err!("Username or password is incorrect. Try again")
+      }
+
+      let (access_token, expires_in) = device.refresh_tokens(&user, scope_vec);
+      Ok(Json(json!({ "access_token": access_token, "expires_in": expires_in })))
+  }
+  ```
+
+test "rank1911: the approval endpoint's state write does not clear the login in another function"
+  lang rust
+  file src/api/core/accounts.rs
+  expect VYQL-AUTH-166
+  expect_review code.UnapprovedLoginArtifactAuthentication
+  code
+  ```
+  async fn put_auth_request(
+      uuid: &str,
+      data: Json<AuthResponseRequest>,
+      headers: Headers,
+      mut conn: DbConn,
+  ) -> JsonResult {
+      let mut auth_request = match AuthRequest::find_by_uuid(uuid, &mut conn).await {
+          Some(auth_request) => auth_request,
+          None => err!("AuthRequest doesn't exist", "Record not found"),
+      };
+
+      if headers.user.uuid != auth_request.user_uuid {
+          err!("AuthRequest doesn't exist", "User uuid's do not match")
+      }
+
+      auth_request.approved = Some(data.request_approved);
+      auth_request.save(&mut conn).await?;
+      Ok(Json(json!({ "id": uuid })))
+  }
+
+  async fn _password_login(
+      data: ConnectData,
+      user_uuid: &mut Option<String>,
+      conn: &mut DbConn,
+      ip: &ClientIp,
+  ) -> JsonResult {
+      let password = data.password.as_ref().unwrap();
+      if let Some(auth_request_uuid) = data.auth_request.clone() {
+          if let Some(auth_request) = AuthRequest::find_by_uuid(auth_request_uuid.as_str(), conn).await {
+              if !auth_request.check_access_code(password) {
+                  err!("Username or access code is incorrect. Try again")
+              }
+          }
+      } else if !user.check_valid_password(password) {
+          err!("Username or password is incorrect. Try again")
+      }
+
+      let (access_token, expires_in) = device.refresh_tokens(&user, scope_vec);
+      Ok(Json(json!({ "access_token": access_token, "expires_in": expires_in })))
+  }
+  ```

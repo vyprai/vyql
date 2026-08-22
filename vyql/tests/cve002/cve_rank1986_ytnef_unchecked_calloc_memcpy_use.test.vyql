@@ -1,0 +1,208 @@
+# Rank 1986 / CVE-2017-6298: ytnef stores the result of calloc() into a
+# struct field and immediately writes through it. lib/ytnef.c at the fixed revision's
+# parent holds 28 allocation sites -- TNEFCodePage, TNEFBody,
+# TNEFOriginalMsgClass, TNEFFromHandler, TNEFSubjectHandler, TNEFRendData,
+# TNEFIcon, TNEFFillMapi (p->properties, mp->propnames, mp->data, vl->data,
+# TNEF->subject.data), TNEFAttachmentFilename, TNEFAttachmentSave,
+# TNEFParse's local data, DecompressRTF's comp_Prebuf.data and dst -- and
+# none checks the returned pointer before the memcpy that fills it, so a
+# TNEF attachment whose declared size makes the allocation fail writes
+# through NULL (CWE-476; X41 D-Sec advisory x41-2017-002, finding "1 of 9.
+# Null Pointer Deref / calloc return value not checked"). The fixed revision
+# b36d6b25b7a546fc28d6c3812124e487987a4910 is the merge of PR #27, so `git
+# show` prints an empty combined diff; `git diff 86df793 <sha>` reads the
+# patch in full, which inserts an ALLOCCHECK/ALLOCCHECK_CHAR macro call
+# (expanding to `if(!x) { ... return(-1); }`) after essentially every
+# calloc. The merge's parent is the fully vulnerable tree, so the pool row
+# works as the scan target as recorded; no correction.
+#
+# ATTENTION, engine gap, three stacked constructs, each isolated below.
+# The whole stack for this weakness exists and works:
+# code.UncheckedNullableResultDeref (VYQL-MEM-018, CWE-476) fires from
+# analysis.nullable_result.unchecked_deref, computed by
+# ccUncheckedNullableResultDerefObservations
+# (internal/extract/frontend/treesitter/c.go:2982) and labelled by binding
+# uncheckedNullableResultDeref131 (vyql/bindings/c/mce54b166.vyql:781). On
+# the real tree nothing fires: `vyql match` over lib/ reports zero
+# nullable_result observations (cache cleared first), and the bounded scan
+# reports 146 findings at the parent and 146 at the fixed revision, stable over three
+# `--cache off` runs, whose only differences are line-number displacements
+# inside lib/ytnef.c itself. Every lib/ytnef.c row is a RawMemoryCopySize
+# mark sitting on the very calloc'd memcpy lines that are the bug, plus
+# FieldDerivedIndexAccess, MissingPostCopyBoundsCheck and two PointerFree
+# pairs -- findings in the function are not coverage. The 48 VYQL-MEM-006
+# rows on the tree are `__deref` presence marks in ytnef/*.c on pointer
+# deref primitives (*key, *tmp_dst++), none at an allocation site.
+#
+#  1. The use spelling. The observation requires the stored member to be
+#     used through a literal `target->` member access. Here the use is a
+#     copy: `TNEF->body.data = calloc(size, 1); memcpy(TNEF->body.data,
+#     data, size);` and `vl->data = calloc(vl->size, 1); memcpy(vl->data,
+#     d, vl->size);`. No member target in the file has a `->` use, so the
+#     regex matches assignments but never emits. Tests 1 and 3 are the
+#     isolating pair: identical member target, identical callee, no guard,
+#     only the use spelling differs, and only the `->` form reports.
+#  2. The remediation is invisible anyway. The fixed revision spells the guard inside
+#     a file-local function-like macro (#define ALLOCCHECK(x) { if(!x)
+#     ... }), and macro bodies are never expanded at call sites -- the
+#     standing #define gap. Measured: the same `->` control with
+#     ALLOCCHECK(target) between store and use still fires VYQL-MEM-018,
+#     because the negation looks for `if(!target)` in the body text and
+#     the call site only ever contains the macro name. So widening the use
+#     spelling alone would report the patched tree identically -- no
+#     revision pair discriminates.
+#  3. The guard negation keys on a truncated target. The assignment regex
+#     `[ident (->|.) ident]=f(` matches the LAST two segments of a longer
+#     path, so TNEF->body.data is matched as target `body.data` and a
+#     guard spelled on the full path (`if (!TNEF->body.data)`) never
+#     matches `if(!body.data)`. Measured: an inlined, correctly-placed
+#     guard on the qualified three-segment target still fires. Tests 4
+#     and 5 are that pair: the two-segment guard suppresses, the
+#     three-segment guard does not.
+#  4. The local-target sites (TNEFParse's `data = calloc(size, 1)` fed
+#     straight to TNEFRawRead, DecompressRTF's dst, to_utf8's utf8) are
+#     the plain-identifier-target gap on file for rank 1015.
+#
+# Why not ship the widening: across the 18,260 C/C++ files under the
+# campaign's target clones there are 1,047 member-target allocation sites,
+# 74 whose target is used again within 600 characters, of which 64 in six
+# trees carry no recognisable guard -- that volume is not disqualifying on
+# its own, but the widening reports vulnerable and patched alike (point
+# 2), which is the trap this loop exists to avoid, and it would need the
+# macro-expansion and target-matching corrections to discriminate at all.
+# New use shapes plus macro expansion plus path-qualified guard matching
+# in one extractor function: not a confined mechanical fix.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1986: calloc result stored to a member and written through memcpy is missed"
+  lang c
+  file lib/ytnef.c
+  reject VYQL-MEM-018
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct { unsigned char *data; unsigned int size; } variableLength;
+  typedef struct { variableLength body; } TNEFStruct;
+
+  /* TNEFBody at lib/ytnef.c:264, parent of the fix: the member target is
+     filled by calloc and used as a copy destination with no check. */
+  int TNEFBody(TNEFStruct *TNEF, int id, char *data, int size) {
+    TNEF->body.size = size;
+    TNEF->body.data = calloc(size, sizeof(unsigned char));
+    memcpy(TNEF->body.data, data, size);
+    return 0;
+  }
+
+  /* the PT_STRING8 arm of TNEFFillMapi at lib/ytnef.c:482, the
+     two-segment spelling of the same miss */
+  int fill_string8(variableLength *vl, unsigned char *d) {
+    vl->data = calloc(vl->size, sizeof(unsigned char));
+    memcpy(vl->data, d, vl->size);
+    return 0;
+  }
+  ```
+
+test "rank1986: the fixed revision's ALLOCCHECK macro between store and copy stays silent"
+  lang c
+  file lib/ytnef.c
+  reject VYQL-MEM-018
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  #include <stdlib.h>
+  #include <string.h>
+  #include <stdio.h>
+
+  typedef struct { unsigned char *data; unsigned int size; } variableLength;
+  typedef struct { variableLength body; } TNEFStruct;
+
+  #define ALLOCCHECK(x) { if(!x) { printf("Out of Memory at %s : %i\n", __FILE__, __LINE__); return(-1); } }
+
+  /* TNEFBody as the patch leaves it: the guard exists but lives inside a
+     file-local macro the frontend never expands, so even a use-spelling
+     widening would keep reporting this form. This reject passes vacuously
+     today because nothing fires at all; it pins the pair the widening
+     alone cannot satisfy. */
+  int TNEFBody(TNEFStruct *TNEF, int id, char *data, int size) {
+    TNEF->body.size = size;
+    TNEF->body.data = calloc(size, sizeof(unsigned char));
+    ALLOCCHECK(TNEF->body.data);
+    memcpy(TNEF->body.data, data, size);
+    return 0;
+  }
+  ```
+
+test "rank1986: the identical store used through a member access is reported"
+  lang c
+  file lib/ytnef.c
+  expect VYQL-MEM-018
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef struct { unsigned int size; } payload;
+  typedef struct { payload *data; unsigned int size; } variableLength;
+  typedef struct { variableLength body; } TNEFStruct;
+
+  /* differs from the first test only in the use spelling: memcpy(target,
+     ...) versus target->member. This is the one shape the observation
+     recognises, which is why the miss is confined to the use. */
+  int TNEFBodyArrow(TNEFStruct *TNEF, int id, char *data, int size) {
+    TNEF->body.size = size;
+    TNEF->body.data = calloc(size, sizeof(payload));
+    TNEF->body.data->size = size;
+    return 0;
+  }
+  ```
+
+test "rank1986: an inlined guard on the two-segment target suppresses"
+  lang c
+  file lib/ytnef.c
+  reject VYQL-MEM-018
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef struct { unsigned int size; } payload;
+  typedef struct { payload *data; unsigned int size; } variableLength;
+
+  /* the negation's own spelling, on the same target the assignment regex
+     matches, correctly silences the finding */
+  int fill_guarded(variableLength *vl) {
+    vl->data = calloc(vl->size, sizeof(payload));
+    if (!vl->data) return -1;
+    vl->data->size = vl->size;
+    return 0;
+  }
+  ```
+
+test "rank1986: the same inlined guard on the qualified target does not suppress"
+  lang c
+  file lib/ytnef.c
+  expect VYQL-MEM-018
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef struct { unsigned int size; } payload;
+  typedef struct { payload *data; unsigned int size; } variableLength;
+  typedef struct { variableLength body; } TNEFStruct;
+
+  /* the assignment regex matches TNEF->body.data as target `body.data`,
+     so the guard `if (!TNEF->body.data)` never matches the `if(!body.data)`
+     the negation looks for. The guard is present, correct and dominating,
+     and the finding still fires -- pinned so the extractor fix has its
+     second minimal pair. */
+  int TNEFBodyGuarded(TNEFStruct *TNEF, int id, char *data, int size) {
+    TNEF->body.size = size;
+    TNEF->body.data = calloc(size, sizeof(payload));
+    if (!TNEF->body.data) return -1;
+    TNEF->body.data->size = size;
+    return 0;
+  }
+  ```

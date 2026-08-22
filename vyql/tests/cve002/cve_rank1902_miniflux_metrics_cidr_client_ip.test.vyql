@@ -1,0 +1,175 @@
+# Rank 1902 / CVE-2023-27591: Miniflux gated the optional /metrics endpoint
+# on a CIDR allowlist whose tested address came from the client-IP helper
+# rather than the transport peer (CWE-287 / CWE-348):
+#
+#   func isAllowedToAccessMetricsEndpoint(r *http.Request) bool {
+#       clientIP := request.ClientIP(r)
+#       ...
+#       for _, cidr := range config.Opts.MetricsAllowedNetworks() {
+#           _, network, err := net.ParseCIDR(cidr)
+#           ...
+#           if network.Contains(net.ParseIP(clientIP)) {
+#               return true
+#           }
+#       }
+#       return false
+#   }
+#
+# `request.ClientIP` reads a value the middleware stored from
+# `request.FindClientIP`, which returns the first entry of `X-Forwarded-For`
+# (or `X-Real-IP`) before ever consulting `r.RemoteAddr` -- and a proxy
+# *appends* to X-Forwarded-For, so the leading entry is whatever the client
+# sent. Any request carrying `X-Forwarded-For: 127.0.0.1` reads back as
+# inside the allowed network and reaches the metrics endpoint, no credential
+# involved. Fix commit b46b5dfb2aa3a1f5320a7a3420b9186bb8fc655f routes the
+# membership test through the new `request.FindRemoteIP(r)` (RemoteAddr
+# only, with the recommendation to use the metrics HTTP basic auth instead)
+# and demotes the header-preferring helper to log lines. `FindClientIP`
+# itself prefers the headers -- so the
+# detection must sit at the decision, not at the parse.
+#
+# FIXED. bindings/go/forwarded_header_client_ip_allowlist.vyql binds
+# forwardedHeaderClientIpAllowlist: a function-scoped presence match on a
+# `net.ParseCIDR` call plus a `net.ParseIP` argument that flows from a call
+# whose method is one of the client-IP spellings (ClientIP / GetClientIP /
+# FindClientIP / RealIP and their capitalisations -- the helper names gin,
+# echo and the X-Forwarded-For documentation themselves use for the
+# header-preferring lookup). It reuses code.ProxyClientIpSpoofingBypass
+# (VYQL-AUTH-012), shipped for the CasaOS gateway hop, the Hono ALB
+# conn-info read and the Python leftmost-split recipe -- the same weakness
+# read at the allowlist that consumes the helper instead of at the header
+# parse. No new concept, no new rule. The flow tie is the discriminator: at
+# the parent the `net.ParseIP` node's argument carries the helper's method
+# token; at the fixed revision the argument is the peer-address call inline and the
+# token changes, so the negation never names the fixed revision's helper. A
+# proxy-aware helper is indistinguishable at the call site, which is why
+# the issue is a medium-confidence review flag.
+#
+# Measured over three `--cache off` runs per revision of the full tree:
+# 176 findings (37 at or above high) with exactly 1 VYQL-AUTH-012 at
+# b46b5dfb^ on service/httpd/httpd.go:224
+# (isAllowedToAccessMetricsEndpoint) and 175 findings (36 high) with 0 at
+# b46b5dfb; no other rule count moved. Reachable-set enumeration over
+# the 87 corpus clones: exactly two Go files call net.ParseCIDR (this one
+# and traefik's pkg/ip/checker.go, which parses static masks and carries no
+# client-IP call), and no other file combines net.ParseIP with any
+# client-IP spelling, so there is no collateral to measure beyond traefik's
+# clean zero.
+
+test "rank1902: the metrics CIDR allowlist tests the client-IP helper's result"
+  lang go
+  file service/httpd/httpd.go
+  expect VYQL-AUTH-012
+  expect_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  package httpd
+
+  func isAllowedToAccessMetricsEndpoint(r *http.Request) bool {
+      clientIP := request.ClientIP(r)
+
+      for _, cidr := range config.Opts.MetricsAllowedNetworks() {
+          _, network, err := net.ParseCIDR(cidr)
+          if err != nil {
+              logger.Fatal(`[Metrics] Unable to parse CIDR %v`, err)
+          }
+
+          if network.Contains(net.ParseIP(clientIP)) {
+              return true
+          }
+      }
+
+      return false
+  }
+  ```
+
+test "rank1902: a GetClientIP spelling keys the same allowlist decision"
+  lang go
+  file service/httpd/httpd.go
+  expect VYQL-AUTH-012
+  expect_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  package httpd
+
+  func isAllowedToAccessMetricsEndpoint(r *http.Request) bool {
+      clientIP := GetClientIP(r)
+
+      for _, cidr := range config.Opts.MetricsAllowedNetworks() {
+          _, network, err := net.ParseCIDR(cidr)
+          if err != nil {
+              logger.Fatal(`[Metrics] Unable to parse CIDR %v`, err)
+          }
+
+          if network.Contains(net.ParseIP(clientIP)) {
+              return true
+          }
+      }
+
+      return false
+  }
+  ```
+
+test "rank1902: the membership test reads the transport peer instead"
+  lang go
+  file service/httpd/httpd.go
+  reject VYQL-AUTH-012
+  reject_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  package httpd
+
+  func isAllowedToAccessMetricsEndpoint(r *http.Request) bool {
+      if config.Opts.MetricsUsername() != "" && config.Opts.MetricsPassword() != "" {
+          clientIP := request.ClientIP(r)
+          username, password, authOK := r.BasicAuth()
+          if !authOK {
+              logger.Info("[Metrics] [ClientIP=%s] No authentication header sent", clientIP)
+              return false
+          }
+          if username != config.Opts.MetricsUsername() || password != config.Opts.MetricsPassword() {
+              logger.Error("[Metrics] [ClientIP=%s] Invalid username or password", clientIP)
+              return false
+          }
+      }
+
+      for _, cidr := range config.Opts.MetricsAllowedNetworks() {
+          _, network, err := net.ParseCIDR(cidr)
+          if err != nil {
+              logger.Fatal(`[Metrics] Unable to parse CIDR %v`, err)
+          }
+
+          // HTTP headers like X-Forwarded-For can be easily spoofed.
+          if network.Contains(net.ParseIP(request.FindRemoteIP(r))) {
+              return true
+          }
+      }
+
+      return false
+  }
+  ```
+
+test "rank1902: an allowlist keyed on the transport peer address directly"
+  lang go
+  file service/httpd/httpd.go
+  reject VYQL-AUTH-012
+  reject_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  package httpd
+
+  func isAllowedToAccessMetricsEndpoint(r *http.Request) bool {
+      for _, cidr := range config.Opts.MetricsAllowedNetworks() {
+          _, network, err := net.ParseCIDR(cidr)
+          if err != nil {
+              logger.Fatal(`[Metrics] Unable to parse CIDR %v`, err)
+          }
+
+          if network.Contains(net.ParseIP(r.RemoteAddr)) {
+              return true
+          }
+      }
+
+      return false
+  }
+  ```

@@ -1,0 +1,263 @@
+# Vitess's backup restore reads the MANIFEST file back out of the backup
+# storage (go/vt/mysqlctl/backupengine.go:273, backupstorage.BackupHandle
+# "starts reading a file from a backup" over the GCS/S3/directory store the
+# operator pointed the deployment at), JSON-decodes it, and -- when the
+# compression engine is "external" -- runs the manifest's
+# ExternalDecompressor string as a child process:
+#
+#   externalDecompressorCmd := ExternalDecompressorCmd
+#   if externalDecompressorCmd == "" && bm.ExternalDecompressor != "" {
+#       externalDecompressorCmd = bm.ExternalDecompressor
+#   }
+#   ...
+#   decompressor, err = newExternalDecompressor(ctx, deCompressionEngine, reader, params.Logger)
+#
+# (builtinbackupengine.go:1332 and the same shape in xtrabackupengine.go:652,
+# reaching exec.CommandContext through compression.go's prepareExternalCmd).
+# Anyone with write access to the backup storage can therefore put any
+# command in the MANIFEST and have it run on the tablet as the Vitess user
+# at restore time (CWE-78). CVE-2026-27965's fix, 4c017329, makes the
+# manifest value opt-in: resolveExternalDecompressor only consults
+# bm.ExternalDecompressor when the operator passes
+# --external-decompressor-use-manifest, whose own help text calls enabling
+# it "a security risk" and "NOT RECOMMENDED".
+#
+# The path is invisible for two data reasons, both fixed here:
+#
+#   1. No Go binding labelled the storage read. vitess's BackupHandle
+#      documents the read as fetching a file from the backup store, which is
+#      data some other writer put there -- the same second-order treatment
+#      redis reads (bindings/python/redis_client_reads.vyql), object stores
+#      and PHP session reads get as code.StoredDataRead. The new
+#      bindings/go/backupstorage_reads.vyql widens that existing concept's
+#      language coverage to Go rather than minting a sibling.
+#   2. The shipped commandExecution74 binding labelled exec.CommandContext
+#      at args[0], which is the context.Context -- a position no attacker
+#      data ever reaches -- while the command name sits at args[1] (the
+#      sibling commandExecution77 knows the ctx shifts indices: it
+#      labels the "-c" payload at args[3]). The corrected position also
+#      removes the nonsense findings the dead label manufactured: on vault's
+#      vendored gopsutil, two CRITICAL VYQL-INJ-002 rows whose taint path
+#      reads `CommandWithContext#param#ctx -> Arg#1508` (the ctx
+#      parameter is not a command), replaced by one correct row following
+#      the name parameter. Measured, 2 stable `--cache off` runs per side:
+#      gopsutil INJ-002 2 -> 1, vagrant/internal and velociraptor
+#      byte-identical, vitess go/vt/mysqlctl byte-identical (12 findings).
+#
+# The api profile's entrypoint list did not include code.StoredDataRead, and
+# vitess auto-resolves to the api profile (google.golang.org/grpc in
+# go.mod), so the new source label is pruned scan-wide on the very tree it
+# describes. It is added to that profile here -- the sweep item the session
+# that shipped the PHP session-read widening left open -- with its
+# collateral measured: vault's zookeeper storage backend is the only
+# api-resolving sibling tree carrying a code.StoredDataRead-labelled shape
+# (an exhaustive grep over the other rank clones), and its bounded subtree
+# scan is byte-identical at 23 findings with and without the widening;
+# traefik, udm, udr, miniflux, vagrant, velociraptor and vikunja resolve to
+# api with no such shape at all.
+#
+# With all three changes, bounded scans of the real checkout (timeout 180,
+# --max-ram 6GB, three `--cache off` runs per revision) report the
+# vulnerability at both fix sites on the vulnerable revision
+# 4c017329^, default profile resolution, byte-stable across the three runs:
+#
+#   code.StoredDataRead @ backupengine.go:273 -> code.CommandExecution @ compression.go:128
+#   code.StoredDataRead @ backupengine.go:273 -> code.CommandExecution @ xtrabackupengine.go:727
+#
+# against a 12-finding baseline with no VYQL-INJ-002 at all. Attribution,
+# measured by removing each change in turn: the sink correction is the
+# load-bearing one -- with it alone (source binding and profile widening
+# both removed) the same two rows still appear, carried by a pre-existing
+# and unrelated code.HttpInput label on the backupstorage.Params composite
+# (backup.go:394), which is how the path reaches the sink while the api
+# profile still prunes stored reads. The binding and the profile entrypoint
+# are what make the reported source the documented trust boundary instead
+# of that incidental label.
+#
+# The patched revision reports the same two rows through
+# resolveExternalDecompressor's return: the change is an opt-in flag gate over
+# a package-level boolean, which branch-insensitive taint cannot see, so
+# vulnerable and patched score 1 -> 1 rather than 1 -> 0. That is the
+# measured "authorization decided by configuration" family, and keying on
+# the flag or helper the fixed revision itself introduces is the fixing commit's own
+# vocabulary; the safe direction the flag enforces -- the operator's
+# --external-decompressor value winning over the manifest -- is what the
+# reject cases below pin instead.
+#
+# The third case pins the corrected sink position on its own: the command
+# name of the context-carrying constructor, reached from an environment
+# value, with no vitess vocabulary involved.
+
+test "rank1921: the manifest's stored decompressor command runs at restore time"
+  lang go
+  file builtinbackupengine.go
+  expect VYQL-INJ-002
+  code
+  ```
+  package mysqlctl
+
+  import (
+  	"context"
+  	"encoding/json"
+  	"os/exec"
+  	"strings"
+
+  	"vitess.io/vitess/go/vt/mysqlctl/backupstorage"
+  )
+
+  const ExternalCompressor = "external"
+
+  type BackupManifest struct {
+  	CompressionEngine    string
+  	ExternalDecompressor string
+  }
+
+  func restoreFile(ctx context.Context, backup backupstorage.BackupHandle, externalDecompressorCmd string) error {
+  	file, err := backup.ReadFile(ctx, "MANIFEST")
+  	if err != nil {
+  		return err
+  	}
+  	defer file.Close()
+
+  	bm := &BackupManifest{}
+  	if err := json.NewDecoder(file).Decode(bm); err != nil {
+  		return err
+  	}
+
+  	// for backward compatibility
+  	deCompressionEngine := bm.CompressionEngine
+  	if deCompressionEngine == "" {
+  		deCompressionEngine = "pgzip"
+  	}
+  	if externalDecompressorCmd == "" && bm.ExternalDecompressor != "" {
+  		externalDecompressorCmd = bm.ExternalDecompressor
+  	}
+  	if externalDecompressorCmd != "" && deCompressionEngine == ExternalCompressor {
+  		deCompressionEngine = externalDecompressorCmd
+  		return newExternalDecompressor(ctx, deCompressionEngine)
+  	}
+  	return nil
+  }
+
+  func newExternalDecompressor(ctx context.Context, cmdStr string) error {
+  	return prepareExternalCmd(ctx, cmdStr)
+  }
+
+  func prepareExternalCmd(ctx context.Context, cmdStr string) error {
+  	cmdArgs := strings.Fields(cmdStr)
+  	if len(cmdArgs) < 1 {
+  		return nil
+  	}
+  	cmdPath, err := exec.LookPath(cmdArgs[0])
+  	if err != nil {
+  		return err
+  	}
+  	return exec.CommandContext(ctx, cmdPath, cmdArgs[1:]...).Run()
+  }
+  ```
+
+test "rank1921: the operator's decompressor flag wins and the manifest field is never consulted"
+  lang go
+  file builtinbackupengine.go
+  reject VYQL-INJ-002
+  code
+  ```
+  package mysqlctl
+
+  import (
+  	"context"
+  	"encoding/json"
+  	"os/exec"
+  	"strings"
+
+  	"vitess.io/vitess/go/vt/mysqlctl/backupstorage"
+  )
+
+  const ExternalCompressor = "external"
+
+  type BackupManifest struct {
+  	CompressionEngine    string
+  	ExternalDecompressor string
+  }
+
+  func restoreFile(ctx context.Context, backup backupstorage.BackupHandle, externalDecompressorCmd string) error {
+  	file, err := backup.ReadFile(ctx, "MANIFEST")
+  	if err != nil {
+  		return err
+  	}
+  	defer file.Close()
+
+  	bm := &BackupManifest{}
+  	if err := json.NewDecoder(file).Decode(bm); err != nil {
+  		return err
+  	}
+
+  	// for backward compatibility
+  	deCompressionEngine := bm.CompressionEngine
+  	if deCompressionEngine == "" {
+  		deCompressionEngine = "pgzip"
+  	}
+  	// The operator-supplied --external-decompressor value decides the
+  	// command; the manifest's stored value is not read for it.
+  	if externalDecompressorCmd != "" && deCompressionEngine == ExternalCompressor {
+  		deCompressionEngine = externalDecompressorCmd
+  		return newExternalDecompressor(ctx, deCompressionEngine)
+  	}
+  	return nil
+  }
+
+  func newExternalDecompressor(ctx context.Context, cmdStr string) error {
+  	return prepareExternalCmd(ctx, cmdStr)
+  }
+
+  func prepareExternalCmd(ctx context.Context, cmdStr string) error {
+  	cmdArgs := strings.Fields(cmdStr)
+  	if len(cmdArgs) < 1 {
+  		return nil
+  	}
+  	cmdPath, err := exec.LookPath(cmdArgs[0])
+  	if err != nil {
+  		return err
+  	}
+  	return exec.CommandContext(ctx, cmdPath, cmdArgs[1:]...).Run()
+  }
+  ```
+
+test "rank1921: the command name of the context-carrying constructor is the tainted position"
+  lang go
+  file decompressor.go
+  expect VYQL-INJ-002
+  code
+  ```
+  package mysqlctl
+
+  import (
+  	"context"
+  	"os"
+  	"os/exec"
+  )
+
+  func runExternalDecompressor(ctx context.Context) error {
+  	// An operator-overridable decompressor command from the environment.
+  	cmdStr := os.Getenv("EXTERNAL_DECOMPRESSOR")
+  	return exec.CommandContext(ctx, cmdStr).Run()
+  }
+  ```
+
+test "rank1921: a literal decompressor command carries nothing"
+  lang go
+  file decompressor.go
+  reject VYQL-INJ-002
+  code
+  ```
+  package mysqlctl
+
+  import (
+  	"context"
+  	"os/exec"
+  )
+
+  func runBuiltinDecompressor(ctx context.Context) error {
+  	return exec.CommandContext(ctx, "gzip", "-d").Run()
+  }
+  ```

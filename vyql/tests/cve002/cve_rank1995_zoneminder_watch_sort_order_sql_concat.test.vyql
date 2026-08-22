@@ -1,0 +1,123 @@
+# ZoneMinder (CVE-2024-43360): web/ajax/watch.php built the event
+# listing's SQL by concatenating the request's sort column straight
+# into the ORDER BY clause. $sort defaults to 'Id' but is overwritten
+# with the raw $_REQUEST['sort'] whenever the parameter is set, and
+# the statement runs through dbQuery() with only the LIMIT value
+# bound:
+#
+#   $sql = 'SELECT '.$col_str.' FROM `Events` AS E '.$where
+#          .' ORDER BY '.$sort.' '.$order.' LIMIT ?';
+#   $rows = dbQuery($sql, array($limit));
+#
+# $order is confined by its ternary to 'ASC'/'DESC' and $mid passes
+# through validCardinal(), so the injectable position is $sort alone.
+# The fixed revision 677f6a31551f128554f7b0110a52fd76453a657a validates $sort
+# against the events-table column list with in_array() and resets it
+# to 'Id' when it is not a member.
+#
+# dbQuery() is ZoneMinder's database API (web/includes/database.php:
+# it prepares and executes the statement text it is handed), the
+# camelCase sibling of the db_query binding the PHP set
+# carries, and lacks a label -- vyql match on the vulnerable file
+# showed the $_REQUEST sources labelled and no sink at all. With the
+# sink bound, web/ajax reports 8 VYQL-INJ-001 rows where it reported
+# 2 (watch.php:53 the CVE itself, events.php:210, snapshots.php,
+# status.php:469/483, modals/download.php:51 added; alarm.php and
+# modals/settings.php are reported through other sinks),
+# stable over three --cache off runs. dbQuery appears in no other
+# checkout under the corpus clones, so the binding's reachable set
+# outside this project is empty.
+#
+# The patched form still reports, through the fixed revision's own layout: the
+# in_array guard sits inside `if ($sort != 'Id')`, and the wrapper's
+# false branch -- where $sort holds the 'Id' literal -- reaches the
+# same sink without passing the guard. Guard coverage is
+# sink-dominance based (endpointGuarded / dominatesGuarded in
+# internal/engine/engine.go), and the guard call does not dominate
+# the sink because of that bypass branch, so no check can credit it
+# without branch-condition refinement. Pricing the data-layer
+# alternatives, both measured on this tree and on yeswiki/winter/
+# twig:
+#
+# - in_array -> core.AllowlistValidation with endpoint coverage,
+#   plus `unless endpoint coveredBy core.AllowlistValidation` on the
+#   Sql rule: clears the patched form not at all (the wrapper's
+#   bypass keeps the flow), while clearing 9 yeswiki rows through
+#   `in_array($tag, $this->pageCache)` -- a cache-membership test
+#   that says nothing about SQL safety -- so the clearing is unsound
+#   in exactly the way a guard keyed by co-presence always is. The
+#   one row it does clear here (snapshots.php, whose identical
+#   remediation sits in dominating position with no wrapper) is a
+#   real recovery, but not worth 9 unsound clearings on one tree.
+# - any file- or function-scope in_array negation is the same
+#   co-presence route and clears the same yeswiki rows.
+#
+# verify_current_expected: attention-engine-gap. The second test pins
+# the patched form still reporting through the wrapper's bypass
+# branch. When guard coverage can credit a check nested under a
+# value-comparison wrapper -- branch refinement on the merge phi, or
+# branch-local rather than sink-dominance coverage -- it flips to
+# reject.
+
+test "zoneminder: the request sort column is concatenated into the order by unvalidated"
+  lang php
+  file web/ajax/watch.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  $sort = 'Id';
+  if (isset($_REQUEST['sort'])) {
+    $sort = $_REQUEST['sort'];
+  }
+
+  $order = (isset($_REQUEST['order']) and (strtolower($_REQUEST['order']) == 'asc')) ? 'ASC' : 'DESC';
+  $mid = validCardinal($_REQUEST['mid']);
+  $limit = (ctype_digit($_REQUEST['limit']) ? $_REQUEST['limit'] : 100);
+
+  $where = 'WHERE MonitorId = '.$mid;
+  $col_str = 'E.*';
+  $sql = 'SELECT ' .$col_str. ' FROM `Events` AS E '.$where.' ORDER BY '.$sort.' '.$order. ' LIMIT ?';
+  $rows = dbQuery($sql, array($limit));
+  ```
+
+test "zoneminder: the in_array column allowlist under the sort!=Id wrapper still reports"
+  lang php
+  file web/ajax/watch.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  $sort = 'Id';
+  if (isset($_REQUEST['sort'])) {
+    $sort = $_REQUEST['sort'];
+  }
+
+  $order = (isset($_REQUEST['order']) and (strtolower($_REQUEST['order']) == 'asc')) ? 'ASC' : 'DESC';
+  $mid = validCardinal($_REQUEST['mid']);
+  $limit = (ctype_digit($_REQUEST['limit']) ? $_REQUEST['limit'] : 100);
+
+  $columns = array('Id', 'MonitorId', 'StorageId', 'Name', 'Cause', 'StartDateTime', 'EndDateTime', 'Length', 'Frames', 'AlarmFrames', 'TotScore', 'AvgScore', 'MaxScore', 'Archived', 'Emailed', 'Notes', 'DiskSpace');
+
+  if ( $sort != 'Id' ) {
+    if (!in_array($sort, $columns)) {
+      ZM\Error('Invalid sort field: ' . $sort);
+      $sort = 'Id';
+    } else if ($sort == 'EndDateTime') {
+      if ($order == 'ASC') {
+        $sort = 'E.EndDateTime IS NULL, E.EndDateTime';
+      } else {
+        $sort = 'E.EndDateTime IS NOT NULL, E.EndDateTime';
+      }
+    } else {
+      $sort = 'E.'.$sort;
+    }
+  }
+
+  $where = 'WHERE MonitorId = '.$mid;
+  $col_str = 'E.*';
+  $sql = 'SELECT ' .$col_str. ' FROM `Events` AS E '.$where.' ORDER BY '.$sort.' '.$order. ' LIMIT ?';
+  $rows = dbQuery($sql, array($limit));
+  ```

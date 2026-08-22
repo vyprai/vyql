@@ -1,0 +1,190 @@
+# Rank 1959 / CVE-2022-40152: Woodstox's DTD reader recursed into
+# nested content specifications with no depth limit, so a DOCTYPE
+# whose <!ELEMENT> content spec nests a few thousand parentheses
+# drove readContentSpec into a StackOverflowError and took the
+# parsing thread down (denial of service through unbounded recursion,
+# CWE-400/CWE-674; fixed in woodstox 6.4.0). readContentSpec in
+# src/main/java/com/ctc/wstx/dtd/FullDTDReader.java walked the spec in
+# a while(true) loop and, at every '(' token, called itself
+# unconditionally -- `ContentSpec cs = readContentSpec(elemName,
+# false, construct)` -- so nesting depth is bounded only by the input
+# itself. The pool row carried nocommit; the flag is advisory-side
+# absence only: commit 7e93907e9c exists in the default clone and is
+# the fixing change ("add recursion limit of 500 for DTD parsing (#159)"):
+# the method gains a recursionDepth parameter,
+# `if (recursionDepth > DTD_RECURSION_DEPTH_LIMIT) throw new
+# XMLStreamException(...)` at entry, and the self-call passes
+# `recursionDepth + 1`. .
+#
+# ATTENTION, recursion depth budgets -- the Java instance of the
+# measured cross-iteration budget family (ranks 1534 header
+# accumulation, 1554 combinatorial expansion, 1559 wire length, 1586
+# the closest sibling: an unbounded recursive descent throwing
+# StackOverflowError, there over JSON). The corpus's CWE-400 rules
+# judge per-iteration progress, not a depth carried through
+# recursion, so nothing can ask "does the content-spec walk stop at a
+# depth cap"; and the self-recursion half is the engine gap on
+# file ("Self-recursion depth: no fact for a function calling itself,
+# or for a depth cap", the rank-1320 entry): a presenceNode query
+# compares one field to a literal and cannot unify the enclosing
+# function's name with the callee it calls, so "a function that calls
+# itself with no depth cap" is inexpressible -- a binding would have
+# to name readContentSpec literally, which detects this parser rather
+# than the weakness (code.UnboundedResourceOperation / VYQL-DOS-042
+# has emitters in rust, python, javascript and swift, none in java,
+# and each is keyed on its ecosystem's documented bounding
+# vocabulary). Measured on the real code: scanning
+# FullDTDReader.java reports 0 findings at both revisions; the whole
+# src/main/java tree reports the same single unrelated VYQL-NUM-014
+# (UTF8Writer.java:112) at both revisions. No definition change
+# shipped. Spec cve_rank1959 records the unbounded recursion and the
+# depth-capped form, both asserting reject VYQL-DOS-029: when
+# depth-budget vocabulary lands, the unbounded form must flip to
+# expect.
+
+test "rank1959: the content-spec walk recurses without a depth cap"
+  lang java
+  file src/main/java/com/ctc/wstx/dtd/FullDTDReader.java
+  reject VYQL-DOS-029
+  code
+  ```
+  package com.ctc.wstx.dtd;
+
+  import java.util.ArrayList;
+  import javax.xml.stream.XMLStreamException;
+
+  class FullDTDReader
+  {
+      private ContentSpec readContentSpec(PrefixedName elemName, boolean mainLevel,
+                                          boolean construct)
+          throws XMLStreamException
+      {
+          ArrayList<ContentSpec> subSpecs = new ArrayList<ContentSpec>();
+          boolean isChoice = false;
+          boolean choiceSet = false;
+
+          while (true) {
+              char c = skipDtdWs(true);
+              if (c == ')') {
+                  if (subSpecs.isEmpty()) {
+                      _reportWFCViolation("Empty content specification for '"+elemName+"' (need at least one entry)");
+                  }
+                  break;
+              }
+              if (c == '|' || c == ',') {
+                  boolean newChoice = (c == '|');
+                  if (!choiceSet) {
+                      isChoice = newChoice;
+                      choiceSet = true;
+                  } else {
+                      if (isChoice != newChoice) {
+                          _reportWFCViolation("Can not mix content spec separators ('|' and ','); need to use parenthesis groups");
+                      }
+                  }
+                  c = skipDtdWs(true);
+              } else {
+                  if (!subSpecs.isEmpty()) {
+                      throwDTDUnexpectedChar(c, " (missing separator '|' or ','?)");
+                  }
+              }
+              if (c == '(') {
+                  ContentSpec cs = readContentSpec(elemName, false, construct);
+                  subSpecs.add(cs);
+                  continue;
+              }
+              PrefixedName thisName = readDTDQName(c);
+              char arity = readArity();
+              ContentSpec cs = construct ?
+                  TokenContentSpec.construct(arity, thisName)
+                  : TokenContentSpec.getDummySpec();
+              subSpecs.add(cs);
+          }
+
+          char arity = readArity();
+          if (subSpecs.size() == 1) {
+              return subSpecs.get(0);
+          }
+          if (isChoice) {
+              return ChoiceContentSpec.constructChoice(mCfgNsEnabled, arity, subSpecs);
+          }
+          return SeqContentSpec.construct(mCfgNsEnabled, arity, subSpecs);
+      }
+  }
+  ```
+
+test "rank1959: the fixed revision caps the content-spec recursion depth"
+  lang java
+  file src/main/java/com/ctc/wstx/dtd/FullDTDReader.java
+  reject VYQL-DOS-029
+  code
+  ```
+  package com.ctc.wstx.dtd;
+
+  import java.util.ArrayList;
+  import javax.xml.stream.XMLStreamException;
+
+  class FullDTDReader
+  {
+      final static int DEFAULT_DTD_RECURSION_DEPTH_LIMIT = 500;
+      static int DTD_RECURSION_DEPTH_LIMIT = DEFAULT_DTD_RECURSION_DEPTH_LIMIT;
+
+      private ContentSpec readContentSpec(final PrefixedName elemName, final boolean construct,
+                                          final int recursionDepth)
+          throws XMLStreamException
+      {
+          if (recursionDepth > DTD_RECURSION_DEPTH_LIMIT) {
+              throw new XMLStreamException("FullDTDReader has reached recursion depth limit of " + DTD_RECURSION_DEPTH_LIMIT);
+          }
+
+          ArrayList<ContentSpec> subSpecs = new ArrayList<ContentSpec>();
+          boolean isChoice = false;
+          boolean choiceSet = false;
+
+          while (true) {
+              char c = skipDtdWs(true);
+              if (c == ')') {
+                  if (subSpecs.isEmpty()) {
+                      _reportWFCViolation("Empty content specification for '"+elemName+"' (need at least one entry)");
+                  }
+                  break;
+              }
+              if (c == '|' || c == ',') {
+                  boolean newChoice = (c == '|');
+                  if (!choiceSet) {
+                      isChoice = newChoice;
+                      choiceSet = true;
+                  } else {
+                      if (isChoice != newChoice) {
+                          _reportWFCViolation("Can not mix content spec separators ('|' and ','); need to use parenthesis groups");
+                      }
+                  }
+                  c = skipDtdWs(true);
+              } else {
+                  if (!subSpecs.isEmpty()) {
+                      throwDTDUnexpectedChar(c, " (missing separator '|' or ','?)");
+                  }
+              }
+              if (c == '(') {
+                  ContentSpec cs = readContentSpec(elemName, construct, recursionDepth + 1);
+                  subSpecs.add(cs);
+                  continue;
+              }
+              PrefixedName thisName = readDTDQName(c);
+              char arity = readArity();
+              ContentSpec cs = construct ?
+                  TokenContentSpec.construct(arity, thisName)
+                  : TokenContentSpec.getDummySpec();
+              subSpecs.add(cs);
+          }
+
+          char arity = readArity();
+          if (subSpecs.size() == 1) {
+              return subSpecs.get(0);
+          }
+          if (isChoice) {
+              return ChoiceContentSpec.constructChoice(mCfgNsEnabled, arity, subSpecs);
+          }
+          return SeqContentSpec.construct(mCfgNsEnabled, arity, subSpecs);
+      }
+  }
+  ```

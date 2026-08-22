@@ -1,0 +1,198 @@
+# vm2's NodeVM constructor treats a truthy `nesting` option as an escape
+# hatch: the option injects a NESTING_OVERRIDE builtin into the module
+# resolver, so sandbox code can `require('vm2')`, build an inner NodeVM
+# whose `require` configuration the *sandbox* chooses, and reach
+# `child_process` for host code execution. The gate that decides whether
+# the override is injected reads the option by truthiness --
+# `makeResolverFromLegacyOptions(requireOpts, nesting && NESTING_OVERRIDE)`
+# (lib/nodevm.js:318 at the parent of the change) -- while the construction
+# time guard that is supposed to reject unsafe pairings compared it with
+# strict equality: `if (nesting === true && !requireOpts) throw` (line 292).
+# A caller passing `nesting: 1`, `nesting: 'yes'`, or any truthy non-`true`
+# value sails past the strict comparison and still opens the truthiness
+# gate; a caller passing a truthy non-object `require` (`true`, a number, a
+# function) passes the `!requireOpts` half because the value is truthy,
+# while the resolver builder destructures it to all-undefined and lands in
+# the same NESTING_OVERRIDE-only branch. Every bypass shape collapses to a
+# resolver whose only builtin is `vm2`. The fixed revision keeps the truthiness gate
+# untouched and widens the guard to mirror it: `requireOpts instanceof
+# Resolver || (typeof requireOpts === 'object' && requireOpts !== null)`
+# checked against truthy `nesting` (86ab819, GHSA-m4wx-m65x-ghrr; the
+# repository's own docs class it as CWE-284 with CWE-697 for the
+# comparison -- the pool's recorded CWE-913 does not name the mechanism,
+# which is a comparison-coverage defect, not dynamic variable control).
+#
+# Measured, both revisions, three `--cache off` runs each: 52 findings on
+# the tree at the parent and the identical 52 at the fixed revision (rule and location
+# lists byte-identical); the only lib/nodevm.js finding either way is an
+# unrelated VYQL-INJ-013 prototype-pollution row at line 106, a different
+# function present at both revisions. `vyql match` labels nothing in the
+# constructor. The two facts that would discriminate do exist as separate
+# function-context tokens -- probe-verified, `expr:nesting===true` and
+# `expr:nesting&&NESTING_OVERRIDE` both reach the constructor's
+# analysis.function.context -- but no predicate unifies one identifier
+# across two context tokens: `bind` in a pattern renames a reference, and
+# each `node.context` clause matches the token blob independently. The only
+# binding that could name both spellings writes `nesting` literally, which
+# is the fixed revision's own vocabulary and goes blind the day the option is renamed
+# while keeping the bug. Same limit as the token-unification family (1391,
+# restated at 1918 for call-argument constants and 1919 for member
+# identity).
+#
+# Even with unification the shape is measured unshippable on precision:
+# across 40,213 JavaScript and TypeScript files of the reachable corpus
+# (86 clones), 324 functions pair a strict `x === true`-style comparison
+# with a bare truthiness use of the same identifier -- ordinary option
+# handling (`checked`, `disabled`, `label`, `copied`, `forward`); the
+# tightest syntactic refinement (the strict check inside a throwing guard,
+# the truthiness use inside a call argument, the fixed revision's exact shape minus
+# names) still fires on 17 benign functions, among them twenty's
+# `permissionOptions?.shouldBypassPermissionChecks === true` -- a correct
+# strict check on a permission flag, the exact false positive the rule
+# would need to survive. Which truthiness use gates a security-relevant
+# operation is a semantic fact the syntax does not carry, so the unification
+# gap and the precision gap have to close together. Vocabulary considered:
+# code.CaptchaValidationTruthyReturnBypass (VYQL-VAL-012) is the inverse
+# polarity -- a *validator* returning truthy non-booleans, not a guard
+# comparing strictly while its gate reads truthiness; code.Vm2HostCallbackBridge
+# (VYQL-INJ-035) is the embedder-side bridge shape, not the library's own
+# configuration validation, and fires on neither revision here. No shipped
+# concept in the validation or misconfig packs covers a guard narrower than
+# the gate it protects. Not mechanical: an identifier-role unification is a
+# new classification in the JS frontend plus a value-unification relation
+# the binding language lacks, and it is not shippable alone.
+#
+# The first two blocks pin the miss -- both assert the vm2 family rule and
+# the nearest validation rule stay silent, on the vulnerable and the
+# patched form alike, because the discriminating fact is not extracted. If
+# identifier-role unification ever lands, the first block must flip to
+# expect while the second stays rejected. The third block is the control:
+# the embedder-side host-callback bridge that VYQL-INJ-035 does catch, so
+# these rejects cannot pass by matching nothing.
+
+test "rank1924: NodeVM guards nesting with strict equality while the override gate reads truthiness"
+  lang javascript
+  file nodevm.js
+  reject VYQL-INJ-035
+  reject VYQL-VAL-012
+  code
+  ```
+  'use strict';
+
+  const VMError = require('./vmerror');
+  const Resolver = require('./resolver');
+  const NESTING_OVERRIDE = 'NESTING_OVERRIDE';
+
+  function makeResolverFromLegacyOptions(options, nesting) {
+    if (!options) return { builtin: ['vm2'] };
+    return { builtin: Object.keys(options.builtin || {}) };
+  }
+
+  class NodeVM {
+    constructor(options = {}) {
+      const {
+        require: requireOpts = false,
+        nesting = false,
+        wrapper = 'commonjs'
+      } = options;
+
+      if (nesting === true && !requireOpts) {
+        throw new VMError('NodeVM nesting requires an explicit require config');
+      }
+
+      const customResolver = requireOpts instanceof Resolver;
+      const resolver = customResolver
+        ? requireOpts
+        : makeResolverFromLegacyOptions(requireOpts, nesting && NESTING_OVERRIDE);
+      this.resolver = resolver;
+    }
+  }
+
+  module.exports = { NodeVM };
+  ```
+
+test "rank1924: patched NodeVM guard mirrors the truthiness gate it protects"
+  lang javascript
+  file nodevm.js
+  reject VYQL-INJ-035
+  reject VYQL-VAL-012
+  code
+  ```
+  'use strict';
+
+  const VMError = require('./vmerror');
+  const Resolver = require('./resolver');
+  const NESTING_OVERRIDE = 'NESTING_OVERRIDE';
+
+  function makeResolverFromLegacyOptions(options, nesting) {
+    if (!options) return { builtin: ['vm2'] };
+    return { builtin: Object.keys(options.builtin || {}) };
+  }
+
+  class NodeVM {
+    constructor(options = {}) {
+      const {
+        require: requireOpts = false,
+        nesting = false,
+        wrapper = 'commonjs'
+      } = options;
+
+      const hasRealRequireConfig =
+        requireOpts instanceof Resolver
+        || (typeof requireOpts === 'object' && requireOpts !== null);
+      if (nesting && !hasRealRequireConfig) {
+        throw new VMError('NodeVM nesting requires an explicit require config object');
+      }
+
+      const customResolver = requireOpts instanceof Resolver;
+      const resolver = customResolver
+        ? requireOpts
+        : makeResolverFromLegacyOptions(requireOpts, nesting && NESTING_OVERRIDE);
+      this.resolver = resolver;
+    }
+  }
+
+  module.exports = { NodeVM };
+  ```
+
+test "rank1924: embedder bridging host callbacks into a vm sandbox still reports"
+  lang javascript
+  file SecureTemplater.ts
+  expect VYQL-INJ-035
+  code
+  ```
+  import { VM } from 'vm2';
+
+  export class SecureTemplater {
+    static async loadRenderer(options = {}) {
+      const { templateFilters, templateGlobals } = options;
+      const sandbox: Record<string, any> = {};
+
+      if (templateFilters) {
+        sandbox.templateFilters = Object.fromEntries(
+          Object.entries(templateFilters).map(([filterName, filterFunction]) => [
+            filterName,
+            (...args: JsonValue[]) => JSON.stringify(filterFunction(...args)),
+          ]),
+        );
+      }
+      if (templateGlobals) {
+        sandbox.templateGlobals = Object.fromEntries(
+          Object.entries(templateGlobals).map(([globalName, global]) => {
+            if (typeof global === 'function') {
+              return [
+                globalName,
+                (...args: JsonValue[]) => JSON.stringify(global(...args)),
+              ];
+            }
+            return [globalName, JSON.stringify(global)];
+          }),
+        );
+      }
+
+      const vm = new VM({ sandbox });
+      vm.run(mkScript(nunjucksSource));
+      return (template, values) => vm.run(`render(templateStr, templateValues)`);
+    }
+  }
+  ```

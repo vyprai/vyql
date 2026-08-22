@@ -1,0 +1,307 @@
+# Rank 1967 / CVE-2023-30207: VideoPlayerCodec::Init
+# (xbmc/cores/paplayer/VideoPlayerCodec.cpp) decodes up to ten packets to
+# learn the audio format from the codec, and when the parse fails it guesses
+# the two fields it can -- `m_channels` (a 2.0 layout) and
+# `m_srcFormat.m_sampleRate` (44100) -- but has no guess for
+# `m_srcFormat.m_frameSize`. When NeedConvert(m_srcFormat.m_dataFormat) is
+# true it arms the resampler path anyway, and ReadPCM later scales the
+# decoded length with
+#
+#     m_nDecodedLen *= (m_bitsPerSample>>3) / (m_srcFormat.m_frameSize / m_channels);
+#
+# (VideoPlayerCodec.cpp:384 at the fixed revision's parent): with m_frameSize 0 the inner
+# division yields 0 and the outer divides by it -- SIGFPE, CWE-369. Fix
+# dbc00c500 keeps the decode loop running while m_format.m_frameSize == 0 and
+# returns false before creating the resampler if it still is:
+#
+#     if (m_srcFormat.m_frameSize == 0)
+#       return false;
+#
+# Measured miss, both revisions identical. The paplayer subtree scanned at the
+# fix's parent and at the fixed revision, three --cache off runs each: 48 findings on
+# both (5 VYQL-LIFE-001, 40 VYQL-MEM-006, 3 VYQL-MEM-016), the same rules on
+# the same lines, nothing at or near :384 -- the nearest rows are
+# code.NullableDeref at :386/:387 on *actualsize. Findings in the function are
+# not coverage.
+#
+# The sink and the judge are present: cpp.sinks labels both divisions at :384
+# code.DivisionDenominator (divisionDenominator92 on __binop.div args[1]) and
+# VYQL-NUM-002 fires on a tainted fread return-value denominator (case 4
+# below). What is absent is every link that would carry file content into the
+# divisor, each isolated below:
+#
+#   (a) No source exists in the file at all. The media bytes are consumed
+#       behind xbmc's codec facade -- out-of-tree ffmpeg demuxes, and in-tree
+#       the value surfaces only as `m_srcFormat = m_pAudioCodec->GetFormat()`,
+#       a by-value struct return from a virtual accessor on a factory-created
+#       codec. `vyql trace -from code.HttpInput -to code.DivisionDenominator`
+#       on a faithful reduction reports "0 source(s)". No honest binding can
+#       label this: GetFormat is xbmc-internal accessor vocabulary, and the
+#       1304 review rejected a same-character source binding for any
+#       two-argument .read() call.
+#   (b) Even with a working source, taint dies at the aggregate field store.
+#       A tainted value stored into a struct field and divided by one line
+#       later, in the same function, reports nothing (case 5) -- the
+#       field-store-to-field-read relation on file at rank 1851(b)
+#       ("field-sensitive value flow ... is a new dataflow relation, not a
+#       missing case"), here measured on the local-variable axis, and on the
+#       member-state axis across two out-of-line member functions (case 2 vs
+#       case 4 differ only in that crossing).
+#   (c) The presence route is dead on precision, enumerated: a division whose
+#       denominator mentions a member field occurs 2845 times in 618 files
+#       under xbmc/cores alone, 19236 lines / 3799 files in the whole xbmc
+#       tree, 15709 / 3200 in wireshark, ~50k across seven other real clones.
+#       The only discriminating signals are the sibling-fallback asymmetry and
+#       the added zero check, both field-identity unification VyQL cannot
+#       express (1391, restated at 1424 and 1919).
+#
+# verify_current_expected: attention-engine-gap; both real revisions rejected
+# below; cases 4-6 are the isolating pairs (control fires, field-store does
+# not, accessor form does not).
+
+test "rank1967: Init guesses channels and sampleRate but arms the converter with an unprobed frameSize, and ReadPCM divides by it"
+  lang cpp
+  file VideoPlayerCodec.cpp
+  reject VYQL-NUM-002
+  code
+  ```
+  enum AEDataFormat { AE_FMT_INVALID, AE_FMT_S16LE, AE_FMT_FLOAT };
+
+  struct AEAudioFormat
+  {
+    AEDataFormat m_dataFormat;
+    unsigned int m_sampleRate;
+    unsigned int m_frameSize;
+    unsigned int m_channels;
+  };
+
+  class IAudioCodec
+  {
+  public:
+    virtual ~IAudioCodec() = default;
+    virtual AEAudioFormat GetFormat() = 0;
+  };
+  IAudioCodec* CreateAudioCodec();
+
+  class CFileItem
+  {
+  public:
+    const char* GetDynPath();
+  };
+
+  bool NeedConvert(AEDataFormat fmt);
+
+  class VideoPlayerCodec
+  {
+    IAudioCodec* m_pAudioCodec;
+    AEAudioFormat m_srcFormat;
+    unsigned int m_channels;
+    int m_bitsPerSample;
+    int m_nDecodedLen;
+    bool m_needConvert;
+
+  public:
+    bool Init(const CFileItem &file);
+    int ReadPCM(unsigned char* pBuffer, size_t size, size_t* actualsize);
+  };
+
+  bool VideoPlayerCodec::Init(const CFileItem &file)
+  {
+    m_channels = 0;
+
+    // we have to decode initial data in order to get channels/samplerate
+    // for sanity - we read no more than 10 packets
+    for (int nPacket = 0;
+         nPacket < 10 && (m_channels == 0 || m_srcFormat.m_sampleRate == 0);
+         nPacket++)
+    {
+      m_srcFormat = m_pAudioCodec->GetFormat();
+      m_channels = m_srcFormat.m_channels;
+      m_bitsPerSample = 16;
+    }
+
+    if (m_channels == 0) // no data - just guess and hope for the best
+      m_channels = 2;
+    if (m_srcFormat.m_sampleRate == 0)
+      m_srcFormat.m_sampleRate = 44100;
+
+    m_needConvert = false;
+    if (NeedConvert(m_srcFormat.m_dataFormat))
+    {
+      m_needConvert = true;
+    }
+    return true;
+  }
+
+  int VideoPlayerCodec::ReadPCM(unsigned char* pBuffer, size_t size, size_t* actualsize)
+  {
+    int bytes = 1024;
+    m_nDecodedLen = bytes;
+    // scale decoded bytes to destination format
+    if (m_needConvert)
+      m_nDecodedLen *= (m_bitsPerSample >> 3) / (m_srcFormat.m_frameSize / m_channels);
+    *actualsize = m_nDecodedLen;
+    return 0;
+  }
+  ```
+
+test "rank1967: fixed Init declines to arm the converter when frameSize never arrived"
+  lang cpp
+  file VideoPlayerCodec.cpp
+  reject VYQL-NUM-002
+  code
+  ```
+  enum AEDataFormat { AE_FMT_INVALID, AE_FMT_S16LE, AE_FMT_FLOAT };
+
+  struct AEAudioFormat
+  {
+    AEDataFormat m_dataFormat;
+    unsigned int m_sampleRate;
+    unsigned int m_frameSize;
+    unsigned int m_channels;
+  };
+
+  class IAudioCodec
+  {
+  public:
+    virtual ~IAudioCodec() = default;
+    virtual AEAudioFormat GetFormat() = 0;
+  };
+  IAudioCodec* CreateAudioCodec();
+
+  class CFileItem
+  {
+  public:
+    const char* GetDynPath();
+  };
+
+  bool NeedConvert(AEDataFormat fmt);
+
+  class VideoPlayerCodec
+  {
+    IAudioCodec* m_pAudioCodec;
+    AEAudioFormat m_srcFormat;
+    unsigned int m_channels;
+    int m_bitsPerSample;
+    int m_nDecodedLen;
+    bool m_needConvert;
+
+  public:
+    bool Init(const CFileItem &file);
+    int ReadPCM(unsigned char* pBuffer, size_t size, size_t* actualsize);
+  };
+
+  bool VideoPlayerCodec::Init(const CFileItem &file)
+  {
+    m_channels = 0;
+
+    // we have to decode initial data in order to get channels/samplerate
+    // for sanity - we read no more than 10 packets
+    for (int nPacket = 0;
+         nPacket < 10 &&
+             (m_channels == 0 || m_srcFormat.m_sampleRate == 0 || m_srcFormat.m_frameSize == 0);
+         nPacket++)
+    {
+      m_srcFormat = m_pAudioCodec->GetFormat();
+      m_channels = m_srcFormat.m_channels;
+      m_bitsPerSample = 16;
+    }
+
+    if (m_channels == 0) // no data - just guess and hope for the best
+      m_channels = 2;
+    if (m_srcFormat.m_sampleRate == 0)
+      m_srcFormat.m_sampleRate = 44100;
+
+    m_needConvert = false;
+    if (NeedConvert(m_srcFormat.m_dataFormat))
+    {
+      // if we don't know the framesize yet, we will fail when converting
+      if (m_srcFormat.m_frameSize == 0)
+        return false;
+
+      m_needConvert = true;
+    }
+    return true;
+  }
+
+  int VideoPlayerCodec::ReadPCM(unsigned char* pBuffer, size_t size, size_t* actualsize)
+  {
+    int bytes = 1024;
+    m_nDecodedLen = bytes;
+    // scale decoded bytes to destination format
+    if (m_needConvert)
+      m_nDecodedLen *= (m_bitsPerSample >> 3) / (m_srcFormat.m_frameSize / m_channels);
+    *actualsize = m_nDecodedLen;
+    return 0;
+  }
+  ```
+
+test "rank1967: control - the same division fed by a tainted read return value reports"
+  lang cpp
+  file control.c
+  expect VYQL-NUM-002
+  code
+  ```
+  #include <stdio.h>
+
+  int one_fn(int m_bitsPerSample)
+  {
+    unsigned char buf[256];
+    size_t n = fread(buf, 1, 256, stdin);
+    int m_nDecodedLen = 1024;
+    m_nDecodedLen *= (m_bitsPerSample >> 3) / (n / 2);
+    return m_nDecodedLen;
+  }
+  ```
+
+test "rank1967: isolating pair - a tainted value stored into a struct field, divided by one line later in the same function, does not"
+  lang cpp
+  file pair_field.c
+  reject VYQL-NUM-002
+  code
+  ```
+  #include <stdio.h>
+
+  struct Fmt
+  {
+    unsigned int m_frameSize;
+  };
+
+  int one_fn()
+  {
+    size_t n = fread(0, 1, 64, stdin);
+    Fmt fmt;
+    fmt.m_frameSize = n;
+    int m_nDecodedLen = 1024;
+    m_nDecodedLen *= (16 >> 3) / (fmt.m_frameSize / 2);
+    return m_nDecodedLen;
+  }
+  ```
+
+test "rank1967: isolating pair - the real form, a by-value struct return from a virtual accessor, has no source at all"
+  lang cpp
+  file pair_accessor.cpp
+  reject VYQL-NUM-002
+  code
+  ```
+  struct Fmt
+  {
+    unsigned int m_frameSize;
+    unsigned int m_channels;
+  };
+
+  class ICodec
+  {
+  public:
+    virtual Fmt GetFormat() = 0;
+  };
+  extern ICodec* g_codec;
+
+  int ReadPCM(int m_bitsPerSample)
+  {
+    Fmt src = g_codec->GetFormat();
+    int m_nDecodedLen = 1024;
+    m_nDecodedLen *= (m_bitsPerSample >> 3) / (src.m_frameSize / src.m_channels);
+    return m_nDecodedLen;
+  }
+  ```

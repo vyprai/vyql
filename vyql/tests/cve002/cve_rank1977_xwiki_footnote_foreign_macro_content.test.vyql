@@ -1,0 +1,206 @@
+# Rank 1977 / CVE-2023-37912 (GHSA-35j5-m29r-xfq5, CWE-270): the footnote
+# macro executed its content "in a potentially different context than the one
+# in which it is defined". At the vulnerable revision the footnote macro's execute()
+# never parsed its own content at all -- it appended a putFootnotes macro to
+# the document root and returned Collections.emptyList()
+# (xwiki-rendering-macros/xwiki-rendering-macro-footnotes/.../FootnoteMacro.java
+# at 5f558b8^) -- while PutFootnotesMacro.execute() walked the whole XDOM for
+# MacroMarkerBlock wrappers of executed macros and re-parsed each
+# foreign macro's raw content under its own context:
+#
+#     List<MacroMarkerBlock> footnotes =
+#         root.getBlocks(new ClassBlockMatcher(MacroMarkerBlock.class), Block.Axes.DESCENDANT);
+#     ...
+#     private ListItemBlock processFootnote(MacroMarkerBlock footnoteMacro, int counter,
+#         MacroTransformationContext context) throws MacroExecutionException
+#     {
+#         String content = footnoteMacro.getContent();
+#         ...
+#         ListItemBlock footnoteBlock = createFootnoteBlock(content, counter, context);
+#     }
+#     ...
+#     parsedContent = this.contentParser.parse(content, context, false, true).getChildren();
+#
+# so a registered user without script rights putting {{groovy}}...{{/groovy}}
+# inside a {{footnote}} had that markup evaluated when putFootnotes re-parsed
+# it under the document's context -- privilege escalation to programming
+# rights. The fixed revision parses the footnote's content directly in FootnoteMacro's
+# own execute() (`this.contentParser.parse(content, context, true, true)`,
+# content being the macro's own content parameter) and removes the parser
+# from PutFootnotesMacro entirely, so the remediation is present at 5f558b8
+# and the row is correct. .
+#
+# `vyql match` at the parent labelled no source on the path: getContent() on
+# the marker block lacks a label, so no rule could see that foreign macro
+# text reached the parse. The parse call itself carried the syntactic
+# code.XmlParse label every .parse( call gets, which no markup rule consumes.
+#
+# Detection is the existing template-injection pair and no new vocabulary:
+# MacroContentParser.parse bound as code.TemplateRender at args[0] (its
+# javadoc: "Parses content of a macro field ... transform if true then
+# executes transformations") and MacroMarkerBlock.getContent() bound as
+# core.UserControlledData (wiki markup authored outside the current context),
+# so VYQL-INJ-008 asks exactly the contract question: did the executing
+# context author the content it evaluates.
+#
+# The sink is keyed on the injected field's dotted path, not a receiver type:
+# a type-constrained sink stays at syntactic fidelity when the receiver type
+# is unresolved, and MacroContentParser never resolves in consuming trees,
+# so the type form labelled every jar-receiver `.parse(` -- 37 unrelated
+# INJ-008 rows on the tomcat tree, measured, against zero for the path form.
+# The source needs no such care: a receiver-constrained source requires a
+# resolved type, so the label lands only on declared-MacroMarkerBlock
+# receivers.
+#
+# Measured on the real checkout (whole tree, 610 main java files, three
+# --cache off runs per revision, identical within each): 26 findings at
+# 5f558b8^ against 24 at the fixed revision, the entire delta being VYQL-INJ-008 and one
+# VYQL-DESER-002 on the same source-to-sink path -- the latter from the
+# catch-all `.parse(` XmlParse sink that predates this work, a wrong-CWE
+# rendering of the same true path. Across the other clones only the sibling
+# xwiki-platform tree carries either API: its rendering module goes 9 -> 10,
+# the one added row the wiki-macro renderer parsing macro content that
+# derives from an HTTP input (DefaultWikiMacroRenderer:759 -> :737, resolved
+# fidelity) -- a true-positive-shaped member of the macro-injection family
+# the platform sibling rank owns. Tomcat (1926 files) is unchanged.
+#
+# Kinship with the sibling xwiki ranks: 1975's escape-parser family needs the
+# same wiki-render sink half and this is that sink, so the platform tree can
+# measure the pair together rather than minting a third render concept; the
+# source half here is context-authorship, not an escape notion, so it does
+# not overlap 1975's HtmlEscape control.
+#
+# verify_current_expected: fixed
+
+test "rank1977: re-parsing a foreign macro marker's content under the current macro context reports template injection"
+  lang java
+  expect VYQL-INJ-008
+  code
+  ```
+  package org.xwiki.rendering.internal.macro.footnote;
+
+  import java.util.Collections;
+  import java.util.List;
+
+  import javax.inject.Inject;
+  import javax.inject.Named;
+  import javax.inject.Singleton;
+
+  import org.xwiki.component.annotation.Component;
+  import org.xwiki.rendering.block.Block;
+  import org.xwiki.rendering.block.ListItemBlock;
+  import org.xwiki.rendering.block.MacroMarkerBlock;
+  import org.xwiki.rendering.block.NumberedListBlock;
+  import org.xwiki.rendering.block.match.ClassBlockMatcher;
+  import org.xwiki.rendering.macro.AbstractMacro;
+  import org.xwiki.rendering.macro.MacroContentParser;
+  import org.xwiki.rendering.macro.MacroExecutionException;
+  import org.xwiki.rendering.macro.footnote.FootnoteMacroParameters;
+  import org.xwiki.rendering.transformation.MacroTransformationContext;
+
+  @Component
+  @Named("putFootnotes")
+  @Singleton
+  public class PutFootnotesMacro extends AbstractMacro<FootnoteMacroParameters>
+  {
+      @Inject
+      private MacroContentParser contentParser;
+
+      @Override
+      public boolean supportsInlineMode()
+      {
+          return false;
+      }
+
+      @Override
+      public List<Block> execute(FootnoteMacroParameters parameters, String content,
+          MacroTransformationContext context) throws MacroExecutionException
+      {
+          Block root = context.getXDOM();
+          List<MacroMarkerBlock> footnotes =
+              root.getBlocks(new ClassBlockMatcher(MacroMarkerBlock.class), Block.Axes.DESCENDANT);
+          if (footnotes.isEmpty()) {
+              return Collections.emptyList();
+          }
+
+          NumberedListBlock container = new NumberedListBlock(Collections.emptyList());
+
+          int counter = 1;
+          for (MacroMarkerBlock footnote : footnotes) {
+              container.addChild(processFootnote(footnote, counter, context));
+              counter++;
+          }
+
+          return Collections.singletonList(container);
+      }
+
+      private Block processFootnote(MacroMarkerBlock footnoteMacro, int counter,
+          MacroTransformationContext context) throws MacroExecutionException
+      {
+          String content = footnoteMacro.getContent();
+          return createFootnoteBlock(content, counter, context);
+      }
+
+      private ListItemBlock createFootnoteBlock(String content, int counter,
+          MacroTransformationContext context) throws MacroExecutionException
+      {
+          List<Block> parsedContent = this.contentParser.parse(content, context, false, true).getChildren();
+          ListItemBlock result = new ListItemBlock(Collections.emptyList());
+          result.addChildren(parsedContent);
+          return result;
+      }
+  }
+  ```
+
+test "rank1977: a macro parsing its own content parameter in its own context is the documented use"
+  lang java
+  reject VYQL-INJ-008
+  code
+  ```
+  package org.xwiki.rendering.internal.macro.footnote;
+
+  import java.util.Collections;
+  import java.util.List;
+
+  import javax.inject.Inject;
+  import javax.inject.Named;
+  import javax.inject.Singleton;
+
+  import org.xwiki.component.annotation.Component;
+  import org.xwiki.rendering.block.Block;
+  import org.xwiki.rendering.macro.AbstractMacro;
+  import org.xwiki.rendering.macro.MacroContentParser;
+  import org.xwiki.rendering.macro.MacroExecutionException;
+  import org.xwiki.rendering.macro.descriptor.DefaultContentDescriptor;
+  import org.xwiki.rendering.macro.footnote.FootnoteMacroParameters;
+  import org.xwiki.rendering.transformation.MacroTransformationContext;
+
+  @Component
+  @Named("footnote")
+  @Singleton
+  public class FootnoteMacro extends AbstractMacro<FootnoteMacroParameters>
+  {
+      @Inject
+      private MacroContentParser contentParser;
+
+      public FootnoteMacro()
+      {
+          super("Footnote", "Add a footnote",
+              new DefaultContentDescriptor("The footnote content", false, Block.LIST_BLOCK_TYPE),
+              FootnoteMacroParameters.class);
+      }
+
+      @Override
+      public boolean supportsInlineMode()
+      {
+          return true;
+      }
+
+      @Override
+      public List<Block> execute(FootnoteMacroParameters parameters, String content,
+          MacroTransformationContext context) throws MacroExecutionException
+      {
+          return this.contentParser.parse(content, context, true, true).getChildren();
+      }
+  }
+  ```

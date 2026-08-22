@@ -1,0 +1,90 @@
+test "rank1985: url host reaches shell command through netrc machine lookup"
+  lang python
+  file getcourseru.py
+  expect VYQL-INJ-002
+  code
+  ```
+  import subprocess
+  import sys
+  import urllib.parse
+
+  from yt_dlp.utils import Popen
+
+
+  class GetCourseRuIE:
+      _NETRC_MACHINE = None
+
+      def get_param(self, name):
+          return None
+
+      def _real_extract(self, url):
+          hostname = urllib.parse.urlparse(url).hostname
+          username, password = self._get_login_info(hostname)
+          return {}
+
+      def _get_login_info(self, netrc_machine=None):
+          username, password = self._get_netrc_login_info(netrc_machine)
+          return username, password
+
+      def _get_netrc_login_info(self, netrc_machine=None):
+          netrc_machine = netrc_machine or self._NETRC_MACHINE
+
+          cmd = self.get_param('netrc_cmd')
+          if cmd:
+              cmd = cmd.replace('{}', netrc_machine)
+              stdout, _, ret = Popen.run(cmd, text=True, shell=True, stdout=subprocess.PIPE)
+
+
+  def main():
+      ie = GetCourseRuIE()
+      for url in sys.argv[1:]:
+          ie._real_extract(url)
+  ```
+
+test "rank1985: netrc machine limited to a shell-safe character set before command use"
+  lang python
+  file getcourseru_patched.py
+  reject VYQL-INJ-002
+  code
+  ```
+  import subprocess
+  import sys
+  import urllib.parse
+
+  from yt_dlp.utils import Popen
+
+
+  class GetCourseRuIE:
+      _NETRC_MACHINE = None
+
+      def get_param(self, name):
+          return None
+
+      def _real_extract(self, url):
+          hostname = urllib.parse.urlparse(url).hostname
+          username, password = self._get_login_info(hostname)
+          return {}
+
+      def _get_login_info(self, netrc_machine=None):
+          username, password = self._get_netrc_login_info(netrc_machine)
+          return username, password
+
+      def _get_netrc_login_info(self, netrc_machine=None):
+          netrc_machine = netrc_machine or self._NETRC_MACHINE
+          if not netrc_machine:
+              raise ExtractorError('Missing netrc_machine')
+          ALLOWED = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-_'
+          if netrc_machine.startswith(('-', '_')) or not all(c in ALLOWED for c in netrc_machine):
+              raise ExtractorError(f'Invalid netrc machine: {netrc_machine!r}', expected=True)
+
+          cmd = self.get_param('netrc_cmd')
+          if cmd:
+              cmd = cmd.replace('{}', netrc_machine)
+              stdout, _, ret = Popen.run(cmd, text=True, shell=True, stdout=subprocess.PIPE)
+
+
+  def main():
+      ie = GetCourseRuIE()
+      for url in sys.argv[1:]:
+          ie._real_extract(url)
+  ```

@@ -1,0 +1,233 @@
+# Vault 0.11.0 through 1.3.3 (CVE-2020-10661 as the pool records it; both
+# GitHub advisories for the 1.3.4 security release -- GHSA-j6vv-vv26-rh7c
+# under CVE-2020-10661 and GHSA-m979-w9wj-qfj9 under CVE-2020-10660 --
+# reference this exact commit 18485ee9, and their descriptions are swapped
+# relative to NVD's texts, so the row's repo/commit pair is corroborated
+# twice while the identifier-vs-description pairing is inconsistent inside
+# the advisory databases themselves). The identity store's
+# refreshExternalGroupMembershipsByEntityID is the revocation mechanism for
+# group-derived policy: it diffs the entity's current external groups
+# against the freshly reported group aliases and removes the entity from
+# every deleted group (vault/identity_store_util.go:1880, diffGroups over
+# oldGroups vs newGroups, then StrListDelete from MemberEntityIDs). At both
+# of its call sites the refresh is conjunctively guarded on the fresh list
+# being non-nil:
+#
+#   if resp.Auth.EntityID != "" &&
+#       resp.Auth.GroupAliases != nil &&
+#       m.core.identityStore != nil {
+#       validAliases, err := m.core.identityStore.refreshExternalGroupMembershipsByEntityID(...)
+#       ...
+#   }
+#
+# An auth method reporting no group aliases is precisely the state that
+# means the user belongs to no external group any more -- LDAP with the user
+# removed from every group -- so the guard skips the refresh exactly when
+# the diff would have removed every membership, and the entity keeps its
+# stale groups, and the policies attached to them, across login and every
+# token renewal (CWE-269/CWE-281; the advisory's own phrasing is "an
+# Entity's Group membership inadvertently include Groups the Entity no
+# longer has permissions to"). The fixed revision drops only the GroupAliases != nil
+# conjunct at vault/expiration.go:1004 (RenewToken) and
+# vault/request_handling.go:1077 (handleLoginRequest); the refresh call,
+# the error check and the assignment are unchanged, and
+# helper/testhelpers/ldap/ldaphelper.go switches the test LDAP GroupAttr
+# from memberOf to cn so the regression test can exercise the removal.
+#
+# Measured, bounded subtree scan of the change-carrying vault/ directory
+# (164 Go files; the fixed revision touches no file outside it except the test
+# helper), three `--cache off` runs per revision, timeout 180, 6GB:
+# a byte-stable 55-finding rule histogram at 18485ee9^ AND at 18485ee9
+# (36 VYQL-CRY-006, 7 VYQL-LIFE-001, 3 VYQL-PATH-001, 2 VYQL-SEC-002,
+# 2 VYQL-AUTH-079, 1 each VYQL-SEC-043/INJ-005/CRY-001/CFG-014/CFG-004)
+# -- zero delta. The only findings on the change-carrying files are CRY-006
+# rows on unrelated ==/!= comparisons (expiration.go:1115/1132/1234,
+# request_handling.go:203/204/1138); nothing fires on or near either
+# refresh call. `vyql match` labels no source, sink or control on the
+# repro of either revision: the call is not in any binding's vocabulary.
+#
+# The exhaustive enumeration of the shape's reachable set across the 95
+# sibling clones under /tmp/cve-work/rank*/: the callee
+# refreshExternalGroupMembershipsByEntityID occurs in no other tree, and
+# the generic name shape (a call named refresh/sync/update/prune/revoke
+# over group/member/role/entitlement) has an empty reachable set outside
+# this checkout -- its only other in-corpus occurrences are two vendored
+# GCP-plugin provisioning writes inside this same tree
+# (updateIamPolicies in vault-plugin-secrets-gcp, updateRole in
+# vault-plugin-auth-gcp), both of which would be false positives.
+#
+# This is the measured family "authorization decided by wiring or
+# configuration, not dataflow" (ranks 1514, 1535, 1540, 1556, 1557, 1593)
+# in the narrowest form yet: the fixed revision changes one conjunct of a guard
+# around a call that exists in both revisions. The 1380 counterweight does
+# not rescue it -- the counterweight needs an API-documented call the fixed revisioned revision
+# leaves inside the guarded method, and keying on the refresh call fires
+# identically before and after (the measured zero delta above). The only
+# discriminator is the removed GroupAliases != nil comparison itself, and
+# expressing "guarded by a non-emptiness check of the call's own argument"
+# requires spelling the shared identifier in both a call_arg clause and a
+# binary clause -- the binding language cannot correlate the two tokens --
+# which is this codebase's internal field name, not library-documentation
+# vocabulary: rename the field and the discrimination goes dark in both
+# directions. A concept minted for the shape would have a corpus-wide
+# reachable set of exactly the two call sites above (measured), the
+# concept-per-CVE failure mode, and 1331 measured the
+# presence-shaped variants of this family as scoring identically on
+# vulnerable and patched trees.
+#
+# Reuse is checked before concluding: code.RevocationCheckAgainstCurrentTime
+# (VYQL-AUTH-121, CWE-613, the nearest expiry/revocation rule and the one
+# these cases pin) validates a token against the current time and has no
+# membership-sync reading; VYQL-AUTH-079 (SensitiveOperation) is a
+# sink-kind rule over privileged calls; the per-endpoint
+# *MissingAuthorization review concepts are endpoint-shaped and there is
+# no endpoint here -- the weakness sits in core request plumbing.
+#
+# All cases assert reject VYQL-AUTH-121: nothing fires today. If a
+# stale-entitlement rule ever ships (keyed on an authorization-membership
+# refresh that is conditional on the fresh list being non-empty), the
+# first and third cases -- the two vulnerable forms minus exactly the
+# fix's removed conjunct from their fixed twins -- are the ones that must
+# flip to expect, while the second and fourth stay reject.
+
+test "rank1910: token renewal skips the membership refresh when the fresh group list is nil"
+  lang go
+  file expiration.go
+  reject VYQL-AUTH-121
+  code
+  ```
+  package vault
+
+  func (m *ExpirationManager) RenewToken(ctx context.Context, req *logical.Request, te *logical.TokenEntry, increment int64) (*logical.Response, error) {
+      le := m.verifyVirtFuncCtx(te)
+      resp, err := m.renewAuthEntry(ctx, req, le, increment)
+      if err != nil {
+          return nil, err
+      }
+      resp.Auth.ClientToken = te.ID
+
+      // Refresh groups
+      if resp.Auth.EntityID != "" &&
+          resp.Auth.GroupAliases != nil &&
+          m.core.identityStore != nil {
+          validAliases, err := m.core.identityStore.refreshExternalGroupMembershipsByEntityID(ctx, resp.Auth.EntityID, resp.Auth.GroupAliases)
+          if err != nil {
+              return nil, err
+          }
+          resp.Auth.GroupAliases = validAliases
+      }
+
+      return resp, nil
+  }
+  ```
+
+test "rank1910: token renewal refreshes memberships unconditionally on a non-empty entity ID"
+  lang go
+  file expiration.go
+  reject VYQL-AUTH-121
+  code
+  ```
+  package vault
+
+  func (m *ExpirationManager) RenewToken(ctx context.Context, req *logical.Request, te *logical.TokenEntry, increment int64) (*logical.Response, error) {
+      le := m.verifyVirtFuncCtx(te)
+      resp, err := m.renewAuthEntry(ctx, req, le, increment)
+      if err != nil {
+          return nil, err
+      }
+      resp.Auth.ClientToken = te.ID
+
+      // Refresh groups
+      if resp.Auth.EntityID != "" && m.core.identityStore != nil {
+          validAliases, err := m.core.identityStore.refreshExternalGroupMembershipsByEntityID(ctx, resp.Auth.EntityID, resp.Auth.GroupAliases)
+          if err != nil {
+              return nil, err
+          }
+          resp.Auth.GroupAliases = validAliases
+      }
+
+      return resp, nil
+  }
+  ```
+
+test "rank1910: login handles an entity whose fresh group list is nil without refreshing"
+  lang go
+  file request_handling.go
+  reject VYQL-AUTH-121
+  code
+  ```
+  package vault
+
+  func (c *Core) handleLoginRequest(ctx context.Context, req *logical.Request) (*logical.Response, *logical.Auth, error) {
+      resp, err := c.handleRequest(ctx, req)
+      if err != nil {
+          return nil, nil, err
+      }
+      if resp != nil && resp.Auth != nil {
+          auth := resp.Auth
+
+          if auth.Alias != nil && c.identityStore != nil {
+              entity, err := c.identityStore.CreateOrFetchEntity(ctx, auth.Alias)
+              if err != nil {
+                  return nil, nil, err
+              }
+              if entity.Disabled {
+                  return nil, nil, logical.ErrPermissionDenied
+              }
+
+              auth.EntityID = entity.ID
+              if auth.GroupAliases != nil {
+                  validAliases, err := c.identityStore.refreshExternalGroupMembershipsByEntityID(ctx, auth.EntityID, auth.GroupAliases)
+                  if err != nil {
+                      return nil, nil, err
+                  }
+                  auth.GroupAliases = validAliases
+              }
+          }
+
+          return resp, auth, nil
+      }
+
+      return resp, nil, nil
+  }
+  ```
+
+test "rank1910: login refreshes memberships even when the fresh group list is nil"
+  lang go
+  file request_handling.go
+  reject VYQL-AUTH-121
+  code
+  ```
+  package vault
+
+  func (c *Core) handleLoginRequest(ctx context.Context, req *logical.Request) (*logical.Response, *logical.Auth, error) {
+      resp, err := c.handleRequest(ctx, req)
+      if err != nil {
+          return nil, nil, err
+      }
+      if resp != nil && resp.Auth != nil {
+          auth := resp.Auth
+
+          if auth.Alias != nil && c.identityStore != nil {
+              entity, err := c.identityStore.CreateOrFetchEntity(ctx, auth.Alias)
+              if err != nil {
+                  return nil, nil, err
+              }
+              if entity.Disabled {
+                  return nil, nil, logical.ErrPermissionDenied
+              }
+
+              auth.EntityID = entity.ID
+              validAliases, err := c.identityStore.refreshExternalGroupMembershipsByEntityID(ctx, auth.EntityID, auth.GroupAliases)
+              if err != nil {
+                  return nil, nil, err
+              }
+              auth.GroupAliases = validAliases
+          }
+
+          return resp, auth, nil
+      }
+
+      return resp, nil, nil
+  }
+  ```

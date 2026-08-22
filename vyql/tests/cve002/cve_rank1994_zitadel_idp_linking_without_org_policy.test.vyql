@@ -1,0 +1,254 @@
+# zitadel's new login app processes the external-IdP callback in one Next.js
+# server action ("use server" file), `processIDPCallback` in
+# apps/login/src/lib/server/idp-intent.ts. Two of its cases link an external
+# identity to an existing local account:
+#
+# - the explicit-link case (CASE 2) checks only the IDP template's own
+#   `options.isLinkingAllowed` flag, then calls `addIDPLink`;
+# - the auto-linking case (CASE 3) searches for a local user by the *external*
+#   identity's email or username -- attributes the caller of the external IdP
+#   controls -- and links straight to whatever account matches, with no check
+#   of any kind.
+#
+# Neither case consults the target user's organization policy: whether the org
+# allows external IDPs at all (`loginSettings.allowExternalIdp`) and whether it
+# has activated this specific IDP with linking allowed. Anyone who controls an
+# account on some external IdP can set that account's email to a victim's
+# email, authenticate there, and the callback links the attacker's external
+# identity to the victim's account -- account takeover with no credential in
+# the target system (CWE-862). The legacy Go handler carried the policy check;
+# this port dropped it. The fixed revision adds a `validateIDPLinkingPermissions` helper
+# (org login settings + active-provider membership, `linking_allowed: true`)
+# and calls it before every `addIDPLink`, after resolving the target user's
+# organization with `getUserByID` / `foundUser.details.resourceOwner`.
+#
+# Pinned as a miss: nothing labels `addIDPLink` or reports any authorization
+# finding on either revision. `vyql match` on the vulnerable file shows only
+# console log-write labels (plus the known regex-`.exec()` CommandExecution
+# misfire); the calls resolve (`vyql resolve` does not list addIDPLink,
+# listUsers or getUserByID as unresolved), so the blocker is not resolution.
+# Probed with a scratch binding emitting the rule-consumed
+# code.UnboundAuthorizationTarget (VYQL-AUTH-095) at functions calling
+# `addIDPLink`, three routes measured on both revisions of
+# apps/login/src/lib/server (two `--cache off` runs per side, stable):
+#
+# - unconditional: 2 -> 2 (idp-intent.ts's processIDPCallback and
+#   register.ts's registerUserAndLinkToIDP fire at both revisions);
+# - function-scoped negation `not (call in ["getUserByID"])`: 2 -> 1. The CVE
+#   function clears only because the fixed revision's explicit-link case happens to add a
+#   `getUserByID` data fetch in the same function -- a fetch, not a check
+#   (unlike the documented-API counterweight's `isRemote()`-style predicate),
+#   failing the rename test, clearing any code that merely fetches a user, and
+#   only covering the auto-linking site because both cases share one function
+#   body;
+# - module-scoped negation on the fixed revision's policy atoms
+#   (`literal contains "allowExternalIdp"`): 2 -> 1 again, the surviving row
+#   being register.ts, whose self-registration link flow the fixed revision deliberately
+#   left untouched -- a standing false positive at both revisions -- and the
+#   module token carries raw source, so a comment naming the field silences it.
+#
+# Every discriminating route keys on text the fixed revision itself introduced (the
+# helper's name, the helper's API calls, the helper's field reads, or the
+# incidental user fetch), which is the delegated-check attribution gap measured
+# for JavaScript/TypeScript (the check lives in a sibling function; the call
+# resolves but no control fact is attributed to the caller), inside the
+# authorization-by-wiring family. A fact that attributes a resolved guard
+# call's control effect to its calling function would flip the first block
+# below to `expect VYQL-AUTH-095` while the guarded block stays rejected.
+
+test "idp callback action links an external identity to a matched local account without an organization policy check"
+  lang javascript
+  file lib/server/idp-intent.ts
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-095
+  code
+  ```
+  import {
+    retrieveIDPIntent,
+    getIDPByID,
+    addIDPLink,
+    listUsers,
+  } from "@/lib/zitadel";
+
+  export async function processIDPCallback({
+    provider,
+    id,
+    token,
+    organization,
+    link,
+  }) {
+    const intent = await retrieveIDPIntent({ id, token });
+    const { idpInformation, userId, addHumanUser } = intent;
+    const idp = await getIDPByID({ id: idpInformation.idpId });
+    const options = idp?.config?.options;
+
+    // CASE 2: explicit link. Only the IDP template's own option is
+    // consulted; the target user's organization policy is not.
+    if (link && userId) {
+      if (!options?.isLinkingAllowed) {
+        return {
+          redirect: `/idp/${provider}/linking-failed?error=linking_not_allowed`,
+        };
+      }
+
+      await addIDPLink({
+        idp: {
+          id: idpInformation.idpId,
+          userId: idpInformation.userId,
+          userName: idpInformation.userName,
+        },
+        userId,
+      });
+      return { redirect: `/idp/${provider}/success` };
+    }
+
+    // CASE 3: auto-linking. The local account is selected by the external
+    // identity's email -- data the caller of the external IdP controls --
+    // and the link is created with no check of any kind.
+    if (options?.autoLinking) {
+      const email = addHumanUser?.email?.email;
+      const foundUser = await listUsers({
+        email,
+        organizationId: organization,
+      }).then((response) => (response.result ? response.result[0] : null));
+
+      if (foundUser) {
+        await addIDPLink({
+          idp: {
+            id: idpInformation.idpId,
+            userId: idpInformation.userId,
+            userName: idpInformation.userName,
+          },
+          userId: foundUser.userId,
+        });
+        return { redirect: `/idp/${provider}/success` };
+      }
+    }
+
+    return { redirect: `/idp/${provider}/account-not-found` };
+  }
+  ```
+
+test "idp callback action validates organization linking policy before addIDPLink"
+  lang javascript
+  file lib/server/idp-intent.ts
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-095
+  code
+  ```
+  import {
+    retrieveIDPIntent,
+    getIDPByID,
+    getLoginSettings,
+    getActiveIdentityProviders,
+    getUserByID,
+    addIDPLink,
+    listUsers,
+  } from "@/lib/zitadel";
+
+  async function validateIDPLinkingPermissions({
+    userOrganizationId,
+    idpId,
+  }) {
+    const loginSettings = await getLoginSettings({
+      organization: userOrganizationId,
+    });
+    if (!loginSettings?.allowExternalIdp) {
+      return false;
+    }
+
+    const activeIDPs = await getActiveIdentityProviders({
+      orgId: userOrganizationId,
+      linking_allowed: true,
+    });
+    return (
+      activeIDPs.identityProviders?.some((idp) => idp.id === idpId) ?? false
+    );
+  }
+
+  export async function processIDPCallback({
+    provider,
+    id,
+    token,
+    organization,
+    link,
+  }) {
+    const intent = await retrieveIDPIntent({ id, token });
+    const { idpInformation, userId, addHumanUser } = intent;
+    const idp = await getIDPByID({ id: idpInformation.idpId });
+    const options = idp?.config?.options;
+
+    if (link && userId) {
+      if (!options?.isLinkingAllowed) {
+        return {
+          redirect: `/idp/${provider}/linking-failed?error=linking_not_allowed`,
+        };
+      }
+
+      const targetUser = await getUserByID({ userId });
+      if (!targetUser || !targetUser.details?.resourceOwner) {
+        return {
+          redirect: `/idp/${provider}/linking-failed?error=user_not_found`,
+        };
+      }
+
+      const isAllowed = await validateIDPLinkingPermissions({
+        userOrganizationId: targetUser.details.resourceOwner,
+        idpId: idpInformation.idpId,
+      });
+      if (!isAllowed) {
+        return {
+          redirect: `/idp/${provider}/linking-failed?error=validation_failed`,
+        };
+      }
+
+      await addIDPLink({
+        idp: {
+          id: idpInformation.idpId,
+          userId: idpInformation.userId,
+          userName: idpInformation.userName,
+        },
+        userId,
+      });
+      return { redirect: `/idp/${provider}/success` };
+    }
+
+    if (options?.autoLinking) {
+      const email = addHumanUser?.email?.email;
+      const foundUser = await listUsers({
+        email,
+        organizationId: organization,
+      }).then((response) => (response.result ? response.result[0] : null));
+
+      if (foundUser) {
+        if (!foundUser.details?.resourceOwner) {
+          return {
+            redirect: `/idp/${provider}/linking-failed?error=missing_organization`,
+          };
+        }
+
+        const isAllowed = await validateIDPLinkingPermissions({
+          userOrganizationId: foundUser.details.resourceOwner,
+          idpId: idpInformation.idpId,
+        });
+        if (!isAllowed) {
+          return {
+            redirect: `/idp/${provider}/linking-failed?error=validation_failed`,
+          };
+        }
+
+        await addIDPLink({
+          idp: {
+            id: idpInformation.idpId,
+            userId: idpInformation.userId,
+            userName: idpInformation.userName,
+          },
+          userId: foundUser.userId,
+        });
+        return { redirect: `/idp/${provider}/success` };
+      }
+    }
+
+    return { redirect: `/idp/${provider}/account-not-found` };
+  }
+  ```

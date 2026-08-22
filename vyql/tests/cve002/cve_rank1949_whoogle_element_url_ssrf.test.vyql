@@ -1,0 +1,267 @@
+# Rank 1949 / CVE-2024-22203: Whoogle's `element` endpoint handed the
+# request's `url` parameter to the per-session fetch wrapper without any
+# hostname validation, so `element_url=127.0.0.1:<port>/<resource>` made the
+# self-hosted instance fetch arbitrary resources and stream them back
+# (server-side request forgery, CWE-918; GHSL-2023-186). The vulnerable chain
+# in app/routes.py and app/request.py:
+#   element_url = src_url = request.args.get('url')
+#   file_data = g.user_request.send(base_url=src_url).content
+#   ...
+#   response = requests.get((base_url or self.search_url) + query, ...)
+# The `window` endpoint has the same shape through its `location` parameter.
+# The fixed revision (3a2e0b2) parses the URL and returns early unless
+# validators.domain(urlparse.urlparse(src_url).netloc) accepts the host.
+#
+# Two engine constructs sat on the exploit path. The first is closed here:
+# the Python frontend lowered the chained assignment
+# `element_url = src_url = request.args.get('url')` by treating the nested
+# assignment on the right as a bare expression, so `src_url` -- the name the
+# fetch argument reads on the plain-URL path the advisory describes -- is
+# never bound and carried no taint. assignStmts now emits the nested
+# assignment before the outer one, the same way the JS frontend lowers its
+# chained assignment expressions, so every target binds the value; measured
+# on the real checkout the finding set is byte-identical (63 findings before
+# and after, three --cache off runs each) because the remaining hop below
+# still blocks the rule.
+#
+# The remaining hop is the wrapper call's receiver: `g.user_request` is a
+# chained attribute assigned in before_request_func (app/routes.py:163), and
+# resolveCallee's nir.Attr arm returns before the unique-name cross-file
+# fallback when the callee's base is itself an attribute rather than a plain
+# name (lowering.go, `base, isName := baseExpr.(nir.Name); if !isName {
+# return nil }`), so `send` stays unresolved and the wrapper body -- the
+# requests.get call included -- is never entered. The source (`request.args`
+# is bound code.HttpInput), the sink (`requests.get` is bound code.UrlFetch
+# at app/request.py:339) and VYQL-RF-001 itself all work: the same-shaped
+# chain reports end to end in app/utils/bangs.py:42 -> :81 on this very
+# scan. This is the Python instance of the chained-attribute receiver family
+# filed for rank 1765 (TypeScript instance 1874, PHP instance 1886); the
+# isolating pair below differs only in the receiver spelling. Measured on
+# the real checkout, timeout 180 --cache off --max-ram 6GB, three runs per
+# revision: 63 findings at the vulnerable revision and 63 at the fixed revision, byte-identical
+# label sets modulo the fixed revision's line shift, none on element() or window() at
+# either revision.
+#
+# The guarded block keeps a resolvable receiver so the guard is what is under
+# test: validators.domain is a third-party validator no binding credits as a
+# control, so even once the receiver resolves the real pair reports at both
+# revisions -- the guard-uncredited shape. When a domain/URL validation
+# control lands, the guarded block must flip to reject; when the
+# chained-attribute receiver resolution lands, the g-receiver blocks must
+# flip to expect.
+# verify_current_expected: attention-engine-gap.
+
+test "rank1949: the element endpoint hands the request url to the session's fetch wrapper"
+  lang python
+  file routes_element.py
+  reject VYQL-RF-001
+  code
+  ```
+  import io
+
+  import requests
+  from flask import g, request
+
+
+  class Request:
+      def send(self, base_url='', query=''):
+          response = requests.get((base_url or self.search_url) + query)
+          return response
+
+
+  def before_request_func():
+      g.user_request = Request()
+
+
+  def element():
+      element_url = src_url = request.args.get('url')
+      if element_url.startswith('gAAAAA'):
+          src_url = decrypt(element_url)
+      src_type = request.args.get('type')
+      try:
+          file_data = g.user_request.send(base_url=src_url).content
+          tmp_mem = io.BytesIO()
+          tmp_mem.write(file_data)
+          tmp_mem.seek(0)
+          return send_file(tmp_mem, mimetype=src_type)
+      except Exception:
+          pass
+      return send_file(io.BytesIO(b'GIF89a'), mimetype='image/gif')
+  ```
+  # Pinned miss: with source and sink both labelled, the chained-attribute
+  # receiver leaves the wrapper call unresolved, so no rule can see the
+  # fetch. A chained-attribute receiver resolution fix must flip this block
+  # to expect VYQL-RF-001.
+
+test "rank1949: the fixed revision validates the parsed domain before fetching"
+  lang python
+  file routes_element_guarded.py
+  expect VYQL-RF-001
+  code
+  ```
+  import io
+  import urllib.parse as urlparse
+
+  import requests
+  import validators
+  from flask import request
+
+
+  class Request:
+      def send(self, base_url='', query=''):
+          response = requests.get((base_url or self.search_url) + query)
+          return response
+
+
+  user_request = None
+
+
+  def before_request_func():
+      global user_request
+      user_request = Request()
+
+
+  def element():
+      element_url = src_url = request.args.get('url')
+      src_type = request.args.get('type')
+
+      # Ensure requested element is from a valid domain
+      domain = urlparse.urlparse(src_url).netloc
+      if not validators.domain(domain):
+          return send_file(io.BytesIO(b'GIF89a'), mimetype='image/gif')
+
+      file_data = user_request.send(base_url=src_url).content
+      tmp_mem = io.BytesIO()
+      tmp_mem.write(file_data)
+      tmp_mem.seek(0)
+      return send_file(tmp_mem, mimetype=src_type)
+  ```
+  # The receiver is spelled resolvable here so the guard is what is under
+  # test: validators.domain is not a credited control, so the rule fires on
+  # the guarded form today. When a domain/URL validation control binding
+  # lands, this block must flip to reject.
+
+test "rank1949: a constant element url keeps the fetch untainted"
+  lang python
+  file routes_element_static.py
+  reject VYQL-RF-001
+  code
+  ```
+  import requests
+
+
+  class Request:
+      def send(self, base_url='', query=''):
+          response = requests.get((base_url or self.search_url) + query)
+          return response
+
+
+  user_request = None
+
+
+  def before_request_func():
+      global user_request
+      user_request = Request()
+
+
+  def element():
+      file_data = user_request.send(
+          base_url='https://maps.google.com/maps').content
+      return file_data
+  ```
+
+test "rank1949: minimal pair, plain-name receiver -- the chain reports"
+  lang python
+  file request_send_pair.py
+  expect VYQL-RF-001
+  code
+  ```
+  import requests
+  from flask import request
+
+
+  class Request:
+      def send(self, base_url='', query=''):
+          response = requests.get((base_url or self.search_url) + query)
+          return response
+
+
+  user_request = None
+
+
+  def before_request_func():
+      global user_request
+      user_request = Request()
+
+
+  def element():
+      src_url = request.args.get('url')
+      file_data = user_request.send(base_url=src_url).content
+      return file_data
+  ```
+
+test "rank1949: minimal pair, chained-attribute receiver -- the call never links"
+  lang python
+  file request_send_pair.py
+  reject VYQL-RF-001
+  code
+  ```
+  import requests
+  from flask import g, request
+
+
+  class Request:
+      def send(self, base_url='', query=''):
+          response = requests.get((base_url or self.search_url) + query)
+          return response
+
+
+  def before_request_func():
+      g.user_request = Request()
+
+
+  def element():
+      src_url = request.args.get('url')
+      file_data = g.user_request.send(base_url=src_url).content
+      return file_data
+  ```
+  # Identical class, source, sink and argument spelling as the previous
+  # block; only the receiver is `g.user_request` instead of the plain name.
+  # A chained-attribute receiver resolution fix must flip this block to
+  # expect VYQL-RF-001.
+
+test "rank1949: minimal pair, chained assignment -- both targets bind the fetched value"
+  lang python
+  file element_chained_assign.py
+  expect VYQL-RF-001
+  code
+  ```
+  import requests
+  from flask import request
+
+
+  class Request:
+      def send(self, base_url='', query=''):
+          response = requests.get((base_url or self.search_url) + query)
+          return response
+
+
+  user_request = None
+
+
+  def before_request_func():
+      global user_request
+      user_request = Request()
+
+
+  def element():
+      element_url = src_url = request.args.get('url')
+      file_data = user_request.send(base_url=src_url).content
+      return file_data
+  ```
+  # `element_url = src_url = request.args.get('url')` is the endpoint's own
+  # spelling, and src_url is the name the fetch argument reads. The Python
+  # frontend lowered the nested assignment as a bare expression, leaving
+  # src_url unbound, so the fetch argument carried no taint; assignStmts now
+  # emits the nested assignment first, so this block reports like its
+  # single-assignment sibling above.
