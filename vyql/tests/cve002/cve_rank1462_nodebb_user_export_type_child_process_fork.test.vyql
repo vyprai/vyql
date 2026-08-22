@@ -1,0 +1,247 @@
+# Rank 1462 / CVE-2023-26045 (NodeBB/NodeBB, CWE-22): NodeBB lets a user export
+# their own profile, posts or uploads. `src/api/users.js` turns the requested
+# export kind straight into the module path of a Node child process:
+#
+#   usersAPI.generateExport = async (caller, { uid, type }) => {
+#     const count = await db.incrObjectField('locks', `export:${uid}${type}`);
+#     ...
+#     const child = require('child_process').fork(`./src/user/jobs/export-${type}.js`, [], {
+#       env: process.env,
+#     });
+#
+# `type` is request data. The HTTP route `POST /api/v3/users/:uid/exports/:type`
+# reaches it through `controllers/write/users.js` as
+# `api.users.generateExport(req, req.params)`, and the deprecated socket call
+# reaches it through `src/socket.io/user/profile.js`:
+#
+#   api.users.generateExport(socket, { type, ...data });
+#
+# where the spread of the client's own payload is written *after* the
+# server-chosen `type`, so a client that sends `{ uid: 1, type: '../../..' }`
+# overwrites it. Either way `fork()` resolves `./src/user/jobs/export-<type>.js`
+# relative to the install directory and executes whatever JavaScript file the
+# traversal lands on, as the NodeBB process.
+#
+# The fixed revision has both halves: `generateExport` gains
+# `const validTypes = ['profile', 'posts', 'uploads']; if
+# (!validTypes.includes(type)) throw`, and the socket handler stops spreading
+# the payload (`{ type, uid: data.uid }`).
+#
+# What this rank ships: `child_process.fork` as a `code.CommandExecution` sink
+# under the spellings Node actually documents and Node code actually writes.
+# Until this rank only `callee.path ~= "child_process.fork"` bound -- covering a
+# module object literally named `child_process`. `require('child_process')
+# .fork(...)` (NodeBB's own spelling, callee path `require.fork`),
+# `const { fork } = require('child_process'); fork(...)` (NodeBB's
+# `src/meta/debugFork.js`), `cp.fork(...)` and `childProcess.fork(...)` are all
+# unlabelled, while the same four spellings of `exec`, `spawn`, `spawnSync`,
+# `execFile` and `execFileSync` have been bound for a long time. The bare form
+# is bound with `callee.path == "fork"`, the receiverless spelling only:
+# `~= "fork"` is segment-aware in both directions and would also claim
+# `cluster.fork(env)` and MikroORM's `em.fork(opts)`. Enumerated over the ~100
+# repository clones on this machine, `.fork(` occurs on 731 lines: `cluster.fork(`
+# 98, bare `fork(` 96 (of which the readable, non-bundled ones are almost all
+# `const { fork } = require('child_process')`), `o.fork(` 12, `cp.fork(` 9,
+# `currentThread.fork(` 3, `childProcess.fork(` 2, `child_process.fork(` 2,
+# `cursor.fork(` 2, `orm.em.fork(` 2, and single instances of `u.fork(`,
+# `oldTimeline.fork(` and `child.fork(`.
+#
+# Measured, three `--cache off --max-ram 6GB` runs of each revision of each
+# tree: NodeBB `src/` 379 -> 380 findings, `VYQL-INJ-002` 5 -> 6, the one new row
+# being `src/meta/debugFork.js:33`, a genuine `fork(modulePath, args, options)`
+# whose `modulePath` parameter is reached from a request. No change anywhere
+# else: nginx-proxy-manager `backend/` 169/169 with `VYQL-INJ-002` 12/12,
+# LibreChat 1043/1043 with 8/8, n8n-mcp `src/` 674/674 with 7/7, eleventy `src/`
+# 75/75, mongoose `lib/` 374/374 with 15/15, node `lib/` 189/187/189 against
+# 189/189/184 (inside the run-to-run noise) with `VYQL-INJ-002` 18/18.
+#
+# Why the rank is still ATTENTION: on NodeBB's real code the sink is now
+# labelled and nothing reaches it, for two JavaScript frontend gaps that the
+# last two cases below pin as minimal pairs against the first.
+#
+#   * A destructuring parameter is dropped. `c.params`
+#     (`internal/extract/frontend/treesitter/javascript.go:2627`) collects
+#     `identifier`, `required_parameter`/`optional_parameter` with an identifier
+#     pattern, and `assignment_pattern`; `object_pattern` and `array_pattern`
+#     match no case and are skipped silently. So `async (caller, { uid, type })`
+#     yields one `code.Param` node, `generateExport#param#caller`, and the
+#     argument carrying `req.params` has nowhere to land -- `vyql trace` reports
+#     "reaches no code.CommandExecution sink -- taint stops at ... call=
+#     generateExport". Dropping rather than placeholding also shifts every later
+#     parameter's index, so in `f(a, { b }, c)` an argument at index 2 binds to
+#     `c` at index 1.
+#
+#   * A local alias for `module.exports` is not an export root.
+#     `c.exportedNames` (javascript.go:328) marks `module.exports = ident` and
+#     `exports.f = fn`, and the `assignment_expression` lowering (javascript.go:
+#     1956-1985) turns `member = function` into a `nir.FuncDef` only when
+#     `exportFuncName` recognises the receiver as `exports`/`module.exports` or
+#     when the receiver's root identifier is in `c.exported`. NodeBB
+#     opens `src/api/users.js` with `const usersAPI = module.exports;` -- a
+#     `variable_declarator`, which that walk does not visit -- so
+#     `usersAPI.generateExport = async function ...` produces no `FuncDef` at
+#     all and no call to it can resolve. `module.exports.generateExport =
+#     async function ...` with the same body does produce one and does report.
+#
+# A third hop is needed after those two: the real caller writes
+# `api.users.generateExport(req, req.params)`, and a dotted call path does not
+# resolve to a `FuncDef` registered under its last segment even in the same file
+# (`module.exports.f = fn` plus `module.exports.f(...)` reports nothing, while
+# the same definition plus a bare `f(...)` reports).
+#
+# Measured and rejected: the patched form is not distinguishable today, and the
+# obvious control is not worth its cost. Case 1 with the fixed revision's own
+# `validTypes.includes(type)` guard inserted ahead of the `fork` still reports 1
+# `VYQL-INJ-002`, because no JavaScript binding emits `core.CommandArgumentValidation`
+# for a membership test. Adding `callee.method == "includes"` as a
+# `core.CommandArgumentValidation` endpoint check makes that case go to 0 and
+# also deletes six other command-injection findings: n8n-mcp `src/`
+# `VYQL-INJ-002` 7 -> 2 and LibreChat 8 -> 7. The n8n-mcp deletions are the
+# tell -- `services/expression-validator.ts` calls
+# `fullMatch.includes('.invalid')` ten lines above the sinks, on a value that
+# has nothing to do with them, and `endpointGuarded` only asks that the check
+# dominate the sink. A membership test on some other string is not a control on
+# this one, so the clause is left off; the shipped
+# `binding521` treats `.includes` as an *advisory* neutralizer for
+# `code.FilePathAccess`, which annotates and never suppresses, and that is the
+# right strength for this shape.
+
+test "rank1462: a request-supplied export kind is interpolated into the module path of child_process.fork"
+  lang javascript
+  file src/api/users.js
+  expect VYQL-INJ-002
+  code
+  ```
+  'use strict';
+
+  const express = require('express');
+  const db = require('./database');
+
+  async function generateExport(caller, params) {
+  	const uid = params.uid;
+  	const type = params.type;
+
+  	const count = await db.incrObjectField('locks', `export:${uid}${type}`);
+  	if (count > 1) {
+  		throw new Error('[[error:already-exporting]]');
+  	}
+
+  	const child = require('child_process').fork(`./src/user/jobs/export-${type}.js`, [], {
+  		env: process.env,
+  	});
+  	child.send({ uid });
+  }
+
+  const router = express.Router();
+
+  router.post('/:uid/exports/:type', async (req, res) => {
+  	await generateExport(req, req.params);
+  	res.sendStatus(202);
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1462: the same fork call with a fixed module path and the request data only in the child's message"
+  lang javascript
+  file install/web.js
+  reject VYQL-INJ-002
+  code
+  ```
+  'use strict';
+
+  const express = require('express');
+  const db = require('./database');
+
+  async function generateExport(caller, params) {
+  	const uid = params.uid;
+
+  	const count = await db.incrObjectField('locks', `export:${uid}`);
+  	if (count > 1) {
+  		throw new Error('[[error:already-exporting]]');
+  	}
+
+  	const child = require('child_process').fork('./src/user/jobs/export-profile.js', [], {
+  		env: process.env,
+  	});
+  	child.send({ uid });
+  }
+
+  const router = express.Router();
+
+  router.post('/:uid/exports/:type', async (req, res) => {
+  	await generateExport(req, req.params);
+  	res.sendStatus(202);
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1462: pinned miss -- the same flow whose export kind arrives through a destructuring parameter"
+  lang javascript
+  file src/api/users.js
+  reject VYQL-INJ-002
+  code
+  ```
+  'use strict';
+
+  const express = require('express');
+  const db = require('./database');
+
+  async function generateExport(caller, { uid, type }) {
+  	const count = await db.incrObjectField('locks', `export:${uid}${type}`);
+  	if (count > 1) {
+  		throw new Error('[[error:already-exporting]]');
+  	}
+
+  	const child = require('child_process').fork(`./src/user/jobs/export-${type}.js`, [], {
+  		env: process.env,
+  	});
+  	child.send({ uid });
+  }
+
+  const router = express.Router();
+
+  router.post('/:uid/exports/:type', async (req, res) => {
+  	await generateExport(req, req.params);
+  	res.sendStatus(202);
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1462: pinned miss -- the same flow whose function is assigned to a local alias of module.exports"
+  lang javascript
+  file src/api/users.js
+  reject VYQL-INJ-002
+  code
+  ```
+  'use strict';
+
+  const express = require('express');
+  const db = require('./database');
+
+  const usersAPI = module.exports;
+
+  usersAPI.generateExport = async function (caller, params) {
+  	const uid = params.uid;
+  	const type = params.type;
+
+  	const count = await db.incrObjectField('locks', `export:${uid}${type}`);
+  	if (count > 1) {
+  		throw new Error('[[error:already-exporting]]');
+  	}
+
+  	const child = require('child_process').fork(`./src/user/jobs/export-${type}.js`, [], {
+  		env: process.env,
+  	});
+  	child.send({ uid });
+  };
+
+  const router = express.Router();
+
+  router.post('/:uid/exports/:type', async (req, res) => {
+  	await generateExport(req, req.params);
+  	res.sendStatus(202);
+  });
+  ```

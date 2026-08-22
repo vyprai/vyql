@@ -825,3 +825,21 @@ binding expressionEval124 {
   query pattern callExpr where callee.method == "parseExpression"
   emit sink code.ExpressionEval at args[0]
 }
+
+// A record store addressed by an opaque identifier names its single-record
+// read `getObjectById`, and the REST-shaped variant of the same operation
+// takes the record's own address instead: `getObjectByUrl`. Both are the
+// caller-names-the-record primitive that findById and getReferenceById above
+// already cover for repository-shaped APIs, so a request value arriving at
+// either one is a direct object reference. The binding says only which
+// argument names the record; whether reading it without constraining it to
+// the authenticated principal is a finding stays VYQL-AUTH-002's call.
+binding objectLookupByUserInput380 {
+  query pattern callExpr where callee.method == "getObjectById"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}
+
+binding objectLookupByUserInput381 {
+  query pattern callExpr where callee.method == "getObjectByUrl"
+  emit sink code.ObjectLookupByUserInput at args[0]
+}

@@ -1,0 +1,32 @@
+module bindings.python.urlopen_response_body;
+
+// `urlopen()` hands back a file-like response whose bytes were produced by
+// whatever host the URL names. urllib's own documentation is explicit that it
+// performs no validation of the content it returns, so those bytes are remote
+// data this program did not compute -- `code.NetworkData`, the same treatment a
+// socket read or an HTTP client library response already gets.
+//
+// The URL argument is separately a `code.UrlFetch` sink; that is the request
+// side. This is the response side, and the two are independent: a request to a
+// hardcoded, entirely trusted URL still returns bytes chosen by the server, so
+// piping the response into a pickle loader, a template compiler, a shell
+// command or an archive extractor is a decision that has to be judged on its
+// own.
+//
+// Only the response object is a source. `urlopen` also accepts a `Request`
+// object and a `data` body, neither of which carries anything remote.
+
+binding urlopenResponseNetworkData470 {
+  query pattern callExpr where callee.path ~= "urllib.request.urlopen"
+  emit source code.NetworkData at call.result
+}
+
+binding urlopenResponseNetworkData471 {
+  query pattern callExpr where callee.path ~= "urllib.urlopen"
+  emit source code.NetworkData at call.result
+}
+
+binding urlopenResponseNetworkData472 {
+  query pattern callExpr where callee.path ~= "urllib2.urlopen"
+  emit source code.NetworkData at call.result
+}

@@ -1,0 +1,199 @@
+# Rank 1463 / CVE-2020-7769: nodemailer's sendmail transport built the argv
+# array for the sendmail binary by concatenating the envelope's own addresses
+# onto an option array and handed it straight to spawn, so an address that
+# begins with a dash arrives as an option rather than a recipient
+# (CWE-88 argument injection). lib/sendmail-transport/index.js had
+#
+#   args = ['-i'].concat(envelope.from ? ['-f', envelope.from] : []).concat(envelope.to);
+#   ...
+#   sendmail = this._spawn(this.path, args);
+#
+# and the fixed revision ba31c64c91 rejects the send outright when any envelope address
+# matches /^-/. The pool row is the v6.4.16 release commit; it is a prettier
+# reformat of the whole tree with this one behavioural hunk inside it, and the
+# hunk is the advisory's fix, so the row stands.
+#
+# The weakness is argument injection, not command injection: spawn with an
+# argv array never reinterprets its elements as shell syntax, which is why
+# code.CommandExecution is correctly withheld here (rank 1086 measured that
+# scoping). The gap is the CWE-88 half -- a value in that same argv
+# array reaching a program that parses leading-dash arguments as options.
+# code.CommandOptionInjection and VYQL-INJ-031 carry that judgement;
+# the gap is JavaScript vocabulary for the shape, so this ships a binding and
+# mints nothing.
+#
+# What the binding reads is the argv assembly itself: an array literal whose
+# first element is a dash option, values concatenated onto it, and a spawn
+# family call in the same function -- the option literals are the evidence that
+# the target program parses options at all. The neutralising control is the
+# documented remediation for the class, a leading-dash rejection, in either of
+# its two spellings (a /^-/ regex or startsWith('-')) or an explicit `--`
+# end-of-options element.
+#
+# Measured on the whole nodemailer tree, three `--cache off` runs each:
+# 158 findings at ba31c64c91^ against 156 at ba31c64c91, the delta being this
+# VYQL-INJ-031 row plus the VYQL-VAL-004 row the same issue concept raises.
+# Three variants pin what the discrimination rests on: renaming the fixed revision's
+# `hasInvalidAddresses` while keeping the check still reports zero, so nothing
+# reads the fixed revision's own vocabulary; replacing /^-/ with an unrelated /^x/ brings
+# the row back, so the leading-dash rejection is what clears it; and the
+# startsWith('-') spelling of the same control also reports zero.
+#
+# Precision: across the ~600 clones under /tmp/cve-work/rank*/ the reachable
+# set is every JavaScript or TypeScript file that both calls a spawn family
+# function and concatenates onto an array literal holding a dash option -- 40
+# files, of which 31 are minified browser bundles. Scanning the scannable
+# remainder plus NodeBB/src, mongoose/lib, node-opcua/packages, next.js's
+# packages/next/src, node/lib and npm's lib reports zero rows either side, and
+# every one of those trees is unchanged in total findings.
+#
+# The npm explore reject below is the one shape that a looser draft did report.
+# Its two clauses are satisfied by two different assignments in one function,
+# `shellArgs = ['-c', ...]` and `shellArgs = ['/d','/s','/c'].concat(execArgs)`,
+# and every value it appends is escaped first; the escaping negation declines it.
+
+test "rank1463: envelope addresses concatenated onto a sendmail option argv"
+  lang javascript
+  file lib/sendmail-transport/index.js
+  expect VYQL-INJ-031
+  code
+  ```
+  const spawn = require('child_process').spawn;
+
+  class SendmailTransport {
+    constructor(options) {
+      this._spawn = spawn;
+      this.path = 'sendmail';
+      this.args = false;
+    }
+
+    send(mail, done) {
+      let envelope = mail.data.envelope || mail.message.getEnvelope();
+      let args;
+      let sendmail;
+
+      if (this.args) {
+        args = ['-i'].concat(this.args).concat(envelope.to);
+      } else {
+        args = ['-i'].concat(envelope.from ? ['-f', envelope.from] : []).concat(envelope.to);
+      }
+
+      try {
+        sendmail = this._spawn(this.path, args);
+      } catch (E) {
+        return done(E);
+      }
+      return sendmail;
+    }
+  }
+
+  module.exports = SendmailTransport;
+  ```
+
+test "rank1463: the same argv after the addresses are rejected for a leading dash"
+  lang javascript
+  file lib/sendmail-transport/index.js
+  reject VYQL-INJ-031
+  code
+  ```
+  const spawn = require('child_process').spawn;
+
+  class SendmailTransport {
+    constructor(options) {
+      this._spawn = spawn;
+      this.path = 'sendmail';
+      this.args = false;
+    }
+
+    send(mail, done) {
+      let envelope = mail.data.envelope || mail.message.getEnvelope();
+      let args;
+      let sendmail;
+
+      const hasInvalidAddresses = []
+        .concat(envelope.from || [])
+        .concat(envelope.to || [])
+        .some(addr => /^-/.test(addr));
+      if (hasInvalidAddresses) {
+        return done(new Error('Can not send mail. Invalid envelope addresses.'));
+      }
+
+      if (this.args) {
+        args = ['-i'].concat(this.args).concat(envelope.to);
+      } else {
+        args = ['-i'].concat(envelope.from ? ['-f', envelope.from] : []).concat(envelope.to);
+      }
+
+      try {
+        sendmail = this._spawn(this.path, args);
+      } catch (E) {
+        return done(E);
+      }
+      return sendmail;
+    }
+  }
+
+  module.exports = SendmailTransport;
+  ```
+
+# The other spelling of the same control. Nothing here is named after the project.
+
+test "rank1463: the same argv with a startsWith leading-dash rejection"
+  lang javascript
+  file lib/sendmail-transport/startswith.js
+  reject VYQL-INJ-031
+  code
+  ```
+  const spawn = require('child_process').spawn;
+
+  class SendmailTransport {
+    constructor(options) {
+      this._spawn = spawn;
+      this.path = 'sendmail';
+    }
+
+    send(mail, done) {
+      let envelope = mail.data.envelope || mail.message.getEnvelope();
+      let args;
+
+      const bad = [].concat(envelope.from || []).concat(envelope.to || []).some(addr => addr.startsWith('-'));
+      if (bad) {
+        return done(new Error('Invalid envelope addresses.'));
+      }
+
+      args = ['-i'].concat(envelope.from ? ['-f', envelope.from] : []).concat(envelope.to);
+      return this._spawn(this.path, args);
+    }
+  }
+
+  module.exports = SendmailTransport;
+  ```
+
+# A subshell launcher that escapes every argv element it appends. The dash
+# option and the concatenation live in two unrelated assignments, and the
+# values are quoted before they are placed in the array.
+
+test "rank1463: a subshell argv whose appended values are escaped first"
+  lang javascript
+  file lib/explore.js
+  reject VYQL-INJ-031
+  code
+  ```
+  var spawn = require('./utils/spawn');
+  var escapeExecPath = require('./utils/escape-exec-path.js');
+  var escapeArg = require('./utils/escape-arg.js');
+
+  function explore (args, cb) {
+    var p = args.shift();
+    var shellArgs = [];
+    if (args) {
+      var execCmd = escapeExecPath(args.shift());
+      var execArgs = [execCmd].concat(args.map(escapeArg));
+      shellArgs = ['-c', args.map(escapeArg).join(' ').trim()];
+      shellArgs = ['/d', '/s', '/c'].concat(execArgs);
+    }
+    return spawn('sh', shellArgs, {cwd: p});
+  }
+
+  module.exports = explore;
+  ```

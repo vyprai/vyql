@@ -4,8 +4,8 @@ concept SamlAssertionWrappingBypass : issue {
   cwe: [CWE_287, CWE_347]
   reviewAssumption: "an attacker can submit a SAML response with wrapping or duplicate Assertion elements so the signed assertion differs from the assertion later unmarshaled for authentication"
   reviewCategory: auth
-  reviewCondition: "SAML assertion signature validation searches and rewrites signed Assertion elements without proving there is exactly one direct assertion in the expected namespace"
+  reviewCondition: "SAML assertion signature validation does not bind the signature it verified to the assertion content processed afterwards, so a wrapped or duplicate Assertion can be accepted in place of the signed one"
   reviewConfidence: high
-  reviewEvidence: "SAML assertion validation context {pattern} iterates namespace matches, detaches an assertion for signature validation, and replaces children in the response tree"
+  reviewEvidence: "SAML assertion validation context {pattern} accepts a signature verification result without constraining the assertion content it goes on to process to what that signature covers"
   vulnerableTo: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
 }

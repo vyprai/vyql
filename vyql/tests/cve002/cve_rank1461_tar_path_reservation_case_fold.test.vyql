@@ -1,0 +1,202 @@
+# Rank 1461 / CVE-2026-23950 (GHSA-r6q2-hw4h-h46w): node-tar unpacks entries in
+# parallel and keeps that safe with `PathReservations`, a table that hands out
+# exclusive access to a path so a symbolic-link entry and a file entry naming
+# the same place cannot run at once -- the ordering the unpacker's symlink
+# protection depends on. `src/path-reservations.ts` builds the table key by
+# lower-casing the path, because the volume may be case-insensitive:
+#
+#   paths = paths.map(p =>
+#     stripTrailingSlashes(join(normalizeUnicode(p))).toLowerCase())
+#   ...
+#   const q = this.#queues.get(p)
+#   if (!q) this.#queues.set(p, [fn])
+#
+# `String.prototype.toLowerCase` is Unicode's *simple* lowercase mapping: one
+# code point in, at most one out. The characters whose lowercase expansion is
+# longer than themselves therefore have no lowercase form at all and come back
+# unchanged -- the ligature block U+FB00-U+FB06, plus `ss`-class `ß` U+00DF,
+# `ẞ` U+1E9E, `ſ` U+017F and `ẛ` U+1E9B. macOS APFS folds with the *full* table
+# instead, under which `ﬁ` and `FI` are one file. A tarball carrying a
+# `SymbolicLink` entry named `ﬁ` and a `File` entry named `FI` gets two
+# reservations, both granted at once, and the file write lands on the link -- an
+# arbitrary write outside the extraction directory. The advisory's own
+# regression test enumerates exactly that character set.
+#
+# The fixed revision has two halves. `src/normalize-unicode.ts` turns the canonical form
+# into a round trip, `.normalize('NFD').toLocaleLowerCase('en')
+# .toLocaleUpperCase('en')`, because `toUpperCase` unlike its counterpart *is* a
+# full mapping and is documented to expand these characters (`ﬁ` -> `FI`, `ß` ->
+# `SS`); and `reserve()` drops its own `.toLowerCase()`, the fold now being done
+# for it.
+#
+# Step 0: no metadata flag and the pool row is correct. `git show` reads the
+# commit, the vulnerable `.toLowerCase()` key and the bare `s.normalize('NFD')`
+# canonicalizer are both present at the parent, and both halves of the
+# remediation are present at the fixed revision. Recorded CWE-178 is the weakness class;
+# the consequence is CWE-59.
+#
+# Nothing reports this, at either revision, and the reason is a layer boundary
+# rather than missing vocabulary. The weakness is a *relation* between three
+# nodes -- a path is composed, the composed value is case-folded, and the folded
+# value is the key a lookup table is indexed by -- and a `presenceNode` binding
+# expresses only co-occurrence of facts inside one function context. Written
+# that way the four facts are `call:toLowerCase`, a `node:path` composition call,
+# and `call:get` plus `call:set`, none of which is rare and none of which is tied
+# to the others. It is built, measured and deliberately not shipped:
+#
+#   * against the real clone it does discriminate -- one row at 3b1abfae65^ and
+#     none at 3b1abfae65, three `--cache off` runs of each revision of the whole
+#     tree (18 findings vs 17), the sole row being path-reservations.ts:53,
+#     which is `PathReservations.reserve`;
+#   * over the reachable set it does not. Exhaustively enumerating every JS/TS
+#     file under /tmp/cve-work/rank*/ that carries all four needles gives 1277
+#     files; scanning the 815 of them under 300 KB (the rest are minified
+#     bundles) reports **110 rows in 81 files** for that one true positive.
+#     They are ordinary code: an icon-extension check
+#     (`ICON_EXTENSIONS.includes(path.extname(file).toLowerCase())`), an
+#     Accept-header parser keying a Map by a lower-cased media type, a
+#     `new URL(u, base).protocol.toLowerCase()` scheme allowlist, a package-name
+#     module index, and 33 rows on minified vendor bundles where the whole file
+#     is one function context.
+#   * tightening does not rescue it. Restricting the path call to
+#     `join`/`basename`/`dirname`/`relative` (dropping `resolve`, which mostly
+#     matches `Promise.resolve`) gives 82; additionally requiring a `new Set` in
+#     the same body gives 25 -- and that clause is the fixed revision's own layout, not the
+#     weakness, since a reservation table need not construct a Set where it
+#     builds its keys.
+#
+# What would close it is the relation, not another token: the binding has to
+# know that the value handed to the table's `get`/`set` is the value the fold
+# produced. Rank 1360's gap (the JavaScript frontend emits no call-argument
+# tokens) is necessary but not sufficient here -- even with `call_arg:` the link
+# from `paths = paths.map(p => ...toLowerCase())` to `this.#queues.get(p)` is a
+# dataflow fact, not a text fact. Neither `node.context.assign` nor
+# `node.context.expr` reaches the fold at all on this file (both measured at 0),
+# because the assignment's right-hand side is an arrow function and the fold is
+# a member call rather than a binary expression.
+#
+# Concepts considered for reuse, all rejected: `RecursionGuardIndexedByUnnormalizedKey`
+# (a table indexed by the raw key while dispatch used the lower-cased one -- the
+# mismatch is between two of the program's own spellings, not between the program
+# and the filesystem), `UrlPathParameterCaseNormalizationBypass` (names stored
+# under caller-controlled case, i.e. no fold at all),
+# `CaseInsensitiveLocalIdentityAuthorizationBypass` and
+# `ComrakDangerousUrlCaseSensitiveGrammar` (both the inverse defect, a
+# case-*sensitive* comparison letting variants through), and
+# `UncanonicalizedPathContainmentCheck` (a containment test, not an identity
+# key). None judges a fold weaker than the filesystem's.
+#
+# verify_current_expected: attention-precision-cost, both revisions rejected.
+
+test "rank1461: a path reservation table lower-cases the joined entry path to build its key"
+  lang javascript
+  file src/path-reservations.ts
+  reject VYQL-PATH-062
+  code
+  ```
+  import { join } from 'node:path'
+  import { normalizeUnicode } from './normalize-unicode.js'
+  import { stripTrailingSlashes } from './strip-trailing-slashes.js'
+
+  export class PathReservations {
+    #queues = new Map()
+    #reservations = new Map()
+
+    reserve(paths, fn) {
+      paths = paths.map(p => {
+        return stripTrailingSlashes(join(normalizeUnicode(p))).toLowerCase()
+      })
+      const dirs = new Set(paths)
+      this.#reservations.set(fn, { dirs, paths })
+      for (const p of paths) {
+        const q = this.#queues.get(p)
+        if (!q) {
+          this.#queues.set(p, [fn])
+        } else {
+          q.push(fn)
+        }
+      }
+      return true
+    }
+  }
+  ```
+
+test "rank1461: fix folds case in the unicode normalizer and the key builder stops lower-casing"
+  lang javascript
+  file src/path-reservations.ts
+  reject VYQL-PATH-062
+  code
+  ```
+  import { join } from 'node:path'
+  import { normalizeUnicode } from './normalize-unicode.js'
+  import { stripTrailingSlashes } from './strip-trailing-slashes.js'
+
+  export class PathReservations {
+    #queues = new Map()
+    #reservations = new Map()
+
+    reserve(paths, fn) {
+      paths = paths.map(p => {
+        return stripTrailingSlashes(join(normalizeUnicode(p)))
+      })
+      const dirs = new Set(paths)
+      this.#reservations.set(fn, { dirs, paths })
+      for (const p of paths) {
+        const q = this.#queues.get(p)
+        if (!q) {
+          this.#queues.set(p, [fn])
+        } else {
+          q.push(fn)
+        }
+      }
+      return true
+    }
+  }
+  ```
+
+test "rank1461: the unicode canonicalizer memoizes an NFD form that is not a case fold"
+  lang javascript
+  file src/normalize-unicode.ts
+  reject VYQL-PATH-062
+  code
+  ```
+  const normalizeCache = Object.create(null)
+
+  const MAX = 10000
+  const cache = new Set()
+
+  export const normalizeUnicode = s => {
+    if (!cache.has(s)) {
+      normalizeCache[s] = s.normalize('NFD')
+    } else {
+      cache.delete(s)
+    }
+    cache.add(s)
+    return normalizeCache[s]
+  }
+  ```
+
+test "rank1461: fix makes the canonical form a full case-fold round trip"
+  lang javascript
+  file src/normalize-unicode.ts
+  reject VYQL-PATH-062
+  code
+  ```
+  const normalizeCache = Object.create(null)
+
+  const MAX = 10000
+  const cache = new Set()
+
+  export const normalizeUnicode = s => {
+    if (!cache.has(s)) {
+      normalizeCache[s] = s
+        .normalize('NFD')
+        .toLocaleLowerCase('en')
+        .toLocaleUpperCase('en')
+    } else {
+      cache.delete(s)
+    }
+    cache.add(s)
+    return normalizeCache[s]
+  }
+  ```

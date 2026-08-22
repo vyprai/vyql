@@ -1,0 +1,258 @@
+# Rank 1458 / CVE-2022-24375 (node-opcua/node-opcua, GHSA-vh4f-fgpp-x8x2,
+# CWE-400): an OPC UA server can be driven into permanent memory exhaustion by
+# creating a subscription, modifying it, then closing the session with
+# `deleteSubscriptions = false`. Reported by Team82 (Claroty) as "bypassing the
+# limitations for excessive memory consumption".
+#
+# The mechanism is a reachable assertion on the subscription's own lifetime
+# timer, in packages/node-opcua-server/source/server_subscription.ts at the
+# parent (684a796, v2.73.1):
+#
+#   public modify(param: ModifySubscriptionParameters): void {
+#       ...
+#       this._stop_timer();          // :688  clearInterval, this.timerId = null
+#       this._start_timer();         // :689
+#   }
+#
+#   private _start_timer() {
+#       assert(this.timerId === null);
+#       this._keep_alive_counter = 0;
+#       assert(this.messageSent === false);                       // :1481
+#       assert(this.state === SubscriptionState.CREATING);        // :1482
+#       assert(this.publishingInterval >= Subscription.minimumPublishingInterval);
+#       this.timerId = setInterval(this._tick.bind(this), this.publishingInterval);  // :1485
+#   }
+#
+# `_start_timer` encodes the invariants of the *creation* path, but `modify()`
+# is the *re-arm* path: a subscription that has published anything has
+# `messageSent === true` and `state === NORMAL`. node-opcua-assert's `assert`
+# is not a build-time macro — packages/node-opcua-assert/source/index.ts does
+# `if (!cond) { throw new Error(message); }` unconditionally — so the call
+# throws after `_stop_timer()` clears the interval and before
+# `this.timerId` is reassigned. The subscription is left with `timerId === null`
+# for the rest of the process's life.
+#
+# That is what makes it unbounded rather than merely a failed request. Expiry
+# runs only from `_tick()` (`increaseLifeTimeCounter` -> `lifeTimeHasExpired` ->
+# `emit("expired")` -> `terminate()`, server_subscription.ts:1520-1546), and
+# `_tick` is only ever called by that interval. A subscription with no timer
+# never expires and is never terminated. `CloseSession` with
+# `deleteSubscriptions = false` — a plain field of the client's request, read at
+# opcua_server.ts:2467 and forwarded through `engine.closeSession` — then moves
+# it to `_orphanPublishEngine` (server_engine.ts:1737-1745), whose `expired`
+# handler is an empty stub with the disposal lines commented out
+# (server_publish_engine_for_orphan_subscriptions.ts:38-45). Orphan
+# subscriptions count against `serverCapabilities.maxSubscriptions`
+# (server_engine.ts:395-405, default 100), so once a hundred immortal
+# subscriptions have accumulated, `CreateSubscription` answers
+# BadTooManySubscriptions forever: an unauthenticated remote peer permanently
+# denies the service with a hundred three-request sequences.
+#
+# Pool row and metadata. The row is correct and reads normally
+# (repository and commit both check out). `7b5044b3` is one of the two commits the
+# advisory references and is the release tip of the change; the whole of v2.74.0
+# over v2.73.1 is exactly `3fd46ec1` ("server: fix Subscription.modify assert")
+# plus `7b5044b3` ("server: use ServiceFault on request error"). The recorded
+# CWE-400 is right about the effect, though the proximate weakness is CWE-617.
+# The parent of the row is the fully vulnerable tree and both remediations are
+# present at the row's own SHA, so the row works as written and needs no
+# correction; the fixing hunk quoted below is `3fd46ec1`'s.
+#
+# The fixed revision makes the two creation-only assertions conditional and threads the
+# caller's lifecycle position in as a parameter:
+#
+#   private _start_timer({ firstTime }: { firstTime: boolean }) {
+#       ...
+#       if (firstTime) {
+#           assert(this.messageSent === false);
+#           assert(this.state === SubscriptionState.CREATING);
+#       }
+#       assert(this.publishingInterval >= Subscription.minimumPublishingInterval);
+#       this.timerId = setInterval(this._tick.bind(this), this.publishingInterval);
+#   }
+#
+# with `_start_timer({ firstTime: true })` from the constructor and
+# `_start_timer({ firstTime: false })` from `modify()`.
+#
+# Measured miss, and why it is a double miss. packages/node-opcua-server
+# reports 17 findings at the parent and 17 at the fixed revision, stable across three
+# `--cache off` runs each (51 javascript files, 3 config, 54 textpattern;
+# `timeout 180`, `--max-ram 6GB`). Not one lands in `_start_timer`, `modify` or
+# `_stop_timer`: the closest rows in the same file are a `code.WeakRandomValue`
+# at :372 and five review flags at :68. The bounded subtree is measured here
+# rather than the whole monorepo; the enumeration below covers the shape's
+# reachable set instead.
+#
+# VYQL-DOS-040 / `code.ReachableAssertionReview` is the rule that names this
+# weakness class, and it has no JavaScript route at all. Its only two bindings
+# are `reachableAssertionReview129` (bindings/c/mce54b166.vyql) and
+# `reachableAssertionReview77` (bindings/cpp/m4e783366.vyql), and both key on
+# `node.analysis ~= "assertion.<one library's shape>"`, i.e. a hand-written Go
+# observation per case — the same limitation rank 1424 recorded for C.
+#
+# Why no JavaScript binding discriminates. The only difference between the two
+# revisions is that two assertion statements moved inside an `if`. The JS
+# frontend emits no fact for statement position: `jsStructuredContextTokens`
+# (internal/extract/frontend/treesitter/javascript.go:480-626) emits
+# `assign:`, `expr:`, `prop:`, `identifier:`, `selector:`, `index:`,
+# `index_base:`, `index_key:`, `subscript:`, `call_path:`, `call:`, `literal:`
+# and `regex:` plus a fixed set of boolean flags, and nothing that records
+# whether a node is dominated by a branch. `context.guard` exists as a presence
+# field (`compile_presence.go:485`) but only `c.go` emits `guard=` values, and
+# each is a per-shape hand-written observation. Both revisions carry an
+# unconditional `assert(this.timerId === null)` and an unconditional
+# `assert(this.publishingInterval >= ...)` in the same function, so every
+# token-level clause available — "arms a timer into instance state" plus
+# "asserts on instance state" — is satisfied identically before and after.
+# Verified with a two-file minimal pair (vulnerable and patched `_start_timer`
+# differing only in the `if (firstTime)` wrapper): a `presenceNode` binding on
+# `node.context.call == "setInterval"` and on `node.context.callPath contains
+# "assert"` labels line 25 of both files. The only clause that separates them
+# is a negation on the parameter name `firstTime`, which is the fixing commit's
+# own vocabulary.
+#
+# Precision measurement for the data-layer route under test. Across the
+# ~170 clones under /tmp/cve-work/rank*/ there are 1143 sites in 777 .js/.ts
+# files (node_modules excluded) that arm a repeating timer into instance state
+# (`this.<field> = setInterval|setTimeout(`). Requiring an `assert(this.…)`
+# within the 25 lines above the arming call — the function-window
+# approximation of a `presenceNode` at `node.scope == "function"` — leaves 17
+# sites in 17 files. Fifteen of those are node-opcua's own four files at the
+# two revisions plus the minimal pair, four files per revision and the *same*
+# four files on both sides; the one genuinely independent hit is
+# rank1440/next.js/packages/next/src/compiled/webpack/bundle5.js, a bundled
+# webpack runtime, which is a false positive. So the shape is rare enough to
+# ship on precision and worthless on discrimination: it scores 4 on the
+# vulnerable tree and 4 on the patched one.
+#
+# What would close it: a fact that says an emitted node is executed
+# unconditionally on every path through its function. The lowering
+# builds control regions (`nir.If`), so the information exists in NIR; what is
+# missing is any binding-level predicate that reads it. With that, the binding
+# is "a function that arms a resource-expiry timer into instance state and
+# unconditionally asserts an instance-state invariant before the arming call",
+# which is writable from Node's `setInterval` and `assert` documentation alone
+# and is the shape 15 of the 17 measured sites have. That is a new dataflow
+# fact across every frontend, not a localized correction, so it is not
+# mechanical and no engine change ships with this rank.
+#
+# No definition is touched, so the OWASP Java and Python numbers are
+# unaffected by this rank.
+
+test "rank1458: the subscription re-arm path asserts creation-only invariants after clearing its expiry timer"
+  lang javascript
+  file server_subscription.ts
+  reject VYQL-DOS-040
+  code
+  ```
+  const assert = require("node-opcua-assert").assert;
+
+  const SubscriptionState = { CREATING: 0, NORMAL: 1, LATE: 4 };
+
+  class Subscription {
+      constructor(options) {
+          this.timerId = null;
+          this.state = SubscriptionState.CREATING;
+          this.messageSent = false;
+          this.publishingInterval = options.publishingInterval;
+          this._life_time_counter = 0;
+          this.lifeTimeCount = options.lifeTimeCount;
+          this._start_timer();
+      }
+
+      modify(param) {
+          this.publishingInterval = param.requestedPublishingInterval;
+          this.lifeTimeCount = param.requestedLifetimeCount;
+          this._stop_timer();
+          this._start_timer();
+      }
+
+      _stop_timer() {
+          if (this.timerId) {
+              clearInterval(this.timerId);
+              this.timerId = null;
+          }
+      }
+
+      _start_timer() {
+          assert(this.timerId === null);
+          this._keep_alive_counter = 0;
+          assert(this.messageSent === false);
+          assert(this.state === SubscriptionState.CREATING);
+          this.timerId = setInterval(this._tick.bind(this), this.publishingInterval);
+      }
+
+      _tick() {
+          this._life_time_counter += 1;
+          if (this._life_time_counter >= this.lifeTimeCount) {
+              this.terminate();
+          }
+      }
+
+      terminate() {
+          this._stop_timer();
+      }
+  }
+
+  module.exports = { Subscription };
+  ```
+
+test "rank1458: gating the creation-only invariants on the caller's lifecycle position is the safe form"
+  lang javascript
+  file server_subscription.ts
+  reject VYQL-DOS-040
+  code
+  ```
+  const assert = require("node-opcua-assert").assert;
+
+  const SubscriptionState = { CREATING: 0, NORMAL: 1, LATE: 4 };
+
+  class Subscription {
+      constructor(options) {
+          this.timerId = null;
+          this.state = SubscriptionState.CREATING;
+          this.messageSent = false;
+          this.publishingInterval = options.publishingInterval;
+          this._life_time_counter = 0;
+          this.lifeTimeCount = options.lifeTimeCount;
+          this._start_timer({ firstTime: true });
+      }
+
+      modify(param) {
+          this.publishingInterval = param.requestedPublishingInterval;
+          this.lifeTimeCount = param.requestedLifetimeCount;
+          this._stop_timer();
+          this._start_timer({ firstTime: false });
+      }
+
+      _stop_timer() {
+          if (this.timerId) {
+              clearInterval(this.timerId);
+              this.timerId = null;
+          }
+      }
+
+      _start_timer({ firstTime }) {
+          assert(this.timerId === null);
+          this._keep_alive_counter = 0;
+          if (firstTime) {
+              assert(this.messageSent === false);
+              assert(this.state === SubscriptionState.CREATING);
+          }
+          this.timerId = setInterval(this._tick.bind(this), this.publishingInterval);
+      }
+
+      _tick() {
+          this._life_time_counter += 1;
+          if (this._life_time_counter >= this.lifeTimeCount) {
+              this.terminate();
+          }
+      }
+
+      terminate() {
+          this._stop_timer();
+      }
+  }
+
+  module.exports = { Subscription };
+  ```

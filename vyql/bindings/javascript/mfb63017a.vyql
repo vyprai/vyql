@@ -4068,3 +4068,37 @@ binding unescapedExceptionMessageResponseBody1180 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath in ["res.send", "res.status.send", "res.status.end", "res.writeHead.end", "response.send", "response.status.send", "response.status.end", "response.writeHead.end"] and node.context.selector in ["err.message", "error.message", "e.message", "ex.message"] and not containsAny(node.context.callPath, ["escape", "sanitize", "encode", "Escape", "Sanitize", "Encode"]) and not containsAny(node.context.literal, ["&amp;", "&lt;", "&quot;"]) and not containsAny(node.context.prop, [".message"])
   emit issue code.UnescapedExceptionMessageMarkup at node
 }
+
+binding sandboxFacadeWholesaleMemberCopy1840 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and containsAny(node.context.callPath, ["runInNewContext", "runInThisContext", "vm.runInContext"]) and node.context.callPath contains "Object.create" and containsAny(node.context.callPath, ["Reflect.ownKeys", "Object.getOwnPropertyNames"]) and node.context.callPath contains "Object.getOwnPropertyDescriptor" and node.context.callPath contains "Object.defineProperty" and node.context.callPath contains "Object.freeze"
+  emit issue code.SandboxFacadeWholesaleMemberCopy at node
+}
+
+binding jwtVerifyAlgorithmFromTokenHeader1420 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["jws.verify", "jwt.verify", "jsonwebtoken.verify"]) and containsAny(node.context.identifier, ["PublicKey", "publicKey", "publicCert", "PublicCert", "pubKey", "PubKey"]) and not containsAny(node.context.selector, ["algorithms"]) and not containsAny(node.context.identifier, ["algorithms"]) and not containsAny(node.context.prop, ["algorithms"]) and not containsAny(node.context.callPath, ["algorithms"]) and not containsAny(node.context.assign, ["algorithms"])
+  emit issue code.JwtUnverified at node
+}
+binding commandExecution1620 {
+  query pattern callExpr where callee.path == "fork"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1621 {
+  query pattern callExpr where callee.path ~= "cp.fork"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1622 {
+  query pattern callExpr where callee.path ~= "childProcess.fork"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1623 {
+  query pattern callExpr where callee.path ~= "require.fork"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandOptionInjection1520 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["spawn", "child_process.spawn", "spawnSync", "child_process.spawnSync", "execFile", "child_process.execFile", "execFileSync", "child_process.execFileSync"]) and containsAny(node.context.assign, ["=['-", "=[\"-"]) and containsAny(node.context.assign, ["'].concat(", "\"].concat("]) and not containsAny(node.context.regex, ["^-", "^\\-", "^[-]"]) and not containsAny(node.context.callPath, ["startsWith", "escape", "Escape", "quote", "Quote"]) and not containsAny(node.context.assign, ["'--'", "\"--\""])
+  emit issue code.CommandOptionInjection at node
+}
