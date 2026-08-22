@@ -1,0 +1,71 @@
+# Rank 1597 / CVE-2023-31136: postgres-nio's connection state
+# machine transitioned into TLS negotiation while unread bytes
+# remained in the incoming buffer, so an attacker could send
+# plaintext ahead of the handshake and have it survive into the
+# encrypted channel's processing (plaintext injection through a
+# state transition that ignores buffered data,
+# CWE-345/CWE-311; GHSA-9cfh-vx93-84vv). sslSupportedReceived in
+# Sources/PostgresNIO/Connection/ConnectionStateMachine.swift took
+# no buffer state: it added the SSL handler with whatever bytes the
+# channel has pre-buffered. The fixing commit 2df54bc946 (the GHSA merge, "Ensure empty incoming buffer
+# when TLS negotiation starts"): the method gains an
+# unprocessedBytes parameter and returns
+# closeConnectionAndCleanup(.receivedUnencryptedDataAfterSSLRequest)
+# when it is positive, with that failure added to the unclean-shutdown
+# handling set. .
+#
+# ATTENTION, transition-state validation. The defect is a security
+# transition that ignores leftover state -- the state-machine-bypass
+# family (VYQL-VAL-011 names it for device status): no rule can ask
+# "does the plaintext-to-TLS transition require a drained buffer" --
+# channel-state vocabulary. A binding on postgres-nio's own state
+# machine would detect this library rather than the weakness.
+# Measured on the real code: scanning the connection state machine
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1597 records the
+# transition without the buffer check and the checked form, both
+# asserting reject VYQL-VAL-011: when transition-state vocabulary
+# lands, the unchecked form must flip to expect.
+
+test "rank1597: the ssl transition ignores buffered bytes"
+  lang swift
+  file Sources/PostgresNIO/Connection/ConnectionStateMachine.swift
+  reject VYQL-VAL-011
+  code
+  ```
+  struct ConnectionStateMachine {
+      mutating func sslSupportedReceived() -> ConnectionAction {
+          return .addSSLHandler
+      }
+  }
+
+  enum ConnectionAction {
+      case addSSLHandler
+      case closeConnectionAndCleanup(PSQLError)
+  }
+  ```
+
+test "rank1597: the fixed revision requires an empty buffer at the transition"
+  lang swift
+  file Sources/PostgresNIO/Connection/ConnectionStateMachine.swift
+  reject VYQL-VAL-011
+  code
+  ```
+  struct ConnectionStateMachine {
+      mutating func sslSupportedReceived(unprocessedBytes: Int) -> ConnectionAction {
+          if unprocessedBytes > 0 {
+              return self.closeConnectionAndCleanup(.receivedUnencryptedDataAfterSSLRequest)
+          }
+          return .addSSLHandler
+      }
+
+      mutating func closeConnectionAndCleanup(_ error: PSQLError) -> ConnectionAction {
+          return .closeConnectionAndCleanup(error)
+      }
+  }
+
+  enum ConnectionAction {
+      case addSSLHandler
+      case closeConnectionAndCleanup(PSQLError)
+  }
+  ```

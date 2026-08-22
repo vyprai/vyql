@@ -1,0 +1,85 @@
+# Rank 1555 / CVE-2026-34747: Payload's drizzle adapter spliced
+# request-supplied field paths into raw SQL identifiers, so a crafted
+# where-clause key broke out of the quoted column name and influenced
+# query execution (SQL injection, CWE-89; GHSA-7xxh-373w-35vg, patched
+# in 3.79.1). parseParams in packages/drizzle/src/queries/parseParams.ts
+# built `${jsonQuerySelector} ${operator} ${formattedValue}` into
+# sql.raw(rawSQLQuery) (line ~207) and operatorMap applied
+# `sql.raw('"' + alias + '"."' + k.split('.').join('_') + '"')` --
+# the key k arrives from the request's where object, and
+# getTableColumnFromPath formatted non-numeric segments as
+# `'${segment}'` straight into the selector. The pool row held
+# fba2438057 -- a sibling drizzle bug fix (the row's nocommit flag reflects
+# right); the real fix is e4742054, "fix: stricter input validation
+# (#15868)", found from the advisory's v3.79.1 release reference --
+# The row's commit is corrected in place. The fixed revision adds
+# packages/drizzle/src/utilities/sanitizePathSegment.ts, which throws
+# APIError 400 unless the segment matches /^\w+$/, threads it through
+# every key-to-identifier site (operatorMap's column names,
+# getTableColumnFromPath's segments, parseParams' formatted segments),
+# and tightens sqlite equals coercion to number/boolean checks.
+#
+# ATTENTION, rule reports, guard uncredited. VYQL-INJ-001
+# reports the vulnerable path on the real code: the scan of
+# packages/drizzle/src/queries carries seven INJ-001 rows at both
+# revisions, including source code.ExternalEntryInput at
+# parseParams.ts:36 (parseParams#param#where -- the request's where
+# object) -> sink code.SqlExecution at :207 (the template into
+# sql.raw), with `unless core.SqlParameterization` unsatisfied and a
+# near-miss note naming the sibling sanitizeQueryValue controls. The
+# finding does not clear at the fixed revision: the new sanitizePathSegment guard
+# is a project-local /^\w+$/ throw, and no binding can credit an
+# arbitrary local regex validator as a neutralizing control --
+# control-at-a-distance, the same shape as ranks 1529 and 1542 (the
+# helper-boundary ENGINE-GAPS row states the gap). A
+# binding on Payload's own sanitizePathSegment would detect this
+# application rather than the weakness; the generic piece is
+# regex-allowlist guards as credited controls. Measured on the real
+# code: 7 VYQL-INJ-001 + 1 VYQL-INJ-013 at both revisions, the only
+# movement being line shifts from the added imports. No new
+# ENGINE-GAPS.md row. No definition change shipped. Spec
+# cve_rank1555 records the raw key-to-identifier interpolation and
+# the sanitized form, both expecting VYQL-INJ-001 (driven from
+# req.query.where, the labelled request source): the rule fires
+# today on both; when allowlist-guard controls land, the sanitized
+# form must flip to reject.
+
+test "rank1555: the where key is spliced into a raw identifier"
+  lang javascript
+  file packages/drizzle/src/queries/parseParams.js
+  expect VYQL-INJ-001
+  code
+  ```
+  import { sql } from 'drizzle-orm';
+
+  function buildWhereClause(req) {
+    const where = req.query.where;
+    const k = Object.keys(where)[0];
+
+    const jsonQuerySelector = k.split('.').join('_');
+    const rawSQLQuery = `${jsonQuerySelector} = '${where[k]}'`;
+    return sql.raw(rawSQLQuery);
+  }
+  ```
+
+test "rank1555: the fixed revision validates every segment before splicing"
+  lang javascript
+  file packages/drizzle/src/queries/parseParams.js
+  expect VYQL-INJ-001
+  code
+  ```
+  import { sql } from 'drizzle-orm';
+  import { sanitizePathSegment } from '../utilities/sanitizePathSegment.js';
+
+  function buildWhereClause(req) {
+    const where = req.query.where;
+    const k = Object.keys(where)[0];
+
+    const jsonQuerySelector = k
+      .split('.')
+      .map((s) => sanitizePathSegment(s))
+      .join('_');
+    const rawSQLQuery = `${jsonQuerySelector} = '${where[k]}'`;
+    return sql.raw(rawSQLQuery);
+  }
+  ```

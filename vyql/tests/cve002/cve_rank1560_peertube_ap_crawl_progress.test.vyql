@@ -1,0 +1,112 @@
+# Rank 1560 / CVE-2025-32947: PeerTube's ActivityPub collection
+# crawler incremented its loop counter only at the bottom of the loop
+# body, so a branch that continued past it never advanced the budget
+# and the crawl looped forever (loop with unreachable exit, CWE-835;
+# the advisory: infinite loop in the AP crawler). crawlCollectionPage
+# in server/core/lib/activitypub/crawl.ts ran `while (nextLink && i <
+# limit) { if (typeof nextLink === 'string') { const remoteHost = new
+# URL(nextLink).host; if (remoteHost === WEBSERVER.HOST) continue; ...
+# } ... nextLink = body.next; i++; ... }` -- the don't-crawl-ourselves
+# `continue` jumps back to the condition without executing the i++
+# further down, so a hostile collection whose next link stays on the
+# instance's own host spins the loop with i frozen below limit. Pool
+# commit 76226d8568 is the fixing change ("Fix infinite loop in
+# AP crawl"): the increment moves to the top of the loop body (`while
+# (nextLink && i < limit) { i++; ... }`) so every iteration advances
+# the budget whatever branch it takes. .
+#
+# ATTENTION, increment-placement progress. The defect is a continue
+# that bypasses its loop's only progress step -- the exact judgement
+# VYQL-DOS-029's concept names (a parser loop that does not
+# advance), but the rule's bindings are numeric-parser-shaped and no
+# observation exists for general loops: nothing can ask "does every
+# path through this loop body advance the counter", the same
+# loop-progress family as ranks 1517, 1534 and 1559's budget rows.
+# A binding on PeerTube's own crawlCollectionPage would detect this
+# application rather than the weakness. Measured on the real code:
+# scanning crawl.ts reports zero findings at both revisions. No
+# ENGINE-GAPS.md entry: the piece is loop-progress vocabulary design,
+# not a localised construct. No definition change shipped. Spec
+# cve_rank1560 records the continue-past-counter loop and the
+# top-increment form -- the two snippets differ only in where i++
+# stands -- both asserting reject VYQL-DOS-029: when loop-progress
+# vocabulary lands, the bypassing form must flip to expect.
+
+test "rank1560: the self-host continue skips the loop's only progress"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  reject VYQL-DOS-029
+  code
+  ```
+  const WEBSERVER = { HOST: 'example.com' };
+  const ACTIVITY_PUB = { FETCH_PAGE_LIMIT: 100 };
+
+  async function crawlCollectionPage(argUrl, handler) {
+    let url = argUrl;
+
+    const response = await fetchAP(url);
+    const firstBody = response.body;
+
+    const limit = ACTIVITY_PUB.FETCH_PAGE_LIMIT;
+    let i = 0;
+    let nextLink = firstBody.first;
+    while (nextLink && i < limit) {
+      let body;
+
+      if (typeof nextLink === 'string') {
+        const remoteHost = new URL(nextLink).host;
+        if (remoteHost === WEBSERVER.HOST) continue
+
+        url = nextLink;
+
+        const res = await fetchAP(url);
+        body = res.body;
+      } else {
+        body = nextLink;
+      }
+
+      nextLink = body.next
+      i++
+    }
+  }
+  ```
+
+test "rank1560: the fixed revision advances the budget before any branch"
+  lang javascript
+  file server/core/lib/activitypub/crawl.ts
+  reject VYQL-DOS-029
+  code
+  ```
+  const WEBSERVER = { HOST: 'example.com' };
+  const ACTIVITY_PUB = { FETCH_PAGE_LIMIT: 100 };
+
+  async function crawlCollectionPage(argUrl, handler) {
+    let url = argUrl;
+
+    const response = await fetchAP(url);
+    const firstBody = response.body;
+
+    const limit = ACTIVITY_PUB.FETCH_PAGE_LIMIT;
+    let i = 0;
+    let nextLink = firstBody.first;
+    while (nextLink && i < limit) {
+      i++
+
+      let body;
+
+      if (typeof nextLink === 'string') {
+        const remoteHost = new URL(nextLink).host;
+        if (remoteHost === WEBSERVER.HOST) continue
+
+        url = nextLink;
+
+        const res = await fetchAP(url);
+        body = res.body;
+      } else {
+        body = nextLink;
+      }
+
+      nextLink = body.next
+    }
+  }
+  ```

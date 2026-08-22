@@ -1,0 +1,103 @@
+# Rank 1577 / CVE-2022-39365: Pimcore rendered user-editable email
+# content as full Twig templates, so anyone able to set a mail
+# subject or body executed arbitrary Twig -- including PHP-reaching
+# extensions -- on the server (server-side template injection,
+# CWE-1336/CWE-94; PR #13347). renderParams in lib/Mail.php did
+# `$twig = $templatingEngine->getTwigEnvironment(); $template =
+# $twig->createTemplate($string); return $template->render($this->
+# getParams());` -- the plain environment, every tag and filter
+# available, on strings that come from document/email fields. Pool
+# The fixing commit 43aa34e018 ("[Mail] Renderer
+# email content twig templates in a sandbox"): a new
+# Pimcore\Twig\Sandbox\SecurityPolicy (allowed tags, filters and
+# functions only) backs getTwigEnvironment(true), renderParams
+# renders in the sandboxed environment and converts SecurityError
+# into a logged exception with a sandbox hint, disabling the sandbox
+# extension afterwards; the class-definition Text layout and the
+# delegating engine gain the same treatment. .
+#
+# ATTENTION, unsandboxed template rendering. The corpus's code
+# rules judge eval-family sinks; Twig's createTemplate->render on an
+# unsandboxed environment is template-engine vocabulary no binding
+# observes (the same boundary as rank 1542's helper-returned
+# factories -- the dangerous capability is the ENVIRONMENT's
+# policy, not the call), and sandbox-enablement is an argument on
+# the project's own getter. A binding on Pimcore's own
+# getTwigEnvironment would detect this platform rather than the
+# weakness. Measured on the real code: scanning lib/Mail.php reports
+# one finding at both revisions (unchanged; unrelated heuristic). No
+# ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1577 records the plain-environment render and the
+# sandboxed form, both asserting reject VYQL-INJ-003: when
+# template-sandbox vocabulary lands, the plain form must flip to
+# expect.
+
+test "rank1577: email content renders on the plain environment"
+  lang php
+  file lib/Mail.php
+  reject VYQL-INJ-003
+  code
+  ```
+  <?php
+
+  class Mail
+  {
+      private $templatingEngine;
+      private $params = [];
+
+      private function renderParams(string $string): string
+      {
+          $twig = $this->templatingEngine->getTwigEnvironment();
+          $template = $twig->createTemplate($string);
+
+          return $template->render($this->getParams());
+      }
+
+      public function setSubject(string $subject)
+      {
+          $this->subject = $this->renderParams($subject);
+          return $this;
+      }
+  }
+  ```
+
+test "rank1577: the fixed revision renders inside the sandbox"
+  lang php
+  file lib/Mail.php
+  reject VYQL-INJ-003
+  code
+  ```
+  <?php
+
+  use Twig\Sandbox\SecurityError;
+
+  class Mail
+  {
+      private $templatingEngine;
+      private $params = [];
+
+      private function renderParams(string $string, string $context): string
+      {
+          try {
+              $twig = $this->templatingEngine->getTwigEnvironment(true);
+              $template = $twig->createTemplate($string);
+
+              return $template->render($this->getParams());
+          } catch (SecurityError $e) {
+              throw new \Exception(sprintf(
+                  "Failed rendering the %s: %s. Please check your twig sandbox security policy.",
+                  $context,
+                  $e->getMessage()
+              ));
+          } finally {
+              $this->templatingEngine->disableSandboxExtensionFromTwigEnvironment();
+          }
+      }
+
+      public function setSubject(string $subject)
+      {
+          $this->subject = $this->renderParams($subject, 'subject');
+          return $this;
+      }
+  }
+  ```

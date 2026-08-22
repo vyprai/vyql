@@ -1438,8 +1438,12 @@ binding codeEval258 {
 }
 
 binding codeEval259 {
+  // The Function constructor's LAST argument is the function body --
+  // the MDN-documented signature -- so a tainted value in any argument
+  // position can be the generated code (with one argument it is the
+  // body; with several, the last one is).
   query pattern callExpr where callee.path ~= "Function"
-  emit sink code.CodeEval at args[0]
+  emit sink code.CodeEval at args.any
 }
 
 binding codeEval260 {

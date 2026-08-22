@@ -1,0 +1,107 @@
+# Rank 1592 / CVE-2026-25221: PolarLearn's OAuth logins for Google
+# and GitHub carried no state parameter, so an attacker could
+# complete a login flow in the victim's browser and attach the
+# attacker's own account (login CSRF / session fixation,
+# CWE-352/CWE-384; GHSA-fhhm-574m). The GitHub route in
+# src/app/api/v1/auth/github/route.ts did `const url = await
+# getGithubAuthUrl(); return Response.redirect(url, 302);` -- no
+# state generation -- and the callback exchanged the code with no
+# verification that the flow began in this browser (the Google twin
+# the same). The fixing commit (confirmed -- --
+# "fix(security): validate OAuth 'state' parameter for Google &
+# GitHub (prevent Login CSRF - GHSA-fhhm-574m)"): the authorization
+# step generates `randomBytes(32).toString("hex")`, sets it as an
+# httpOnly/sameSite cookie (15-minute max-age), and the callback
+# rejects with invalid_state unless `stateParam === stateCookie`
+# before any code exchange. .
+#
+# ATTENTION, oauth state binding. The flow's cookie sessions exist
+# -- the missing piece is the per-flow nonce comparison binding the
+# callback to the browser that started it, the same
+# decision-completeness family as ranks 1567/1581 (CSRF tokens) at
+# the protocol layer: no rule can ask "does the OAuth callback
+# verify state against a browser-bound store" -- protocol-flow
+# vocabulary. A binding on PolarLearn's own routes would detect
+# this application rather than the weakness. Measured on the real
+# code: scanning the github route reports zero findings at both
+# revisions. No ENGINE-GAPS.md entry. No definition change shipped.
+# Spec cve_rank1592 records the stateless redirect flow and the
+# state-bound form, both asserting reject VYQL-AUTH-079: when
+# oauth-flow vocabulary lands, the stateless form must flip to
+# expect.
+
+test "rank1592: the oauth flow carries no state"
+  lang javascript
+  file src/app/api/v1/auth/github/route.ts
+  reject VYQL-AUTH-079
+  code
+  ```
+  import { NextRequest, NextResponse } from "next/server";
+
+  export async function GET(request: NextRequest) {
+    const { searchParams } = new URL(request.url);
+
+    if (!searchParams.get("code")) {
+      const url = await getGithubAuthUrl();
+      return Response.redirect(url, 302);
+    }
+
+    const code = searchParams.get("code");
+    const tokens = await exchangeGithubCode(code);
+    const profile = await fetchGithubProfile(tokens.access_token);
+
+    const session = await createSession(profile.id);
+    const response = NextResponse.redirect(new URL("/dashboard", request.url), 302);
+    response.cookies.set("polarlearn.session", session.token);
+    return response;
+  }
+  ```
+
+test "rank1592: the fixed revision binds the callback to a state cookie"
+  lang javascript
+  file src/app/api/v1/auth/github/route.ts
+  reject VYQL-AUTH-079
+  code
+  ```
+  import { randomBytes } from "crypto";
+  import { NextRequest, NextResponse } from "next/server";
+
+  export async function GET(request: NextRequest) {
+    const { searchParams } = new URL(request.url);
+    const stateParam = searchParams.get("state");
+    const requestCookies = await cookies();
+
+    if (!searchParams.get("code")) {
+      const state = randomBytes(32).toString("hex");
+      const url = await getGithubAuthUrl(state);
+      const response = NextResponse.redirect(url, 302);
+      const secure = process.env.NODE_ENV === "production";
+      response.cookies.set("polarlearn.oauth_state_github", state, {
+        httpOnly: true,
+        secure,
+        sameSite: "lax",
+        path: "/api/v1/auth",
+        maxAge: 60 * 15,
+      });
+      return response;
+    }
+
+    // Verify the state parameter matches the stored cookie
+    const stateCookie = requestCookies.get("polarlearn.oauth_state_github")?.value;
+    if (!stateParam || !stateCookie || stateParam !== stateCookie) {
+      return NextResponse.redirect(
+        new URL("/auth/sign-in?error=invalid_state&provider=github", request.url),
+        302
+      );
+    }
+
+    const code = searchParams.get("code");
+    const tokens = await exchangeGithubCode(code);
+    const profile = await fetchGithubProfile(tokens.access_token);
+
+    const session = await createSession(profile.id);
+    const response = NextResponse.redirect(new URL("/dashboard", request.url), 302);
+    response.cookies.set("polarlearn.session", session.token);
+    return response;
+  }
+  ```

@@ -1,0 +1,94 @@
+# Rank 1570 / CVE-2019-19617: phpMyAdmin rendered the Git revision
+# information on its index page without escaping, so crafted commit
+# hashes, branch names or repository URLs executed markup in an
+# administrator's browser (reflected cross-site scripting, CWE-79;
+# the task list's repo! flag resolves as packaging: the advisory
+# names phpmyadmin/composer while the code lives in phpmyadmin/
+# phpmyadmin, the pool row's target). libraries/classes/Display/
+# GitRevision.php built the revision line as `'<strong>' . $commit_hash
+# . '</strong> from ' . $branch ... '<a href="' . $repobase .
+# $fullrevision . '">'` with htmlspecialchars nowhere, and Footer.php
+# the same -- every value comes from the git environment through
+# $GLOBALS['PMA_Config']->get('PMA_VERSION_GIT_...'). The fixing commit
+# 1119de642b ("Escape Git information on
+# the index page"): every interpolated value and URL passes through
+# htmlspecialchars() before the markup. .
+#
+# ATTENTION, config-field sources. The corpus has both halves --
+# htmlspecialchars is a bound core.HtmlEscape control (htmlEscape306)
+# and the echo concatenation is the HtmlRender sink -- but the values
+# arrive through $GLOBALS['PMA_Config']->get(...), an object-field
+# read no binding labels as input, so no taint reaches the sink
+# (scanning GitRevision.php reports zero findings at both revisions;
+# the same object-field boundary ranks 1526 and 1545 recorded). When
+# config-field provenance lands, the unescaped revision line reports
+# and the escaped one suppresses -- the control exists. A
+# binding on phpMyAdmin's own PMA_Config would detect this
+# application rather than the weakness. No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1570 records the raw
+# revision concatenation and the htmlspecialchars-wrapped form, both
+# asserting reject VYQL-INJ-004: when config-field vocabulary lands,
+# the raw form must flip to expect.
+
+test "rank1570: the git revision line renders its values raw"
+  lang php
+  file libraries/classes/Display/GitRevision.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  class GitRevision
+  {
+      public static function revision($cfg)
+      {
+          $commit_hash = $cfg->get('PMA_VERSION_GIT_COMMITHASH');
+          $branch = $cfg->get('PMA_VERSION_GIT_BRANCH');
+          $repobase = 'https://github.com/phpmyadmin/phpmyadmin/commit/';
+
+          $revision = '<strong class="git_commit_hash"'
+              . ' href="' . $repobase . $commit_hash . '">'
+              . '">' . $commit_hash . '</strong>';
+
+          $branch = sprintf(
+              __('%1$s from %2$s branch'),
+              $commit_hash,
+              $branch
+          );
+
+          echo '<span>' . $branch . '</span>';
+      }
+  }
+  ```
+
+test "rank1570: the fixed revision escapes every interpolated value"
+  lang php
+  file libraries/classes/Display/GitRevision.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+
+  class GitRevision
+  {
+      public static function revision($cfg)
+      {
+          $commit_hash = htmlspecialchars($cfg->get('PMA_VERSION_GIT_COMMITHASH'));
+          $branch = $cfg->get('PMA_VERSION_GIT_BRANCH');
+          $isRemoteBranch = $cfg->get('PMA_VERSION_GIT_ISREMOTEBRANCH');
+          $repobase = 'https://github.com/phpmyadmin/phpmyadmin/commit/';
+
+          $revision = '<strong class="git_commit_hash"'
+              . ' href="' . htmlspecialchars($repobase . $commit_hash) . '">'
+              . '">' . $commit_hash . '</strong>';
+
+          $branch = sprintf(
+              __('%1$s from %2$s branch'),
+              $commit_hash,
+              $isRemoteBranch ? $branch : htmlspecialchars($branch)
+          );
+
+          echo '<span>' . $branch . '</span>';
+      }
+  }
+  ```

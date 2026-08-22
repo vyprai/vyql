@@ -1,0 +1,90 @@
+# Rank 1581 / CVE-2023-5898: PKP's reviewer action forms accepted
+# submissions without a CSRF token check, so a crafted page could
+# make an editor's browser unassign, cancel or reinstate reviews
+# (cross-site request forgery, CWE-352; pkp/pkp-lib#9410). The
+# constructor of ReviewerNotifyActionForm (and the unassign/cancel
+# and reinstate forms extending it) in controllers/grid/users/
+# reviewer/form/ReviewerNotifyActionForm.inc.php set its assignment,
+# round and submission and never registered FormValidatorCSRF --
+# while sibling pkp forms add the The fixing commit 01feef7a93
+# ("pkp/pkp-lib#9410 Add missing CSRF
+# checks to unassign/cancel and reinstate forms", +3 lines):
+# `$this->addCheck(new FormValidatorCSRF($this));` joins the
+# constructor. .
+#
+# ATTENTION, csrf-decision completeness. The same shape and family
+# as rank 1567 (phpBB's bbcodes form key): one guard call missing on
+# submit paths whose siblings carry it -- nothing can ask "does every
+# state-changing form register the CSRF validator", and
+# FormValidatorCSRF is pkp's own API (a binding detects this
+# application, not the weakness). Measured on the real code: scanning
+# the form reports zero findings at both revisions (the file is a
+# thin constructor; nothing else fires). No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1581 records the bare
+# constructor and the CSRF-checked form, both asserting reject
+# VYQL-AUTH-079: when csrf-decision vocabulary lands, the unchecked
+# form must flip to expect.
+
+test "rank1581: the reviewer forms build without a csrf check"
+  lang php
+  file controllers/grid/users/reviewer/form/ReviewerNotifyActionForm.inc.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  abstract class ReviewerNotifyActionForm extends Form
+  {
+      public $reviewAssignment;
+      public $reviewRound;
+      public $submission;
+
+      public function __construct($reviewAssignment, $reviewRound, $submission, $template)
+      {
+          $this->setReviewAssignment($reviewAssignment);
+          $this->setReviewRound($reviewRound);
+          $this->setSubmission($submission);
+
+          parent::__construct($template);
+      }
+
+      public function execute(...$args)
+      {
+          $this->reviewAssignment->setCancelled(true);
+          $this->reviewAssignmentDao->updateObject($this->reviewAssignment);
+      }
+  }
+  ```
+
+test "rank1581: the fixed revision registers the csrf validator"
+  lang php
+  file controllers/grid/users/reviewer/form/ReviewerNotifyActionForm.inc.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  abstract class ReviewerNotifyActionForm extends Form
+  {
+      public $reviewAssignment;
+      public $reviewRound;
+      public $submission;
+
+      public function __construct($reviewAssignment, $reviewRound, $submission, $template)
+      {
+          $this->setReviewAssignment($reviewAssignment);
+          $this->setReviewRound($reviewRound);
+          $this->setSubmission($submission);
+
+          $this->addCheck(new FormValidatorCSRF($this));
+
+          parent::__construct($template);
+      }
+
+      public function execute(...$args)
+      {
+          $this->reviewAssignment->setCancelled(true);
+          $this->reviewAssignmentDao->updateObject($this->reviewAssignment);
+      }
+  }
+  ```

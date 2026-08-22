@@ -1,0 +1,137 @@
+# Rank 1590 / CVE-2025-9394: PoDoFo's tokenizer returned from
+# literal-token parse failures without initializing the output
+# variant, after enqueueing (and freeing) the token buffer, so the
+# caller read an uninitialized union through freed state
+# (use-after-free / uninitialized read on the error path,
+# CWE-416/CWE-457; issues #275/#276). DetermineDataType in
+# src/podofo/main/PdfTokenizer.cpp did, on invalid reals and
+# numbers, `this->EnqueueToken(token, tokenType); ... return
+# PdfLiteralDataType::Unknown;` -- both early returns skip the
+# placement-new that every other exit performs on the variant union,
+# leaving it whatever it held. The fixing commitng change
+# ("PdfTokenizer: Fixed free-after-use after failing to
+# parse content while reading literal tokens"): both branches `goto
+# Recovery`, a labeled common exit that placement-news
+# PdfVariant::NullMember into the variant before returning Unknown.
+
+#
+# ATTENTION, error-path initialization. The defect is an early
+# return that bypasses the exit invariant -- every normal path
+# initializes the variant union, the two error paths do not -- the
+# same exit-completeness family as rank 1557's log-without-halt
+# (control flow leaving through a door that skips the required
+# step): no rule can ask "does every return from this function
+# satisfy the output initialization" -- path-completeness over a
+# union's initialization is exit-invariant vocabulary. A binding on
+# PoDoFo's own tokenizer would detect this library rather than the
+# weakness. Measured on the real code: scanning PdfTokenizer.cpp
+# reports the same findings at both revisions (memory heuristics;
+# none change). No ENGINE-GAPS.md entry. No definition change
+# shipped. Spec cve_rank1590 records the early return without
+# initialization and the recovery-goto form, both asserting reject
+# VYQL-MEM-006: when exit-invariant vocabulary lands, the skipping
+# form must flip to expect.
+
+test "rank1590: the parse failure returns an uninitialized variant"
+  lang cpp
+  file src/podofo/main/PdfTokenizer.cpp
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <cstdlib>
+  #include <string>
+
+  struct PdfVariant {
+      union Primitive {
+          double m_Real;
+          long m_Number;
+          void *m_Null;
+      } primitive;
+      int type;
+  };
+
+  enum class PdfLiteralDataType { Real, Number, Unknown };
+
+  class PdfTokenizer {
+  public:
+      PdfLiteralDataType DetermineDataType(char token[], PdfVariant &variant)
+      {
+          char *end;
+          if (token[0] == '.' || (token[0] >= '0' && token[0] <= '9')) {
+              double val = strtod(token, &end);
+              if (end == token) {
+                  // Don't consume the token
+                  EnqueueToken(token);
+                  return PdfLiteralDataType::Unknown;
+              }
+              new (&variant.primitive.m_Real) double(val);
+              return PdfLiteralDataType::Real;
+          }
+
+          long val = strtol(token, &end, 10);
+          if (end == token) {
+              EnqueueToken(token);
+              return PdfLiteralDataType::Unknown;
+          }
+          new (&variant.primitive.m_Number) long(val);
+          return PdfLiteralDataType::Number;
+      }
+
+      void EnqueueToken(char token[]);
+  };
+  ```
+
+test "rank1590: the fixed revision routes failures through the recovery exit"
+  lang cpp
+  file src/podofo/main/PdfTokenizer.cpp
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <cstdlib>
+  #include <string>
+
+  struct PdfVariant {
+      union Primitive {
+          double m_Real;
+          long m_Number;
+          void *m_Null;
+      } primitive;
+      int type;
+  };
+
+  enum class PdfLiteralDataType { Real, Number, Unknown };
+
+  class PdfTokenizer {
+  public:
+      PdfLiteralDataType DetermineDataType(char token[], PdfVariant &variant)
+      {
+          char *end;
+          if (token[0] == '.' || (token[0] >= '0' && token[0] <= '9')) {
+              double val = strtod(token, &end);
+              if (end == token) {
+                  // Don't consume the token
+                  EnqueueToken(token);
+                  goto Recovery;
+              }
+              new (&variant.primitive.m_Real) double(val);
+              return PdfLiteralDataType::Real;
+          }
+
+          {
+              long val = strtol(token, &end, 10);
+              if (end == token) {
+                  EnqueueToken(token);
+                  goto Recovery;
+              }
+              new (&variant.primitive.m_Number) long(val);
+              return PdfLiteralDataType::Number;
+          }
+
+      Recovery:
+          new (&variant.primitive.m_Null) void *(nullptr);
+          return PdfLiteralDataType::Unknown;
+      }
+
+      void EnqueueToken(char token[]);
+  };
+  ```

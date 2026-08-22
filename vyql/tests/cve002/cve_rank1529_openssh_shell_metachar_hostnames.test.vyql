@@ -1,0 +1,88 @@
+# Rank 1529 / CVE-2026-4631: ssh(1) accepted user and host names
+# containing shell metacharacters from the command line, and those
+# names flow into shell commands that scripts and wrappers build
+# around them, so a hostname like `host';cmd` escaped its argument
+# position (argument/shell injection, CWE-78/CWE-88). ssh.c took
+# options.host_arg and options.user verbatim -- no character policy
+# anywhere between argv and every later use (ProxyCommand expansion,
+# askpass invocations, logging). the fixing commit is the fixing change
+# (confirmed, upstream "ban user/hostnames with most shell
+# metacharacters", ssh.c v1.599): new valid_hostname() and
+# valid_ruser() reject names starting with '-' (option injection)
+# and any of `'`"$\;&<>|(){}`, whitespace or control characters,
+# applied where the command-line arguments are parsed. No pool
+# correction.
+#
+# ATTENTION, allowlist guards at the argv boundary. The corpus has an
+# argument-injection family (VYQL-INJ-031, proven at rank 1050 on
+# CocoaPods' git invocation) but its rules judge specific command
+# constructions; nothing asks "are command-line user/host values
+# constrained to a character set before flowing into shell-bearing
+# paths" -- the guard's position is the ssh CLI itself, where the
+# tainted origin (argv) is the program's contract. The fixed revision's control
+# shape -- a deny-list of shell metacharacters plus the leading '-'
+# check -- is the general vocabulary piece. Measured on the real
+# code: scanning ssh.c reports 85 findings at the parent and 87 at
+# the fixed revision -- the two new rows are heuristic noise on the added
+# strchr/isspace loops, and the underlying gap is never visible. A
+# binding on openssh's own valid_hostname would detect this client
+# rather than the weakness. No ENGINE-GAPS.md entry. No definition
+# change shipped. Spec cve_rank1529 records the unguarded argv host
+# and the valid_hostname-gated form, both asserting reject
+# VYQL-INJ-031: when argv-boundary vocabulary lands, the unguarded
+# form must flip to expect.
+
+test "rank1529: the command-line host flows wherever it is told"
+  lang c
+  file ssh.c
+  reject VYQL-INJ-031
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  int connect_to_host(const char *host_arg, const char *ruser)
+  {
+      char cmd[4096];
+
+      snprintf(cmd, sizeof(cmd), "ssh-askpass %s@%s", ruser, host_arg);
+      return system(cmd);
+  }
+  ```
+
+test "rank1529: the fixed revision refuses metacharactered names at parse"
+  lang c
+  file ssh.c
+  reject VYQL-INJ-031
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include <ctype.h>
+
+  static int
+  valid_hostname(const char *s)
+  {
+      size_t i;
+
+      if (*s == '-')
+          return 0;
+      for (i = 0; s[i] != 0; i++) {
+          if (strchr("'`\"$\\;&<>|(){}", s[i]) != NULL ||
+              isspace((unsigned char)s[i]) || iscntrl((unsigned char)s[i]))
+              return 0;
+      }
+      return 1;
+  }
+
+  int connect_to_host(const char *host_arg, const char *ruser)
+  {
+      char cmd[4096];
+
+      if (!valid_hostname(host_arg))
+          return -1;
+      snprintf(cmd, sizeof(cmd), "ssh-askpass %s@%s", ruser, host_arg);
+      return system(cmd);
+  }
+  ```

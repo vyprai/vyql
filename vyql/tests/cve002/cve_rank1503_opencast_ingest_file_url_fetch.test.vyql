@@ -1,0 +1,111 @@
+# Rank 1503 / CVE-2021-43821: OpenCast's ingest service accepted a media URL
+# from the request and fetched it with the local filesystem in scope
+# (CWE-552, CWE-918). Two entry points shared the shape: the REST layer's
+# updateMediaPackageID(MediaPackage, URI) and the ingest service's download()
+# in IngestServiceImpl both branched on uri.toString().startsWith("http") and
+# gave every other scheme -- file:///etc/passwd among them -- to
+# uri.toURL().openStream(), so an ingest request could make the server read
+# local files (the advisory's fix title: "Ensure local files are not
+# addable"). The fixing commit (GHSA-59g4-
+# hpg3-3gcp): the service's else branch became
+#   else if (!uri.toString().startsWith("file") || testMode)
+#       in = uri.toURL().openStream();
+#   else throw new IOException("Refusing to fetch files from the local
+# filesystem");
+# with testMode a protected flag only tests set. .
+#
+# FIXED by a sink binding. The rule VYQL-RF-001 (taint core.UserControlledData
+# -> code.UrlFetch, unless AllowlistValidation) had java bindings for
+# openConnection, getForObject and getForEntity, but not for URL.openStream,
+# which the JDK documents as "opens a connection to this URL and returns an
+# InputStream for reading from that connection" -- a URL fetch with the
+# connection step folded in. vyql/bindings/java/murlfetch.vyql emits
+# code.UrlFetch at openStream's receiver. Measured on the real module
+# (modules/ingest-service-impl/.../ingest/, 7 java files): the vulnerable
+# revision goes from 72 findings to 73, adding VYQL-RF-001 at medium
+# confidence, source code.HttpInput at IngestRestService.java:936 (the @POST
+# addTrack family feeding a private URI overload), sink code.UrlFetch at
+# IngestRestService.java:966 (uri.toURL().openStream()), the unless clause
+# unsatisfied. Two honest limits, recorded rather than papered over: the
+# service's own copy of the fetch sits behind the job queue -- addTrack
+# serialises the URI into a service-registry job payload and download() reads
+# it back, a boundary taint does not cross -- and the endpoint's copy is
+# untouched by this fix commit, so the same finding is present at the fixed
+# revision too: the detection is the shape, and on this checkout the shape
+# survives at the fixed revision. The fixed revision's own control -- an inline
+# startsWith("file") refusal -- is not expressible as a neutralising control:
+# vyql explain on the patched form reports "no neutralizing control dominates
+# the path; none found anywhere on flows", startsWith is bound only as an
+# advisory core.InputValidation check for trust boundaries, and a java
+# AllowlistValidation binding keyed on a scheme literal would be shaped by
+# this incident rather than by the JDK's documentation, so none ships.
+# The finding on the fixed code is defensible: the fixed revision narrows the file
+# scope (CWE-552), not URL provenance, and a user-directed openStream fetch
+# of https://attacker.example remains after it. The spec's reject direction
+# therefore pins the boundary the rule actually draws, following the
+# rank 232 precedent: a URI that is parsed and branched on but never fetched
+# is not a request forgery.
+#
+# verify_current_expected: fixed-sink-binding
+
+test "rank1503: an ingest url that is fetched with the filesystem in scope"
+  lang java
+  file modules/ingest-service-impl/src/main/java/org/opencastproject/ingest/endpoint/IngestRestService.java
+  expect VYQL-RF-001
+  code
+  ```
+  package org.opencastproject.ingest.endpoint;
+
+  import java.io.InputStream;
+  import java.net.URI;
+  import jakarta.ws.rs.FormParam;
+  import jakarta.ws.rs.POST;
+  import jakarta.ws.rs.Path;
+  import jakarta.ws.rs.core.Response;
+
+  public class IngestRestService {
+    private java.net.http.HttpClient httpClient = java.net.http.HttpClient.newHttpClient();
+
+    @POST
+    @Path("addTrack")
+    public Response addMediaPackageTrack(@FormParam("url") String url) throws Exception {
+      return updateMediaPackageId(new URI(url));
+    }
+
+    private Response updateMediaPackageId(URI uri) throws Exception {
+      InputStream in;
+      if (uri.toString().startsWith("http")) {
+        java.net.http.HttpRequest get = java.net.http.HttpRequest.newBuilder(uri).build();
+        in = httpClient.send(get, java.net.http.HttpResponse.BodyHandlers.ofInputStream()).body();
+      } else {
+        in = uri.toURL().openStream();
+      }
+      in.close();
+      return Response.ok().build();
+    }
+  }
+  ```
+
+test "rank1503: uri parsing with no fetch is not a request forgery"
+  lang java
+  file modules/ingest-service-impl/src/main/java/org/opencastproject/ingest/impl/IngestServiceImpl.java
+  reject VYQL-RF-001
+  code
+  ```
+  package org.opencastproject.ingest.impl;
+
+  import java.net.URI;
+  import jakarta.ws.rs.FormParam;
+  import jakarta.ws.rs.POST;
+
+  public class IngestServiceImpl {
+    @POST
+    public String resolveName(@FormParam("url") String url) throws Exception {
+      URI uri = new URI(url);
+      if (uri.toString().startsWith("file")) {
+        return "refused";
+      }
+      return uri.getPath();
+    }
+  }
+  ```

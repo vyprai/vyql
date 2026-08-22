@@ -1,0 +1,80 @@
+# Rank 1542 / CVE-2024-51132: HAPI FHIR created its XML
+# DocumentBuilderFactory instances through the raw JDK factory, so
+# every code path parsing untrusted FHIR or CDA XML resolved external
+# entities (XXE, CWE-611; GHSA-8498-9ggv-vcj9 fixed by this sweep).
+# Dozens of call sites did `DocumentBuilderFactory factory =
+# DocumentBuilderFactory.newInstance();` -- CDAUtilities.java:56 among
+# them -- with no secure-processing or disallow-doctype features
+# anywhere at the site. the fixing commit is the fixing change
+# (confirmed, "Move new documentbuilderfactory calls to XMLUtils"):
+# every instantiation is replaced by XMLUtil.
+# newXXEProtectedDocumentBuilderFactory(), the project helper that
+# sets the XXE-disabling features centrally. .
+#
+# ATTENTION, rule reports, helper guard uncredited. VYQL-DESER-004
+# reports the vulnerable path on the real code: scanning
+# CDAUtilities.java carries a DESER-004 row at :56 (code.
+# XmlParserCreate by java.marks, `unless core.XmlHardening`
+# unsatisfied at both endpoint and sameReceiver). The finding does
+# not clear at the fixed revision: the hardening happens inside HAPI's own
+# newXXEProtectedDocumentBuilderFactory helper, and the corpus's
+# XmlHardening credit only knows the apache
+# getSecureDocumentBuilderFactory shape -- a control returned by a
+# project-local helper is invisible at the call site
+# (control-at-a-distance). A binding on HAPI's own helper would
+# detect this library rather than the weakness; the generic piece --
+# crediting hardening returned from helpers, or reading the features
+# the helper sets -- is recorded as an ENGINE-GAPS.md Medium row
+# (helper-boundary controls), Blocks 1542. Measured on the real
+# code: one DESER-004 at both revisions, identical. No definition
+# change shipped. Spec cve_rank1542 records the raw factory and the
+# helper-hardened form, both expecting VYQL-DESER-004: the rule
+# fires today on both; when helper-boundary credit lands, the
+# hardened form must flip to reject.
+
+test "rank1542: the parser factory is created raw"
+  lang java
+  file org.hl7.fhir.convertors/src/main/java/org/hl7/fhir/convertors/misc/CDAUtilities.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.hl7.fhir.convertors.misc;
+
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.w3c.dom.Document;
+  import org.xml.sax.InputSource;
+
+  public class CDAUtilities {
+
+      public static Document load(String source) throws Exception {
+          DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+          DocumentBuilder builder = factory.newDocumentBuilder();
+          return builder.parse(new InputSource(source));
+      }
+  }
+  ```
+
+test "rank1542: the fixed revision takes the hardened factory from the helper"
+  lang java
+  file org.hl7.fhir.convertors/src/main/java/org/hl7/fhir/convertors/misc/CDAUtilities.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.hl7.fhir.convertors.misc;
+
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.hl7.fhir.utilities.xml.XMLUtil;
+  import org.w3c.dom.Document;
+  import org.xml.sax.InputSource;
+
+  public class CDAUtilities {
+
+      public static Document load(String source) throws Exception {
+          DocumentBuilderFactory factory = XMLUtil.newXXEProtectedDocumentBuilderFactory();
+          DocumentBuilder builder = factory.newDocumentBuilder();
+          return builder.parse(new InputSource(source));
+      }
+  }
+  ```

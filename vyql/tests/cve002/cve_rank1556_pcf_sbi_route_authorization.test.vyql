@@ -1,0 +1,115 @@
+# Rank 1556 / CVE-2026-42083: free5gc's PCF registered its Session
+# Management and UE Policy SBI route groups without the authorization
+# middleware every sibling group carries, so requests to the policy
+# control endpoints bypassed service-authorization (missing
+# function-level access control, CWE-306/862; the task list's repo!
+# flag resolves as an umbrella naming: the advisory names free5gc/
+# free5gc while the vulnerable component is the pcf repository, and
+# the pool row's target is the better scan). internal/sbi/server.go
+# did `smPolicyGroup := s.router.Group(factory.PcfSMpolicyCtlResUriPrefix);
+# applyRoutes(smPolicyGroup, smPolicyRoutes)` and the UE-Policy twin
+# with no Use(...) between Group and applyRoutes -- while the same
+# function's AM-Policy, BDT-Policy and OAM groups each install
+# `util.NewRouterAuthorizationCheck(models.ServiceName_...).Check`
+# middleware first. The fixing commit (confirmed --MMIT_OK
+# by diff -- merge "fix/pcf-smpolicy-auth-middleware" #63, +8 lines):
+# both missing groups now install the same
+# RouterAuthorizationCheck middleware for ServiceName_NPCF_
+# SMPOLICYCONTROL and NPCF_UE_POLICY_CONTROL before their routes apply.
+
+#
+# ATTENTION, route-authorization completeness. The vulnerable code is
+# the ABSENCE of a middleware on two of five sibling groups -- the
+# expected pattern is visible three times in the same function, and
+# the defect is that two groups skip it. Nothing in the corpus can ask
+# "does every route group in a service install the authorization
+# check its siblings install" -- the same per-resource
+# decision-completeness family as ranks 1540 (permission-switch
+# branches) and 1541 (per-item gates in enumeration), here at route
+# registration. A binding on free5gc's own RouterAuthorizationCheck
+# would detect this platform rather than the weakness. Measured on
+# the real code: scanning internal/sbi reports one finding at both
+# revisions (unchanged; the 21 go files otherwise carry no
+# authorization rules). No ENGINE-GAPS.md entry: the piece is
+# ontology design (route-group authorization completeness), not a
+# localised construct. No definition change shipped. Spec
+# cve_rank1556 records the router with two unchecked groups beside
+# their checked siblings and the fully checked form, both asserting
+# reject VYQL-AUTH-079: when route-completeness vocabulary lands, the
+# unchecked groups must flip to expect.
+
+test "rank1556: two policy groups skip the authorization middleware"
+  lang go
+  file internal/sbi/server.go
+  reject VYQL-AUTH-079
+  code
+  ```
+  package sbi
+
+  import (
+      "github.com/free5gc/pcf/internal/sbi/util"
+      "github.com/free5gc/pcf/internal/sbi/factory"
+      "github.com/free5gc/openapi/models"
+      "github.com/gin-gonic/gin"
+  )
+
+  func (s *Server) registerRoutes() {
+      smPolicyRoutes := s.getSmPolicyRoutes()
+      smPolicyGroup := s.router.Group(factory.PcfSMpolicyCtlResUriPrefix)
+      applyRoutes(smPolicyGroup, smPolicyRoutes)
+
+      uePolicyRoutes := s.getUePolicyRoutes()
+      uePolicyGroup := s.router.Group(factory.PcfUePolicyCtlResUriPrefix)
+      applyRoutes(uePolicyGroup, uePolicyRoutes)
+
+      amPolicyRoutes := s.getAmPolicyRoutes()
+      amPolicyGroup := s.router.Group(factory.PcfAMpolicyCtlResUriPrefix)
+      amRouterAuthorizationCheck := util.NewRouterAuthorizationCheck(models.ServiceName_NPCF_AM_POLICY_CONTROL)
+      amPolicyGroup.Use(func(c *gin.Context) {
+          amRouterAuthorizationCheck.Check(c, s.Context())
+      })
+      applyRoutes(amPolicyGroup, amPolicyRoutes)
+  }
+  ```
+
+test "rank1556: the fixed revision checks both policy groups like their siblings"
+  lang go
+  file internal/sbi/server.go
+  reject VYQL-AUTH-079
+  code
+  ```
+  package sbi
+
+  import (
+      "github.com/free5gc/pcf/internal/sbi/util"
+      "github.com/free5gc/pcf/internal/sbi/factory"
+      "github.com/free5gc/openapi/models"
+      "github.com/gin-gonic/gin"
+  )
+
+  func (s *Server) registerRoutes() {
+      smPolicyRoutes := s.getSmPolicyRoutes()
+      smPolicyGroup := s.router.Group(factory.PcfSMpolicyCtlResUriPrefix)
+      smRouterAuthorizationCheck := util.NewRouterAuthorizationCheck(models.ServiceName_NPCF_SMPOLICYCONTROL)
+      smPolicyGroup.Use(func(c *gin.Context) {
+          smRouterAuthorizationCheck.Check(c, s.Context())
+      })
+      applyRoutes(smPolicyGroup, smPolicyRoutes)
+
+      uePolicyRoutes := s.getUePolicyRoutes()
+      uePolicyGroup := s.router.Group(factory.PcfUePolicyCtlResUriPrefix)
+      uePolicyRouterAuthorizationCheck := util.NewRouterAuthorizationCheck(models.ServiceName_NPCF_UE_POLICY_CONTROL)
+      uePolicyGroup.Use(func(c *gin.Context) {
+          uePolicyRouterAuthorizationCheck.Check(c, s.Context())
+      })
+      applyRoutes(uePolicyGroup, uePolicyRoutes)
+
+      amPolicyRoutes := s.getAmPolicyRoutes()
+      amPolicyGroup := s.router.Group(factory.PcfAMpolicyCtlResUriPrefix)
+      amRouterAuthorizationCheck := util.NewRouterAuthorizationCheck(models.ServiceName_NPCF_AM_POLICY_CONTROL)
+      amPolicyGroup.Use(func(c *gin.Context) {
+          amRouterAuthorizationCheck.Check(c, s.Context())
+      })
+      applyRoutes(amPolicyGroup, amPolicyRoutes)
+  }
+  ```

@@ -1,0 +1,102 @@
+# Rank 1579 / CVE-2026-40892: Piwigo's web-service search accepted
+# date filter parameters without validating them as MySQL datetimes,
+# so a crafted f_min_date_available (and its siblings) injected SQL
+# into the search query built from the filters (SQL injection,
+# CWE-89; GHSA-mgqc-3445-qghq). The filter setup in
+# include/ws_functions.inc.php took $params['f_min_date_available'],
+# f_max_date_available, f_min_date_created and f_max_date_created and
+# handed them to the query builder with no shape check. The fixing commit
+# 0d5ed1f777 ("(cp 0f359f2af) fixes
+# GHSA-mgqc-3445-qghq checks standard date fields"): a loop validates
+# each of the four fields with is_valid_mysql_datetime (a helper
+# added to include/functions.inc.php matching MySQL's datetime
+# grammar) and rejects the request with WS_ERR_INVALID_PARAM on any
+# mismatch. .
+#
+# ATTENTION, param-provenance at the filter boundary. The values
+# arrive through Piwigo's web-service parameter array and cross into
+# its own query builder -- the project-API boundary of ranks 1545
+# and 1568: no binding labels the ws param array element as a source
+# or the builder as a SqlExecution, so no taint forms (scanning
+# ws_functions.inc.php reports zero findings at both revisions).
+# The fixed revision's control -- a datetime-grammar validator before the query
+# -- is the general allowlist shape, but is_valid_mysql_datetime is
+# Piwigo's own helper. No ENGINE-GAPS.md entry. No definition change
+# shipped. Spec cve_rank1579 records the raw date filters reaching
+# the query build and the validated form, both asserting reject
+# VYQL-INJ-001: when ws-param provenance lands, the raw form must
+# flip to expect.
+
+test "rank1579: the date filters reach the query unvalidated"
+  lang php
+  file include/ws_functions.inc.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  function ws_search_getImages($params, &$service)
+  {
+      $sql_filters = array();
+
+      foreach (array('f_min_date_available', 'f_max_date_available',
+                     'f_min_date_created', 'f_max_date_created') as $datefield)
+      {
+          if (isset($params[$datefield]))
+          {
+              $sql_filters[] = sprintf(
+                  "date_available >= '%s'",
+                  $params[$datefield]
+              );
+          }
+      }
+
+      $query = 'SELECT id FROM images WHERE ' . implode(' AND ', $sql_filters);
+      return query2array($query);
+  }
+  ```
+
+test "rank1579: the fixed revision checks each field against the grammar"
+  lang php
+  file include/ws_functions.inc.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  function ws_search_getImages($params, &$service)
+  {
+      foreach (array('f_min_date_available', 'f_max_date_available',
+                     'f_min_date_created', 'f_max_date_created') as $datefield)
+      {
+          if (isset($params[$datefield]) and !is_valid_mysql_datetime($params[$datefield]))
+          {
+              global $service;
+              $service->sendResponse(new PwgError(WS_ERR_INVALID_PARAM, 'Invalid '.$datefield));
+              exit;
+          }
+      }
+
+      $sql_filters = array();
+
+      foreach (array('f_min_date_available', 'f_max_date_available',
+                     'f_min_date_created', 'f_max_date_created') as $datefield)
+      {
+          if (isset($params[$datefield]))
+          {
+              $sql_filters[] = sprintf(
+                  "date_available >= '%s'",
+                  $params[$datefield]
+              );
+          }
+      }
+
+      $query = 'SELECT id FROM images WHERE ' . implode(' AND ', $sql_filters);
+      return query2array($query);
+  }
+
+  function is_valid_mysql_datetime($value)
+  {
+      return 1 === preg_match('/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/', $value);
+  }
+  ```

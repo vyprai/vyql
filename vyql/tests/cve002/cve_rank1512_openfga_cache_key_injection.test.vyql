@@ -1,0 +1,144 @@
+# Rank 1512 / CVE-2026-33729: OpenFGA built authorization cache keys by
+# concatenating user-controlled context values without escaping, so a
+# crafted context could collide with another request's cache entry (cache
+# poisoning of authorization decisions). pkg/storage/cache.go serializes
+# a structpb.Struct into the cache key: writeStruct writes 'key:' pairs
+# with fmt.Sprintf("'%s:'", key) after sorting, and writeValue wrote
+# val.StringValue raw -- so a string value like "x,'b:'y" injects a fake
+# key/value pair into the serialized key, and control characters could
+# manipulate the key arbitrarily. the fixing commit is the fixing change
+# (confirmed, "add cache_key tests to ensure we escape control characters
+# and encode context key length" with the CHANGELOG row): writeValue now
+# replaces every unicode.IsControl rune with "?", and writeStruct
+# prefixes the key count (strconv.Itoa(len(keys))) so the number of keys
+# is reflected in the key and cannot be spoofed by injected delimiters.
+
+#
+# ATTENTION, vocabulary gap. The weakness is delimiter injection into a
+# serialized interchange key -- the cache-poisoning sibling of SQL
+# injection and log forging -- and the corpus has no position for it:
+# code.LogOutput is bound to the standard log package only
+# (vyql/bindings/go/m48a985c1.vyql, log.Print/Printf/Println), an
+# io.StringWriter feeding a cache key is not a sink of any kind, and the
+# source side (a structpb.Value arriving from an FGA API request) has no
+# binding either. Measured on the real code: scanning pkg/storage/cache.go
+# the vulnerable revision reports zero findings -- no rule participates in the
+# file at all -- and the fixed revision's directories report the
+# usual crypto/deserialization noise elsewhere (225 VYQL-CRY-001, 159
+# VYQL-DESER-001 on generated protobuf code among them) with nothing on
+# the cache-key path. A binding on OpenFGA's own writeValue would detect
+# this repository rather than the weakness; the general shape needs a
+# CacheKey/interchange-key sink concept and a decision about which
+# serializers count, which is ontology design of the same family as the
+# credential-vs-identifier question at ranks 1501/1504/1505/1508 -- not
+# worth one rank. No ENGINE-GAPS.md entry: nothing here is localised to a
+# construct; the piece is a missing concept. No definition change
+# shipped. Spec cve_rank1512 records the raw-value serialization and the
+# control-stripped, length-prefixed form, both asserting reject
+# VYQL-INJ-001.
+
+test "rank1512: context values serialize raw into the cache key"
+  lang go
+  file pkg/storage/cache.go
+  reject VYQL-INJ-001
+  code
+  ```
+  package storage
+
+  import (
+      "fmt"
+      "io"
+      "sort"
+
+      "google.golang.org/protobuf/types/known/structpb"
+  )
+
+  func writeValue(w io.StringWriter, v *structpb.Value) (err error) {
+      switch val := v.Kind.(type) {
+      case *structpb.Value_StringValue:
+          _, err = w.WriteString(val.StringValue)
+      case *structpb.Value_NumberValue:
+          _, err = w.WriteString(fmt.Sprintf("%v", val.NumberValue))
+      }
+      return
+  }
+
+  func writeStruct(w io.StringWriter, s *structpb.Struct) (err error) {
+      fields := s.GetFields()
+      keys := make([]string, 0, len(fields))
+      for k := range fields {
+          keys = append(keys, k)
+      }
+      sort.Strings(keys)
+      for _, key := range keys {
+          if _, err = w.WriteString(fmt.Sprintf("'%s:'", key)); err != nil {
+              return
+          }
+          if err = writeValue(w, fields[key]); err != nil {
+              return
+          }
+      }
+      return
+  }
+  ```
+
+test "rank1512: the fixed revision strips control runes and encodes the key count"
+  lang go
+  file pkg/storage/cache.go
+  reject VYQL-INJ-001
+  code
+  ```
+  package storage
+
+  import (
+      "fmt"
+      "io"
+      "sort"
+      "strconv"
+      "unicode"
+
+      "google.golang.org/protobuf/types/known/structpb"
+  )
+
+  func writeValue(w io.StringWriter, v *structpb.Value) (err error) {
+      switch val := v.Kind.(type) {
+      case *structpb.Value_StringValue:
+          for _, c := range val.StringValue {
+              if unicode.IsControl(c) {
+                  _, err = w.WriteString("?")
+                  if err != nil {
+                      return
+                  }
+                  continue
+              }
+              if _, err = w.WriteString(string(c)); err != nil {
+                  return
+              }
+          }
+      case *structpb.Value_NumberValue:
+          _, err = w.WriteString(strconv.FormatFloat(val.NumberValue, 'f', -1, 64))
+      }
+      return
+  }
+
+  func writeStruct(w io.StringWriter, s *structpb.Struct) (err error) {
+      fields := s.GetFields()
+      keys := make([]string, 0, len(fields))
+      for k := range fields {
+          keys = append(keys, k)
+      }
+      sort.Strings(keys)
+      if _, err = w.WriteString(strconv.Itoa(len(keys))); err != nil {
+          return
+      }
+      for _, key := range keys {
+          if _, err = w.WriteString(fmt.Sprintf("'%s:'", key)); err != nil {
+              return
+          }
+          if err = writeValue(w, fields[key]); err != nil {
+              return
+          }
+      }
+      return
+  }
+  ```

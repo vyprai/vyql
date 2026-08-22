@@ -1,0 +1,108 @@
+# Rank 1594 / CVE-2026-44881: Portainer materialized Git repository
+# entries with mode 0o120000 as real OS symlinks when cloning
+# Git-backed stacks (only .gitmodules is exempted), and its
+# GET /api/stacks/{id}/file endpoint read the entry point with
+# os.ReadFile -- which follows symlinks -- so a repository whose
+# docker-compose.yml is a symlink to an arbitrary path returned
+# that file's contents verbatim to any stack-creating user
+# (arbitrary file read through materialized symlinks,
+# CWE-59/CWE-22; BE-12768). The clone in api/git/git.go used go-git
+# with a plain osfs filesystem, letting every blob entry of mode
+# 120000 become a host symlink. The row is corrected in place:
+# the row held aae5e533c6 (the 2.39.2 version bump -- the nocommit
+# flag holds); the fixing commit is 8be327f0, "fix(git): forbid the
+# usage of symlinks BE-12768 (#2532)": a noSymlinkFS wrapper over
+# the billy filesystem whose Symlink() returns
+# gittypes.ErrSymlinkDetected -- go-git clones into a filesystem
+# that cannot create symlinks at all, with the storer rebuilt on
+# the same root.
+#
+# ATTENTION, materialized-symlink defenses. The read side
+# (os.ReadFile) is ordinary; the defect is the clone step
+# translating untrusted repository entries into host filesystem
+# objects with link semantics -- the same ownership vocabulary as
+# rank 1553 (Passenger's given-away work dir): no rule can ask "can
+# untrusted archive/repository content materialize as symlinks the
+# later reads will follow" -- that is clone-materialisation
+# vocabulary. A binding on Portainer's own noSymlinkFS would detect
+# this platform rather than the weakness. Measured on the real
+# code: scanning api/git/git.go reports zero findings at both
+# revisions. No ENGINE-GAPS.md entry. No definition change shipped.
+# Spec cve_rank1594 records the plain-filesystem clone and the
+# no-symlink wrapper form, both asserting reject VYQL-PATH-001:
+# when materialisation vocabulary lands, the plain-clone form must
+# flip to expect.
+
+test "rank1594: the clone materializes repository symlinks"
+  lang go
+  file api/git/git.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package git
+
+  import (
+      "context"
+      "os"
+
+      gogit "github.com/go-git/go-git/v5"
+      "github.com/go-git/go-billy/v5/osfs"
+  )
+
+  type gitClient struct{}
+
+  func (c *gitClient) Download(ctx context.Context, dst string, opt *CloneOptions) error {
+      wt := osfs.New(dst)
+      _, err := gogit.CloneContext(ctx, nil, wt, &gogit.CloneOptions{
+          URL: opt.RepositoryURL,
+      })
+      return err
+  }
+
+  func (c *gitClient) ReadEntryPoint(dst string, entryPoint string) ([]byte, error) {
+      return os.ReadFile(dst + string(os.PathSeparator) + entryPoint)
+  }
+  ```
+
+test "rank1594: the fixed revision clones into a filesystem without symlinks"
+  lang go
+  file api/git/git.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package git
+
+  import (
+      "context"
+      "errors"
+      "os"
+
+      gogit "github.com/go-git/go-git/v5"
+      "github.com/go-git/go-billy/v5"
+      "github.com/go-git/go-billy/v5/osfs"
+  )
+
+  var ErrSymlinkDetected = errors.New("symlink detected")
+
+  // noSymlinkFS wraps a billy.Filesystem and rejects symlink creation to prevent
+  // symlink traversal attacks from untrusted git repositories
+  type noSymlinkFS struct {
+      billy.Filesystem
+  }
+
+  func (fs noSymlinkFS) Symlink(_, _ string) error {
+      return ErrSymlinkDetected
+  }
+
+  func (c *gitClient) Download(ctx context.Context, dst string, opt *CloneOptions) error {
+      wt := noSymlinkFS{osfs.New(dst)}
+      _, err := gogit.CloneContext(ctx, nil, wt, &gogit.CloneOptions{
+          URL: opt.RepositoryURL,
+      })
+      return err
+  }
+
+  func (c *gitClient) ReadEntryPoint(dst string, entryPoint string) ([]byte, error) {
+      return os.ReadFile(dst + string(os.PathSeparator) + entryPoint)
+  }
+  ```

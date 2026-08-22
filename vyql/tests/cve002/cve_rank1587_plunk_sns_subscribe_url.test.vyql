@@ -1,0 +1,88 @@
+# Rank 1587 / CVE-2026-32096: Plunk's SNS webhook fetched the
+# SubscribeURL straight from the request body, so any poster chose
+# the URL the server fetched -- internal addresses included
+# (server-side request forgery, CWE-918). handleWebhook in
+# apps/api/src/controllers/Webhooks.ts did `const confirmResponse =
+# await fetch(req.body.SubscribeURL);` on a SubscriptionConfirmation
+# -- the SNS contract says that URL belongs to Amazon, but nothing
+# checked. The fixing commit (confirmed -- --
+# "fix: Verify SNS URL before sending fetch request"): the value is
+# type-checked, parsed with new URL, and the protocol must be https
+# with the hostname matching /^sns\.[a-z0-9-]+\.amazonaws\.com$/ --
+# otherwise 400 -- before the fetch. .
+#
+# ATTENTION, rule reports, guard uncredited. VYQL-RF-001 reports the
+# vulnerable path on the real code: at the vulnerable revision, source
+# code.HttpInput at Webhooks.ts:41 -> sink code.UrlFetch at :41 (the
+# bare fetch of req.body.SubscribeURL), `unless
+# core.AllowlistValidation` unsatisfied. The finding does not clear
+# at the fixed revision: the guard is an inline regex test (SNS_HOST_RE.test on
+# the parsed hostname) plus a protocol comparison, and no binding
+# credits an arbitrary local regex/protocol pair as
+# AllowlistValidation -- control-at-a-distance, the same shape as
+# ranks 1542 (helper-returned hardening) and 1555 (regex-allowlist
+# guards). A binding on Plunk's own SNS_HOST_RE would detect this
+# application rather than the weakness; the generic piece is
+# inline-predicate guards as credited controls. Measured on the real
+# code: one RF-001 at both revisions (the fixed revision's finding sits at :65,
+# the fetch inside the validated branch); an unrelated INJ-072
+# heuristic row appears at :32 at both revisions. No new
+# ENGINE-GAPS.md row (the helper-boundary row at 1542 states the
+# gap). No definition change shipped. Spec cve_rank1587 records the
+# bare request-URL fetch and the validated form, both expecting
+# VYQL-RF-001: the rule fires today on both; when guard-credit
+# vocabulary lands, the validated form must flip to reject.
+
+test "rank1587: the webhook fetches the url it is posted"
+  lang javascript
+  file apps/api/src/controllers/Webhooks.ts
+  expect VYQL-RF-001
+  code
+  ```
+  export async function handleWebhook(req, res) {
+      if (req.body.Type === 'SubscriptionConfirmation') {
+          signale.info('Subscribe URL:', req.body.SubscribeURL);
+
+          const confirmResponse = await fetch(req.body.SubscribeURL);
+          if (!confirmResponse.ok) {
+              throw new Error('Failed to confirm SNS subscription');
+          }
+      }
+      return res.status(200).json({ success: true });
+  }
+  ```
+
+test "rank1587: the fixed revision validates the sns host before fetching"
+  lang javascript
+  file apps/api/src/controllers/Webhooks.ts
+  expect VYQL-RF-001
+  code
+  ```
+  export async function handleWebhook(req, res) {
+      if (req.body.Type === 'SubscriptionConfirmation') {
+          const subscribeURL = req.body.SubscribeURL;
+          if (typeof subscribeURL !== 'string') {
+              return res.status(400).json({ success: false, message: 'Invalid SubscribeURL' });
+          }
+
+          let parsedURL;
+          try {
+              parsedURL = new URL(subscribeURL);
+          } catch {
+              return res.status(400).json({ success: false, message: 'Invalid SubscribeURL' });
+          }
+
+          const SNS_HOST_RE = /^sns\.[a-z0-9-]+\.amazonaws\.com$/;
+          if (parsedURL.protocol !== 'https:' || !SNS_HOST_RE.test(parsedURL.hostname)) {
+              signale.warn('SNS SubscriptionConfirmation rejected');
+              return res.status(400).json({ success: false, message: 'Invalid SubscribeURL' });
+          }
+
+          const confirmResponse = await fetch(parsedURL.toString());
+          if (!confirmResponse.ok) {
+              throw new Error('Failed to confirm SNS subscription');
+          }
+      }
+      return res.status(200).json({ success: true });
+  }
+  ```

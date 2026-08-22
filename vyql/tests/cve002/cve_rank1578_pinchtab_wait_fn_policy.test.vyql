@@ -1,0 +1,113 @@
+# Rank 1578 / CVE-2026-33622: PinchTab's /wait endpoint accepted a
+# user-controlled fn expression and evaluated it in the browser
+# context without consulting the security.allowEvaluate policy its
+# sibling endpoint /evaluate enforces, so a tokened caller executed
+# arbitrary JavaScript even where the operator had explicitly
+# disabled evaluation (security-policy bypass, CWE-94/CWE-284;
+# GHSA-w5pc-m664-r62v). handleWaitCore in internal/handlers/wait.go
+# dispatched the request's mode and, for "fn", embedded req.Fn into
+# executable JavaScript with no evaluateEnabled() check -- /evaluate
+# alone carried the guard. The row is corrected in place: the commit he row
+# held d0032c5a5e (an MCP snapshot-params merge -- the nocommit flag
+# holds); the fixing commit is c619c43a, "fix: dashboard security
+# hardening (#363)", whose bullet reads "fix: gate wait fn behind
+# evaluate access" (+6 lines on wait.go): `if mode == "fn" &&
+# !h.evaluateEnabled() { httpx.ErrorCode(w, 403, "evaluate_disabled",
+# ...); return; }` -- the same policy boundary as /evaluate, applied
+# to the wait path.
+#
+# ATTENTION, sibling-policy completeness. The guard exists on the
+# evaluate route and is absent on the wait route that reaches the
+# same capability -- the same per-resource decision-completeness
+# family as ranks 1556 (sibling route groups) and 1540 (permission
+# branches): nothing can ask "does every path to an execution
+# capability enforce the capability's policy", because the shared
+# capability (evaluate-in-tab) is reached through different
+# handlers. A binding on PinchTab's own evaluateEnabled would detect
+# this server rather than the weakness. Measured on the real code:
+# scanning internal/handlers/wait.go reports zero findings at both
+# revisions (the fn expression crosses into the browser bridge, a
+# project boundary no sink labels). No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1578 records the ungated
+# fn mode and the evaluateEnabled-gated form, both asserting reject
+# VYQL-INJ-003: when capability-gate vocabulary lands, the ungated
+# form must flip to expect.
+
+test "rank1578: the wait fn mode skips the evaluate policy"
+  lang go
+  file internal/handlers/wait.go
+  reject VYQL-INJ-003
+  code
+  ```
+  package handlers
+
+  import (
+      "fmt"
+      "net/http"
+
+      "github.com/pinchtab/pinchtab/internal/httpx"
+  )
+
+  func (h *Handlers) handleWaitCore(w http.ResponseWriter, r *http.Request, req WaitRequest) {
+      mode := req.mode()
+
+      if mode == "" {
+          httpx.Error(w, 400, fmt.Errorf("one of selector, text, url, load, fn, or ms is required"))
+          return
+      }
+
+      h.recordActivity(r, activityUpdate("wait."+mode, req.TabID))
+
+      if mode == "fn" {
+          result, err := h.bridge.Evaluate(r.Context(), req.TabID, "("+req.Fn+")()")
+          if err != nil {
+              httpx.Error(w, 500, err)
+              return
+          }
+          writeJSON(w, result)
+      }
+  }
+  ```
+
+test "rank1578: the fixed revision gates fn behind the evaluate policy"
+  lang go
+  file internal/handlers/wait.go
+  reject VYQL-INJ-003
+  code
+  ```
+  package handlers
+
+  import (
+      "fmt"
+      "net/http"
+
+      "github.com/pinchtab/pinchtab/internal/httpx"
+  )
+
+  func (h *Handlers) handleWaitCore(w http.ResponseWriter, r *http.Request, req WaitRequest) {
+      mode := req.mode()
+
+      if mode == "" {
+          httpx.Error(w, 400, fmt.Errorf("one of selector, text, url, load, fn, or ms is required"))
+          return
+      }
+
+      h.recordActivity(r, activityUpdate("wait."+mode, req.TabID))
+
+      if mode == "fn" && !h.evaluateEnabled() {
+          httpx.ErrorCode(w, 403, "evaluate_disabled", httpx.DisabledEndpointMessage("evaluate", "security.allowEvaluate"), false, map[string]any{
+              "setting": "security.allowEvaluate",
+          })
+          return
+      }
+
+      if mode == "fn" {
+          result, err := h.bridge.Evaluate(r.Context(), req.TabID, "("+req.Fn+")()")
+          if err != nil {
+              httpx.Error(w, 500, err)
+              return
+          }
+          writeJSON(w, result)
+      }
+  }
+  ```

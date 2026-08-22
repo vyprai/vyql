@@ -1,0 +1,99 @@
+# Rank 1593 / CVE-2023-33189: Pomerium's authorize service identified
+# the policy to evaluate from client-controllable request
+# attributes, so a crafted Host header or URL could make a request
+# evaluated against a different route's (weaker) policy (authorization
+# bypass through request-attribute provenance, CWE-346/CWE-863;
+# GHSA-pvrc-wvj2-f59p). The evaluator's pomerium_routes criterion
+# (pkg/policy/criteria/pomerium_routes.go) matched the route by the
+# request's host/path information, and the authorize decision
+# trusted it. The fixing commit (confirmed -- --
+# the GHSA merge: "authorize: use route id from envoy for policy
+# evaluation" + "authorize: normalize URL query params" + "config:
+# enable envoy normalize_path option"): the pomerium_routes criterion
+# is deleted, and the matched route's identity comes from Envoy's
+# dynamic route-id metadata -- set by the proxy that actually matched
+# the request, not by the client. .
+#
+# ATTENTION, policy-key provenance. The authorization engine exists
+# and its policies evaluate -- the defect is WHICH input selects the
+# policy: client-controllable request attributes instead of the
+# proxy's authoritative match, the same provenance family as rank
+# 1546 (the unverified JWT claim selecting the rate bucket) and
+# 1538 (the spoofable throttle key). Nothing can ask "is the policy
+# selection keyed on trusted metadata rather than request headers"
+# -- trust-boundary vocabulary at the policy engine. A binding on
+# Pomerium's own evaluator would detect this proxy rather than the
+# weakness. Measured on the real code: scanning the evaluator
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1593 records the
+# host-keyed policy lookup and the route-id-keyed form, both
+# asserting reject VYQL-AUTH-079: when policy-provenance vocabulary
+# lands, the host-keyed form must flip to expect.
+
+test "rank1593: the policy is chosen by the request host"
+  lang go
+  file authorize/evaluator/evaluator.go
+  reject VYQL-AUTH-079
+  code
+  ```
+  package evaluator
+
+  type Request struct {
+      Host string
+      Path string
+      User string
+  }
+
+  type Policy struct {
+      Host        string
+      AllowedUsers []string
+  }
+
+  func Evaluate(req Request, policies []Policy) bool {
+      for _, policy := range policies {
+          if policy.Host == req.Host {
+              for _, user := range policy.AllowedUsers {
+                  if user == req.User {
+                      return true
+                  }
+              }
+          }
+      }
+      return false
+  }
+  ```
+
+test "rank1593: the fixed revision keys the policy on the envoy route id"
+  lang go
+  file authorize/evaluator/evaluator.go
+  reject VYQL-AUTH-079
+  code
+  ```
+  package evaluator
+
+  type Request struct {
+      Host    string
+      Path    string
+      User    string
+      RouteID string
+  }
+
+  type Policy struct {
+      ID           string
+      AllowedUsers []string
+  }
+
+  func Evaluate(req Request, policies []Policy) bool {
+      for _, policy := range policies {
+          if policy.ID != req.RouteID {
+              continue
+          }
+          for _, user := range policy.AllowedUsers {
+              if user == req.User {
+                  return true
+              }
+          }
+      }
+      return false
+  }
+  ```

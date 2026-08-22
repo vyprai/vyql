@@ -1,0 +1,90 @@
+# Rank 1588 / CVE-2024-53866: pnpm's resolver kept the registry
+# metadata object alive between caching it and writing the cache
+# file, so any mutation applied to that shared object in between --
+# including through hooks and concurrent resolution -- is
+# serialized to disk and poisoned later resolutions (metadata cache
+# integrity, CWE-349/CWE-345; the advisory's registry-poisoning
+# scenario). pickPackage in resolving/npm-resolver/src/pickPackage.ts
+# did `ctx.metaCache.set(spec.name, meta); ... await saveMeta(
+# pkgMirror, meta)` with saveMeta itself calling JSON.stringify(meta)
+# at write time -- whatever the object had become by then is what
+# every later install reads. The fixing commit 11afcddea4
+# ("Merge commit from fork", the security merge;
+# changeset "Don't ever save mutated metadata to the metadata
+# cache"): the meta is stringified the moment it is cached (`const
+# stringifiedMeta = JSON.stringify(meta)`), saveMeta takes the
+# string and writes it verbatim -- a snapshot immune to later
+# mutation. .
+#
+# ATTENTION, shared-mutable snapshots. The defect is one object
+# serving two masters -- the in-memory cache and the on-disk cache
+# -- with the serialization deferred until after other code can
+# mutate it: that is shared-mutable-state vocabulary (the
+# LocklessSharedMutation family, VYQL-RACE-002, judges races over
+# shared maps -- here the sharing is reference aliasing rather than
+# concurrency), and no rule can ask "is the persisted form a
+# snapshot taken before the object is shared". A binding on pnpm's
+# own saveMeta would detect this package manager rather than the
+# weakness. Measured on the real code: scanning pickPackage.ts
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1588 records the
+# write-time serialization and the cache-time snapshot, both
+# asserting reject VYQL-RACE-002: when snapshot vocabulary lands,
+# the write-time form must flip to expect.
+
+test "rank1588: the cache file serializes whatever the object became"
+  lang javascript
+  file resolving/npm-resolver/src/pickPackage.ts
+  reject VYQL-RACE-002
+  code
+  ```
+  import { promises as fs } from 'fs';
+
+  export async function pickPackage(ctx, spec, pkgMirror, opts) {
+    const meta = await fetchRegistryMetadata(spec);
+
+    ctx.metaCache.set(spec.name, meta);
+    if (!opts.dryRun) {
+      await saveMeta(pkgMirror, meta);
+    }
+    return meta;
+  }
+
+  async function saveMeta(pkgMirror, meta) {
+    const dir = pkgMirror.slice(0, pkgMirror.lastIndexOf('/'));
+    await fs.mkdir(dir, { recursive: true });
+    const temp = pkgMirror + '.tmp';
+    await fs.writeFile(temp, JSON.stringify(meta));
+    await fs.rename(temp, pkgMirror);
+  }
+  ```
+
+test "rank1588: the fixed revision snapshots the meta when it is cached"
+  lang javascript
+  file resolving/npm-resolver/src/pickPackage.ts
+  reject VYQL-RACE-002
+  code
+  ```
+  import { promises as fs } from 'fs';
+
+  export async function pickPackage(ctx, spec, pkgMirror, opts) {
+    const meta = await fetchRegistryMetadata(spec);
+
+    ctx.metaCache.set(spec.name, meta);
+    if (!opts.dryRun) {
+      // We stringify this meta here to avoid saving any mutations
+      // that could happen to the meta object.
+      const stringifiedMeta = JSON.stringify(meta);
+      await saveMeta(pkgMirror, stringifiedMeta);
+    }
+    return meta;
+  }
+
+  async function saveMeta(pkgMirror, meta) {
+    const dir = pkgMirror.slice(0, pkgMirror.lastIndexOf('/'));
+    await fs.mkdir(dir, { recursive: true });
+    const temp = pkgMirror + '.tmp';
+    await fs.writeFile(temp, meta);
+    await fs.rename(temp, pkgMirror);
+  }
+  ```

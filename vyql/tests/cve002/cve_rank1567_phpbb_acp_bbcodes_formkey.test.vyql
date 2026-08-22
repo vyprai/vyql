@@ -1,0 +1,130 @@
+# Rank 1567 / CVE-2019-16993: phpBB's ACP bbcodes module accepted
+# submissions without validating the form key, so a crafted page
+# could make an administrator's browser add or edit BBCode tokens
+# (cross-site request forgery on an admin endpoint, CWE-352;
+# SECURITY-188; the task list's repo! flag resolves as an umbrella
+# naming: the advisory names phpbb/phpbb-app while the code lives in
+# phpbb/phpbb, the pool row's target). main() in phpBB/includes/acp/
+# acp_bbcodes.php handled `$submit = $request->is_set_post('submit')`
+# and processed bbcodes without ever calling phpBB's check_form_key
+# -- the CSRF token validation every other ACP module runs. Pool
+# The fixing commit 18abef716e ("[ticket/
+# security-188] Check form key in acp_bbcodes", +6 lines): the
+# module now does `if ($submit && !check_form_key($form_key)) {
+# trigger_error($user->lang['FORM_INVALID'] . adm_back_link(
+# $this->u_action), E_USER_WARNING); }` before any submission
+# processing. .
+#
+# ATTENTION, csrf-decision completeness. The missing piece is one
+# guard call on a submit path -- the same decision-completeness
+# family as ranks 1540/1556/1557: every sibling ACP module calls
+# check_form_key and this one skipped it, and nothing can ask "does
+# every state-changing submit path validate the form token".
+# check_form_key is phpBB's own API, so a binding on it detects this
+# application rather than the weakness; the corpus's CSRF rules are
+# app-specific pattern shapes (BestWebSoft, DokuWiki, Cockpit),
+# with no general submit-without-token concept. Measured on the
+# real code: scanning acp_bbcodes.php reports the same 5 findings at
+# both revisions (all VYQL-DOS-001 regex heuristics on the bbcode
+# first-pass matching -- unrelated to the form key). No
+# ENGINE-GAPS.md entry: the piece is ontology design (submit-path
+# token completeness), not a localised construct. No definition
+# change shipped. Spec cve_rank1567 records the submit handling
+# without and with the form-key gate, both asserting reject
+# VYQL-AUTH-079: when csrf-decision vocabulary lands, the ungated
+# submit must flip to expect.
+
+test "rank1567: the submit path processes bbcodes without the form key"
+  lang php
+  file phpBB/includes/acp/acp_bbcodes.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  namespace phpbb\acp;
+
+  class acp_bbcodes
+  {
+      public $u_action;
+
+      public function main($id, $mode)
+      {
+          global $request, $user, $template, $db;
+
+          $submit = $request->is_set_post('submit');
+
+          $sql = 'SELECT *
+              FROM ' . BBCODES_TABLE;
+          $result = $db->sql_query($sql);
+
+          if ($submit)
+          {
+              $bbcode_match = $request->variable('bbcode_match', '');
+              $bbcode_tpl = $request->variable('bbcode_tpl', '');
+
+              $sql = 'UPDATE ' . BBCODES_TABLE . '
+                  SET bbcode_match = \'' . $db->sql_escape($bbcode_match) . '\',
+                      bbcode_tpl = \'' . $db->sql_escape($bbcode_tpl) . '\'';
+              $db->sql_query($sql);
+
+              trigger_error($user->lang['BBCODES_UPDATED'] . adm_back_link($this->u_action));
+          }
+
+          $template->assign_vars(array(
+              'U_ACTION' => $this->u_action,
+          ));
+      }
+  }
+  ```
+
+test "rank1567: the fixed revision refuses submissions with an invalid form key"
+  lang php
+  file phpBB/includes/acp/acp_bbcodes.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  namespace phpbb\acp;
+
+  class acp_bbcodes
+  {
+      public $u_action;
+
+      public function main($id, $mode)
+      {
+          global $request, $user, $template, $db;
+
+          add_form_key('acp_bbcodes');
+          $form_key = 'acp_bbcodes';
+
+          $submit = $request->is_set_post('submit');
+          if ($submit && !check_form_key($form_key))
+          {
+              trigger_error($user->lang['FORM_INVALID'] . adm_back_link($this->u_action), E_USER_WARNING);
+          }
+
+          $sql = 'SELECT *
+              FROM ' . BBCODES_TABLE;
+          $result = $db->sql_query($sql);
+
+          if ($submit)
+          {
+              $bbcode_match = $request->variable('bbcode_match', '');
+              $bbcode_tpl = $request->variable('bbcode_tpl', '');
+
+              $sql = 'UPDATE ' . BBCODES_TABLE . '
+                  SET bbcode_match = \'' . $db->sql_escape($bbcode_match) . '\',
+                      bbcode_tpl = \'' . $db->sql_escape($bbcode_tpl) . '\'';
+              $db->sql_query($sql);
+
+              trigger_error($user->lang['BBCODES_UPDATED'] . adm_back_link($this->u_action));
+          }
+
+          $template->assign_vars(array(
+              'U_ACTION' => $this->u_action,
+          ));
+      }
+  }
+  ```

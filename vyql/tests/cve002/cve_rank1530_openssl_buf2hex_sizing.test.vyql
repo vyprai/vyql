@@ -1,0 +1,109 @@
+# Rank 1530 / CVE-2026-31789: OpenSSL's buf2hex helper sized its
+# output buffer with unchecked arithmetic, so an oversized input
+# length wrapped the size computation and overflowed the undersized
+# allocation (integer overflow to buffer overflow, CWE-190/CWE-787).
+# The conversion in crypto/o_str.c did `tmp_n = (sep != CH_ZERO) ?
+# buflen * 3 : 1 + buflen * 2;` -- buflen arrives from callers
+# converting attacker-influenced buffers, and the multiply can exceed
+# SIZE_MAX, wrapping to a small tmp_n while the write loop fills 2 or
+# 3 bytes per input byte. the fixing commit is the fixing change
+# (confirmed, "Avoid possible buffer overflow in buf2hex
+# conversion. Fixes CVE-2026-31789"): both paths are guarded --
+# `if ((sep != CH_ZERO && (size_t)buflen > SIZE_MAX / 3) || (sep ==
+# CH_ZERO && (size_t)buflen > (SIZE_MAX - 1) / 2)) { ERR_raise(
+# ERR_LIB_CRYPTO, CRYPTO_R_TOO_MANY_BYTES); return 0; }` -- with the
+# arithmetic itself made explicitly size_t-cast. .
+#
+# ATTENTION, unchecked length multiply in C. The defect is an
+# allocation sized by a multiply of attacker-influenced factors with
+# no overflow guard, and the C frontend emits no cast/checked-shape
+# observations -- the C# frontend has them (checked contexts and
+# cast shapes fire twelve NUM rows on OpenMcdf at rank 1517's twin
+# shapes), but internal/extract/frontend/treesitter/c.go has no
+# counterpart, so nothing can see "this multiply feeds a size and
+# carries no bound". Recorded as an ENGINE-GAPS.md Medium row
+# (cast/checked-shape observations, C#-only). Measured on the real
+# code: scanning crypto/o_str.c reports the same 20 findings at both
+# revisions (memory-family heuristics; none change with the guard).
+# No definition change shipped. Spec cve_rank1530 records the
+# unguarded multiply sizing and the guarded form, both asserting
+# reject VYQL-NUM-005: when cast/checked-shape observations reach C,
+# the unguarded form must flip to expect.
+
+test "rank1530: the hex buffer is sized by an unchecked multiply"
+  lang c
+  file crypto/o_str.c
+  reject VYQL-NUM-005
+  code
+  ```
+  #include <stdlib.h>
+  #include <stddef.h>
+
+  #define CH_ZERO ((char)0)
+
+  char *buf2hex(const char *buf, int buflen, char sep)
+  {
+      size_t tmp_n;
+      char *tmp;
+
+      if (buflen < 0)
+          return NULL;
+
+      tmp_n = (sep != CH_ZERO) ? buflen * 3 : 1 + buflen * 2;
+      tmp = malloc(tmp_n);
+      if (tmp == NULL)
+          return NULL;
+
+      size_t i = 0;
+      for (int j = 0; j < buflen; j++) {
+          if (sep != CH_ZERO && j != 0)
+              tmp[i++] = sep;
+          tmp[i++] = "0123456789ABCDEF"[(buf[j] >> 4) & 0xF];
+          tmp[i++] = "0123456789ABCDEF"[buf[j] & 0xF];
+      }
+      tmp[i] = CH_ZERO;
+      return tmp;
+  }
+  ```
+
+test "rank1530: the fixed revision refuses sizes that cannot fit"
+  lang c
+  file crypto/o_str.c
+  reject VYQL-NUM-005
+  code
+  ```
+  #include <stdlib.h>
+  #include <stddef.h>
+  #include <stdint.h>
+
+  #define CH_ZERO ((char)0)
+
+  char *buf2hex(const char *buf, int buflen, char sep)
+  {
+      size_t tmp_n;
+      char *tmp;
+
+      if (buflen < 0)
+          return NULL;
+
+      if ((sep != CH_ZERO && (size_t)buflen > SIZE_MAX / 3)
+          || (sep == CH_ZERO && (size_t)buflen > (SIZE_MAX - 1) / 2)) {
+          return NULL;
+      }
+
+      tmp_n = (sep != CH_ZERO) ? (size_t)buflen * 3 : 1 + (size_t)buflen * 2;
+      tmp = malloc(tmp_n);
+      if (tmp == NULL)
+          return NULL;
+
+      size_t i = 0;
+      for (int j = 0; j < buflen; j++) {
+          if (sep != CH_ZERO && j != 0)
+              tmp[i++] = sep;
+          tmp[i++] = "0123456789ABCDEF"[(buf[j] >> 4) & 0xF];
+          tmp[i++] = "0123456789ABCDEF"[buf[j] & 0xF];
+      }
+      tmp[i] = CH_ZERO;
+      return tmp;
+  }
+  ```

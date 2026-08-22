@@ -1,0 +1,95 @@
+# Rank 1557 / CVE-2016-0720: pcs's Sinatra before-filter verified
+# authentication without stopping the request when the check failed,
+# so unauthenticated callers reached the remote and GUI endpoints
+# (CSRF / authentication bypass, CWE-352/CWE-306). The filter in
+# pcsd/pcsd.rb did `if not PCSAuth.loginByToken(session, cookies) and
+# not PCSAuth.isLoggedIn(session)` and, for /remote*, /run_pcs,
+# /clusters_overview, /permissions_* and non-main managec paths,
+# merely logged `$logger.info "ERROR: Request without authentication"`
+# -- no halt, no redirect on those shapes, so the request continued
+# into the route handlers with no authenticated session. The fixing commit
+# b9e7f06178 ("fix CSRF vulnerability"):
+# /remote/* and /run_pcs now halt [401, '{"notauthorized":"true"}']
+# unless PCSAuth.loginByToken succeeds, GUI pages require an
+# isLoggedIn session (redirecting to /login), and all non-GUI requests
+# must carry the X-Requested-With: XMLHttpRequest header -- the
+# CSRF-preventing same-origin signal. .
+#
+# ATTENTION, fail-open check vocabulary. The defect is a guard that
+# logs instead of stopping: the branch runs, reports the violation,
+# and control falls through to the protected handler -- the inverse
+# of a missing check, and the same decision-completeness family as
+# ranks 1540/1541/1556 with a control-flow twist: nothing can ask
+# "does a failed authentication check terminate the request" (the
+# halt/redirect-vs-log distinction is Sinatra control-flow
+# vocabulary). A binding on pcs's own PCSAuth would detect this
+# application rather than the weakness. Measured on the real code:
+# scanning pcsd/ reports the same 257 findings at both revisions (135
+# at high or above, across 43 ruby files -- the usual broad
+# heuristics; nothing changes across revisions). No ENGINE-GAPS.md entry:
+# the piece is ontology design (check-termination semantics), not a
+# localised construct. No definition change shipped. Spec cve_rank1557
+# records the log-without-halt filter and the halting form, both
+# asserting reject VYQL-AUTH-079: when check-termination vocabulary
+# lands, the falling-through form must flip to expect.
+
+test "rank1557: the failed authentication check logs and continues"
+  lang ruby
+  file pcsd/pcsd.rb
+  reject VYQL-AUTH-079
+  code
+  ```
+  before do
+    if not PCSAuth.loginByToken(session, cookies) and not PCSAuth.isLoggedIn(session)
+      match_expr = "/managec/(.*)/(.*)"
+      mymatch = request.path.match(match_expr)
+      on_managec_main = false
+      if mymatch and mymatch.length >= 3 and mymatch[2] == "main"
+        on_managec_main = true
+      end
+
+      if request.path.start_with?('/remote') or
+        (request.path.match(match_expr) and not on_managec_main) or
+        '/run_pcs' == request.path
+
+        $logger.info "ERROR: Request without authentication"
+      else
+        session[:pre_login_path] = request.path
+        redirect '/login'
+      end
+    end
+  end
+  ```
+
+test "rank1557: the fixed revision halts unauthenticated remote requests"
+  lang ruby
+  file pcsd/pcsd.rb
+  reject VYQL-AUTH-079
+  code
+  ```
+  before do
+    gui_request = (
+      request.path == '/' or
+      request.path == '/manage' or
+      request.path == '/permissions' or
+      request.path.match('/managec/.+/main')
+    )
+    if request.path.start_with?('/remote/') or request.path == '/run_pcs'
+      unless PCSAuth.loginByToken(session, cookies)
+        halt [401, '{"notauthorized":"true"}']
+      end
+    else
+      if !gui_request and
+        request.env['HTTP_X_REQUESTED_WITH'] != 'XMLHttpRequest'
+        halt [401, '{"notauthorized":"true"}']
+      elsif not PCSAuth.isLoggedIn(session)
+        if gui_request
+          session[:pre_login_path] = request.path
+          redirect '/login'
+        else
+          halt [401, '{"notauthorized":"true"}']
+        end
+      end
+    end
+  end
+  ```

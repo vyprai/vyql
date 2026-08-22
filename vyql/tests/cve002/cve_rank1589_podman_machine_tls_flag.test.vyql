@@ -1,0 +1,92 @@
+# Rank 1589 / CVE-2025-6032: podman machine init inverted its
+# TLS-verify option when handing it to the image pull, so the
+# default zero value of the bool (TLSVerify=false) produced
+# InsecureSkipVerify=true -- every machine-init image pull verified
+# no certificates and a network attacker could serve the image
+# (certificate validation disabled by inverted default, CWE-295).
+# The pull setup in pkg/machine/ocipull/pull.go did
+# `DockerInsecureSkipTLSVerify: types.NewOptionalBool(!o.pullOptions.
+# TLSVerify)` -- the negation makes the secure-by-default posture
+# insecure-by-default. the fixing commit is the fixing change
+# (confirmed, "machine init: fix tls check. Ensure we verify the
+# TLS connection when pulling the OCI image."): the option becomes
+# `SkipTLSVerify types.OptionalBool` (unset means verify) and the
+# assignment passes it through without negation. No pool
+# correction.
+#
+# ATTENTION, inverted security defaults. The flag exists and is
+# consumed correctly -- the defect is one negation that flips the
+# default posture, the default-inversion sibling of rank 1535's
+# open-bind and rank 1540's default-open authorization: no rule can
+# ask "does the secure option's default compose to a secure
+# configuration" -- that is default-posture vocabulary over a
+# project-specific option type (types.OptionalBool). A binding on
+# podman's own pullOptions would detect this tool rather than the
+# weakness. Measured on the real code: scanning pkg/machine/ocipull/
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1589 records the
+# negated flag handoff and the OptionalBool form, both asserting
+# reject VYQL-CFG-004: when default-posture vocabulary lands, the
+# negated form must flip to expect.
+
+test "rank1589: the verify flag is negated into the pull options"
+  lang go
+  file pkg/machine/ocipull/pull.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package ocipull
+
+  type PullOptions struct {
+      // Require HTTPS and verify certificates when accessing the registry.
+      TLSVerify bool
+  }
+
+  func newDockerOptions(o PullOptions) *dockerOptions {
+      return &dockerOptions{
+          DockerInsecureSkipTLSVerify: newOptionalBool(!o.TLSVerify),
+      }
+  }
+
+  type dockerOptions struct {
+      DockerInsecureSkipTLSVerify optionalBool
+  }
+
+  type optionalBool struct {
+      value bool
+      set   bool
+  }
+
+  func newOptionalBool(v bool) optionalBool {
+      return optionalBool{value: v, set: true}
+  }
+  ```
+
+test "rank1589: the fixed revision passes an explicit skip flag through"
+  lang go
+  file pkg/machine/ocipull/pull.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package ocipull
+
+  type PullOptions struct {
+      // Skip TLS verification when accessing the registry.
+      SkipTLSVerify optionalBool
+  }
+
+  func newDockerOptions(o PullOptions) *dockerOptions {
+      return &dockerOptions{
+          DockerInsecureSkipTLSVerify: o.SkipTLSVerify,
+      }
+  }
+
+  type dockerOptions struct {
+      DockerInsecureSkipTLSVerify optionalBool
+  }
+
+  type optionalBool struct {
+      value bool
+      set   bool
+  }
+  ```

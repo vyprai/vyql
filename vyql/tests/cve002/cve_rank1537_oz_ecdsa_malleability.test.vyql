@@ -1,0 +1,112 @@
+# Rank 1537 / CVE-2022-35961: OpenZeppelin's ECDSA library accepted a
+# second, compact signature encoding alongside the standard one, so
+# the same commitment recovered through two different encodings let
+# signature schemes that assume uniqueness (nonces, replay guards) be
+# bypassed (signature malleability, CWE-347; PR #3610, fixed in 4.7.2).
+# recover in contracts/utils/cryptography/ECDSA.sol handled
+# `signature.length == 64` by unpacking the EIP-2098 compact r,vs
+# form in assembly and delegating to tryRecover(hash, r, vs) -- the
+# compact encoding maps ambiguously to (v, s) pairs, so a signature
+# and its malleable twin both verify. The fixing commit d693d89d99
+# ("Fix ECDSA signature malleability (#3610)"):
+# the 64-byte branch is removed from recover entirely (the standard
+# 65-byte form is the only accepted encoding at that entry point;
+# tryRecover retains the explicit forms for advanced callers), and
+# the changelog names the malleability rationale. No pool
+# correction.
+#
+# ATTENTION, canonical-encoding enforcement. The corpus's
+# smart-contract pack judges call, destruct, reentrancy and
+# tx-origin shapes (VYQL-SC-001..004); nothing asks "does the
+# signature recovery entry point accept exactly one canonical
+# encoding", the same verification-pairing family as ranks 1524
+# (algorithm match) and 1536 (hint subfield) -- malleability is a
+# property of the ACCEPTED ENCODING SET, invisible to localised
+# rules. Measured on the real code: scanning ECDSA.sol reports the
+# same 3 findings at both revisions (SC-family heuristics elsewhere
+# in the file; none change across revisions). No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1537 records the
+# dual-encoding recover and the canonical-only form, both asserting
+# reject VYQL-SC-003: when canonical-encoding vocabulary lands, the
+# dual-encoding form must flip to expect.
+
+test "rank1537: recover accepts a second compact encoding"
+  lang solidity
+  file contracts/utils/cryptography/ECDSA.sol
+  reject VYQL-SC-003
+  code
+  ```
+  // SPDX-License-Identifier: MIT
+  pragma solidity ^0.8.0;
+
+  library ECDSA {
+      function recover(bytes32 hash, bytes memory signature) internal pure returns (address) {
+          // Check the signature length
+          // - case 65: r,s,v signature (standard)
+          // - case 64: r,vs signature (cf EIP-2098)
+          if (signature.length == 65) {
+              bytes32 r;
+              bytes32 s;
+              uint8 v;
+              assembly {
+                  r := mload(add(signature, 0x20))
+                  s := mload(add(signature, 0x40))
+                  v := byte(0, mload(add(signature, 0x60)))
+              }
+              return tryRecover(hash, r, s, v);
+          } else if (signature.length == 64) {
+              bytes32 r;
+              bytes32 vs;
+              assembly {
+                  r := mload(add(signature, 0x20))
+                  vs := mload(add(signature, 0x40))
+              }
+              return tryRecover(hash, r, vs);
+          } else {
+              revert("ECDSA: invalid signature length");
+          }
+      }
+
+      function tryRecover(bytes32, bytes32, bytes32, uint8) internal pure returns (address) {
+          revert("not implemented in snippet");
+      }
+
+      function tryRecover(bytes32, bytes32, bytes32) internal pure returns (address) {
+          revert("not implemented in snippet");
+      }
+  }
+  ```
+
+test "rank1537: the fixed revision keeps only the canonical encoding"
+  lang solidity
+  file contracts/utils/cryptography/ECDSA.sol
+  reject VYQL-SC-003
+  code
+  ```
+  // SPDX-License-Identifier: MIT
+  pragma solidity ^0.8.0;
+
+  library ECDSA {
+      function recover(bytes32 hash, bytes memory signature) internal pure returns (address) {
+          // Check the signature length
+          // - case 65: r,s,v signature (standard)
+          if (signature.length == 65) {
+              bytes32 r;
+              bytes32 s;
+              uint8 v;
+              assembly {
+                  r := mload(add(signature, 0x20))
+                  s := mload(add(signature, 0x40))
+                  v := byte(0, mload(add(signature, 0x60)))
+              }
+              return tryRecover(hash, r, s, v);
+          } else {
+              revert("ECDSA: invalid signature length");
+          }
+      }
+
+      function tryRecover(bytes32, bytes32, bytes32, uint8) internal pure returns (address) {
+          revert("not implemented in snippet");
+      }
+  }
+  ```
