@@ -3,9 +3,9 @@ module code;
 concept AuthEndpointRawRequestUriExemption : issue {
   cwe: [CWE_187, CWE_863]
   reviewAssumption: "the raw request target is whatever the client wrote on the request line, and it carries the query string and any percent-encoded or dot segments alongside the path the server actually routes on"
-  reviewCondition: "a security decision that singles out an authentication endpoint tests the raw request URI for a substring, prefix or suffix instead of the parsed path, so any request whose target merely contains that endpoint's spelling is treated as that endpoint"
+  reviewCondition: "a security decision that exempts an endpoint from authentication tests the raw request URI with a containment predicate or with a route pattern instead of the parsed path, so any request whose target merely contains or matches that spelling is treated as that endpoint"
   reviewCategory: auth
   reviewConfidence: high
-  reviewEvidence: "authentication-endpoint decision context {pattern} matches an authentication path literal against a raw request-URI value with a string containment predicate, and never derives a parsed path from it in the same scope"
+  reviewEvidence: "authentication-exemption decision context {pattern} tests a raw request-URI value against an authentication path literal or an access-decision route pattern, and never derives a parsed path from it in the same scope"
   vulnerableTo: [access_control.IncorrectAuthorization, validation.ImproperInputValidation]
 }

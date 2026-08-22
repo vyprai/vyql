@@ -1,0 +1,8 @@
+module code;
+
+review code.UnrestrictedClassDeserialization {
+  category: deserialization
+  expected: [core.SafeDeserialization]
+  kind: attention
+  text: "review byte-array deserialization helpers that reconstruct a serialized object graph without restricting which classes the stream may name"
+}

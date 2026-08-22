@@ -1,0 +1,7 @@
+module code;
+
+review code.ReentrantCallbackStaleSlotWrite {
+  category: memory
+  kind: attention
+  text: "re-resolve a container entry by key after running caller-supplied code instead of writing through a cached slot pointer"
+}

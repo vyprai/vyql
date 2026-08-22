@@ -1,0 +1,11 @@
+module code;
+
+concept UrlPolicyNotReappliedOnRedirect : issue {
+  cwe: [CWE_918]
+  reviewAssumption: "the fetched URL is caller-influenced, so whoever supplies it also controls the response and can answer with a 3xx pointing anywhere"
+  reviewCategory: request_forgery
+  reviewCondition: "an outbound fetch checks its URL against a host, address or scheme policy and then issues the request through a client that follows redirects with no per-hop hook, so the policy binds the first request only"
+  reviewConfidence: high
+  reviewEvidence: "outbound fetch context {pattern} runs a URL or address policy check and then requests the URL through a helper bound to the default client, whose redirect policy cannot be replaced"
+  vulnerableTo: [request_forgery.Ssrf]
+}

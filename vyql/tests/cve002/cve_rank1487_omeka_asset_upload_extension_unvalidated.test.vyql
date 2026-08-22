@@ -1,0 +1,249 @@
+# omeka/omeka-s, CVE-2023-4159 (CWE-434), fix 2a7fb26452167c8a1d95f207ae5328c6b1b0fcf8.
+#
+# The weakness, from the diff rather than the advisory: Omeka S accepts an asset
+# upload in Omeka\Api\Adapter\AssetAdapter::hydrate(). The handler saves the
+# client-supplied upload name onto the temp file, admits the file against one
+# allowlist, and then persists what the file will be stored and served as:
+#
+#   $tempFile = $uploader->upload($fileData['file'], $errorStore);
+#   $tempFile->setSourceName($fileData['file']['name']);
+#   $config = $this->getServiceLocator()->get('Config');
+#   $validator = new Validator($config['api_assets']['allowed_media_types']);
+#   if (!$validator->validate($tempFile, $errorStore)) { return; }
+#   $entity->setExtension($tempFile->getExtension());
+#   $entity->setMediaType($tempFile->getMediaType());
+#   $tempFile->storeAsset();
+#
+# Omeka\File\Validator is documented as validating "against the media type and
+# extension whitelists", and its constructor takes both: __construct(array
+# $mediaTypes = null, array $extensions = null, $disable = false). validate() skips
+# any whitelist that is null. Constructed with the media-type list alone, it checks
+# only what finfo sniffs out of the bytes -- while TempFile::getExtension() is
+# documented to derive the extension from the *original filename*, falling back to
+# the media-type map only when the source name carries none. So the two halves
+# disagree about where the truth is: content decides admission, the attacker's
+# filename decides the stored name. A file whose leading bytes sniff as image/gif
+# and whose name is "x.php" or "x.html" passes and is stored under that extension
+# in the asset store, which the web server serves directly.
+#
+# The fixed revision adds the parallel list and passes it:
+#
+#   +'allowed_extensions' => ['jpeg', 'jpg', 'png', 'gif', 'webp'],
+#   -$validator = new Validator($config['api_assets']['allowed_media_types']);
+#   +$validator = new Validator($config['api_assets']['allowed_media_types'],
+#   +                           $config['api_assets']['allowed_extensions']);
+#
+# The pool row is correct and needed no repointing: the commit reads normally, the
+# one-argument construction is present at the parent (application/src/Api/Adapter/
+# AssetAdapter.php:73) and the two-argument one at the fixed revision, and CWE-434 is right.
+#
+# Vocabulary: nothing is minted. code.IncompleteFileExtensionValidation
+# carries CWE-434, reviewCategory upload, and the assumption "an attacker can
+# preserve or submit a stored filename value that later controls an uploaded or
+# served file extension" -- which is this weakness verbatim -- and VYQL-INJ-037
+# judges it. Its reviewCondition and reviewEvidence are widened here from
+# the one shape they described (an uploaded-file array checked but a string filename
+# not) to the class both shapes belong to: admission without a check on the
+# extension the stored file keeps. The three sibling per-product upload concepts
+# (ConcreteCmsIncompleteUploadExtensionBlacklist, IncompleteDangerousUpload-
+# ExtensionBlocklist, StatamicAssetUploadPhpExtensionValidationBypass) are
+# considered and rejected: all three judge *which* extensions a blocklist names,
+# and here there is no extension list at all.
+#
+# The binding is uploadMediaTypeAllowlistWithoutExtensionAllowlist, function-scoped
+# PHP: a handler that calls validate(), reads getExtension() and writes
+# setExtension(), assigns a media-type allowlist, and names no extension list in any
+# of its assignments. Nothing in it is the fixed revision's own vocabulary -- renaming the
+# class Validator to FileTypeGate leaves the vulnerable form flagged, and the
+# patched form stays clean whether its new key is called allowed_extensions,
+# valid_extensions or allowedFileExtensions. Residual, stated rather than hidden: an
+# extension allowlist named without the substring "extension" (a bare "permitted_ext"
+# is measured) is not seen, and the finding stands.
+#
+# Measured. Baseline over the whole repository, union of three `timeout 180
+# ./bin/vyql scan --cache off --max-ram 6GB` runs: 588 findings on the vulnerable
+# checkout and 588 on the patched one, no row about the upload. With the binding:
+# 589 and 588 -- the single added row is VYQL-INJ-037 at
+# application/src/Api/Adapter/AssetAdapter.php:54, and nothing else moves. Across
+# the 210 target clones on this machine the exhaustive enumeration of the shape's
+# reachable set (a PHP file carrying setExtension, getExtension, validate and a
+# media-type allowlist name) is one non-Omeka file, october/modules/cms/widgets/
+# AssetList.php; `vyql match` reports 0 there, and 0 over the whole cms module.
+# Minimal pairs: moving the validator construction and the extension write into
+# sibling methods gives 0, so the clause is function-confined and does not take the
+# PHP file-wide scoped-hit path; a comment inside the vulnerable handler naming
+# allowed_extensions leaves the finding at 1, because `assign:` is AST-derived.
+
+test "rank1487: an asset upload admitted by a media-type allowlist alone, then stored under the uploaded file's own extension"
+  lang php
+  file application/src/Api/Adapter/AssetAdapter.php
+  expect VYQL-INJ-037
+  code
+  ```
+  <?php
+  namespace Omeka\Api\Adapter;
+
+  use Omeka\Api\Request;
+  use Omeka\Entity\EntityInterface;
+  use Omeka\File\Validator;
+  use Omeka\Stdlib\ErrorStore;
+
+  class AssetAdapter extends AbstractEntityAdapter
+  {
+      public function hydrate(Request $request, EntityInterface $entity, ErrorStore $errorStore)
+      {
+          $fileData = $request->getFileData();
+          if (!isset($fileData['file'])) {
+              $errorStore->addError('file', 'No file was uploaded');
+              return;
+          }
+
+          $uploader = $this->getServiceLocator()->get('Omeka\File\Uploader');
+          $tempFile = $uploader->upload($fileData['file'], $errorStore);
+          if (!$tempFile) {
+              return;
+          }
+
+          $tempFile->setSourceName($fileData['file']['name']);
+          $config = $this->getServiceLocator()->get('Config');
+          $validator = new Validator($config['api_assets']['allowed_media_types']);
+          if (!$validator->validate($tempFile, $errorStore)) {
+              return;
+          }
+
+          $this->hydrateOwner($request, $entity);
+          $entity->setStorageId($tempFile->getStorageId());
+          $entity->setExtension($tempFile->getExtension());
+          $entity->setMediaType($tempFile->getMediaType());
+          $entity->setName($request->getValue('o:name', $fileData['file']['name']));
+
+          $tempFile->storeAsset();
+          $tempFile->delete();
+      }
+  }
+  ```
+
+test "rank1487: the same handler passing the extension allowlist alongside the media-type allowlist"
+  lang php
+  file application/src/Api/Adapter/AssetAdapter.php
+  reject VYQL-INJ-037
+  code
+  ```
+  <?php
+  namespace Omeka\Api\Adapter;
+
+  use Omeka\Api\Request;
+  use Omeka\Entity\EntityInterface;
+  use Omeka\File\Validator;
+  use Omeka\Stdlib\ErrorStore;
+
+  class AssetAdapter extends AbstractEntityAdapter
+  {
+      public function hydrate(Request $request, EntityInterface $entity, ErrorStore $errorStore)
+      {
+          $fileData = $request->getFileData();
+          if (!isset($fileData['file'])) {
+              $errorStore->addError('file', 'No file was uploaded');
+              return;
+          }
+
+          $uploader = $this->getServiceLocator()->get('Omeka\File\Uploader');
+          $tempFile = $uploader->upload($fileData['file'], $errorStore);
+          if (!$tempFile) {
+              return;
+          }
+
+          $tempFile->setSourceName($fileData['file']['name']);
+          $config = $this->getServiceLocator()->get('Config');
+          $validator = new Validator($config['api_assets']['allowed_media_types'], $config['api_assets']['allowed_extensions']);
+          if (!$validator->validate($tempFile, $errorStore)) {
+              return;
+          }
+
+          $this->hydrateOwner($request, $entity);
+          $entity->setStorageId($tempFile->getStorageId());
+          $entity->setExtension($tempFile->getExtension());
+          $entity->setMediaType($tempFile->getMediaType());
+          $entity->setName($request->getValue('o:name', $fileData['file']['name']));
+
+          $tempFile->storeAsset();
+          $tempFile->delete();
+      }
+  }
+  ```
+
+test "rank1487: a comment naming the missing extension allowlist does not stand in for one"
+  lang php
+  file application/src/Api/Adapter/AssetAdapter.php
+  expect VYQL-INJ-037
+  code
+  ```
+  <?php
+  namespace Omeka\Api\Adapter;
+
+  use Omeka\Api\Request;
+  use Omeka\Entity\EntityInterface;
+  use Omeka\File\Validator;
+  use Omeka\Stdlib\ErrorStore;
+
+  class AssetAdapter extends AbstractEntityAdapter
+  {
+      public function hydrate(Request $request, EntityInterface $entity, ErrorStore $errorStore)
+      {
+          $fileData = $request->getFileData();
+          $uploader = $this->getServiceLocator()->get('Omeka\File\Uploader');
+          $tempFile = $uploader->upload($fileData['file'], $errorStore);
+          $tempFile->setSourceName($fileData['file']['name']);
+          // TODO: also pass $config['api_assets']['allowed_extensions'] here
+          $config = $this->getServiceLocator()->get('Config');
+          $validator = new Validator($config['api_assets']['allowed_media_types']);
+          if (!$validator->validate($tempFile, $errorStore)) {
+              return;
+          }
+
+          $entity->setStorageId($tempFile->getStorageId());
+          $entity->setExtension($tempFile->getExtension());
+          $entity->setMediaType($tempFile->getMediaType());
+          $tempFile->storeAsset();
+      }
+  }
+  ```
+
+test "rank1487: a handler whose validator construction and extension write sit in different methods"
+  lang php
+  file application/src/Api/Adapter/AssetAdapter.php
+  reject VYQL-INJ-037
+  code
+  ```
+  <?php
+  namespace Omeka\Api\Adapter;
+
+  use Omeka\Api\Request;
+  use Omeka\Entity\EntityInterface;
+  use Omeka\File\Validator;
+  use Omeka\Stdlib\ErrorStore;
+
+  class AssetAdapter extends AbstractEntityAdapter
+  {
+      public function hydrate(Request $request, EntityInterface $entity, ErrorStore $errorStore)
+      {
+          $fileData = $request->getFileData();
+          $uploader = $this->getServiceLocator()->get('Omeka\File\Uploader');
+          $tempFile = $uploader->upload($fileData['file'], $errorStore);
+          $tempFile->setSourceName($fileData['file']['name']);
+          $config = $this->getServiceLocator()->get('Config');
+          $validator = new Validator($config['api_assets']['allowed_media_types']);
+          if (!$validator->validate($tempFile, $errorStore)) {
+              return;
+          }
+          $this->persist($entity, $tempFile);
+      }
+
+      protected function persist(EntityInterface $entity, $tempFile)
+      {
+          $entity->setStorageId($tempFile->getStorageId());
+          $entity->setExtension($tempFile->getExtension());
+          $entity->setMediaType($tempFile->getMediaType());
+      }
+  }
+  ```

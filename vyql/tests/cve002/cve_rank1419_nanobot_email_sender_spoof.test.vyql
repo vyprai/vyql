@@ -1,0 +1,216 @@
+# Rank 1419 / CVE-2026-33654: an LLM agent framework polls an IMAP mailbox and
+# turns every message it fetches into a conversation turn. The sender it attaches
+# to that turn is `parseaddr(parsed.get("From", ""))[1]`, and BaseChannel then
+# runs that string through `is_allowed(sender_id)` against the `allow_from`
+# list. RFC 5322 From is written by whoever submitted the message, so the
+# allowlist is satisfied by typing an address into a header: an unauthenticated
+# remote sender both passes the channel's access control and, because the body
+# becomes agent input, drives the agent's tools. The advisory records CWE-94,
+# CWE-290 and CWE-1336; the axis the fixed revision closes is CWE-290's, an identity claim
+# accepted without anything that authenticates it.
+#
+# Pool row 1419 records c15f63a3207a4288fd228a762793101d22898471, which resolves
+# and reads fine under a plain `git show` but is `chore: bump version to
+# 0.1.4.post6` -- two lines, `nanobot/__init__.py` and `pyproject.toml`. It is
+# the release the advisory names as first patched, not the change. The fixing commit is
+# 6e428b7939473ff7628303e35c52de8d0aabc51c, `fix: verify Authentication-Results
+# (SPF/DKIM) for inbound emails`, the ancestor the pool names: it adds
+# `_check_authentication_results`, which reads RFC 8601's Authentication-Results
+# field for `spf=pass` / `dkim=pass`, gates the fetch loop on it behind
+# `verify_spf` / `verify_dkim`, and tags the message body `[EMAIL-CONTEXT]`.
+#
+# Nothing in the corpus labelled inbound mail at all -- `vyql match` on the
+# channel returned no source and no auth-category label, and no binding in any
+# language mentioned imaplib, poplib, parseaddr or a mail parser. The binding
+# added here keys on the two documented halves of the shape, mailbox retrieval
+# through imaplib/poplib and the From read through email.utils.parseaddr or
+# Message.__getitem__, and takes SPF/DKIM/DMARC vocabulary as the control.
+#
+# Measured over hkuds/nanobot, union of three --cache off runs at each revision:
+# 137 -> 136 across 6e428b79^ -> 6e428b79, the single delta being VYQL-AUTH-126
+# at nanobot/channels/email.py:226. Renaming every identifier the fixed revision introduces
+# (`_check_authentication_results` -> `_verify_sender`, `verify_spf` /
+# `verify_dkim` -> `require_envelope` / `require_signed`, `spf_pass` /
+# `dkim_pass` -> `envelope_ok` / `signature_ok`, and the log strings with them)
+# leaves the patched revision at 0, because what remains and suppresses it is the
+# header name the RFC defines. A sibling-function minimal pair puts the From read
+# one method away from the imaplib call and reports 0, so the pairing is
+# function-confined. Enumerating every Python file under /tmp/cve-work that
+# imports imaplib or poplib or calls parseaddr/getaddresses found four outside
+# this repository -- mindsdb's email_handler, subversion's dist/security/mailer,
+# modoboa's lib/email_utils, mlflow's clint/builtin -- and all four scan 0.
+
+test "rank1419: an IMAP poller takes the sender identity from the From header"
+  lang python
+  file nanobot/channels/email.py
+  expect VYQL-AUTH-126
+  expect_review code.UnverifiedMailSenderIdentity
+  code
+  ```
+  import imaplib
+  from email import policy
+  from email.parser import BytesParser
+  from email.utils import parseaddr
+
+
+  class EmailChannel:
+      def _fetch_by_criteria(self, search_criteria, mark_seen, dedupe, limit):
+          messages = []
+          mailbox = self.config.imap_mailbox or "INBOX"
+          client = imaplib.IMAP4_SSL(self.config.imap_host, self.config.imap_port)
+          try:
+              client.login(self.config.imap_username, self.config.imap_password)
+              status, _ = client.select(mailbox)
+              if status != "OK":
+                  return messages
+
+              status, data = client.search(None, *search_criteria)
+              if status != "OK" or not data:
+                  return messages
+
+              for imap_id in data[0].split():
+                  status, fetched = client.fetch(imap_id, "(BODY.PEEK[] UID)")
+                  if status != "OK" or not fetched:
+                      continue
+
+                  raw_bytes = self._extract_message_bytes(fetched)
+                  if raw_bytes is None:
+                      continue
+
+                  parsed = BytesParser(policy=policy.default).parsebytes(raw_bytes)
+                  sender = parseaddr(parsed.get("From", ""))[1].strip().lower()
+                  if not sender:
+                      continue
+
+                  subject = self._decode_header_value(parsed.get("Subject", ""))
+                  body = self._extract_text_body(parsed)
+                  content = f"Email received.\nFrom: {sender}\n\n{body}"
+                  messages.append({"sender": sender, "content": content})
+
+                  if mark_seen:
+                      client.store(imap_id, "+FLAGS", "\\Seen")
+          finally:
+              client.logout()
+
+          return messages
+  ```
+
+test "rank1419: the poller requires an SPF and DKIM verdict for the From address"
+  lang python
+  file nanobot/channels/email.py
+  reject VYQL-AUTH-126
+  reject_review code.UnverifiedMailSenderIdentity
+  code
+  ```
+  import imaplib
+  import re
+  from email import policy
+  from email.parser import BytesParser
+  from email.utils import parseaddr
+
+
+  class EmailChannel:
+      def _fetch_by_criteria(self, search_criteria, mark_seen, dedupe, limit):
+          messages = []
+          mailbox = self.config.imap_mailbox or "INBOX"
+          client = imaplib.IMAP4_SSL(self.config.imap_host, self.config.imap_port)
+          try:
+              client.login(self.config.imap_username, self.config.imap_password)
+              status, _ = client.select(mailbox)
+              if status != "OK":
+                  return messages
+
+              status, data = client.search(None, *search_criteria)
+              if status != "OK" or not data:
+                  return messages
+
+              for imap_id in data[0].split():
+                  status, fetched = client.fetch(imap_id, "(BODY.PEEK[] UID)")
+                  if status != "OK" or not fetched:
+                      continue
+
+                  raw_bytes = self._extract_message_bytes(fetched)
+                  if raw_bytes is None:
+                      continue
+
+                  parsed = BytesParser(policy=policy.default).parsebytes(raw_bytes)
+                  sender = parseaddr(parsed.get("From", ""))[1].strip().lower()
+                  if not sender:
+                      continue
+
+                  spf_pass, dkim_pass = self._check_authentication_results(parsed)
+                  if self.config.verify_spf and not spf_pass:
+                      continue
+                  if self.config.verify_dkim and not dkim_pass:
+                      continue
+
+                  subject = self._decode_header_value(parsed.get("Subject", ""))
+                  body = self._extract_text_body(parsed)
+                  content = f"[EMAIL-CONTEXT] Email received.\nFrom: {sender}\n\n{body}"
+                  messages.append({"sender": sender, "content": content})
+
+                  if mark_seen:
+                      client.store(imap_id, "+FLAGS", "\\Seen")
+          finally:
+              client.logout()
+
+          return messages
+
+      @staticmethod
+      def _check_authentication_results(parsed_msg):
+          spf_pass = False
+          dkim_pass = False
+          for ar_header in parsed_msg.get_all("Authentication-Results") or []:
+              ar_lower = ar_header.lower()
+              if re.search(r"\bspf\s*=\s*pass\b", ar_lower):
+                  spf_pass = True
+              if re.search(r"\bdkim\s*=\s*pass\b", ar_lower):
+                  dkim_pass = True
+          return spf_pass, dkim_pass
+  ```
+
+test "rank1419: a poller reading the From header directly is the same claim"
+  lang python
+  file mail/poller.py
+  expect VYQL-AUTH-126
+  expect_review code.UnverifiedMailSenderIdentity
+  code
+  ```
+  import email
+  import imaplib
+
+
+  def poll(server, user, password):
+      client = imaplib.IMAP4_SSL(server)
+      client.login(user, password)
+      _, data = client.search(None, "UNSEEN")
+      out = []
+      for num in data[0].split():
+          _, raw = client.fetch(num, "(RFC822)")
+          message = email.message_from_bytes(raw[0][1])
+          sender = message["From"]
+          out.append({"from": sender, "body": message.get_payload()})
+      return out
+  ```
+
+test "rank1419: a From read one method away from the fetch is not the pairing"
+  lang python
+  file mail/poller.py
+  reject VYQL-AUTH-126
+  reject_review code.UnverifiedMailSenderIdentity
+  code
+  ```
+  import email
+  import imaplib
+
+
+  def poll(server, user, password):
+      client = imaplib.IMAP4_SSL(server)
+      client.login(user, password)
+      _, data = client.search(None, "UNSEEN")
+      return data
+
+
+  def display_name(message):
+      return message["From"]
+  ```

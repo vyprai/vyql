@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule RedeployPinnedHostSchedulerBypass {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_863]
+    id: "VYQL-AUTH-145"
+    severity: high
+  }
+  issue code.RedeployPinnedHostSchedulerBypass as check
+}

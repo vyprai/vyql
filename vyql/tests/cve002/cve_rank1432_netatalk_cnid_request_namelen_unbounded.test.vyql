@@ -1,0 +1,367 @@
+# netatalk's CNID daemon speaks a private binary RPC. `comm_rcv`
+# (etc/cnid_dbd/comm.c) reads a fixed-size `struct cnid_dbd_rqst` header straight
+# off the client socket, so every field of it -- including the `size_t namelen`
+# byte count -- is whatever the client wrote. It saves the daemon's own name
+# buffer pointer across that read (`nametmp`, pointing at main.c's
+# `static char namebuf[MAXPATHLEN + 1]`), restores it, and then uses the
+# wire-supplied count twice with nothing bounding it:
+#
+#     if (rqst->namelen
+#             && readt(cur_fd, (char *)rqst->name, rqst->namelen, 1, CNID_DBD_TIMEOUT)
+#             != rqst->namelen) { ... }
+#     ((char *)(rqst->name))[rqst->namelen] = '\0';
+#
+# The first is a body read of attacker-chosen length into a fixed-capacity
+# buffer; the second writes a NUL at an attacker-chosen offset from that buffer's
+# base even when no body bytes follow. CVE-2026-44050 (GHSA-8f3j-jffj-vg2m,
+# CWE-122, CVSS 9.9) is that overflow: an authenticated AFP client reaches
+# cnid_dbd through afpd and can execute code in the daemon or kill CNID service
+# for the volume.
+#
+# The fixed revision is commit 1375dad2844c4abf17c12dd3ad06201b38dc2bd8, "CVE-2026-44050:
+# cnid_dbd: validate CNID request name length", which inserts the bound ahead of
+# both uses:
+#
+#     if (rqst->namelen > MAXPATHLEN) {
+#         LOG(log_error, logtype_cnid, "comm_rcv: name too long: %zu",
+#             rqst->namelen);
+#         invalidate_fd(cur_fd);
+#         return 0;
+#     }
+#
+# The scanner does see the NUL write: `code.FieldDerivedIndexAccess`
+# (VYQL-MEM-010) lands on `((char *)(rqst->name))[rqst->namelen] = '\0'` at the
+# vulnerable revision. It lands on the very same statement at the patched
+# revision too -- one scan of etc/cnid_dbd/ reports comm.c:260 at the vulnerable revision and
+# comm.c:267 after, the same line shifted by the seven inserted ones -- so today
+# the flag reads the defect and its remediation identically.
+#
+# The reason is `ccHasUpperBoundGuard`
+# (internal/extract/frontend/treesitter/c.go). It decides whether a
+# struct-derived subscript is bounded by looking for the index expression next to
+# a relational operator in the function's compacted body text, and it enumerates
+# only the proceed-if-in-range half of the relation: `idx<`, `idx<=`, `>idx`,
+# `>=idx`. The reject-if-out-of-range half -- `idx > BOUND`, the spelling an early
+# return or a clamp takes -- is not in the list, so `rqst->namelen > MAXPATHLEN`
+# followed by `return 0` is invisible and the guarded code keeps reporting.
+#
+# Only the index-on-the-left half of that missing spelling can be read this way.
+# The mirrored `BOUND < idx` is not a bound at all in text: it is what
+# `for (i = 0; i < s->len; i++)` looks like, where the field is the loop's bound
+# rather than the bounded value. Reading it as a guard suppresses the commonest
+# shape this analysis exists to report -- measured, it deletes
+# `p->buffer[p->length] = p->checksum` in libgphoto2's sonydscf55 camlib, which
+# carries no bound on `p->length` anywhere and is the same shape as this CVE. Two
+# further restrictions follow for the same reason: a zero or sign literal on the
+# right (`s->len > 0`, `>= 0`, `> -1`) is a nonzero or sign test rather than a
+# bound, and the reject spelling counts only where it precedes the access, since
+# an early return bounds what follows it and nothing else.
+#
+# The pair below is that boundary. The first case is the vulnerable function; the
+# second is the fixed revision, whose guard is the reject-if-larger spelling; the third
+# writes the identical bound as `rqst->namelen < MAXPATHLEN`, the spelling the
+# matcher knows, and is quiet today. Second and third are the same bound
+# and must agree.
+
+test "rank1432: cnid_dbd terminates its receive buffer at a name length taken straight off the wire"
+  lang c
+  file etc/cnid_dbd/comm.c
+  expect VYQL-MEM-010
+  expect_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stddef.h>
+
+  #define MAXPATHLEN 1024
+  #define CNID_DBD_TIMEOUT 10
+
+  struct cnid_dbd_rqst {
+      int op;
+      unsigned int cnid;
+      unsigned int did;
+      const char *name;
+      size_t namelen;
+  };
+
+  extern int cur_fd;
+
+  int readt(int fd, void *buf, size_t len, int setnonblocking, int timeout);
+  void invalidate_fd(int fd);
+  int check_fd(long timeout);
+  int setnonblock(int fd, int on);
+
+  int comm_rcv(struct cnid_dbd_rqst *rqst, long timeout)
+  {
+      char *nametmp;
+      int b;
+
+      if ((cur_fd = check_fd(timeout)) < 0) {
+          return -1;
+      }
+
+      if (!cur_fd) {
+          return 0;
+      }
+
+      if (setnonblock(cur_fd, 1) != 0) {
+          return -1;
+      }
+
+      nametmp = (char *)rqst->name;
+
+      if ((b = readt(cur_fd, rqst, sizeof(struct cnid_dbd_rqst), 1, CNID_DBD_TIMEOUT))
+              != sizeof(struct cnid_dbd_rqst)) {
+          invalidate_fd(cur_fd);
+          rqst->name = nametmp;
+          return 0;
+      }
+
+      rqst->name = nametmp;
+
+      if (rqst->namelen
+              && readt(cur_fd, (char *)rqst->name, rqst->namelen, 1, CNID_DBD_TIMEOUT)
+              != rqst->namelen) {
+          invalidate_fd(cur_fd);
+          return 0;
+      }
+
+      /* We set this to make life easier for logging. None of the other stuff
+         needs zero terminated strings. */
+      ((char *)(rqst->name))[rqst->namelen] = '\0';
+      return 1;
+  }
+  ```
+
+test "rank1432: the fixed revision returns before the terminator write when the wire length exceeds the buffer"
+  lang c
+  file etc/cnid_dbd/comm.c
+  reject VYQL-MEM-010
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stddef.h>
+
+  #define MAXPATHLEN 1024
+  #define CNID_DBD_TIMEOUT 10
+
+  struct cnid_dbd_rqst {
+      int op;
+      unsigned int cnid;
+      unsigned int did;
+      const char *name;
+      size_t namelen;
+  };
+
+  extern int cur_fd;
+
+  int readt(int fd, void *buf, size_t len, int setnonblocking, int timeout);
+  void invalidate_fd(int fd);
+  int check_fd(long timeout);
+  int setnonblock(int fd, int on);
+
+  int comm_rcv(struct cnid_dbd_rqst *rqst, long timeout)
+  {
+      char *nametmp;
+      int b;
+
+      if ((cur_fd = check_fd(timeout)) < 0) {
+          return -1;
+      }
+
+      if (!cur_fd) {
+          return 0;
+      }
+
+      if (setnonblock(cur_fd, 1) != 0) {
+          return -1;
+      }
+
+      nametmp = (char *)rqst->name;
+
+      if ((b = readt(cur_fd, rqst, sizeof(struct cnid_dbd_rqst), 1, CNID_DBD_TIMEOUT))
+              != sizeof(struct cnid_dbd_rqst)) {
+          invalidate_fd(cur_fd);
+          rqst->name = nametmp;
+          return 0;
+      }
+
+      rqst->name = nametmp;
+
+      if (rqst->namelen > MAXPATHLEN) {
+          invalidate_fd(cur_fd);
+          return 0;
+      }
+
+      if (rqst->namelen
+              && readt(cur_fd, (char *)rqst->name, rqst->namelen, 1, CNID_DBD_TIMEOUT)
+              != rqst->namelen) {
+          invalidate_fd(cur_fd);
+          return 0;
+      }
+
+      /* We set this to make life easier for logging. None of the other stuff
+         needs zero terminated strings. */
+      ((char *)(rqst->name))[rqst->namelen] = '\0';
+      return 1;
+  }
+  ```
+
+test "rank1432: the same bound written as a proceed-if-in-range comparison is equally quiet"
+  lang c
+  file etc/cnid_dbd/comm.c
+  reject VYQL-MEM-010
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stddef.h>
+
+  #define MAXPATHLEN 1024
+  #define CNID_DBD_TIMEOUT 10
+
+  struct cnid_dbd_rqst {
+      int op;
+      unsigned int cnid;
+      unsigned int did;
+      const char *name;
+      size_t namelen;
+  };
+
+  extern int cur_fd;
+
+  int readt(int fd, void *buf, size_t len, int setnonblocking, int timeout);
+  void invalidate_fd(int fd);
+  int check_fd(long timeout);
+  int setnonblock(int fd, int on);
+
+  int comm_rcv(struct cnid_dbd_rqst *rqst, long timeout)
+  {
+      char *nametmp;
+      int b;
+
+      if ((cur_fd = check_fd(timeout)) < 0) {
+          return -1;
+      }
+
+      if (!cur_fd) {
+          return 0;
+      }
+
+      if (setnonblock(cur_fd, 1) != 0) {
+          return -1;
+      }
+
+      nametmp = (char *)rqst->name;
+
+      if ((b = readt(cur_fd, rqst, sizeof(struct cnid_dbd_rqst), 1, CNID_DBD_TIMEOUT))
+              != sizeof(struct cnid_dbd_rqst)) {
+          invalidate_fd(cur_fd);
+          rqst->name = nametmp;
+          return 0;
+      }
+
+      rqst->name = nametmp;
+
+      if (!(rqst->namelen < MAXPATHLEN)) {
+          invalidate_fd(cur_fd);
+          return 0;
+      }
+
+      if (rqst->namelen
+              && readt(cur_fd, (char *)rqst->name, rqst->namelen, 1, CNID_DBD_TIMEOUT)
+              != rqst->namelen) {
+          invalidate_fd(cur_fd);
+          return 0;
+      }
+
+      /* We set this to make life easier for logging. None of the other stuff
+         needs zero terminated strings. */
+      ((char *)(rqst->name))[rqst->namelen] = '\0';
+      return 1;
+  }
+  ```
+
+# The three cases below pin the restrictions on the reject-if-larger spelling.
+# Each carries a relational operator beside `rqst->namelen` that is not a bound
+# on it, and each must still report.
+
+test "rank1432: a nonzero test on the wire length is not a bound"
+  lang c
+  file etc/cnid_dbd/comm.c
+  expect VYQL-MEM-010
+  expect_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stddef.h>
+
+  struct cnid_dbd_rqst {
+      int op;
+      const char *name;
+      size_t namelen;
+  };
+
+  int comm_rcv(struct cnid_dbd_rqst *rqst)
+  {
+      if (rqst->namelen > 0) {
+          ((char *)(rqst->name))[rqst->namelen] = '\0';
+      }
+
+      return 1;
+  }
+  ```
+
+test "rank1432: a loop that walks to the wire length uses it as the bound, not the bounded value"
+  lang c
+  file etc/cnid_dbd/comm.c
+  expect VYQL-MEM-010
+  expect_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stddef.h>
+
+  struct cnid_dbd_rqst {
+      int op;
+      const char *name;
+      size_t namelen;
+  };
+
+  int comm_rcv(struct cnid_dbd_rqst *rqst)
+  {
+      size_t i;
+      ((char *)(rqst->name))[rqst->namelen] = '\0';
+
+      for (i = 0; i < rqst->namelen; i++) {
+          ((char *)(rqst->name))[i] = 'x';
+      }
+
+      return 1;
+  }
+  ```
+
+test "rank1432: a length check below the terminator write does not bound it"
+  lang c
+  file etc/cnid_dbd/comm.c
+  expect VYQL-MEM-010
+  expect_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stddef.h>
+
+  #define MAXPATHLEN 1024
+
+  struct cnid_dbd_rqst {
+      int op;
+      const char *name;
+      size_t namelen;
+  };
+
+  int comm_rcv(struct cnid_dbd_rqst *rqst)
+  {
+      ((char *)(rqst->name))[rqst->namelen] = '\0';
+
+      if (rqst->namelen > MAXPATHLEN) {
+          return 0;
+      }
+
+      return 1;
+  }
+  ```

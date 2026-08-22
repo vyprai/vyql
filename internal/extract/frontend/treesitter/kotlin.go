@@ -127,7 +127,13 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return append(out, c.trailingLambdaStmts(n)...)
 	case "jump_expression", "return_expression":
 		if k := c.namedChildren(n); len(k) > 0 {
-			return []nir.Stmt{nir.Return{Value: c.expr(k[len(k)-1])}}
+			e := k[len(k)-1]
+			// A return whose expression runs a scope function (`return x.let { … }`)
+			// executes the lambda before the value exists, so its statements lower
+			// ahead of the return itself — the same inlining the call-expression case
+			// above does, ordered so the lambda's side effects precede the return.
+			out := c.trailingLambdaStmts(e)
+			return append(out, nir.Return{Value: c.expr(e)})
 		}
 		return []nir.Stmt{nir.Return{}}
 	// branch-structured (B1); Cond nil (Kotlin did not evaluate the predicate) -> byte-identical.
@@ -192,6 +198,14 @@ func (c *ktConv) ktWhen(n *tree_sitter.Node) nir.Stmt {
 				switch e.Kind() {
 				case "block", "control_structure_body", "statements":
 					stmts = append(stmts, c.collectBlocks(e)...)
+				default:
+					// A brace-less entry body (`1 -> skipGroup(tag)`) is a bare
+					// expression with no block wrapper, so it reaches neither the
+					// cases above nor collectBlocks' own statement fallback. Lower
+					// it the way that fallback does or the arm's code is dropped.
+					if isKtStmt(e.Kind()) {
+						stmts = append(stmts, c.stmt(e)...)
+					}
 				}
 			}
 			if !hasCond { // the `else` arm
@@ -320,13 +334,40 @@ func (c *ktConv) block(body *tree_sitter.Node) []nir.Stmt {
 	}
 	var out []nir.Stmt
 	for _, ch := range c.namedChildren(body) {
-		if ch.Kind() == "block" || ch.Kind() == "statements" {
+		kind := ch.Kind()
+		if kind == "block" || kind == "statements" {
 			out = append(out, c.decls(ch)...)
+		} else if ktExprBodyKind(kind) {
+			// A function_body's non-block child is the expression body of
+			// `fun f() = expr`: the expression IS the function's return value,
+			// so it lowers through nir.Return. As a bare expression statement
+			// it never reached the return node, and a caller of the function
+			// saw no value at all — the flow died at analysis.function.return.
+			// Branch-structured kinds keep their statement lowering: their
+			// value form (branchValue) keeps only the last statement of each
+			// branch, so routing them here would drop the earlier ones.
+			out = append(out, nir.Return{Value: c.expr(ch)})
+			out = append(out, c.trailingLambdaStmts(ch)...)
 		} else {
 			out = append(out, c.stmt(ch)...)
 		}
 	}
 	return out
+}
+
+// ktExprBodyKind reports whether a function_body child is an expression whose
+// value the function returns, as opposed to a statement kind that keeps its
+// structured lowering (declarations, assignments, branches, loops, returns).
+func ktExprBodyKind(kind string) bool {
+	switch kind {
+	case "class_declaration", "object_declaration", "interface_declaration",
+		"function_declaration", "property_declaration", "assignment",
+		"jump_expression", "return_expression", "if_expression", "when_expression",
+		"for_statement", "while_statement", "do_while_statement", "try_expression",
+		"control_structure_body":
+		return false
+	}
+	return true
 }
 
 func (c *ktConv) params(n *tree_sitter.Node) []string {

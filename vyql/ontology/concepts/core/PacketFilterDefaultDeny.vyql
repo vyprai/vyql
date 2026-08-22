@@ -1,0 +1,7 @@
+module core;
+
+concept PacketFilterDefaultDeny : check {
+  covers: [postDominates]
+  cwe: [CWE_284]
+  neutralizes: [iac.NetworkFilteringDisabled]
+}

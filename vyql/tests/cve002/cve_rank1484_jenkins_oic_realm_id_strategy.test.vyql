@@ -1,0 +1,174 @@
+# The OpenID Connect security realm turned the provider's username claim into a
+# Jenkins user ID without ever declaring an IdStrategy, so it inherited
+# SecurityRealm's IdStrategy.CASE_INSENSITIVE default. Against a case-sensitive
+# provider that collapses every case variant of a name onto one Jenkins user and
+# onto that user's permissions. The fixed revision declares userIdStrategy/groupIdStrategy
+# as configurable fields and overrides getUserIdStrategy()/getGroupIdStrategy()
+# to return them.
+#
+# Concepts considered for reuse: `code.CaseInsensitiveLocalIdentityAuthorizationBypass`
+# names the same case-folding weakness but is written for OS-local passwd/group
+# authorization -- its evidence and condition both say "canonical OS identity
+# names", which a broker-fed realm does not have. `code.UserIdentityMappingReview`
+# is the one that fits unchanged: "external identity data determines local user
+# or group identifiers without an observed uniqueness boundary", assuming "an
+# attacker can influence the external username and local id collisions affect
+# authorization". This widens it from Go to Java.
+#
+# The negation reads the class-scope context, which is capped at 512 tokens, so a
+# realm that declares the override far enough down a large class would still be
+# reported. Measured on the real file: `function_name:getUserIdStrategy` at line
+# 438 of a 1663-line class is inside the cap, while `createSecurityComponents` at
+# line 926 is past it -- which is why the positive anchor is the
+# `@DataBoundConstructor` near the top of the class and not the realm's abstract
+# method.
+
+test "rank1484: an OIDC security realm declares no IdStrategy for the identities it maps"
+  lang java
+  file OicSecurityRealm.java
+  expect VYQL-AUTH-083
+  expect_review code.UserIdentityMappingReview
+  code
+  ```
+  package org.jenkinsci.plugins.oic;
+
+  import hudson.model.Descriptor.FormException;
+  import hudson.security.SecurityRealm;
+  import hudson.util.Secret;
+  import java.io.IOException;
+  import java.io.Serializable;
+  import org.kohsuke.stapler.DataBoundConstructor;
+
+  public class OicSecurityRealm extends SecurityRealm implements Serializable {
+
+      private String clientId;
+      private Secret clientSecret;
+      private String userNameField;
+
+      @DataBoundConstructor
+      public OicSecurityRealm(String clientId, Secret clientSecret, Boolean disableSslVerification)
+              throws IOException, FormException {
+          this.clientId = clientId;
+          this.clientSecret = clientSecret;
+      }
+
+      public String getClientId() {
+          return clientId;
+      }
+
+      public String getUserNameField() {
+          return userNameField;
+      }
+
+      @Override
+      public SecurityComponents createSecurityComponents() {
+          return new SecurityComponents(authentication -> {
+              throw new BadCredentialsException("Unexpected authentication type: " + authentication);
+          });
+      }
+  }
+  ```
+
+test "rank1484: the OIDC security realm returns the IdStrategy it is configured with"
+  lang java
+  file OicSecurityRealm.java
+  reject VYQL-AUTH-083
+  code
+  ```
+  package org.jenkinsci.plugins.oic;
+
+  import hudson.model.Descriptor.FormException;
+  import hudson.security.SecurityRealm;
+  import hudson.util.Secret;
+  import java.io.IOException;
+  import java.io.Serializable;
+  import jenkins.model.IdStrategy;
+  import org.kohsuke.stapler.DataBoundConstructor;
+
+  public class OicSecurityRealm extends SecurityRealm implements Serializable {
+
+      private String clientId;
+      private Secret clientSecret;
+      private String userNameField;
+      private IdStrategy userIdStrategy;
+      private IdStrategy groupIdStrategy;
+
+      @DataBoundConstructor
+      public OicSecurityRealm(
+              String clientId,
+              Secret clientSecret,
+              Boolean disableSslVerification,
+              IdStrategy userIdStrategy,
+              IdStrategy groupIdStrategy)
+              throws IOException, FormException {
+          this.clientId = clientId;
+          this.clientSecret = clientSecret;
+          this.userIdStrategy = userIdStrategy;
+          this.groupIdStrategy = groupIdStrategy;
+      }
+
+      public String getClientId() {
+          return clientId;
+      }
+
+      @Override
+      public IdStrategy getUserIdStrategy() {
+          if (userIdStrategy != null) {
+              return userIdStrategy;
+          } else {
+              return IdStrategy.CASE_INSENSITIVE;
+          }
+      }
+
+      @Override
+      public IdStrategy getGroupIdStrategy() {
+          if (groupIdStrategy != null) {
+              return groupIdStrategy;
+          } else {
+              return IdStrategy.CASE_INSENSITIVE;
+          }
+      }
+
+      @Override
+      public SecurityComponents createSecurityComponents() {
+          return new SecurityComponents(authentication -> {
+              throw new BadCredentialsException("Unexpected authentication type: " + authentication);
+          });
+      }
+  }
+  ```
+
+test "rank1484: a password-based realm authenticating against a directory is not reported"
+  lang java
+  file CrowdSecurityRealm.java
+  reject VYQL-AUTH-083
+  code
+  ```
+  package de.theit.jenkins.crowd;
+
+  import hudson.security.AbstractPasswordBasedSecurityRealm;
+  import hudson.security.GroupDetails;
+  import org.kohsuke.stapler.DataBoundConstructor;
+
+  public class CrowdSecurityRealm extends AbstractPasswordBasedSecurityRealm {
+
+      private String url;
+      private String applicationName;
+
+      @DataBoundConstructor
+      public CrowdSecurityRealm(String url, String applicationName) {
+          this.url = url;
+          this.applicationName = applicationName;
+      }
+
+      @Override
+      protected UserDetails authenticate2(String username, String password) {
+          return configuration.getUser(username, password);
+      }
+
+      @Override
+      public GroupDetails loadGroupByGroupname2(String groupname, boolean fetchMembers) {
+          return configuration.getGroup(groupname);
+      }
+  }
+  ```

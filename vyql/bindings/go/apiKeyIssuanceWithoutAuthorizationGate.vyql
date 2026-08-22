@@ -1,0 +1,33 @@
+module bindings.go.apiKeyIssuanceWithoutAuthorizationGate;
+
+// Three documented calls in one Go request handler describe a bearer-credential
+// issuance: a router's path-parameter accessor (chi's URLParam, gorilla's
+// mux.Vars, net/http's Request.PathValue, gin/echo's Context.Param) names the
+// principal the credential is for; crypto/rand's Read, or io.ReadFull over
+// rand.Reader, produces the secret; and a one-way digest of that secret
+// (sha256.Sum256, sha512.Sum512, bcrypt, argon2) is what gets persisted, which
+// is the shape every API-key guide prescribes -- store the hash, return the
+// plaintext once. Together they mean the handler hands the caller a working
+// credential for whichever principal the request path named.
+//
+// The caller-supplied subject is the whole point of the operation, so it is not
+// itself the defect. What makes it privileged is that the subject is somebody
+// else's: nothing in a router's path parameter says the authenticated caller may
+// act for the principal it names, and bearer-token middleware answers only who
+// the caller is. So the handler needs its own authorization decision, and the
+// decision it needs is the one whose HTTP meaning is "authenticated, but not
+// permitted" -- 403. A handler that can reach net/http's StatusForbidden, or
+// that passes 403 to a rejection helper, has made that decision on some axis
+// (role, ownership, tenancy) and does not report; one that cannot reject the
+// caller at all issues the credential to whoever asks (CWE-862/CWE-639).
+//
+// Two limits worth stating. A project whose gate lives in a helper that writes
+// the 403 itself leaves no 403 in the handler, so it reports -- the shape is
+// visible only where the rejection is; and a handler mounted under a router
+// subtree that already applies an authorization middleware likewise carries no
+// 403 of its own. Both are false positives in the direction of the route
+// registration rather than the handler.
+binding goCredentialIssuanceForPathNamedPrincipalWithoutAuthorizationGate {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath in ["chi.URLParam", "mux.Vars", "r.PathValue", "req.PathValue", "c.Param", "ctx.Param", "e.Param"] and node.context.callPath in ["rand.Read", "io.ReadFull"] and node.context.callPath in ["sha256.Sum256", "sha256.New", "sha512.Sum512", "bcrypt.GenerateFromPassword", "argon2.IDKey"] and not (node.context.selector contains "http.StatusForbidden") and not (node.context.callArg contains ":403")
+  emit issue code.SensitiveOperation at node
+}

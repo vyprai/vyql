@@ -1,0 +1,92 @@
+test "rank1414: SCEditor BBCode handler concatenates the default attribute into an HTML attribute"
+  lang javascript
+  expect VYQL-INJ-199
+  expect_review code.HtmlAttributeRewriteReview
+  code
+  ```
+  $(function ($) {
+  	'use strict';
+
+  	$.sceditor.formats.bbcode
+  		.set('align', {
+  			html: function (element, attrs, content) {
+  				return '<div align="' + (attrs.defaultattr || 'left') + '">' + content + '</div>';
+  			},
+  			isInline: false
+  		});
+  });
+  ```
+
+test "rank1414: SCEditor BBCode font handler renders the face attribute from the raw tag attribute"
+  lang javascript
+  expect VYQL-INJ-199
+  expect_review code.HtmlAttributeRewriteReview
+  code
+  ```
+  $(function ($) {
+  	$.sceditor.formats.bbcode.set('font', {
+  		html: function (token, attrs, content) {
+  			if (typeof attrs.defaultattr == 'string' && attrs.defaultattr != '') {
+  				return '<font face="' +
+  					attrs.defaultattr +
+  					'">' + content + '</font>';
+  			} else {
+  				return content;
+  			}
+  		}
+  	});
+  });
+  ```
+
+test "rank1414: SCEditor BBCode handler escaping the default attribute is clean"
+  lang javascript
+  reject VYQL-INJ-199
+  reject_review code.HtmlAttributeRewriteReview
+  code
+  ```
+  $(function ($) {
+  	'use strict';
+
+  	$.sceditor.formats.bbcode
+  		.set('align', {
+  			html: function (element, attrs, content) {
+  				return '<div align="' + ($.sceditor.escapeEntities(attrs.defaultattr) || 'left') + '">' + content + '</div>';
+  			},
+  			isInline: false
+  		});
+
+  	$.sceditor.formats.bbcode.set('font', {
+  		html: function (token, attrs, content) {
+  			if (typeof attrs.defaultattr == 'string' && attrs.defaultattr != '') {
+  				return '<font face="' +
+  					$.sceditor.escapeEntities(attrs.defaultattr) +
+  					'">' + content + '</font>';
+  			} else {
+  				return content;
+  			}
+  		}
+  	});
+  });
+  ```
+
+test "rank1414: SCEditor BBCode handler mapping the default attribute through a constant allowlist is clean"
+  lang javascript
+  reject VYQL-INJ-199
+  reject_review code.HtmlAttributeRewriteReview
+  code
+  ```
+  $(function ($) {
+  	$.sceditor.formats.bbcode
+  		.set('list', {
+  			html: function (element, attrs, content) {
+  				var type = (attrs.defaultattr === '1' ? 'ol' : 'ul');
+
+  				if (attrs.defaultattr === 'a')
+  					type = 'ol type="a"';
+
+  				return '<' + type + '>' + content + '</' + type + '>';
+  			},
+  			breakAfter: false
+  		});
+  });
+  ```

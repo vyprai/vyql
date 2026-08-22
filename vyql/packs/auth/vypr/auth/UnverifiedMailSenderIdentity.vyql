@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule UnverifiedMailSenderIdentity {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_287, CWE_290]
+    id: "VYQL-AUTH-126"
+    severity: high
+  }
+  issue code.UnverifiedMailSenderIdentity as mail
+}

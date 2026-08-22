@@ -1,0 +1,402 @@
+# Rank 1465 / CVE-2020-7956 (recorded CWE-295): Nomad's server-to-server and
+# client-to-server RPC runs over mutual TLS. A Nomad deployment issues every
+# agent a certificate from one cluster CA, and the operator guide encodes the
+# agent's *role* and *region* in the certificate name -- `client.<region>.nomad`
+# for a client agent, `server.<region>.nomad` for a server agent. The RPC
+# listener validated only that the presented client certificate chained to that
+# CA and had not expired; it never looked at the name. So any holder of any
+# certificate the CA had issued -- including an ordinary client agent's, and
+# including one issued for a different region -- could open an RPC connection
+# and be served as a peer server, reading every secret the cluster holds.
+#
+# The vulnerable code is the whole of `getTLSConf`, which hands the incoming
+# configuration straight out of the helper that built it:
+#
+#   func getTLSConf(enableRPC bool, tlsConf *tlsutil.Config) (*tls.Config, tlsutil.RegionWrapper, error) {
+#     var tlsWrap tlsutil.RegionWrapper
+#     var incomingTLS *tls.Config
+#     if enableRPC {
+#       tw, err := tlsConf.OutgoingTLSWrapper()
+#       ...
+#       tlsWrap = tw
+#       itls, err := tlsConf.IncomingTLSConfig()
+#       ...
+#       incomingTLS = itls
+#     }
+#     return incomingTLS, tlsWrap, nil
+#   }
+#
+# The fixed revision clones that configuration and installs a `crypto/tls`
+# `VerifyPeerCertificate` callback which walks the verified peer certificate's
+# SANs and common name and requires one of them to name the expected role and
+# region:
+#
+#   + if tlsConf.VerifyServerHostname {
+#   +   incomingTLS = itls.Clone()
+#   +   incomingTLS.VerifyPeerCertificate = rpcNameAndRegionValidator(region)
+#   + } else {
+#       incomingTLS = itls
+#   + }
+#   ...
+#   + func validateRPCRegionPeer(name, region string) bool {
+#   +   parts := strings.Split(name, ".")
+#   +   if len(parts) < 3 { return false }
+#   +   if parts[len(parts)-1] != "nomad" { return false }
+#   +   if parts[0] == "client" { return name == "client."+region+".nomad" }
+#   +   return parts[0] == "server"
+#   + }
+#
+# Note where the two halves live. The setting that makes this mutual TLS at all
+# -- `tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert` -- is in
+# `helper/tlsutil/config.go` and the fixed revision does not touch it. The remediation is
+# in `nomad/server.go`, a different package, applied to the `*tls.Config` value
+# after the helper returned it. Nothing in `getTLSConf` at the vulnerable
+# revision names a `crypto/tls` API; its only calls are the project's own
+# `tlsConf.OutgoingTLSWrapper()` and `tlsConf.IncomingTLSConfig()`.
+#
+# ## The pool row
+#
+# Correct, and no correction is proposed. `f5441e69d4` is the merge of PR #7023
+# ("Validate role and region for mTLS"); `git show` prints a file stat with
+# **zero** content lines -- the multi-fix-PR-merge cause of the empty combined
+# diff -- while `git diff dd8fbf476e f5441e69d4` reads all three files in full.
+# Repointing would not help: the merged branch's own tip `cb9274ac` is itself a
+# `Merge branch 'master' into b-tls-validation`, and its parent `3589d4c4` is a
+# merge of a private PR, so there is no single non-merge commit on the public
+# repository carrying the change. The first parent `dd8fbf476e` is the fully
+# vulnerable tree and is the right scan target. The vulnerable construct is
+# present at the parent and the remediation is present at the merge.
+#
+# ## What fires
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over `nomad/` plus
+# `helper/tlsutil/` (169 Go files) reports **36 findings, 8 at or above high, at
+# both revisions**, byte-identical across three runs each. The one
+# certificate-related row is `VYQL-CFG-004` on `helper/tlsutil/config.go:236`,
+# the `InsecureSkipVerify: true` in `OutgoingTLSConfig` -- the *outgoing* side,
+# unchanged by this fix, and not the weakness: the field is set back to `false`
+# three lines down whenever hostname verification is on, and the outgoing side
+# is the half that *did* check the peer name, via
+# `conf.ServerName = "server." + region + ".nomad"`. Nothing labels the incoming
+# configuration, the client-auth requirement, or the missing identity check.
+# The fourth case below pins that row; the first three pin the miss.
+#
+# ## Why no binding ships, measured
+#
+# The weakness stated language-neutrally is "a server requires and verifies
+# client certificates but never checks which peer the certificate names". In Go
+# that is exactly expressible from the `crypto/tls` documentation alone --
+# `ClientAuth = tls.RequireAndVerifyClientCert` present, `VerifyPeerCertificate`
+# absent -- and it is measured. A probe binding at `node.scope == "function"`
+# with `node.context.selector contains "tls.RequireAndVerifyClientCert"` and
+# `not (node.context.selector contains "VerifyPeerCertificate")` reports:
+#
+#   nomad (this subtree)                    2 at the parent, 2 at the fixed revision
+#   nats-server/server                      7
+#   argo-cd/reposerver                      5
+#   argo-cd/util/tls                        3
+#   moby/cmd/dockerd                        2
+#   neuvector/controller/rest               1
+#
+# -- 18 new HIGH `VYQL-CFG-004` rows across five unrelated Go projects, zero of
+# them a true positive, and **no movement at all across this fix**, because the
+# `ClientAuth` assignment lives in the package the fixed revision does not touch. Several
+# of the rows are not even settings: `nats-server/server/server.go:231`,
+# `reload.go:182`, `leafnode.go:348` and `moby/cmd/dockerd/daemon.go:620` all
+# *read* `ClientAuth == tls.RequireAndVerifyClientCert` to decide whether
+# verification is on. An exhaustive grep over the 187 checkouts under
+# `/tmp/cve-work/rank*/` finds `RequireAndVerifyClientCert` in 24 Go files and
+# `VerifyPeerCertificate` in the same file in **0** of them, so the negation is
+# satisfied by every mutual-TLS server in the corpus. This is the "so broad it
+# flags ordinary code everywhere" case.
+#
+# A probe that does discriminate exists and is not shippable for the opposite
+# reason. Keying the positive half on the project's own helper --
+# `node.context.callPath contains "IncomingTLSConfig"` with the same
+# `VerifyPeerCertificate` negation -- reports **8 labels at the parent and 7 at
+# the fixed revision**, the one that moves being `nomad/server.go:450`, `getTLSConf`
+# itself, exactly the function the fixed revision rewrites. The remaining 7 are test
+# helpers in `helper/tlsutil/config_test.go` and are false positives at both
+# revisions, so even on its own repository the shape is 1 true positive in 8.
+# And `IncomingTLSConfig` appears in **0** of the other 186 checkouts under
+# `/tmp/cve-work/rank*/`: it is HashiCorp's method on HashiCorp's own
+# `tlsutil.Config`, not a documented library API, so the binding could only ever
+# fire on this repository. That is the genericity test failing with a number
+# attached, the same result rank 1442 recorded for `TaskStream`.
+#
+# The negation half is sound and worth keeping on record: `VerifyPeerCertificate`
+# is a documented `crypto/tls` field, not the fixing commit's vocabulary, so
+# rank 1394's rename test passes for it -- renaming `rpcNameAndRegionValidator`
+# leaves the patched form unflagged. It is the positive half that has no
+# library-documented spelling at the fixed site, because the vulnerable
+# `getTLSConf` contains no `crypto/tls` call whatsoever.
+#
+# This is the cross-package form of the delegated-control attribution family
+# recorded for Go at ranks 1377, 1389 and 1399, with one difference
+# worth naming: there the control is a sibling *function* invisible to the
+# guarded function's facts; here the control is a field written on a
+# *configuration value* in a different package from the one that set the
+# property making the value dangerous. Reading the pair would need the
+# configuration object tracked across the package boundary, which is a dataflow
+# relation the engine does not have and not a localized correction. No new
+# `ENGINE-GAPS.md` entry is filed; this restates the family.
+#
+# Concepts considered for reuse, and why each is still not enough to ship:
+# `code.CertValidationDisabled` (VYQL-CFG-004, CWE-295) is the right concept and
+# is what the three shipped `tlsWeakClientAuth345/346/347` bindings emit
+# for `tls.RequestClientCert`, `tls.RequireAnyClientCert` and
+# `tls.VerifyClientCertIfGiven` -- the weaker `ClientAuth` modes. This CVE is
+# the *strongest* mode with no identity check on top, which is the same weakness
+# class, so no new concept is warranted; the missing piece is a discriminating
+# anchor, not vocabulary. `core.CertificateValidation` is the control side.
+# `code.ProxyRedirectCertVerificationBypass` and
+# `code.SnsCertificateUrlTrustBypass` are per-product siblings of the same class
+# and adding a third would be exactly the ontology rot AGENTS.md names.
+#
+# verify_current_expected: attention-precision-cost, both revisions rejected.
+
+test "rank1465: an RPC listener's incoming mTLS config is used as the helper returned it, with no peer identity check"
+  lang go
+  file nomad/server.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package nomad
+
+  import (
+  	"crypto/tls"
+
+  	"github.com/hashicorp/nomad/helper/tlsutil"
+  	"github.com/hashicorp/nomad/nomad/structs/config"
+  )
+
+  // getTLSConf gets the server's TLS configuration based on the config supplied
+  // by the operator
+  func getTLSConf(enableRPC bool, tlsConf *tlsutil.Config) (*tls.Config, tlsutil.RegionWrapper, error) {
+  	var tlsWrap tlsutil.RegionWrapper
+  	var incomingTLS *tls.Config
+  	if enableRPC {
+  		tw, err := tlsConf.OutgoingTLSWrapper()
+  		if err != nil {
+  			return nil, nil, err
+  		}
+  		tlsWrap = tw
+
+  		itls, err := tlsConf.IncomingTLSConfig()
+  		if err != nil {
+  			return nil, nil, err
+  		}
+  		incomingTLS = itls
+  	}
+  	return incomingTLS, tlsWrap, nil
+  }
+
+  func (s *Server) reloadTLSConnections(newTLSConfig *config.TLSConfig) error {
+  	tlsConf, err := tlsutil.NewTLSConfiguration(newTLSConfig, true, true)
+  	if err != nil {
+  		return err
+  	}
+
+  	incomingTLS, tlsWrap, err := getTLSConf(newTLSConfig.EnableRPC, tlsConf)
+  	if err != nil {
+  		return err
+  	}
+
+  	s.rpcTLS = incomingTLS
+  	s.connPool.ReloadTLS(tlsWrap)
+  	return nil
+  }
+  ```
+
+test "rank1465: the same listener config rejects a peer whose certificate names the wrong role or region"
+  lang go
+  file nomad/server.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package nomad
+
+  import (
+  	"crypto/tls"
+  	"crypto/x509"
+  	"errors"
+  	"strings"
+
+  	"github.com/hashicorp/nomad/helper/tlsutil"
+  	"github.com/hashicorp/nomad/nomad/structs/config"
+  )
+
+  // getTLSConf gets the server's TLS configuration based on the config supplied
+  // by the operator
+  func getTLSConf(enableRPC bool, tlsConf *tlsutil.Config, region string) (*tls.Config, tlsutil.RegionWrapper, error) {
+  	var tlsWrap tlsutil.RegionWrapper
+  	var incomingTLS *tls.Config
+  	if !enableRPC {
+  		return incomingTLS, tlsWrap, nil
+  	}
+
+  	tlsWrap, err := tlsConf.OutgoingTLSWrapper()
+  	if err != nil {
+  		return nil, nil, err
+  	}
+
+  	itls, err := tlsConf.IncomingTLSConfig()
+  	if err != nil {
+  		return nil, nil, err
+  	}
+
+  	if tlsConf.VerifyServerHostname {
+  		incomingTLS = itls.Clone()
+  		incomingTLS.VerifyPeerCertificate = rpcNameAndRegionValidator(region)
+  	} else {
+  		incomingTLS = itls
+  	}
+  	return incomingTLS, tlsWrap, nil
+  }
+
+  // implements signature of tls.Config.VerifyPeerCertificate which is called
+  // after the certs have been verified.
+  func rpcNameAndRegionValidator(region string) func([][]byte, [][]*x509.Certificate) error {
+  	return func(_ [][]byte, certificates [][]*x509.Certificate) error {
+  		if len(certificates) > 0 && len(certificates[0]) > 0 {
+  			cert := certificates[0][0]
+  			for _, dnsName := range cert.DNSNames {
+  				if validateRPCRegionPeer(dnsName, region) {
+  					return nil
+  				}
+  			}
+  			if validateRPCRegionPeer(cert.Subject.CommonName, region) {
+  				return nil
+  			}
+  		}
+  		return errors.New("invalid role or region for certificate")
+  	}
+  }
+
+  func validateRPCRegionPeer(name, region string) bool {
+  	parts := strings.Split(name, ".")
+  	if len(parts) < 3 {
+  		return false
+  	}
+  	if parts[len(parts)-1] != "nomad" {
+  		return false
+  	}
+  	if parts[0] == "client" {
+  		return name == "client."+region+".nomad"
+  	}
+  	return parts[0] == "server"
+  }
+
+  func (s *Server) reloadTLSConnections(newTLSConfig *config.TLSConfig) error {
+  	tlsConf, err := tlsutil.NewTLSConfiguration(newTLSConfig, true, true)
+  	if err != nil {
+  		return err
+  	}
+
+  	incomingTLS, tlsWrap, err := getTLSConf(newTLSConfig.EnableRPC, tlsConf, s.config.Region)
+  	if err != nil {
+  		return err
+  	}
+
+  	s.rpcTLS = incomingTLS
+  	s.connPool.ReloadTLS(tlsWrap)
+  	return nil
+  }
+  ```
+
+test "rank1465: the helper that requires and verifies client certificates names no expected peer, and the fixed revision does not touch it"
+  lang go
+  file helper/tlsutil/config.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package tlsutil
+
+  import (
+  	"crypto/tls"
+  	"crypto/x509"
+  	"fmt"
+  )
+
+  // IncomingTLSConfig generates a TLS configuration for incoming requests
+  func (c *Config) IncomingTLSConfig() (*tls.Config, error) {
+  	tlsConfig := &tls.Config{
+  		ClientCAs:                x509.NewCertPool(),
+  		ClientAuth:               tls.NoClientCert,
+  		CipherSuites:             c.CipherSuites,
+  		MinVersion:               c.MinVersion,
+  		PreferServerCipherSuites: c.PreferServerCipherSuites,
+  	}
+
+  	err := c.AppendCA(tlsConfig.ClientCAs)
+  	if err != nil {
+  		return nil, err
+  	}
+
+  	cert, err := c.LoadKeyPair()
+  	if err != nil {
+  		return nil, err
+  	} else if cert != nil {
+  		tlsConfig.GetCertificate = c.KeyLoader.GetOutgoingCertificate
+  	}
+
+  	// Check if we require verification
+  	if c.VerifyIncoming {
+  		tlsConfig.ClientAuth = tls.RequireAndVerifyClientCert
+  		if c.CAFile == "" {
+  			return nil, fmt.Errorf("VerifyIncoming set, and no CA certificate provided!")
+  		}
+  		if cert == nil {
+  			return nil, fmt.Errorf("VerifyIncoming set, and no Cert/Key pair provided!")
+  		}
+  	}
+
+  	return tlsConfig, nil
+  }
+  ```
+
+test "rank1465: the outgoing config's skipped chain verification is the one certificate row the scan does report, at both revisions"
+  lang go
+  file helper/tlsutil/config.go
+  expect VYQL-CFG-004
+  code
+  ```
+  package tlsutil
+
+  import (
+  	"crypto/tls"
+  	"crypto/x509"
+  	"fmt"
+  )
+
+  // OutgoingTLSConfig generates a TLS configuration for outgoing requests.
+  func (c *Config) OutgoingTLSConfig() (*tls.Config, error) {
+  	if c.VerifyServerHostname {
+  		c.VerifyOutgoing = true
+  	}
+  	if !c.VerifyOutgoing {
+  		return nil, nil
+  	}
+  	tlsConfig := &tls.Config{
+  		RootCAs:                  x509.NewCertPool(),
+  		InsecureSkipVerify:       true,
+  		CipherSuites:             c.CipherSuites,
+  		MinVersion:               c.MinVersion,
+  		PreferServerCipherSuites: c.PreferServerCipherSuites,
+  	}
+  	if c.VerifyServerHostname {
+  		tlsConfig.InsecureSkipVerify = false
+  	}
+
+  	if c.VerifyOutgoing && c.CAFile == "" {
+  		return nil, fmt.Errorf("VerifyOutgoing set, and no CA certificate provided!")
+  	}
+
+  	err := c.AppendCA(tlsConfig.RootCAs)
+  	if err != nil {
+  		return nil, err
+  	}
+
+  	return tlsConfig, nil
+  }
+  ```

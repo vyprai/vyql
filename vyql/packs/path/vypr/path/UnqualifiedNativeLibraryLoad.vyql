@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule UnqualifiedNativeLibraryLoad {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_427]
+    id: "VYQL-PATH-075"
+    severity: high
+  }
+  issue code.UnqualifiedNativeLibraryLoad as sink
+}

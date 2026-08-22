@@ -1,0 +1,262 @@
+# Rank 1409 / CVE-2024-33999 (GHSA-r2wx-46gp-rp3h, MDL-80878, CWE-20 as recorded,
+# CWE-601 by the flow): Moodle's MFA administration page took the browser's Referer
+# header as the URL it would send the administrator back to.
+#
+# admin/tool/mfa/index.php, at dadffe8989^:
+#
+#   require_login(null, false);
+#   require_capability('moodle/site:config', context_system::instance());
+#
+#   global $_SERVER;
+#   $returnurl = $_SERVER['HTTP_REFERER'];
+#   ...
+#   throw new moodle_exception('factornotfound', 'tool_mfa', $returnurl, $factor);
+#   ...
+#   redirect($returnurl);
+#
+# $_SERVER['HTTP_REFERER'] is whatever the client chose to send. Nothing restricts it
+# to the site, so the value reaches redirect() -- which is lib/weblib.php's global
+# function, ending in `@header('Location: '.$url)` -- and the browser follows it off
+# the site. The same value is also the $link argument of the two moodle_exception
+# early exits. The fixing change is one line:
+#
+#   -global $_SERVER;
+#   -$returnurl = $_SERVER['HTTP_REFERER'];
+#   +$returnurl = get_local_referer(false);
+#
+# get_local_referer() is weblib.php's documented accessor, and its body is where the
+# actual restriction lives: `clean_param($_SERVER['HTTP_REFERER'], PARAM_LOCALURL)`,
+# which returns the referer only when it is inside $CFG->wwwroot and the empty string
+# otherwise.
+#
+# Detection is two PHP vocabulary bindings, both judgement-free:
+#
+#   redirectTarget480   header(...) whose argument list carries a "Location: " literal
+#                       emits code.RedirectTargetSink at args[0]. Sending a Location
+#                       response header is how PHP performs a redirect, and it is the
+#                       call Moodle's redirect() itself ends on.
+#   redirectAllowlist481  clean_param($value, PARAM_LOCALURL) emits core.RedirectAllowlist
+#                       covering the call. PARAM_LOCALURL is documented as "expected
+#                       properly formatted URL as well as one that refers to the local
+#                       site", so a value that has been through it does not a
+#                       free redirect target.
+#
+# Together they give VYQL-RF-002 (vypr.request_forgery.OpenRedirect, CWE-601) with
+# its existing `unless path coveredBy core.RedirectAllowlist`. Neither binding names
+# anything the fixed revision introduces: redirectTarget480 keys on the PHP manual's Location
+# header, and redirectAllowlist481 on a Moodle parameter type that predates fix by
+# a decade and is untouched by it. Renaming get_local_referer changes nothing, because
+# what clears the path is the clean_param call inside it.
+#
+# Measured, --cache off, --max-ram 6GB, counts taken over three runs each (every count
+# below is identical on all three):
+#
+#   admin/tool/mfa plus lib/weblib.php, both revisions, 146 PHP files:
+#   48 findings before the bindings on each revision, 49 after on each. The one
+#   VYQL-RF-002 row is what moves. At dadffe8989^ it is
+#   code.HttpInput @ admin/tool/mfa/index.php:35 -> code.RedirectTargetSink @
+#   lib/weblib.php:3097, i.e. the CVE's own flow, resolved through the global
+#   redirect() into its Location header. At dadffe8989 that row is gone and the
+#   surviving row at the same sink is code.ExternalEntryInput @ lib/weblib.php:1784,
+#   a weblib-internal parameter flow that has nothing to do with the page. So the
+#   discrimination is on the reported flow, not on the total: the count is 49 either
+#   way because findings are reported per sink and weblib's own callers reach that
+#   header line regardless.
+#
+#   Collateral, four independent PHP trees:
+#     moodle admin/ (1606 PHP files)            1140 -> 1141
+#     microweber src/ (1785 PHP files)          2147 -> 2147
+#     mautic CoreBundle (525 PHP files)          146 -> 146
+#     livehelperchat lhc_web/modules (684)       266 -> 283
+#   The single moodle row is admin/index.php:70, `header('Location:
+#   index.php?cache=0&upgradekeyhash='.sha1($_POST['upgradekey']))` -- a fixed
+#   relative path with a hex digest appended, so not reachable off-site: one false
+#   positive. All 17 livehelperchat rows are the same weakness as this CVE in a
+#   different codebase, sixteen of them literally
+#   `header('Location: ' . $_SERVER['HTTP_REFERER'])` in an admin action script, and
+#   the seventeenth a rawurldecode'd query parameter appended to the site base URL.
+#   Reachable set of the sink across all of moodle: 26 `header('Location:` call sites.
+#
+# Two other routes are measured and rejected, so that they are not re-derived:
+#
+#   Binding PHP's framework redirect() function (callee.method == "redirect") as
+#   code.RedirectTargetSink does catch the CVE directly, but its precision is
+#   unacceptable: moodle admin/ goes 1140 -> 1156 with VYQL-RF-002 rows 3 -> 19, of
+#   which exactly one is real; microweber src/ goes 2147 -> 2186, +39 rows, of which
+#   roughly ten are genuine and the rest are redirect(site_url()),
+#   redirect(route(...)) and redirect(admin_url()) -- constant destinations credited
+#   a source from another file entirely.
+#
+#   A presence binding over the file is not available for this shape. The vulnerable
+#   code is a top-level script with no function context of its own, and a PHP
+#   module-scope context's str_args carries the whole file's raw source, so every
+#   `contains` clause on it degenerates into a file-wide text search. Enumerated
+#   exhaustively over the shape's reachable set -- 60 PHP files across the review
+#   clones that read $_SERVER['HTTP_REFERER'], plus this one -- a module-scope draft
+#   fired on 10 files with one or two genuine, matching a referer accessor in one
+#   method against an unrelated redirect method elsewhere in the same class file
+#   (Yii's CHttpRequest, limesurvey's frontend_helper, microweber's JsCompileController).
+#   The function-scope form of the same draft is properly confined -- zero on all of
+#   those, two on microweber's UserManager where the referer really is the redirect
+#   target -- but cannot see this CVE at all.
+#
+# Pool row dadffe8989 is correct and needs no repointing. The metadata flag is
+# names no commit because the advisory references only a moodle.org forum post and a
+# git.moodle.org commit search for MDL-80878, not a commit URL; the SHA itself is
+# present on main and on MOODLE_404_STABLE and plain `git show` reads the whole
+# one-line fix. bcb96be529 is the same change on the other stable branch.
+
+test "rank1409: the MFA admin page returns the administrator to the raw Referer header"
+  lang php
+  file admin/tool/mfa/index.php
+  expect VYQL-RF-002
+  code
+  ```
+  <?php
+
+  require_once(__DIR__ . '/../../../config.php');
+  require_once($CFG->libdir . '/adminlib.php');
+
+  require_login(null, false);
+  require_capability('moodle/site:config', context_system::instance());
+
+  global $_SERVER;
+  $returnurl = $_SERVER['HTTP_REFERER'];
+
+  $PAGE->set_url('/admin/tool/mfa/index.php');
+
+  $action = optional_param('action', '', PARAM_ALPHANUMEXT);
+  $factor = optional_param('factor', '', PARAM_ALPHANUMEXT);
+
+  require_sesskey();
+
+  switch ($action) {
+      case 'enable':
+          \tool_mfa\manager::do_factor_action($factor, $action);
+          break;
+      default:
+          break;
+  }
+
+  redirect($returnurl);
+
+  function redirect($url, $message = '', $delay = null) {
+      if (!empty($message)) {
+          echo $message;
+      }
+      @header('Location: ' . $url);
+      echo '<p>' . $url . '</p>';
+      exit;
+  }
+  ```
+
+test "rank1409: the same page taking the referer through Moodle's local-URL cleaner"
+  lang php
+  file admin/tool/mfa/index.php
+  reject VYQL-RF-002
+  code
+  ```
+  <?php
+
+  require_once(__DIR__ . '/../../../config.php');
+  require_once($CFG->libdir . '/adminlib.php');
+
+  require_login(null, false);
+  require_capability('moodle/site:config', context_system::instance());
+
+  $returnurl = get_local_referer(false);
+
+  $PAGE->set_url('/admin/tool/mfa/index.php');
+
+  $action = optional_param('action', '', PARAM_ALPHANUMEXT);
+  $factor = optional_param('factor', '', PARAM_ALPHANUMEXT);
+
+  require_sesskey();
+
+  switch ($action) {
+      case 'enable':
+          \tool_mfa\manager::do_factor_action($factor, $action);
+          break;
+      default:
+          break;
+  }
+
+  redirect($returnurl);
+
+  function get_local_referer($stripquery = true) {
+      if (isset($_SERVER['HTTP_REFERER'])) {
+          $referer = clean_param($_SERVER['HTTP_REFERER'], PARAM_LOCALURL);
+          if ($stripquery) {
+              return strip_querystring($referer);
+          }
+          return $referer;
+      }
+      return '';
+  }
+
+  function redirect($url, $message = '', $delay = null) {
+      if (!empty($message)) {
+          echo $message;
+      }
+      @header('Location: ' . $url);
+      echo '<p>' . $url . '</p>';
+      exit;
+  }
+  ```
+
+test "rank1409: an action script sending the browser straight back to its Referer header"
+  lang php
+  file modules/lhfront/switchdashboard.php
+  expect VYQL-RF-002
+  code
+  ```
+  <?php
+
+  require 'bootstrap.php';
+
+  $userData = erLhcoreClassUser::instance();
+  $userData->setSetting('dashboard', 'switch');
+
+  if (isset($_SERVER['HTTP_REFERER'])) {
+      header('Location: ' . $_SERVER['HTTP_REFERER']);
+  } else {
+      header('Location: /user/dashboard');
+  }
+  exit;
+  ```
+
+test "rank1409: a Location header built from a fixed path is not a redirect target"
+  lang php
+  file modules/lhfront/switchdashboard.php
+  reject VYQL-RF-002
+  code
+  ```
+  <?php
+
+  require 'bootstrap.php';
+
+  $userData = erLhcoreClassUser::instance();
+  $userData->setSetting('dashboard', 'switch');
+
+  header('Location: /user/dashboard');
+  exit;
+  ```
+
+test "rank1409: a response header that is not a Location is not a redirect target"
+  lang php
+  file modules/lhfront/stats.php
+  reject VYQL-RF-002
+  code
+  ```
+  <?php
+
+  require 'bootstrap.php';
+
+  if (isset($_SERVER['HTTP_REFERER'])) {
+      $ref = $_SERVER['HTTP_REFERER'];
+      erLhcoreClassStats::record($ref);
+  }
+
+  header('Content-Type: application/json');
+  echo json_encode(['status' => 'ok']);
+  ```

@@ -1,0 +1,266 @@
+# Rank 1427 / CVE-2026-44327: free5GC's NEF mounted every one of its HTTP route
+# groups with no inbound OAuth2 middleware, so an unauthenticated peer that can
+# reach the SBI address gets a handler response with no Authorization header at
+# all (CWE-306, CWE-862). GHSA-cmpj-2x3g-m7g3 describes the OAM group -- "hit the
+# OAM route with no Authorization header at all and the handler returns 200 OK" --
+# but the defect is the whole of NewServer (internal/sbi/server.go:39):
+#
+#   s.router = logger_util.NewGinWithLogrus(logger.GinLog)
+#   s.router.Use(metrics.InboundMetrics())
+#
+#   endpoints := s.getTrafficInfluenceRoutes()
+#   group := s.router.Group(factory.TraffInfluResUriPrefix)
+#   applyRoutes(group, endpoints)
+#   ... four more groups, PFD management, PFDF, OAM and the SMF callback ...
+#
+#   s.router.Use(cors.New(cors.Config{ ... }))
+#
+# Five groups, five applyRoutes, and the only middleware installed is inbound
+# metrics and CORS. The NF is OAuth2-aware in the other direction -- NefContext
+# has GetTokenCtx minting tokens for its own outbound service requests --
+# and four PFD handlers carried `// TODO: Authorize the AF` in place of the check.
+# Every other free5GC network function does install the control: amf's server.go
+# wraps each of its eight groups in util_oauth.NewRouterAuthorizationCheck, and
+# NEF is the one that does not.
+#
+# The fixing commit eda016d9df is correct. It adds
+# NefContext.AuthorizationCheck, which calls oauth.VerifyOAuth(token,
+# serviceName, NrfCertPem), a RouterAuthorizationCheck middleware in
+# internal/util/util.go that reads the Authorization header and aborts with 401,
+# and a group.Use(...) for every group; it also gates the non-callback groups on
+# the operator's ServiceList and deletes the four TODO comments.
+#
+# Two notes on the row. The recorded repo, free5gc/nef, is right and the
+# `repo!->free5gc/free5gc` annotation is wrong: the SHA resolves only in
+# free5gc/nef (free5gc/free5gc answers `upload-pack: not our ref`), and the GHSA
+# names the affected package as github.com/free5gc/nef. This is failure mode 12
+# again -- the advisory also references the umbrella repo's issue #861, which is
+# what the REPO_MISMATCH flag fired on. And the SHA is a GitHub merge preview of
+# PR #30 (`Merge 2559d116 into a7b8320e`, on no branch), so `git show` prints a
+# stat with an empty per-file diff; `git diff a7b8320e eda016d9` reads it in full,
+# and the merged equivalent is c38a82f. Fourth instance of that symptom, and the
+# row is not flagged nocommit.
+#
+# ATTENTION, analysis gap. What separates the revisions is one sentence -- the
+# route group these handlers are mounted on has no authorization middleware in
+# its chain -- and three separate things are needed to say it, none of which
+# exists.
+#
+# There is no route-group relation. `router.Group(prefix)` is an ordinary call
+# returning a value, `group.Use(h)` and `applyRoutes(group, endpoints)` are
+# ordinary calls on that value, and the only thing tying the three together is
+# the receiver variable's name. goAtomToken returns "" for any *ast.CallExpr
+# except len(...) -- the same defect 1420 measured for the `binary:` route -- so
+# `callbackGroup := s.router.Group(...)` emits no `assign:` token at all, and
+# there is no fact anywhere saying which routes a middleware protects.
+#
+# So the discriminator would have to be "a .Use whose receiver is not the
+# engine", and that is not writable either. `call:Use` is emitted at both
+# revisions here, from the metrics and CORS installs on s.router; measured, a
+# negation on it gives 0 on the vulnerable revision and 0 on the patched one.
+# The pair does exist in the ordering tokens -- the patched body carries
+# call_before:s.router.Group>callbackGroup.Use -- but the vulnerable body carries
+# call_before:s.router.Group>s.router.Use for the trailing CORS install, so the
+# pair alone does not separate them, and narrowing it needs either a regex over
+# the token (rejected in presence predicates at compile_presence.go:268, "regex
+# matcher invocation requires reviewed scanner support") or the unification of
+# two facts on one node that 1391 recorded as unavailable.
+#
+# And the control itself is invisible. The middleware the fixed revision installs is
+# `func(c *gin.Context) { callbackAuthCheck.Check(c, s.Context()) }`, an
+# *ast.FuncLit, and goFunctionTokens returns false for *ast.FuncLit
+# (golang.go:1134), so neither the Authorization header read nor the c.Abort()
+# contributes a single fact to NewServer -- a fourth instance of 1334. The
+# remediation's only visible trace in the function that installs it is the
+# helper's name.
+#
+# That last point is what makes the shape unshippable rather than merely
+# unwritten, and it is measured rather than argued. A probe binding over the
+# Go function context -- creates a route group, no authorization-named call in
+# the body -- scores 1 at eda016d9^ (internal/sbi/server.go:39) and 0 at
+# eda016d9, which looks like detection. Rename the fixed revision's helper
+# (NewRouterAuthorizationCheck -> NewRouterGate, AuthorizationCheck ->
+# PolicyProbe) and leave the change otherwise intact, and the flag comes straight
+# back at 1. The whole delta is the substring `AuthorizationCheck` in the
+# fixing commit's own vocabulary.
+#
+# The positive half is no better, and it is §9's "endpoint with no authorization
+# signal in its body" one altitude up. On chaos-mesh the same probe reports 12
+# gin route-group registrations, every one of them correct code -- the dashboard
+# API server's newAPIRouter, and the archive, common, event, experiment,
+# schedule, template and workflow Register functions, which mount their routes
+# on a group handed in by the caller and authorize per handler against the
+# caller's own Kubernetes token, plus the gcp and oidc auth services whose
+# Middleware is installed in a sibling function at service.go:91. 12 against 1,
+# and the 1 only under the fixed revision's naming.
+#
+# This is the endpointGuarded / delegated-control family (1377, 1389, 1397, 1399)
+# in its router-mount form, and both counterweights are tested and fail. 1380's
+# -- does the fixed revision leave an API-documented call inside the function it guards -- is
+# satisfied on paper, since (*gin.RouterGroup).Use is documented gin API, but
+# `call:Use` is present at both revisions and gives 0/0. 1420's -- is the
+# vulnerable fact deleted from the guarded function -- comes closest, because the
+# fix does delete four `// TODO: Authorize the AF` lines from pfd.go, but
+# goFunctionTokens walks the AST and comments produce no nodes, so those
+# deletions leave no fact behind either.
+#
+# Measured: 19 findings at both revisions, identical across three --cache off
+# runs each, and internal/sbi/server.go carries no label at all at either
+# revision -- the file that holds the whole weakness and the whole fix is
+# untouched by the scanner. The CORS config three statements below the route
+# mounts sets AllowAllOrigins together with AllowCredentials, and is also
+# installed after applyRoutes so it never reaches those routes; neither is
+# reported, and neither is this CVE.
+#
+# The two snippets differ only in the middleware install.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1427: SBI route groups mounted with no inbound OAuth2 middleware"
+  lang go
+  file internal/sbi/server.go
+  reject VYQL-AUTH-092
+  code
+  ```
+  package sbi
+
+  import (
+  	"github.com/gin-gonic/gin"
+  	"github.com/free5gc/nef/internal/logger"
+  	"github.com/free5gc/nef/pkg/factory"
+  	logger_util "github.com/free5gc/util/logger"
+  	"github.com/free5gc/util/metrics"
+  )
+
+  type Server struct {
+  	nef
+
+  	router *gin.Engine
+  }
+
+  func NewServer(nef nef, tlsKeyLogPath string) (*Server, error) {
+  	s := &Server{nef: nef}
+
+  	s.router = logger_util.NewGinWithLogrus(logger.GinLog)
+
+  	s.router.Use(metrics.InboundMetrics())
+
+  	endpoints := s.getTrafficInfluenceRoutes()
+  	group := s.router.Group(factory.TraffInfluResUriPrefix)
+  	applyRoutes(group, endpoints)
+
+  	endpoints = s.getPFDManagementRoutes()
+  	group = s.router.Group(factory.PfdMngResUriPrefix)
+  	applyRoutes(group, endpoints)
+
+  	endpoints = s.getOamRoutes()
+  	group = s.router.Group(factory.NefOamResUriPrefix)
+  	applyRoutes(group, endpoints)
+
+  	endpoints = s.getCallbackRoutes()
+  	group = s.router.Group(factory.NefCallbackResUriPrefix)
+  	applyRoutes(group, endpoints)
+
+  	return s, nil
+  }
+  ```
+
+test "rank1427: the same groups with the OAuth2 middleware installed"
+  lang go
+  file internal/sbi/server.go
+  reject VYQL-AUTH-092
+  code
+  ```
+  package sbi
+
+  import (
+  	"github.com/gin-gonic/gin"
+  	"github.com/free5gc/nef/internal/logger"
+  	nef_util "github.com/free5gc/nef/internal/util"
+  	"github.com/free5gc/nef/pkg/factory"
+  	"github.com/free5gc/openapi/models"
+  	logger_util "github.com/free5gc/util/logger"
+  	"github.com/free5gc/util/metrics"
+  )
+
+  type Server struct {
+  	nef
+
+  	router *gin.Engine
+  }
+
+  func NewServer(nef nef, tlsKeyLogPath string) (*Server, error) {
+  	s := &Server{nef: nef}
+
+  	s.router = logger_util.NewGinWithLogrus(logger.GinLog)
+
+  	s.router.Use(metrics.InboundMetrics())
+
+  	tiAuthCheck := nef_util.NewRouterAuthorizationCheck(models.ServiceName_3GPP_TRAFFIC_INFLUENCE)
+  	tiGroup := s.router.Group(factory.TraffInfluResUriPrefix)
+  	tiGroup.Use(func(c *gin.Context) {
+  		tiAuthCheck.Check(c, s.Context())
+  	})
+  	applyRoutes(tiGroup, s.getTrafficInfluenceRoutes())
+
+  	pfdAuthCheck := nef_util.NewRouterAuthorizationCheck(models.ServiceName_NNEF_PFDMANAGEMENT)
+  	pfdMngGroup := s.router.Group(factory.PfdMngResUriPrefix)
+  	pfdMngGroup.Use(func(c *gin.Context) {
+  		pfdAuthCheck.Check(c, s.Context())
+  	})
+  	applyRoutes(pfdMngGroup, s.getPFDManagementRoutes())
+
+  	oamAuthCheck := nef_util.NewRouterAuthorizationCheck(models.ServiceName(factory.ServiceNefOam))
+  	oamGroup := s.router.Group(factory.NefOamResUriPrefix)
+  	oamGroup.Use(func(c *gin.Context) {
+  		oamAuthCheck.Check(c, s.Context())
+  	})
+  	applyRoutes(oamGroup, s.getOamRoutes())
+
+  	callbackAuthCheck := nef_util.NewRouterAuthorizationCheck(models.ServiceName("nnef-callback"))
+  	callbackGroup := s.router.Group(factory.NefCallbackResUriPrefix)
+  	callbackGroup.Use(func(c *gin.Context) {
+  		callbackAuthCheck.Check(c, s.Context())
+  	})
+  	applyRoutes(callbackGroup, s.getCallbackRoutes())
+
+  	return s, nil
+  }
+  ```
+
+test "rank1427: the middleware that performs the inbound token check"
+  lang go
+  file internal/util/util.go
+  reject VYQL-AUTH-092
+  code
+  ```
+  package util
+
+  import (
+  	"net/http"
+
+  	nef_context "github.com/free5gc/nef/internal/context"
+  	"github.com/free5gc/nef/internal/logger"
+  	"github.com/free5gc/openapi/models"
+  	"github.com/gin-gonic/gin"
+  )
+
+  type RouterAuthorizationCheck struct {
+  	serviceName models.ServiceName
+  }
+
+  func NewRouterAuthorizationCheck(serviceName models.ServiceName) *RouterAuthorizationCheck {
+  	return &RouterAuthorizationCheck{serviceName: serviceName}
+  }
+
+  func (rac *RouterAuthorizationCheck) Check(c *gin.Context, nefCtx nef_context.NFContext) {
+  	token := c.Request.Header.Get("Authorization")
+  	if err := nefCtx.AuthorizationCheck(token, rac.serviceName); err != nil {
+  		logger.UtilLog.Debugf("RouterAuthorizationCheck::Check Unauthorized: %s", err.Error())
+  		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+  		c.Abort()
+  		return
+  	}
+  	logger.UtilLog.Debugf("RouterAuthorizationCheck::Check Authorized")
+  }
+  ```

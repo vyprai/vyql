@@ -1,0 +1,266 @@
+# Rank 1421 / CVE-2026-44797: Nautobot's Webhook model stores a `payload_url`
+# that anyone holding extras.add_webhook can set to any value a Django URLField
+# accepts, and the Celery task nautobot/extras/tasks.py:process_webhook builds a
+# requests.Request around that stored field and sends it. Nothing between the two
+# constrains the scheme, the host or the address it resolves to, and
+# requests.Session.send() follows redirects by default, so every change event on
+# a subscribed model makes the worker issue an attacker-chosen HTTP request from
+# inside the deployment's network -- 169.254.169.254 cloud metadata, loopback
+# admin ports, unexported internal services -- and the response status and body
+# come back in the job result. Server-side request forgery, CWE-918.
+#
+# The fixing commit is a "Merge commit from fork" GHSA merge; `git show`
+# reads it in full here. It adds nautobot/extras/webhooks.py's
+# validate_webhook_url_format (save-time: scheme allow-list, host allow-list,
+# built-in block-list for IP-literal hosts) and validate_webhook_url (send-time:
+# the same plus socket.getaddrinfo on the name and a block-list check on every
+# resolved address), calls the first from Webhook.clean() and the second from
+# process_webhook, pins the outbound connection to the validated address where TLS
+# does not prevent rebinding, and passes allow_redirects=False. The row is
+# correct as recorded and the remediation is present at 7324c8f0d8c7.
+#
+# code.WebhookUrlFetchMissingSsrfGuard (CWE_918) and VYQL-RF-035 exist for
+# exactly this weakness, with a single JavaScript binding. Python had none, so the
+# concept is widened rather than a sibling minted: a delivery function that reads a
+# webhook record's destination URL -- payload_url, callback_url, target_url,
+# webhook_url, hook_url are the documented field names across Python webhook
+# implementations -- and hands it to a general-purpose outbound client while never
+# inspecting the URL or its resolved address with any of the stdlib/netaddr APIs an
+# SSRF policy is built from.
+#
+# Measured on nautobot/extras excluding tests and migrations, 132 files, union of
+# three --cache off runs each revision: 137 -> 138 at 7324c8f0d8c7^ with the new
+# row on tasks.py's process_webhook, and 137 -> 137 identical at 7324c8f0d8c7. An
+# AST enumeration of the shape's reachable set over all 1200+ .py files in the repo
+# returns process_webhook and nothing else; over every other clone under
+# /tmp/cve-work it returns MetaGPT's Reporter._report, which posts to a configured
+# self.callback_url with no validation and is the same weakness, while that class's
+# _async_report is correctly declined because it calls urlparse. Renaming the two
+# identifiers the fixed revision introduces (validate_webhook_url,
+# _send_webhook_request_pinned) leaves the patched revision at 0, and deleting only
+# the urlsplit call from the patched process_webhook brings the row back while the
+# sibling _send_webhook_request_pinned still calls urlsplit -- so the discriminator
+# is a documented URL-inspection API inside the sending function, not the fixed revision's own
+# vocabulary, and Python's call_path: context is function-confined.
+
+test "rank1421: webhook task sends a stored payload_url through requests with no URL policy"
+  lang python
+  file nautobot/extras/tasks.py
+  expect VYQL-RF-035
+  expect_review code.WebhookUrlFetchMissingSsrfGuard
+  code
+  ```
+  from logging import getLogger
+
+  from django.conf import settings
+  from jinja2.exceptions import TemplateError
+  import requests
+
+  from nautobot.core.celery import nautobot_task
+  from nautobot.extras.choices import ObjectChangeActionChoices
+  from nautobot.extras.utils import generate_signature
+
+  logger = getLogger("nautobot.extras.tasks")
+
+
+  @nautobot_task
+  def process_webhook(webhook_pk, data, model_name, event, timestamp, username, request_id, snapshots):
+      """
+      Make a POST request to the defined Webhook
+      """
+      from nautobot.extras.models import Webhook  # avoiding circular import
+
+      webhook = Webhook.objects.get(pk=webhook_pk)
+
+      context = {
+          "event": dict(ObjectChangeActionChoices)[event].lower(),
+          "timestamp": timestamp,
+          "model": model_name,
+          "username": username,
+          "request_id": request_id,
+          "data": data,
+          "snapshots": snapshots,
+      }
+
+      headers = {
+          "Content-Type": webhook.http_content_type,
+      }
+      try:
+          headers.update(webhook.render_headers(context))
+      except (TemplateError, ValueError) as e:
+          logger.error("Error parsing HTTP headers for webhook %s: %s", webhook, e)
+          raise
+
+      try:
+          body = webhook.render_body(context)
+      except TemplateError as e:
+          logger.error("Error rendering request body for webhook %s: %s", webhook, e)
+          raise
+
+      params = {
+          "method": webhook.http_method,
+          "url": webhook.payload_url,
+          "headers": headers,
+          "data": body.encode("utf8"),
+      }
+      logger.info("Sending %s request to %s", params["method"], params["url"])
+      try:
+          prepared_request = requests.Request(**params).prepare()
+      except requests.exceptions.RequestException as e:
+          logger.error("Error forming HTTP request: %s", e)
+          raise
+
+      if webhook.secret != "":
+          prepared_request.headers["X-Hook-Signature"] = generate_signature(prepared_request.body, webhook.secret)
+
+      # Send the request
+      with requests.Session() as session:
+          session.verify = webhook.ssl_verification
+          if webhook.ca_file_path:
+              session.verify = webhook.ca_file_path
+          response = session.send(prepared_request, proxies=settings.HTTP_PROXIES)
+
+      if response.ok:
+          logger.info("Request succeeded; response status %s", response.status_code)
+          return f"Status {response.status_code} returned, webhook successfully processed."
+      raise requests.exceptions.RequestException(
+          f"Status {response.status_code} returned with content '{response.content}', webhook FAILED to process."
+      )
+  ```
+
+test "rank1421: webhook task validates the payload_url and pins the resolved address"
+  lang python
+  file nautobot/extras/tasks.py
+  reject VYQL-RF-035
+  reject_review code.WebhookUrlFetchMissingSsrfGuard
+  code
+  ```
+  from logging import getLogger
+  from urllib.parse import urlsplit
+
+  from django.conf import settings
+  from django.core.exceptions import ValidationError
+  from jinja2.exceptions import TemplateError
+  import requests
+  import urllib3
+
+  from nautobot.core.celery import nautobot_task
+  from nautobot.extras.choices import ObjectChangeActionChoices
+  from nautobot.extras.utils import generate_signature
+
+  logger = getLogger("nautobot.extras.tasks")
+
+
+  def _send_webhook_request_pinned(prepared_request, validated_ip):
+      parts = urlsplit(prepared_request.url)
+      hostname = parts.hostname
+      port = parts.port or (443 if parts.scheme == "https" else 80)
+
+      pool_kwargs = {"timeout": urllib3.Timeout(connect=10, read=30)}
+      if parts.scheme == "https":
+          pool_kwargs.update(cert_reqs="CERT_NONE", server_hostname=hostname)
+          pool = urllib3.HTTPSConnectionPool(host=validated_ip, port=port, **pool_kwargs)
+      else:
+          pool = urllib3.HTTPConnectionPool(host=validated_ip, port=port, **pool_kwargs)
+
+      target = parts.path or "/"
+      if parts.query:
+          target = f"{target}?{parts.query}"
+
+      headers = dict(prepared_request.headers)
+      headers["Host"] = hostname if port in (80, 443) else f"{hostname}:{port}"
+
+      raw = pool.urlopen(
+          method=prepared_request.method,
+          url=target,
+          body=prepared_request.body,
+          headers=headers,
+          redirect=False,
+          retries=False,
+      )
+      response = requests.Response()
+      response.status_code = raw.status
+      response.headers.update(raw.headers)
+      response._content = raw.data
+      response.url = prepared_request.url
+      response.request = prepared_request
+      return response
+
+
+  @nautobot_task
+  def process_webhook(webhook_pk, data, model_name, event, timestamp, username, request_id, snapshots):
+      """
+      Make a POST request to the defined Webhook
+      """
+      from nautobot.extras.models import Webhook  # avoiding circular import
+      from nautobot.extras.webhooks import validate_webhook_url  # avoiding circular import
+
+      webhook = Webhook.objects.get(pk=webhook_pk)
+
+      try:
+          validated_ip = validate_webhook_url(webhook.payload_url)
+      except ValidationError as e:
+          logger.error("Webhook %s payload URL %r blocked by SSRF policy: %s", webhook, webhook.payload_url, e)
+          raise
+
+      context = {
+          "event": dict(ObjectChangeActionChoices)[event].lower(),
+          "timestamp": timestamp,
+          "model": model_name,
+          "username": username,
+          "request_id": request_id,
+          "data": data,
+          "snapshots": snapshots,
+      }
+
+      headers = {
+          "Content-Type": webhook.http_content_type,
+      }
+      try:
+          headers.update(webhook.render_headers(context))
+      except (TemplateError, ValueError) as e:
+          logger.error("Error parsing HTTP headers for webhook %s: %s", webhook, e)
+          raise
+
+      try:
+          body = webhook.render_body(context)
+      except TemplateError as e:
+          logger.error("Error rendering request body for webhook %s: %s", webhook, e)
+          raise
+
+      params = {
+          "method": webhook.http_method,
+          "url": webhook.payload_url,
+          "headers": headers,
+          "data": body.encode("utf8"),
+      }
+      logger.info("Sending %s request to %s", params["method"], params["url"])
+      try:
+          prepared_request = requests.Request(**params).prepare()
+      except requests.exceptions.RequestException as e:
+          logger.error("Error forming HTTP request: %s", e)
+          raise
+
+      if webhook.secret != "":
+          prepared_request.headers["X-Hook-Signature"] = generate_signature(prepared_request.body, webhook.secret)
+
+      parts_scheme = urlsplit(webhook.payload_url).scheme.lower()
+      can_pin = not settings.HTTP_PROXIES and (
+          parts_scheme == "http" or (parts_scheme == "https" and not webhook.ssl_verification)
+      )
+      if can_pin:
+          response = _send_webhook_request_pinned(prepared_request, validated_ip)
+      else:
+          with requests.Session() as session:
+              session.verify = webhook.ssl_verification
+              if webhook.ca_file_path:
+                  session.verify = webhook.ca_file_path
+              response = session.send(prepared_request, proxies=settings.HTTP_PROXIES, allow_redirects=False)
+
+      if response.ok:
+          logger.info("Request succeeded; response status %s", response.status_code)
+          return f"Status {response.status_code} returned, webhook successfully processed."
+      raise requests.exceptions.RequestException(
+          f"Status {response.status_code} returned with content '{response.content}', webhook FAILED to process."
+      )
+  ```

@@ -553,6 +553,9 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rustCompactText(text)},
 	}
+	if abi := c.rsExternAbi(fn); abi != "" {
+		args = append(args, nir.Const{Loc: loc, Value: "abi=" + abi})
+	}
 	for _, tok := range c.rsStructuredContextTokens(body) {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
@@ -566,6 +569,30 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+// rsExternAbi reports the extern ABI a function item is declared with: the
+// function_modifiers -> extern_modifier grammar path, whose optional string
+// literal names the ABI and defaults to "C" when absent. A function with no
+// extern modifier returns "".
+func (c *rsConv) rsExternAbi(fn *tree_sitter.Node) string {
+	for _, ch := range c.namedChildren(fn) {
+		if ch.Kind() != "function_modifiers" {
+			continue
+		}
+		for _, m := range c.namedChildren(ch) {
+			if m.Kind() != "extern_modifier" {
+				continue
+			}
+			for _, lit := range c.namedChildren(m) {
+				if lit.Kind() == "string_literal" {
+					return strings.Trim(c.text(lit), "\"")
+				}
+			}
+			return "C"
+		}
+	}
+	return ""
 }
 
 func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {

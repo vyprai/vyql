@@ -2,7 +2,7 @@ module core;
 
 concept SafeDeserialization : check {
   applies: path
-  covers: [endpoint, path]
+  covers: [endpoint, path, sameScope]
   cwe: [CWE_502]
   neutralizes: [deserialization.DeserializationAbuse]
 }

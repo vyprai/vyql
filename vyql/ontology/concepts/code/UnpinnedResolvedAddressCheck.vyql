@@ -1,0 +1,11 @@
+module code;
+
+concept UnpinnedResolvedAddressCheck : issue {
+  cwe: [CWE_367, CWE_918]
+  reviewAssumption: "an attacker who controls the hostname also controls its DNS records, so two resolutions of the same name can return different addresses"
+  reviewCategory: request_forgery
+  reviewCondition: "a host allowlist resolves a hostname itself and validates the resolved address, but the connection is left to resolve the hostname again instead of being pinned to the address that was validated"
+  reviewConfidence: high
+  reviewEvidence: "address validation context {pattern} resolves a hostname through the DNS API and tests the result against loopback, private or link-local address ranges without an observed connection pinned to that address"
+  vulnerableTo: [request_forgery.Ssrf]
+}

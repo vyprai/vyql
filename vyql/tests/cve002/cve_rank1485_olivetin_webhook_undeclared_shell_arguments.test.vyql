@@ -1,0 +1,596 @@
+# Rank 1485 / CVE-2026-27626 (GHSA-49gm-hh7w-wfvf), OliveTin/OliveTin, go.
+#
+# OliveTin runs shell commands from a configuration file, so the trust boundary
+# is not "a command runs" -- it is which *values* a request may push into the
+# command line. An action declares its arguments, each with a type, and the
+# executor typechecks every declared argument against that type's regex
+# (`ascii_identifier` is `^[a-zA-Z0-9\-\._]+$`, and so on) before expanding the
+# `shell:` template with them.
+#
+# The webhook entry point broke that. `WebhookMatcher.ExtractArguments`
+# (service/internal/webhooks/matcher.go:141) builds the argument map from the
+# request itself and then adds three request-derived entries and one per
+# incoming header:
+#
+#   func (m *WebhookMatcher) addWebhookMetadata(args map[string]string) {
+#     args["webhook_method"] = m.req.Method
+#     args["webhook_path"]   = m.req.URL.Path
+#     args["webhook_query"]  = m.req.URL.RawQuery
+#   }
+#   func (m *WebhookMatcher) addWebhookHeaders(args map[string]string) {
+#     for key, values := range m.req.Header {
+#       if len(values) > 0 { args["webhook_header_"+strings.ToLower(key)] = values[0] }
+#     }
+#   }
+#
+# `WebhookHandler.executeAction` handed that whole map to the executor as
+# `Arguments`. `parseActionArguments` (service/internal/executor/arguments.go:78)
+# then loops over `req.Binding.Action.Arguments` -- the *declared* list -- to
+# typecheck, and passes `req.Arguments` -- the *whole map* -- to
+# `tpl.ParseTemplateWithActionContext`, whose output goes to
+# `exec.CommandContext(ctx, "sh", "-c", finalParsedCommand)`
+# (service/internal/executor/executor_unix.go:18). Every key the request
+# invented is therefore expanded into the shell string having passed no check at
+# all; the fixed revision's own regression test uses `webhook_path: "/malicious/$(id)"`.
+# Validate-by-declared-list, substitute-the-whole-map.
+#
+# The fixed revision does three things:
+#
+#   webhooks/handler.go   filterToDefinedArguments(args, action) drops every key
+#                         the action did not declare, before the request is built
+#   executor/executor.go  filterToDefinedArgumentsOnly(req) repeats that inside
+#                         the executor, keeping only declared names and `ot_`
+#                         system arguments, and handleShellBranch now refuses any
+#                         request tagged "webhook" outright
+#   executor/arguments.go "password" joins url/email/raw_string_multiline/
+#                         very_dangerous_raw_string in the shell-unsafe type set
+#
+# ## The pool row
+#
+# Correct; no correction is proposed. `4bbd2eab15` is a single non-merge commit,
+# `git show` reads it in full, the vulnerable collection is present at the parent
+# and all three remediations are present at the commit.
+#
+# ## What fires, measured
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over `service/`
+# (76 Go files) reports **30 findings, 6 at or above high, at both revisions**,
+# identical across three runs each. There is no command-injection row at either
+# revision: the rules that fire are VYQL-CRY-001 (14), VYQL-DESER-001 (3),
+# VYQL-PATH-001 (2), VYQL-RF-001, VYQL-RES-001 (2), VYQL-INJ-010 (4),
+# VYQL-CFG-006 and VYQL-CFG-014 (3). `vyql match` shows both ends are labelled --
+# `m.req.URL.Path` and `m.req.URL.RawQuery` are `code.HttpInput` at matcher.go:175
+# and :176, `m.req.Header.Get` at :48, and `exec.CommandContext` is
+# `code.CommandExecution` at executor_unix.go:18 -- so this is a reach problem,
+# not a vocabulary one.
+#
+# ## Three engine gaps stack on the one path, each isolated below
+#
+# `vyql trace -from code.HttpInput -to code.CommandExecution` on the vulnerable
+# tree reports the matcher.go:175/176 sources as reaching nothing at all, with an
+# empty stop list -- the taint never leaves the statement.
+#
+# (A) A callee's write into a caller-owned value is not modelled. Both metadata
+#     helpers fill a map the caller allocated. Cases (c)/(d) below are the same
+#     file differing only in whether the map is filled in the caller or through a
+#     parameter: 1 -> 0. The same holds for a slice element, a `*struct` field and
+#     a `*string` deref written in a callee -- all four measured at 0. Inlining
+#     both helpers into `ExtractArguments` in a copy of the real tree moves the
+#     trace forward but the scan still reports 30 findings, because (C) is next.
+#
+# (B) A struct field *store* joins no taint into the object, so `req.final = cmd`
+#     at executor.go:700 and the read at :878 are unrelated. Cases (e)/(f) are the
+#     same file differing only in whether the field is set by a composite literal
+#     or by an assignment: 1 -> 0. `vyql graph` shows why -- the map form emits
+#     `Format` joining container and value (golang.go:1516 has an explicit
+#     `*ast.IndexExpr` LHS case doing exactly that), while the field form emits
+#     the two `Attr` nodes with no node between them, because `stmt`'s
+#     `*ast.AssignStmt` case has no `*ast.SelectorExpr` LHS counterpart and
+#     `assignTarget` (golang.go:1612) returns the dotted text `q.Cmd`, which
+#     unifies with nothing. Python and JavaScript both propagate the identical
+#     field store, so this is the Go frontend, not the solver.
+#
+# (C) A call through a table of function values is opaque. `execChain` runs
+#     `for _, step := range e.chainOfCommand { step(req) }`, the slice being
+#     assigned in the constructor at executor.go:136. Cases (g)/(h) are the same
+#     file differing only in whether the step is called directly or through that
+#     slice: 1 -> 0.
+#
+# ## Why no binding or rule ships even when the path is reachable
+#
+# Cases (a) and (b) are the whole chain condensed into one package, which is the
+# only form a single-file spec can hold. Both report VYQL-INJ-002 and VYQL-INJ-003
+# -- and they report them **identically**, at both revisions. That is the
+# second, independent reason this rank is ATTENTION: the remediation is an
+# allowlist over the substitution map's *keys*, and taint is a property of
+# values. Filtering `args` down to the declared names removes no taint from the
+# entries that survive; what actually makes the survivors safe is that every one
+# of them now passes `typecheckActionArgument`. Stating that needs the relation
+# "the set of keys validated by this loop covers the set of keys this sink
+# consumes", and no concept in vyql/ontology expresses a key-set restriction --
+# `core.InputValidation` and `core.CommandArgumentValidation` are value-level
+# controls, and both are what the declared-argument typecheck would emit.
+# So a value-level model reports both revisions the same however far the taint
+# reaches.
+#
+# Keying on the fixed revision's own vocabulary is rejected before measuring: a negation on
+# `filterToDefinedArguments`, `filterToDefinedArgumentsOnly` or `hasWebhookTag`
+# fails rank 1394's rename test outright -- all three are names this commit
+# invented, and none appears in any library's documentation.
+#
+# Concepts considered for reuse: `code.CommandExecution` /
+# `core.CommandArgumentValidation` (VYQL-INJ-002) are the right pair and are
+# bound to `exec.CommandContext` and firing on the isolating cases below,
+# so nothing new is warranted on the sink side; `code.HttpInput` covers
+# `r.URL.Path`, `r.URL.RawQuery` and `r.Header`; `core.InputValidation` is the
+# control the typecheck loop would emit. Nothing is missing from the vocabulary
+# except the key-set relation named above, which is not a concept.
+#
+# verify_current_expected: attention-engine-gap, isolating pairs below.
+
+test "rank1485: request path, query and every header land in the substitution map a shell template expands, condensed into one package"
+  lang go
+  file service/internal/webhooks/handler.go
+  expect VYQL-INJ-002
+  code
+  ```
+  package webhooks
+
+  import (
+  	"context"
+  	"net/http"
+  	"os/exec"
+  	"strings"
+  	"text/template"
+  )
+
+  type ActionArgument struct {
+  	Name string
+  	Type string
+  }
+
+  type Action struct {
+  	Shell     string
+  	Arguments []ActionArgument
+  }
+
+  type ExecutionRequest struct {
+  	Action             *Action
+  	Arguments          map[string]string
+  	Tags               []string
+  	finalParsedCommand string
+  }
+
+  type WebhookMatcher struct {
+  	req *http.Request
+  }
+
+  func (m *WebhookMatcher) ExtractArguments() (map[string]string, error) {
+  	args := make(map[string]string)
+  	m.addWebhookMetadata(args)
+  	m.addWebhookHeaders(args)
+  	return args, nil
+  }
+
+  func (m *WebhookMatcher) addWebhookMetadata(args map[string]string) {
+  	args["webhook_method"] = m.req.Method
+  	args["webhook_path"] = m.req.URL.Path
+  	args["webhook_query"] = m.req.URL.RawQuery
+  }
+
+  func (m *WebhookMatcher) addWebhookHeaders(args map[string]string) {
+  	for key, values := range m.req.Header {
+  		if len(values) > 0 {
+  			args["webhook_header_"+strings.ToLower(key)] = values[0]
+  		}
+  	}
+  }
+
+  func ParseTemplateWithActionContext(source string, args map[string]string) (string, error) {
+  	t, err := template.New("tpl").Parse(source)
+  	if err != nil {
+  		return "", err
+  	}
+  	var sb strings.Builder
+  	if err := t.Execute(&sb, args); err != nil {
+  		return "", err
+  	}
+  	return sb.String(), nil
+  }
+
+  func typecheckActionArgument(arg ActionArgument, value string) error { return nil }
+
+  func parseActionArguments(req *ExecutionRequest) (string, error) {
+  	for _, arg := range req.Action.Arguments {
+  		if err := typecheckActionArgument(arg, req.Arguments[arg.Name]); err != nil {
+  			return "", err
+  		}
+  	}
+  	return ParseTemplateWithActionContext(req.Action.Shell, req.Arguments)
+  }
+
+  func stepParseArgs(req *ExecutionRequest) bool {
+  	cmd, err := parseActionArguments(req)
+  	if err != nil {
+  		return false
+  	}
+  	req.finalParsedCommand = cmd
+  	return true
+  }
+
+  func stepExec(req *ExecutionRequest) bool {
+  	cmd := exec.CommandContext(context.Background(), "sh", "-c", req.finalParsedCommand)
+  	return cmd.Run() == nil
+  }
+
+  func ExecRequest(req *ExecutionRequest) {
+  	if !stepParseArgs(req) {
+  		return
+  	}
+  	stepExec(req)
+  }
+
+  func HandleWebhook(w http.ResponseWriter, r *http.Request, action *Action) {
+  	m := &WebhookMatcher{req: r}
+  	args, err := m.ExtractArguments()
+  	if err != nil {
+  		return
+  	}
+  	ExecRequest(&ExecutionRequest{Action: action, Arguments: args, Tags: []string{"webhook"}})
+  }
+  ```
+
+test "rank1485: the same chain with undeclared keys dropped and webhook shell execution refused reports identically, because a key allowlist clears no value's taint"
+  lang go
+  file service/internal/webhooks/handler.go
+  expect VYQL-INJ-002
+  code
+  ```
+  package webhooks
+
+  import (
+  	"context"
+  	"net/http"
+  	"os/exec"
+  	"strings"
+  	"text/template"
+  )
+
+  type ActionArgument struct {
+  	Name string
+  	Type string
+  }
+
+  type Action struct {
+  	Shell     string
+  	Arguments []ActionArgument
+  }
+
+  type ExecutionRequest struct {
+  	Action             *Action
+  	Arguments          map[string]string
+  	Tags               []string
+  	finalParsedCommand string
+  }
+
+  type WebhookMatcher struct {
+  	req *http.Request
+  }
+
+  func (m *WebhookMatcher) ExtractArguments() (map[string]string, error) {
+  	args := make(map[string]string)
+  	m.addWebhookMetadata(args)
+  	m.addWebhookHeaders(args)
+  	return args, nil
+  }
+
+  func (m *WebhookMatcher) addWebhookMetadata(args map[string]string) {
+  	args["webhook_method"] = m.req.Method
+  	args["webhook_path"] = m.req.URL.Path
+  	args["webhook_query"] = m.req.URL.RawQuery
+  }
+
+  func (m *WebhookMatcher) addWebhookHeaders(args map[string]string) {
+  	for key, values := range m.req.Header {
+  		if len(values) > 0 {
+  			args["webhook_header_"+strings.ToLower(key)] = values[0]
+  		}
+  	}
+  }
+
+  func ParseTemplateWithActionContext(source string, args map[string]string) (string, error) {
+  	t, err := template.New("tpl").Parse(source)
+  	if err != nil {
+  		return "", err
+  	}
+  	var sb strings.Builder
+  	if err := t.Execute(&sb, args); err != nil {
+  		return "", err
+  	}
+  	return sb.String(), nil
+  }
+
+  func typecheckActionArgument(arg ActionArgument, value string) error { return nil }
+
+  func parseActionArguments(req *ExecutionRequest) (string, error) {
+  	for _, arg := range req.Action.Arguments {
+  		if err := typecheckActionArgument(arg, req.Arguments[arg.Name]); err != nil {
+  			return "", err
+  		}
+  	}
+  	return ParseTemplateWithActionContext(req.Action.Shell, req.Arguments)
+  }
+
+  func filterToDefinedArgumentsOnly(req *ExecutionRequest) {
+  	definedNames := make(map[string]struct{})
+  	for _, arg := range req.Action.Arguments {
+  		definedNames[arg.Name] = struct{}{}
+  	}
+  	filtered := make(map[string]string)
+  	for k, v := range req.Arguments {
+  		if _, ok := definedNames[k]; ok || strings.HasPrefix(k, "ot_") {
+  			filtered[k] = v
+  		}
+  	}
+  	req.Arguments = filtered
+  }
+
+  func hasWebhookTag(req *ExecutionRequest) bool {
+  	for _, tag := range req.Tags {
+  		if tag == "webhook" {
+  			return true
+  		}
+  	}
+  	return false
+  }
+
+  func stepParseArgs(req *ExecutionRequest) bool {
+  	if hasWebhookTag(req) {
+  		return false
+  	}
+  	filterToDefinedArgumentsOnly(req)
+  	cmd, err := parseActionArguments(req)
+  	if err != nil {
+  		return false
+  	}
+  	req.finalParsedCommand = cmd
+  	return true
+  }
+
+  func stepExec(req *ExecutionRequest) bool {
+  	cmd := exec.CommandContext(context.Background(), "sh", "-c", req.finalParsedCommand)
+  	return cmd.Run() == nil
+  }
+
+  func ExecRequest(req *ExecutionRequest) {
+  	if !stepParseArgs(req) {
+  		return
+  	}
+  	stepExec(req)
+  }
+
+  func filterToDefinedArguments(args map[string]string, action *Action) map[string]string {
+  	definedNames := make(map[string]struct{})
+  	for _, arg := range action.Arguments {
+  		definedNames[arg.Name] = struct{}{}
+  	}
+  	filtered := make(map[string]string)
+  	for k, v := range args {
+  		if _, ok := definedNames[k]; ok {
+  			filtered[k] = v
+  		}
+  	}
+  	return filtered
+  }
+
+  func HandleWebhook(w http.ResponseWriter, r *http.Request, action *Action) {
+  	m := &WebhookMatcher{req: r}
+  	args, err := m.ExtractArguments()
+  	if err != nil {
+  		return
+  	}
+  	definedArgs := filterToDefinedArguments(args, action)
+  	ExecRequest(&ExecutionRequest{Action: action, Arguments: definedArgs, Tags: []string{"webhook"}})
+  }
+  ```
+
+test "rank1485: gap A, the argument map filled where it is allocated reaches the shell"
+  lang go
+  file service/internal/webhooks/matcher.go
+  expect VYQL-INJ-002
+  code
+  ```
+  package webhooks
+
+  import (
+  	"context"
+  	"net/http"
+  	"os/exec"
+  	"strings"
+  )
+
+  func expand(tmpl string, values map[string]string) string {
+  	out := tmpl
+  	for k, v := range values {
+  		out = strings.ReplaceAll(out, "{{"+k+"}}", v)
+  	}
+  	return out
+  }
+
+  func ExtractArguments(r *http.Request) map[string]string {
+  	args := make(map[string]string)
+  	args["webhook_path"] = r.URL.Path
+  	return args
+  }
+
+  func HandleWebhook(r *http.Request, shell string) {
+  	cmd := exec.CommandContext(context.Background(), "sh", "-c", expand(shell, ExtractArguments(r)))
+  	_ = cmd.Run()
+  }
+  ```
+
+test "rank1485: gap A, the same map filled through a parameter by the metadata helper reaches nothing"
+  lang go
+  file service/internal/webhooks/matcher.go
+  reject VYQL-INJ-002
+  code
+  ```
+  package webhooks
+
+  import (
+  	"context"
+  	"net/http"
+  	"os/exec"
+  	"strings"
+  )
+
+  func expand(tmpl string, values map[string]string) string {
+  	out := tmpl
+  	for k, v := range values {
+  		out = strings.ReplaceAll(out, "{{"+k+"}}", v)
+  	}
+  	return out
+  }
+
+  func addWebhookMetadata(args map[string]string, r *http.Request) {
+  	args["webhook_path"] = r.URL.Path
+  }
+
+  func ExtractArguments(r *http.Request) map[string]string {
+  	args := make(map[string]string)
+  	addWebhookMetadata(args, r)
+  	return args
+  }
+
+  func HandleWebhook(r *http.Request, shell string) {
+  	cmd := exec.CommandContext(context.Background(), "sh", "-c", expand(shell, ExtractArguments(r)))
+  	_ = cmd.Run()
+  }
+  ```
+
+test "rank1485: gap B, the parsed command carried into the request by a composite literal reaches the shell"
+  lang go
+  file service/internal/executor/executor.go
+  expect VYQL-INJ-002
+  code
+  ```
+  package executor
+
+  import (
+  	"context"
+  	"net/http"
+  	"os/exec"
+  )
+
+  type ExecutionRequest struct{ finalParsedCommand string }
+
+  func stepExec(final string) {
+  	_ = exec.CommandContext(context.Background(), "sh", "-c", final).Run()
+  }
+
+  func ExecRequest(r *http.Request) {
+  	req := &ExecutionRequest{finalParsedCommand: r.URL.Path}
+  	stepExec(req.finalParsedCommand)
+  }
+  ```
+
+test "rank1485: gap B, the same command stored into the field by an assignment reaches nothing"
+  lang go
+  file service/internal/executor/executor.go
+  reject VYQL-INJ-002
+  code
+  ```
+  package executor
+
+  import (
+  	"context"
+  	"net/http"
+  	"os/exec"
+  )
+
+  type ExecutionRequest struct{ finalParsedCommand string }
+
+  func stepExec(final string) {
+  	_ = exec.CommandContext(context.Background(), "sh", "-c", final).Run()
+  }
+
+  func ExecRequest(r *http.Request) {
+  	req := &ExecutionRequest{}
+  	req.finalParsedCommand = r.URL.Path
+  	stepExec(req.finalParsedCommand)
+  }
+  ```
+
+test "rank1485: gap C, the execution step called directly reaches the shell"
+  lang go
+  file service/internal/executor/executor.go
+  expect VYQL-INJ-002
+  code
+  ```
+  package executor
+
+  import (
+  	"context"
+  	"net/http"
+  	"os/exec"
+  )
+
+  type ExecutionRequest struct{ Arguments map[string]string }
+
+  type Executor struct{ chainOfCommand []func(*ExecutionRequest) bool }
+
+  func stepExec(req *ExecutionRequest) bool {
+  	_ = exec.CommandContext(context.Background(), "sh", "-c", req.Arguments["webhook_path"]).Run()
+  	return true
+  }
+
+  func (e *Executor) execChain(req *ExecutionRequest) {
+  	stepExec(req)
+  }
+
+  func HandleWebhook(r *http.Request, e *Executor) {
+  	args := map[string]string{"webhook_path": r.URL.Path}
+  	e.execChain(&ExecutionRequest{Arguments: args})
+  }
+  ```
+
+test "rank1485: gap C, the same step invoked through the chain-of-command slice reaches nothing"
+  lang go
+  file service/internal/executor/executor.go
+  reject VYQL-INJ-002
+  code
+  ```
+  package executor
+
+  import (
+  	"context"
+  	"net/http"
+  	"os/exec"
+  )
+
+  type ExecutionRequest struct{ Arguments map[string]string }
+
+  type Executor struct{ chainOfCommand []func(*ExecutionRequest) bool }
+
+  func stepExec(req *ExecutionRequest) bool {
+  	_ = exec.CommandContext(context.Background(), "sh", "-c", req.Arguments["webhook_path"]).Run()
+  	return true
+  }
+
+  func DefaultExecutor() *Executor {
+  	return &Executor{chainOfCommand: []func(*ExecutionRequest) bool{stepExec}}
+  }
+
+  func (e *Executor) execChain(req *ExecutionRequest) {
+  	for _, step := range e.chainOfCommand {
+  		if !step(req) {
+  			break
+  		}
+  	}
+  }
+
+  func HandleWebhook(r *http.Request, e *Executor) {
+  	args := map[string]string{"webhook_path": r.URL.Path}
+  	e.execChain(&ExecutionRequest{Arguments: args})
+  }
+  ```

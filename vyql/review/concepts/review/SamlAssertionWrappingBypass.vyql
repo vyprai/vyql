@@ -4,5 +4,5 @@ review code.SamlAssertionWrappingBypass {
   category: auth
   expected: [core.AuthenticationCheck]
   kind: attention
-  text: "review SAML assertion validation for a single direct Assertion element in the expected namespace before accepting a signed assertion"
+  text: "review SAML assertion validation so the assertion content it processes is the content the verified signature covers, not an element re-selected from the unverified response"
 }

@@ -1,0 +1,383 @@
+# Rank 1405 / CVE-2025-11695 (GHSA-3p6w-gv5g-xjw9, CWE-295):
+# mongodb/mongo-rust-driver parses `tlsInsecure` out of a connection string with
+# its boolean inverted. `ConnectionString::parse_option_pair` handled the option
+# in the same match arm as its narrower sibling and negated the value for one of
+# them:
+#
+#   k @ "tlsinsecure" | k @ "tlsallowinvalidcertificates" => {
+#       let val = get_bool!(value, k);
+#       let allow_invalid_certificates =
+#           if k == "tlsinsecure" { !val } else { val };   // options.rs:2070
+#       ...
+#       Some(Tls::Enabled(ref mut options)) => {
+#           options.allow_invalid_certificates = Some(allow_invalid_certificates);
+#       }
+#   }
+#
+# Both the option and the field it lands in are permissive-polarity: the option
+# name asserts insecurity and the field name asserts that invalid certificates
+# are accepted. Negating between them flips the meaning of the setting. So a URI
+# carrying `?tls=true&tlsInsecure=false` -- an application explicitly declining
+# to relax TLS -- produced `allow_invalid_certificates = Some(true)`, and every
+# connection accepted any certificate the peer presented, while
+# `tlsInsecure=true` turned validation on. The attacker is a MITM on the
+# driver-to-server link, or a hostile server: with validation off it can present
+# a self-signed certificate for any name and read or rewrite the wire protocol,
+# including the SCRAM exchange. Nothing in the application is misused; the
+# application asked for the secure setting and got the insecure one.
+#
+# 21ed6aeeea (the 3.2.5 cherry-pick of #1453) splits the arm in two, drops the
+# negation, and makes the option mean what its documentation says:
+#
+#   TLS_INSECURE => {
+#       let val = get_bool!(value, key);
+#       self.tls_insecure = Some(val);
+#       match self.tls.get_or_insert_with(|| Tls::Enabled(Default::default())) {
+#           Tls::Enabled(ref mut options) => {
+#               options.allow_invalid_certificates = Some(val);
+#               #[cfg(feature = "openssl-tls")]
+#               { options.allow_invalid_hostnames = Some(val); }
+#           }
+#           Tls::Disabled => return Err(...),
+#       }
+#   }
+#
+# and adds the URI-spec conflict errors (`tlsInsecure` together with
+# `tlsAllowInvalidCertificates`, or with `tls=false`) plus case-insensitive
+# duplicate-key detection. The regression test in src/client/options/test.rs
+# asserts the polarity in both directions.
+#
+# The pool row is correct in every field. 21ed6aeeea is a real, readable,
+# non-merge commit; the negated derivation is present at its parent
+# (src/client/options.rs:2070) and the remediation is present at the commit
+# itself, so both halves of the 1390 check hold. No corpus correction.
+#
+# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+# both real checkouts reports the same 49 findings at or above high, byte-stable
+# across three runs each, with an identical per-rule split before and after:
+# VYQL-MEM-006 x185, VYQL-DOS-042 x25, VYQL-CFG-014 x18, VYQL-MEM-005 x8,
+# VYQL-PATH-001 x7, and singletons below. Exactly four of them land in
+# src/client/options.rs and all four are the host-list parser, not the option
+# parser: three VYQL-MEM-005 rows on the `s[..]`/`hosts[..]` slices at 1403,
+# 1421 and 1599 and one VYQL-CFG-014 on the TrustBoundary at 1604, each shifted
+# four lines by the change and otherwise identical. `scan -flags only` adds eight
+# code.IndexAccess flags before and seven after, again all subscripts. Nothing
+# labels the TLS arm in either revision -- the pattern ranks 1370, 1371, 1378
+# and 1393 recorded holds once more: findings in the file are not coverage.
+#
+# Vocabulary is checked for reuse before anything else. code.CertValidationDisabled
+# (VYQL-CFG-004, CWE-295) is the right existing home and is what the measurements
+# below emit; its Rust binding today is `danger_accept_invalid_certs(true)`, a
+# literal-argument call, which is the consumer side of this weakness and not the
+# parser side. The other CWE-295 concepts are read and rejected on shape:
+# core.CertificateValidation is a check concept for the neutralising control,
+# code.ProxyRedirectCertVerificationBypass (VYQL-CFG-023) is about a redirect
+# hop, code.CertValidationDependency is SCA, code.SnsCertificateUrlTrustBypass
+# and code.JavaMailSmtpSslIdentityVerificationMissing are unrelated protocols.
+# Nothing anywhere in vyql/ontology, vyql/review or vyql/packs expresses the
+# weakness class this CVE actually is -- a security setting assigned the logical
+# negation of the option that requests it. No concept and no rule ID is minted
+# here, because the measurements say nothing discriminating can be built on one.
+#
+# ATTENTION, engine gap: the two facts that would have to meet cannot meet.
+#
+# (1) The negation is a node, and a node carries no function facts. `code.Unary`
+#     with path `__unary.not` exists at options.rs:2070 and a presence binding
+#     on `node.kind == "unary"` labels it -- 8 such nodes in the vulnerable file,
+#     9 in the patched one, the extra being the fixed revision's own `if !tls` guard. But
+#     adding any `node.context.*` clause to that binding drops it to zero in both
+#     revisions: context predicates read the matched node's own `str_args`
+#     (`flagContextTokenValuePredicate`, internal/bindings/bindings_match.go:1520),
+#     and a Unary node has none. Measured with `node.context.language == "rust"`,
+#     `node.context.name == "parse_option_pair"` and
+#     `node.context.selector contains "allow_invalid_certificates"`: 0 and 0.
+#     So the negation cannot be qualified by anything about where it sits, and
+#     both `!` unaries in this function are indistinguishable.
+#
+# (2) The destination is a function fact, and it has the value erased.
+#     `rsStructuredContextTokens` (internal/extract/frontend/treesitter/rust.go:594)
+#     emits `assign:` only for `assignment_expression`, and `atom()` collapses a
+#     call-shaped right-hand side to its dotted callee path. Both revisions
+#     therefore emit the *same* token, `assign:options.allow_invalid_certificates=Some`,
+#     and the `let` that actually holds the negation emits no `assign:` token at
+#     all because `let_declaration` is not in that switch. There is no unary or
+#     negation prefix in the Rust token set (the switch handles
+#     assignment_expression, call_expression, field_expression and match_arm).
+#
+# (3) The destination is absent from the USG as well. `(*rsConv).exprStmt`
+#     (internal/extract/frontend/treesitter/rust.go:911) builds an `nir.Assign`
+#     only when the assignment's left-hand side is a bare `identifier`; a
+#     `field_expression` target is discarded and the statement becomes a bare
+#     `ExprStmt` of the right-hand side. Case (d) below is the minimal pair:
+#     `vyql graph` over it shows `Unary path=__unary.not` for both functions,
+#     `Unary --FLOWS--> Arg --FLOWS--> Call path=Some` for the field-target one,
+#     and no node anywhere naming `allow_invalid_certificates`. The value's
+#     destination simply is not in the graph, so "a negation reaches a
+#     certificate-relaxation setting" is not a statement the query language can
+#     make about Rust today.
+#
+# This is not the 1364/1377/1397/1399 delegated-check family and that is tested,
+# not assumed: the remediation here is inline in the same function the weakness
+# is in, no check moves into a sibling, and no call needs resolving. Landing the
+# caller-side control attribution those ranks are blocked on would change nothing
+# for this rank. Rank 1380's counterweight also comes out negative -- the patched
+# arm's API-documented content (`get_bool` on the URI value, an assignment to
+# `allow_invalid_certificates`) is present in the vulnerable arm too.
+#
+# The one clause that does separate the revisions is built and then rejected,
+# with the rename test the preamble prescribes. `node.scope == "function" and
+# node.context.matchArm contains "tlsinsecure" and node.context.assign contains
+# "allow_invalid_certificates"` scores 1 on the vulnerable file and 0 on the
+# patched one -- but it separates them only because the fixed revision replaced the string
+# literal `"tlsinsecure"` with the constant `TLS_INSECURE` in the arm pattern.
+# Respelling the patched arms with their original literals, changing nothing else
+# about the remediation, brings the flag straight back: 1 on fully-fixed code.
+# That is the fixing commit's own layout as the discriminator, which is standing
+# rejection grounds, and it is also wrong in the field -- any driver that spells
+# the arm with a literal and gets the polarity right would be flagged.
+#
+# The shape is rare enough that precision is never the obstacle. Across the 120
+# rank clones under /tmp/cve-work (1338 Rust files), 22 files mention a
+# certificate-relaxation field at all, 16 mention a `tlsInsecure`-family option
+# name, and a grep for a relaxation field assigned a negated expression returns
+# exactly one hit outside this rank's own scratch copies: options.rs:2070, the
+# CVE. There is a real detection here and nothing to write it with.
+#
+# The gap is not judged mechanical. Making `exprStmt` keep a `field_expression`
+# target would create new Assign nodes and new flow edges in every Rust scan,
+# which is a solver-wide dataflow change rather than a confined correction, and
+# even with it the negation would still have to be correlated through the `Some`
+# wrapper and the intervening `let` to the target -- a second capability that
+# does not exist and is not measured.
+#
+# The four cases are the pair, plus the two instances that make it a pair. (a)
+# and (b) are the real revisions and record the miss. (c) is the correct polarity
+# conversion in the same vocabulary and shows why "a negation into a relaxation
+# field" cannot itself be the key. (d) is the frontend minimal pair for (3).
+#
+# verify_current_expected: attention-engine-gap, all four cases rejected. (c) and
+# (d) are correct code and must remain rejects.
+
+test "rank1405: (a) a connection-string option whose name asserts insecurity has its boolean negated on the way into the field that accepts invalid certificates, so declining to relax TLS disables validation"
+  lang rust
+  file src/client/options.rs
+  reject VYQL-CFG-004
+  reject VYQL-CFG-023
+  code
+  ```
+  use crate::error::{Error, ErrorKind, Result};
+  use crate::options::{Tls, TlsOptions};
+
+  pub struct ConnectionString {
+      pub tls: Option<Tls>,
+      pub tls_insecure: Option<bool>,
+  }
+
+  macro_rules! get_bool {
+      ($value:expr, $option:expr) => {
+          match $value {
+              "true" => true,
+              "false" => false,
+              _ => {
+                  return Err(ErrorKind::InvalidArgument {
+                      message: format!("connection string `{}` option must be a boolean", $option),
+                  }
+                  .into())
+              }
+          }
+      };
+  }
+
+  impl ConnectionString {
+      fn parse_option_pair(&mut self, key: &str, value: &str) -> Result<()> {
+          match key {
+              k @ "tls" | k @ "ssl" => {
+                  let tls = get_bool!(value, k);
+                  if self.tls.is_none() {
+                      let tls = if tls {
+                          Tls::Enabled(Default::default())
+                      } else {
+                          Tls::Disabled
+                      };
+                      self.tls = Some(tls);
+                  }
+              }
+              k @ "tlsinsecure" | k @ "tlsallowinvalidcertificates" => {
+                  let val = get_bool!(value, k);
+
+                  let allow_invalid_certificates = if k == "tlsinsecure" { !val } else { val };
+
+                  match self.tls {
+                      Some(Tls::Disabled) => {
+                          return Err(ErrorKind::InvalidArgument {
+                              message: "'tlsInsecure' can't be set if tls=false".into(),
+                          }
+                          .into())
+                      }
+                      Some(Tls::Enabled(ref mut options)) => {
+                          options.allow_invalid_certificates = Some(allow_invalid_certificates);
+                      }
+                      None => {
+                          self.tls = Some(Tls::Enabled(
+                              TlsOptions::builder()
+                                  .allow_invalid_certificates(allow_invalid_certificates)
+                                  .build(),
+                          ))
+                      }
+                  }
+              }
+              _ => {}
+          }
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1405: (b) the fixed revision gives the insecure option its own arm and stores the parsed value with its polarity intact"
+  lang rust
+  file src/client/options.rs
+  reject VYQL-CFG-004
+  reject VYQL-CFG-023
+  code
+  ```
+  use crate::error::{Error, ErrorKind, Result};
+  use crate::options::{Tls, TlsOptions};
+
+  const TLS_INSECURE: &str = "tlsinsecure";
+  const TLS_ALLOW_INVALID_CERTIFICATES: &str = "tlsallowinvalidcertificates";
+
+  pub struct ConnectionString {
+      pub tls: Option<Tls>,
+      pub tls_insecure: Option<bool>,
+  }
+
+  macro_rules! get_bool {
+      ($value:expr, $option:expr) => {
+          match $value {
+              "true" => true,
+              "false" => false,
+              _ => {
+                  return Err(Error::invalid_argument(format!(
+                      "connection string `{}` option must be a boolean",
+                      $option
+                  )))
+              }
+          }
+      };
+  }
+
+  impl ConnectionString {
+      fn parse_option_pair(&mut self, key: &str, value: &str) -> Result<()> {
+          match key {
+              k @ "tls" | k @ "ssl" => {
+                  let tls = get_bool!(value, k);
+                  match self.tls {
+                      Some(Tls::Enabled(_)) if !tls => {
+                          return Err(Error::invalid_argument(
+                              "cannot set {key}={tls} if other TLS options are set",
+                          ))
+                      }
+                      Some(Tls::Disabled) if tls => {
+                          return Err(Error::invalid_argument(
+                              "cannot set {key}={tls} if TLS is disabled",
+                          ))
+                      }
+                      None => {
+                          if tls {
+                              self.tls = Some(Tls::Enabled(Default::default()))
+                          } else {
+                              self.tls = Some(Tls::Disabled)
+                          }
+                      }
+                      _ => {}
+                  }
+              }
+              TLS_INSECURE => {
+                  let val = get_bool!(value, key);
+                  self.tls_insecure = Some(val);
+
+                  match self
+                      .tls
+                      .get_or_insert_with(|| Tls::Enabled(Default::default()))
+                  {
+                      Tls::Enabled(ref mut options) => {
+                          options.allow_invalid_certificates = Some(val);
+                          options.allow_invalid_hostnames = Some(val);
+                      }
+                      Tls::Disabled => {
+                          return Err(Error::invalid_argument(format!(
+                              "cannot set {key} when TLS is disabled"
+                          )));
+                      }
+                  }
+              }
+              TLS_ALLOW_INVALID_CERTIFICATES => {
+                  let val = get_bool!(value, key);
+
+                  match self
+                      .tls
+                      .get_or_insert_with(|| Tls::Enabled(Default::default()))
+                  {
+                      Tls::Enabled(ref mut options) => {
+                          options.allow_invalid_certificates = Some(val);
+                      }
+                      Tls::Disabled => {
+                          return Err(Error::invalid_argument(format!(
+                              "cannot set {key} when TLS is disabled"
+                          )))
+                      }
+                  }
+              }
+              _ => {}
+          }
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1405: (c) a relaxation field assigned the negation of a strict-polarity option is the correct conversion and must not be flagged"
+  lang rust
+  file src/runtime/tls_rustls.rs
+  reject VYQL-CFG-004
+  reject VYQL-CFG-023
+  code
+  ```
+  use crate::error::Result;
+  use crate::options::TlsOptions;
+
+  pub struct AppConfig {
+      pub verify_server_certificate: bool,
+      pub verify_server_hostname: bool,
+  }
+
+  pub fn tls_options_from_config(config: &AppConfig) -> Result<TlsOptions> {
+      let mut options = TlsOptions::default();
+
+      options.allow_invalid_certificates = Some(!config.verify_server_certificate);
+      options.allow_invalid_hostnames = Some(!config.verify_server_hostname);
+
+      Ok(options)
+  }
+  ```
+
+test "rank1405: (d) the frontend pair: a negation stored through a bare identifier and the same negation stored into a struct field, whose target the Rust lowering discards"
+  lang rust
+  file src/client/options/pair.rs
+  reject VYQL-CFG-004
+  reject VYQL-CFG-023
+  code
+  ```
+  pub struct TlsOptions {
+      pub allow_invalid_certificates: Option<bool>,
+  }
+
+  fn identifier_target(val: bool) -> bool {
+      let mut allow_invalid_certificates = false;
+      allow_invalid_certificates = !val;
+      allow_invalid_certificates
+  }
+
+  fn field_target(options: &mut TlsOptions, val: bool) {
+      options.allow_invalid_certificates = Some(!val);
+  }
+  ```

@@ -1,0 +1,191 @@
+# OpenAM's JATO console carries view state in the `jato.clientSession` request
+# value: the framework base64-decodes it and hands the bytes to
+# com.iplanet.jato.util.Encoder.deserialize(byte[], boolean), which wrapped them
+# in a ByteArrayInputStream (through an InflaterInputStream when compressed) and
+# read the object graph back with a plain ObjectInputStream subclass. Nothing
+# bounded the classes the stream could name, so any gadget on the console's
+# classpath ran before authentication.
+#
+# The fixed revision keeps the signature and moves the read into openam-shared's
+# IOUtils.deserialise, whose WhitelistObjectInputStream overrides resolveClass
+# and throws InvalidClassException for a class outside a configured list, so at
+# at the fixed revision the object stream is gone from Encoder entirely.
+#
+# The shape the binding labels is the byte-array decoder itself: a public method
+# that receives the serialized bytes as a byte[] parameter, wraps them in a
+# ByteArrayInputStream and calls readObject/readUnshared. That method decides
+# nothing about where the bytes came from, so it owns the obligation to bound the
+# class set for every caller, which is exactly what java.io.ObjectInputStream's
+# own javadoc asks for. A stream opened over a file or a socket stays
+# VYQL-DESER-001's business, reachable from a labelled source by taint; the byte[]
+# helper is not, because its caller is the source.
+#
+# Measured: jato-shaded + openam-shared goes 43 -> 45 findings at the vulnerable
+# revision and 43 -> 44 at the fixed revision, stable over three --cache off runs each, the
+# delta being Encoder.deserialize (gone at the fixed revision) and IOUtils.deserialise. An
+# exhaustive walk of every public byte[] method in 48273 Java files across the
+# review clones finds seven instances of the shape in total: these two, nifi's
+# ObjectSerDe.deserialize (in three checkouts of the same repository), solr's
+# SolrResponse.deserialize and a log4j2 test round-trip helper. Scanning those
+# trees reports exactly that set and nothing else -- 0 on netty (3567 files),
+# logback (1138), log4j-core (1281), solr/core (1518) and openam-core (1949).
+#
+# Dropping the byte[] requirement and keeping only "public method building a
+# ByteArrayInputStream it reads objects from" measures 19 findings on the
+# same trees against 5, the twelve extra being serialization round-trip helpers in
+# logback and log4j2 tests, for two more real instances in openam-core where the
+# blob arrives as a base64 String rather than a byte[]. Those two are the known
+# recall boundary.
+#
+# Known residual, and it is the control-attribution gap recorded at rank 1338:
+# openam's own IOUtils.deserialise has the identical function-scoped shape and
+# reports too, because its allowlist lives in a resolveClass override on a nested
+# class and no relation attributes a class-level control to a construction site in
+# a sibling method. The rule's `unless ... coveredBy core.SafeDeserialization`
+# does clear the JEP 290 route, including log4j2's reflective
+# setObjectInputFilter.invoke form, which is why SortedArrayStringMap.unmarshall
+# stops reporting.
+
+test "rank1499: a public byte[] decoder reads an object graph with no class allowlist"
+  lang java
+  file com/iplanet/jato/util/Encoder.java
+  expect VYQL-DESER-023
+  code
+  ```
+  package com.iplanet.jato.util;
+
+  import java.io.ByteArrayInputStream;
+  import java.io.IOException;
+  import java.io.ObjectInputStream;
+  import java.util.zip.InflaterInputStream;
+
+  public class Encoder {
+
+      private Encoder() {
+      }
+
+      public static Object deserialize(byte[] b, boolean compressed) throws IOException, ClassNotFoundException {
+          ByteArrayInputStream bais = new ByteArrayInputStream(b);
+          InflaterInputStream iis = null;
+          ObjectInputStream ois = null;
+          if (compressed) {
+              iis = new InflaterInputStream(bais);
+              ois = new ApplicationObjectInputStream(iis);
+          } else {
+              ois = new ApplicationObjectInputStream(bais);
+          }
+
+          Object result = ois.readObject();
+          return result;
+      }
+  }
+  ```
+
+test "rank1499: the decoder delegating the read away carries no object stream"
+  lang java
+  file com/iplanet/jato/util/Encoder.java
+  reject VYQL-DESER-023
+  code
+  ```
+  package com.iplanet.jato.util;
+
+  import org.forgerock.openam.utils.IOUtils;
+
+  import java.io.IOException;
+
+  public class Encoder {
+
+      private Encoder() {
+      }
+
+      public static Object deserialize(byte[] b, boolean compressed) throws IOException, ClassNotFoundException {
+          return IOUtils.deserialise(b, compressed);
+      }
+  }
+  ```
+
+test "rank1499: a byte[] decoder that installs a serialization filter is bounded"
+  lang java
+  file com/iplanet/jato/util/FilteredEncoder.java
+  reject VYQL-DESER-023
+  code
+  ```
+  package com.iplanet.jato.util;
+
+  import java.io.ByteArrayInputStream;
+  import java.io.IOException;
+  import java.io.ObjectInputFilter;
+  import java.io.ObjectInputStream;
+
+  public class FilteredEncoder {
+
+      public static Object deserialize(byte[] b) throws IOException, ClassNotFoundException {
+          ByteArrayInputStream bais = new ByteArrayInputStream(b);
+          ObjectInputStream ois = new ObjectInputStream(bais);
+          ois.setObjectInputFilter(ObjectInputFilter.Config.createFilter("com.example.*;!*"));
+          return ois.readObject();
+      }
+  }
+  ```
+
+test "rank1499: a class reading its own fields back from a stream is not a byte[] decoder"
+  lang java
+  file com/iplanet/jato/model/ViewState.java
+  reject VYQL-DESER-023
+  code
+  ```
+  package com.iplanet.jato.model;
+
+  import java.io.ByteArrayInputStream;
+  import java.io.IOException;
+  import java.io.ObjectInputStream;
+  import java.io.Serializable;
+
+  public class ViewState implements Serializable {
+
+      private String name;
+
+      private void readObject(ObjectInputStream in) throws IOException, ClassNotFoundException {
+          in.defaultReadObject();
+          this.name = (String) in.readObject();
+      }
+
+      public byte[] marker() {
+          return new byte[] { 0 };
+      }
+
+      public ByteArrayInputStream open(byte[] raw) {
+          return new ByteArrayInputStream(raw);
+      }
+  }
+  ```
+
+test "rank1499: a filter set in a sibling method does not bound this decoder"
+  lang java
+  file com/example/SiblingEncoder.java
+  expect VYQL-DESER-023
+  code
+  ```
+  package com.example;
+
+  import java.io.ByteArrayInputStream;
+  import java.io.IOException;
+  import java.io.ObjectInputFilter;
+  import java.io.ObjectInputStream;
+
+  public class SiblingEncoder {
+
+      public static Object safeRead(byte[] b) throws IOException, ClassNotFoundException {
+          ByteArrayInputStream bais = new ByteArrayInputStream(b);
+          ObjectInputStream ois = new ObjectInputStream(bais);
+          ois.setObjectInputFilter(ObjectInputFilter.Config.createFilter("com.example.*;!*"));
+          return ois.readObject();
+      }
+
+      public static Object unsafeRead(byte[] b) throws IOException, ClassNotFoundException {
+          ByteArrayInputStream bais = new ByteArrayInputStream(b);
+          ObjectInputStream ois = new ObjectInputStream(bais);
+          return ois.readObject();
+      }
+  }
+  ```

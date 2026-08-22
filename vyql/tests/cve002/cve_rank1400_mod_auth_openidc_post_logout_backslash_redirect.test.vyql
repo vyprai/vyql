@@ -1,0 +1,209 @@
+# Rank 1400 / CVE-2019-20479: mod_auth_openidc lets the user agent name where to
+# go after single logout through the `logout=` query parameter, and that value
+# ends up verbatim in the `Location` response header. The only gate is
+# oidc_validate_post_logout_url (src/mod_auth_openidc.c): it parses the target
+# with apr_uri_parse, and when the parse yields no hostname it decides whether
+# the value is a same-origin path by enumerating leading-character cases with
+# strstr prefix tests — it demands a leading "/" and rejects "//". That
+# enumeration is incomplete: "/\evil.com" also parses with no hostname, passes
+# both tests, and is normalised by every browser to the scheme-relative
+# "//evil.com", so the redirect leaves the site (CWE-601, GHSA-5fmg-x3vm-cm8v).
+# The fixed revision 02431c0adfa30f47 (readable as `git diff 6a965b11 02431c0a`) adds the
+# missing "/\" prefix case beside the "//" one.
+#
+# A validator that spells its rule as a list of disallowed URL prefixes and
+# omits the backslash forms is the weakness, so detection keys on a hostname-less
+# target admitted by slash-only prefix tests with no backslash case anywhere in
+# the validator.
+
+test "rank1400: post-logout URL validator prefix-tests only the slash forms"
+  lang c
+  file mod_auth_openidc.c
+  expect VYQL-RF-039
+  expect_review code.WeakRedirectUrlValidation
+  code
+  ```
+  #include <apr_uri.h>
+
+  static apr_byte_t oidc_validate_post_logout_url(request_rec *r, const char *url,
+  		char **err_str, char **err_desc) {
+  	apr_uri_t uri;
+  	const char *c_host = NULL;
+
+  	if (apr_uri_parse(r->pool, url, &uri) != APR_SUCCESS) {
+  		*err_str = apr_pstrdup(r->pool, "Malformed URL");
+  		*err_desc = apr_psprintf(r->pool, "Logout URL malformed: %s", url);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	}
+
+  	c_host = oidc_get_current_url_host(r);
+  	if ((uri.hostname != NULL)
+  			&& ((strstr(c_host, uri.hostname) == NULL)
+  					|| (strstr(uri.hostname, c_host) == NULL))) {
+  		*err_str = apr_pstrdup(r->pool, "Invalid Request");
+  		*err_desc = apr_psprintf(r->pool,
+  				"logout value \"%s\" does not match the hostname of the current request \"%s\"",
+  				apr_uri_unparse(r->pool, &uri, 0), c_host);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	} else if ((uri.hostname == NULL) && (strstr(url, "/") != url)) {
+  		*err_str = apr_pstrdup(r->pool, "Malformed URL");
+  		*err_desc = apr_psprintf(r->pool,
+  				"No hostname was parsed and it does not seem to be relative, i.e starting with '/': %s",
+  				url);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	} else if ((uri.hostname == NULL) && (strstr(url, "//") == url)) {
+  		*err_str = apr_pstrdup(r->pool, "Malformed URL");
+  		*err_desc = apr_psprintf(r->pool,
+  				"No hostname was parsed and starting with '//': %s", url);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	}
+
+  	/* validate the URL to prevent HTTP header splitting */
+  	if (((strstr(url, "\n") != NULL) || strstr(url, "\r") != NULL)) {
+  		*err_str = apr_pstrdup(r->pool, "Invalid Request");
+  		*err_desc = apr_psprintf(r->pool,
+  				"logout value \"%s\" contains illegal \"\n\" or \"\r\" character(s)",
+  				url);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	}
+
+  	return TRUE;
+  }
+  ```
+
+test "rank1400: post-logout URL validator also rejects the slash-backslash prefix"
+  lang c
+  file mod_auth_openidc.c
+  reject VYQL-RF-039
+  reject_review code.WeakRedirectUrlValidation
+  code
+  ```
+  #include <apr_uri.h>
+
+  static apr_byte_t oidc_validate_post_logout_url(request_rec *r, const char *url,
+  		char **err_str, char **err_desc) {
+  	apr_uri_t uri;
+  	const char *c_host = NULL;
+
+  	if (apr_uri_parse(r->pool, url, &uri) != APR_SUCCESS) {
+  		*err_str = apr_pstrdup(r->pool, "Malformed URL");
+  		*err_desc = apr_psprintf(r->pool, "Logout URL malformed: %s", url);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	}
+
+  	c_host = oidc_get_current_url_host(r);
+  	if ((uri.hostname != NULL)
+  			&& ((strstr(c_host, uri.hostname) == NULL)
+  					|| (strstr(uri.hostname, c_host) == NULL))) {
+  		*err_str = apr_pstrdup(r->pool, "Invalid Request");
+  		*err_desc = apr_psprintf(r->pool,
+  				"logout value \"%s\" does not match the hostname of the current request \"%s\"",
+  				apr_uri_unparse(r->pool, &uri, 0), c_host);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	} else if ((uri.hostname == NULL) && (strstr(url, "/") != url)) {
+  		*err_str = apr_pstrdup(r->pool, "Malformed URL");
+  		*err_desc = apr_psprintf(r->pool,
+  				"No hostname was parsed and it does not seem to be relative, i.e starting with '/': %s",
+  				url);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	} else if ((uri.hostname == NULL) && (strstr(url, "//") == url)) {
+  		*err_str = apr_pstrdup(r->pool, "Malformed URL");
+  		*err_desc = apr_psprintf(r->pool,
+  				"No hostname was parsed and starting with '//': %s", url);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	} else if ((uri.hostname == NULL) && (strstr(url, "/\\") == url)) {
+  		*err_str = apr_pstrdup(r->pool, "Malformed URL");
+  		*err_desc = apr_psprintf(r->pool,
+  				"No hostname was parsed and starting with '/\\': %s", url);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	}
+
+  	/* validate the URL to prevent HTTP header splitting */
+  	if (((strstr(url, "\n") != NULL) || strstr(url, "\r") != NULL)) {
+  		*err_str = apr_pstrdup(r->pool, "Invalid Request");
+  		*err_desc = apr_psprintf(r->pool,
+  				"logout value \"%s\" contains illegal \"\n\" or \"\r\" character(s)",
+  				url);
+  		oidc_error(r, "%s: %s", *err_str, *err_desc);
+  		return FALSE;
+  	}
+
+  	return TRUE;
+  }
+  ```
+
+test "rank1400: a validator that rejects the backslash prefix with strncmp is not flagged"
+  lang c
+  file util.c
+  reject VYQL-RF-039
+  reject_review code.WeakRedirectUrlValidation
+  code
+  ```
+  #include <apr_uri.h>
+
+  static int validate_return_uri(request_rec *r, const char *url) {
+  	apr_uri_t uri;
+
+  	if (apr_uri_parse(r->pool, url, &uri) != APR_SUCCESS)
+  		return 0;
+  	if (uri.hostname != NULL)
+  		return 0;
+  	if (strstr(url, "/") != url)
+  		return 0;
+  	if (strncmp(url, "//", 2) == 0)
+  		return 0;
+  	if (strncmp(url, "/\\", 2) == 0)
+  		return 0;
+  	return 1;
+  }
+  ```
+
+test "rank1400: a validator that rejects a backslash by character comparison is not flagged"
+  lang c
+  file util.c
+  reject VYQL-RF-039
+  reject_review code.WeakRedirectUrlValidation
+  code
+  ```
+  #include <apr_uri.h>
+
+  static int validate_return_uri(request_rec *r, const char *url) {
+  	apr_uri_t uri;
+
+  	if (apr_uri_parse(r->pool, url, &uri) != APR_SUCCESS)
+  		return 0;
+  	if ((uri.hostname == NULL) && (strstr(url, "/") != url))
+  		return 0;
+  	if ((uri.hostname == NULL) && (strstr(url, "//") == url))
+  		return 0;
+  	if (url[1] == '\\')
+  		return 0;
+  	return 1;
+  }
+  ```
+
+test "rank1400: a URL prefix walk with no target parse is not flagged"
+  lang c
+  file path.c
+  reject VYQL-RF-039
+  reject_review code.WeakRedirectUrlValidation
+  code
+  ```
+  static int is_absolute_path(const char *p) {
+  	if (strstr(p, "/") != p)
+  		return 0;
+  	if (strstr(p, "//") == p)
+  		return 0;
+  	return 1;
+  }
+  ```

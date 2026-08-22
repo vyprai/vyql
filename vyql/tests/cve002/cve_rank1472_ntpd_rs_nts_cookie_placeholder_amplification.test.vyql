@@ -1,0 +1,261 @@
+# Rank 1472 / CVE-2026-26076 (pendulum-project/ntpd-rs, CWE-400/CWE-405):
+# an NTS server minted one fresh cookie per NTS Cookie Placeholder extension
+# field in the client's request, with nothing capping how many placeholders it
+# would honour.
+#
+# NtpPacket::nts_timestamp_response in ntp-proto/src/packet/mod.rs builds the
+# response's encrypted extension-field list straight out of the request's:
+#
+#   encrypted: input.efdata.authenticated.iter()
+#       .chain(input.efdata.encrypted.iter())
+#       .filter_map(|f| match f {
+#           ExtensionField::NtsCookiePlaceholder { cookie_length } => {
+#               let new_cookie = keyset.encode_cookie(cookie);
+#               ...
+#           }
+#           ExtensionField::NtsCookie(old_cookie) => { ... }
+#           _ => None,
+#       })
+#       .collect(),
+#
+# The iterator is the request's own field list, so the peer chooses its length.
+# A placeholder is a nearly empty extension field; the cookie it is exchanged
+# for is an AEAD seal over the negotiated key material and is much larger on the
+# wire. One packet packed with placeholders therefore costs the server one seal
+# per placeholder and returns a response many times the request's size --
+# CPU amplification and reflection amplification from a single datagram, before
+# any packet-counting rate limit notices. RFC 8915 section 5.7 is explicit that
+# the exchange is bounded: a client holds at most eight cookies, and a server
+# should not return more than the client can hold.
+#
+# The fixed revision (fa73af14d17b666b1142b9fee3ba22c18a841d24) adds `.take(MAX_COOKIES)`
+# to both the V4 and the V5 arm, immediately after the `.chain(...)` that joins
+# the two request field lists and before the `filter_map` that mints cookies.
+#
+# FIXED by a new Rust binding, vyql/bindings/rust/nts_cookie_placeholder_response_cap.vyql,
+# emitting code.UnboundedResourceOperation (VYQL-DOS-042, high). It reads the
+# function's own context tokens: an NTS cookie-placeholder match arm, a
+# cookie-minting call, a collecting call that puts the per-element result into
+# the response, and no bounding adaptor (`take`, `truncate`, `resize`, `min`)
+# and no named cookie ceiling reaching the pipeline.
+#
+# Measured, three `--cache off --max-ram 6GB` runs per revision over the real
+# checkout at /tmp/cve-work/rank1472/ntpd-rs:
+#   fa73af14^ (vulnerable): 53 findings at or above high, one VYQL-DOS-042 at
+#     ntp-proto/src/packet/mod.rs:711 -- nts_timestamp_response itself.
+#   fa73af14  (patched):    52 findings at or above high, zero VYQL-DOS-042.
+# Without the binding both revisions report 52; the file carries 37
+# unrelated rows (WeakRandomValue, IndexAccessSink) and none of them touched the
+# cookie loop, so findings in the function are not coverage.
+#
+# The discrimination is not the fixed revision's own vocabulary: replacing
+# `.take(MAX_COOKIES)` with a bare `.take(8)` keeps the finding suppressed,
+# because `Iterator::take` is what the negation reads. Collateral: no `.rs` file
+# in any of the ~100 other clones under /tmp/cve-work/rank*/ contains any of the
+# cookie-minting call names, and no file in any language in any of them contains
+# the placeholder variant name, so the binding's reachable set outside an NTS
+# server is empty.
+
+test "rank1472: (a) an NTS response builder mints a cookie for every cookie-placeholder extension field the request carries, with no cap on the request's field count"
+  lang rust
+  file ntp-proto/src/packet/mod.rs
+  expect VYQL-DOS-042
+  code
+  ```
+  use std::borrow::Cow;
+
+  impl<'a> NtpPacket<'a> {
+      pub fn nts_timestamp_response<C: NtpClock>(
+          system: &SystemSnapshot,
+          input: Self,
+          recv_timestamp: NtpTimestamp,
+          clock: &C,
+          cookie: &DecodedServerCookie,
+          keyset: &KeySet,
+      ) -> Self {
+          match input.header {
+              NtpHeader::V4(header) => NtpPacket {
+                  header: NtpHeader::V4(NtpHeaderV3V4::timestamp_response(
+                      system,
+                      header,
+                      recv_timestamp,
+                      clock,
+                  )),
+                  efdata: ExtensionFieldData {
+                      encrypted: input
+                          .efdata
+                          .authenticated
+                          .iter()
+                          .chain(input.efdata.encrypted.iter())
+                          .filter_map(|f| match f {
+                              ExtensionField::NtsCookiePlaceholder { cookie_length } => {
+                                  let new_cookie = keyset.encode_cookie(cookie);
+                                  if new_cookie.len() > *cookie_length as usize {
+                                      None
+                                  } else {
+                                      Some(ExtensionField::NtsCookie(Cow::Owned(new_cookie)))
+                                  }
+                              }
+                              ExtensionField::NtsCookie(old_cookie) => {
+                                  let new_cookie = keyset.encode_cookie(cookie);
+                                  if new_cookie.len() > old_cookie.len() {
+                                      None
+                                  } else {
+                                      Some(ExtensionField::NtsCookie(Cow::Owned(new_cookie)))
+                                  }
+                              }
+                              _ => None,
+                          })
+                          .collect(),
+                      authenticated: input
+                          .efdata
+                          .authenticated
+                          .into_iter()
+                          .filter(|ef| matches!(ef, ExtensionField::UniqueIdentifier(_)))
+                          .collect(),
+                      untrusted: vec![],
+                  },
+                  mac: None,
+              },
+              _ => unreachable!("NTS shouldn't work with NTPv3"),
+          }
+      }
+  }
+  ```
+
+test "rank1472: (b) the fixed revision caps the request field list with Iterator::take before the cookies are minted"
+  lang rust
+  file ntp-proto/src/packet/mod.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  use std::borrow::Cow;
+
+  use crate::MAX_COOKIES;
+
+  impl<'a> NtpPacket<'a> {
+      pub fn nts_timestamp_response<C: NtpClock>(
+          system: &SystemSnapshot,
+          input: Self,
+          recv_timestamp: NtpTimestamp,
+          clock: &C,
+          cookie: &DecodedServerCookie,
+          keyset: &KeySet,
+      ) -> Self {
+          match input.header {
+              NtpHeader::V4(header) => NtpPacket {
+                  header: NtpHeader::V4(NtpHeaderV3V4::timestamp_response(
+                      system,
+                      header,
+                      recv_timestamp,
+                      clock,
+                  )),
+                  efdata: ExtensionFieldData {
+                      encrypted: input
+                          .efdata
+                          .authenticated
+                          .iter()
+                          .chain(input.efdata.encrypted.iter())
+                          .take(MAX_COOKIES)
+                          .filter_map(|f| match f {
+                              ExtensionField::NtsCookiePlaceholder { cookie_length } => {
+                                  let new_cookie = keyset.encode_cookie(cookie);
+                                  if new_cookie.len() > *cookie_length as usize {
+                                      None
+                                  } else {
+                                      Some(ExtensionField::NtsCookie(Cow::Owned(new_cookie)))
+                                  }
+                              }
+                              ExtensionField::NtsCookie(old_cookie) => {
+                                  let new_cookie = keyset.encode_cookie(cookie);
+                                  if new_cookie.len() > old_cookie.len() {
+                                      None
+                                  } else {
+                                      Some(ExtensionField::NtsCookie(Cow::Owned(new_cookie)))
+                                  }
+                              }
+                              _ => None,
+                          })
+                          .collect(),
+                      authenticated: input
+                          .efdata
+                          .authenticated
+                          .into_iter()
+                          .filter(|ef| matches!(ef, ExtensionField::UniqueIdentifier(_)))
+                          .collect(),
+                      untrusted: vec![],
+                  },
+                  mac: None,
+              },
+              _ => unreachable!("NTS shouldn't work with NTPv3"),
+          }
+      }
+  }
+  ```
+
+test "rank1472: (c) a bare literal bound discriminates as well as the project's named constant, so the suppression is Iterator::take and not the fixed revision's own vocabulary"
+  lang rust
+  file ntp-proto/src/packet/mod.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  use std::borrow::Cow;
+
+  impl<'a> NtpPacket<'a> {
+      pub fn nts_timestamp_response<C: NtpClock>(
+          input: Self,
+          cookie: &DecodedServerCookie,
+          keyset: &KeySet,
+      ) -> Self {
+          NtpPacket {
+              efdata: ExtensionFieldData {
+                  encrypted: input
+                      .efdata
+                      .authenticated
+                      .iter()
+                      .chain(input.efdata.encrypted.iter())
+                      .take(8)
+                      .filter_map(|f| match f {
+                          ExtensionField::NtsCookiePlaceholder { cookie_length } => {
+                              let new_cookie = keyset.encode_cookie(cookie);
+                              if new_cookie.len() > *cookie_length as usize {
+                                  None
+                              } else {
+                                  Some(ExtensionField::NtsCookie(Cow::Owned(new_cookie)))
+                              }
+                          }
+                          _ => None,
+                      })
+                      .collect(),
+                  untrusted: vec![],
+              },
+              mac: None,
+          }
+      }
+  }
+  ```
+
+test "rank1472: (d) a client that collects the cookies a response carried, minting nothing of its own, is ordinary extension-field handling and must not be flagged"
+  lang rust
+  file ntp-proto/src/packet/mod.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  use std::borrow::Cow;
+
+  impl<'a> NtpPacket<'a> {
+      pub fn new_cookies(&self) -> impl Iterator<Item = Vec<u8>> + '_ {
+          self.efdata
+              .encrypted
+              .iter()
+              .chain(self.efdata.authenticated.iter())
+              .filter_map(|f| match f {
+                  ExtensionField::NtsCookie(cookie) => Some(cookie.to_vec()),
+                  ExtensionField::NtsCookiePlaceholder { .. } => None,
+                  _ => None,
+              })
+              .collect::<Vec<_>>()
+              .into_iter()
+      }
+  }
+  ```

@@ -3410,7 +3410,7 @@ binding urlPathParameterCaseNormalizationBypass587 {
 }
 
 binding coerciblePathSegmentPrototypePollution588 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains ".length" and node.context.dynamicPropertyWrite == "true" and node.context.prototypeKeyGuard == "true" and not (node.context.pathSegmentTypeGuard == "true") and not (node.context.expr contains "\"\"+") and not (node.context.expr contains "+\"\"")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains ".length" and node.context.dynamicPropertyWrite == "true" and node.context.prototypeKeyGuard == "true" and not (node.context.pathSegmentTypeGuard == "true") and not (containsAny(node.context.callPath, ["Object.keys", "Object.entries"])) and not (node.context.forIn == "true") and not (node.context.expr contains "\"\"+") and not (node.context.expr contains "+\"\"")
   emit issue code.CoerciblePathSegmentPrototypePollution at node
 }
 
@@ -4047,4 +4047,58 @@ binding openedWindowConcatenatedDocumentWrite961 {
 binding nestedPathInheritedPropertyPrototypePollution962 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.dynamicPropertyWrite == "true" and node.context.callPath contains "regex.exec" and not (containsAny(node.context.callPath, ["Object.hasOwn", "hasOwnProperty"])) and not (node.context.prototypeKeyGuard == "true")
   emit issue code.NestedPathInheritedPropertyPrototypePollution at node
+}
+
+binding regexMatch970 {
+  query pattern callExpr where callee.method in ["replace", "replaceAll", "match", "matchAll", "search", "split"] and containsAny(args.any.literal, ["\\([^)]*\\)", "\\([^)]+\\)", "\\([^)]*?\\)", "\\([^)]+?\\)", "<[^>]*>", "<[^>]+>", "<[^>]*?>", "<[^>]+?>", "\\{[^}]*\\}", "\\{[^}]+\\}", "\\{[^}]*?\\}", "\\{[^}]+?\\}", "\\[[^\\]]*\\]", "\\[[^\\]]+\\]", "\\[[^\\]]*?\\]", "\\[[^\\]]+?\\]"])
+  emit sink code.RegexMatchSink at callee.receiver
+}
+
+binding nestedPathInheritedPropertyPrototypePollution963 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "Object.keys" and node.context.dynamicPropertyWrite == "true" and node.context.dynamicPropertyWriteObjectLiteral == "true" and node.context.dynamicPropertyWriteFromSubscript == "true" and not (node.context.prototypeKeyGuard == "true") and not (node.context.callPath contains "Object.defineProperty") and not (node.context.callPath contains "Object.create")
+  emit issue code.NestedPathInheritedPropertyPrototypePollution at node
+}
+
+binding commandStringWrapperExecution1035 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["spawn", "child_process.spawn", "spawnSync", "child_process.spawnSync", "execFile", "child_process.execFile", "execFileSync", "child_process.execFileSync"]) and node.context.literal in ["sh", "bash", "zsh", "/bin/sh", "/bin/bash", "/bin/zsh", "/usr/bin/sh", "/usr/bin/bash", "cmd.exe"] and node.context.literal in ["-c", "/c", "/C"]
+  emit issue code.CommandStringWrapperExecution at node
+}
+
+binding unescapedExceptionMessageResponseBody1180 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath in ["res.send", "res.status.send", "res.status.end", "res.writeHead.end", "response.send", "response.status.send", "response.status.end", "response.writeHead.end"] and node.context.selector in ["err.message", "error.message", "e.message", "ex.message"] and not containsAny(node.context.callPath, ["escape", "sanitize", "encode", "Escape", "Sanitize", "Encode"]) and not containsAny(node.context.literal, ["&amp;", "&lt;", "&quot;"]) and not containsAny(node.context.prop, [".message"])
+  emit issue code.UnescapedExceptionMessageMarkup at node
+}
+
+binding sandboxFacadeWholesaleMemberCopy1840 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and containsAny(node.context.callPath, ["runInNewContext", "runInThisContext", "vm.runInContext"]) and node.context.callPath contains "Object.create" and containsAny(node.context.callPath, ["Reflect.ownKeys", "Object.getOwnPropertyNames"]) and node.context.callPath contains "Object.getOwnPropertyDescriptor" and node.context.callPath contains "Object.defineProperty" and node.context.callPath contains "Object.freeze"
+  emit issue code.SandboxFacadeWholesaleMemberCopy at node
+}
+
+binding jwtVerifyAlgorithmFromTokenHeader1420 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["jws.verify", "jwt.verify", "jsonwebtoken.verify"]) and containsAny(node.context.identifier, ["PublicKey", "publicKey", "publicCert", "PublicCert", "pubKey", "PubKey"]) and not containsAny(node.context.selector, ["algorithms"]) and not containsAny(node.context.identifier, ["algorithms"]) and not containsAny(node.context.prop, ["algorithms"]) and not containsAny(node.context.callPath, ["algorithms"]) and not containsAny(node.context.assign, ["algorithms"])
+  emit issue code.JwtUnverified at node
+}
+binding commandExecution1620 {
+  query pattern callExpr where callee.path == "fork"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1621 {
+  query pattern callExpr where callee.path ~= "cp.fork"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1622 {
+  query pattern callExpr where callee.path ~= "childProcess.fork"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1623 {
+  query pattern callExpr where callee.path ~= "require.fork"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandOptionInjection1520 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["spawn", "child_process.spawn", "spawnSync", "child_process.spawnSync", "execFile", "child_process.execFile", "execFileSync", "child_process.execFileSync"]) and containsAny(node.context.assign, ["=['-", "=[\"-"]) and containsAny(node.context.assign, ["'].concat(", "\"].concat("]) and not containsAny(node.context.regex, ["^-", "^\\-", "^[-]"]) and not containsAny(node.context.callPath, ["startsWith", "escape", "Escape", "quote", "Quote"]) and not containsAny(node.context.assign, ["'--'", "\"--\""])
+  emit issue code.CommandOptionInjection at node
 }

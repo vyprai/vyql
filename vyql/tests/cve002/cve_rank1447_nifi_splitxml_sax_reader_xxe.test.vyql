@@ -1,0 +1,77 @@
+# Rank 1447 / CVE-2018-1309: SplitXml built its reader straight from a shared
+# SAXParserFactory whose only configuration is namespace awareness, so a
+# FlowFile carrying a DOCTYPE declaration expanded external entities while the
+# document is split. The fixed revision routes construction through
+# XmlUtils.createSafeSaxReader(), which disables external general entities and
+# rejects DOCTYPE declarations on the factory before building the parser.
+
+test "rank1447: a SAX reader built from a factory configured only for namespaces is XXE"
+  lang java
+  expect VYQL-DESER-004
+  code
+  ```
+  import java.io.InputStream;
+  import javax.xml.parsers.SAXParser;
+  import javax.xml.parsers.SAXParserFactory;
+  import org.xml.sax.ContentHandler;
+  import org.xml.sax.InputSource;
+  import org.xml.sax.XMLReader;
+
+  public class SplitXml {
+    private static final String ENABLE_NAMESPACES_FEATURE = "http://xml.org/sax/features/namespaces";
+    private static final SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
+
+    static {
+      saxParserFactory.setNamespaceAware(true);
+      try {
+        saxParserFactory.setFeature(ENABLE_NAMESPACES_FEATURE, true);
+      } catch (Exception e) {
+      }
+    }
+
+    public void split(InputStream rawIn, ContentHandler parser) throws Exception {
+      SAXParser saxParser = saxParserFactory.newSAXParser();
+      final XMLReader reader = saxParser.getXMLReader();
+      reader.setContentHandler(parser);
+      reader.parse(new InputSource(rawIn));
+    }
+  }
+  ```
+
+test "rank1447: createSafeSaxReader disables entity expansion before building the reader"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import java.io.InputStream;
+  import javax.xml.parsers.ParserConfigurationException;
+  import javax.xml.parsers.SAXParser;
+  import javax.xml.parsers.SAXParserFactory;
+  import org.xml.sax.ContentHandler;
+  import org.xml.sax.InputSource;
+  import org.xml.sax.SAXException;
+  import org.xml.sax.XMLReader;
+
+  public class SplitXml {
+    private static final SAXParserFactory saxParserFactory = SAXParserFactory.newInstance();
+
+    public void split(InputStream rawIn, ContentHandler parser) throws Exception {
+      final XMLReader reader = XmlUtils.createSafeSaxReader(saxParserFactory, parser);
+      reader.parse(new InputSource(rawIn));
+    }
+  }
+
+  class XmlUtils {
+    public static XMLReader createSafeSaxReader(SAXParserFactory saxParserFactory, ContentHandler contentHandler)
+        throws SAXException, ParserConfigurationException {
+      saxParserFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+      saxParserFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+
+      SAXParser saxParser = saxParserFactory.newSAXParser();
+      XMLReader xmlReader = saxParser.getXMLReader();
+      xmlReader.setContentHandler(contentHandler);
+
+      return xmlReader;
+    }
+  }
+  ```

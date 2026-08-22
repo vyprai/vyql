@@ -1,0 +1,7 @@
+module code;
+
+review code.SandboxFacadeWholesaleMemberCopy {
+  category: code_execution
+  kind: attention
+  text: "expose an explicit allowlist of members on a sandbox facade instead of copying every own property descriptor of the host object it wraps"
+}

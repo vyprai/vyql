@@ -1,0 +1,160 @@
+# Rank 1439 / CVE-2022-35924 (GHSA-xv97-c62v-4587): next-auth's e-mail provider
+# sends the passwordless sign-in link ("magic link") to whatever the browser put
+# in the `email` field of the sign-in POST. Without the change,
+# `core/routes/signin.ts` did no more than lower-case it:
+#
+#   const email = body?.email?.toLowerCase()
+#   ... const redirect = await emailSignin(email, options)
+#
+# and `providers/email.ts` handed that string straight to nodemailer as the
+# message's recipient: `transport.sendMail({ to: identifier, ... })`. nodemailer
+# documents `to`/`cc`/`bcc` as "comma separated list or an array of recipients",
+# so `victim@example.com,attacker@example.com` is two RCPT TO commands and the
+# attacker receives the victim's login link -- an account takeover needing only
+# the victim's address. The fixed revision reduces the identifier to exactly one address
+# before anything else sees it: split on `@`, keep the first two elements, and
+# cut the domain at the first `,`.
+#
+# Step 0: no metadata flag, and the row is right. `git show` reads the commit,
+# the vulnerable construct is present at the parent (`body?.email?.toLowerCase()`
+# with no separator handling anywhere on the path) and the remediation is
+# present at the fixed revision (the `normalizeIdentifier` default in signin.ts, plus the
+# `EmailConfig.normalizeIdentifier` hook). Recorded CWE-20/CWE-863; the
+# mechanism is closer to CWE-93, the address list being a delimited protocol
+# field. No pool row correction.
+#
+# Two separate things stop this being reported, and the spec pins both.
+#
+# 1. Vocabulary. nodemailer is the dominant Node mailer and has no binding at
+#    all -- `vyql match` on the unmodified `providers/email.ts` labels nothing
+#    but a `host.replace` filter. `code.MailHeaderWrite` and VYQL-INJ-017 exist
+#    and carry ruby's net/smtp envelope addresses, so the sink concept
+#    is there; what is missing is the JS side. A trial binding emitting
+#    `code.MailHeaderWrite at args[0].collection` on `sendMail` is measured and
+#    is deliberately NOT shipped: nodemailer takes one message object, the
+#    binding language has no key-selected sink location, and `.collection`
+#    therefore labels `text`/`html`/`attachments` -- the body -- alongside the
+#    header and envelope fields. Over the reachable set (every JS/TS tree under
+#    /tmp/cve-work/rank*/ that calls `sendMail`) it added exactly three
+#    VYQL-INJ-017 rows: one genuine (librechat, a request-supplied `subject`),
+#    one spurious 24-hop chain through an unrelated cache lookup (lobehub), and
+#    one on next-auth itself that arrives through the `html` body field from a
+#    client test file. It is the shape the loop's precision rule names -- a sink
+#    added for one CVE that does not catch it.
+#
+# 2. It does not catch it because the vulnerable and patched revisions are
+#    indistinguishable from the sink. The recipient expression
+#    `sendMail({ to: identifier })` is byte-identical in both, the change lives two
+#    files away in the sign-in route, and the normalizer it installs
+#    (`identifier.toLowerCase().trim().split("@")`, `domain.split(",")[0]`,
+#    reassembled by a template literal) neither clears taint nor is a control
+#    any concept declares -- `injection.CrlfInjection` is listed in
+#    testdata/threats_without_controls.txt, so nothing can neutralize a
+#    MailHeaderWrite row. Measured directly: a single-file model of the route
+#    reports one VYQL-INJ-017 at afb1fcdae3^ and one at afb1fcdae3.
+#
+# The first pair is a different finding, and it is the reason the recipient
+# position is not even reachable. `providers/email.ts` is a provider factory --
+# `export default function Email(options) { return { id: "email", async
+# sendVerificationRequest(params) { ... } } }` -- and c.expr's `object` case
+# (internal/extract/frontend/treesitter/javascript.go) lowers `pair` and
+# `shorthand_property_identifier` children only, so a `method_definition` in a
+# returned object literal contributes no statements of its own and the whole
+# method body is dead code. `returnedObjectMethodFuncDefs` exists for exactly
+# this and runs on the object-valued declaration, export and call-argument
+# paths; `stmt` now runs it on a function declaration's own body too, so both
+# spellings below are analysed. The pair differs only in whether the method is
+# written as `async send(req) {}` or as `send: async (req) => {}`.
+
+test "rank1439: a provider factory's returned object literal defines its send method with shorthand method syntax"
+  lang javascript
+  file src/providers/email.ts
+  expect VYQL-INJ-002
+  code
+  ```
+  import { exec } from "child_process"
+
+  export default function EmailProvider(options: any) {
+    return {
+      id: "email",
+      type: "email",
+      async sendVerificationRequest(req: any) {
+        const identifier = req.body?.email
+        exec(`sendmail -f no-reply@example.com ${identifier}`)
+      },
+    }
+  }
+  ```
+
+test "rank1439: the same factory writing the send method as a function-valued property is analysed"
+  lang javascript
+  file src/providers/email.ts
+  expect VYQL-INJ-002
+  code
+  ```
+  import { exec } from "child_process"
+
+  export default function EmailProvider(options: any) {
+    return {
+      id: "email",
+      type: "email",
+      sendVerificationRequest: async (req: any) => {
+        const identifier = req.body?.email
+        exec(`sendmail -f no-reply@example.com ${identifier}`)
+      },
+    }
+  }
+  ```
+
+test "rank1439: the sign-in route puts the request's email field straight into the verification message's recipient"
+  lang javascript
+  file src/core/routes/signin.ts
+  reject VYQL-INJ-017
+  code
+  ```
+  import { createTransport } from "nodemailer"
+
+  export default async function signin(req: any, provider: any) {
+    const email = req.body?.email?.toLowerCase()
+    if (!email) return { redirect: `${provider.url}/error?error=EmailSignin` }
+
+    const transport = createTransport(provider.server)
+    await transport.sendMail({
+      to: email,
+      from: provider.from,
+      subject: `Sign in to ${provider.host}`,
+      text: `${provider.url}/callback/${provider.id}?token=abc`,
+    })
+    return { redirect: `${provider.url}/verify-request` }
+  }
+  ```
+
+test "rank1439: the fixed revision reduces the identifier to a single address before the verification message is built"
+  lang javascript
+  file src/core/routes/signin.ts
+  reject VYQL-INJ-017
+  code
+  ```
+  import { createTransport } from "nodemailer"
+
+  export default async function signin(req: any, provider: any) {
+    const normalizer = (identifier: string) => {
+      let [local, domain] = identifier.toLowerCase().trim().split("@")
+      domain = domain.split(",")[0]
+      return `${local}@${domain}`
+    }
+
+    let email: string = req.body?.email
+    if (!email) return { redirect: `${provider.url}/error?error=EmailSignin` }
+    email = normalizer(req.body?.email)
+
+    const transport = createTransport(provider.server)
+    await transport.sendMail({
+      to: email,
+      from: provider.from,
+      subject: `Sign in to ${provider.host}`,
+      text: `${provider.url}/callback/${provider.id}?token=abc`,
+    })
+    return { redirect: `${provider.url}/verify-request` }
+  }
+  ```

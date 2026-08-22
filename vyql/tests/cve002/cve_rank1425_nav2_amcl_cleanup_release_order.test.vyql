@@ -1,0 +1,395 @@
+# Rank 1425 / CVE-2024-25198 (CWE-416, CVSS 7.2): ros-navigation/navigation2,
+# `AmclNode::on_cleanup` releases a message filter while the transform listener
+# that can dispatch into it is still alive.
+#
+# nav2_amcl's AMCL node is an rclcpp_lifecycle node, so its resources are
+# created in `on_configure` and released in `on_cleanup`. Two of those resources
+# are coupled at construction (nav2_amcl/src/amcl_node.cpp:1473, :1493):
+#
+#   tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
+#   tf_buffer_->setCreateTimerInterface(timer_interface);
+#   tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+#   ...
+#   laser_scan_sub_ = std::make_unique<message_filters::Subscriber<...>>(...);
+#   laser_scan_filter_ = std::make_unique<tf2_ros::MessageFilter<LaserScan>>(
+#     *laser_scan_sub_, *tf_buffer_, odom_frame_id_, 10, ...);
+#   laser_scan_connection_ = laser_scan_filter_->registerCallback(
+#     std::bind(&AmclNode::laserReceived, this, std::placeholders::_1));
+#
+# `tf2_ros::TransformListener` owns a subscription to /tf and /tf_static and a
+# callback thread that writes every arriving transform into the shared
+# `tf_buffer_`. `tf2_ros::MessageFilter` registers a transformable callback with
+# that same buffer for each queued scan it is waiting on. So the buffer write
+# performed by the listener's thread is what drives the filter forward: the
+# listener is the producer, the filter the consumer, and the edge between them
+# runs through the buffer, never directly.
+#
+# `on_cleanup` at the vulnerable revision (amcl_node.cpp:319) releases them in
+# this order:
+#
+#   laser_scan_connection_.disconnect();
+#   laser_scan_filter_.reset();            // consumer destroyed at :331
+#   laser_scan_sub_.reset();
+#   ...
+#   tf_broadcaster_.reset();
+#   tf_listener_.reset();                  // producer still running until :344
+#   tf_buffer_.reset();
+#
+# Between :331 and :344 the listener's callback thread is still delivering
+# transforms into a buffer that holds a transformable callback into the
+# destroyed `tf2_ros::MessageFilter`, and the deleter of a `std::unique_ptr`
+# does not deregister it. Any /tf message arriving in that window is dispatched
+# into freed memory. Because /tf is an ordinary ROS topic reachable by any node
+# on the graph, the window is remotely triggerable, which is what carries the
+# 7.2 score with A:H/I:H.
+#
+# 1348e526f4 is a one-line fix that releases the producer first:
+#
+#   laser_scan_connection_.disconnect();
+#   tf_listener_.reset();  //  listener may access lase_scan_filter_, so it should be reset earlier
+#   laser_scan_filter_.reset();
+#   laser_scan_sub_.reset();
+#
+# The weakness is a release-ordering defect between two co-owned RAII
+# resources, not a missing release and not a missing bounds check: both
+# revisions release exactly the same set of members exactly once, and the only
+# difference is which of the two goes first.
+#
+# Pool row. The row is correct in every field and the `nocommit` flag is wrong,
+# for a new reason: the row's owner is `ros-planning`, the project's pre-rename
+# organisation. `git clone https://github.com/ros-planning/navigation2` follows
+# GitHub's rename redirect and `git show 1348e526f4c945ea0c64239f78736c71349a5913`
+# then reads the fixing change on the first try -- a single-file, non-merge commit on the
+# default branch, +1/-1. The advisory confirms the pair: MITRE's description for
+# CVE-2024-25198 names `laser_scan_filter_.reset()` and `tf_listener_.reset()`
+# in amcl_node.cpp explicitly, and its references are this project's PR #4068
+# (the report) and PR #4070 (this commit). OSV records the repository under the
+# post-rename owner `ros-navigation`, which is the same tree: a clone of each
+# owner resolves the identical default-branch tip. No corpus correction; the
+# flag needed nothing but the redirect.
+#
+# What fires today: nothing on the defect, and the two revisions are
+# indistinguishable. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# over the vulnerable and patched amcl_node.cpp reports 6 findings each, all
+# VYQL-MEM-006 code.NullableDeref, at lines 1384, 1484, 1502, 530, 539 and 959 --
+# byte-identical fingerprint sets, and every one of them outside `on_cleanup`.
+# `vyql match` labels 421 nodes in the file and **not one of them lies between
+# lines 319 and 395**, so the entire teardown method is unlabelled. The same
+# holds over the whole nav2_amcl package (31 sources, `scanned c:9 cpp:22
+# config:2 textpattern:18`): 25 findings and 783 review flags at each revision,
+# stable over three `--cache off` runs each, and the two sets are identical.
+# `on_cleanup` (lines 319-383) carries no finding and no flag; the nearest flags
+# are at :396/:397 inside `checkElapsedTime`. That is the
+# 1370/1371/1378/1407/1411 pattern again: findings exist in the file, none of
+# them is the defect.
+#
+# Extraction is not the blocker. `vyql query` resolves every statement of the
+# teardown as a `code.Call` with a path, in source order and in the right
+# lexical scope -- `laser_scan_connection_.disconnect` at :330,
+# `laser_scan_filter_.reset` at :331, `laser_scan_sub_.reset` at :332,
+# `map_free` at :336, `tf_broadcaster_.reset` at :343, `tf_listener_.reset`
+# at :344, `tf_buffer_.reset` at :345. Nothing is dropped and nothing is
+# mis-ordered.
+#
+# Nor is the *right* half of the CWE-416 rule missing. `code.PointerUse` (and
+# `code.NullableDeref`) is emitted three times in this file, on the `*` in
+# `std::make_shared<tf2_ros::TransformListener>(*tf_buffer_)` and on both derefs
+# in the `tf2_ros::MessageFilter` constructor -- that is, on the *construction*
+# of the two coupled resources, in both revisions, on code the fixed revision never
+# touches. The left half is what is absent: no `code.PointerFree` exists
+# anywhere in the file, so VYQL-MEM-007 has nothing to start a path from. Case
+# (c) below records that asymmetry.
+#
+# Neither is the engine's ordering relation. A throwaway probe pair labelling
+# `laser_scan_filter_.reset` code.PointerFree and `tf_listener_.reset`
+# code.PointerUse makes VYQL-MEM-007 (`code.PointerFree reaches
+# code.PointerUse`) report **1 on the vulnerable file and 0 on the patched one**,
+# a clean 1 -> 0 with the other 6 findings unchanged. So `reaches` is
+# order-sensitive across sibling statements of one block and would express this
+# weakness exactly. This is a vocabulary gap, not an engine gap, and no
+# ENGINE-GAPS entry is warranted.
+#
+# ATTENTION, no genericity: the shape is expressible and it discriminates, and
+# the only thing it can key on is two of this project's member names.
+#
+# The vocabulary that would have to exist does not, and cannot be reused.
+# `code.PointerFree` is bound for C++ as `node.path ~= "free"` (pointerFree91,
+# vyql/bindings/cpp/m4e783366.vyql), an explicit release primitive. `.reset()`
+# on a `std::shared_ptr`/`std::unique_ptr` is not one, and `~=` being
+# segment-aware in both directions (1374, 1386) means it does not even match the
+# `map_free(map_)` and `pf_free(pf_)` calls that *are* in this function --
+# `map_free` is a single segment and is not equal to `free`, which is why the
+# teardown carries no label at all. The package-wide flag dump makes the
+# boundary exact: all 14 `code.PointerFree` flags in nav2_amcl are bare `free()`
+# calls in the plain-C helpers (src/map/map.c, src/map/map_draw.c, src/pf/pf.c,
+# src/pf/pf_kdtree.c, src/pf/pf_pdf.c) and not one is in amcl_node.cpp. Rank 1393 recorded that VYQL-MEM-007 is
+# inapplicable in principle to lifetimes mediated by RAII, refcounting or a
+# collector rather than by an explicit release call, and 1411 re-verified it;
+# this rank is the RAII instance and it holds. CWE-672 -- operation on a
+# resource after expiration or release, which is what this actually is -- still
+# appears in vyql/taxonomy/cwe.json and in no concept and no rule anywhere.
+# Reuse is checked across every memory concept: code.MysqlConnectErrorUseAfterFree
+# (VYQL-MEM-050) is a connect-failure handle freed before an error read,
+# code.ConditionalFallbackListDoubleFree is a fallback branch double-freeing a
+# parsed list, code.ReentrantQueueCleanupReview (VYQL-MEM-019) is a cleanup
+# traversal racing a cancellation over queued entries, code.FailurePathOwnedBufferFree
+# is a failure-path double free, and code.ThreadLocalScopeOverwriteWithoutCleanup
+# is a race concept about unmatched lifecycle callbacks. None of them is
+# "two co-owned resources released in the wrong relative order". Nothing is
+# minted here, because the measurements below say nothing generic can be built
+# on top of one.
+#
+# Rank 1394's rename test fails outright. The probe discriminates only because
+# it spells `laser_scan_filter_` and `tf_listener_`: with those two members
+# renamed to `scan_gate_` and `frame_sub_` throughout the *vulnerable* file, the
+# probe reports 0 and the file falls back to the same 6 findings as the patched
+# one. A binding naming them is a rule about two lines of one file of one
+# project. AGENTS.md's genericity test also fails on the API-typed form: no
+# tf2_ros documentation states that a live `TransformListener` can drive a
+# destroyed `MessageFilter`; that relation is the discovery this CVE made, and
+# it runs through `tf_buffer_` rather than appearing in either type's contract.
+# The types are not reachable anyway -- both members are declared in
+# nav2_amcl/include/nav2_amcl/amcl_node.hpp:163/:176, no tree-sitter frontend
+# emits `recv_type`, and `call_order:` (the one ordering context token that
+# exists, compile_presence.go:409) is emitted only by java.go:756.
+#
+# Generalising away from the names is worse than imprecise -- it is wrong in
+# both directions. The only ordering discipline derivable from the file itself
+# is "destroy in reverse order of construction", and the vulnerable revision
+# **obeys** it while the fixed revision **violates** it: construction runs tf_buffer_ (1478)
+# -> tf_listener_ (1484) -> laser_scan_sub_ (1497) -> laser_scan_filter_ (1501),
+# so reverse order is exactly filter, sub, ..., listener, buffer, which is the
+# buggy teardown. A rule keyed on that heuristic would clear the vulnerability
+# and flag the remediation. The weaker construction-derived rule -- "release a
+# member before the members it constructs from" -- is satisfied by both
+# revisions: the filter's constructor arguments are `laser_scan_sub_` and
+# `tf_buffer_`, the listener's is `tf_buffer_`, and both revisions release
+# `tf_buffer_` last, so nothing in either constructor orders the filter against
+# the listener.
+#
+# The name-free form is unshippable on volume. Read as "a teardown function
+# releases two or more smart pointers and one of them is an event source", the
+# only part that is expressible is "two or more `.reset()`/`->reset()` calls in
+# one function", because no fact says which member is an event source. Across
+# the 4401 C++ files in the ~110 repositories cloned for this campaign, 332
+# files carry two or more such calls and 1561 calls sit in them; `on_cleanup`
+# alone holds ten. Ordered-adjacent pairs alone exceed 1200 sites, every one of
+# which is correct code, to find this one -- and the pairwise form is quadratic
+# in the count. Rank 1424 is the same repository under the post-rename owner, so
+# it is not usable as a collateral baseline; the enumeration above is measured
+# across the genuinely distinct C++ trees instead.
+#
+# The three cases are the pair, plus the sibling that makes it a pair. (a) and
+# (b) are the two real revisions and record the miss. (c) is the untouched
+# construction, which is where the producer/consumer coupling is established
+# and where the reverse-of-construction heuristic gets its ordering from -- it
+# is unchanged at both revisions and is the reason (a) cannot be discriminated by
+# reading the constructors.
+#
+# verify_current_expected: attention-no-genericity, all three revisions rejected.
+# (b) is the correct fix and must remain a reject.
+
+test "rank1425: (a) a lifecycle cleanup destroys a transform message filter while the transform listener whose callback thread drives it is still running"
+  lang cpp
+  file nav2_amcl/src/amcl_node.cpp
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-019
+  reject VYQL-MEM-050
+  reject_review code.PointerFree
+  reject_review code.PointerUse
+  reject_review code.MysqlConnectErrorUseAfterFree
+  reject_review code.ConditionalFallbackListDoubleFree
+  reject_review code.ReentrantQueueCleanupReview
+  code
+  ```
+  #include <memory>
+  #include <message_filters/subscriber.h>
+  #include <tf2_ros/buffer.h>
+  #include <tf2_ros/message_filter.h>
+  #include <tf2_ros/transform_broadcaster.h>
+  #include <tf2_ros/transform_listener.h>
+
+  nav2_util::CallbackReturn
+  AmclNode::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
+  {
+    RCLCPP_INFO(get_logger(), "Cleaning up");
+
+    executor_thread_.reset();
+
+    // Get rid of the inputs first (services and message filter input), so we
+    // don't continue to process incoming messages
+    global_loc_srv_.reset();
+    nomotion_update_srv_.reset();
+    initial_pose_sub_.reset();
+    laser_scan_connection_.disconnect();
+    laser_scan_filter_.reset();
+    laser_scan_sub_.reset();
+
+    // Map
+    if (map_ != NULL) {
+      map_free(map_);
+      map_ = nullptr;
+    }
+    first_map_received_ = false;
+    free_space_indices.resize(0);
+
+    // Transforms
+    tf_broadcaster_.reset();
+    tf_listener_.reset();
+    tf_buffer_.reset();
+
+    // PubSub
+    pose_pub_.reset();
+    particle_cloud_pub_.reset();
+
+    // Odometry
+    motion_model_.reset();
+
+    // Particle Filter
+    pf_free(pf_);
+    pf_ = nullptr;
+
+    // Laser Scan
+    lasers_.clear();
+    lasers_update_.clear();
+    frame_to_laser_.clear();
+    force_update_ = true;
+
+    return nav2_util::CallbackReturn::SUCCESS;
+  }
+  ```
+
+test "rank1425: (b) the fixed revision releases the transform listener before the message filter it can dispatch into"
+  lang cpp
+  file nav2_amcl/src/amcl_node.cpp
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-019
+  reject VYQL-MEM-050
+  reject_review code.PointerFree
+  reject_review code.PointerUse
+  reject_review code.MysqlConnectErrorUseAfterFree
+  reject_review code.ConditionalFallbackListDoubleFree
+  reject_review code.ReentrantQueueCleanupReview
+  code
+  ```
+  #include <memory>
+  #include <message_filters/subscriber.h>
+  #include <tf2_ros/buffer.h>
+  #include <tf2_ros/message_filter.h>
+  #include <tf2_ros/transform_broadcaster.h>
+  #include <tf2_ros/transform_listener.h>
+
+  nav2_util::CallbackReturn
+  AmclNode::on_cleanup(const rclcpp_lifecycle::State & /*state*/)
+  {
+    RCLCPP_INFO(get_logger(), "Cleaning up");
+
+    executor_thread_.reset();
+
+    // Get rid of the inputs first (services and message filter input), so we
+    // don't continue to process incoming messages
+    global_loc_srv_.reset();
+    nomotion_update_srv_.reset();
+    initial_pose_sub_.reset();
+    laser_scan_connection_.disconnect();
+    tf_listener_.reset();  //  listener may access lase_scan_filter_, so it should be reset earlier
+    laser_scan_filter_.reset();
+    laser_scan_sub_.reset();
+
+    // Map
+    if (map_ != NULL) {
+      map_free(map_);
+      map_ = nullptr;
+    }
+    first_map_received_ = false;
+    free_space_indices.resize(0);
+
+    // Transforms
+    tf_broadcaster_.reset();
+    tf_buffer_.reset();
+
+    // PubSub
+    pose_pub_.reset();
+    particle_cloud_pub_.reset();
+
+    // Odometry
+    motion_model_.reset();
+
+    // Particle Filter
+    pf_free(pf_);
+    pf_ = nullptr;
+
+    // Laser Scan
+    lasers_.clear();
+    lasers_update_.clear();
+    frame_to_laser_.clear();
+    force_update_ = true;
+
+    return nav2_util::CallbackReturn::SUCCESS;
+  }
+  ```
+
+test "rank1425: (c) the untouched construction couples the filter to the listener only through the shared buffer, so the constructors do not order the two releases"
+  lang cpp
+  file nav2_amcl/src/amcl_node.cpp
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-019
+  reject VYQL-MEM-050
+  reject_review code.PointerFree
+  reject_review code.MysqlConnectErrorUseAfterFree
+  reject_review code.ConditionalFallbackListDoubleFree
+  reject_review code.ReentrantQueueCleanupReview
+  code
+  ```
+  #include <memory>
+  #include <message_filters/subscriber.h>
+  #include <tf2_ros/buffer.h>
+  #include <tf2_ros/create_timer_ros.h>
+  #include <tf2_ros/message_filter.h>
+  #include <tf2_ros/transform_broadcaster.h>
+  #include <tf2_ros/transform_listener.h>
+
+  void
+  AmclNode::initTransforms()
+  {
+    RCLCPP_INFO(get_logger(), "initTransforms");
+
+    // Initialize transform listener and broadcaster
+    tf_buffer_ = std::make_shared<tf2_ros::Buffer>(get_clock());
+    auto timer_interface = std::make_shared<tf2_ros::CreateTimerROS>(
+      get_node_base_interface(),
+      get_node_timers_interface(),
+      callback_group_);
+    tf_buffer_->setCreateTimerInterface(timer_interface);
+    tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+    tf_broadcaster_ = std::make_shared<tf2_ros::TransformBroadcaster>(shared_from_this());
+
+    sent_first_transform_ = false;
+    latest_tf_valid_ = false;
+    latest_tf_ = tf2::Transform::getIdentity();
+  }
+
+  void
+  AmclNode::initMessageFilters()
+  {
+    auto sub_opt = rclcpp::SubscriptionOptions();
+    sub_opt.callback_group = callback_group_;
+    laser_scan_sub_ = std::make_unique<message_filters::Subscriber<sensor_msgs::msg::LaserScan,
+        rclcpp_lifecycle::LifecycleNode>>(
+      shared_from_this(), scan_topic_, rmw_qos_profile_sensor_data, sub_opt);
+
+    laser_scan_filter_ = std::make_unique<tf2_ros::MessageFilter<sensor_msgs::msg::LaserScan>>(
+      *laser_scan_sub_, *tf_buffer_, odom_frame_id_, 10,
+      get_node_logging_interface(),
+      get_node_clock_interface(),
+      transform_tolerance_);
+
+    laser_scan_connection_ = laser_scan_filter_->registerCallback(
+      std::bind(
+        &AmclNode::laserReceived,
+        this, std::placeholders::_1));
+  }
+  ```

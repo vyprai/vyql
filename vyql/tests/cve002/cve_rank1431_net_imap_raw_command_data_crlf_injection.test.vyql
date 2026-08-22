@@ -1,0 +1,135 @@
+# CVE-2026-42257: Net::IMAP encodes an ordinary String command argument as an
+# IMAP `astring` -- atom, quoted string or literal, whichever the bytes require
+# -- so CR and LF inside it can never end the command line. Several commands
+# opted out of that by wrapping their String argument in Net::IMAP::RawData,
+# whose send_data hands the bytes straight to put_string:
+#
+#   def setquota(mailbox, quota)
+#     data = '(STORAGE ' + quota.to_s + ')'
+#     send_command("SETQUOTA", mailbox, RawData.new(data))
+#   end
+#
+#   def store_internal(cmd, set, attr, flags, unchangedsince: nil)
+#     attr = RawData.new(attr) if attr.instance_of?(String)
+#
+# The same happened for the search/sort/thread criteria and the fetch
+# attributes. IMAP is line-oriented, so a caller that forwards unvetted input
+# into one of those arguments lets an attacker close the command with CRLF and
+# have the server read the remainder as a command of its own (CWE-93, CWE-77).
+#
+# The fixed revision (aec06996eb, backporting #636 and #657-#661) stops using RawData for
+# SETQUOTA and STORE -- the limit becomes Integer(storage_limit) inside an
+# ordinary list, the attribute becomes an Atom that rejects atom-specials -- and
+# teaches RawData itself to split literals out and reject a bare NUL, CR or LF
+# in the remaining text.
+
+test "rank1431: a SETQUOTA limit is interpolated into a string sent raw"
+  lang ruby
+  file lib/net/imap.rb
+  profile library
+  expect VYQL-INJ-245
+  code
+  ```
+  module Net
+    class IMAP < Protocol
+      def setquota(mailbox, quota)
+        if quota.nil?
+          data = '()'
+        else
+          data = '(STORAGE ' + quota.to_s + ')'
+        end
+        send_command("SETQUOTA", mailbox, RawData.new(data))
+      end
+    end
+  end
+  ```
+
+test "rank1431: a STORE attribute given as a String is sent raw"
+  lang ruby
+  file lib/net/imap.rb
+  profile library
+  expect VYQL-INJ-245
+  code
+  ```
+  module Net
+    class IMAP < Protocol
+      def store_internal(cmd, set, attr, flags)
+        attr = RawData.new(attr) if attr.instance_of?(String)
+        args = [MessageSet.new(set)]
+        args << attr << flags
+        send_command(cmd, *args)
+      end
+    end
+  end
+  ```
+
+test "rank1431: a SETQUOTA limit coerced into an ordinary list is encoded, not sent raw"
+  lang ruby
+  file lib/net/imap.rb
+  profile library
+  reject VYQL-INJ-245
+  code
+  ```
+  module Net
+    class IMAP < Protocol
+      def setquota(quota_root, storage_limit)
+        if storage_limit.nil?
+          list = []
+        else
+          list = ["STORAGE", Integer(storage_limit)]
+        end
+        send_command("SETQUOTA", quota_root, list)
+      end
+    end
+  end
+  ```
+
+test "rank1431: a STORE attribute wrapped as an atom is validated before it is sent"
+  lang ruby
+  file lib/net/imap.rb
+  profile library
+  reject VYQL-INJ-245
+  code
+  ```
+  module Net
+    class IMAP < Protocol
+      def store_internal(cmd, set, attr, flags)
+        attr = Atom.new(attr) if attr.instance_of?(String)
+        args = [MessageSet.new(set)]
+        args << attr << flags
+        send_command(cmd, *args)
+      end
+    end
+  end
+  ```
+
+test "rank1431: an application forwards request input into the search criteria"
+  lang ruby
+  file app/services/mailbox_search.rb
+  expect VYQL-INJ-245
+  code
+  ```
+  class MailboxSearch
+    def call(params)
+      imap = Net::IMAP.new("imap.example.com", ssl: true)
+      imap.login(params[:user], params[:password])
+      imap.select("INBOX")
+      imap.uid_search(params[:query])
+    end
+  end
+  ```
+
+test "rank1431: a hard-coded STORE attribute is not an injection site"
+  lang ruby
+  file app/services/mailbox_cleanup.rb
+  reject VYQL-INJ-245
+  code
+  ```
+  class MailboxCleanup
+    def call(params)
+      imap = Net::IMAP.new("imap.example.com", ssl: true)
+      imap.select(params[:mailbox])
+      imap.uid_store(params[:uid], "+FLAGS", [:Deleted])
+    end
+  end
+  ```

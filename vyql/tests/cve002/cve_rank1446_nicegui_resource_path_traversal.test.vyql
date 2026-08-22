@@ -1,0 +1,74 @@
+# Rank 1446 / CVE-2024-32005: NiceGUI served registered component resources from
+# a route whose trailing segment used the FastAPI `path` converter, so the
+# segment carries slashes. The handler joined it onto the resource directory
+# with pathlib's `/` operator and handed the result to FileResponse without ever
+# checking the result stayed under that directory, so `../` sequences read any
+# file the server process could open (CWE-22/CWE-23). The fixed revision ed12eb14f2 resolves
+# both the composed path and the resource directory and calls relative_to, whose
+# ValueError becomes a 403.
+#
+# VYQL-PATH-001 reports the vulnerable form: the route parameter is
+# code.HttpInput, FileResponse's first argument is code.FilePathAccess, and
+# neither core.PathCanonicalization nor core.PathAccessCheck covers the flow.
+# The patched form is recognised through a function-scope pathlib containment
+# check, because the raising form of relative_to is a bare statement inside a
+# try block and an exception region is not on the straight-line path to the
+# access it protects.
+
+test "rank1446: resource route joins a path-converter segment onto a resource directory"
+  lang python
+  file nicegui/nicegui.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import mimetypes
+
+  from fastapi import FastAPI, HTTPException
+  from fastapi.responses import FileResponse
+
+  from .dependencies import resources
+
+  app = FastAPI()
+
+
+  @app.get('/_nicegui/resources/{key}/{path:path}')
+  def _get_resource(key: str, path: str) -> FileResponse:
+      if key in resources:
+          filepath = resources[key].path / path
+          if filepath.exists():
+              headers = {'Cache-Control': 'public, max-age=3600'}
+              media_type, _ = mimetypes.guess_type(filepath)
+              return FileResponse(filepath, media_type=media_type, headers=headers)
+      raise HTTPException(status_code=404, detail=f'resource "{key}" not found')
+  ```
+
+test "rank1446: fix requires the resolved path to stay under the resolved resource directory"
+  lang python
+  file nicegui/nicegui.py
+  reject VYQL-PATH-001
+  code
+  ```
+  import mimetypes
+
+  from fastapi import FastAPI, HTTPException
+  from fastapi.responses import FileResponse
+
+  from .dependencies import resources
+
+  app = FastAPI()
+
+
+  @app.get('/_nicegui/resources/{key}/{path:path}')
+  def _get_resource(key: str, path: str) -> FileResponse:
+      if key in resources:
+          filepath = resources[key].path / path
+          try:
+              filepath.resolve().relative_to(resources[key].path.resolve())
+          except ValueError as e:
+              raise HTTPException(status_code=403, detail='forbidden') from e
+          if filepath.exists():
+              headers = {'Cache-Control': 'public, max-age=3600'}
+              media_type, _ = mimetypes.guess_type(filepath)
+              return FileResponse(filepath, media_type=media_type, headers=headers)
+      raise HTTPException(status_code=404, detail=f'resource "{key}" not found')
+  ```

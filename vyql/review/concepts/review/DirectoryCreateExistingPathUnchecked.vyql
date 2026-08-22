@@ -1,0 +1,8 @@
+module code;
+
+review code.DirectoryCreateExistingPathUnchecked {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: target
+  text: "review directory creation on joined destination paths for a test of the already-exists result before entries are written under it"
+}

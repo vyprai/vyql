@@ -1,0 +1,36 @@
+module bindings.go.authExemptionRouteRegexRawRequestTarget;
+
+// net/http documents (*http.Request).RequestURI as "the unmodified request-target of
+// the Request-Line (RFC 7230, Section 3.1.1) as sent by the client to a server", and
+// net/url documents URL.RequestURI() as returning "the encoded path?query or
+// opaque_params string". Both therefore carry the query string, and de-facto proxy
+// headers that spell the same value (`X-Forwarded-Uri`) carry it too. The value a
+// server routes on is the path, which net/url produces through url.Parse /
+// url.ParseRequestURI and its URL.Path, URL.RawPath and URL.EscapedPath fields.
+//
+// A route pattern deciding which requests are exempt from authentication is a
+// security decision, and running that pattern over the raw request target hands it
+// to the client: every route regular expression that is not anchored at both ends
+// also matches when the exempted spelling appears in the query, so
+// `GET /admin?next=/public/health` satisfies a pattern written for `/public/health`
+// while the server routes to `/admin`. The same applies to a pattern that is meant
+// to be anchored but whose `$` matches before the `?`.
+//
+// The shape is three facts about one Go function. It runs one of regexp's documented
+// matching methods -- MatchString, FindStringIndex, FindStringSubmatch; it names the
+// raw request target rather than a path (`RequestURI` in any of its spellings, which
+// covers the net/http field, net/url's method and any accessor named for it); and
+// its own name says the decision it takes is an access decision -- allow, skip,
+// exempt, public, whitelist, bypass, anonymous, protected, auth. That last one is
+// what separates a pattern deciding authentication from a pattern deciding a
+// response format or a metrics label, both of which legitimately classify the whole
+// request target.
+//
+// The neutraliser is the documented way to obtain the path however it is spelled:
+// url.Parse or url.ParseRequestURI in the same function, or a URL.Path / URL.RawPath
+// / URL.EscapedPath read the function already has. A function that derives the path
+// and matches on that is the patched form, and is deliberately not this shape.
+binding goAuthExemptionRouteRegexRawRequestTarget {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.call in ["MatchString", "FindStringIndex", "FindStringSubmatch"] and containsAny(node.context.identifier, ["RequestURI", "RequestUri", "requestURI", "requestUri"]) and containsAny(node.context.functionName, ["Allow", "Skip", "Exempt", "Public", "Whitelist", "Bypass", "Anonymous", "Protected", "Auth"]) and not containsAny(node.context.callPath, ["url.Parse", "url.ParseRequestURI"]) and not containsAny(node.context.selector, [".URL.Path", ".URL.RawPath", ".URL.EscapedPath"])
+  emit issue code.AuthEndpointRawRequestUriExemption at node
+}

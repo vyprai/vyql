@@ -1,0 +1,133 @@
+# Rank 1440 / CVE-2025-29927: Next.js runs the router in one process and the
+# renderer and the edge middleware in others, and talks to them over ordinary
+# HTTP. The routing decisions taken earlier travel as request headers --
+# `x-matched-path` and `x-now-route-matches` name the resolved route,
+# `x-middleware-rewrite`, `x-middleware-next`, `x-middleware-skip` and
+# `x-middleware-override-headers` carry what middleware decided -- so the
+# handler facing the network strips them from every inbound request before
+# anything downstream reads them. `filterInternalHeaders` in
+# `packages/next/src/server/lib/server-ipc/utils.ts` is that filter, and it is
+# a denylist: a `for (const header in headers)` loop deleting whatever appears
+# in a module-level `INTERNAL_HEADERS` array.
+#
+# `x-middleware-subrequest` is not in the array. It is the recursion marker the
+# edge sandbox stamps on middleware's own outbound fetches, and the middleware
+# runner reads it straight off the inbound request
+# (`packages/next/src/server/web/sandbox/sandbox.ts:86`): split it on `:`, count
+# how many times this middleware's own name appears, and once the count reaches
+# MAX_RECURSION_DEPTH return an `x-middleware-next: 1` response without ever
+# invoking the middleware. So `x-middleware-subrequest:
+# middleware:middleware:middleware:middleware:middleware` on a request from the
+# network is a client telling the server that middleware ran elsewhere, five
+# times. Middleware is where a Next.js application puts authentication, so
+# every route it guards becomes an unauthenticated route -- CVSS 9.1, no
+# credentials, one header.
+#
+# Step 0: no metadata flag, and the row reads normally. 5fd3ae8f85 is the v14
+# backport of #77201; the vulnerable construct is present at the parent
+# (INTERNAL_HEADERS naming eight headers and not this one, against the
+# subrequest read in sandbox.ts) and the remediation is present at the fixed revision:
+# router-server.ts generates eight random bytes into
+# `globalThis[Symbol.for('@next/middleware-subrequest-id')]` at startup,
+# sandbox/context.ts stamps that value beside the marker on internal fetches,
+# and filterInternalHeaders deletes `x-middleware-subrequest` unless the
+# request carries the matching id. No pool row correction.
+#
+# The consumption site cannot discriminate: sandbox.ts is byte-identical either
+# side of the change, since the fixed revision works by making sure the header never reaches
+# it. The filter is what changed, and what it does is a documented Next.js
+# fact -- these header names are the server's own control protocol -- so the
+# binding is a module-scope presence over the filter module, reusing
+# `code.LocalRequestBypassReview`: the marker is a claim that the request
+# originated inside the server, and honoring it exempts protected routes.
+# Neither remediation's vocabulary is keyed on; both spell the header name,
+# which is the protocol identifier rather than anything the fixed revision invented.
+#
+# Measured: `packages/next/src/server` at 5fd3ae8f85^ reports the flag once, on
+# `lib/server-ipc/utils.ts`, and at 5fd3ae8f85 reports it zero times -- 1/1/1
+# against 0/0/0 over three `--cache off` runs each. `packages/next/src` whole
+# does not finish inside the 180s bound, so the enumeration is a grep: across
+# the monorepo at the parent three files name a header from both families --
+# this one, `base-server.ts` and `shared/lib/router/router.ts` -- and scanning
+# the other two reports nothing. router.ts has no membership test over a header
+# map, and base-server.ts is the consumer rather than the filter, reading
+# `req.headers['x-matched-path']` to pick the page, which the subscript
+# exclusion declines.
+#
+# Three variants pin what the discrimination rests on. Renaming everything the
+# fix invented -- `middlewareSubrequestId`, the `@next/middleware-subrequest-id`
+# symbol -- while keeping the header spelling still reports zero, so the flag
+# reads the protocol identifier and not the fixed revision's own vocabulary. The other
+# correct remediation, adding `'x-middleware-subrequest'` to INTERNAL_HEADERS,
+# also reports zero. And the patched module with every `//` comment stripped
+# reports zero, so the clearing is the code rather than the comment the change
+# added beside it, while a comment naming the marker unquoted leaves the
+# vulnerable module reporting.
+#
+# Across the ~150 other clones under /tmp/cve-work/rank*/ no JavaScript or
+# TypeScript file names any of these headers at all, so the reachable set
+# outside this monorepo is empty and that zero says nothing about precision.
+# The enumeration above is the measurement that does: three candidate modules,
+# one reported.
+
+test "rank1440: internal request header filter leaves the middleware subrequest marker"
+  lang javascript
+  expect_review code.LocalRequestBypassReview
+  code
+  ```
+  // These are headers that are only used internally and should
+  // not be honored from the external request
+  const INTERNAL_HEADERS = [
+    'x-middleware-rewrite',
+    'x-middleware-redirect',
+    'x-middleware-set-cookie',
+    'x-middleware-skip',
+    'x-middleware-override-headers',
+    'x-middleware-next',
+    'x-now-route-matches',
+    'x-matched-path',
+  ]
+
+  export const filterInternalHeaders = (headers) => {
+    for (const header in headers) {
+      if (INTERNAL_HEADERS.includes(header)) {
+        delete headers[header]
+      }
+    }
+  }
+  ```
+
+test "rank1440: the marker is dropped unless the request carries this session's id"
+  lang javascript
+  reject_review code.LocalRequestBypassReview
+  code
+  ```
+  // These are headers that are only used internally and should
+  // not be honored from the external request
+  const INTERNAL_HEADERS = [
+    'x-middleware-rewrite',
+    'x-middleware-redirect',
+    'x-middleware-set-cookie',
+    'x-middleware-skip',
+    'x-middleware-override-headers',
+    'x-middleware-next',
+    'x-now-route-matches',
+    'x-matched-path',
+  ]
+
+  export const filterInternalHeaders = (headers) => {
+    for (const header in headers) {
+      if (INTERNAL_HEADERS.includes(header)) {
+        delete headers[header]
+      }
+
+      if (
+        header === 'x-middleware-subrequest' &&
+        headers['x-middleware-subrequest-id'] !==
+          globalThis[Symbol.for('@next/middleware-subrequest-id')]
+      ) {
+        delete headers['x-middleware-subrequest']
+      }
+    }
+  }
+  ```

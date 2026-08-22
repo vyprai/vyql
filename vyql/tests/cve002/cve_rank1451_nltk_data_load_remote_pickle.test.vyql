@@ -1,0 +1,150 @@
+# Rank 1451 / CVE-2024-39705: nltk.data.load() picks a format from the resource
+# name's extension, opens the resource through _open() -- which delegates to
+# urllib.request.urlopen for any protocol other than nltk:/file: -- and, for the
+# `pickle` format, feeds the resulting response object straight to pickle.load().
+# A pickle stream reconstructs arbitrary objects by naming a module and a global
+# for the interpreter to import and call, so whoever serves the URL, or anyone
+# who can substitute the bytes in transit or in the on-disk data package, chooses
+# what runs in the loading process. Deserialization of untrusted data, CWE-502.
+#
+# The pool row 441aecb7d330 is a version bump: it moves nltk/VERSION to 3.8.2 and
+# adds the ChangeLog and web/news.rst entries that name this CVE, and touches no
+# library source (failure mode 1). The fixing commit is a12d0a6a8cdb, merged as 11be99e7c71d,
+# which adds data.py's restricted_pickle_load() and routes the `pickle` branch
+# through it; that helper builds a pickle.Unpickler subclass whose find_class()
+# raises UnpicklingError for every module/name pair, so no global can be imported
+# and the stream can only rebuild plain containers. The vulnerable pickle.load is
+# present at a12d0a6a^ and the remediation is present at a12d0a6a.
+#
+# code.Deserialization and VYQL-DESER-001 cover the sink, and
+# core.SafeDeserialization covers the neutralising side; the gap is the
+# source. urlopen's response is the one stdlib way a Python program gets bytes off
+# the network, and no binding says so -- urllib binds only on the request side,
+# as a code.UrlFetch sink on the URL argument. code.NetworkData is the existing
+# concept for exactly this ("data read from a network connection", refining
+# core.UserControlledData) and ~850 package bindings emit it from HTTP,
+# websocket and message-broker client responses, so the stdlib client is widened
+# into the same concept rather than a sibling being minted.
+#
+# Measured on the 24 top-level nltk/*.py files, union of three --cache off runs per
+# revision: 34 -> 44 at a12d0a6a^ and 34 -> 43 at a12d0a6a, the difference being
+# the one conf=high VYQL-DESER-001 whose source is urlopen at data.py:880 and whose
+# sink is pickle.load at data.py:754. The remaining nine rows appear on both
+# revisions alike and are downstream of a call-resolution defect rather than of the
+# label: `pickle.load(opened_resource)` resolves to nltk's own module-level load(),
+# so the response value re-enters load()'s resource_url parameter and reaches
+# find()'s path joins; nltk defining a function named load is what makes that
+# reachable here. On four other Python trees that call urlopen and resolve to the
+# same generic profile -- kfp release/kfpr, mlflow dev, MobSF scripts,
+# llama-index readers/web, union of three runs each -- the finding set is
+# byte-identical with and without the binding, and the label is confirmed emitted
+# on kfpr rather than the zero being vacuous. urlopen appears nowhere in
+# /tmp/bench/BenchmarkPython.
+
+test "rank1451: data loader unpickles a response opened from a URL"
+  lang python
+  file nltk/data.py
+  expect VYQL-DESER-001
+  code
+  ```
+  import pickle
+  from urllib.request import urlopen
+
+  from nltk.data import find, normalize_resource_url, split_resource_url
+
+  AUTO_FORMATS = {"pickle": "pickle", "json": "json", "yaml": "yaml", "txt": "text"}
+
+
+  def _open(resource_url):
+      resource_url = normalize_resource_url(resource_url)
+      protocol, path_ = split_resource_url(resource_url)
+
+      if protocol is None or protocol.lower() == "nltk":
+          return find(path_, [""]).open()
+      elif protocol.lower() == "file":
+          return find(path_, [""]).open()
+      else:
+          return urlopen(resource_url)
+
+
+  def load(resource_url, format="auto"):
+      resource_url = normalize_resource_url(resource_url)
+
+      if format == "auto":
+          ext = resource_url.split(".")[-1]
+          format = AUTO_FORMATS.get(ext)
+          if format is None:
+              raise ValueError("Could not determine format for %s" % resource_url)
+
+      opened_resource = _open(resource_url)
+
+      if format == "raw":
+          resource_val = opened_resource.read()
+      elif format == "pickle":
+          resource_val = pickle.load(opened_resource)
+      else:
+          resource_val = opened_resource.read().decode("utf-8")
+
+      return resource_val
+  ```
+
+test "rank1451: data loader routes the pickle branch through an unpickler that forbids every global"
+  lang python
+  file nltk/data.py
+  reject VYQL-DESER-001
+  code
+  ```
+  import pickle
+  from io import BytesIO
+  from urllib.request import urlopen
+
+  from nltk.data import find, normalize_resource_url, split_resource_url
+
+  AUTO_FORMATS = {"pickle": "pickle", "json": "json", "yaml": "yaml", "txt": "text"}
+
+
+  class RestrictedUnpickler(pickle.Unpickler):
+      """
+      Unpickler that prevents any class or function from being used during loading.
+      """
+
+      def find_class(self, module, name):
+          raise pickle.UnpicklingError(f"global '{module}.{name}' is forbidden")
+
+
+  def restricted_pickle_load(string):
+      return RestrictedUnpickler(BytesIO(string)).load()
+
+
+  def _open(resource_url):
+      resource_url = normalize_resource_url(resource_url)
+      protocol, path_ = split_resource_url(resource_url)
+
+      if protocol is None or protocol.lower() == "nltk":
+          return find(path_, [""]).open()
+      elif protocol.lower() == "file":
+          return find(path_, [""]).open()
+      else:
+          return urlopen(resource_url)
+
+
+  def load(resource_url, format="auto"):
+      resource_url = normalize_resource_url(resource_url)
+
+      if format == "auto":
+          ext = resource_url.split(".")[-1]
+          format = AUTO_FORMATS.get(ext)
+          if format is None:
+              raise ValueError("Could not determine format for %s" % resource_url)
+
+      opened_resource = _open(resource_url)
+
+      if format == "raw":
+          resource_val = opened_resource.read()
+      elif format == "pickle":
+          resource_val = restricted_pickle_load(opened_resource.read())
+      else:
+          resource_val = opened_resource.read().decode("utf-8")
+
+      return resource_val
+  ```

@@ -1,0 +1,45 @@
+module bindings.java.http_message_body_framing_conflict;
+
+// RFC 7230 gives an HTTP/1 message exactly one body length, and says what to do
+// when the headers offer two. Section 3.3.2: a message with more than one
+// Content-Length field "MUST either reject the message as invalid or replace
+// the duplicated field-values with a single valid Content-Length field".
+// Section 3.3.3: a message carrying both Transfer-Encoding and Content-Length
+// "might indicate an attempt to perform request smuggling ... and ought to be
+// handled as an error", and a sender forwarding it "MUST remove the received
+// Content-Length field". A parser that silently picks one of the two readings
+// instead is not wrong on its own bytes -- it is wrong relative to the next
+// implementation on the connection, which may pick the other, so one TCP stream
+// becomes two different request sequences.
+//
+// The method this labels is the one where that obligation lands: the parser's
+// header-block reader. It is identified by doing all three of the things the
+// reconciliation needs, in one method -- it accumulates the parsed header lines
+// into the message's header store, it asks whether the transfer encoding is
+// chunked, and it asks for the content length -- because a method that only
+// does one of them is not the place where the two framings meet. Netty
+// documents both questions on io.netty.handler.codec.http.HttpUtil:
+// isTransferEncodingChunked(HttpMessage) and getContentLength(HttpMessage,
+// long); Servlet, Jetty and Undertow spell the same two as
+// getHeader("Transfer-Encoding") / getContentLength(). Encoders, keep-alive
+// policy helpers and the deprecated one-line delegates ask one of the two
+// questions without ever building the header store, and are not reported.
+//
+// The negation lists the remedies RFC 7230 itself names, in the spellings a
+// Java decoder uses for them: refusing the message (constructing a decoder or
+// argument exception, marking the message invalid, failing the DecoderResult),
+// and dropping the duplicate (removing the Content-Length header, or reading
+// every value of it with getAll/getAllAsString so the count can be compared).
+// It deliberately does not look for a specific comparison: a parser that
+// rejects, or that normalises the header away, has discharged the obligation
+// whichever way it spells the test. It is the absence of any of them, in a
+// method that has both framings in hand, that is the finding.
+//
+// This is a property of the parser rather than of any value flowing through it
+// -- there is no untrusted argument to follow, because the attacker's input is
+// the header block the method is parsing -- so it is a presence fact on the
+// method context, not a taint sink.
+binding httpMessageBodyFramingConflict {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["headers.add", "headers.set", "getHeaders.add", "message.headers.add", "trailer.headers.add"]) and containsAny(node.context.call, ["isTransferEncodingChunked", "isChunked"]) and containsAny(node.context.call, ["contentLength", "getContentLength", "isContentLengthSet"]) and not (containsAny(node.context.call, ["IllegalArgumentException", "DecoderException", "TooLongFrameException", "PrematureChannelClosureException", "invalidMessage", "getAll", "getAllAsString"])) and not (containsAny(node.context.callPath, ["headers.remove", "message.headers.remove", "DecoderResult.failure", "setDecoderResult"]))
+  emit issue code.AmbiguousMessageBodyFraming at node
+}

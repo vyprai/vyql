@@ -1,0 +1,313 @@
+# Rank 1441 / CVE-2021-32702 (auth0/nextjs-auth0, GHSA-954c-jjx6-cxv7, CWE-79):
+# reflected XSS through the SDK's default API-route error handler. The SDK
+# mounts `/api/auth/[...auth0]` and wraps every one of its four handlers in
+# `wrapErrorHandling` (`src/handlers/auth.ts`), which at the parent read
+#
+#   const wrapErrorHandling = (fn: NextApiHandler): NextApiHandler => async (
+#     req: NextApiRequest,
+#     res: NextApiResponse
+#   ): Promise<void> => {
+#     try {
+#       await fn(req, res);
+#     } catch (error) {
+#       console.error(error);
+#       res.status(error.status || 500).end(error.message);
+#     }
+#   };
+#
+# The message is not a constant. `/api/auth/callback` hands the request to
+# openid-client's `client.callback(...)`; when the identity provider redirects
+# back with an OpenID Connect `error`/`error_description` query parameter, that
+# call throws an `OPError` whose `message` is built from those parameters, and
+# `src/auth0-session/handlers/callback.ts` re-throws it as
+# `throw new BadRequest(err.message)`. So a link to
+# `/api/auth/callback?error=<script>…` puts attacker text into `error.message`,
+# and `res.end(string)` writes it as the raw response body with no content type
+# of its own — the browser sniffs it and runs the script on the application's
+# own origin.
+#
+# The pool row is the GHSA merge commit and its combined diff is empty, the
+# third known cause of that symptom (1382); `git diff 36655df8
+# 6996e2528ceed98627caa28abafbc09e90163ccf` reads the change in full and needs no
+# reconstruction, so the row is kept as the scan target and the parent is the
+# fully vulnerable tree. The recorded CWE-79 is right. Metadata says
+# repository and commit both check out.
+#
+# What the fixed revision does, and why it is invisible where the defect is rendered.
+# The commit adds `htmlSafe` and a `HandlerError` class to `src/utils/errors.ts`
+#
+#   function htmlSafe(input: string): string {
+#     return input
+#       .replace(/&/g, '&amp;')
+#       .replace(/</g, '&lt;')
+#       .replace(/>/g, '&gt;')
+#       .replace(/"/g, '&quot;')
+#       .replace(/'/g, '&#39;');
+#   }
+#
+#   export class HandlerError extends Error {
+#     constructor(error: Error | AccessTokenError | HttpError) {
+#       super(htmlSafe(error.message));
+#       …
+#     }
+#   }
+#
+# and wraps each of the four handler factories in `try { … } catch (e) { throw
+# new HandlerError(e); }`. `src/handlers/auth.ts` is not touched at all: the
+# rendering line is byte-identical at `<fix>^` and `<fix>`, and so is
+# `throw new BadRequest(err.message)`. The remediation is centralised in an
+# error constructor two modules away from the write — the delegated-check shape
+# recorded at 1371 and 1380 — so **no function-scoped fact discriminates the two
+# revisions**, and this rank does not claim one. It is also not a complete
+# neutralisation: `AccessTokenError` and anything else thrown outside the four
+# wrapped factories still reaches the same `res.end(error.message)` raw, which
+# is why the fixed revision also adds a README section telling anyone writing their own
+# error handler not to render the message unescaped.
+#
+# What the shape is worth detecting anyway. "A caught exception's message is
+# written into the HTTP response body" is precisely the review condition
+# `code.UnescapedExceptionMessageMarkup` carries — "exception text is
+# propagated into a markup-rendered error response without escaping", with the
+# advisory "the exception message can include attacker-controlled request, URL,
+# parser, or validation text and is later rendered in a browser". The concept
+# is bound only in Java (`vyql/bindings/java/m420f6b67.vyql`,
+# `vyql/bindings/packages/java/m9ef49b0f.vyql`); VYQL-INJ-033 consumes it at
+# HIGH/CWE-79, so it is not one of the inert concepts (1385, 1426). This rank
+# widens its language coverage to JavaScript/TypeScript rather than minting a
+# sibling. Considered and rejected for reuse: `code.ErrorDetailDisclosure` and
+# `code.VerboseHttpErrorObjectDisclosure`, which are about leaking internals
+# rather than about markup; `code.HtmlRender`, which is the existing `res.send`
+# sink concept and needs a taint source that does not exist for a `catch`
+# binding; and a new sibling concept, which is what AGENTS.md calls ontology rot.
+#
+# `unescapedExceptionMessageResponseBody1180`
+# (`vyql/bindings/javascript/mfb63017a.vyql`, appended at end of file, suffix
+# well above the file's previous maximum of 1035) is written from Express and
+# Next.js documentation only: `res.send`, `res.status(n).send`,
+# `res.status(n).end`, `res.writeHead(n).end` are the documented body-writing
+# calls, and `.message` is the documented `Error` property. Nothing in it names
+# `HandlerError`, `htmlSafe`, `BadRequest`, `wrapErrorHandling` or any other
+# identifier the commit introduces or touches; renaming all of them leaves the
+# result unchanged.
+#
+# Four shaping decisions, each measured rather than assumed.
+#
+#  * **A bare `res.end` / `response.end` is excluded.** With it in the list the
+#    parent reported 3 rows instead of 1: two extra on
+#    `src/auth0-session/handlers/callback.ts`, whose function both re-throws
+#    `err.message` and finishes an unrelated redirect with a no-argument
+#    `res.end()`. The chained and `send` spellings always carry a body; a bare
+#    `res.end()` usually terminates one. Cost, over the corpus enumeration
+#    below: two lines in next.js's own test support code.
+#  * **`res.write` is excluded** for the same reason and at the same price:
+#    with it, n8n's `ai.controller.ts` streaming handlers contributed 2 rows for
+#    `res.write(JSON.stringify(chunk))` beside an unrelated `e.message`.
+#  * **An object-literal property carrying the message is declined**
+#    (`not containsAny(node.context.prop, [".message"])`). Express serialises an
+#    object body as JSON, so `res.status(500).send({ error: err.message })` is
+#    not markup; without the clause librechat's `api/server/routes` reported 3
+#    such rows, with it 0.
+#  * **The neutralising control is read two ways**: an escaping or sanitising
+#    call in the same function, and an HTML entity in a literal there — the
+#    latter is what recognises the fixed revision's own `.replace(/&/g, '&amp;')` chain
+#    when it is applied at the write rather than in a constructor. Both are
+#    AST-derived token routes and are comment-proof: a function whose comments
+#    say "escape", "sanitize", "encode", "&amp;" and "&quot;" still reports,
+#    verified directly against the 1348/1402 prose-silencing defect.
+#
+# Measured. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+# `src/`, three runs of each revision, identical every run: the parent goes
+# 4 -> 5 findings, the one added row being VYQL-INJ-033 HIGH,
+# `code.UnescapedExceptionMessageMarkup @ handlers/auth.ts:67`, which is
+# `wrapErrorHandling`. The fixed revision reports the same 5, for the reason set out
+# above. Without this binding no revision of this repository reported anything
+# on either the rendering line or the `BadRequest(err.message)` line; the four
+# pre-existing rows are two VYQL-CFG-014 on the session cache, one VYQL-RF-002
+# in `frontend/`, and one VYQL-INJ-010 on cookie writing. Over the whole
+# repository the parent reports 131 findings, 3 of them this binding's: the
+# rendering line plus `tests/fixtures/setup.ts` and
+# `tests/fixtures/test-app/pages/api/access-token.ts`, which are the SDK's own
+# copies of the same default handler.
+#
+# The spec asserts the rule id rather than the concept: VYQL-INJ-033 fires and
+# carries the concept's review text, but `code.UnescapedExceptionMessageMarkup`
+# has no twin under `vyql/review/concepts/review/`, so it never appears in a
+# spec's reviewed list.
+#
+# Reach and precision, enumerated rather than sampled. Across the 157 clones
+# under /tmp/cve-work/rank*/ , an exhaustive grep for a response-body write of
+# an `err`/`error`/`e`/`ex` `.message` in a `.js`/`.ts`/`.jsx`/`.tsx` file
+# outside `node_modules` finds 30 lines in 9 repositories — that is the shape's
+# whole reachable set in this corpus, and it is rare. Scanning the eight
+# subtrees holding them: next.js `examples/` 8 rows, all of them Next.js API
+# routes doing exactly this CVE's `catch { res.status(...).end(err.message) }`;
+# n8n `packages/cli/src/controllers` 4, of which 2 are real
+# (`binary-data.controller.ts` returns `res.status(400).end(error.message)` for
+# a `BadRequestError` built from the caller's `id`) and 2 are co-occurrence
+# artifacts on `project.controller.ts`, where a no-argument
+# `res.status(201).send()` sits in a method that throws `BadRequestError(e.message)`;
+# kubeflow pipelines `frontend/server` 3, one real
+# (`res.status(500).send('Could not get main container logs: ' + err)`) and two
+# artifacts of the same kind; mytube 3, all on one integration test's
+# `res.status(err.status ?? 500).send(err.message ?? "Error")`, one row per
+# nesting level of the wrapping lambdas (1412, 1414); librechat 0; graphql-http
+# 0 (its instances are in doc comments, which produce no nodes). So roughly two
+# thirds of the rows are the weakness and the rest are the co-occurrence
+# residual.
+#
+# That residual is a named engine gap, not a shaping mistake: the JavaScript
+# frontend emits no call-argument tokens at all (1360, reconfirmed 1388), so a
+# function-scoped fact cannot tell that the `.message` it sees is the argument
+# of the body write it also sees. Nothing in the data layer can close it, and
+# faking the correlation is the workaround AGENTS.md forbids. Two of nest's
+# instances are missed for a different known reason: `handleError` is a class
+# **field** initializer arrow, which sits outside every method body (1325), so
+# `packages/common/file-stream` reports 0.
+#
+# The three declines below are the discrimination. The first is the fixed revision's own
+# escaping chain moved to the write; the second is the same remediation spelled
+# with the documented `escape-html` package; the third answers with a JSON body,
+# which is not a markup context at all.
+
+test "rank1441: the default API-route error handler ends the response with a caught exception's message"
+  lang javascript
+  file src/handlers/auth.ts
+  expect VYQL-INJ-033
+  code
+  ```
+  import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
+  import { HandleLogin } from './login';
+  import { HandleLogout } from './logout';
+  import { HandleCallback } from './callback';
+  import { HandleProfile } from './profile';
+
+  const wrapErrorHandling = (fn: NextApiHandler): NextApiHandler => async (
+    req: NextApiRequest,
+    res: NextApiResponse
+  ): Promise<void> => {
+    try {
+      await fn(req, res);
+    } catch (error) {
+      console.error(error);
+      res.status(error.status || 500).end(error.message);
+    }
+  };
+
+  export default function handlerFactory({
+    handleLogin,
+    handleLogout,
+    handleCallback,
+    handleProfile
+  }: {
+    handleLogin: HandleLogin;
+    handleLogout: HandleLogout;
+    handleCallback: HandleCallback;
+    handleProfile: HandleProfile;
+  }) {
+    return (userHandlers = {}): NextApiHandler => {
+      const { login, logout, callback, profile } = {
+        login: wrapErrorHandling(handleLogin),
+        logout: wrapErrorHandling(handleLogout),
+        callback: wrapErrorHandling(handleCallback),
+        profile: wrapErrorHandling(handleProfile),
+        ...userHandlers
+      };
+      return async (req, res): Promise<void> => {
+        let {
+          query: { auth0: route }
+        } = req;
+
+        route = Array.isArray(route) ? route[0] : route;
+
+        switch (route) {
+          case 'login':
+            return login(req, res);
+          case 'logout':
+            return logout(req, res);
+          case 'callback':
+            return callback(req, res);
+          case 'me':
+            return profile(req, res);
+          default:
+            res.status(404).end();
+        }
+      };
+    };
+  }
+  ```
+
+test "rank1441: the same handler html-encoding the message before it becomes the response body"
+  lang javascript
+  file src/handlers/auth.ts
+  reject VYQL-INJ-033
+  code
+  ```
+  import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
+
+  const wrapErrorHandling = (fn: NextApiHandler): NextApiHandler => async (
+    req: NextApiRequest,
+    res: NextApiResponse
+  ): Promise<void> => {
+    try {
+      await fn(req, res);
+    } catch (error) {
+      console.error(error);
+      const body = error.message
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+      res.status(error.status || 500).end(body);
+    }
+  };
+
+  export default wrapErrorHandling;
+  ```
+
+test "rank1441: the same handler passing the message through the escape-html package"
+  lang javascript
+  file src/handlers/auth.ts
+  reject VYQL-INJ-033
+  code
+  ```
+  import escapeHtml from 'escape-html';
+  import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
+
+  const wrapErrorHandling = (fn: NextApiHandler): NextApiHandler => async (
+    req: NextApiRequest,
+    res: NextApiResponse
+  ): Promise<void> => {
+    try {
+      await fn(req, res);
+    } catch (error) {
+      console.error(error);
+      res.status(error.status || 500).end(escapeHtml(error.message));
+    }
+  };
+
+  export default wrapErrorHandling;
+  ```
+
+test "rank1441: the same handler answering with a JSON body rather than a markup-rendered one"
+  lang javascript
+  file src/handlers/auth.ts
+  reject VYQL-INJ-033
+  code
+  ```
+  import { NextApiHandler, NextApiRequest, NextApiResponse } from 'next';
+
+  const wrapErrorHandling = (fn: NextApiHandler): NextApiHandler => async (
+    req: NextApiRequest,
+    res: NextApiResponse
+  ): Promise<void> => {
+    try {
+      await fn(req, res);
+    } catch (error) {
+      console.error(error);
+      res.status(error.status || 500).json({ error: 'internal_error', code: error.code });
+    }
+  };
+
+  export default wrapErrorHandling;
+  ```

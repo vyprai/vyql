@@ -1,0 +1,236 @@
+# Rank 1404 / CVE-2019-20925: mongod's wire-protocol message decompressor sized
+# its output buffer from the uncompressed length advertised in the compressed
+# message's own header and validated that length only against a maximum.
+# MessageCompressorManager::decompressMessage in
+# src/mongo/transport/message_compressor_manager.cpp reads the frame header into
+# a `struct CompressionHeader` whose `uncompressedSize` is a **signed** int32_t
+# taken straight off the wire cursor, and then:
+#
+#   size_t bufferSize = compressionHeader.uncompressedSize + MsgData::MsgDataHeaderSize;
+#   if (bufferSize > MaxMessageSizeBytes) {
+#       return {ErrorCodes::BadValue, "Decompressed message would be larger ..."};
+#   }
+#   auto outputMessageBuffer = SharedBuffer::allocate(bufferSize);
+#   ...
+#   DataRangeCursor output(outMessage.data(), outMessage.data() + outMessage.dataLen());
+#   auto sws = compressor->decompressData(input, output);
+#
+# The addition promotes the signed field into size_t, so a negative advertised
+# length wraps modulo 2^64 and lands *below* MaxMessageSizeBytes -- the only
+# guard present. The undersized allocation is then handed to the decompressor
+# with an output range derived from the same wrapped value, which is the
+# unauthenticated remote denial of service the advisory describes (CWE-191
+# underflow via signed-to-unsigned conversion, CWE-1284 on the unvalidated
+# quantity). The fixed revision (SERVER-43751, mongodb/mongo@1411cf602a21) adds the missing
+# lower bound before the arithmetic:
+#
+#   if (compressionHeader.uncompressedSize < 0) {
+#       return {ErrorCodes::BadValue, "Decompressed message would be negative in size"};
+#   }
+#
+# Corpus note: pool.tsv's SHA 18934fb5c814 is a real mongodb/mongo commit but it
+# is SERVER-43879 ("OplogInterfaceLocal::next should return an owned BSON obj"),
+# a one-line change to src/mongo/db/repl/oplog_interface_local.cpp. All four
+# github.com commits the advisory references are the peeled commits of the four
+# fixed releases' tags -- r3.4.24 -> 865b4f6a96d0, r3.6.15 -> 18934fb5c814,
+# r4.0.13 -> bda366f0b0e4, r4.2.1 -> edf6d45851c0 -- so the row records a
+# release-tag commit, not the fixing change; the other three are a RHEL8 repo config, a
+# plan-cache serverStatus metric and a SUSE build-variant change. 18934fb5c814
+# sits on the v3.6 release branch and is not reachable from the default branch,
+# which is why the row reads as unresolvable; `git fetch --depth 2 origin <sha>`
+# retrieves it. The real fix is 1411cf602a21e45a5ef42b6869c480eb420976ee, the
+# only commit in the repository whose message names SERVER-43751, the ticket the
+# advisory cites.
+#
+# FIXED. Detection now covers the class as code.DecompressionOutputSizeMissingLowerBound
+# / VYQL-MEM-056: a C++ function that decompresses, derives an allocation size by
+# adding to a header length field, compares that size against a maximum, and
+# never compares the length against zero. Measured on the real subtree at both
+# revisions (src/mongo/transport, cpp:55 files, three --cache off runs each):
+# exactly one VYQL-MEM-056 at decompressMessage at 1411cf602a21^ and zero at
+# 1411cf602a21, with the other 43 findings identical on both sides. The binding
+# keys on the comparison *shape* (binary_shape:ID.FIELD<0 and the other seven
+# spellings of a sign test in both operand orders), never on the fixed revision's own
+# wording, so replacing the error string leaves the finding suppressed while
+# rewriting the guard as `0 > header.uncompressedSize` also suppresses it. It is
+# not keyed on mongo's vocabulary either: a zlib-shaped function with unrelated
+# names (hdr.rawLen, Pool::allocate, inflate) is flagged and its lower-bounded
+# form is not. Function confinement is measured, not assumed: moving the
+# decompress call into a sibling method drops the finding to zero, so
+# node.context.call does not leak file-wide for C++ despite `call:` being an
+# AST-routing prefix. Collateral: zero on the enumerated reachable set -- every
+# C/C++ translation unit under /tmp/cve-work/rank*/ naming a decompression entry
+# point (13 files outside this rank's own clone, 328 other findings) -- and zero
+# across rank1305 (jpegli, cpp:293), rank1320 and rank1310 whole-tree scans.
+#
+# The known limitation is the attribution gap recorded at ranks 1377/1380/1397:
+# the negation is function-confined, so a fix that moved the sign test into a
+# helper called from the decompressor would still be flagged.
+#
+# verify_current_expected: fixed-detected
+
+test "rank1404: the advertised uncompressed size is only checked against the maximum"
+  lang cpp
+  file src/mongo/transport/message_compressor_manager.cpp
+  expect VYQL-MEM-056
+  code
+  ```
+  StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& msg,
+                                                                  MessageCompressorId* compressorId) {
+      auto inputHeader = msg.header();
+      ConstDataRangeCursor input(inputHeader.data(), inputHeader.data() + inputHeader.dataLen());
+      if (input.length() < CompressionHeader::size()) {
+          return {ErrorCodes::BadValue, "Invalid compressed message header"};
+      }
+      CompressionHeader compressionHeader(&input);
+
+      auto compressor = _registry->getCompressor(compressionHeader.compressorId);
+      if (!compressor) {
+          return {ErrorCodes::InternalError,
+                  "Compression algorithm specified in message is not available"};
+      }
+
+      size_t bufferSize = compressionHeader.uncompressedSize + MsgData::MsgDataHeaderSize;
+      if (bufferSize > MaxMessageSizeBytes) {
+          return {ErrorCodes::BadValue,
+                  "Decompressed message would be larger than maximum message size"};
+      }
+
+      auto outputMessageBuffer = SharedBuffer::allocate(bufferSize);
+      MsgData::View outMessage(outputMessageBuffer.get());
+      outMessage.setOperation(compressionHeader.originalOpCode);
+      outMessage.setLen(bufferSize);
+
+      DataRangeCursor output(outMessage.data(), outMessage.data() + outMessage.dataLen());
+
+      auto sws = compressor->decompressData(input, output);
+      if (!sws.isOK())
+          return sws.getStatus();
+
+      outMessage.setLen(sws.getValue() + MsgData::MsgDataHeaderSize);
+      return {Message(outputMessageBuffer)};
+  }
+  ```
+
+test "rank1404: the fixed revision rejects a negative advertised size before the sizing arithmetic"
+  lang cpp
+  file src/mongo/transport/message_compressor_manager.cpp
+  reject VYQL-MEM-056
+  code
+  ```
+  StatusWith<Message> MessageCompressorManager::decompressMessage(const Message& msg,
+                                                                  MessageCompressorId* compressorId) {
+      auto inputHeader = msg.header();
+      ConstDataRangeCursor input(inputHeader.data(), inputHeader.data() + inputHeader.dataLen());
+      if (input.length() < CompressionHeader::size()) {
+          return {ErrorCodes::BadValue, "Invalid compressed message header"};
+      }
+      CompressionHeader compressionHeader(&input);
+
+      auto compressor = _registry->getCompressor(compressionHeader.compressorId);
+      if (!compressor) {
+          return {ErrorCodes::InternalError,
+                  "Compression algorithm specified in message is not available"};
+      }
+
+      if (compressionHeader.uncompressedSize < 0) {
+          return {ErrorCodes::BadValue, "Decompressed message would be negative in size"};
+      }
+
+      size_t bufferSize = compressionHeader.uncompressedSize + MsgData::MsgDataHeaderSize;
+      if (bufferSize > MaxMessageSizeBytes) {
+          return {ErrorCodes::BadValue,
+                  "Decompressed message would be larger than maximum message size"};
+      }
+
+      auto outputMessageBuffer = SharedBuffer::allocate(bufferSize);
+      MsgData::View outMessage(outputMessageBuffer.get());
+      outMessage.setOperation(compressionHeader.originalOpCode);
+      outMessage.setLen(bufferSize);
+
+      DataRangeCursor output(outMessage.data(), outMessage.data() + outMessage.dataLen());
+
+      auto sws = compressor->decompressData(input, output);
+      if (!sws.isOK())
+          return sws.getStatus();
+
+      outMessage.setLen(sws.getValue() + MsgData::MsgDataHeaderSize);
+      return {Message(outputMessageBuffer)};
+  }
+  ```
+
+test "rank1404: an unrelated decompressor trusting a header length is flagged the same way"
+  lang cpp
+  file src/chunk.cpp
+  expect VYQL-MEM-056
+  code
+  ```
+  Result Chunk::expand(const ChunkHeader& hdr, ByteView src) {
+      size_t need = hdr.rawLen + kChunkTrailer;
+      if (need > kChunkCeiling) {
+          return Result::error("chunk too big");
+      }
+      Bytes dst = Pool::allocate(need);
+      z_stream strm{};
+      strm.next_out = dst.data();
+      strm.avail_out = need - kChunkTrailer;
+      return inflate(&strm, Z_FINISH) == Z_STREAM_END ? Result::ok(dst) : Result::error("bad");
+  }
+  ```
+
+test "rank1404: a lower bound on the header length clears the flag whatever its wording"
+  lang cpp
+  file src/chunk.cpp
+  reject VYQL-MEM-056
+  code
+  ```
+  Result Chunk::expand(const ChunkHeader& hdr, ByteView src) {
+      if (0 > hdr.rawLen) {
+          return Result::error("bad");
+      }
+      size_t need = hdr.rawLen + kChunkTrailer;
+      if (need > kChunkCeiling) {
+          return Result::error("chunk too big");
+      }
+      Bytes dst = Pool::allocate(need);
+      z_stream strm{};
+      strm.next_out = dst.data();
+      strm.avail_out = need - kChunkTrailer;
+      return inflate(&strm, Z_FINISH) == Z_STREAM_END ? Result::ok(dst) : Result::error("bad");
+  }
+  ```
+
+test "rank1404: an output size taken from the bytes actually present is not flagged"
+  lang cpp
+  file src/chunk.cpp
+  reject VYQL-MEM-056
+  code
+  ```
+  Result Chunk::expand(ByteView src) {
+      size_t need = src.size() + kChunkTrailer;
+      if (need > kChunkCeiling) {
+          return Result::error("chunk too big");
+      }
+      Bytes dst = Pool::allocate(need);
+      z_stream strm{};
+      strm.next_out = dst.data();
+      strm.avail_out = need - kChunkTrailer;
+      return inflate(&strm, Z_FINISH) == Z_STREAM_END ? Result::ok(dst) : Result::error("bad");
+  }
+  ```
+
+test "rank1404: sizing a buffer from a header length with no decompression is not flagged"
+  lang cpp
+  file src/chunk.cpp
+  reject VYQL-MEM-056
+  code
+  ```
+  Result Chunk::reserveOutput(const ChunkHeader& hdr) {
+      size_t need = hdr.rawLen + kChunkTrailer;
+      if (need > kChunkCeiling) {
+          return Result::error("chunk too big");
+      }
+      Bytes dst = Pool::allocate(need);
+      return Result::ok(dst);
+  }
+  ```

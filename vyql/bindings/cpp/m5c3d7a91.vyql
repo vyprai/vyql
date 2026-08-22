@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m5c3d7a91;
+
+binding decompressionOutputSizeMissingLowerBound1 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.call in ["decompress", "decompressData", "decompressStream", "decompressBlock", "uncompress", "inflate", "BrotliDecoderDecompress", "BrotliDecoderDecompressStream", "ZSTD_decompress", "ZSTD_decompressDCtx", "LZ4_decompress_safe", "snappy_uncompress", "lzo1x_decompress_safe"] and node.context.call in ["allocate", "reallocate", "malloc", "calloc", "realloc", "reserve", "resize"] and containsAny(node.context.assignShape, ["ID=ID.FIELD+ID", "ID=ID.FIELD+NUM", "ID=ID+ID.FIELD", "ID=NUM+ID.FIELD"]) and node.context.binaryShape contains "ID>ID" and not (containsAny(node.context.binaryShape, ["ID.FIELD<0", "ID.FIELD<=0", "ID.FIELD>=0", "ID.FIELD>0", "0>ID.FIELD", "0>=ID.FIELD", "0<ID.FIELD", "0<=ID.FIELD", "ID<0", "ID<=0", "ID>=0", "ID>0", "0>ID", "0>=ID", "0<ID", "0<=ID"]))
+  emit issue code.DecompressionOutputSizeMissingLowerBound at node
+}

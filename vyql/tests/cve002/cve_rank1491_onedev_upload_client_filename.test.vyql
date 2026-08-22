@@ -1,0 +1,150 @@
+# A Wicket FileUpload's getClientFileName() is the name the browser sent, path
+# separators and dot segments included. Storing under it without reducing it to
+# a bare name lets the request choose where the bytes land.
+
+test "rank1491: wicket upload client file name stored unreduced"
+  lang java
+  file InsertUrlPanel.java
+  expect VYQL-PATH-013
+  expect_review code.UploadFilePathTraversalWrite
+  code
+  ```
+  import java.io.IOException;
+  import java.io.InputStream;
+  import java.util.Collection;
+  import org.apache.wicket.markup.html.form.Form;
+  import org.apache.wicket.markup.html.form.upload.FileUpload;
+
+  class InsertUrlPanel {
+      private Collection<FileUpload> uploads;
+      private AttachmentSupport attachmentSupport;
+
+      Form<?> newUploadPanel() {
+          Form<?> form = new Form<Void>("form") {
+
+              @Override
+              protected void onSubmit() {
+                  super.onSubmit();
+                  String attachmentName;
+                  FileUpload upload = uploads.iterator().next();
+                  try (InputStream is = upload.getInputStream()) {
+                      attachmentName = attachmentSupport.saveAttachment(upload.getClientFileName(), is);
+                  } catch (IOException e) {
+                      throw new RuntimeException(e);
+                  }
+              }
+
+          };
+          return form;
+      }
+
+      interface AttachmentSupport {
+          String saveAttachment(String suggestedAttachmentName, InputStream attachmentStream);
+      }
+  }
+  ```
+
+test "rank1491: wicket upload client file name concatenated into a blob path"
+  lang java
+  file ProjectBlobPage.java
+  expect VYQL-PATH-013
+  expect_review code.UploadFilePathTraversalWrite
+  code
+  ```
+  import java.util.Collection;
+  import java.util.HashMap;
+  import java.util.Map;
+  import org.apache.wicket.markup.html.form.upload.FileUpload;
+
+  class ProjectBlobPage {
+
+      public void uploadFiles(Collection<FileUpload> uploads, String directory) {
+          Map<String, byte[]> newBlobs = new HashMap<>();
+
+          String parentPath = directory;
+
+          for (FileUpload upload : uploads) {
+              String blobPath = upload.getClientFileName();
+              if (parentPath != null)
+                  blobPath = parentPath + "/" + blobPath;
+
+              newBlobs.put(blobPath, upload.getBytes());
+          }
+      }
+  }
+  ```
+
+test "rank1491: wicket upload client file name reduced before storage"
+  lang java
+  file InsertUrlPanel.java
+  reject VYQL-PATH-013
+  reject_review code.UploadFilePathTraversalWrite
+  code
+  ```
+  import java.io.IOException;
+  import java.io.InputStream;
+  import java.util.Collection;
+  import org.apache.wicket.markup.html.form.Form;
+  import org.apache.wicket.markup.html.form.upload.FileUpload;
+  import org.apache.commons.io.FilenameUtils;
+
+  class InsertUrlPanel {
+      private Collection<FileUpload> uploads;
+      private AttachmentSupport attachmentSupport;
+
+      Form<?> newUploadPanel() {
+          Form<?> form = new Form<Void>("form") {
+
+              @Override
+              protected void onSubmit() {
+                  super.onSubmit();
+                  String attachmentName;
+                  FileUpload upload = uploads.iterator().next();
+                  try (InputStream is = upload.getInputStream()) {
+                      attachmentName = attachmentSupport.saveAttachment(
+                              FilenameUtils.getName(upload.getClientFileName()), is);
+                  } catch (IOException e) {
+                      throw new RuntimeException(e);
+                  }
+              }
+
+          };
+          return form;
+      }
+
+      interface AttachmentSupport {
+          String saveAttachment(String suggestedAttachmentName, InputStream attachmentStream);
+      }
+  }
+  ```
+
+test "rank1491: wicket upload blob path reduced before storage"
+  lang java
+  file ProjectBlobPage.java
+  reject VYQL-PATH-013
+  reject_review code.UploadFilePathTraversalWrite
+  code
+  ```
+  import java.util.Collection;
+  import java.util.HashMap;
+  import java.util.Map;
+  import org.apache.wicket.markup.html.form.upload.FileUpload;
+  import io.onedev.server.util.FilenameUtils;
+
+  class ProjectBlobPage {
+
+      public void uploadFiles(Collection<FileUpload> uploads, String directory) {
+          Map<String, byte[]> newBlobs = new HashMap<>();
+
+          String parentPath = directory;
+
+          for (FileUpload upload : uploads) {
+              String blobPath = FilenameUtils.sanitizeFilename(upload.getClientFileName());
+              if (parentPath != null)
+                  blobPath = parentPath + "/" + blobPath;
+
+              newBlobs.put(blobPath, upload.getBytes());
+          }
+      }
+  }
+  ```

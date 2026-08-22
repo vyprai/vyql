@@ -1,0 +1,267 @@
+# NeuVector's process supervisor is a small C program, monitor/monitor.c, that
+# starts and restarts the controller, enforcer and scanner. Before it restarts
+# consul it checks whether consul's ports are still bound, and it does that by
+# shelling out:
+#
+#     rpc_port = getenv(ENV_CLUSTER_RPC_PORT);
+#     lan_port = getenv(ENV_CLUSTER_LAN_PORT);
+#     ...
+#     sprintf(shbuf, "ss -lnp|grep '%s\\|%s'", rpc_port, lan_port);
+#     fp = popen(shbuf, "r");
+#
+# Both port strings come straight from the environment and land inside a
+# single-quoted fragment of a shell pipeline. A value carrying a quote closes
+# the fragment, so anything after it is a command the supervisor runs as root
+# in the container (CWE-78). Commit 084a437033b4 fixes it by adding
+# is_valid_port() -- a NULL test, `strlen(p) == strspn(p, "0123456789")`, and a
+# 1..65535 range test -- and returning -1 from check_consul_ports() before the
+# sprintf when either port fails it. The pool row's `nocommit` flag is wrong in
+# the usual way: the commit resolves and `git show` reads it in full. It is a
+# large multi-ticket commit (NVSHAS-9553-9979-9987, 28 files) whose C hunk is
+# the CVE; the row needs no correction, and its language field, `c`, is right.
+#
+# ATTENTION, for two separate reasons, both measured on the real checkout.
+#
+# First, the taint route exists and works. On the vulnerable revision the
+# scanner reports VYQL-INJ-002 critical, code.EnvVariable at monitor.c:692
+# through the sprintf propagator to code.CommandExecution at monitor.c:703 --
+# but only when the analysis profile is `generic` or `cli`. On the repository
+# as it stands the profile resolves to `api`, because neuvector's go.mod
+# requires google.golang.org/grpc and the api profile's detect list matches
+# dependency("grpc"). The api profile's entrypoints are
+# [code.HttpInput, code.HttpHeader, code.PatternOptionInput, code.SecretValue,
+# code.ComputedSizeValue, code.ArchiveEntryName] -- code.EnvVariable is not
+# among them, so every non-HTTP source in the scan is dropped and `vyql match`
+# on monitor.c reports no sources at all. Three `--cache off` runs of
+# monitor/ at the vulnerable revision: 8 findings and 0 VYQL-INJ-002 under
+# `-profile auto`, 15 findings and 1 VYQL-INJ-002 under `-profile generic`.
+# The profile is chosen once for the whole scan from whichever manifest the
+# root carries, so a Go API server's dependency list decides what counts as
+# untrusted input in a C process supervisor that shares the repository.
+#
+# Second, even with the profile forced to `generic` the finding does not
+# discriminate: 1 VYQL-INJ-002 at the vulnerable revision and 1 at the patched
+# one, over three `--cache off` runs each. VYQL-INJ-002 carries
+# `unless endpoint coveredBy core.CommandArgumentValidation`, and
+# `endpointGuarded` (internal/engine/engine.go) accepts a guard only through
+# `sameFunctionContextGuarded` or `solvers.Dominates` -- both function-local.
+# The fixed revision's validation runs inside is_valid_port(), a sibling function, so the
+# check is invisible to check_consul_ports() no matter what concept it emits.
+# Measured with a throwaway binding labelling `strspn` as
+# core.CommandArgumentValidation: the identical validation written inline in
+# check_consul_ports() suppresses the finding, the same validation moved into a
+# sibling helper does not. That is the C instance of the delegated-check
+# attribution gap recorded for Go (1377, 1399), Python (1397), Rust (1364),
+# TypeScript (1372) and PHP (1394).
+#
+# No definition change is shippable here. Keying on is_valid_port would be the
+# fixing commit's own vocabulary. A `strspn` allowlist binding is generic
+# enough to write from the C library's documentation -- there is no
+# core.CommandArgumentValidation or allowlist-style core.ShellEscape binding
+# for C today, only `escape_shell` -- but on its own it suppresses every
+# command-injection finding in any function that calls strspn for any reason,
+# and it still leaves this CVE undiscriminated, so it buys a false-negative
+# risk and no coverage.
+#
+# The three cases below pin that state. The first is the vulnerable function.
+# The second is the fixed revision, and reports identically. The third writes the fixed revision's
+# own validation inline in the sink's function instead of behind a helper, and
+# also reports today because C has no vocabulary for a character-set allowlist;
+# once that vocabulary exists the third must go quiet while the second, the
+# real fix, still reports until the attribution gap closes.
+#
+# verify_current_expected: attention-engine-gap, all three cases fire identically
+
+test "rank1437: the consul port check interpolates two environment values into a shell pipeline it runs with popen"
+  lang c
+  file monitor/monitor.c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  #define ENV_CLUSTER_RPC_PORT "CLUSTER_RPC_PORT"
+  #define ENV_CLUSTER_LAN_PORT "CLUSTER_LAN_PORT"
+  #define SH_LINE_MAX 1024
+  #define SCRIPT_MAX  256
+  #define DEFAULT_RPC_PORT "18300"
+  #define DEFAULT_LAN_PORT "18301"
+  #define SCRIPT_KILL_CONSUL "/usr/local/bin/kill_consul.sh"
+
+  void debug(const char *fmt, ...);
+
+  static int check_consul_ports(void)
+  {
+      FILE *fp;
+      char pline[SH_LINE_MAX];
+      char shbuf[SCRIPT_MAX];
+      char *rpc_port;
+      char *lan_port;
+
+      rpc_port = getenv(ENV_CLUSTER_RPC_PORT);
+      lan_port = getenv(ENV_CLUSTER_LAN_PORT);
+
+      if (rpc_port == NULL) {
+          rpc_port = DEFAULT_RPC_PORT;
+      }
+      if (lan_port == NULL) {
+          lan_port = DEFAULT_LAN_PORT;
+      }
+      sprintf(shbuf, "ss -lnp|grep '%s\\|%s'", rpc_port, lan_port);
+
+      fp = popen(shbuf, "r");
+      if (fp == NULL) {
+          debug("Failed to run script\n");
+          return 0;
+      }
+
+      while (fgets(pline, sizeof(pline) - 1, fp) != NULL) {
+          if (strstr(pline, rpc_port) != NULL) {
+              pclose(fp);
+              return -1;
+          }
+      }
+      pclose(fp);
+      return 0;
+  }
+  ```
+
+test "rank1437: the fixed revision rejects a non-numeric port before the pipeline is built, but the check sits in a sibling function"
+  lang c
+  file monitor/monitor.c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <stdbool.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  #define ENV_CLUSTER_RPC_PORT "CLUSTER_RPC_PORT"
+  #define ENV_CLUSTER_LAN_PORT "CLUSTER_LAN_PORT"
+  #define SH_LINE_MAX 1024
+  #define SCRIPT_MAX  256
+  #define DEFAULT_RPC_PORT "18300"
+  #define DEFAULT_LAN_PORT "18301"
+
+  void debug(const char *fmt, ...);
+
+  static bool is_valid_port(const char *strPort)
+  {
+      if ((strPort == NULL) || (strlen(strPort) != strspn(strPort, "0123456789"))) {
+          return false;
+      }
+
+      int port = atoi(strPort);
+
+      return ((port > 0) && (port <= 65535));
+  }
+
+  static int check_consul_ports(void)
+  {
+      FILE *fp;
+      char pline[SH_LINE_MAX];
+      char shbuf[SCRIPT_MAX];
+      char *rpc_port;
+      char *lan_port;
+
+      rpc_port = getenv(ENV_CLUSTER_RPC_PORT);
+      lan_port = getenv(ENV_CLUSTER_LAN_PORT);
+
+      if (rpc_port == NULL) {
+          rpc_port = DEFAULT_RPC_PORT;
+      }
+      if (lan_port == NULL) {
+          lan_port = DEFAULT_LAN_PORT;
+      }
+      if (!is_valid_port(rpc_port)) {
+          debug("invalid consul rpc port %s\n", rpc_port);
+          return -1;
+      }
+      if (!is_valid_port(lan_port)) {
+          debug("invalid consul lan port %s\n", lan_port);
+          return -1;
+      }
+      sprintf(shbuf, "ss -lnp|grep '%s\\|%s'", rpc_port, lan_port);
+
+      fp = popen(shbuf, "r");
+      if (fp == NULL) {
+          debug("Failed to run script\n");
+          return 0;
+      }
+
+      while (fgets(pline, sizeof(pline) - 1, fp) != NULL) {
+          if (strstr(pline, rpc_port) != NULL) {
+              pclose(fp);
+              return -1;
+          }
+      }
+      pclose(fp);
+      return 0;
+  }
+  ```
+
+test "rank1437: the same digits-only allowlist written inline in the function that builds the pipeline"
+  lang c
+  file monitor/monitor.c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  #define ENV_CLUSTER_RPC_PORT "CLUSTER_RPC_PORT"
+  #define ENV_CLUSTER_LAN_PORT "CLUSTER_LAN_PORT"
+  #define SH_LINE_MAX 1024
+  #define SCRIPT_MAX  256
+  #define DEFAULT_RPC_PORT "18300"
+  #define DEFAULT_LAN_PORT "18301"
+
+  void debug(const char *fmt, ...);
+
+  static int check_consul_ports(void)
+  {
+      FILE *fp;
+      char pline[SH_LINE_MAX];
+      char shbuf[SCRIPT_MAX];
+      char *rpc_port;
+      char *lan_port;
+
+      rpc_port = getenv(ENV_CLUSTER_RPC_PORT);
+      lan_port = getenv(ENV_CLUSTER_LAN_PORT);
+
+      if (rpc_port == NULL) {
+          rpc_port = DEFAULT_RPC_PORT;
+      }
+      if (lan_port == NULL) {
+          lan_port = DEFAULT_LAN_PORT;
+      }
+      if (strlen(rpc_port) != strspn(rpc_port, "0123456789")) {
+          debug("invalid consul rpc port %s\n", rpc_port);
+          return -1;
+      }
+      if (strlen(lan_port) != strspn(lan_port, "0123456789")) {
+          debug("invalid consul lan port %s\n", lan_port);
+          return -1;
+      }
+      sprintf(shbuf, "ss -lnp|grep '%s\\|%s'", rpc_port, lan_port);
+
+      fp = popen(shbuf, "r");
+      if (fp == NULL) {
+          debug("Failed to run script\n");
+          return 0;
+      }
+
+      while (fgets(pline, sizeof(pline) - 1, fp) != NULL) {
+          if (strstr(pline, rpc_port) != NULL) {
+              pclose(fp);
+              return -1;
+          }
+      }
+      pclose(fp);
+      return 0;
+  }
+  ```

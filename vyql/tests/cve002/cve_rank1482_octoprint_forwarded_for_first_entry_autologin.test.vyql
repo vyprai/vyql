@@ -1,0 +1,114 @@
+# Rank 1482 / CVE-2024-32977: OctoPrint derived a request's client IP from the
+# first comma-separated entry of the `X-Forwarded-For` header, then used that
+# string as the sole input to its `autologinLocal` decision (CWE-290):
+#
+#   def get_remote_address(request):
+#       forwardedFor = request.headers.get("X-Forwarded-For", None)
+#       if forwardedFor is not None:
+#           return forwardedFor.split(",")[0]
+#       return request.remote_addr
+#
+# `passive_login` feeds the result to `netaddr.IPAddress(remote_address) in
+# local_networks` and, on a match, logs the configured autologin user in
+# without any credential. A proxy *appends* to X-Forwarded-For, so the leading
+# entries are whatever the client sent: any unauthenticated request carrying
+# `X-Forwarded-For: 127.0.0.1` reads back as local and is logged in as that
+# user. `PrinterStateConnection._get_remote_address` in sockjs.py carries the
+# identical parse for the websocket path.
+#
+# The advisory (GHSA-2vjq-hg5w-5gm7) records merge commit 5afbec8d2 as the
+# patch; the substantive change is ff64916cccfe96585f354c3fb52d95e77f1cc1ba,
+# which replaces both parses with `octoprint.util.net.get_http_client_ip`:
+# it walks the list from the right and stops at the first entry not in the
+# configured trusted-proxy set, and only consults the header at all when the
+# transport peer is itself a trusted proxy. The `reject` case below is that
+# function verbatim.
+#
+# FIXED. bindings/python/forwarded_for_first_hop_client_ip.vyql binds
+# forwardedForFirstHopClientIp: a function-scoped presence match on a request
+# header/environ read, the X-Forwarded-For (or WSGI HTTP_X_FORWARDED_FOR)
+# header name in that function's own assignment token, and a `split(",")[0]`
+# subscript. It widens the existing code.ProxyClientIpSpoofingBypass
+# (VYQL-AUTH-012) to Python -- the same weakness the javascript binding
+# proxyClientIpSpoofingBypass904 covers for Hono's ALB adapter and the go
+# binding proxyClientIpSpoofingBypass249 covers for a gateway hop -- so no
+# new concept and no new rule. Every clause is answerable to the header's own
+# specification: RFC 7239 and Django's documentation both print the leftmost
+# read and both warn it is client-controlled.
+#
+# Measured over three `--cache off` runs of each revision on
+# src/octoprint/{server,util} (43 python files): 240 findings with 2
+# VYQL-AUTH-012 at ff64916^, on server/util/flask.py:1716 and
+# server/util/sockjs.py:181 -- exactly the two parses the fixed revision removes -- and
+# 238 findings with 0 at ff64916. Collateral, enumerated over the 204 corpus
+# clones under /tmp/cve-work/rank*: 32 python files name the header, 6 also
+# carry a `split(...)[0]`, and the binding reports 2 distinct files (maxkb's
+# `apps/common/log/log.py`, the verbatim Django recipe, and nova's
+# `api/metadata/handler.py:_handle_instance_id_request_from_lb`, which keys an
+# instance lookup on the entry). Both are the weakness. litellm's
+# `proxy/auth/ip_address_utils.py` correctly does not report: its split takes
+# an extracted parameter and its extractor gates on a trusted-proxy
+# range.
+
+test "rank1482: the first X-Forwarded-For entry is taken as the client address"
+  lang python
+  file src/octoprint/server/util/flask.py
+  expect VYQL-AUTH-012
+  expect_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  def get_remote_address(request):
+      forwardedFor = request.headers.get("X-Forwarded-For", None)
+      if forwardedFor is not None:
+          return forwardedFor.split(",")[0]
+      return request.remote_addr
+  ```
+
+test "rank1482: the forwarded list is walked from the right against trusted proxies"
+  lang python
+  file src/octoprint/util/net.py
+  reject VYQL-AUTH-012
+  reject_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  def get_http_client_ip(remote_addr, forwarded_for, trusted_proxies):
+      if forwarded_for is not None and sanitize_address(remote_addr) in trusted_proxies:
+          for addr in (
+              sanitize_address(addr.strip()) for addr in reversed(forwarded_for.split(","))
+          ):
+              if addr not in trusted_proxies:
+                  return addr
+      return remote_addr
+  ```
+
+test "rank1482: the Django recipe's leftmost read is the same weakness"
+  lang python
+  file apps/common/log/log.py
+  expect VYQL-AUTH-012
+  expect_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  def get_client_ip(request):
+      x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+      if x_forwarded_for:
+          ip = x_forwarded_for.split(',')[0]
+      else:
+          ip = request.META.get('REMOTE_ADDR')
+      return ip
+  ```
+
+test "rank1482: splitting an address a caller extracts is not the weakness"
+  lang python
+  file litellm/proxy/auth/ip_address_utils.py
+  reject VYQL-AUTH-012
+  reject_review code.ProxyClientIpSpoofingBypass
+  code
+  ```
+  def is_internal_ip(client_ip, internal_networks=None):
+      if not client_ip:
+          return False
+      if "," in client_ip:
+          client_ip = client_ip.split(",")[0].strip()
+      networks = internal_networks or DEFAULT_INTERNAL_NETWORKS
+      return any(ipaddress.ip_address(client_ip) in n for n in networks)
+  ```

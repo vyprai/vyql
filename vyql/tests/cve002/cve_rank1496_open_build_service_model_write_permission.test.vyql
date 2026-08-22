@@ -1,0 +1,263 @@
+# Rank 1496 / CVE-2013-3703 (GHSA-jw5v-mxm6-2753, CWE-862): the Open Build
+# Service API enforced its write permissions in the controllers, one call site
+# at a time, and several controller actions reached the same model mutators
+# without doing so. `src/api/app/controllers/source_controller.rb` at
+# `06ad7fdb^` guards `prj.update_from_xml` behind `@http_user.can_modify_project?`
+# in `update_project_meta` (line 766) and does not guard it at all in
+# `undelete_project` (line 1466) or `undelete_package` (line 1739):
+#
+#   def undelete_project
+#     path = request.path
+#     path << build_query_from_hash(params, [:cmd, :user, :comment])
+#     pass_to_backend path
+#     path = request.path + "/_meta"
+#     prj = Project.new(name: params[:project])
+#     Project.transaction do
+#       prj.update_from_xml(Xmlhash.parse(backend_get(path)))
+#       prj.store
+#     end
+#     ...
+#
+# so any authenticated user could restore, and thereby rewrite the meta of, a
+# project or package they have no rights to. The same hole reaches
+# `Project#add_role`, `#add_user`, `#add_group`, `#remove_role`,
+# `#set_project_type`, `#set_maintenance_project`, `#update_patchinfo`,
+# `#do_project_copy`, `#do_project_release` and the `Package` equivalents.
+#
+# The fixed revision moves the decision into the models. It adds one predicate per class
+#
+#   def check_write_access!
+#     return if Rails.env.test? and User.current.nil? # for unit tests
+#     unless User.current.can_modify_project?(self) || User.current.can_create_project?(self.name)
+#       raise WritePermissionError, "No permission to modify project '#{self.name}' ..."
+#     end
+#   end
+#
+# and prepends a bare `check_write_access!` call to fifteen `Project` methods and
+# nine `Package` methods, with `rescue_from Project::WritePermissionError` in
+# `ApplicationController` turning the raise into a 403. In `do_project_copy` it
+# also hoists `User.current ||= User.find_by_login(params[:user])` above the
+# backend copy, which runs before the acting principal exists at all.
+#
+# ## What fires, both revisions
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over `src/api/app`
+# (98 ruby files) at `06ad7fdb^` and at `06ad7fdb`, three runs each, reports the
+# **same 70 findings and the same 52 flags**, with the same per-rule split: 27
+# VYQL-AUTH-002, 15 VYQL-INJ-009, 11 VYQL-CRY-001, 4 VYQL-PATH-001, 3
+# VYQL-AUTH-001, 3 VYQL-INJ-001, 2 VYQL-RF-003, 2 VYQL-INJ-004, and one each of
+# VYQL-INJ-012, VYQL-INJ-018 and VYQL-CRY-003. Ten of the 52 flags land in
+# `project.rb`/`package.rb`, all of them `code.ObjectLookupByUserInput` on
+# `Collection.find` and `DbProjectType.find` calls, none of them on any of the
+# twenty-four methods the fixed revision guards. Nothing moves across the revisions.
+#
+# ## Why no binding ships
+#
+# The fixed revision's entire textual delta inside each guarded method is the line
+# `check_write_access!`. There is no other difference: no documented API call, no
+# framework hook, no changed argument. So any clause that separates the two
+# revisions has to name the fixing commit's own helper, which is the
+# discriminator this loop refuses. Rank 1380's counterweight -- "does the fixed revision
+# leave an API-documented call inside the method it guards" -- answers no here;
+# `can_modify_project?` and `can_create_project?` are OBS's own predicates and
+# they live in the helper, not in the guarded methods.
+#
+# The check would also have to be visible from the guarded method, and it is not.
+# Cases four through six below are a three-way minimal pair over shipped
+# vocabulary -- `core.OwnershipCheck` from `check_ownership`
+# (`bindings/ruby/m5a48bf47.vyql:ownershipCheck75`) against
+# `code.ObjectLookupByUserInput` from `find`, judged by VYQL-AUTH-002's
+# `unless endpoint coveredBy core.OwnershipCheck`. Inline, the check suppresses.
+# Moved one method away and called from the method it guards -- exactly the
+# fix's shape -- it does not, and the result is byte-identical to having no
+# check at all. `Engine.endpointGuarded` (`internal/engine/engine.go:1160`)
+# reaches only `sameFunctionContextGuarded` and `solvers.Dominates`, both
+# function-local, so a control that leaves the function is invisible. This is
+# the attribution-gap family: Go 1377/1389/1399, Python 1397, Rust 1364,
+# TypeScript 1372, PHP 1394, C 1437, and Ruby here.
+#
+# Ruby sits on the 1364 side of that family rather than the 1372 side: the hop
+# does not resolve either. `vyql resolve` reports `check_write_access!` as
+# "no callee body" for a same-class sibling method, and so are `check_write_access`
+# without the bang, `self.guard_it` with an explicit receiver, `guard_it()` with
+# parentheses, `guard_it(self)` with an argument, and a top-level `def` called
+# from another top-level `def` -- five spellings, all unresolved. A helper whose
+# *return value* is consumed does resolve (`system(build())` carries taint from a
+# `params` read inside `build`), so the gap is specific to a call made for its
+# effect, which is every spelling a guard uses.
+#
+# Closing it is not mechanical: attributing a callee's control to its caller is a
+# new dataflow relation, not a correction to a construct the engine
+# handles, and widening the scope instead -- to the class or the file -- is wrong
+# rather than coarse, since a correctly guarded sibling method shares that scope
+# (1364's measurement). Recorded in ENGINE-GAPS.md instead.
+#
+# Considered for reuse and rejected: `code.IdorPolicyReview`, `code.AccessPolicyReview`
+# and `code.PrivilegedEntryPointReview` all judge *which* principal a lookup is
+# scoped to, and the defect here is that no principal is consulted at all;
+# `code.StateChangingOpSink` is CWE-352 and is judged only by the CSRF rule.
+# Nothing is minted: the shape "a state-changing model method with no principal
+# read in its body" is the fallback settled unshippable at 1417, 1433 and 1442,
+# and OBS is a codebase where it would be maximally expensive -- `project.rb` and
+# `package.rb` alone define 24 such methods.
+
+test "rank1496: an api action restores project meta from the backend with no write-permission check"
+  lang ruby
+  file src/api/app/controllers/source_controller.rb
+  reject VYQL-AUTH-002
+  code
+  ```
+  class SourceController < ApplicationController
+
+    def undelete_project
+      valid_http_methods :post
+      project_name = params[:project]
+
+      path = request.path
+      path << build_query_from_hash(params, [:cmd, :user, :comment])
+      pass_to_backend path
+
+      path = request.path + "/_meta"
+      prj = Project.new(name: params[:project])
+      Project.transaction do
+        prj.update_from_xml(Xmlhash.parse(backend_get(path)))
+        prj.store
+      end
+    end
+
+    def update_project_meta
+      prj = Project.get_by_name(params[:project])
+      unless @http_user.can_modify_project?(prj)
+        render_error :status => 403, :errorcode => "change_project_no_permission"
+        return
+      end
+      prj.update_from_xml(Xmlhash.parse(request.raw_post))
+      prj.store
+    end
+  end
+  ```
+
+test "rank1496: the model mutators the action reaches carry no permission check"
+  lang ruby
+  file src/api/app/models/project.rb
+  reject VYQL-AUTH-002
+  code
+  ```
+  class Project < ActiveRecord::Base
+
+    def set_project_type(project_type_name)
+      mytype = DbProjectType.find_by_name(project_type_name)
+      return false unless mytype
+      self.type_id = mytype.id
+      self.save!
+      return true
+    end
+
+    def add_role(what, role)
+      self.transaction do
+        if what.kind_of? Group
+          self.project_group_role_relationships.create!(role: role, group: what)
+        else
+          self.project_user_role_relationships.create!(role: role, user: what)
+        end
+        write_to_backend
+      end
+    end
+  end
+  ```
+
+test "rank1496: the patched mutators delegate the decision to check_write_access!"
+  lang ruby
+  file src/api/app/models/project.rb
+  reject VYQL-AUTH-002
+  code
+  ```
+  class Project < ActiveRecord::Base
+
+    def check_write_access!
+      return if Rails.env.test? and User.current.nil?
+
+      unless User.current.can_modify_project?(self) || User.current.can_create_project?(self.name)
+        raise WritePermissionError, "No permission to modify project for user"
+      end
+    end
+
+    def set_project_type(project_type_name)
+      check_write_access!
+
+      mytype = DbProjectType.find_by_name(project_type_name)
+      return false unless mytype
+      self.type_id = mytype.id
+      self.save!
+      return true
+    end
+
+    def add_role(what, role)
+      check_write_access!
+
+      self.transaction do
+        if what.kind_of? Group
+          self.project_group_role_relationships.create!(role: role, group: what)
+        else
+          self.project_user_role_relationships.create!(role: role, user: what)
+        end
+        write_to_backend
+      end
+    end
+  end
+  ```
+
+test "rank1496: minimal pair -- an ownership check in the acting method covers the lookup"
+  lang ruby
+  file src/api/app/controllers/inline_controller.rb
+  reject VYQL-AUTH-002
+  code
+  ```
+  class InlineController < ApplicationController
+    def set_project_type
+      check_ownership
+      mytype = DbProjectType.find(params[:type_id])
+      mytype.name = params[:name]
+      mytype.save!
+    end
+  end
+  ```
+
+# Pinned false positive. The source is the case above with the check moved one
+# method away and called from the method it guards -- the fixed revision's own shape -- and
+# it must flip to `reject VYQL-AUTH-002` when a control emitted inside a callee
+# is attributed to the caller it guards.
+test "rank1496: minimal pair -- the same check one method away does not cover the lookup"
+  lang ruby
+  file src/api/app/controllers/delegated_controller.rb
+  expect VYQL-AUTH-002
+  code
+  ```
+  class DelegatedController < ApplicationController
+    def check_write_access!
+      check_ownership
+    end
+
+    def set_project_type
+      check_write_access!
+      mytype = DbProjectType.find(params[:type_id])
+      mytype.name = params[:name]
+      mytype.save!
+    end
+  end
+  ```
+
+test "rank1496: minimal pair -- the same lookup with no check anywhere is the true positive"
+  lang ruby
+  file src/api/app/controllers/unguarded_controller.rb
+  expect VYQL-AUTH-002
+  code
+  ```
+  class UnguardedController < ApplicationController
+    def set_project_type
+      mytype = DbProjectType.find(params[:type_id])
+      mytype.name = params[:name]
+      mytype.save!
+    end
+  end
+  ```

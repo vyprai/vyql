@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule DecompressionOutputSizeMissingLowerBound {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_191, CWE_1284]
+    id: "VYQL-MEM-056"
+    severity: high
+  }
+  issue code.DecompressionOutputSizeMissingLowerBound as size
+}

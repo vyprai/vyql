@@ -1,0 +1,144 @@
+# Rank 1479 / CVE-2020-15256: object-path's `set()` walked a caller-supplied dot
+# path one segment at a time and wrote `obj[currentPath]` — creating a fresh
+# object or array for a missing intermediate segment — without rejecting the
+# magic property names. Under `withInheritedProps` the shallow-property check is
+# hardcoded to true, so `set(obj, '__proto__.polluted', 'x')` descended into
+# `Object.prototype` and polluted every object in the process. The fixed revision rejects a
+# `__proto__` segment, and a `constructor` segment resolving to a function,
+# before the segment is used as a write key.
+
+test "rank1479: a recursive path setter writes each segment as a property key with no magic-name filter"
+  lang javascript
+  file index.js
+  expect VYQL-INJ-134
+  expect_review code.NestedPathInheritedPropertyPrototypePollution
+  code
+  ```
+  'use strict';
+
+  function hasOwnProperty (obj, prop) {
+    if (obj == null) { return false }
+    return Object.prototype.hasOwnProperty.call(obj, prop)
+  }
+
+  function getKey (key) {
+    var intKey = parseInt(key)
+    if (intKey.toString() === key) { return intKey }
+    return key
+  }
+
+  function factory (options) {
+    options = options || {}
+
+    var hasShallowProperty
+    if (options.includeInheritedProps) {
+      hasShallowProperty = function () { return true }
+    } else {
+      hasShallowProperty = function (obj, prop) {
+        return (typeof prop === 'number' && Array.isArray(obj)) || hasOwnProperty(obj, prop)
+      }
+    }
+
+    function getShallowProperty (obj, prop) {
+      if (hasShallowProperty(obj, prop)) { return obj[prop] }
+    }
+
+    function set (obj, path, value, doNotReplace) {
+      if (typeof path === 'number') { path = [path] }
+      if (!path || path.length === 0) { return obj }
+      if (typeof path === 'string') {
+        return set(obj, path.split('.').map(getKey), value, doNotReplace)
+      }
+      var currentPath = path[0]
+      var currentValue = getShallowProperty(obj, currentPath)
+      if (path.length === 1) {
+        if (currentValue === void 0 || !doNotReplace) {
+          obj[currentPath] = value
+        }
+        return currentValue
+      }
+      if (currentValue === void 0) {
+        if (typeof path[1] === 'number') {
+          obj[currentPath] = []
+        } else {
+          obj[currentPath] = {}
+        }
+      }
+      return set(obj[currentPath], path.slice(1), value, doNotReplace)
+    }
+
+    return { set: set }
+  }
+
+  module.exports = factory
+  ```
+
+test "rank1479: the setter refuses a __proto__ or constructor segment before using it as a write key"
+  lang javascript
+  file index.js
+  reject VYQL-INJ-134
+  reject_review code.NestedPathInheritedPropertyPrototypePollution
+  code
+  ```
+  'use strict';
+
+  function hasOwnProperty (obj, prop) {
+    if (obj == null) { return false }
+    return Object.prototype.hasOwnProperty.call(obj, prop)
+  }
+
+  function getKey (key) {
+    var intKey = parseInt(key)
+    if (intKey.toString() === key) { return intKey }
+    return key
+  }
+
+  function factory (options) {
+    options = options || {}
+
+    var hasShallowProperty
+    if (options.includeInheritedProps) {
+      hasShallowProperty = function () { return true }
+    } else {
+      hasShallowProperty = function (obj, prop) {
+        return (typeof prop === 'number' && Array.isArray(obj)) || hasOwnProperty(obj, prop)
+      }
+    }
+
+    function getShallowProperty (obj, prop) {
+      if (hasShallowProperty(obj, prop)) { return obj[prop] }
+    }
+
+    function set (obj, path, value, doNotReplace) {
+      if (typeof path === 'number') { path = [path] }
+      if (!path || path.length === 0) { return obj }
+      if (typeof path === 'string') {
+        return set(obj, path.split('.').map(getKey), value, doNotReplace)
+      }
+      var currentPath = path[0]
+      var currentValue = getShallowProperty(obj, currentPath)
+      if (options.includeInheritedProps && (currentPath === '__proto__' ||
+        (currentPath === 'constructor' && typeof currentValue === 'function'))) {
+        throw new Error('For security reasons, object\'s magic properties cannot be set')
+      }
+      if (path.length === 1) {
+        if (currentValue === void 0 || !doNotReplace) {
+          obj[currentPath] = value
+        }
+        return currentValue
+      }
+      if (currentValue === void 0) {
+        if (typeof path[1] === 'number') {
+          obj[currentPath] = []
+        } else {
+          obj[currentPath] = {}
+        }
+      }
+      return set(obj[currentPath], path.slice(1), value, doNotReplace)
+    }
+
+    return { set: set }
+  }
+
+  module.exports = factory
+  ```

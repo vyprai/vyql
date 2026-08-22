@@ -1,0 +1,174 @@
+# Rank 1413 / CVE-2021-27229: Mumble's connect dialog handed a server-supplied
+# URL straight to the desktop's URL handler.
+#
+# src/mumble/ConnectDialog.cpp downloads the public server list over HTTP and
+# parses it as XML in ConnectDialog::fetched:
+#
+#   pi.quUrl = e.attribute(QLatin1String("url"));
+#
+# That attribute becomes PublicInfo::quUrl, is copied into ServerItem::qsUrl in
+# fillList(), and is finally opened by the "Open Webpage" context-menu action:
+#
+#   void ConnectDialog::on_qaUrl_triggered() {
+#       ServerItem *si = static_cast<ServerItem *>(qtwServers->currentItem());
+#       if (! si || si->qsUrl.isEmpty())
+#           return;
+#       QDesktopServices::openUrl(QUrl(si->qsUrl));
+#   }
+#
+# QDesktopServices::openUrl does not fetch anything itself: it asks the platform
+# to launch whatever application is registered for the URL's scheme (ShellExecute
+# on Windows, xdg-open on Linux, LSOpenCFURLRef on macOS). With no restriction on
+# the scheme, a server that registers itself on the public list with a website
+# field such as a UNC path or a locally registered protocol handler turns "open
+# this server's website" into running a program of the attacker's choosing on the
+# victim's machine. The weakness is therefore not link following (the corpus
+# records CWE-59, the fifth wrong CWE seen this campaign) and not an open
+# redirect: it is an unvalidated, externally supplied URI reaching a
+# command-executing platform handler.
+#
+# The fixed revision (e59ee87abe24) adds a scheme allowlist in front of the launch:
+#
+#   const QStringList allowedSchemes = { QLatin1String("http"), QLatin1String("https") };
+#   const auto url = QUrl(si->qsUrl);
+#   if (allowedSchemes.contains(url.scheme())) {
+#       QDesktopServices::openUrl(url);
+#   } else { ...QMessageBox... }
+#
+# FIXED. Detection now covers the class as
+# code.ExternalUrlOpenWithoutSchemeAllowlist / VYQL-INJ-248: a C++ function that
+# passes a non-constant URL to QDesktopServices::openUrl and never reads the
+# URL's scheme. Measured on src/mumble at both revisions (cpp:200 files, three
+# --cache off runs each): 3 flags at e59ee87abe24^ and 2 at e59ee87abe24, the
+# whole delta being ConnectDialog.cpp:1267; `vyql diff` over the two JSON reports
+# shows 231 of 234 findings unchanged and the only other movement is two
+# VYQL-MEM-006 rows shifting by the 14 lines the fixed revision adds.
+#
+# The negation is a Qt API accessor, not the fixed revision's wording: renaming
+# allowedSchemes to zzz and the allowed schemes to ftp/gopher still suppresses
+# the flag, and rewriting the guard as an early-return denylist
+# (`if (u.scheme() != "http" && u.scheme() != "https") return;`) suppresses it
+# too. It is function-confined on real code as well as in a minimal pair --
+# ConnectDialog.cpp calls url.scheme() at lines 425/426/434 and
+# startsWith()/isValid() in five other functions, 840 lines above the vulnerable
+# one, and the flag still fires; a two-function pair with the allowlist moved to
+# a sibling also still fires. It is comment-proof: a commented-out copy of the
+# fix inside the vulnerable function leaves the flag at 1. MainWindow.cpp's own
+# QDesktopServices::openUrl at line 3218, which is guarded by a scheme test, is
+# flagged at neither revision -- discrimination proven on code the fixed revision never
+# touched.
+#
+# The two surviving flags are the other two unguarded launches in the same tree,
+# both still unguarded upstream today: UserView.cpp:131 opens the href of a
+# QWhatsThisClicked event, whose markup comes from server-supplied user and
+# channel comments, and Cert.cpp:352 opens a link from the certificate wizard's
+# own intro label, which is application-authored and is the precision cost of
+# this shape. Collateral outside this rank's clone is vacuous rather than
+# measured: no other C/C++ tree under /tmp/cve-work/rank*/ mentions
+# QDesktopServices at all, so the binding's reachable set in the local corpus is
+# exactly mumble's four call sites.
+#
+# verify_current_expected: fixed-detected
+
+test "rank1413: a server-supplied website URL is opened with no scheme allowlist"
+  lang cpp
+  file src/mumble/ConnectDialog.cpp
+  expect VYQL-INJ-248
+  code
+  ```
+  void ConnectDialog::on_qaUrl_triggered() {
+  	ServerItem *si = static_cast<ServerItem *>(qtwServers->currentItem());
+  	if (! si || si->qsUrl.isEmpty())
+  		return;
+
+  	QDesktopServices::openUrl(QUrl(si->qsUrl));
+  }
+  ```
+
+test "rank1413: the fixed revision restricts the scheme to http and https before opening"
+  lang cpp
+  file src/mumble/ConnectDialog.cpp
+  reject VYQL-INJ-248
+  code
+  ```
+  void ConnectDialog::on_qaUrl_triggered() {
+  	auto *si = static_cast< const ServerItem * >(qtwServers->currentItem());
+  	if (!si || si->qsUrl.isEmpty()) {
+  		return;
+  	}
+
+  	const QStringList allowedSchemes = { QLatin1String("http"), QLatin1String("https") };
+
+  	const auto url = QUrl(si->qsUrl);
+  	if (allowedSchemes.contains(url.scheme())) {
+  		QDesktopServices::openUrl(url);
+  	} else {
+  		QMessageBox msgBox;
+  		msgBox.setText(QObject::tr("<b>Blocked URL scheme \"%1\"</b>").arg(url.scheme()));
+  		msgBox.setIcon(QMessageBox::Warning);
+  		msgBox.exec();
+  	}
+  }
+  ```
+
+test "rank1413: an early-return scheme test with none of the fixed revision's names also clears it"
+  lang cpp
+  file src/mumble/ConnectDialog.cpp
+  reject VYQL-INJ-248
+  code
+  ```
+  void ConnectDialog::on_qaUrl_triggered() {
+  	ServerItem *si = static_cast<ServerItem *>(qtwServers->currentItem());
+  	if (! si || si->qsUrl.isEmpty())
+  		return;
+
+  	const QUrl u(si->qsUrl);
+  	if (u.scheme() != QLatin1String("http") && u.scheme() != QLatin1String("https")) {
+  		return;
+  	}
+  	QDesktopServices::openUrl(u);
+  }
+  ```
+
+test "rank1413: an unrelated dialog launching a stored link is flagged the same way"
+  lang cpp
+  file src/plugins/PluginList.cpp
+  expect VYQL-INJ-248
+  code
+  ```
+  void PluginList::openDocsForEntry(const PluginEntry &entry) {
+  	QDesktopServices::openUrl(entry.docsLink);
+  }
+  ```
+
+test "rank1413: a hardcoded homepage link is not a launch an attacker can choose"
+  lang cpp
+  file src/mumble/AboutDialog.cpp
+  reject VYQL-INJ-248
+  code
+  ```
+  void AboutDialog::on_qpbHomepage_clicked() {
+  	QDesktopServices::openUrl(QUrl(QLatin1String("https://www.example.org/")));
+  }
+  ```
+
+test "rank1413: a scheme allowlist in a sibling function does not clear the launch"
+  lang cpp
+  file src/mumble/ConnectDialog.cpp
+  expect VYQL-INJ-248
+  code
+  ```
+  void ConnectDialog::validateAddress() {
+  	QUrl url(qleAddress->text());
+  	if (url.scheme() == QLatin1String("http") || url.scheme() == QLatin1String("https")) {
+  		accept();
+  	}
+  }
+
+  void ConnectDialog::on_qaUrl_triggered() {
+  	ServerItem *si = static_cast<ServerItem *>(qtwServers->currentItem());
+  	if (! si || si->qsUrl.isEmpty())
+  		return;
+  	QDesktopServices::openUrl(QUrl(si->qsUrl));
+  }
+  ```

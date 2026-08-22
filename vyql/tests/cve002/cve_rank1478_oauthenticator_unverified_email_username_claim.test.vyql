@@ -1,0 +1,270 @@
+# Rank 1478 / CVE-2026-33175 (CWE-287): jupyterhub/oauthenticator resolves a
+# federated login to a local JupyterHub account by reading one claim out of the
+# provider's userinfo response. `Auth0OAuthenticator` names that claim `email`:
+#
+#	@default("username_claim")
+#	def _username_claim_default(self):
+#	    return "email"
+#
+# and nothing on the class ever asks Auth0 whether the address is confirmed. Auth0
+# returns `email_verified` in its `/userinfo` response exactly so a relying party
+# can, and OpenID Connect Core 5.7 says the address must not be used as an
+# identifier without it. So an attacker registers an Auth0 database-connection
+# account with the victim's address, skips the confirmation mail, signs in, and
+# JupyterHub hands them the victim's account and server.
+#
+# The fixed revision adds `check_allowed` to the authenticator: it reads
+# `user_info.get("email_verified")` and raises `HTTPError(403)` unless the new
+# `allow_unverified_email` trait is set, before deferring to the allow lists. The
+# sibling `GoogleOAuthenticator` carries the same check against Google's
+# spelling of the attestation, `user_info["verified_email"]`.
+#
+# Detection is code.UnverifiedEmailClaimIdentity (VYQL-AUTH-146, CWE-287/CWE-290),
+# emitted by oauthEmailClaimUsernameUnverified on an OAuthenticator subclass whose
+# `username_claim` default is unconditionally the email address while no
+# email-verification claim is read anywhere on the class. The vocabulary is the
+# providers' own documented claim names -- OIDC Core's `email_verified`, Google's
+# `verified_email`, GitLab's `confirmed_at`, Bitbucket's `is_confirmed` -- not this
+# commit's: renaming `allow_unverified_email`, `check_allowed` and the class itself
+# throughout the patched file leaves the count at 0, while renaming only
+# `email_verified` brings it back to 1.
+#
+# Measured on the repository, three --cache off runs each: 1 flag on the vulnerable
+# revision (auth0.py:21) and 0 on the patched one, against totals of 35 and 36
+# findings at or above high before the binding and 36 and 36 after. `GoogleOAuth-
+# enticator`, which names the same claim, is quiet on both because `check_allowed`
+# reads `verified_email` -- the control is class-wide, not beside the claim
+# selection. `GlobusOAuthenticator` is deliberately excluded: its default returns
+# `preferred_username` unless `username_from_email` is configured, so the address is
+# the identity only where an operator asked for it, and upstream added no
+# verification check there. Collateral is unmeasurable rather than zero: the shape's
+# reachable set across the 211 sibling clones under /tmp/cve-work is empty, since no
+# other tree declares a `username_claim` default at all.
+
+test "rank1478: an authenticator resolves the account to the provider's email claim"
+  lang python
+  file oauthenticator/auth0.py
+  expect VYQL-AUTH-146
+  expect_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  import os
+
+  from jupyterhub.auth import LocalAuthenticator
+  from traitlets import Unicode, default
+
+  from .oauth2 import OAuthenticator
+
+
+  class Auth0OAuthenticator(OAuthenticator):
+      user_auth_state_key = "auth0_user"
+
+      @default("login_service")
+      def _login_service_default(self):
+          return os.environ.get("LOGIN_SERVICE", "Auth0")
+
+      @default("username_claim")
+      def _username_claim_default(self):
+          return "email"
+
+      auth0_domain = Unicode(
+          config=True,
+          help="""
+          The domain for your Auth0 account.
+          """,
+      )
+
+      @default("userdata_url")
+      def _userdata_url_default(self):
+          return f"https://{self.auth0_domain}/userinfo"
+
+
+  class LocalAuth0OAuthenticator(LocalAuthenticator, Auth0OAuthenticator):
+      """A version that mixes in local system user creation"""
+  ```
+
+test "rank1478: the provider's verification claim decides the login"
+  lang python
+  file oauthenticator/auth0.py
+  reject VYQL-AUTH-146
+  reject_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  import os
+
+  from jupyterhub.auth import LocalAuthenticator
+  from tornado.web import HTTPError
+  from traitlets import Bool, Unicode, default
+
+  from .oauth2 import OAuthenticator
+
+
+  class Auth0OAuthenticator(OAuthenticator):
+      user_auth_state_key = "auth0_user"
+
+      @default("username_claim")
+      def _username_claim_default(self):
+          return "email"
+
+      allow_unverified_email = Bool(
+          False,
+          config=True,
+          help="""
+          Allow login with unverified email.
+          """,
+      )
+
+      auth0_domain = Unicode(config=True)
+
+      @default("userdata_url")
+      def _userdata_url_default(self):
+          return f"https://{self.auth0_domain}/userinfo"
+
+      async def check_allowed(self, username, auth_model):
+          if auth_model is None:
+              return True
+
+          user_info = auth_model["auth_state"][self.user_auth_state_key]
+          user_email = user_info["email"]
+
+          if not user_info.get("email_verified"):
+              if self.allow_unverified_email:
+                  self.log.warning(f"Allowing {username} with {user_email}")
+              else:
+                  message = f"Login with unverified email {user_email} is not allowed"
+                  self.log.warning(message)
+                  raise HTTPError(403, message)
+
+          return await super().check_allowed(username, auth_model)
+
+
+  class LocalAuth0OAuthenticator(LocalAuthenticator, Auth0OAuthenticator):
+      """A version that mixes in local system user creation"""
+  ```
+
+test "rank1478: the attestation is read under the provider's own spelling"
+  lang python
+  file oauthenticator/google.py
+  reject VYQL-AUTH-146
+  reject_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  import os
+
+  from tornado.web import HTTPError
+  from traitlets import List, Unicode, default
+
+  from .oauth2 import OAuthenticator
+
+
+  class GoogleOAuthenticator(OAuthenticator):
+      user_auth_state_key = "google_user"
+
+      @default("username_claim")
+      def _username_claim_default(self):
+          return "email"
+
+      hosted_domain = List(
+          Unicode(),
+          config=True,
+          help="""
+          Restrict sign-in to a list of Google organizations.
+          """,
+      )
+
+      @default("userdata_url")
+      def _userdata_url_default(self):
+          return "https://www.googleapis.com/oauth2/v1/userinfo"
+
+      async def check_allowed(self, username, auth_model):
+          if auth_model is None:
+              return True
+
+          user_info = auth_model["auth_state"][self.user_auth_state_key]
+          user_email = user_info["email"]
+
+          if not user_info["verified_email"]:
+              message = f"Login with unverified email {user_email} is not allowed"
+              self.log.warning(message)
+              raise HTTPError(403, message)
+
+          return await super().check_allowed(username, auth_model)
+  ```
+
+test "rank1478: a configured default names another claim for an unconfigured deployment"
+  lang python
+  file oauthenticator/globus.py
+  reject VYQL-AUTH-146
+  reject_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  import os
+
+  from traitlets import Bool, Unicode, default
+
+  from .oauth2 import OAuthenticator
+
+
+  class GlobusOAuthenticator(OAuthenticator):
+      user_auth_state_key = "globus_user"
+
+      identity_provider = Unicode(
+          config=True,
+          help="""
+          Restrict which institution a user can use to login.
+          """,
+      )
+
+      username_from_email = Bool(
+          False,
+          config=True,
+          help="""
+          Create username from email address, not preferred username.
+          """,
+      )
+
+      @default("username_claim")
+      def _username_claim_default(self):
+          if self.username_from_email:
+              return "email"
+          return "preferred_username"
+
+      @default("userdata_url")
+      def _userdata_url_default(self):
+          return "https://auth.globus.org/v2/oauth2/userinfo"
+  ```
+
+test "rank1478: an authenticator keyed on the provider's own account name"
+  lang python
+  file oauthenticator/github.py
+  reject VYQL-AUTH-146
+  reject_review code.UnverifiedEmailClaimIdentity
+  code
+  ```
+  import os
+
+  from traitlets import Set, Unicode, default
+
+  from .oauth2 import OAuthenticator
+
+
+  class GitHubOAuthenticator(OAuthenticator):
+      user_auth_state_key = "github_user"
+
+      @default("username_claim")
+      def _username_claim_default(self):
+          return "login"
+
+      github_url = Unicode("https://github.com", config=True)
+
+      @default("userdata_url")
+      def _userdata_url_default(self):
+          return f"{self.github_api_url}/user"
+
+      allowed_organizations = Set(
+          config=True,
+          help="""
+          Allow members of organizations or teams by specifying names.
+          """,
+      )
+  ```

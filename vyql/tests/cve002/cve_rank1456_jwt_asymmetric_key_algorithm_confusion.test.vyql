@@ -1,0 +1,224 @@
+# Rank 1456 / CVE-2015-9235 (CWE-347): jsonwebtoken's `verify` takes one
+# `secretOrPublicKey` parameter for both key families and hands it straight to
+# `jws.verify(jwtString, secretOrPublicKey)`, which reads the algorithm out of
+# the token's own header:
+#
+#	module.exports.verify = function(jwtString, secretOrPublicKey, options, callback) {
+#	  ...
+#	  var valid;
+#	  try {
+#	    valid = jws.verify(jwtString, secretOrPublicKey);
+#	  } catch (e) {
+#	    return done(e);
+#	  }
+#	  if (!valid)
+#	    return done(new JsonWebTokenError('invalid signature'));
+#
+# A caller that expects an RS*/ES* token and passes an RSA public key therefore
+# also accepts an HS* token, because `alg: HS256` makes the library HMAC the
+# token with that same public key as the shared secret -- and the public key is
+# public. The attacker mints any payload they like.
+#
+# The fixed revision adds the `algorithms` option, defaults it from the key material
+# (`BEGIN CERTIFICATE` -> the RS/ES list, otherwise the HS list) and rejects the
+# token when the header's `alg` is not in it:
+#
+#	if (!options.algorithms) {
+#	  options.algorithms = ~secretOrPublicKey.toString().indexOf('BEGIN CERTIFICATE') ?
+#	                      [ 'RS256','RS384','RS512','ES256','ES384','ES512' ] :
+#	                      [ 'HS256','HS384','HS512' ];
+#	}
+#	...
+#	var header = jws.decode(jwtString).header;
+#	if (!~options.algorithms.indexOf(header.alg)) {
+#	  return done(new JsonWebTokenError('invalid signature'));
+#	}
+#
+# Detection is code.JwtUnverified (VYQL-CFG-005, CWE-347), the concept the
+# `alg: none` bindings use, widened by
+# jwtVerifyAlgorithmFromTokenHeader1420: a function that verifies a JWT through
+# `jws.verify`/`jwt.verify` against key material named as a public key or
+# certificate, and never constrains the accepted algorithms. Both halves are the
+# libraries' own documented vocabulary -- `secretOrPublicKey` is jsonwebtoken's
+# published parameter name at both revisions, and `algorithms` is the published
+# option name that jose, express-jwt and passport-jwt spell the same way -- so
+# nothing here is the fixing commit's invention. The asymmetric-key requirement
+# is the weakness class, not a narrowing convenience: confusing HS* for RS* needs
+# a key the attacker can read, so an HMAC secret verified without an allow-list
+# is a different (and much weaker) complaint and is deliberately not reported.
+#
+# Measured on auth0/node-jsonwebtoken, three --cache off runs each: index.js:72
+# flags on the vulnerable revision and does not on the patched one, with the tree
+# at 22 findings either way (the patched revision's extra row is a hardcoded
+# token in the regression test the fixed revision adds). Collateral: the shape's reachable
+# set across the 169 sibling clones is nine further files -- n8n's Webhook
+# utils.ts and Jwt.node.ts and their tests, next.js's vendored copy of this very
+# library, nginx-proxy-manager's token.js and nhost's two jwt-verify.ts -- and
+# every one scans 0, seven of them because they pin `algorithms` explicitly. The
+# three code.JwtUnverified rows on n8n's Webhook utils.ts are the pre-existing
+# `alg: none` bindings and are unchanged by this one.
+
+test "rank1456: a JWT is verified with a public key while the token picks the algorithm"
+  lang javascript
+  file index.js
+  expect VYQL-CFG-005
+  code
+  ```
+  var jws = require('jws');
+  var JsonWebTokenError = require('./lib/JsonWebTokenError');
+
+  module.exports.verify = function(jwtString, secretOrPublicKey, options, callback) {
+    if (!options) options = {};
+
+    var done = function(err, data) {
+      if (err) throw err;
+      return data;
+    };
+
+    if (!jwtString) {
+      return done(new JsonWebTokenError('jwt must be provided'));
+    }
+
+    var parts = jwtString.split('.');
+
+    if (parts.length !== 3) {
+      return done(new JsonWebTokenError('jwt malformed'));
+    }
+
+    var valid;
+
+    try {
+      valid = jws.verify(jwtString, secretOrPublicKey);
+    } catch (e) {
+      return done(e);
+    }
+
+    if (!valid) {
+      return done(new JsonWebTokenError('invalid signature'));
+    }
+
+    return done(null, this.decode(jwtString));
+  };
+  ```
+
+test "rank1456: the header's algorithm is checked against the allow-list the key implies"
+  lang javascript
+  file index.js
+  reject VYQL-CFG-005
+  code
+  ```
+  var jws = require('jws');
+  var JsonWebTokenError = require('./lib/JsonWebTokenError');
+
+  module.exports.verify = function(jwtString, secretOrPublicKey, options, callback) {
+    if (!options) options = {};
+
+    var done = function(err, data) {
+      if (err) throw err;
+      return data;
+    };
+
+    if (!jwtString) {
+      return done(new JsonWebTokenError('jwt must be provided'));
+    }
+
+    var parts = jwtString.split('.');
+
+    if (parts.length !== 3) {
+      return done(new JsonWebTokenError('jwt malformed'));
+    }
+
+    if (!options.algorithms) {
+      options.algorithms = ~secretOrPublicKey.toString().indexOf('BEGIN CERTIFICATE') ?
+                          [ 'RS256','RS384','RS512','ES256','ES384','ES512' ] :
+                          [ 'HS256','HS384','HS512' ];
+    }
+
+    var valid;
+
+    try {
+      valid = jws.verify(jwtString, secretOrPublicKey);
+    } catch (e) {
+      return done(e);
+    }
+
+    if (!valid) {
+      return done(new JsonWebTokenError('invalid signature'));
+    }
+
+    var header = jws.decode(jwtString).header;
+    if (!~options.algorithms.indexOf(header.alg)) {
+      return done(new JsonWebTokenError('invalid signature'));
+    }
+
+    return done(null, this.decode(jwtString));
+  };
+  ```
+
+test "rank1456: a caller hands a public key to jwt.verify with nothing pinned"
+  lang javascript
+  file src/auth/verifyBearer.js
+  expect VYQL-CFG-005
+  code
+  ```
+  var fs = require('fs');
+  var jwt = require('jsonwebtoken');
+
+  var publicKey = fs.readFileSync('/etc/keys/idp.pub', 'utf8');
+
+  module.exports = function verifyBearer(req, res, next) {
+    var header = req.headers.authorization || '';
+    var token = header.replace('Bearer ', '');
+
+    try {
+      req.user = jwt.verify(token, publicKey);
+    } catch (err) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    return next();
+  };
+  ```
+
+test "rank1456: the caller pins the algorithm family the public key belongs to"
+  lang javascript
+  file src/auth/verifyBearer.js
+  reject VYQL-CFG-005
+  code
+  ```
+  var fs = require('fs');
+  var jwt = require('jsonwebtoken');
+
+  var publicKey = fs.readFileSync('/etc/keys/idp.pub', 'utf8');
+
+  module.exports = function verifyBearer(req, res, next) {
+    var header = req.headers.authorization || '';
+    var token = header.replace('Bearer ', '');
+
+    try {
+      req.user = jwt.verify(token, publicKey, { algorithms: ['RS256'] });
+    } catch (err) {
+      return res.status(401).json({ error: 'unauthorized' });
+    }
+
+    return next();
+  };
+  ```
+
+test "rank1456: a shared secret carries no algorithm confusion to report"
+  lang javascript
+  file src/auth/session.js
+  reject VYQL-CFG-005
+  code
+  ```
+  var jwt = require('jsonwebtoken');
+
+  module.exports = function readSession(req) {
+    var token = req.cookies.session;
+    if (!token) {
+      return null;
+    }
+
+    return jwt.verify(token, process.env.SESSION_SECRET);
+  };
+  ```

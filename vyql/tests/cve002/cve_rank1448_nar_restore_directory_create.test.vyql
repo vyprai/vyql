@@ -1,0 +1,93 @@
+# Rank 1448 / CVE-2024-45593: Nix's NAR restore sink created each directory
+# entry with std::filesystem::create_directory and threw the result away.
+# src/libutil/fs-sink.cc had
+#
+#   void RestoreSink::createDirectory(const CanonPath & path)
+#   {
+#       std::filesystem::create_directory(dstPath / path.rel());
+#   };
+#
+# create_directory returns false, without an error, when the path
+# names a directory - including a symlink to one - so a NAR carrying two
+# entries that land on the same name, or a restore into a destination an
+# attacker stages, unpacks into the pre-existing object instead
+# of being refused. The sibling createRegularFile in the same sink
+# opened with O_CREAT | O_EXCL and threw, so the collision protection simply
+# does not extend to directories. The fixed revision eb11c14998 tests the return
+# (if (!std::filesystem::create_directory(p)) throw Error("path '%s'
+# exists", p)) and, in src/libutil/archive.cc, hoists the prevName the
+# directory-entry loop compares against out of the loop body so the "NAR
+# directory is not sorted" rejection can actually fire.
+#
+# The binding keys on the API contract rather than on that layout: a
+# create_directory call whose path argument is a join of a base with another
+# component, whose boolean result reaches neither a unary operator nor a
+# comparison, and which is therefore unable to tell a directory it created
+# from one that is there. The third case below is the fixed revision's guard
+# written without the fixed revision's hoist, and is declined, which is what shows the
+# discriminator is the missing test and not the shape of the argument.
+
+test "rank1448: restore sink creates the entry directory and discards the-exists result"
+  lang cpp
+  file src/libutil/fs-sink.cc
+  expect VYQL-PATH-069
+  expect_review code.DirectoryCreateExistingPathUnchecked
+  code
+  ```
+  #include <filesystem>
+
+  void RestoreSink::createDirectory(const CanonPath & path)
+  {
+      std::filesystem::create_directory(dstPath / path.rel());
+  };
+
+  void RestoreSink::createRegularFile(const CanonPath & path, std::function<void(CreateRegularFileSink &)> func)
+  {
+      auto p = append(dstPath, path);
+      RestoreRegularFile crf;
+      crf.fd = open(p.c_str(), O_CREAT | O_EXCL | O_WRONLY | O_CLOEXEC, 0666);
+      if (!crf.fd) throw NativeSysError("creating file '%1%'", p);
+      func(crf);
+  }
+  ```
+
+test "rank1448: restore sink refuses an entry directory that exists"
+  lang cpp
+  file src/libutil/fs-sink.cc
+  reject VYQL-PATH-069
+  reject_review code.DirectoryCreateExistingPathUnchecked
+  code
+  ```
+  #include <filesystem>
+
+  static std::filesystem::path append(const std::filesystem::path & src, const CanonPath & path)
+  {
+      auto dst = src;
+      if (!path.rel().empty())
+          dst /= path.rel();
+      return dst;
+  }
+
+  void RestoreSink::createDirectory(const CanonPath & path)
+  {
+      auto p = append(dstPath, path);
+      if (!std::filesystem::create_directory(p))
+          throw Error("path '%s' already exists", p.string());
+  };
+  ```
+
+test "rank1448: the guard counts even when the destination path is still joined in the call"
+  lang cpp
+  file src/libutil/fs-sink.cc
+  reject VYQL-PATH-069
+  reject_review code.DirectoryCreateExistingPathUnchecked
+  code
+  ```
+  #include <filesystem>
+
+  void RestoreSink::createDirectory(const CanonPath & path)
+  {
+      if (!std::filesystem::create_directory(dstPath / path.rel()))
+          throw Error("path '%s' already exists", (dstPath / path.rel()).string());
+  };
+  ```

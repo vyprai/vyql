@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule UnverifiedEmailClaimIdentity {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_290]
+    id: "VYQL-AUTH-146"
+    severity: high
+  }
+  issue code.UnverifiedEmailClaimIdentity as identity
+}

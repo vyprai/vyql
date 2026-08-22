@@ -1,0 +1,337 @@
+# Rank 1471 / CVE-2017-5473: ntopng's Lua script dispatcher validated the CSRF
+# token only from inside the loop that walked the query string. src/Lua.cpp had
+#
+#   tok = strtok_r(query_string, "&", &where);
+#   while(tok != NULL) {
+#     ...
+#     if(strcmp(tok, "csrf") == 0) {
+#       mg_get_cookie(conn, "user", user, sizeof(user));
+#       if((ntop->getRedis()->get(decoded_buf, rsp, sizeof(rsp)) == -1)
+#          || (strcmp(rsp, user) != 0))
+#         return(send_error(conn, 500, msg, PAGE_ERROR, query_string, msg));
+#       else
+#         ntop->getRedis()->delKey(decoded_buf);
+#     }
+#     ...
+#   }
+#
+# so the verification ran only for a request that carried the parameter. A
+# request that simply omitted csrf never entered the branch, reached the Lua
+# page with no token checked at all, and every state-changing admin script is
+# reachable cross-site. The fixed revision f91fbe3d94 records that the branch runs
+# (bool csrf_found = false; ... csrf_found = true;) and, after the loop, refuses
+# an /admin/ URI whose flag is still clear.
+#
+# The binding keys on that structure, not on the fixed revision's identifier: a function
+# that splits a string with strtok_r/strsep and compares a piece of it against a
+# CSRF parameter name is a hand-rolled token check, and it is complete only if
+# some flag in the same function records that the comparison matched. The third
+# case writes the same enforcement with an int counter under a different name
+# and is declined, which is what shows the discriminator is the recorded
+# presence rather than a project-specific spelling.
+
+test "rank1471: script dispatcher checks the CSRF token only when the parameter is present"
+  lang cpp
+  file src/Lua.cpp
+  expect VYQL-RF-006
+  expect_review code.IncompleteCsrfTokenValidation
+  code
+  ```
+  #include <string.h>
+  #include <stdlib.h>
+
+  int Lua::handle_script_request(struct mg_connection *conn,
+                                 const struct mg_request_info *request_info,
+                                 char *script_path) {
+    char user[64] = { 0 };
+
+    if(request_info->query_string != NULL) {
+      char *query_string = strdup(request_info->query_string);
+
+      if(query_string) {
+        char *where;
+        char *tok;
+
+        tok = strtok_r(query_string, "&", &where);
+
+        while(tok != NULL) {
+          char *_equal = strchr(tok, '=');
+
+          if(_equal) {
+            char *decoded_buf;
+
+            _equal[0] = '\0';
+            _equal = &_equal[1];
+
+            if((decoded_buf = http_decode(_equal)) != NULL) {
+              if(strcmp(tok, "csrf") == 0) {
+                char rsp[32];
+
+                mg_get_cookie(conn, "user", user, sizeof(user));
+
+                if((ntop->getRedis()->get(decoded_buf, rsp, sizeof(rsp)) == -1)
+                   || (strcmp(rsp, user) != 0)) {
+                  const char *msg = "The submitted form is expired";
+                  return(send_error(conn, 500, msg, PAGE_ERROR, query_string, msg));
+                } else
+                  ntop->getRedis()->delKey(decoded_buf);
+              }
+
+              lua_push_str_table_entry(L, tok, decoded_buf);
+              free(decoded_buf);
+            }
+          }
+
+          tok = strtok_r(NULL, "&", &where);
+        }
+
+        free(query_string);
+      }
+    }
+
+    lua_setglobal(L, "_GET");
+    return(0);
+  }
+  ```
+
+test "rank1471: script dispatcher refuses an admin request that carried no CSRF parameter"
+  lang cpp
+  file src/Lua.cpp
+  reject VYQL-RF-006
+  reject_review code.IncompleteCsrfTokenValidation
+  code
+  ```
+  #include <string.h>
+  #include <stdlib.h>
+
+  int Lua::handle_script_request(struct mg_connection *conn,
+                                 const struct mg_request_info *request_info,
+                                 char *script_path) {
+    char user[64] = { 0 };
+    bool csrf_found = false;
+
+    if(request_info->query_string != NULL) {
+      char *query_string = strdup(request_info->query_string);
+
+      if(query_string) {
+        char *where;
+        char *tok;
+
+        tok = strtok_r(query_string, "&", &where);
+
+        while(tok != NULL) {
+          char *_equal = strchr(tok, '=');
+
+          if(_equal) {
+            char *decoded_buf;
+
+            _equal[0] = '\0';
+            _equal = &_equal[1];
+
+            if((decoded_buf = http_decode(_equal)) != NULL) {
+              if(strcmp(tok, "csrf") == 0) {
+                char rsp[32];
+
+                mg_get_cookie(conn, "user", user, sizeof(user));
+
+                if((ntop->getRedis()->get(decoded_buf, rsp, sizeof(rsp)) == -1)
+                   || (strcmp(rsp, user) != 0)) {
+                  const char *msg = "The submitted form is expired";
+                  return(send_error(conn, 500, msg, PAGE_ERROR, query_string, msg));
+                } else
+                  ntop->getRedis()->delKey(decoded_buf);
+
+                csrf_found = true;
+              }
+
+              lua_push_str_table_entry(L, tok, decoded_buf);
+              free(decoded_buf);
+            }
+          }
+
+          tok = strtok_r(NULL, "&", &where);
+        }
+
+        free(query_string);
+      }
+    }
+
+    if(strstr(request_info->uri, "/admin/") && (!csrf_found)) {
+      const char *msg = "Missing CSRF parameter";
+      return(send_error(conn, 500, msg, PAGE_ERROR, request_info->uri, msg));
+    }
+
+    lua_setglobal(L, "_GET");
+    return(0);
+  }
+  ```
+
+test "rank1471: script dispatcher counts the CSRF parameter it saw under a different name"
+  lang cpp
+  file src/Lua.cpp
+  reject VYQL-RF-006
+  reject_review code.IncompleteCsrfTokenValidation
+  code
+  ```
+  #include <string.h>
+  #include <stdlib.h>
+
+  int Lua::handle_script_request(struct mg_connection *conn,
+                                 const struct mg_request_info *request_info,
+                                 char *script_path) {
+    char user[64] = { 0 };
+    int seen_tokens = 0;
+
+    if(request_info->query_string != NULL) {
+      char *query_string = strdup(request_info->query_string);
+
+      if(query_string) {
+        char *where;
+        char *tok;
+
+        tok = strtok_r(query_string, "&", &where);
+
+        while(tok != NULL) {
+          char *_equal = strchr(tok, '=');
+
+          if(_equal) {
+            char *decoded_buf;
+
+            _equal[0] = '\0';
+            _equal = &_equal[1];
+
+            if((decoded_buf = http_decode(_equal)) != NULL) {
+              if(strcmp(tok, "csrf") == 0) {
+                char rsp[32];
+
+                mg_get_cookie(conn, "user", user, sizeof(user));
+
+                if((ntop->getRedis()->get(decoded_buf, rsp, sizeof(rsp)) == -1)
+                   || (strcmp(rsp, user) != 0)) {
+                  const char *msg = "The submitted form is expired";
+                  return(send_error(conn, 500, msg, PAGE_ERROR, query_string, msg));
+                } else
+                  ntop->getRedis()->delKey(decoded_buf);
+
+                seen_tokens = 1;
+              }
+
+              lua_push_str_table_entry(L, tok, decoded_buf);
+              free(decoded_buf);
+            }
+          }
+
+          tok = strtok_r(NULL, "&", &where);
+        }
+
+        free(query_string);
+      }
+    }
+
+    if(seen_tokens == 0) {
+      const char *msg = "Missing CSRF parameter";
+      return(send_error(conn, 500, msg, PAGE_ERROR, request_info->uri, msg));
+    }
+
+    lua_setglobal(L, "_GET");
+    return(0);
+  }
+  ```
+
+# The same hand-rolled shape occurs in plain C embedded HTTP servers, so the
+# C frontend carries the binding too.
+
+test "rank1471: C request handler validates the CSRF parameter only when it arrives"
+  lang c
+  file src/http_server.c
+  expect VYQL-RF-006
+  expect_review code.IncompleteCsrfTokenValidation
+  code
+  ```
+  #include <string.h>
+  #include <stdlib.h>
+
+  int handle_form_post(struct connection *conn, const char *query) {
+    char *copy = strdup(query);
+    char *where, *tok;
+
+    if(copy == NULL) return -1;
+
+    tok = strtok_r(copy, "&", &where);
+    while(tok != NULL) {
+      char *value = strchr(tok, '=');
+
+      if(value) {
+        *value++ = '\0';
+
+        if(strcmp(tok, "authenticity_token") == 0) {
+          char expected[64];
+
+          session_token(conn, expected, sizeof(expected));
+          if(strcmp(value, expected) != 0) {
+            free(copy);
+            return send_error(conn, 403, "bad token");
+          }
+        }
+
+        store_param(conn, tok, value);
+      }
+
+      tok = strtok_r(NULL, "&", &where);
+    }
+
+    free(copy);
+    return apply_settings(conn);
+  }
+  ```
+
+test "rank1471: C request handler refuses a form post that carried no CSRF parameter"
+  lang c
+  file src/http_server.c
+  reject VYQL-RF-006
+  reject_review code.IncompleteCsrfTokenValidation
+  code
+  ```
+  #include <string.h>
+  #include <stdlib.h>
+
+  int handle_form_post(struct connection *conn, const char *query) {
+    char *copy = strdup(query);
+    char *where, *tok;
+    int token_present = 0;
+
+    if(copy == NULL) return -1;
+
+    tok = strtok_r(copy, "&", &where);
+    while(tok != NULL) {
+      char *value = strchr(tok, '=');
+
+      if(value) {
+        *value++ = '\0';
+
+        if(strcmp(tok, "authenticity_token") == 0) {
+          char expected[64];
+
+          session_token(conn, expected, sizeof(expected));
+          if(strcmp(value, expected) != 0) {
+            free(copy);
+            return send_error(conn, 403, "bad token");
+          }
+
+          token_present = 1;
+        }
+
+        store_param(conn, tok, value);
+      }
+
+      tok = strtok_r(NULL, "&", &where);
+    }
+
+    free(copy);
+
+    if(!token_present)
+      return send_error(conn, 403, "missing token");
+
+    return apply_settings(conn);
+  }
+  ```

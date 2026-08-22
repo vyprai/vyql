@@ -1,0 +1,11 @@
+module code;
+
+concept MiddlewarePathMatchNormalizationMismatch : issue {
+  cwe: [CWE_863, CWE_436]
+  reviewAssumption: "the router that dispatches the request is what decides which middleware guards it, so any component that derives its own view of the request path can act on a request the guard was never given"
+  reviewCategory: access_control
+  reviewCondition: "a component canonicalizes or percent-decodes the request path differently from the router that dispatched it, so the path it matches or opens is not the path route selection and middleware dispatch were decided from"
+  reviewConfidence: high
+  reviewEvidence: "request path context {pattern} re-derives the request path for itself — percent-decoding alone where the router also normalizes duplicate slashes, trailing slashes, case and parameter delimiters, or decoding the reserved delimiters the router left encoded — and matches or opens the result"
+  vulnerableTo: [access_control.IncorrectAuthorization, access_control.BrokenAccess]
+}

@@ -2731,7 +2731,7 @@ binding httpInput57 {
 }
 
 binding storedHtmlWrite473 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.functionName contains "save" and node.context.assign contains "$page->description=$data[\"attributes\"][\"description\"]" and not (node.context.assign contains "$page->description=strip_tags(")
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "haxcms_page_break_description_stored_html_write"
   emit issue code.StoredHtmlWrite at node
 }
 
@@ -2807,6 +2807,21 @@ binding pathAccessCheck479 {
   emit check core.PathAccessCheck at call {
     covers endpoint {
       anchor: call
+    }
+  }
+}
+
+binding redirectTarget480 {
+  query pattern callExpr where callee.method == "header" and containsAny(args.any.literal, ["Location: "])
+  emit sink code.RedirectTargetSink at args[0]
+}
+
+binding redirectAllowlist481 {
+  query pattern callExpr where callee.method == "clean_param" and containsAny(args.any.literal, ["PARAM_LOCALURL"])
+  emit check core.RedirectAllowlist at call {
+    covers path {
+      from: call
+      to: call
     }
   }
 }

@@ -1,0 +1,62 @@
+module bindings.javascript.internal_request_header_filter_denylist;
+
+// A Next.js-style server talks to its own render and middleware workers over
+// HTTP, and encodes the routing decisions it has already taken as request
+// headers: `x-matched-path` and `x-now-route-matches` name the route the
+// platform resolved, `x-middleware-rewrite`, `x-middleware-next`,
+// `x-middleware-skip` and `x-middleware-override-headers` carry what middleware
+// decided about the request. Every one of them is an instruction from the
+// server to itself, so the request handler that faces the network strips them
+// before anything downstream reads them -- a module that enumerates these names
+// and deletes them out of an inbound header map is that filter.
+//
+// The filter is a denylist, and the header it forgets is honored exactly as if
+// the server had set it. `x-middleware-subrequest` is the recursion marker the
+// edge sandbox stamps on middleware's own outbound fetches: the middleware
+// runner splits it, counts how many times its own name appears, and returns an
+// `x-middleware-next` response without invoking the middleware at all once the
+// count reaches the recursion limit. A client that sends the marker itself is
+// therefore telling the server that middleware has already run, and middleware
+// is where authentication and authorization live -- so a filter that removes
+// the other internal headers and leaves this one turns every route the
+// middleware guards into an unauthenticated route.
+//
+// The binding asks for the two families together, because either alone is
+// ordinary: a middleware header appears wherever a rewrite is written, and a
+// platform routing header wherever a matched path is read. A module that names
+// both, tests header names for membership in a list, and deletes out of a
+// header map is enumerating internal headers in order to remove them.
+//
+// Naming any spelling of `x-middleware-subrequest` clears the flag, since both
+// remediations spell it: adding it to the denylist array, and the narrower form
+// of deleting it unless the request also carries the per-process nonce the
+// server generates at startup and the sandbox stamps beside the marker.
+//
+// Module scope rather than function scope, because the denylist is a
+// module-level array and the loop that consumes it is four lines: a
+// function-scope query sees the membership test and none of the names. That
+// makes the header literals readable as raw module text, comments included, so
+// each is spelled with the quote that opens it -- prose about middleware
+// rewrites is not a denylist entry, and a comment mentioning the subrequest
+// marker in passing does not clear the flag. The residual, in the
+// false-negative direction only, is a comment that spells the marker in the
+// quotes a denylist entry would carry; a filter whose remediation is a comment
+// is not one this reports.
+//
+// A module that reads one of these routing headers by name is the consumer, not
+// the filter: the base server reads `req.headers['x-matched-path']` to pick the
+// page, and co-occurs with a list membership test and a header delete of its
+// own without ever being a header filter. Subscript reads are AST-derived, so
+// that exclusion is not silenceable by a comment. Its cost is a filter that
+// also reads one of the headers it removes, which this does not report.
+binding internalRequestHeaderFilterOmitsSubrequestMarker {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "javascript"
+    and containsAny(node.context.literal, ["'x-middleware-rewrite'", "\"x-middleware-rewrite\"", "'x-middleware-next'", "\"x-middleware-next\"", "'x-middleware-skip'", "\"x-middleware-skip\"", "'x-middleware-override-headers'", "\"x-middleware-override-headers\""])
+    and containsAny(node.context.literal, ["'x-matched-path'", "\"x-matched-path\"", "'x-now-route-matches'", "\"x-now-route-matches\""])
+    and node.context.call == "includes"
+    and node.context.subscript contains "headers["
+    and not containsAny(node.context.subscript, ["x-matched-path", "x-now-route-matches"])
+    and not containsAny(node.context.literal, ["'x-middleware-subrequest", "\"x-middleware-subrequest", "`x-middleware-subrequest"])
+  emit issue code.LocalRequestBypassReview at node
+}

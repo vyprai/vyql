@@ -1,0 +1,6 @@
+module bindings.php.upload_archive_content_scan_php_extension_only;
+
+binding uploadArchiveContentScanPhpExtensionOnly {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.token contains "tmp_name" and node.context.call == "extractTo" and containsAny(node.token, ["assign_call_method:file_get_contents", "assign_call_method:fread", "assign_call_method:fgets", "assign_call_method:file"]) and containsAny(node.token, ["assign_literal:eval(", "assign_literal:exec(", "assign_literal:system(", "assign_literal:passthru(", "assign_literal:popen(", "assign_literal:proc_open(", "assign_literal:assert(", "assign_literal:<?"]) and containsAny(node.token, ["assign_literal:.php", "assign_literal:*php", "assign_literal:(php", "assign_literal:|php", "assign_literal:php|", "assign_literal:php)", "assign_literal:php$"]) and not containsAny(node.token, ["phtml", "phar", "php3", "php4", "php5", "php7", "phps", "pht"])
+  emit issue code.IncompleteDangerousUploadExtensionBlocklist at node
+}

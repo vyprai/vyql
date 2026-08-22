@@ -7,4 +7,5 @@ rule NetworkFilteringDisabled {
     severity: high
   }
   issue code.NetworkFilteringDisabled as n
+  unless n.postDominates coveredBy core.PacketFilterDefaultDeny
 }

@@ -1,0 +1,127 @@
+# Rank 1468 / CVE-2022-32168: Notepad++ resolved two of its optional Windows
+# support libraries by bare module name. PowerEditor/src/Parameters.cpp had
+#
+#   _hUXTheme = ::LoadLibrary(TEXT("uxtheme.dll"));
+#
+# and PowerEditor/src/MISC/Exception/MiniDumper.cpp had
+#
+#   HMODULE hDll = ::LoadLibrary( TEXT("DBGHELP.DLL") );
+#
+# LoadLibrary with an unqualified file name walks the process module search
+# order, which reaches the directory the executable starts from before it
+# reaches System32, so a copy of Notepad++ run out of a directory a lower
+# privileged account can write - a downloads folder, a shared drive - loads a
+# planted uxtheme.dll or DBGHELP.DLL with the process's own rights. The fixed revision
+# 85d7215d9b switches both to
+# ::LoadLibraryEx(name, nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32), which resolves
+# the name against the system directory alone and consults no other path.
+#
+# The binding is written from the loader's documented behaviour rather than
+# from this project: it reports a LoadLibrary/LoadLibraryEx call whose module
+# argument is a bare file name literal - no directory component, no drive
+# letter - unless the call also passes one of the search-order restricting
+# LOAD_LIBRARY_SEARCH_* flags. Names on the loader's KnownDLLs list are
+# excluded, because those resolve from the KnownDLLs section rather than by
+# searching, so a bare kernel32.dll or user32.dll is not plantable and
+# reporting it would be noise. The third case below is a KnownDLL loaded in
+# exactly the vulnerable spelling, and is declined.
+
+test "rank1468: theme and crash-dump libraries are resolved by bare module name"
+  lang cpp
+  file PowerEditor/src/Parameters.cpp
+  expect VYQL-PATH-075
+  expect_review code.UnqualifiedNativeLibraryLoad
+  code
+  ```
+  #include <windows.h>
+
+  bool NppParameters::load()
+  {
+      _hUXTheme = ::LoadLibrary(TEXT("uxtheme.dll"));
+      if (_hUXTheme)
+          _enableThemeDialogTextureFuncAddr = (WNDPROC)::GetProcAddress(_hUXTheme, "EnableThemeDialogTexture");
+      return true;
+  }
+
+  bool MiniDumper::writeDump(EXCEPTION_POINTERS * pExceptionInfo)
+  {
+      HMODULE hDll = ::LoadLibrary( TEXT("DBGHELP.DLL") );
+      if (hDll)
+          return true;
+      return false;
+  }
+  ```
+
+test "rank1468: both libraries are pinned to the system directory"
+  lang cpp
+  file PowerEditor/src/Parameters.cpp
+  reject VYQL-PATH-075
+  reject_review code.UnqualifiedNativeLibraryLoad
+  code
+  ```
+  #include <windows.h>
+
+  bool NppParameters::load()
+  {
+      _hUXTheme = ::LoadLibraryEx(TEXT("uxtheme.dll"), nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+      if (_hUXTheme)
+          _enableThemeDialogTextureFuncAddr = (WNDPROC)::GetProcAddress(_hUXTheme, "EnableThemeDialogTexture");
+      return true;
+  }
+
+  bool MiniDumper::writeDump(EXCEPTION_POINTERS * pExceptionInfo)
+  {
+      HMODULE hDll = ::LoadLibraryEx(TEXT("DBGHELP.DLL"), nullptr, LOAD_LIBRARY_SEARCH_SYSTEM32);
+      if (hDll)
+          return true;
+      return false;
+  }
+  ```
+
+test "rank1468: a KnownDLLs entry loaded by bare name resolves without a search"
+  lang cpp
+  file PowerEditor/src/MISC/Exception/MiniDumper.cpp
+  reject VYQL-PATH-075
+  reject_review code.UnqualifiedNativeLibraryLoad
+  code
+  ```
+  #include <windows.h>
+
+  bool MiniDumper::writeDump(EXCEPTION_POINTERS * pExceptionInfo)
+  {
+      HMODULE hDll = ::LoadLibrary( TEXT("kernel32.dll") );
+      HMODULE hUser = ::LoadLibraryW(L"USER32.dll");
+      return hDll != NULL && hUser != NULL;
+  }
+  ```
+
+test "rank1468: a fully qualified module path is not resolved by searching"
+  lang c
+  file PowerEditor/src/MISC/Exception/MiniDumper.c
+  reject VYQL-PATH-075
+  reject_review code.UnqualifiedNativeLibraryLoad
+  code
+  ```
+  #include <windows.h>
+
+  HMODULE openDumper(void)
+  {
+      return LoadLibraryA("C:\\Windows\\System32\\dbghelp.dll");
+  }
+  ```
+
+test "rank1468: a Win32 C caller resolves a support library by bare module name"
+  lang c
+  file PowerEditor/src/MISC/Exception/MiniDumper.c
+  expect VYQL-PATH-075
+  expect_review code.UnqualifiedNativeLibraryLoad
+  code
+  ```
+  #include <windows.h>
+
+  HMODULE openDumper(void)
+  {
+      HMODULE hDll = LoadLibraryA("dbghelp.dll");
+      return hDll;
+  }
+  ```

@@ -1075,6 +1075,15 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{c.cSwitch(n)}
 	case "compound_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
+	case "labeled_statement": // `name:` marks live code; lower the statement it names
+		var out []nir.Stmt
+		for _, ch := range c.namedChildren(n) {
+			if ch.Kind() == "statement_identifier" {
+				continue
+			}
+			out = append(out, c.stmt(ch)...)
+		}
+		return out
 	}
 	return nil
 }
@@ -1614,7 +1623,7 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 				if !seen[loc] {
 					seen[loc] = true
 					guard := "guard=missing_upper_bound"
-					if ccHasUpperBoundGuard(bodyText, compactIdx) {
+					if ccHasUpperBoundGuard(bodyText, compactCExprText(c.textBefore(body, n)), compactIdx) {
 						guard = "guard=upper_bound"
 					}
 					path := "analysis.index.access"
@@ -4476,11 +4485,118 @@ func ccStructuredIndex(s string) bool {
 	return strings.Contains(s, "->") || strings.Contains(s, ".")
 }
 
-func ccHasUpperBoundGuard(bodyText, idx string) bool {
-	return strings.Contains(bodyText, idx+"<") ||
-		strings.Contains(bodyText, idx+"<=") ||
-		strings.Contains(bodyText, ">"+idx) ||
-		strings.Contains(bodyText, ">="+idx)
+// ccHasUpperBoundGuard reports whether idx is bounded above somewhere the
+// access can rely on. bodyText is the whole function body; prefixText is the
+// part of it that precedes the access.
+func ccHasUpperBoundGuard(bodyText, prefixText, idx string) bool {
+	// Proceed-if-in-range spellings: `idx < BOUND` and `BOUND > idx`. Read over
+	// the whole body, as they always have been.
+	if ccComparisonAfter(bodyText, idx, '<', false) || ccComparisonBefore(bodyText, idx, '>') {
+		return true
+	}
+	// Reject-if-out-of-range spelling: `idx > BOUND` / `idx >= BOUND`, the form
+	// an early return or a clamp takes.
+	//
+	// Read only over what precedes the access. An early return bounds what
+	// comes after it and nothing else, and unlike a loop condition it carries
+	// no hint of its own scope, so crediting one from further down the function
+	// is how a guard three lines below an unguarded access gets read as
+	// protecting it.
+	//
+	// Only the index-on-the-left half is read at all. The mirrored `BOUND <
+	// idx` is not: it is indistinguishable from `for (i = 0; i < s->len; i++)`,
+	// where the field is the loop's bound rather than the bounded value, which
+	// would suppress the commonest shape this analysis exists to report.
+	//
+	// A zero or sign literal on the right is a nonzero/sign test (`s->len > 0`,
+	// `s->len >= 0`, `s->len > -1`), not a bound, and does not count either.
+	return ccComparisonAfter(prefixText, idx, '>', true)
+}
+
+// ccComparisonAfter reports whether bodyText contains `idx` immediately
+// followed by the relational operator op ("<" / ">", optionally with a
+// trailing "="). A doubled operator is a shift, not a comparison, and does
+// not count. When needBound is set, a right-hand side that is a zero or sign
+// literal does not count either.
+func ccComparisonAfter(bodyText, idx string, op byte, needBound bool) bool {
+	if idx == "" {
+		return false
+	}
+	for off := 0; ; {
+		i := strings.Index(bodyText[off:], idx)
+		if i < 0 {
+			return false
+		}
+		off += i + len(idx)
+		tail := bodyText[off:]
+		if len(tail) == 0 || tail[0] != op {
+			continue
+		}
+		if len(tail) > 1 && tail[1] == op {
+			continue
+		}
+		rhs := strings.TrimPrefix(tail[1:], "=")
+		if needBound && ccZeroOrSignLiteral(rhs) {
+			continue
+		}
+		return true
+	}
+}
+
+// ccComparisonBefore reports whether bodyText contains the relational
+// operator op ("<" / ">", optionally with a trailing "=") immediately before
+// `idx`. A doubled operator is a shift and does not count.
+func ccComparisonBefore(bodyText, idx string, op byte) bool {
+	if idx == "" {
+		return false
+	}
+	for off := 0; ; {
+		i := strings.Index(bodyText[off:], idx)
+		if i < 0 {
+			return false
+		}
+		at := off + i
+		head := bodyText[:at]
+		if strings.HasSuffix(head, string(op)+"=") {
+			head = head[:len(head)-1]
+		}
+		if strings.HasSuffix(head, string(op)) &&
+			!strings.HasSuffix(head, string(op)+string(op)) {
+			return true
+		}
+		off = at + len(idx)
+	}
+}
+
+// ccZeroOrSignLiteral reports whether s opens with the integer literal 0, -0
+// or -1 as a complete token. Those spell a nonzero or sign test rather than a
+// bound. A literal that continues into a longer number or identifier (0x10,
+// 0777, 0u, 1024) is a real bound.
+func ccZeroOrSignLiteral(s string) bool {
+	negative := strings.HasPrefix(s, "-")
+	if negative {
+		s = s[1:]
+	}
+	end := 0
+	for end < len(s) && s[end] >= '0' && s[end] <= '9' {
+		end++
+	}
+	if end == 0 {
+		return false
+	}
+	if end < len(s) && (s[end] == '.' || s[end] == '_' ||
+		(s[end] >= '0' && s[end] <= '9') ||
+		(s[end] >= 'a' && s[end] <= 'z') ||
+		(s[end] >= 'A' && s[end] <= 'Z')) {
+		return false
+	}
+	switch s[:end] {
+	case "0":
+		return true
+	case "1":
+		return negative
+	}
+	return false
 }
 
 func ccLastElementCountExpr(compactIdx string) (string, bool) {

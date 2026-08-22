@@ -3,5 +3,5 @@ module code;
 review code.UnsafeMutableAlias {
   category: memory
   kind: attention
-  text: "review unsafe mutable reference construction from raw pointer casts and aliasing/lifetime guarantees"
+  text: "review the aliasing and lifetime guarantees behind a mutable reference built from a raw pointer cast, or a copy that keeps sharing element storage its source still owns"
 }

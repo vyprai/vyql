@@ -1,0 +1,312 @@
+# Rank 1420 / CVE-2020-26892 (GHSA-4w5x-x539-ppf5, CWE-287/CWE-613): nats-server
+# authenticates clients from a user JWT and keeps two revocation lists per account
+# -- `usersRevoked` for user credentials and `actsRevoked` for import activation
+# tokens -- both maps of subject public key to a Unix timestamp, populated from the
+# account JWT's `Revocations` field.
+#
+# nats-io/jwt defines that timestamp against the *credential*: `RevocationList.Revoke`
+# revokes everything the subject is issued before it, and the library's own checks
+# take the credential's time (`IsRevoked(pubKey, timestamp)`, `IsClaimRevoked(claim)`).
+# server/accounts.go instead weighed each entry against the server's clock:
+#
+#	func (a *Account) checkUserRevoked(nkey string) bool {
+#		if a.usersRevoked == nil { return false }
+#		if t, ok := a.usersRevoked[nkey]; !ok || t > time.Now().Unix() { return false }
+#		return true
+#	}
+#
+# and, for activation tokens, `if t, ok := a.actsRevoked[act.Subject]; ok && t <= time.Now().Unix()`.
+# That is the weakness: the operand the revocation record is defined against -- the
+# presented credential's issue time -- never enters the comparison, so an entry dated
+# ahead of the clock revokes nothing and a user whose credentials the operator has
+# revoked keeps authenticating (server/auth.go's processClientOrLeafAuthentication
+# accepts the connection), while an entry the clock has passed revokes credentials
+# minted afterwards that it is never meant to cover. updateAccountClaimsWithRefresh
+# had the third instance, reading `ac.Revocations[nkey]` against a `now` captured at
+# the top of the function -- and against the *connection's* recorded nkey rather than
+# the JWT it presented.
+#
+# The fixed revision routes all three through one helper that takes the credential's time:
+#
+#	func isRevoked(revocations map[string]int64, subject string, issuedAt int64) bool {
+#		if revocations == nil { return false }
+#		if t, ok := revocations[subject]; !ok || t < issuedAt { return false }
+#		return true
+#	}
+#
+# with `checkUserRevoked(nkey, juc.IssuedAt)`, `!isRevoked(a.actsRevoked, act.Subject,
+# act.IssuedAt)`, and `ac.IsClaimRevoked(juc)` after decoding the connection's own JWT.
+# No clock is read in any of them.
+#
+# Nothing labelled it: the vulnerable server/ scan reported 61 findings and 1874
+# flags, none of them in checkUserRevoked, checkActivation or
+# updateAccountClaimsWithRefresh -- the nearest are code.SecretComparisonReview on
+# auth.go:809 and two code.WeakRandomValue in accounts.go. The ontology had no
+# revocation vocabulary at all: greping ontology/, review/ and packs/ for
+# "revok"/"revocation" returned nothing, and code.LdapCrlCredentialReuse is about
+# reusing LDAP bind credentials to fetch a CRL, not about honouring one.
+# code.OptionalTokenClaimValidation (VYQL-AUTH-118) is the closest existing concept
+# and is a different weakness -- a claim compared only when the token supplies it --
+# whereas here the claim is compared unconditionally against the wrong operand.
+#
+# Detection is code.RevocationCheckAgainstCurrentTime (VYQL-AUTH-121, CWE-287/CWE-613),
+# emitted by goRevocationCheckAgainstCurrentTime on a Go function that subscripts a
+# revocation-named record and reads the wall clock, with no issuance or not-before
+# time of the presented credential named in the body. The vocabulary is the
+# construction's, not this commit's: the hand-rolled subscript is what
+# `IsRevoked`/`IsClaimRevoked` exist to replace, and `IssuedAt`/`NotBefore` are
+# RFC 7519's `iat`/`nbf` in Go spelling.
+#
+# Measured: 3 flags on the vulnerable revision -- accounts.go:1529 checkActivation,
+# :1713 checkUserRevoked, :1817 updateAccountClaimsWithRefresh, which are exactly the
+# three functions the fixed revision rewrites -- and 0 on the patched revision over three
+# --cache off runs. Collateral is 0: across 115 other Go clones one file contains a
+# revocation-named subscript at all (argo-cd util/session/state.go, seven of them),
+# its map is a `map[string]bool` with no clock in the file, and argo-cd's util/,
+# nats-io/jwt and Mattermost's channels/app all scan to 0.
+#
+# Both facts are function-confined in Go, measured with minimal pairs rather than
+# assumed from `flagASTRoutingValuePrefixes` membership: the subscript in one method
+# and `time.Now()` in a sibling labels nothing, and a sibling function naming
+# `IssuedAt` does not silence a neighbouring vulnerable one. The last two cases below
+# pin both.
+#
+# Pool row: the row is flagged repo!->nats-io/jwt, which is failure mode 12 -- a
+# multi-repository advisory recording only its first repo. 1e08b67f08 resolves in
+# nats-io/nats-server and not in nats-io/jwt, its parent carries all three wall-clock
+# comparisons and its tree carries isRevoked and IsClaimRevoked, so the row stands.
+
+test "rank1420: a user revocation entry is weighed against the server clock"
+  lang go
+  file server/accounts.go
+  expect VYQL-AUTH-121
+  expect_review code.RevocationCheckAgainstCurrentTime
+  code
+  ```
+  package server
+
+  import (
+  	"sync"
+  	"time"
+  )
+
+  type Account struct {
+  	mu           sync.RWMutex
+  	Name         string
+  	usersRevoked map[string]int64
+  }
+
+  // checkUserRevoked will check if a user has been revoked.
+  func (a *Account) checkUserRevoked(nkey string) bool {
+  	a.mu.RLock()
+  	defer a.mu.RUnlock()
+  	if a.usersRevoked == nil {
+  		return false
+  	}
+  	if t, ok := a.usersRevoked[nkey]; !ok || t > time.Now().Unix() {
+  		return false
+  	}
+  	return true
+  }
+  ```
+
+test "rank1420: an activation token revocation entry is weighed against the server clock"
+  lang go
+  file server/accounts.go
+  expect VYQL-AUTH-121
+  expect_review code.RevocationCheckAgainstCurrentTime
+  code
+  ```
+  package server
+
+  import (
+  	"sync"
+  	"time"
+  )
+
+  type ActivationClaims struct {
+  	Subject  string
+  	IssuedAt int64
+  }
+
+  type Account struct {
+  	mu          sync.RWMutex
+  	actsRevoked map[string]int64
+  }
+
+  // checkActivation will check the activation token for validity.
+  func (a *Account) checkActivation(act *ActivationClaims, expTimer bool) bool {
+  	if act == nil || act.Subject == "" {
+  		return false
+  	}
+  	if expTimer {
+  		a.mu.Lock()
+  		a.mu.Unlock()
+  	}
+  	// Check for token revocation..
+  	if a.actsRevoked != nil {
+  		if t, ok := a.actsRevoked[act.Subject]; ok && t <= time.Now().Unix() {
+  			return false
+  		}
+  	}
+
+  	return true
+  }
+  ```
+
+test "rank1420: a revocation entry weighed against the credential's issue time"
+  lang go
+  file server/accounts.go
+  reject VYQL-AUTH-121
+  reject_review code.RevocationCheckAgainstCurrentTime
+  code
+  ```
+  package server
+
+  import (
+  	"sync"
+  	"time"
+  )
+
+  type Account struct {
+  	mu           sync.RWMutex
+  	usersRevoked map[string]int64
+  	expiration   time.Time
+  }
+
+  func isRevoked(revocations map[string]int64, subject string, issuedAt int64) bool {
+  	if revocations == nil {
+  		return false
+  	}
+  	if t, ok := revocations[subject]; !ok || t < issuedAt {
+  		return false
+  	}
+  	return true
+  }
+
+  // checkUserRevoked will check if a user has been revoked.
+  func (a *Account) checkUserRevoked(nkey string, issuedAt int64) bool {
+  	a.mu.RLock()
+  	defer a.mu.RUnlock()
+  	return isRevoked(a.usersRevoked, nkey, issuedAt)
+  }
+  ```
+
+test "rank1420: an inline revocation comparison against the credential's issue time still reads the clock"
+  lang go
+  file server/accounts.go
+  reject VYQL-AUTH-121
+  reject_review code.RevocationCheckAgainstCurrentTime
+  code
+  ```
+  package server
+
+  import (
+  	"sync"
+  	"time"
+  )
+
+  type UserClaims struct {
+  	Subject  string
+  	IssuedAt int64
+  }
+
+  type Account struct {
+  	mu           sync.RWMutex
+  	usersRevoked map[string]int64
+  }
+
+  func (a *Account) checkUserRevoked(juc *UserClaims) bool {
+  	a.mu.RLock()
+  	defer a.mu.RUnlock()
+  	if t, ok := a.usersRevoked[juc.Subject]; ok && t >= juc.IssuedAt {
+  		a.lastRevocationCheck(time.Now())
+  		return true
+  	}
+  	return false
+  }
+
+  func (a *Account) lastRevocationCheck(when time.Time) {}
+  ```
+
+test "rank1420: the account's revocation map is refreshed and the connection's own JWT is asked"
+  lang go
+  file server/accounts.go
+  reject VYQL-AUTH-121
+  reject_review code.RevocationCheckAgainstCurrentTime
+  code
+  ```
+  package server
+
+  import (
+  	"sync"
+  	"time"
+  )
+
+  type UserClaims struct {
+  	Subject  string
+  	IssuedAt int64
+  }
+
+  type AccountClaims struct {
+  	Revocations map[string]int64
+  }
+
+  func (ac *AccountClaims) IsClaimRevoked(juc *UserClaims) bool { return false }
+
+  type Account struct {
+  	mu           sync.RWMutex
+  	usersRevoked map[string]int64
+  	updated      time.Time
+  }
+
+  func (a *Account) updateAccountClaims(ac *AccountClaims, jwts []string) {
+  	a.mu.Lock()
+  	if len(ac.Revocations) > 0 {
+  		a.usersRevoked = make(map[string]int64, len(ac.Revocations))
+  		for pk, t := range ac.Revocations {
+  			a.usersRevoked[pk] = t
+  		}
+  	} else {
+  		a.usersRevoked = nil
+  	}
+  	a.updated = time.Now()
+  	a.mu.Unlock()
+
+  	for _, theJWT := range jwts {
+  		if ac.Revocations != nil && theJWT != "" {
+  			juc := &UserClaims{Subject: theJWT, IssuedAt: 0}
+  			if ok := ac.IsClaimRevoked(juc); ok {
+  				continue
+  			}
+  		}
+  	}
+  }
+  ```
+
+test "rank1420: a revocation lookup and a clock read in separate functions are not one check"
+  lang go
+  file server/accounts.go
+  reject VYQL-AUTH-121
+  reject_review code.RevocationCheckAgainstCurrentTime
+  code
+  ```
+  package server
+
+  import "time"
+
+  type Account struct {
+  	usersRevoked map[string]int64
+  }
+
+  func (a *Account) isListed(nkey string) bool {
+  	if t, ok := a.usersRevoked[nkey]; !ok || t < 0 {
+  		return false
+  	}
+  	return true
+  }
+
+  func (a *Account) stamp() int64 {
+  	return time.Now().Unix()
+  }
+  ```

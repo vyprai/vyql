@@ -1,0 +1,203 @@
+# Rank 1424 / CVE-2026-26011 (GHSA-mgj5-g2p6-gc5x): nav2_amcl's particle-filter
+# clustering, pf_cluster_stats() in nav2_amcl/src/pf/pf.c, takes a cluster
+# label from pf_kdtree_get_cluster(), which returns -1 when the kd-tree lookup
+# misses (pf_kdtree.c:176-178). The only lower-bound protection on that label
+# is `assert(cidx >= 0)`, which NDEBUG removes from every Release build -- the
+# way nav2 ships. The surviving runtime guard checks the upper bound only
+# (`if (cidx >= set->cluster_max_count) { continue; }`), so `set->clusters +
+# cidx` addresses one pf_cluster_t *before* the calloc'd array and the
+# accumulate statements that follow write through it. CWE-787/CWE-129 by way
+# of CWE-617.
+#
+# The lookup miss is reachable from the wire: extreme `covariance` values in a
+# geometry_msgs/PoseWithCovarianceStamped published to /initialpose make the
+# Gaussian-sampled poses overflow the int conversion in
+# `key[i] = floor(pose.v[i] / self->size[i])`, so insertion and lookup compute
+# inconsistent keys and pf_kdtree_find_node() returns NULL. The attacker is
+# any node on the same ROS 2 / DDS domain -- /initialpose carries no
+# authentication or authorisation by default, so a single published message is
+# enough.
+#
+# # What the fixing commit does, and what it does not: d09ea82477 does not touch
+# pf.c. It adds `#include <array>` plus one line to
+# nav2_ros_common/include/nav2_ros_common/validate_messages.hpp:
+#
+#     bool validateMsg(const geometry_msgs::msg::PoseWithCovarianceStamped & msg)
+#     {
+#       if (!validateMsg(msg.header)) {return false;}
+#       if (!validateMsg(msg.pose)) {return false;}
+#   +   if (!validateMsg(msg.pose.covariance)) {return false;}
+#       return true;
+#     }
+#
+# At the parent that added line is redundant: `msg.pose` has type
+# geometry_msgs::msg::PoseWithCovariance, so `validateMsg(msg.pose)`
+# resolves by overload to the PoseWithCovariance form (line 137 of the parent
+# file), which itself calls `validateMsg(msg.covariance)` -> the
+# `std::array<double, N>` template that rejects any element outside
+# [MIN_COVARIANCE, MAX_COVARIANCE] = [0, 1e9]. Compiling the parent's complete
+# overload set against the advisory's own proof-of-concept value
+# (covariance[0] = 57647175600963584.0) returns false, i.e. rejected, before
+# the change. So the covariance bound is reachable in main, the added
+# line restates it, and the un-remediated defect -- the assert-only lower
+# bound in pf_cluster_stats() -- is still present at d09ea82477 itself. The
+# vulnerable state the pinned cases below model is therefore the index axis,
+# not the validator.
+#
+# Measured miss. nav2_amcl at the parent reports 26 findings over three
+# --cache off runs (stable at 26), none of them at pf.c:509-518. Four
+# VYQL-MEM-010 (code.FieldDerivedIndexAccess) rows land in the sibling file
+# pf_kdtree.c at 263/265/280/311 -- `key[node->pivot_dim]`, guarded by nothing
+# but `assert(node->pivot_dim >= 0)` two lines above -- so the rule that names
+# this weakness class fires on the field-derived form in the same package and
+# not on the call-derived one that is the CVE. `code.NullableDeref` rows land
+# on amcl_node.cpp:410 and :1282, which are the two `if
+# (!nav2::validateMsg(*msg))` rejection lines: the scanner reports the
+# validation and says nothing about the write.
+#
+# Why nothing is labelled. The pointer offset itself is labelled
+# code.IntegerSizeArithmeticSink / code.IndexAccessSink, but `cidx` carries no
+# taint and there is no issue concept for the shape. Three independent causes,
+# all in ccIndexAccessObservations
+# (internal/extract/frontend/treesitter/c.go:1595):
+#   1. the walk only visits `subscript_expression`, so pointer-offset
+#      addressing (`set->clusters + cidx`) is not an index at all;
+#   2. `ccStructuredIndex` (c.go:4475) accepts an index only when its text
+#      contains "->" or "." , so a plain local is never an index of interest --
+#      the 1295/1310 gap, here on the "the index came from a call" axis;
+#   3. there is no lower-bound axis. `ccHasUpperBoundGuard` (c.go:4479) is the
+#      only guard test and it recognises only the accepting polarity
+#      (`idx<X`, `idx<=X`, `X>idx`, `X>=idx`), so neither the rejecting guard
+#      the real code writes nor an `assert(cidx >= 0)` registers either way.
+#
+# This is rank 1296's engine gap restated on the index axis: the only two C
+# bindings for code.ReachableAssertionReview / VYQL-DOS-040
+# (reachableAssertionReview129 in bindings/c/mce54b166.vyql,
+# reachableAssertionReview77 in bindings/cpp/m4e783366.vyql) both route through
+# `node.analysis ~= "assertion.<one library's shape>"`, i.e. a hand-written Go
+# observation per case, and the same is true of every sibling index concept
+# (fieldDerivedIndexAccess79, binarySearchTableIndexGuardBypass98,
+# pointerOffsetBoundsCheck115). Covering this shape needs a new extraction
+# capability -- correlate a callee's negative failure sentinel with an index or
+# pointer-offset use, and treat assert() as not a runtime control -- plus a
+# guard axis that does not exist. Not mechanical.
+#
+# Precision measurement that rules out the data-layer route. Across the ~100
+# C/C++ clones under /tmp/cve-work/rank*/ there are 337 `assert(<id> >= 0)` /
+# `> 0` / `!= -1` occurrences in 167 files. Narrowing to sites where the same
+# identifier is also used as a subscript index or pointer offset within 3000
+# characters -- an identity unification VyQL cannot express (1391) -- still
+# leaves 108 sites in 63 files, essentially all loop counters whose
+# non-negativity holds by construction. One true positive in 109 candidates:
+# a function-scoped binding on "assert is the only >= 0 check and the value is
+# used as an offset" is unshippable, and the discriminator between an assert
+# that documents a true invariant and an assert that is the only check on an
+# attacker-influenced value is provenance the engine does not have.
+#
+# Pool row is correct as written: d09ea82477 is on main in
+# ros-navigation/navigation2 and is the advisory's fix commit. Rank 1425's
+# ros-planning/navigation2 is the same repository under its pre-rename org --
+# github.com/ros-planning/navigation2 redirects and resolves to the identical
+# HEAD (8b2d3a1c) -- so a collateral measurement against that clone would be
+# vacuous; the enumeration above is over the other C/C++ trees instead.
+#
+# No definition is touched, so the OWASP Java and Python numbers are
+# unaffected by this rank.
+
+test "rank1424: pf_cluster_stats offsets the cluster array by a lookup result whose only lower bound is assert()"
+  lang c
+  file pf.c
+  reject VYQL-MEM-010
+  code
+  ```
+  #include <assert.h>
+  #include <stdlib.h>
+
+  typedef struct { double v[3]; } pf_vector_t;
+  typedef struct { double weight; pf_vector_t mean; double m[4]; } pf_cluster_t;
+  typedef struct { pf_vector_t pose; double weight; } pf_sample_t;
+  typedef struct {
+    void * kdtree;
+    pf_sample_t * samples;
+    int sample_count;
+    pf_cluster_t * clusters;
+    int cluster_count;
+    int cluster_max_count;
+  } pf_sample_set_t;
+
+  int pf_kdtree_get_cluster(void * self, pf_vector_t pose);
+
+  void pf_cluster_stats(pf_sample_set_t * set)
+  {
+    int i, cidx;
+    pf_sample_t * sample;
+    pf_cluster_t * cluster;
+
+    set->cluster_count = 0;
+
+    for (i = 0; i < set->sample_count; i++) {
+      sample = set->samples + i;
+
+      cidx = pf_kdtree_get_cluster(set->kdtree, sample->pose);
+      assert(cidx >= 0);
+      if (cidx >= set->cluster_max_count) {
+        continue;
+      }
+      if (cidx + 1 > set->cluster_count) {
+        set->cluster_count = cidx + 1;
+      }
+
+      cluster = set->clusters + cidx;
+      cluster->weight += sample->weight;
+      cluster->m[0] += sample->weight * sample->pose.v[0];
+    }
+  }
+  ```
+
+test "rank1424: a runtime lower-bound rejection on the same lookup result is the safe form"
+  lang c
+  file pf.c
+  reject VYQL-MEM-010
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef struct { double v[3]; } pf_vector_t;
+  typedef struct { double weight; pf_vector_t mean; double m[4]; } pf_cluster_t;
+  typedef struct { pf_vector_t pose; double weight; } pf_sample_t;
+  typedef struct {
+    void * kdtree;
+    pf_sample_t * samples;
+    int sample_count;
+    pf_cluster_t * clusters;
+    int cluster_count;
+    int cluster_max_count;
+  } pf_sample_set_t;
+
+  int pf_kdtree_get_cluster(void * self, pf_vector_t pose);
+
+  void pf_cluster_stats(pf_sample_set_t * set)
+  {
+    int i, cidx;
+    pf_sample_t * sample;
+    pf_cluster_t * cluster;
+
+    set->cluster_count = 0;
+
+    for (i = 0; i < set->sample_count; i++) {
+      sample = set->samples + i;
+
+      cidx = pf_kdtree_get_cluster(set->kdtree, sample->pose);
+      if (cidx < 0 || cidx >= set->cluster_max_count) {
+        continue;
+      }
+      if (cidx + 1 > set->cluster_count) {
+        set->cluster_count = cidx + 1;
+      }
+
+      cluster = set->clusters + cidx;
+      cluster->weight += sample->weight;
+      cluster->m[0] += sample->weight * sample->pose.v[0];
+    }
+  }
+  ```

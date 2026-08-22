@@ -1,0 +1,291 @@
+# Rank 1401 / CVE-2026-29167: a use-after-free (CWE-416) in Apache httpd's
+# mod_ldap, in per-directory configuration. uldap_connection_find() builds an
+# LDAP connection in a pool it creates with apr_pool_create(&newpool, NULL) --
+# no parent, so it lives for the life of the process -- and links it into
+# st->connections, the module's connection cache. Into that cached object it
+# copied the per-directory client certificate list with
+#
+#     l->client_certs = apr_array_copy_hdr(l->pool, dc->client_certs);
+#
+# apr_array_copy_hdr() is documented as the shallow half of a documented pair:
+# "copies the headers of the array, and arranges for the elements to be copied
+# if and only if the code subsequently does a push or arraycat", and its body in
+# apr/tables/apr_tables.c is res->elts = arr->elts. So the cached connection
+# held an alias for element storage owned by the per-directory config pool. With
+# LDAPTrustedClientCert in an .htaccess the per-directory config is built in the
+# request pool and freed at the end of the request, while the connection stays
+# in the cache; the next request that reuses that connection walks
+# client_certs->elts and reads freed memory, and every element carries a
+# certificate path and password. The fixed revision switches to apr_array_copy(), the deep
+# half of the pair, and then apr_pstrdup()s each element's path and password
+# into l->pool as well, because apr_array_copy copies the element structs
+# bytewise and their own pointers would still reference the source pool.
+#
+# Pool row correction, and it is a large one. Line 1402 reads
+# `mod_h2  icing  github.com  CVE-2026-29167  35c6e405390ed361189a82acd96675401ea5947c  1  c`
+# and both the repository and the commit are wrong. The advisory
+# (GHSA-85f4-9pxx-739j) has no source_code_location and no commit reference at
+# all -- its references are NVD, httpd.apache.org/security/vulnerabilities_24.html
+# and two openwall threads -- which is what the metadata report's REPO_UNKNOWN
+# record, and build_pool.py fills both fields by guess. The
+# advisory's own text is "Use After Free vulnerability in Apache HTTP Server
+# with mod_ldap in per-directory configuration", affecting 2.4.0 through 2.4.67
+# and fixed in 2.4.68, and Apache's page names the fixing revision: r1934935 on
+# the 2.4.x branch, 2026-06-03. In the git mirror that is
+# apache/httpd 2cf9b3f393633f43746047e779fdf265a1ad8016, "Merge r1934932 from
+# trunk: * modules/ldap/util_ldap.c (uldap_connection_find): Fix inheritance in
+# per-dir context", 17 insertions in one file. The correct row is
+# `httpd  apache  github.com  CVE-2026-29167  2cf9b3f393633f43746047e779fdf265a1ad8016  1  c`.
+#
+# The commit the row named is a real, single-parent, readable fix -- icing/mod_h2
+# 35c6e405, "cookie reqest header counting", which makes req_add_header() set
+# *pwas_added when it merges a second Cookie field so LimitRequestFields keeps
+# counting -- but it is a fix for a different weakness class (CWE-770 limit
+# bypass, not CWE-416) and mod_h2's own HTTP/2 CVEs in 2.4.68 are CVE-2026-48913
+# and CVE-2026-49975. So the `nocommit` flag needed neither a merge-preview diff
+# nor a reconstruction: `git show` in a plain clone read the named commit in
+# full, and reading it is what showed it answers the wrong advisory.
+#
+# FIXED. Nothing labelled the shape: modules/ + server/ + include/ at the
+# vulnerable parent (282 .c files) reports 5767 findings over two runs and none
+# of them names uldap_connection_find or apr_array_copy_hdr.
+#
+# aprArrayHeaderCopyRetainedAlias1 emits the existing code.UnsafeMutableAlias
+# (VYQL-MEM-009, CWE-416/787) for a C function that assigns an
+# apr_array_copy_hdr result to a struct field or through a pointer. Both halves
+# are documentation-derived: apr_tables.h says the call shares the source's
+# elements, and escaping the frame is what lets the alias outlive the pool that
+# owns them. A copy kept in a local cannot, which is why apr_array_append() --
+# APR's own correct use of the same call, `apr_array_header_t *res =
+# apr_array_copy_hdr(p, first)` -- does not match: its assign_shape is
+# `ID=apr_array_copy_hdr(ID,ID)` where the defect's is
+# `ID.FIELD=apr_array_copy_hdr(ID.FIELD,ID.FIELD)`.
+#
+# The clause is node.context.assignShape, which is not one of the AST-routing
+# value prefixes, so it stays on the function context's own tokens. That is
+# deliberate: server/core.c:1487 carries the comment "Use apr_array_copy instead
+# of apr_array_copy_hdr because it does not protect from the way unset_define
+# removes entries", and a text match over the C function body -- which keeps
+# comments -- would have reported it. It does not.
+#
+# The documented neutraliser is not in the binding, and the measurement is why.
+# apr_tables.h says a push or arraycat onto the copy forces the elements into
+# the destination pool, so `not (callArgShape has apr_array_push/apr_array_cat)`
+# is the right control on paper and it works on a minimal pair (the fourth test
+# below). On the real file it deletes the true positive: util_ldap.c's
+# uldap_connection_find spans lines 741-933, its apr_array_push calls are at
+# 1383, 2460 and 2540 in three other functions, and the function context at 741
+# carries their tokens anyway -- `assignShape contains "=apr_array_push("`
+# matches the context at 741 as well as the three real ones, while a token
+# absent from the whole file (apr_array_cat) matches nothing. The
+# over-collection is one-directional: the other functions' contexts do not carry
+# line 901's token. The likely cause is the file's preprocessor-split braces,
+# where uldap_connection_find opens a brace inside one `#if APR_HAS_THREADS`
+# block and closes it inside the next, which no single parse of the file can
+# nest; a two-function minimal pair with the same construct does not reproduce
+# it, so the trigger is larger than the construct alone. Either way, a negation
+# in a C function-scope binding is silenceable by an unrelated later function in
+# any file built this way, so the retention narrowing carries the precision
+# instead.
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 6GB,
+# --cache off), counts stable over the runs shown. modules/ + server/ +
+# include/ at 2cf9b3f39^ reports 5767 findings including exactly one
+# VYQL-MEM-009, at modules/ldap/util_ldap.c:741; the same trees at 2cf9b3f39
+# report 5766 and zero. modules/ alone: 3962 with the one finding, 3961 without.
+# False positives: apache/apr, which holds the only other apr_array_copy_hdr
+# call in either project, reports it zero times; grep over apache/subversion
+# (2345 files, 16 apr_array_copy calls) and over the 119 other repository clones
+# on this machine finds no apr_array_copy_hdr call at all, so there is
+# nothing else for the token to match. server/core.c's comment naming the call
+# does not fire.
+#
+
+test "rank1401: a cached connection keeps the per-dir client cert list by header copy"
+  lang c
+  file util_ldap.c
+  expect VYQL-MEM-009
+  expect_review code.UnsafeMutableAlias
+  code
+  ```
+  #include "util_ldap.h"
+
+  static util_ldap_connection_t *
+              uldap_connection_find(request_rec *r,
+                                    const char *host, int port,
+                                    const char *binddn, const char *bindpw,
+                                    deref_options deref, int secureflag)
+  {
+      util_ldap_connection_t *l;
+      util_ldap_config_t *dc = ap_get_module_config(r->per_dir_config, &ldap_module);
+      util_ldap_state_t *st = ap_get_module_config(r->server->module_config, &ldap_module);
+      apr_pool_t *newpool;
+
+      if (apr_pool_create(&newpool, NULL) != APR_SUCCESS) {
+          return NULL;
+      }
+      apr_pool_tag(newpool, "util_ldap_connection");
+
+      l = apr_pcalloc(newpool, sizeof(util_ldap_connection_t));
+      l->pool = newpool;
+      l->st = st;
+      l->host = apr_pstrdup(l->pool, host);
+      l->port = port;
+      l->deref = deref;
+      l->secure = secureflag;
+
+      /* save away a copy of the client cert list that is presently valid */
+      l->client_certs = apr_array_copy_hdr(l->pool, dc->client_certs);
+
+      l->keep = (st->connection_pool_ttl == 0) ? 0 : 1;
+      st->connections = l;
+      return l;
+  }
+  ```
+
+test "rank1401: the cert list is deep-copied into the connection pool"
+  lang c
+  file util_ldap.c
+  reject VYQL-MEM-009
+  reject_review code.UnsafeMutableAlias
+  code
+  ```
+  #include "util_ldap.h"
+
+  static util_ldap_connection_t *
+              uldap_connection_find(request_rec *r,
+                                    const char *host, int port,
+                                    const char *binddn, const char *bindpw,
+                                    deref_options deref, int secureflag)
+  {
+      util_ldap_connection_t *l;
+      util_ldap_config_t *dc = ap_get_module_config(r->per_dir_config, &ldap_module);
+      util_ldap_state_t *st = ap_get_module_config(r->server->module_config, &ldap_module);
+      apr_pool_t *newpool;
+
+      if (apr_pool_create(&newpool, NULL) != APR_SUCCESS) {
+          return NULL;
+      }
+      apr_pool_tag(newpool, "util_ldap_connection");
+
+      l = apr_pcalloc(newpool, sizeof(util_ldap_connection_t));
+      l->pool = newpool;
+      l->st = st;
+      l->host = apr_pstrdup(l->pool, host);
+      l->port = port;
+      l->deref = deref;
+      l->secure = secureflag;
+
+      /* Deep-copy the client cert list into the connection pool so that
+       * the cached connection does not retain pointers into the
+       * (potentially short-lived) per-directory config pool.
+       */
+      l->client_certs = apr_array_copy(l->pool, dc->client_certs);
+      if (!apr_is_empty_array(l->client_certs)) {
+          int i;
+          apr_ldap_opt_tls_cert_t *certs;
+
+          certs = (apr_ldap_opt_tls_cert_t *)l->client_certs->elts;
+          for (i = 0; i < l->client_certs->nelts; i++) {
+              if (certs[i].path)
+                  certs[i].path = apr_pstrdup(l->pool, certs[i].path);
+              if (certs[i].password)
+                  certs[i].password = apr_pstrdup(l->pool, certs[i].password);
+          }
+      }
+
+      l->keep = (st->connection_pool_ttl == 0) ? 0 : 1;
+      st->connections = l;
+      return l;
+  }
+  ```
+
+test "rank1401: the header copy stays in a local that dies with the frame"
+  lang c
+  file apr_tables.c
+  reject VYQL-MEM-009
+  reject_review code.UnsafeMutableAlias
+  code
+  ```
+  #include "apr_tables.h"
+
+  APR_DECLARE(apr_array_header_t *)
+      apr_array_append(apr_pool_t *p,
+                        const apr_array_header_t *first,
+                        const apr_array_header_t *second)
+  {
+      apr_array_header_t *res = apr_array_copy_hdr(p, first);
+
+      apr_array_cat(res, second);
+      return res;
+  }
+  ```
+
+test "rank1401: a sibling function's push does not excuse the retained alias"
+  lang c
+  file util_ldap.c
+  expect VYQL-MEM-009
+  expect_review code.UnsafeMutableAlias
+  code
+  ```
+  #include "util_ldap.h"
+
+  static void *conn_find(request_rec *r, util_ldap_config_t *dc)
+  {
+      util_ldap_connection_t *l;
+      apr_pool_t *newpool;
+
+      apr_pool_create(&newpool, NULL);
+      l = apr_pcalloc(newpool, sizeof(util_ldap_connection_t));
+      l->pool = newpool;
+      l->client_certs = apr_array_copy_hdr(l->pool, dc->client_certs);
+      return l;
+  }
+
+  static const char *set_client_cert(cmd_parms *cmd, void *config, const char *file)
+  {
+      util_ldap_config_t *dc = config;
+      apr_ldap_opt_tls_cert_t *cert;
+
+      cert = (apr_ldap_opt_tls_cert_t *)apr_array_push(dc->client_certs);
+      cert->path = file;
+      return NULL;
+  }
+  ```
+
+test "rank1401: an out parameter carries the shared storage out of the frame"
+  lang c
+  file util_ldap.c
+  expect VYQL-MEM-009
+  expect_review code.UnsafeMutableAlias
+  code
+  ```
+  #include "util_ldap.h"
+
+  static apr_status_t snapshot_certs(apr_pool_t *cache_pool,
+                                     util_ldap_config_t *dc,
+                                     apr_array_header_t **pcerts)
+  {
+      *pcerts = apr_array_copy_hdr(cache_pool, dc->client_certs);
+      return APR_SUCCESS;
+  }
+  ```
+
+test "rank1401: a comment naming the shallow copy is not a call"
+  lang c
+  file core.c
+  reject VYQL-MEM-009
+  reject_review code.UnsafeMutableAlias
+  code
+  ```
+  #include "httpd.h"
+
+  static void init_config_defines(apr_pool_t *pconf)
+  {
+      saved_server_config_defines = ap_server_config_defines;
+      /* Use apr_array_copy instead of apr_array_copy_hdr because it does not
+       * protect from the way unset_define removes entries.
+       */
+      ap_server_config_defines = apr_array_copy(pconf, ap_server_config_defines);
+  }
+  ```

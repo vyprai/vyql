@@ -1,0 +1,18 @@
+module bindings.javascript.iframe_srcdoc_sandbox;
+
+// `srcdoc` is the inline-markup half of the same contract a frame's
+// `contentDocument.write` offers: the string assigned to the property is
+// parsed as a whole HTML document by the frame, so script elements execute
+// and event-handler attributes fire. A frame carrying no `sandbox`
+// restriction keeps the embedder's origin, which puts `window.parent` -- and
+// on an Electron renderer everything the preload exposes there -- in reach of
+// that markup. The two documented controls are independent: `sandbox` on the
+// element (the attribute, the property, or a token added through the
+// `sandbox` DOMTokenList) withholds script execution and same-origin access
+// whatever the markup says, and a sanitizer strips the active markup before
+// the parser sees it. A `srcdoc` assignment with neither hands the frame's
+// parser whatever string it was given.
+binding unsanitizedFrameSrcdocAssignment {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "srcdoc" and not (containsAny(node.context.callPath, ["sandbox", "sanitize", "purify", "Purify", "escapeHtml"])) and not (node.context.literal contains "sandbox") and not (node.context.selector contains "sandbox")
+  emit issue code.UnsanitizedFrameDocumentWrite at node
+}

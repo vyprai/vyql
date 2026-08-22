@@ -1,0 +1,138 @@
+# Rank 1476 / CVE-2023-3224 (GHSA-v72p-jf8f-9x3j): nuxt's dev-mode single
+# component renderer imports whatever module the request's query string names.
+# `app/components/nuxt-root.vue` mounts the wrapper for any URL under
+# `/__nuxt_component_test__/`, handing it `ssrContext.url` on the server and
+# `window.location.href` in the browser, and
+# `app/components/test-component-wrapper.ts` did:
+#
+#   const query = parseQuery(parseURL(url).search)
+#   const comp = await import(/* @vite-ignore */ query.path as string)
+#
+# so `?path=/etc/passwd` or `?path=../../any/file.js` loads and executes an
+# arbitrary module off the developer's disk. The fixed revision resolves the requested
+# path and refuses anything outside the project root (`devRootDir`, newly
+# taken from the generated nuxt config, and gates the whole
+# renderer on `process.test` so it does not exist in an ordinary `nuxt dev`.
+#
+# Step 0: no metadata flag, and the row is right. `git show` reads the commit,
+# the vulnerable construct is present at the parent (the unguarded
+# `import(query.path)`) and the remediation is present at the fixed revision (the
+# `resolve(...)`/`startsWith(devRootDir)` refusal). Recorded CWE-22; the sink
+# is a module loader, so CWE-829 is the closer match and is what
+# `code.DynamicCodeLoad` carries. No pool row correction.
+#
+# The vocabulary for this is complete: `window.location.href` is
+# `code.DomInput`, `import(...)` is `code.DynamicCodeLoad`, taint survives the
+# `parseURL`/`parseQuery` hops, and `VYQL-INJ-023` pairs them. What stopped it
+# being reported is the frontend, in two places; the first is closed here and
+# the tests below pin both.
+#
+# 1. tree-sitter makes a comment a named child of an argument list, and the JS
+#    frontend built a call's arguments from every named child, so
+#    `import(/* @vite-ignore */ query.path)` put the comment in args[0] and the
+#    specifier in args[1] -- every binding emitting at a fixed argument index
+#    labelled the comment instead of the value, and the sink vanished. The same
+#    shift deleted `code.CommandExecution` from `exec(/* nosemgrep */ cmd)`.
+#    Inline argument annotations are ordinary in bundler and linter directives
+#    (`@vite-ignore`, `webpackChunkName`, `#__PURE__`), so it stays silent. A
+#    comment is not an argument: the first and last tests are the
+#    positive half, and the second differs from the first only in the specifier
+#    being a constant.
+#
+# 2. The wrapper is a component factory -- `export default (url) =>
+#    defineComponent({ async setup () { … } })` -- and `c.expr`'s `object` case
+#    lowers `pair` and shorthand-property children only, so the body of a
+#    `method_definition` inside an object literal handed to a call is dead
+#    code. `callArgObjectMethodFuncDefs` exists for exactly this but runs only
+#    where the call is an expression *statement*, and
+#    `returnedObjectMethodFuncDefs` only for an object literal returned
+#    directly, so neither reaches an object literal passed to a call in an
+#    arrow function's expression body. The third test holds the real shape and
+#    reports nothing.
+#
+# Beyond those, the patched revision is not distinguishable from the vulnerable
+# one either: `injection.UnsafeDynamicLoading`, the only threat
+# `code.DynamicCodeLoad` is vulnerableTo, is listed in
+# testdata/threats_without_controls.txt -- no concept declares it neutralized,
+# `VYQL-INJ-023` carries no `unless`, and the fixed revision's root-directory refusal
+# therefore cannot suppress anything. Measured directly: a single-file model of
+# the wrapper reports one VYQL-INJ-023 both with and without the
+# `resolve(query.path).startsWith(devRootDir)` guard. The generic control that
+# would close it -- calling every `startsWith` a `core.PathAccessCheck` -- is
+# the shape the loop's precision rule rejects, since it would clear genuine
+# VYQL-PATH-001/002 rows anywhere a string prefix is tested.
+
+test "rank1476: a request query parameter names the module a dynamic import loads, through an inline bundler annotation"
+  lang javascript
+  file src/app/components/test-component-wrapper.ts
+  expect VYQL-INJ-023
+  code
+  ```
+  import { parseURL } from 'ufo'
+  import { parseQuery } from 'vue-router'
+
+  export async function renderTestComponent () {
+    const url = window.location.href
+    const query = parseQuery(parseURL(url).search)
+    const comp = await import(/* @vite-ignore */ query.path as string).then(r => r.default)
+    return comp
+  }
+  ```
+
+test "rank1476: the same annotated dynamic import of a fixed module specifier is not a finding"
+  lang javascript
+  file src/app/components/test-component-wrapper.ts
+  reject VYQL-INJ-023
+  code
+  ```
+  import { parseURL } from 'ufo'
+  import { parseQuery } from 'vue-router'
+
+  export async function renderTestComponent () {
+    const url = window.location.href
+    const query = parseQuery(parseURL(url).search)
+    const comp = await import(/* @vite-ignore */ '#build/test-component.mjs').then(r => r.default)
+    return { comp, name: query.name }
+  }
+  ```
+
+test "rank1476: the wrapper as written, a component factory whose setup method is an object literal handed to a call"
+  lang javascript
+  file src/app/components/test-component-wrapper.ts
+  reject VYQL-INJ-023
+  code
+  ```
+  import { parseURL } from 'ufo'
+  import { defineComponent, h } from 'vue'
+  import { parseQuery } from 'vue-router'
+
+  export default (url: string) => defineComponent({
+    name: 'NuxtTestComponentWrapper',
+
+    async setup (props, { attrs }) {
+      const query = parseQuery(parseURL(url).search)
+      const urlProps = query.props ? JSON.parse(query.props as string) : {}
+      const comp = await import(/* @vite-ignore */ query.path as string).then(r => r.default)
+      return () => [
+        h('div', 'Component Test Wrapper for ' + query.path),
+        h('div', { id: 'nuxt-component-root' }, [
+          h(comp, { ...attrs, ...props, ...urlProps })
+        ])
+      ]
+    }
+  })
+  ```
+
+test "rank1476: a command string reaching a child process behind an inline linter annotation"
+  lang javascript
+  file src/core/build.ts
+  expect VYQL-INJ-002
+  code
+  ```
+  import { exec } from 'child_process'
+
+  export function buildComponent (req: any) {
+    const target = req.query.target
+    exec(/* nosemgrep: js-child-process */ 'nuxi build --target ' + target)
+  }
+  ```

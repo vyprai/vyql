@@ -1,0 +1,8 @@
+module code;
+
+review code.UnverifiedEmailClaimIdentity {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "read the provider's email-verification claim before an email address is accepted as the account identity, and refuse the login when it is absent or false"
+}
