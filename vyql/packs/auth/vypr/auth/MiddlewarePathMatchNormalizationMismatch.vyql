@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule MiddlewarePathMatchNormalizationMismatch {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_863, CWE_436]
+    id: "VYQL-AUTH-127"
+    severity: high
+  }
+  issue code.MiddlewarePathMatchNormalizationMismatch as event
+}

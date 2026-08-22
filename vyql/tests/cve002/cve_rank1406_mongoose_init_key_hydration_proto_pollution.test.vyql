@@ -1,0 +1,131 @@
+# Rank 1406 / CVE-2023-3696: Mongoose hydrated a document by enumerating the
+# stored record's keys and writing each one as a property of the target document,
+# recursing into nested objects, so a stored key named `__proto__` or
+# `constructor` walked the prototype chain and polluted `Object.prototype` for
+# the whole process.
+
+test "rank1406: enumerated record keys hydrate a document without a prototype-name filter"
+  lang javascript
+  file document.js
+  expect VYQL-INJ-134
+  expect_review code.NestedPathInheritedPropertyPrototypePollution
+  code
+  ```
+  'use strict';
+
+  const utils = require('./utils');
+
+  function init(self, obj, doc, opts, prefix) {
+    prefix = prefix || '';
+
+    const keys = Object.keys(obj);
+    const len = keys.length;
+    let schemaType;
+    let path;
+    let i;
+    let index = 0;
+    const strict = self.$__.strictMode;
+    const docSchema = self.$__schema;
+
+    while (index < len) {
+      _init(index++);
+    }
+
+    function _init(index) {
+      i = keys[index];
+      path = prefix + i;
+      schemaType = docSchema.path(path);
+
+      if (!schemaType && utils.isPOJO(obj[i])) {
+        if (!doc[i]) {
+          doc[i] = {};
+          if (!strict) {
+            self[i] = doc[i];
+          }
+        }
+        init(self, obj[i], doc[i], opts, path + '.');
+      } else if (!schemaType) {
+        doc[i] = obj[i];
+        if (!strict && !prefix) {
+          self[i] = obj[i];
+        }
+      } else {
+        // Retain order when overwriting defaults
+        if (doc.hasOwnProperty(i) && obj[i] !== void 0) {
+          delete doc[i];
+        }
+        doc[i] = schemaType.cast(obj[i], self, true);
+      }
+    }
+  }
+
+  module.exports = init;
+  ```
+
+# The own-property call in the vulnerable form guards a `delete` that preserves
+# key order; it never decides whether the write happens. Only the added
+# key-name comparison stops the prototype write, and the string keys
+# `Object.keys` yields cannot be coerced, so the coercible-segment shape must
+# not fire on the patched form either.
+test "rank1406: the hydration loop skips prototype-mutating key names"
+  lang javascript
+  file document.js
+  reject VYQL-INJ-134
+  reject VYQL-INJ-165
+  reject_review code.NestedPathInheritedPropertyPrototypePollution
+  code
+  ```
+  'use strict';
+
+  const utils = require('./utils');
+
+  function init(self, obj, doc, opts, prefix) {
+    prefix = prefix || '';
+
+    const keys = Object.keys(obj);
+    const len = keys.length;
+    let schemaType;
+    let path;
+    let i;
+    let index = 0;
+    const strict = self.$__.strictMode;
+    const docSchema = self.$__schema;
+
+    while (index < len) {
+      _init(index++);
+    }
+
+    function _init(index) {
+      i = keys[index];
+      // avoid prototype pollution
+      if (i === '__proto__' || i === 'constructor') {
+        return;
+      }
+      path = prefix + i;
+      schemaType = docSchema.path(path);
+
+      if (!schemaType && utils.isPOJO(obj[i])) {
+        if (!doc[i]) {
+          doc[i] = {};
+          if (!strict) {
+            self[i] = doc[i];
+          }
+        }
+        init(self, obj[i], doc[i], opts, path + '.');
+      } else if (!schemaType) {
+        doc[i] = obj[i];
+        if (!strict && !prefix) {
+          self[i] = obj[i];
+        }
+      } else {
+        // Retain order when overwriting defaults
+        if (doc.hasOwnProperty(i) && obj[i] !== void 0) {
+          delete doc[i];
+        }
+        doc[i] = schemaType.cast(obj[i], self, true);
+      }
+    }
+  }
+
+  module.exports = init;
+  ```

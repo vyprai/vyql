@@ -1,0 +1,403 @@
+# Rank 1442 / CVE-2026-46716 (GHSA-99gv-2m7h-3hh9, recorded CWE-78 + CWE-269 +
+# CWE-862): nezha is a multi-tenant server-monitoring dashboard. Every record it
+# stores embeds `model.Common`, which carries a `UserID`, so a cron task, an
+# alert rule, a service check and an agent-connected server each belong to one
+# account. A cron task's `Command` is a shell command line the dashboard pushes
+# to an agent over that agent's gRPC task stream, and the agent runs it.
+#
+# `CronTrigger` fans a task out to every connected agent and never looks at whose
+# agent it is:
+#
+#   func CronTrigger(cr *model.Cron, triggerServer ...uint64) func() {
+#     ...
+#     return func() {
+#       ...
+#       for _, s := range ServerShared.Range {
+#         if cr.Cover == model.CronCoverAll && crIgnoreMap[s.ID] { continue }
+#         if cr.Cover == model.CronCoverIgnoreAll && !crIgnoreMap[s.ID] { continue }
+#         if s.TaskStream != nil {
+#           s.TaskStream.Send(&pb.Task{Id: cr.ID, Data: cr.Command, Type: model.TaskTypeCommand})
+#         }
+#       }
+#     }
+#   }
+#
+# `ServerShared` is the process-wide registry of every agent of every account, so
+# a member's own cron task with `Cover: CronCoverAll` executes its command on
+# every other account's machines. The second leg is the reverse direction:
+#
+#   func (c *CronClass) SendTriggerTasks(taskIDs []uint64, triggerServer uint64) {
+#     for _, taskID := range taskIDs {
+#       if c, ok := c.list[taskID]; ok { cronLists = append(cronLists, c) }
+#     }
+#     for _, c := range cronLists { go CronTrigger(c, triggerServer)() }
+#   }
+#
+# `taskIDs` is an alert rule's `FailTriggerTasks`/`RecoverTriggerTasks`, a plain
+# list of ids the rule's owner chose, and `c.list` is the process-wide cron
+# registry. Naming another account's task id in one's own alert rule therefore
+# runs that account's command, which is the privilege-escalation half: an
+# administrator's maintenance task is reachable by any member.
+#
+# The fixed revision restricts both legs to the task's owner, or to an administrator:
+#
+#   +func cronCanSendToServer(cr *model.Cron, server *model.Server) bool {
+#   +  return cr.UserID == server.UserID || userIsAdmin(cr.UserID)
+#   +}
+#   +func cronCanBeTriggeredByOwner(cr *model.Cron, triggerOwner uint64) bool {
+#   +  return cr.UserID == triggerOwner || userIsAdmin(triggerOwner)
+#   +}
+#
+# called as `if !cronCanSendToServer(cr, s) { continue }` inside the fan-out and
+# as `if c, ok := c.list[taskID]; ok && cronCanBeTriggeredByOwner(c, triggerOwner)`
+# in the lookup, with `SendTriggerTasks` gaining a third `triggerOwner` parameter
+# that `alertsentinel.go` and `servicesentinel.go` fill with `alert.UserID` and
+# `ss.UserID`.
+#
+# ## The pool row
+#
+# Flagged `nocommit`, and it is the "never checked" cause rank 1432 recorded:
+# the metadata reads repository-ok and no commit because the GHSA is unreviewed and
+# references no commit at all, so the pool's SHA is never resolved against any
+# repository. A plain `git clone` plus `git show` reads
+# `d7526351cf97869f00d9d3862147c0d42ef2e265` ("fix(cron): restrict task delivery
+# by owner", 4 files, +169/-6) on the first try. The vulnerable construct is at
+# the parent and the remediation is at the fixed revision, both confirmed; the row needs no
+# correction.
+#
+# ## What fires
+#
+# Nothing, in either direction. `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` over the whole tree reports **14 findings at both revisions**,
+# stable across three runs each: four VYQL-INJ-009 from a DDNS log path, a
+# VYQL-CFG-014 on the OAuth2 callback, and nine textpattern rows. `-flags only`
+# gives 232 flags at the parent and 238 at the fixed revision, and every flag on
+# `crontask.go`, `alertsentinel.go` and `servicesentinel.go` is a
+# `code.LockAcquire`/`core.LockRelease` pair. Nothing labels a task dispatch, an
+# owner field or a tenancy decision. The first four cases below pin that in both
+# directions.
+#
+# ## Why no binding ships, measured
+#
+# The codebase has the control the fixed revision re-implements, and it has it
+# at the *vulnerable* revision, twice: `cmd/dashboard/rpc/rpc.go` guards its two
+# `server.TaskStream.Send(task.PB())` calls with
+# `canSendTaskToServer(task, server)`, whose body is
+# `task.UserID == server.UserID || role.IsAdmin()`; and
+# `cmd/dashboard/controller/server.go` guards its dispatches with
+# `server.HasPermission(c)`. So a binding on the project's own dispatch shape --
+# a `TaskStream.Send` in a function that reads no `UserID` and calls neither
+# pre-existing control -- is well founded, names only vocabulary older than the
+# fix, and separates the guarded dispatches from the unguarded one.
+#
+# It also does not move across the revisions. Measured on the real tree with
+# `vyql match`: **4 labels at the parent and 4 at the fixed revision**, the same four
+# functions, `crontask.go` merely shifting line 138 -> 142. Three of the four are
+# false positives -- `DispatchKeepalive`, which sends a payloadless keepalive, and
+# the NAT stream handler -- so the shape is 1 true positive in 4 and blind to the
+# patch. Restricting it to a *command* payload does not help: the discrimination
+# is what is missing, not the reach.
+#
+# The only token that does move is the fixed revision's own new helper name. Adding
+# `not (node.context.callPath contains "cronCanSendToServer")` takes the same
+# binding to **4 -> 3**, and that is the entire delta. Rank 1394's rule applies
+# directly: a discriminator that is a substring of a name the fixing commit
+# introduced is not detection.
+#
+# This is *not* the `endpointGuarded` attribution gap of ranks 1377/1389/1397/1399.
+# The guard call is perfectly visible from the guarded function -- that is what
+# makes the 4 -> 3 measurement possible. What is missing is any principled way to
+# read `cronCanSendToServer(cr, s)` as an authorization decision, when the same
+# codebase's equivalent decision is called `canSendTaskToServer` and
+# `HasPermission` at the parent and neither name is what the fixed revision uses. A control
+# concept would have to be emitted for a Go function whose whole body compares two
+# records' owner fields, and then attributed to its callers; that is a design
+# change, not a localized correction.
+#
+# The generic fallback is section 9's "no principal read in the body" shape, and
+# it is as bad here as on the six codebases before it. `callPath contains ".Send"`
+# with no `UserID` read and no `HasPermission`/`Authorize` call gives **20 labels
+# on nezha, 45 on argo-cd, 18 on moby and 46 on neuvector** -- 129 rows across four
+# Go trees for at most one true positive, which itself does not move across the
+# fix.
+#
+# Collateral for the narrow form is vacuous rather than clean: `TaskStream` appears
+# in **0** of the other 156 clone trees under `/tmp/cve-work/rank*/`, so the
+# binding could only ever fire on this one repository. That is the genericity test
+# failing with a number attached.
+#
+# ## A Go frontend fact worth having
+#
+# The whole vulnerable fan-out sits inside `return func() { ... }`, so the
+# `goFunctionTokens` closure gap (ranks 1334, 1427) looked like the blocker and is
+# not. `ast.Inspect` in `goFunctionTokens` does return false on `*ast.FuncLit`
+# (`internal/extract/frontend/golang/golang.go:1132`), so the *enclosing* function
+# inherits nothing -- but `conv.expr` hoists every `*ast.FuncLit` into a synthetic
+# anonymous `FuncDef` of its own (`golang.go:1707`), which gets its own
+# `analysis.function.context` node. A `presenceNode` binding at
+# `node.scope == "function"` therefore does reach closure bodies: the probe above
+# matched at `crontask.go:138`, the `return func() {` line, not at `CronTrigger`'s
+# own line. The 1334/1427 gap is one-directional.
+
+test "rank1442: a cron task fans its command out to every registered agent with no owner comparison"
+  lang go
+  file service/singleton/crontask.go
+  reject VYQL-AUTH-095
+  code
+  ```
+  package singleton
+
+  import (
+  	"github.com/jinzhu/copier"
+
+  	"github.com/nezhahq/nezha/model"
+  	pb "github.com/nezhahq/nezha/proto"
+  )
+
+  func CronTrigger(cr *model.Cron, triggerServer ...uint64) func() {
+  	crIgnoreMap := make(map[uint64]bool)
+  	for _, server := range cr.Servers {
+  		crIgnoreMap[server] = true
+  	}
+  	return func() {
+  		if cr.Cover == model.CronCoverAlertTrigger {
+  			if len(triggerServer) == 0 {
+  				return
+  			}
+  			if s, ok := ServerShared.Get(triggerServer[0]); ok {
+  				if s.TaskStream != nil {
+  					s.TaskStream.Send(&pb.Task{
+  						Id:   cr.ID,
+  						Data: cr.Command,
+  						Type: model.TaskTypeCommand,
+  					})
+  				}
+  			}
+  			return
+  		}
+
+  		for _, s := range ServerShared.Range {
+  			if cr.Cover == model.CronCoverAll && crIgnoreMap[s.ID] {
+  				continue
+  			}
+  			if cr.Cover == model.CronCoverIgnoreAll && !crIgnoreMap[s.ID] {
+  				continue
+  			}
+  			if s.TaskStream != nil {
+  				s.TaskStream.Send(&pb.Task{
+  					Id:   cr.ID,
+  					Data: cr.Command,
+  					Type: model.TaskTypeCommand,
+  				})
+  			} else {
+  				curServer := model.Server{}
+  				copier.Copy(&curServer, s)
+  			}
+  		}
+  	}
+  }
+  ```
+
+test "rank1442: the same fan-out skips every agent the task's owner does not own"
+  lang go
+  file service/singleton/crontask.go
+  reject VYQL-AUTH-095
+  code
+  ```
+  package singleton
+
+  import (
+  	"github.com/jinzhu/copier"
+
+  	"github.com/nezhahq/nezha/model"
+  	pb "github.com/nezhahq/nezha/proto"
+  )
+
+  func CronTrigger(cr *model.Cron, triggerServer ...uint64) func() {
+  	crIgnoreMap := make(map[uint64]bool)
+  	for _, server := range cr.Servers {
+  		crIgnoreMap[server] = true
+  	}
+  	return func() {
+  		if cr.Cover == model.CronCoverAlertTrigger {
+  			if len(triggerServer) == 0 {
+  				return
+  			}
+  			if s, ok := ServerShared.Get(triggerServer[0]); ok {
+  				if !cronCanSendToServer(cr, s) {
+  					return
+  				}
+  				if s.TaskStream != nil {
+  					s.TaskStream.Send(&pb.Task{
+  						Id:   cr.ID,
+  						Data: cr.Command,
+  						Type: model.TaskTypeCommand,
+  					})
+  				}
+  			}
+  			return
+  		}
+
+  		for _, s := range ServerShared.Range {
+  			if !cronCanSendToServer(cr, s) {
+  				continue
+  			}
+  			if cr.Cover == model.CronCoverAll && crIgnoreMap[s.ID] {
+  				continue
+  			}
+  			if cr.Cover == model.CronCoverIgnoreAll && !crIgnoreMap[s.ID] {
+  				continue
+  			}
+  			if s.TaskStream != nil {
+  				s.TaskStream.Send(&pb.Task{
+  					Id:   cr.ID,
+  					Data: cr.Command,
+  					Type: model.TaskTypeCommand,
+  				})
+  			} else {
+  				curServer := model.Server{}
+  				copier.Copy(&curServer, s)
+  			}
+  		}
+  	}
+  }
+
+  func cronCanSendToServer(cr *model.Cron, server *model.Server) bool {
+  	return cr.UserID == server.UserID || userIsAdmin(cr.UserID)
+  }
+
+  func userIsAdmin(userID uint64) bool {
+  	if userID == 0 {
+  		return true
+  	}
+
+  	UserLock.RLock()
+  	defer UserLock.RUnlock()
+
+  	userInfo, ok := UserInfoMap[userID]
+  	return ok && userInfo.Role.IsAdmin()
+  }
+  ```
+
+test "rank1442: an alert rule triggers every task id it names out of the shared registry"
+  lang go
+  file service/singleton/crontask.go
+  reject VYQL-AUTH-095
+  code
+  ```
+  package singleton
+
+  import (
+  	"github.com/nezhahq/nezha/model"
+  )
+
+  func (c *CronClass) SendTriggerTasks(taskIDs []uint64, triggerServer uint64) {
+  	c.listMu.RLock()
+  	var cronLists []*model.Cron
+  	for _, taskID := range taskIDs {
+  		if c, ok := c.list[taskID]; ok {
+  			cronLists = append(cronLists, c)
+  		}
+  	}
+  	c.listMu.RUnlock()
+
+  	for _, c := range cronLists {
+  		go CronTrigger(c, triggerServer)()
+  	}
+  }
+  ```
+
+test "rank1442: the same lookup admits only tasks the triggering rule's owner may run"
+  lang go
+  file service/singleton/crontask.go
+  reject VYQL-AUTH-095
+  code
+  ```
+  package singleton
+
+  import (
+  	"github.com/nezhahq/nezha/model"
+  )
+
+  func (c *CronClass) SendTriggerTasks(taskIDs []uint64, triggerServer uint64, triggerOwner uint64) {
+  	c.listMu.RLock()
+  	var cronLists []*model.Cron
+  	for _, taskID := range taskIDs {
+  		if c, ok := c.list[taskID]; ok && cronCanBeTriggeredByOwner(c, triggerOwner) {
+  			cronLists = append(cronLists, c)
+  		}
+  	}
+  	c.listMu.RUnlock()
+
+  	for _, c := range cronLists {
+  		go CronTrigger(c, triggerServer)()
+  	}
+  }
+
+  func cronCanBeTriggeredByOwner(cr *model.Cron, triggerOwner uint64) bool {
+  	return cr.UserID == triggerOwner || userIsAdmin(triggerOwner)
+  }
+  ```
+
+test "rank1442: the service dispatcher that compares the two owners before sending"
+  lang go
+  file cmd/dashboard/rpc/rpc.go
+  reject VYQL-AUTH-095
+  code
+  ```
+  package rpc
+
+  import (
+  	"github.com/nezhahq/nezha/model"
+  	"github.com/nezhahq/nezha/service/singleton"
+  )
+
+  func DispatchTask(serviceSentinelDispatchBus <-chan *model.Service) {
+  	for task := range serviceSentinelDispatchBus {
+  		if task == nil {
+  			continue
+  		}
+
+  		switch task.Cover {
+  		case model.ServiceCoverIgnoreAll:
+  			for id, enabled := range task.SkipServers {
+  				if !enabled {
+  					continue
+  				}
+
+  				server, _ := singleton.ServerShared.Get(id)
+  				if server == nil || server.TaskStream == nil {
+  					continue
+  				}
+
+  				if canSendTaskToServer(task, server) {
+  					server.TaskStream.Send(task.PB())
+  				}
+  			}
+  		case model.ServiceCoverAll:
+  			for id, server := range singleton.ServerShared.Range {
+  				if server == nil || server.TaskStream == nil || task.SkipServers[id] {
+  					continue
+  				}
+
+  				if canSendTaskToServer(task, server) {
+  					server.TaskStream.Send(task.PB())
+  				}
+  			}
+  		}
+  	}
+  }
+
+  func canSendTaskToServer(task *model.Service, server *model.Server) bool {
+  	var role model.Role
+  	singleton.UserLock.RLock()
+  	if u, ok := singleton.UserInfoMap[task.UserID]; !ok {
+  		role = model.RoleMember
+  	} else {
+  		role = u.Role
+  	}
+  	singleton.UserLock.RUnlock()
+
+  	return task.UserID == server.UserID || role.IsAdmin()
+  }
+  ```

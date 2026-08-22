@@ -1,0 +1,221 @@
+# A prefix comparison proves only the bytes it compared. `strncasecmp("NO", s, 2)`
+# establishes that `s[0]` and `s[1]` exist and nothing more, so after it succeeds
+# the last byte the code may read is `s[2]` -- which, for the shortest response the
+# guard admits, is the string's NUL terminator. Advancing further steps outside the
+# buffer.
+#
+# neomutt's untagged-IMAP-response parser did exactly that. `cmd_handle_untagged`
+# (`imap/command.c`) dispatches on a prefix of the server's line and, for an
+# untagged `NO`, printed the server's warning text starting one byte past what the
+# guard had verified:
+#
+#   else if (ImapServernoise && (mutt_str_strncasecmp("NO", s, 2) == 0))
+#   {
+#     /* Display the warning message from the server */
+#     mutt_error("%s", s + 3);
+#   }
+#
+# An IMAP server that answers `* NO` with no message leaves `s` pointing at the
+# two-byte string "NO", so `s + 2` is the terminator and `s + 3` is one past the
+# end of the response buffer. `mutt_error`'s `%s` then reads whatever follows in
+# `idata->buf` until it finds a NUL, printing adjacent memory into the status line
+# and running off the end of the allocation if none is there. The attacker is the
+# IMAP server, which chooses the response; the corpus records CWE-20, but the
+# behaviour is CWE-125 out-of-bounds read.
+#
+# Fix commit 36a29280448097f34ce9c94606195f2ac643fed1 ("Handle NO response without
+# message properly") changes the offset to `s + 2`, so the read starts at the last
+# byte the comparison proved present. Nothing else changes -- one character.
+#
+# The pool row named the release merge 6a147a62cf39c2a12cf2e96a8a62f378164548fa
+# instead. That merge carries only translations, a changelog entry and a
+# clang-format pass over five files; the fixing commit is an ancestor of both its parents, so
+# the vulnerable construct is absent at `<fix>^` and the row cannot be A/B-ed.
+#
+# The correct form of the guard is in the same function, eleven lines above, and it
+# is why this cannot be detected by counting facts in a function body:
+#
+#   else if (mutt_str_strncasecmp("BYE", s, 3) == 0)
+#   {
+#     s += 3;
+#     SKIPWS(s);
+#     mutt_error("%s", s);
+#
+# Three bytes compared, three bytes skipped, and `SKIPWS` stops at the NUL. So the
+# function holds a safe length-3 comparison paired with a `+ 3` advance and an
+# unsafe length-2 comparison paired with a `+ 3` advance, and the difference is
+# which comparison each advance belongs to.
+#
+# ATTENTION, engine gap. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# over the whole checkout reports 6816 findings and 2235 at or above high at the
+# vulnerable revision and 6816 and 2235 at the fixed one, identical over three runs
+# each. `imap/` alone reports 195 findings both ways, 18 of them in `command.c`, at
+# lines 266 through 811 -- none within the function. The vulnerable line is
+# labelled: `code.IntegerSizeArithmetic` / `code.IntegerSizeArithmeticSink` land on
+# the `__binop.add` at `command.c:895` at confidence low. They land on it at *both*
+# revisions, because `s + 2` is the same addition as `s + 3`; the flag reads the
+# fix and the defect identically, and no rule consumes it without a taint source.
+# There is no source: `idata->buf` is filled by `mutt_socket_readln`, and C
+# out-parameter taint is the hardcoded `cReaders` table at
+# `internal/extract/frontend/treesitter/c.go:74`, so labelling that call would
+# still leave the buffer clean (measured at 1407, and the `propagate ... to
+# args[N].pointee` route panics every scan).
+#
+# The missing fact is a correlation, and its two halves are present in the
+# C function context separately: `call_arg_at:mutt_str_strncasecmp:2:2` carries the
+# compared length and `call_arg_at:mutt_error:1:s+3` carries the offset. Binding
+# predicates over them are `contains` tests, with no way to require that the two
+# tokens name the same pointer, no way to compare two integers, and no branch
+# scope -- `call_arg_at:` is function-confined (1400), and function-confined is the
+# wrong granularity here rather than a safe approximation.
+#
+# Measured, so a sweep need not re-derive it. Over `.c`/`.h` sources, requiring the
+# offset to sit in the body of the `if` whose condition holds the comparison, to
+# exceed the longest prefix length that condition compares on that pointer, and the
+# pointer not to be separately subscripted at or past that prefix, selects **1**
+# site in neomutt -- `cmd_handle_untagged` -- and **0** at the fixed revision, and
+# **0** across 4607 C files in sixteen other libraries (httpd, subversion,
+# libgit2, libxml2, mbedtls, miniupnp, memcached, libpng, libyang, libvncserver,
+# libmspack, libexpat, libredwg, lua, libvips, libxkbcommon). Each of the three
+# requirements is load-bearing:
+#
+#   - Drop the branch pairing and count over the whole function instead, which is
+#     what a VyQL binding can express: **15** functions in neomutt at the
+#     vulnerable revision and the same **15** at the fixed one. Zero
+#     discrimination, because `cmd_handle_untagged` holds sixteen prefix
+#     comparisons with lengths 2, 3, 4, 5, 6, 7, 8, 9, 10, 11 and 14 and keeps the
+#     safe `s += 3` under the length-3 `"BYE"` guard at the fixed revision.
+#   - Drop the "longest prefix in a disjunctive condition" rule: httpd's
+#     `mod_rewrite.c` adds 2 false positives, `fname = a2+8` under
+#     `strncasecmp(a2,"dbd:",4) || strncasecmp(a2,"fastdbd:",8)`, where a nested
+#     test picks the arm.
+#   - Drop the separate-subscript exclusion: httpd's `lookup_variable` adds 7 more,
+#     `var += 4` and `var+5` guarded by `var[3] == ':'` and `var[4] &&` rather than
+#     by the comparison length.
+#
+# So the shape is worth having and is not shippable as data. It needs a
+# branch-scoped bound on a pointer -- "the first N bytes are known to exist" --
+# established by a prefix-comparison guard and read by pointer arithmetic on that
+# same pointer. That is a new dataflow relation, not a missing switch case, so it
+# is not mechanical.
+#
+# Existing concepts considered instead of minting: `code.PointerOffsetBoundsCheck`
+# is the nearest ("a pointer is advanced by an encoded length before the bounds
+# comparison is made") but its axis is a length read out of the payload, not a
+# constant offset exceeding a verified prefix, and widening it would not help --
+# the blocker is the correlation fact, not the vocabulary.
+# `code.OffsetLengthBoundsOverflow` and `code.UncheckedEncodedLengthArithmetic` are
+# both about narrow-width addition of a serialized length. `code.IntegerSizeArithmetic`
+# labels the exact node and cannot tell the revisions apart.
+#
+# The pair below isolates the construct: the two snippets differ in one character,
+# the offset applied to `s` in the `NO` branch, and both keep the correctly-paired
+# `BYE` branch that a function-scoped correlation would satisfy either way.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1428: an untagged IMAP NO response is printed from three bytes in after a two-byte prefix comparison"
+  lang c
+  file imap/command.c
+  reject VYQL-NUM-003
+  reject VYQL-NUM-017
+  reject VYQL-MEM-010
+  reject VYQL-MEM-016
+  reject_review code.PointerOffsetBoundsCheck
+  reject_review code.OffsetLengthBoundsOverflow
+  reject_review code.UncheckedEncodedLengthArithmetic
+  code
+  ```
+  #include <string.h>
+
+  #define SKIPWS(c)                                                              \
+    while (*(c) && (*(c) == ' ' || *(c) == '\t'))                                \
+      c++;
+
+  static int cmd_handle_untagged(struct ImapData *idata)
+  {
+    char *s = imap_next_word(idata->buf);
+
+    if (mutt_str_strncasecmp("CAPABILITY", s, 10) == 0)
+      cmd_parse_capability(idata, s);
+    else if (mutt_str_strncasecmp("LIST", s, 4) == 0)
+      cmd_parse_list(idata, s);
+    else if (mutt_str_strncasecmp("MYRIGHTS", s, 8) == 0)
+      cmd_parse_myrights(idata, s);
+    else if (mutt_str_strncasecmp("BYE", s, 3) == 0)
+    {
+      if (idata->status == IMAP_BYE)
+        return 0;
+
+      /* server shut down our connection */
+      s += 3;
+      SKIPWS(s);
+      mutt_error("%s", s);
+      cmd_handle_fatal(idata);
+
+      return -1;
+    }
+    else if (ImapServernoise && (mutt_str_strncasecmp("NO", s, 2) == 0))
+    {
+      mutt_debug(2, "Handling untagged NO\n");
+
+      /* Display the warning message from the server */
+      mutt_error("%s", s + 3);
+    }
+
+    return 0;
+  }
+  ```
+
+test "rank1428: the same response is printed from the last byte the two-byte comparison proved present"
+  lang c
+  file imap/command.c
+  reject VYQL-NUM-003
+  reject VYQL-NUM-017
+  reject VYQL-MEM-010
+  reject VYQL-MEM-016
+  reject_review code.PointerOffsetBoundsCheck
+  reject_review code.OffsetLengthBoundsOverflow
+  reject_review code.UncheckedEncodedLengthArithmetic
+  code
+  ```
+  #include <string.h>
+
+  #define SKIPWS(c)                                                              \
+    while (*(c) && (*(c) == ' ' || *(c) == '\t'))                                \
+      c++;
+
+  static int cmd_handle_untagged(struct ImapData *idata)
+  {
+    char *s = imap_next_word(idata->buf);
+
+    if (mutt_str_strncasecmp("CAPABILITY", s, 10) == 0)
+      cmd_parse_capability(idata, s);
+    else if (mutt_str_strncasecmp("LIST", s, 4) == 0)
+      cmd_parse_list(idata, s);
+    else if (mutt_str_strncasecmp("MYRIGHTS", s, 8) == 0)
+      cmd_parse_myrights(idata, s);
+    else if (mutt_str_strncasecmp("BYE", s, 3) == 0)
+    {
+      if (idata->status == IMAP_BYE)
+        return 0;
+
+      /* server shut down our connection */
+      s += 3;
+      SKIPWS(s);
+      mutt_error("%s", s);
+      cmd_handle_fatal(idata);
+
+      return -1;
+    }
+    else if (ImapServernoise && (mutt_str_strncasecmp("NO", s, 2) == 0))
+    {
+      mutt_debug(2, "Handling untagged NO\n");
+
+      /* Display the warning message from the server */
+      mutt_error("%s", s + 2);
+    }
+
+    return 0;
+  }
+  ```

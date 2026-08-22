@@ -1,0 +1,32 @@
+module bindings.go.revocationCheckAgainstCurrentTime;
+
+// A revocation list is a map from a subject -- a public key, a key id, a
+// certificate serial -- to the instant that subject's credentials stop being
+// honoured, and the instant is defined against the *credential*, not against the
+// reader: nats-io/jwt documents `RevocationList.Revoke(pubKey, timestamp)` as
+// revoking everything issued before that timestamp and hands the check
+// `IsRevoked(pubKey, timestamp)` / `IsClaimRevoked(claim)` so the caller supplies
+// the claim's own issue time; RFC 5280 5.3.1 dates a CRL entry the same way, and
+// an `iat`-keyed JWT denylist is the same construction again.
+//
+// Comparing the entry against `time.Now()` instead is what breaks it, in both
+// directions. An entry dated ahead of the clock never fires, so an already-issued
+// credential the operator has revoked keeps authenticating until that date; once
+// the clock passes it, the entry fires against credentials minted afterwards that
+// the entry was never meant to cover. Either way the revocation list does not say
+// what it is documented to say (CWE-287/CWE-613).
+//
+// Two facts in one Go function body are that shape: a subscript read of a
+// revocation-named record, which is the hand-rolled lookup the library APIs above
+// exist to replace, and a wall-clock read in the same body. Both are
+// function-confined here -- a minimal pair with the subscript in one method and
+// `time.Now()` in a sibling labels nothing.
+//
+// The neutraliser is the credential's own time being in scope: `IssuedAt`, `iat`,
+// `NotBefore` or `nbf` named anywhere in the body means the comparison has the
+// operand the record is defined against, whether it is spelled inline or passed
+// to a helper that does the comparing.
+binding goRevocationCheckAgainstCurrentTime {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and containsAny(node.context.index, ["Revok", "revok", "Revoc", "revoc"]) and containsAny(node.context.callPath, ["time.Now"]) and not containsAny(node.context.identifier, ["IssuedAt", "issuedAt", "issued_at", "NotBefore", "notBefore", "not_before"])
+  emit issue code.RevocationCheckAgainstCurrentTime at node
+}

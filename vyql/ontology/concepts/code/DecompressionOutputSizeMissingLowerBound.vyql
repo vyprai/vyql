@@ -1,0 +1,11 @@
+module code;
+
+concept DecompressionOutputSizeMissingLowerBound : issue {
+  cwe: [CWE_191, CWE_1284]
+  reviewAssumption: "a peer controls the uncompressed size advertised in the compressed frame's own header, including negative values of a signed length field"
+  reviewCategory: memory
+  reviewCondition: "a decompressor sizes its output buffer from the advertised uncompressed size and validates that size only against an upper limit"
+  reviewConfidence: high
+  reviewEvidence: "decompression context {pattern} derives an allocation size from a header length field and compares it against a maximum without any comparison of that length against zero"
+  vulnerableTo: [memory.IntegerOverflow, memory.OobWrite]
+}

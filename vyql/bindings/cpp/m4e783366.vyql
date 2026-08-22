@@ -931,3 +931,8 @@ binding integerOverflowGuard163 {
     }
   }
 }
+
+binding directoryCreateExistingPathUnchecked620 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "create_directory" and operand(node, where: operand.path contains "__binop.div") and not (node.flowTo.path contains "__unary") and not (node.flowTo.path contains "__binop")
+  emit issue code.DirectoryCreateExistingPathUnchecked at node
+}

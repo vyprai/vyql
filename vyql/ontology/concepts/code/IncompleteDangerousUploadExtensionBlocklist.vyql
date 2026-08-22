@@ -2,10 +2,10 @@ module code;
 
 concept IncompleteDangerousUploadExtensionBlocklist : issue {
   cwe: [CWE_434]
-  reviewAssumption: "an attacker can name an upload with an executable extension the blocklist does not carry, and that extension stays executable on affected PHP/web-server configurations"
+  reviewAssumption: "an attacker can name an upload, or a member of an uploaded archive, with an executable extension the screen does not cover, and that extension stays executable on affected PHP/web-server configurations"
   reviewCategory: upload
   reviewCondition: "dangerous upload extension blocklist omits an executable extension handled by common PHP deployments"
   reviewConfidence: high
-  reviewEvidence: "upload processing context {pattern} restricts extensions with a blocklist naming neither PHAR nor the alternative PHP extensions common deployments still execute"
+  reviewEvidence: "upload processing context {pattern} decides which extensions are executable from a list naming neither PHAR nor the alternative PHP extensions common deployments still execute"
   vulnerableTo: [injection.UnrestrictedUpload]
 }

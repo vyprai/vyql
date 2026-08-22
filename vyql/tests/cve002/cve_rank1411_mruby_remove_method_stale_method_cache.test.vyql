@@ -1,0 +1,485 @@
+# Rank 1411 / CVE-2022-1286 (GHSA-6c7w-5xfj-j2mc, recorded CWE-122/CWE-787):
+# mruby resolves a method call through a global inline cache. `mrb->cache` is a
+# fixed-size table of `struct mrb_cache_entry`, keyed on the receiver class and
+# the method symbol, and `mrb_method_search_vm` (src/class.c:1770) consults it
+# before walking any method table at all:
+#
+#   int h = kh_int_hash_func(mrb, ((intptr_t)oc) ^ mid) & (MRB_METHOD_CACHE_SIZE-1);
+#   struct mrb_cache_entry *mc = &mrb->cache[h];
+#
+#   if (mc->c == c && mc->mid == mid) {
+#     *cp = mc->c0;
+#     return mc->m;                      /* cached mrb_method_t, no mt walk */
+#   }
+#
+# So a cache entry is a memo of a resolution, holding the resolved
+# `mrb_method_t` -- a `struct RProc*` for a Ruby-defined method -- and the class
+# that defined it. Every path that mutates a class's method table therefore has
+# to invalidate the memo, and every one of them did except this one:
+#
+#   MRB_API void
+#   mrb_remove_method(mrb_state *mrb, struct RClass *c, mrb_sym mid)
+#   {
+#     mt_tbl *h;
+#
+#     MRB_CLASS_ORIGIN(c);
+#     h = c->mt;
+#
+#     if (h && mt_del(mrb, h, mid)) return;      /* src/class.c:2364 */
+#     mrb_name_error(mrb, mid, "method '%n' not defined in %C", mid, c);
+#   }
+#
+# `mt_del` (src/class.c:183) marks the slot `MT_DELETED` and decrements
+# `t->size`; it frees nothing. The `struct RProc` the slot referred to simply
+# stops being reachable from the method table, and the next GC sweep collects
+# it. Meanwhile the cache entry still names it. So `Module#remove_method` on a
+# method that is called once leaves the interpreter able to
+# dispatch to it again -- `mc->c == c && mc->mid == mid` still holds -- and the
+# VM executes an `RProc` whose irep the collector has reclaimed. That is what
+# the advisory's "heap-buffer-overflow in mrb_vm_exec" is: the crash site is the
+# bytecode loop reading a freed irep, several frames and one GC cycle away from
+# the missing invalidation. The weakness is CWE-672 / CWE-416 -- a memoized
+# resolution used after the resource it names has been released -- and neither
+# recorded CWE (CWE-122 heap overflow, CWE-787 out-of-bounds write) describes
+# the defect the fixed revision removes; both describe the fuzzer's symptom. Nothing in
+# `mrb_remove_method` writes out of bounds and nothing there frees anything.
+#
+# b1d0296a93 adds the one call:
+#
+#   if (h && mt_del(mrb, h, mid)) {
+#     mrb_mc_clear_by_class(mrb, c);
+#     return;
+#   }
+#
+# and that helper (src/class.c:1753) either zeroes every entry naming `c`, or,
+# when `c` has been inherited, clears the whole cache, because an entry is keyed
+# on the *receiver* class and a subclass entry can name a superclass's proc.
+#
+# The other mutators are correct, which is what makes this a single
+# missing invalidation rather than a design gap: `mrb_define_method_raw`
+# (src/class.c:744) ends `mt_put(...); mc_clear(mrb);`, `mrb_class_inherited`
+# calls `mrb_mc_clear_by_class` at src/class.c:566, and `undef_method`
+# (src/class.c:2321) reaches `mrb_define_method_raw` with a NULL proc rather
+# than deleting, so it invalidates too. `mt_del` has exactly one call site in
+# the whole tree, and it is the one that does not clear.
+#
+# The pool row is correct in every field: b1d0296a93 is a real, readable,
+# single-file, non-merge commit on mruby's master, the vulnerable
+# `mrb_remove_method` body is present at its parent, and the remediation is
+# present at the commit itself. No corpus correction. The recorded CWE pair is
+# the effect rather than the weakness, which is a metadata observation, not a
+# pool field.
+#
+# What fires today. `timeout 300 ./bin/vyql scan --cache off --max-ram 6GB` over
+# both full checkouts reports 2505 findings, 870 at or above high, stable over
+# three runs each, and the two sets are *identical* apart from the three-line
+# shift the fixed revision introduces: VYQL-MEM-006 src/class.c:2377 -> :2380, VYQL-MEM-018
+# :2687 -> :2690 and two VYQL-NUM-003 rows :2437/:2442 -> :2440/:2445. Per-rule
+# totals match exactly (VYQL-MEM-005 785, VYQL-MEM-006 725, VYQL-NUM-003 679,
+# VYQL-MEM-016 114, VYQL-MEM-010 56, ...). `mrb_remove_method` itself, lines
+# 2356-2366, carries no finding at all; the nearest row is a VYQL-MEM-006 at
+# :2377 inside `mrb_mod_undef`, which is correct code. Ranks 1370, 1371, 1378
+# and 1407 recorded the same pattern and it holds again: over cases (a) and (b)
+# below, which differ only in the fixed revision, every label sits on the *remediation* or on
+# the reader it protects -- code.OwnerFieldClear on `mc[i].c = 0` inside
+# `mrb_mc_clear_by_class`, and code.NullableDeref plus code.PointerUse on the
+# `*cp` writes in `mrb_method_search_vm`. Both score 3 findings with identical
+# fingerprints: VYQL-MEM-010 on `&t->ptr[t->alloc]` inside `mt_del`, and two
+# VYQL-MEM-006 on the cache reader's dereferences. Nothing lands on the removal.
+#
+# Vocabulary is checked for reuse before anything else, and there is none for
+# this weakness class. CWE-672 appears in vyql/taxonomy/cwe.json and in no
+# concept and no rule anywhere -- rank 1393 measured that and it is unchanged.
+# The CWE-416 rule VYQL-MEM-007 is `code.PointerFree reaches code.PointerUse`,
+# and code.PointerFree is bound as `node.path ~= "free"`: an explicit release
+# primitive. This weakness contains no release at all, so that vocabulary is
+# inapplicable in principle and not merely unbound -- the dangling reference is
+# manufactured later, by the collector, from a slot that stopped being reachable.
+# code.ReentrantQueueCleanupReview (VYQL-MEM-019, CWE-415/416, C) is about a
+# cleanup traversal racing a cancellation over queued entries;
+# code.ClosureUnwindStaleLength (VYQL-MEM-052) is about a buffer length not
+# restored across a callback; code.PublicVisibilityCacheInvalidationMissing
+# (VYQL-AUTH-036) is the nearest wording -- "cache entries are not invalidated
+# when the public status changes" -- but it is an access-control review concept
+# bound only for JavaScript and scoped to a sandbox preview service's public
+# flag. None of them is this. No concept and no rule ID is minted here, because
+# the measurements below say nothing generic can be built on top of one.
+#
+# ATTENTION, no genericity: the shape is expressible and it discriminates, and
+# the only thing it can key on is one project's file-private helper plus the
+# literal spelling of the call the fixed revision adds.
+#
+# Extraction is not the blocker. `vyql query -call` over the repro resolves every
+# relevant call as a `code.Call` node with a path -- `mt_del` at class.c:90,
+# `mt_put` and `mc_clear` in `mrb_define_method_raw`, `mrb_name_error` on the
+# error path -- so the facts a binding would need are all present. A draft
+# binding is written and measured on the real 2990-line src/class.c of both
+# revisions:
+#
+#   node.scope == "function" and node.context.language == "c"
+#     and (node.context.callArgAt contains "mt_del:1:h")
+#     and not (node.context.call == "mrb_mc_clear_by_class")
+#
+# It reports 1 -> 0: one flag at src/class.c:2356 on the vulnerable file, none on
+# the patched one, with the other 254 flags and 98 findings unchanged. Two
+# measured facts fall out of that and both are worth keeping. First,
+# `node.context.call` is exact-token *and function-confined for C*: the patched
+# file calls `mrb_mc_clear_by_class` at src/class.c:566 from
+# `mrb_class_inherited` as well, 1790 lines above the function under test, and
+# that call satisfies nothing -- so the negation is genuinely reading
+# `mrb_remove_method`'s own body, extending rank 1387's PHP result and rank
+# 1400's `call_arg_at` result to the plain `call:` prefix. Second, and fatally,
+# renaming the helper brings the flag straight back: with
+# `mrb_mc_clear_by_class` spelled `mrb_method_cache_invalidate` throughout the
+# *patched* file, the flag returns at src/class.c:2356 on correctly-fixed code.
+# Rank 1394's test is therefore failed outright -- the discriminator is the
+# spelling of the fixed revision's own added call, so an equivalent invalidation written
+# under any other name, or spelled inline as the same `for` loop over
+# `mrb->cache`, reads as unpatched.
+#
+# The positive anchor is no better. `mt_del` is `static` to src/class.c, absent
+# from every mruby header, and occurs twice in the entire tree: its definition
+# and its single call. Across the 4893 C files in the ~110 repositories cloned
+# for this campaign it occurs nowhere else. A binding naming it is a rule about
+# one line of one file of one project, which is AGENTS.md's genericity test
+# failing by definition -- no library documentation could produce it.
+#
+# Generalising the names instead is what makes the precision cost visible.
+# Reading the shape as "a function calls a removal helper and does not invalidate
+# a cache", with removal spelled `*_del|*_delete|*_remove|*_unset|*_erase` and
+# invalidation spelled `*cache*(clear|flush|inval)*` or
+# `*(clear|flush|inval)*cache*`, the same 4893 C files hold 2774 removal call
+# sites in 716 files, while only 33 files contain any cache-invalidation call at
+# all and only 15 contain both. So the generic form flags on the order of 2700
+# sites -- apr_table_unset 587 times, apr_bucket_delete 281, lydict_remove 273,
+# event_del 24 -- to find this one, because almost no removal in C has a memo
+# cache behind it and the binding cannot tell which do.
+#
+# Rank 1380's counterweight is tested and comes out negative: the fixed revision adds a
+# call rather than moving a check out, so the only pre-existing documented API
+# call left inside the guarded function is `mrb_name_error`, which both revisions
+# make, on the error path, and which therefore cannot discriminate.
+#
+# What is missing is a fact, not a binding and not an extraction fix: nothing
+# relates a mutation of a lookup structure to the invalidation of a memo derived
+# from it. The reader (`mrb_method_search_vm` indexing `mrb->cache`), the
+# invalidator (`mrb_mc_clear_by_class` zeroing `mc[i].c`, which the engine
+# labels code.OwnerFieldClear) and the mutators (`mt_put`, `mt_del` on
+# `c->mt`) are three separate functions over two separate structures, and no
+# predicate says the second must be reached on every path through the third.
+# Until such a fact exists the only expressible discriminator is the name.
+#
+# The three cases are the pair, plus the sibling that makes it a pair. (a) and
+# (b) are the two real revisions and record the miss. (c) is the untouched
+# `mrb_define_method_raw`: it mutates the same table and is correct in both
+# revisions, and it is the reason (a) cannot be turned into an expect by keying
+# on the mutation alone.
+#
+# verify_current_expected: attention-no-genericity, all three revisions rejected.
+# (c) is correct today and must remain a reject.
+
+test "rank1411: (a) removing a method from a class's method table returns without invalidating the global method cache, so the memoized resolution still names the removed proc"
+  lang c
+  file src/class.c
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-019
+  reject VYQL-MEM-052
+  reject VYQL-AUTH-036
+  reject_review code.ReentrantQueueCleanupReview
+  reject_review code.ClosureUnwindStaleLength
+  reject_review code.PublicVisibilityCacheInvalidationMissing
+  code
+  ```
+  #include <mruby.h>
+  #include <mruby/class.h>
+  #include <mruby/proc.h>
+
+  static mrb_bool
+  mt_del(mrb_state *mrb, mt_tbl *t, mrb_sym sym)
+  {
+    int hash, pos, start;
+
+    if (t == NULL) return FALSE;
+    if (t->alloc == 0) return FALSE;
+    if (t->size == 0) return FALSE;
+
+    mrb_sym *keys = (mrb_sym*)&t->ptr[t->alloc];
+    hash = kh_int_hash_func(mrb, sym);
+    start = pos = hash & (t->alloc-1);
+    for (;;) {
+      mrb_sym key = keys[pos];
+      if (MT_KEY_SYM(key) == sym) {
+        t->size--;
+        keys[pos] = MT_DELETED;
+        return TRUE;
+      }
+      else if (key == MT_EMPTY) {
+        return FALSE;
+      }
+      pos = (pos+1) & (t->alloc-1);
+      if (pos == start) {
+        return FALSE;
+      }
+    }
+  }
+
+  static void
+  mc_clear(mrb_state *mrb)
+  {
+    static const struct mrb_cache_entry ce_zero = {0};
+
+    for (int i=0; i<MRB_METHOD_CACHE_SIZE; i++) {
+      mrb->cache[i] = ce_zero;
+    }
+  }
+
+  void
+  mrb_mc_clear_by_class(mrb_state *mrb, struct RClass *c)
+  {
+    struct mrb_cache_entry *mc = mrb->cache;
+    int i;
+
+    if (c->flags & MRB_FL_CLASS_IS_INHERITED) {
+      mc_clear(mrb);
+      return;
+    }
+    for (i=0; i<MRB_METHOD_CACHE_SIZE; i++) {
+      if (mc[i].c == c) mc[i].c = 0;
+    }
+  }
+
+  MRB_API mrb_method_t
+  mrb_method_search_vm(mrb_state *mrb, struct RClass **cp, mrb_sym mid)
+  {
+    mrb_method_t m;
+    struct RClass *c = *cp;
+    struct RClass *oc = c;
+    int h = kh_int_hash_func(mrb, ((intptr_t)oc) ^ mid) & (MRB_METHOD_CACHE_SIZE-1);
+    struct mrb_cache_entry *mc = &mrb->cache[h];
+
+    if (mc->c == c && mc->mid == mid) {
+      *cp = mc->c0;
+      return mc->m;
+    }
+
+    while (c) {
+      mt_tbl *h2 = c->mt;
+
+      if (h2) {
+        union mt_ptr ptr;
+        mrb_sym ret = mt_get(mrb, h2, mid, &ptr);
+        if (ret) {
+          mc->c = oc;
+          mc->c0 = c;
+          mc->mid = mid;
+          mc->m = m;
+          return m;
+        }
+      }
+      c = c->super;
+    }
+    MRB_METHOD_FROM_PROC(m, NULL);
+    return m;
+  }
+
+  MRB_API void
+  mrb_remove_method(mrb_state *mrb, struct RClass *c, mrb_sym mid)
+  {
+    mt_tbl *h;
+
+    MRB_CLASS_ORIGIN(c);
+    h = c->mt;
+
+    if (h && mt_del(mrb, h, mid)) return;
+    mrb_name_error(mrb, mid, "method '%n' not defined in %C", mid, c);
+  }
+  ```
+
+test "rank1411: (b) the fixed revision clears the cache entries naming the class before returning from the removal"
+  lang c
+  file src/class.c
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-019
+  reject VYQL-MEM-052
+  reject VYQL-AUTH-036
+  reject_review code.ReentrantQueueCleanupReview
+  reject_review code.ClosureUnwindStaleLength
+  reject_review code.PublicVisibilityCacheInvalidationMissing
+  code
+  ```
+  #include <mruby.h>
+  #include <mruby/class.h>
+  #include <mruby/proc.h>
+
+  static mrb_bool
+  mt_del(mrb_state *mrb, mt_tbl *t, mrb_sym sym)
+  {
+    int hash, pos, start;
+
+    if (t == NULL) return FALSE;
+    if (t->alloc == 0) return FALSE;
+    if (t->size == 0) return FALSE;
+
+    mrb_sym *keys = (mrb_sym*)&t->ptr[t->alloc];
+    hash = kh_int_hash_func(mrb, sym);
+    start = pos = hash & (t->alloc-1);
+    for (;;) {
+      mrb_sym key = keys[pos];
+      if (MT_KEY_SYM(key) == sym) {
+        t->size--;
+        keys[pos] = MT_DELETED;
+        return TRUE;
+      }
+      else if (key == MT_EMPTY) {
+        return FALSE;
+      }
+      pos = (pos+1) & (t->alloc-1);
+      if (pos == start) {
+        return FALSE;
+      }
+    }
+  }
+
+  static void
+  mc_clear(mrb_state *mrb)
+  {
+    static const struct mrb_cache_entry ce_zero = {0};
+
+    for (int i=0; i<MRB_METHOD_CACHE_SIZE; i++) {
+      mrb->cache[i] = ce_zero;
+    }
+  }
+
+  void
+  mrb_mc_clear_by_class(mrb_state *mrb, struct RClass *c)
+  {
+    struct mrb_cache_entry *mc = mrb->cache;
+    int i;
+
+    if (c->flags & MRB_FL_CLASS_IS_INHERITED) {
+      mc_clear(mrb);
+      return;
+    }
+    for (i=0; i<MRB_METHOD_CACHE_SIZE; i++) {
+      if (mc[i].c == c) mc[i].c = 0;
+    }
+  }
+
+  MRB_API mrb_method_t
+  mrb_method_search_vm(mrb_state *mrb, struct RClass **cp, mrb_sym mid)
+  {
+    mrb_method_t m;
+    struct RClass *c = *cp;
+    struct RClass *oc = c;
+    int h = kh_int_hash_func(mrb, ((intptr_t)oc) ^ mid) & (MRB_METHOD_CACHE_SIZE-1);
+    struct mrb_cache_entry *mc = &mrb->cache[h];
+
+    if (mc->c == c && mc->mid == mid) {
+      *cp = mc->c0;
+      return mc->m;
+    }
+
+    while (c) {
+      mt_tbl *h2 = c->mt;
+
+      if (h2) {
+        union mt_ptr ptr;
+        mrb_sym ret = mt_get(mrb, h2, mid, &ptr);
+        if (ret) {
+          mc->c = oc;
+          mc->c0 = c;
+          mc->mid = mid;
+          mc->m = m;
+          return m;
+        }
+      }
+      c = c->super;
+    }
+    MRB_METHOD_FROM_PROC(m, NULL);
+    return m;
+  }
+
+  MRB_API void
+  mrb_remove_method(mrb_state *mrb, struct RClass *c, mrb_sym mid)
+  {
+    mt_tbl *h;
+
+    MRB_CLASS_ORIGIN(c);
+    h = c->mt;
+
+    if (h && mt_del(mrb, h, mid)) {
+      mrb_mc_clear_by_class(mrb, c);
+      return;
+    }
+    mrb_name_error(mrb, mid, "method '%n' not defined in %C", mid, c);
+  }
+  ```
+
+test "rank1411: (c) the sibling that installs a method mutates the same table and invalidates the cache, and is unchanged at both revisions"
+  lang c
+  file src/class.c
+  reject VYQL-MEM-007
+  reject VYQL-MEM-008
+  reject VYQL-MEM-019
+  reject VYQL-MEM-052
+  reject VYQL-AUTH-036
+  reject_review code.ReentrantQueueCleanupReview
+  reject_review code.ClosureUnwindStaleLength
+  reject_review code.PublicVisibilityCacheInvalidationMissing
+  code
+  ```
+  #include <mruby.h>
+  #include <mruby/class.h>
+  #include <mruby/proc.h>
+
+  static void
+  mc_clear(mrb_state *mrb)
+  {
+    static const struct mrb_cache_entry ce_zero = {0};
+
+    for (int i=0; i<MRB_METHOD_CACHE_SIZE; i++) {
+      mrb->cache[i] = ce_zero;
+    }
+  }
+
+  MRB_API void
+  mrb_define_method_raw(mrb_state *mrb, struct RClass *c, mrb_sym mid, mrb_method_t m)
+  {
+    mt_tbl *h;
+    union mt_ptr ptr;
+
+    MRB_CLASS_ORIGIN(c);
+    h = c->mt;
+    mrb_check_frozen(mrb, c);
+    if (!h) h = c->mt = mt_new(mrb);
+    if (MRB_METHOD_PROC_P(m)) {
+      struct RProc *p = MRB_METHOD_PROC(m);
+
+      ptr.proc = p;
+      if (p) {
+        p->flags |= MRB_PROC_SCOPE;
+        p->c = NULL;
+        mrb_field_write_barrier(mrb, (struct RBasic*)c, (struct RBasic*)p);
+        if (!MRB_PROC_ENV_P(p)) {
+          MRB_PROC_SET_TARGET_CLASS(p, c);
+        }
+      }
+    }
+    else {
+      ptr.func = MRB_METHOD_FUNC(m);
+    }
+    mt_put(mrb, h, mid, MT_FLAGS(MRB_METHOD_FUNC_P(m), MRB_METHOD_NOARG_P(m)), ptr);
+    mc_clear(mrb);
+  }
+
+  static void
+  undef_method(mrb_state *mrb, struct RClass *c, mrb_sym a)
+  {
+    mrb_method_t m;
+
+    MRB_METHOD_FROM_PROC(m, NULL);
+    mrb_define_method_raw(mrb, c, a, m);
+  }
+  ```

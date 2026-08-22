@@ -1,0 +1,10 @@
+module vypr.request_forgery;
+
+rule UnpinnedResolvedAddressCheck {
+  meta {
+    cwe: [CWE_367, CWE_918]
+    id: "VYQL-RF-047"
+    severity: high
+  }
+  issue code.UnpinnedResolvedAddressCheck as guard
+}

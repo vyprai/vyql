@@ -1,0 +1,350 @@
+# Rank 1423 / CVE-2020-14067: Navigate CMS installs a theme or an extension from
+# a ZIP the operator uploads, and `theme::check_upload()` /
+# `extension::check_upload()` (lib/packages/themes/theme.class.php,
+# lib/packages/extensions/extension.class.php) are the screen that decides
+# whether the archive is safe to unpack into the web root. The screen inflates
+# the upload into a private temporary directory, then enumerates the members it
+# considers PHP and reads each one looking for execution primitives:
+#
+#   $zip->extractTo($tempdir);
+#   ...
+#   $files = core_recursive_file_search($tempdir,  '/.*\/*.php/');
+#   $prohibited_functions = array('eval(', 'system(', 'exec(', 'shell_exec(', ...);
+#   foreach($files as $file) {
+#       $file_content = file_get_contents($file);
+#       foreach($prohibited_functions as $pf) {
+#           if(stripos($file_content, $pf) !== false) { ... return false; }
+#       }
+#   }
+#
+# The weakness is the enumeration, not the search: the pattern selects `.php`
+# and nothing else, while a stock PHP deployment hands `.phtml` to the same
+# interpreter (`AddType application/x-httpd-php .php .phtml`). An archive whose
+# webshell is named `x.phtml` therefore passes every branch of the screen, is
+# copied into NAVIGATE_PATH/themes/<name>/, and is executable at a URL the
+# uploader knows. CWE-434, and the advisory rates it 9.8.
+#
+# The fixed revision widens the enumeration to '/.*\/*.(php|phtml)/' in both classes, skips
+# members that vanished between the search and the read, and -- in the same
+# commit -- stops `install_from_hash` downloading from an arbitrary host and
+# routes its download through check_upload at all.
+#
+# FIXED. Nothing is labelled without it: a scan of lib/packages at the vulnerable
+# revision reported 298 flags and no statement about the screen, its nearest
+# neighbour being a VYQL-PATH-001 on the `.theme` read three lines above the
+# enumeration. code.IncompleteDangerousUploadExtensionBlocklist / VYQL-INJ-070
+# is the concept for "the set of extensions an upload screen treats as
+# executable omits one common PHP deployments still run", so this adds a PHP
+# binding for the archive-content-screen spelling of it rather than a second
+# concept; the two shipped bindings for that concept cover a `class.upload.php`
+# blocklist and a Zend_File_Transfer denylist, neither of which is a screen over
+# an extracted archive.
+#
+# The binding asks five things of a function, all readable from PHP's own
+# documentation: it handles an upload (`tmp_name`, the documented $_FILES key),
+# it inflates an archive (ZipArchive::extractTo), it reads the members back
+# (file_get_contents/fread/fgets), it searches them for execution primitives
+# (eval(/system(/exec(/`<?`), and the pattern it selects members with names the
+# `php` extension. It goes silent as soon as any other extension a PHP
+# deployment executes is named anywhere in the function -- phtml, phar, php3-7,
+# phps, pht -- which is the axis the fixed revision moves along, and which is deliberately
+# not the fixed revision's own spelling: a variant patch naming php5/php7/pht instead of
+# phtml suppresses it too (third case below).
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 6GB,
+# --cache off), over lib/packages: the vulnerable revision reports VYQL-INJ-070
+# exactly twice, at extension.class.php:509 and theme.class.php:510 -- the two
+# check_upload declarations the advisory names -- stable over three runs, and the
+# patched revision reports it zero times, also over three runs. `extractTo`
+# occurs in six PHP files in the whole repository and only those four in
+# lib/packages pair it with `tmp_name`, so the reachable set is fully covered by
+# that scan. Across the other 159 CVE clones under /tmp/cve-work/ `extractTo`
+# appears in 17 PHP files and none of them mentions `tmp_name`, so the binding
+# has no other reachable site there; three of those subtrees scanned anyway
+# (microweber Package, mautic CoreBundle/Helper, moodle lib/filestorage) report
+# it zero times.
+#
+# Residual, stated rather than hidden: the alternative-extension negation is
+# spelled against the whole function context, so a comment mentioning phtml
+# silences it -- false-negative direction only, the same property recorded for
+# every PHP body-text clause. The positive clauses are all AST-derived instead,
+# so this function's own `// https://www.php.net/manual/en/...execution.php`
+# comment does not stand in for the enumeration pattern.
+
+test "rank1423: a theme-archive screen that inspects only the .php members it extracted"
+  lang php
+  file lib/packages/themes/theme.class.php
+  expect VYQL-INJ-070
+  expect_review code.IncompleteDangerousUploadExtensionBlocklist
+  code
+  ```
+  <?php
+  class theme
+  {
+      public static function check_upload($file_upload, $theme_name)
+      {
+          // check mime
+          if(!in_array($file_upload['type'], array('application/zip', 'application/x-zip-compressed')))
+          {
+              return false;
+          }
+
+          // check file extension
+          if(pathinfo($file_upload['name'], PATHINFO_EXTENSION) != 'zip')
+          {
+              return false;
+          }
+
+          // extract the zip in a temporary folder
+          $zip = new ZipArchive;
+          if($zip->open($file_upload['tmp_name']) !== true)
+          {
+              return false;
+          }
+
+          $tempdir = NAVIGATE_PRIVATE . '/tmp/' . uniqid('theme-check-');
+
+          mkdir($tempdir);
+          $zip->extractTo($tempdir);
+          $zip->close();
+
+          // theme definition exists?
+          if(!file_exists($tempdir . '/' . $theme_name . '.theme'))
+          {
+              core_remove_folder($tempdir);
+              return false;
+          }
+
+          // check every php file included
+          $files = core_recursive_file_search($tempdir,  '/.*\/*.php/');
+
+          $prohibited_functions = array(
+              'eval(',
+              'system(',
+              'exec(',
+              'shell_exec(',
+              'popen(',
+              'proc_open(',
+              'passthru('
+          );
+
+          foreach($files as $file)
+          {
+              // remove all spaces
+              $file_content = file_get_contents($file);
+              $file_content = str_replace(array(' ', "\t", "\r", "\n"), '', $file_content);
+
+              foreach($prohibited_functions as $pf)
+              {
+                  if(stripos($file_content, $pf) !== false)
+                  {
+                      core_remove_folder($tempdir);
+                      return false;
+                  }
+              }
+          }
+
+          // check for "dangerous" files
+          $htaccess = core_recursive_file_search($tempdir,  '/.htaccess/');
+          $phpini = core_recursive_file_search($tempdir,  '/php.ini/');
+          if(!empty($htaccess) || !empty($phpini))
+          {
+              core_remove_folder($tempdir);
+              return false;
+          }
+
+          core_remove_folder($tempdir);
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1423: the same screen once the enumeration reaches .phtml too is silent"
+  lang php
+  file lib/packages/themes/theme.class.php
+  reject VYQL-INJ-070
+  reject_review code.IncompleteDangerousUploadExtensionBlocklist
+  code
+  ```
+  <?php
+  class theme
+  {
+      public static function check_upload($file_upload, $theme_name)
+      {
+          // check mime
+          if(!in_array($file_upload['type'], array('application/zip', 'application/x-zip-compressed')))
+          {
+              return false;
+          }
+
+          // check file extension
+          if(pathinfo($file_upload['name'], PATHINFO_EXTENSION) != 'zip')
+          {
+              return false;
+          }
+
+          // extract the zip in a temporary folder
+          $zip = new ZipArchive;
+          if($zip->open($file_upload['tmp_name']) !== true)
+          {
+              return false;
+          }
+
+          $tempdir = NAVIGATE_PRIVATE . '/tmp/' . uniqid('theme-check-');
+
+          mkdir($tempdir);
+          $zip->extractTo($tempdir);
+          $zip->close();
+
+          // theme definition exists?
+          if(!file_exists($tempdir . '/' . $theme_name . '.theme'))
+          {
+              core_remove_folder($tempdir);
+              return false;
+          }
+
+          // check every php file included
+          $files = core_recursive_file_search($tempdir,  '/.*\/*.(php|phtml)/');
+
+          $prohibited_functions = array(
+              'eval(',
+              'system(',
+              'exec(',
+              'shell_exec(',
+              'popen(',
+              'proc_open(',
+              'passthru('
+          );
+
+          foreach($files as $file)
+          {
+              if(!file_exists($file))
+              {
+                  continue;
+              }
+              $file_content = file_get_contents($file);
+              // remove all spaces
+              $file_content = str_replace(array(' ', "\t", "\r", "\n"), '', $file_content);
+
+              foreach($prohibited_functions as $pf)
+              {
+                  if(stripos($file_content, $pf) !== false)
+                  {
+                      core_remove_folder($tempdir);
+                      return false;
+                  }
+              }
+          }
+
+          // check for "dangerous" files
+          $htaccess = core_recursive_file_search($tempdir,  '/.htaccess/');
+          $phpini = core_recursive_file_search($tempdir,  '/php.ini/');
+          if(!empty($htaccess) || !empty($phpini))
+          {
+              core_remove_folder($tempdir);
+              return false;
+          }
+
+          core_remove_folder($tempdir);
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1423: an archive screen enumerating the legacy PHP extensions is silent"
+  lang php
+  file lib/packages/plugins/plugin.class.php
+  reject VYQL-INJ-070
+  reject_review code.IncompleteDangerousUploadExtensionBlocklist
+  code
+  ```
+  <?php
+  class plugin
+  {
+      public static function check_upload($file_upload, $plugin_name)
+      {
+          $zip = new ZipArchive;
+          if($zip->open($file_upload['tmp_name']) !== true)
+          {
+              return false;
+          }
+
+          $tempdir = sys_get_temp_dir() . '/' . uniqid('plugin-check-');
+          mkdir($tempdir);
+          $zip->extractTo($tempdir);
+          $zip->close();
+
+          $files = plugin_recursive_file_search($tempdir, '/\.(php|php3|php4|php5|php7|pht)$/i');
+
+          $prohibited_functions = array('eval(', 'system(', 'exec(', 'passthru(');
+
+          foreach($files as $file)
+          {
+              $file_content = file_get_contents($file);
+
+              foreach($prohibited_functions as $pf)
+              {
+                  if(stripos($file_content, $pf) !== false)
+                  {
+                      plugin_remove_folder($tempdir);
+                      return false;
+                  }
+              }
+          }
+
+          plugin_remove_folder($tempdir);
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1423: an archive screen that reads every member it extracted is silent"
+  lang php
+  file lib/packages/plugins/plugin_strict.class.php
+  reject VYQL-INJ-070
+  reject_review code.IncompleteDangerousUploadExtensionBlocklist
+  code
+  ```
+  <?php
+  class plugin_strict
+  {
+      public static function check_upload($file_upload, $plugin_name)
+      {
+          $zip = new ZipArchive;
+          if($zip->open($file_upload['tmp_name']) !== true)
+          {
+              return false;
+          }
+
+          $tempdir = sys_get_temp_dir() . '/' . uniqid('plugin-check-');
+          mkdir($tempdir);
+          $zip->extractTo($tempdir);
+          $zip->close();
+
+          $files = plugin_recursive_file_search($tempdir, '/.*/');
+
+          $prohibited_functions = array('eval(', 'system(', 'exec(', 'passthru(');
+
+          foreach($files as $file)
+          {
+              $file_content = file_get_contents($file);
+
+              foreach($prohibited_functions as $pf)
+              {
+                  if(stripos($file_content, $pf) !== false)
+                  {
+                      plugin_remove_folder($tempdir);
+                      return false;
+                  }
+              }
+          }
+
+          plugin_remove_folder($tempdir);
+
+          return true;
+      }
+  }
+  ```

@@ -1,0 +1,47 @@
+module bindings.go.sqlBuilderConditionKeyInterpolation;
+
+// Squirrel's condition helpers -- Eq, NotEq, Lt, LtOrEq, Gt, GtOrEq, Like, NotLike,
+// ILike and NotILike -- are documented as "syntactic sugar for use with Where/Having/Set
+// methods", and each is a map whose *key is the SQL expression* while the value is what
+// gets bound: `sq.Eq{"id": 1}` renders `id = ?` with 1 as the argument. Only the value
+// half is ever parameterised, so whatever the key holds is copied into the statement as
+// SQL text. That split is not squirrel's invention -- no SQL dialect has a placeholder
+// form for a column, table or ORDER BY identifier -- which is why an identifier can only
+// be made safe by checking it against a fixed set of permitted names (CWE-89).
+//
+// A key written as a string literal is the ordinary usage and is what the documentation
+// shows. A key produced by a *formatting call* is the identifier-interpolation shape:
+// fmt.Sprintf, fmt.Sprint, fmt.Sprintln, strings.Join and the strings replacement helpers
+// all splice their arguments into the result verbatim, so a runtime value reaching one of
+// them reaches the statement. `Eq{fmt.Sprintf("stats ->> '$.%v'", role): nil}` puts `role`
+// inside the quoted JSON path of a comparison the builder emits unquoted, and a role of
+// `x') SELECT ...--` closes the expression and continues the statement.
+//
+// The neutraliser is the allowlist, in whichever form Go spells it. A set membership test
+// -- `if _, ok := allowed[name]; ok`, the idiom the standard library's own map-as-a-set
+// pattern documents -- shows up as an index of a collection; slices.Contains, slices.Index
+// and sort.SearchStrings are the ordered-list spellings; and a driver's identifier quoter
+// (lib/pq's QuoteIdentifier, its Postgres-array sibling) is the escaping form. Any of them
+// in the same body declines the flag, which is deliberately generous: an indexed lookup in
+// a function that builds a condition key from formatted text is far more likely to be the
+// name check than not, and the cost of being wrong here is a false negative rather than a
+// false positive.
+//
+// A key built by `+` concatenation rather than a call is not this shape, because the Go
+// frontend records a composite-literal key only when it resolves to a path -- a call or a
+// name -- so a concatenated key carries no field token at all. That is a known gap in the
+// shape's reach and not a judgement that concatenation is safe.
+//
+// The dependency requirement states which builder the shape is written from, but it does
+// not narrow much on its own: a Go module path's package root is its hostname, so any
+// `github.com/...` requirement in go.mod satisfies it. What keeps the shape narrow is the
+// conjunction -- an exact condition-map identifier together with a composite-literal key
+// that is a formatting call. The condition-map names are squirrel's own vocabulary, and a
+// map literal keyed by a formatted string is rare in any case.
+binding goSqlBuilderConditionKeyInterpolation {
+  requires {
+    dependency("github.com/Masterminds/squirrel")
+  }
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.identifier in ["Eq", "NotEq", "Lt", "LtOrEq", "Gt", "GtOrEq", "Like", "NotLike", "ILike", "NotILike"] and node.context.field in ["fmt.Sprintf", "fmt.Sprint", "fmt.Sprintln", "strings.Join", "strings.Replace", "strings.ReplaceAll"] and not (node.token contains "index:") and not containsAny(node.context.callPath, ["slices.Contains", "slices.Index", "slices.IndexFunc", "sort.SearchStrings", "pq.QuoteIdentifier", "pq.QuoteLiteral"])
+  emit issue code.UnvalidatedSqlIdentifierInterpolation at node
+}

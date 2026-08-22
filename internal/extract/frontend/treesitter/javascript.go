@@ -1488,7 +1488,13 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.funcParamTypes(n)
 		body := c.funcBody(n)
 		decorators := c.jsDecoratorTokens(n)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: exported}}
+		out := []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: exported}}
+		// A factory function returns its API as an object literal of shorthand
+		// methods, e.g. `function Email(opts){ return { async send(p){…} } }`.
+		// c.expr's object case lowers only pairs, so those method bodies are dead
+		// code unless the same walk the object-valued declaration paths already use
+		// runs here too.
+		return append(out, c.returnedObjectMethodFuncDefs(n, exported)...)
 	case "class_declaration", "abstract_class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "field_definition", "public_field_definition":

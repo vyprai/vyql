@@ -1,0 +1,241 @@
+# Rank 1407 / CVE-2022-25299: the embedded HTTP server's file-upload handler
+# built the destination path out of a query-string variable and never removed
+# the `..` segments from it. `mg_http_upload()` (src/http.c, gated behind
+# MG_ENABLE_FILE) read the client-supplied `name` variable out of the request's
+# query string with `mg_http_get_var(&hm->query, "name", name, sizeof(name))`,
+# joined it to the caller's upload directory with
+# `snprintf(path, sizeof(path), "%s%c%s", dir, MG_DIRSEP, name)`, and passed the
+# result straight to `fopen(path, oft == 0 ? "wb" : "ab")` followed by
+# `fwrite(hm->body.ptr, 1, hm->body.len, fp)`. The only check on `name` is
+# `name[0] == '\0'`, so `POST /upload?name=../uploaded.txt` writes the request
+# body one directory above `dir` -- CWE-22, an arbitrary-file write reaching
+# anywhere the server process can write, which on the embedded targets this
+# library ships for is the whole filesystem.
+#
+# The fixed revision moves the function below `remove_double_dots()` -- a `..`-collapsing
+# helper the same file uses for static-file serving -- and calls
+# `remove_double_dots(path)` on the joined path before `fopen`. Upstream later
+# replaced that with the public `mg_path_is_sane()` predicate, which is the
+# documented form of the same control; both patched forms appear below. The
+# remediation is present at the fixed revision and absent at its parent.
+#
+# Detection state: the sink half of this is covered and the source half
+# now is too, but no taint path connects them, so VYQL-PATH-001
+# (TaintedPathAccess) reports nothing in either direction.
+#
+#  - The sink is labelled: `fopen`'s first argument is
+#    code.FilePathAccess (vyql/bindings/c/mce54b166.vyql, binding
+#    filePathAccess29), and `vyql match` on the vulnerable src/http.c shows it
+#    at http.c:396, the very `fopen(path, ...)` of this CVE.
+#  - The source now is too: this change binds `mg_http_get_var`'s `dst`
+#    out-parameter as code.HttpInput, which is what the function's own
+#    documentation says it fills ("fetch an HTTP variable ... url-decoded into
+#    dst"). `vyql match` on the vulnerable src/http.c emits three labels --
+#    http.c:385, http.c:386 and http.c:813 -- 386 being this CVE's `name`.
+#  - What is missing is the propagation. C out-parameter dataflow is modelled by
+#    a hardcoded name table in the frontend, `cReaders` in
+#    internal/extract/frontend/treesitter/c.go:74 ("cReaders write the call
+#    result into a destination buffer argument"), holding fgets/gets/fread/
+#    fscanf/read/recv/recvfrom/pread and nothing else. For a call in that table
+#    the frontend lowers the statement to `dst = <call>` (c.go:1172), so the
+#    buffer carries the call's taint; for any other read-style call it lowers to
+#    a bare ExprStmt and the buffer stays clean. `mg_http_get_var` is not in the
+#    table, so `name` is untainted, `path` is untainted, and the labelled
+#    `fopen` sink is unreachable from the labelled source. Measured: on the
+#    vulnerable src/ subtree, 290 findings over three `--cache off` runs both
+#    with and without the new source binding, of which zero are VYQL-PATH-*.
+#    Rule coverage of that tree is MEM-006 75, NUM-003 70, MEM-005 67,
+#    MEM-016 42, MEM-010 15, MEM-003 5, MEM-041 4, MEM-008 4 -- the scanner
+#    reports the library's memory arithmetic and nothing about the traversal.
+#  - The data layer has the vocabulary for exactly this and the engine
+#    does not execute it. `propagate value from call.result to args[2].pointee`
+#    parses (internal/parser/v2_parser.go:348 parseV2Propagate) and compiles to
+#    a "flow_path" mapping (internal/bindings/compile_binding.go:1009
+#    lowerV2Propagation), but adding it to this binding makes every scan die
+#    with `vyql: unsupported compiled v2 binding action kind "flow_path"` --
+#    specFromBindingSet (internal/bindings/bindings_spec.go, the mapping switch
+#    ending at line 641) has no case for the flow_* kinds and falls into its
+#    default panic. Even past that panic the mapping would do nothing:
+#    internal/bindings/callflows.go turns flow_* mappings into nir.CallEffect
+#    values via CallEffectsFor, and CallEffectsFor has no callers anywhere in
+#    the tree, so nir.Call.Effects -- which lowering.applyCallEffects
+#    (internal/extract/lowering/lowering.go:4967) is written to consume -- is
+#    never populated from a binding. This is rank 1206's gap restated with the
+#    mechanism named: not "read-style sources taint only the return value" as a
+#    property of the fread binding, but a frontend-local allowlist standing in
+#    for an unwired binding-declared call effect.
+#
+# The first three cases therefore all reject for one reason -- no taint path --
+# and the second and third are not evidence that either control is recognised;
+# they are here so that a later fix to the propagation has both patched forms to
+# discriminate against.
+#
+# The last two cases are the minimal pair for that gap: the same handler, the
+# same formatted path, the same `fopen` sink, differing only in which read-style
+# call fills the buffer -- `recv`, which is in `cReaders`, reports; the library
+# accessor, which is not, does not.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1407: an upload handler opens a path formatted from an HTTP query variable"
+  lang c
+  file mongoose/src/http.c
+  reject VYQL-PATH-001
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  int mg_http_upload(struct mg_connection *c, struct mg_http_message *hm,
+                     const char *dir) {
+    char offset[40] = "", name[200] = "", path[256];
+    mg_http_get_var(&hm->query, "offset", offset, sizeof(offset));
+    mg_http_get_var(&hm->query, "name", name, sizeof(name));
+    if (name[0] == '\0') {
+      mg_http_reply(c, 400, "", "%s", "name required");
+      return -1;
+    } else {
+      FILE *fp;
+      size_t oft = strtoul(offset, NULL, 0);
+      snprintf(path, sizeof(path), "%s%c%s", dir, MG_DIRSEP, name);
+      if ((fp = fopen(path, oft == 0 ? "wb" : "ab")) == NULL) {
+        mg_http_reply(c, 400, "", "fopen(%s): %d", name, errno);
+        return -2;
+      } else {
+        fwrite(hm->body.ptr, 1, hm->body.len, fp);
+        fclose(fp);
+        mg_http_reply(c, 200, "", "");
+        return (int) hm->body.len;
+      }
+    }
+  }
+  ```
+
+test "rank1407: the same handler collapses the double dots out of the joined path first"
+  lang c
+  file mongoose/src/http.c
+  reject VYQL-PATH-001
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  static void remove_double_dots(char *s) {
+    char *p = s;
+    while (*s != '\0') {
+      *p++ = *s++;
+      if (s[-1] == '/' || s[-1] == '\\') {
+        while (s[0] != '\0') {
+          if (s[0] == '/' || s[0] == '\\') {
+            s++;
+          } else if (s[0] == '.' && s[1] == '.') {
+            s += 2;
+          } else {
+            break;
+          }
+        }
+      }
+    }
+    *p = '\0';
+  }
+
+  int mg_http_upload(struct mg_connection *c, struct mg_http_message *hm,
+                     const char *dir) {
+    char offset[40] = "", name[200] = "", path[256];
+    mg_http_get_var(&hm->query, "offset", offset, sizeof(offset));
+    mg_http_get_var(&hm->query, "name", name, sizeof(name));
+    if (name[0] == '\0') {
+      mg_http_reply(c, 400, "", "%s", "name required");
+      return -1;
+    } else {
+      FILE *fp;
+      long oft = strtol(offset, NULL, 0);
+      snprintf(path, sizeof(path), "%s%c%s", dir, MG_DIRSEP, name);
+      remove_double_dots(path);
+      if ((fp = fopen(path, oft == 0 ? "wb" : "ab")) == NULL) {
+        mg_http_reply(c, 400, "", "fopen(%s): %d", path, errno);
+        return -2;
+      } else {
+        fwrite(hm->body.ptr, 1, hm->body.len, fp);
+        fclose(fp);
+        mg_http_reply(c, 200, "", "");
+        return (int) hm->body.len;
+      }
+    }
+  }
+  ```
+
+test "rank1407: the same handler refuses the upload when the requested name is not a sane path"
+  lang c
+  file mongoose/src/http.c
+  reject VYQL-PATH-001
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  int mg_http_upload(struct mg_connection *c, struct mg_http_message *hm,
+                     const char *dir) {
+    char offset[40] = "", name[200] = "", path[256];
+    mg_http_get_var(&hm->query, "offset", offset, sizeof(offset));
+    mg_http_get_var(&hm->query, "name", name, sizeof(name));
+    snprintf(path, sizeof(path), "%s%c%s", dir, MG_DIRSEP, name);
+    if (name[0] == '\0') {
+      mg_http_reply(c, 400, "", "%s", "name required");
+      return -1;
+    } else if (mg_path_is_sane(mg_str(name)) == false) {
+      mg_http_reply(c, 400, "", "%s: invalid file", name);
+      return -2;
+    } else {
+      FILE *fp;
+      long oft = strtol(offset, NULL, 0);
+      if ((fp = fopen(path, oft == 0 ? "wb" : "ab")) == NULL) {
+        mg_http_reply(c, 400, "", "fopen(%s): %d", path, errno);
+        return -3;
+      } else {
+        fwrite(hm->body.ptr, 1, hm->body.len, fp);
+        fclose(fp);
+        mg_http_reply(c, 200, "", "");
+        return (int) hm->body.len;
+      }
+    }
+  }
+  ```
+
+test "rank1407: minimal pair -- an upload name read into the buffer by recv reaches the open"
+  lang c
+  file mongoose/src/http.c
+  expect VYQL-PATH-001
+  code
+  ```
+  #include <stdio.h>
+
+  int upload(int sock, const char *dir) {
+    char name[200] = "", path[256];
+    FILE *fp;
+    recv(sock, name, sizeof(name), 0);
+    snprintf(path, sizeof(path), "%s/%s", dir, name);
+    fp = fopen(path, "wb");
+    fclose(fp);
+    return 0;
+  }
+  ```
+
+test "rank1407: minimal pair -- the same name read into the buffer by the query-variable accessor does not"
+  lang c
+  file mongoose/src/http.c
+  reject VYQL-PATH-001
+  code
+  ```
+  #include <stdio.h>
+
+  int upload(struct mg_http_message *hm, const char *dir) {
+    char name[200] = "", path[256];
+    FILE *fp;
+    mg_http_get_var(&hm->query, "name", name, sizeof(name));
+    snprintf(path, sizeof(path), "%s/%s", dir, name);
+    fp = fopen(path, "wb");
+    fclose(fp);
+    return 0;
+  }
+  ```

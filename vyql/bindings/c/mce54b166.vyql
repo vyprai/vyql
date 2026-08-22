@@ -1255,3 +1255,32 @@ binding integerOverflowGuard211 {
     }
   }
 }
+
+binding weakRedirectUrlValidation212 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and containsAny(node.context.callArgShapeAt, ["apr_uri_parse:2:&ID", "apr_uri_parse:2:ID"]) and containsAny(node.context.callArgAt, ["strstr:1:\"/\"", "strncmp:1:\"/\"", "strncasecmp:1:\"/\""]) and containsAny(node.context.callArgAt, ["strstr:1:\"//\"", "strncmp:1:\"//\"", "strncasecmp:1:\"//\""]) and not (containsAny(node.context.callArgAt, ["strstr:1:\"/\\\\\"", "strstr:1:\"\\\\/\"", "strstr:1:\"\\\\\"", "strstr:1:\"\\\\\\\\\"", "strncmp:1:\"/\\\\\"", "strncmp:1:\"\\\\/\"", "strncmp:1:\"\\\\\"", "strncmp:1:\"\\\\\\\\\"", "strncasecmp:1:\"/\\\\\"", "strncasecmp:1:\"\\\\/\"", "strchr:1:'\\\\'", "strpbrk:1:\"\\\\\""])) and not (node.context.binary contains "'\\\\'")
+  emit issue code.WeakRedirectUrlValidation at node
+}
+
+binding httpInput213 {
+  query pattern callExpr where callee.path ~= "mg_http_get_var"
+  emit source code.HttpInput at args[2]
+}
+
+binding pathAccessCheck214 {
+  query pattern callExpr where callee.path ~= "mg_path_is_sane"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding peerSecurityRequestPairingWithoutLinkSecurityState260 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.callPath contains "ble_hs_mbuf_pullup_base" and node.context.callPath contains "ble_sm_pair_initiate" and not (node.context.selector contains "sec_state")
+  emit issue code.ProtocolStateReview at node
+}
+
+binding reentrantCallbackStaleSlotWrite700 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.identifier in ["njs_object_prop_t"] and node.context.callPath in ["njs_function_apply", "njs_function_call"] and node.context.assignShape startsWith "ID.FIELD=" and not (node.context.callPath in ["njs_property_query", "njs_lvlhsh_find"])
+  emit issue code.ReentrantCallbackStaleSlotWrite at node
+}

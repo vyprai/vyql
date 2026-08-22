@@ -1,0 +1,324 @@
+# Rank 1434 / CVE-2019-20445 (netty 8494b046ec): HttpObjectDecoder.readHeaders
+# parsed the whole HTTP/1 header block and then chose the body framing from it
+# with no reconciliation:
+#
+#   if (isContentAlwaysEmpty(message)) { ... }
+#   else if (HttpUtil.isTransferEncodingChunked(message)) nextState = READ_CHUNK_SIZE;
+#   else if (contentLength() >= 0)                        nextState = READ_FIXED_LENGTH_CONTENT;
+#   else                                                  nextState = READ_VARIABLE_LENGTH_CONTENT;
+#
+# Two headers can each declare a body length, so a message that carries both --
+# or that carries Content-Length twice with different values -- has two readings.
+# The decoder took the first: chunked wins over Content-Length, and
+# HttpUtil.getContentLength returns only the first of several Content-Length
+# values. Nothing rejected the message. RFC 7230 requires the opposite in both
+# cases: 3.3.2 says a recipient of duplicate Content-Length "MUST either reject
+# the message as invalid or replace the duplicated field-values with a single
+# valid Content-Length field", and 3.3.3 says a message carrying both
+# Transfer-Encoding and Content-Length "might indicate an attempt to perform
+# request smuggling ... and ought to be handled as an error", with a forwarder
+# required to remove the Content-Length before passing it on.
+#
+# The weakness is not in netty's own bytes -- the decoder frames its stream
+# self-consistently. It is in the disagreement with whatever else parses the
+# same connection. A front-end proxy that resolves the ambiguity the other way
+# and netty behind it draw the message boundary in different places, so the tail
+# of one request becomes the head of the next: request smuggling, CWE-444. Fix
+# 8494b046ec adds both checks to readHeaders -- headers.getAll(CONTENT_LENGTH)
+# so the count can be compared, and an IllegalArgumentException for either
+# conflict when the version is HTTP/1.1.
+#
+# FIXED. There is nothing tainted to follow: the attacker's input *is* the
+# header block this method is parsing, so the weakness is a property of the
+# parser and not of a value reaching a sink. code.AmbiguousMessageBodyFraming
+# and rule VYQL-INJ-249 (CWE-444) judge it, and the Java binding names the
+# method by what the reconciliation needs to be in one place: it accumulates
+# parsed header lines into the message's header store, it asks whether the
+# transfer encoding is chunked, and it asks for the content length. All three
+# are required. netty's own encoder consults isTransferEncodingChunked without
+# ever building a header store, and HttpServerKeepAliveHandler reads
+# isContentLengthSet and isTransferEncodingChunked together for a keep-alive
+# decision rather than a framing one; neither is reported, and both are pinned
+# below.
+#
+# The negation lists the remedies RFC 7230 itself names, in the spellings a Java
+# decoder uses: refusing the message (IllegalArgumentException, DecoderException,
+# TooLongFrameException, invalidMessage, a failed DecoderResult) and dropping the
+# duplicate (headers.remove of the Content-Length, or getAll/getAllAsString so
+# every value is in hand). It deliberately does not look for a particular
+# comparison -- a parser that rejects, or that normalises the header away, has
+# discharged the obligation however it spells the test -- which is also what
+# keeps the binding off the fixing commit's own layout: the two reject cases
+# below discharge it with DecoderException and with headers.remove, neither of
+# which appears in netty's patch, and both are silent.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off), identical across
+# three runs. netty codec-http + codec-http2, 503 java files including tests, at
+# 8494b046ec^: 33 findings, exactly one VYQL-INJ-249, at
+# codec-http/src/main/java/io/netty/handler/codec/http/HttpObjectDecoder.java:568,
+# the CVE method; at 8494b046ec: 32 findings and no VYQL-INJ-249, no other
+# finding moving. The whole netty tree at 8494b046ec^ -- every codec module,
+# memcache, mqtt, redis, stomp, haproxy, socks and dns among them -- reports the
+# same single row. logging-log4j2 (2237 java) reports none. No identifier this
+# binding names appears anywhere in the OWASP Java Benchmark corpus, which
+# contains no headers.add or headers.set call at all.
+
+test "rank1434: an HTTP/1 header-block parser that frames the body from Transfer-Encoding or Content-Length without reconciling them"
+  lang java
+  file codec-http/src/main/java/io/netty/handler/codec/http/HttpObjectDecoder.java
+  expect VYQL-INJ-249
+  expect_review code.AmbiguousMessageBodyFraming
+  code
+  ```
+  package io.netty.handler.codec.http;
+
+  import io.netty.buffer.ByteBuf;
+
+  public abstract class HttpObjectDecoder {
+
+      private State readHeaders(ByteBuf buffer) {
+          final HttpMessage message = this.message;
+          final HttpHeaders headers = message.headers();
+
+          AppendableCharSequence line = headerParser.parse(buffer);
+          if (line == null) {
+              return null;
+          }
+          if (line.length() > 0) {
+              do {
+                  char firstChar = line.charAtUnsafe(0);
+                  if (name != null && (firstChar == ' ' || firstChar == '\t')) {
+                      String trimmedLine = line.toString().trim();
+                      String valueStr = String.valueOf(value);
+                      value = valueStr + ' ' + trimmedLine;
+                  } else {
+                      if (name != null) {
+                          headers.add(name, value);
+                      }
+                      splitHeader(line);
+                  }
+
+                  line = headerParser.parse(buffer);
+                  if (line == null) {
+                      return null;
+                  }
+              } while (line.length() > 0);
+          }
+
+          if (name != null) {
+              headers.add(name, value);
+          }
+          name = null;
+          value = null;
+
+          State nextState;
+
+          if (isContentAlwaysEmpty(message)) {
+              HttpUtil.setTransferEncodingChunked(message, false);
+              nextState = State.SKIP_CONTROL_CHARS;
+          } else if (HttpUtil.isTransferEncodingChunked(message)) {
+              nextState = State.READ_CHUNK_SIZE;
+          } else if (contentLength() >= 0) {
+              nextState = State.READ_FIXED_LENGTH_CONTENT;
+          } else {
+              nextState = State.READ_VARIABLE_LENGTH_CONTENT;
+          }
+          return nextState;
+      }
+
+      private long contentLength() {
+          if (contentLength == Long.MIN_VALUE) {
+              contentLength = HttpUtil.getContentLength(message, -1L);
+          }
+          return contentLength;
+      }
+  }
+  ```
+
+test "rank1434: the fixed revision counts every Content-Length value and refuses a message that also declares chunked framing"
+  lang java
+  file codec-http/src/main/java/io/netty/handler/codec/http/HttpObjectDecoder.java
+  reject VYQL-INJ-249
+  code
+  ```
+  package io.netty.handler.codec.http;
+
+  import io.netty.buffer.ByteBuf;
+  import java.util.List;
+
+  public abstract class HttpObjectDecoder {
+
+      private State readHeaders(ByteBuf buffer) {
+          final HttpMessage message = this.message;
+          final HttpHeaders headers = message.headers();
+
+          AppendableCharSequence line = headerParser.parse(buffer);
+          if (line == null) {
+              return null;
+          }
+          if (line.length() > 0) {
+              do {
+                  char firstChar = line.charAtUnsafe(0);
+                  if (name != null && (firstChar == ' ' || firstChar == '\t')) {
+                      String trimmedLine = line.toString().trim();
+                      String valueStr = String.valueOf(value);
+                      value = valueStr + ' ' + trimmedLine;
+                  } else {
+                      if (name != null) {
+                          headers.add(name, value);
+                      }
+                      splitHeader(line);
+                  }
+
+                  line = headerParser.parse(buffer);
+                  if (line == null) {
+                      return null;
+                  }
+              } while (line.length() > 0);
+          }
+
+          if (name != null) {
+              headers.add(name, value);
+          }
+          name = null;
+          value = null;
+
+          List<String> values = headers.getAll(HttpHeaderNames.CONTENT_LENGTH);
+          int contentLengthValuesCount = values.size();
+
+          if (contentLengthValuesCount > 0) {
+              if (contentLengthValuesCount > 1 && message.protocolVersion() == HttpVersion.HTTP_1_1) {
+                  throw new IllegalArgumentException("Multiple Content-Length headers found");
+              }
+              contentLength = Long.parseLong(values.get(0));
+          }
+
+          if (isContentAlwaysEmpty(message)) {
+              HttpUtil.setTransferEncodingChunked(message, false);
+              return State.SKIP_CONTROL_CHARS;
+          } else if (HttpUtil.isTransferEncodingChunked(message)) {
+              if (contentLengthValuesCount > 0 && message.protocolVersion() == HttpVersion.HTTP_1_1) {
+                  throw new IllegalArgumentException(
+                          "Both 'Content-Length: " + contentLength + "' and 'Transfer-Encoding: chunked' found");
+              }
+              return State.READ_CHUNK_SIZE;
+          } else if (contentLength() >= 0) {
+              return State.READ_FIXED_LENGTH_CONTENT;
+          } else {
+              return State.READ_VARIABLE_LENGTH_CONTENT;
+          }
+      }
+  }
+  ```
+
+test "rank1434: a parser that refuses the ambiguous message with a decoder exception instead is not reported"
+  lang java
+  file codec-http/src/main/java/io/netty/handler/codec/http/StrictHttpMessageDecoder.java
+  reject VYQL-INJ-249
+  code
+  ```
+  package io.netty.handler.codec.http;
+
+  import io.netty.buffer.ByteBuf;
+  import io.netty.handler.codec.DecoderException;
+
+  public abstract class StrictHttpMessageDecoder {
+
+      private State readHeaders(ByteBuf buffer) {
+          final HttpMessage message = this.message;
+          final HttpHeaders headers = message.headers();
+
+          AppendableCharSequence line = headerParser.parse(buffer);
+          while (line != null && line.length() > 0) {
+              splitHeader(line);
+              headers.add(name, value);
+              line = headerParser.parse(buffer);
+          }
+
+          if (HttpUtil.isTransferEncodingChunked(message) && contentLength() >= 0) {
+              throw new DecoderException("Transfer-Encoding and Content-Length both present");
+          }
+
+          if (HttpUtil.isTransferEncodingChunked(message)) {
+              return State.READ_CHUNK_SIZE;
+          } else if (contentLength() >= 0) {
+              return State.READ_FIXED_LENGTH_CONTENT;
+          }
+          return State.READ_VARIABLE_LENGTH_CONTENT;
+      }
+  }
+  ```
+
+test "rank1434: a parser that drops the Content-Length header when a transfer encoding is present is not reported"
+  lang java
+  file codec-http/src/main/java/io/netty/handler/codec/http/NormalizingHttpMessageDecoder.java
+  reject VYQL-INJ-249
+  code
+  ```
+  package io.netty.handler.codec.http;
+
+  import io.netty.buffer.ByteBuf;
+
+  public abstract class NormalizingHttpMessageDecoder {
+
+      private State readHeaders(ByteBuf buffer) {
+          final HttpMessage message = this.message;
+          final HttpHeaders headers = message.headers();
+
+          AppendableCharSequence line = headerParser.parse(buffer);
+          while (line != null && line.length() > 0) {
+              splitHeader(line);
+              headers.add(name, value);
+              line = headerParser.parse(buffer);
+          }
+
+          if (HttpUtil.isTransferEncodingChunked(message)) {
+              headers.remove(HttpHeaderNames.CONTENT_LENGTH);
+              return State.READ_CHUNK_SIZE;
+          } else if (contentLength() >= 0) {
+              return State.READ_FIXED_LENGTH_CONTENT;
+          }
+          return State.READ_VARIABLE_LENGTH_CONTENT;
+      }
+  }
+  ```
+
+test "rank1434: an encoder that picks a chunked write path without ever parsing a header block is not reported"
+  lang java
+  file codec-http/src/main/java/io/netty/handler/codec/http/HttpObjectEncoder.java
+  reject VYQL-INJ-249
+  code
+  ```
+  package io.netty.handler.codec.http;
+
+  import io.netty.buffer.ByteBuf;
+
+  public abstract class HttpObjectEncoder {
+
+      protected void encode(Object msg, ByteBuf buf) {
+          HttpMessage m = (HttpMessage) msg;
+          state = HttpUtil.isTransferEncodingChunked(m) ? ST_CONTENT_CHUNK : ST_CONTENT_NON_CHUNK;
+          encodeInitialLine(buf, m);
+          encodeHeaders(m.headers(), buf);
+          long length = contentLength();
+          buf.writeShort(CRLF_SHORT);
+      }
+  }
+  ```
+
+test "rank1434: a keep-alive policy helper that reads both framing headers without parsing a header block is not reported"
+  lang java
+  file codec-http/src/main/java/io/netty/handler/codec/http/HttpServerKeepAliveHandler.java
+  reject VYQL-INJ-249
+  code
+  ```
+  package io.netty.handler.codec.http;
+
+  public class HttpServerKeepAliveHandler {
+
+      private static boolean shouldSelfClose(HttpResponse response) {
+          return HttpUtil.isContentLengthSet(response) || HttpUtil.isTransferEncodingChunked(response)
+                  || contentLength() >= 0;
+      }
+  }
+  ```

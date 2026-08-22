@@ -4343,3 +4343,18 @@ binding unescapedHtmlPresenter909 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.functionName contains "html" and node.context.selector contains ".name" and node.context.literal contains "<div" and not (node.context.callPath contains "bleach_input") and not (node.context.callPath contains "escape")
   emit issue code.UnescapedHtmlPresenter at node
 }
+
+// A webhook or callback destination read off a stored record -- payload_url,
+// callback_url, target_url, webhook_url and hook_url are the documented field
+// names across Python webhook implementations -- handed to a general-purpose
+// outbound HTTP client. The control is any of the APIs an SSRF policy is built
+// from: urllib.parse's splitters for the scheme and host, socket's resolvers for
+// the address behind a name, ipaddress/netaddr for the range check, Django's
+// URLValidator for the scheme allow-list. Residual: a delivery function whose
+// whole policy sits in a helper it calls, leaving no URL inspection of its own,
+// still reports -- which is what the advisory says, since the sending function
+// carries no evidence of a guard.
+binding webhookUrlFetchMissingSsrfGuard960 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.selector, ["payload_url", "callback_url", "target_url", "webhook_url", "hook_url"]) and containsAny(node.context.callPath, ["requests.Session", "requests.request", "requests.post", "requests.put", "requests.patch", "requests.get", "httpx.Client", "httpx.AsyncClient", "httpx.post", "httpx.request", "aiohttp.ClientSession", "urlopen"]) and not (containsAny(node.context.callPath, ["urlsplit", "urlparse", "socket.getaddrinfo", "socket.gethostbyname", "ipaddress.ip_address", "ipaddress.ip_network", "netaddr.IPAddress", "URLValidator"]))
+  emit issue code.WebhookUrlFetchMissingSsrfGuard at node
+}

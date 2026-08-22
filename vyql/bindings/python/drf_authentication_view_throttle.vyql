@@ -1,0 +1,65 @@
+module bindings.python.drf_authentication_view_throttle;
+
+// Django REST Framework routes a class-based view's HTTP method to the method of
+// the same name, so for an `APIView`, a `GenericAPIView` or a `ViewSet` the
+// handler is `post`/`put`/`patch`/`create` and the endpoint's identity lives in
+// the class, not in the handler's name. That is why the function-name vocabulary
+// this concept already carries (`login`, `reset_password`, `forgot_password`, and
+// the route-path variants) never reaches a DRF view: the credential-checking
+// endpoint of such a project is spelled `class LoginView(APIView): def post(...)`.
+//
+// The class names listed here are the authentication surface DRF projects expose:
+// credential submission (login, sign-in, authenticate, and Simple JWT's
+// `TokenObtain*` token-issuing views) and password recovery in each of its three
+// steps -- request a reset, submit the mailed or texted code, apply the new
+// password. Every one of them decides an outcome from a secret the caller
+// supplies, so an unthrottled one can be driven at machine speed until the secret
+// is found.
+//
+// The class also has to derive from one of the framework's own view bases. A view
+// deriving from another application view inherits that class's throttle
+// declaration, so its own body saying nothing about throttling says nothing about
+// whether it is throttled, and reporting it would report the base class twice.
+//
+// The neutralising control is DRF's documented throttling declaration:
+// `throttle_classes` on the view, `throttle_scope` for `ScopedRateThrottle`, a
+// `get_throttles()` override that returns them, or the `DEFAULT_THROTTLE_RATES`
+// and `DEFAULT_THROTTLE_CLASSES` settings keys; `@ratelimit` covers the
+// django-ratelimit decorator that does the same job outside DRF.
+//
+// The declaration is a class attribute rather than a statement in the handler, so
+// Python emits no structured token for it and it is read from the enclosing
+// class's context text -- which holds that class's own body and no sibling
+// class's, but holds it verbatim, comments included. Each control is therefore
+// spelled with the punctuation the declaration itself carries, matched against the
+// whitespace-stripped copy of that body: `throttle_classes=[` is the assignment
+// rather than prose about it, and `get_throttles(` is the definition or the call
+// rather than a sentence naming the hook. Prose mentioning throttling does not
+// decide the result; a commented-out declaration still does, because the class
+// body text keeps comments.
+binding drfAuthenticationEndpointRateLimitRequired {
+  query pattern presenceNode where node.scope == "function"
+    and node.token contains "lang=python"
+    and node.context.functionName in ["post", "put", "patch", "create"]
+    and containsAny(node.context.className, ["Login", "SignIn", "Signin", "SignUp", "Signup", "Register", "Authenticate", "TokenObtain", "PasswordReset", "ResetPassword", "PasswordRecovery", "RecoverPassword", "ForgotPassword", "PasswordChange", "ChangePassword"])
+    and containsAny(node.context.classBase, ["APIView", "GenericAPIView", "CreateAPIView", "ListCreateAPIView", "GenericViewSet", "ModelViewSet", "ViewSet", "ViewSetMixin", "View", "FormView", "TemplateView", "TokenObtainPairView", "TokenObtainSlidingView", "TokenViewBase", "ObtainAuthToken", "LoginView", "PasswordResetView", "PasswordResetConfirmView", "PasswordChangeView"])
+    and not containsAny(node.token, ["throttle_classes=[", "throttle_classes=(", "throttle_scope=", "get_throttles(", "DEFAULT_THROTTLE_CLASSES", "DEFAULT_THROTTLE_RATES", "@ratelimit"])
+  emit issue code.RateLimitRequiredOp at node
+}
+
+// The same endpoint reached by inheritance rather than by name. Simple JWT's
+// `TokenObtainPairView`/`TokenObtainSlidingView`/`TokenViewBase` issue a token
+// from a submitted username and password, DRF's `ObtainAuthToken` does the same
+// for its token authentication, and `django.contrib.auth.views`' `LoginView`,
+// `PasswordResetView`, `PasswordResetConfirmView` and `PasswordChangeView` are
+// that framework's own credential and recovery views. A subclass overriding
+// `post` is that endpoint whatever the subclass is called, and the throttle
+// declaration reads the same way.
+binding drfAuthenticationViewSubclassRateLimitRequired {
+  query pattern presenceNode where node.scope == "function"
+    and node.token contains "lang=python"
+    and node.context.functionName in ["post", "put", "patch", "create"]
+    and containsAny(node.context.classBase, ["TokenObtainPairView", "TokenObtainSlidingView", "TokenViewBase", "ObtainAuthToken", "LoginView", "PasswordResetView", "PasswordResetConfirmView", "PasswordChangeView"])
+    and not containsAny(node.token, ["throttle_classes=[", "throttle_classes=(", "throttle_scope=", "get_throttles(", "DEFAULT_THROTTLE_CLASSES", "DEFAULT_THROTTLE_RATES", "@ratelimit"])
+  emit issue code.RateLimitRequiredOp at node
+}

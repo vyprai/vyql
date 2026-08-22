@@ -1,0 +1,34 @@
+module bindings.python.pathlib_containment_check_scope;
+
+// pathlib documents two containment operations: PurePath.relative_to(other)
+// raises ValueError when the receiver is not below other, and
+// PurePath.is_relative_to(other) answers the same question as a bool. Both are
+// purely lexical -- PurePath keeps ".." segments verbatim -- so the documented
+// confinement idiom canonicalizes first and compares the resolved forms, which
+// is why the canonicalizer and the comparison are read together here.
+//
+// The scope is the enclosing function rather than the call, because the raising
+// form is written as a bare statement inside a try block whose handler turns the
+// ValueError into a rejection. A statement in an exception region is not on the
+// straight-line path to the code that follows the try, so a call-anchored
+// control never reaches the file access it protects; the function is the
+// granularity at which this idiom is visible at all. Python context call paths
+// are function-confined, so a canonicalizer or a comparison written in a sibling
+// function is not credited.
+//
+// Residual, in the false-negative direction: relative_to also computes a display
+// path relative to a known root, and a function that does that while touching
+// files elsewhere reads the same way. Requiring the canonicalizer keeps the
+// plain lexical uses out, but it cannot tell a discarded result from a consumed
+// one.
+binding pathlibContainmentCheckScope {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "python"
+    and node.context.callPath contains "relative_to"
+    and containsAny(node.context.callPath, ["resolve", "realpath", "abspath", "normpath"])
+  emit check core.PathAccessCheck at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

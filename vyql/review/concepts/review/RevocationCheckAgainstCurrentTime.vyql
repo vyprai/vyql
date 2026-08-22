@@ -1,0 +1,8 @@
+module code;
+
+review code.RevocationCheckAgainstCurrentTime {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review revocation lookups so the entry's timestamp is compared against the presented credential's issuance time rather than the current clock"
+}

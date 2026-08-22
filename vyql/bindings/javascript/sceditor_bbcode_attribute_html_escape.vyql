@@ -1,0 +1,29 @@
+module bindings.javascript.sceditor_bbcode_attribute_html_escape;
+
+// SCEditor's BBCode format API (`sceditor.formats.bbcode.set(tag, {html: ...})`)
+// hands the `html` handler an `attrs` object whose `defaultattr` property is the
+// raw text the document author wrote after `=` in `[tag=...]`. SCEditor applies
+// no encoding to it and documents `sceditor.escapeEntities()` as the helper a
+// handler must call before putting such a value into markup.
+//
+// A handler that concatenates an `attrs` property straight onto a string literal
+// which opens an HTML attribute (a literal ending in `="`) closes that attribute
+// with document text: a quote in the source terminates the attribute early and
+// the remainder is parsed as markup by the editor's WYSIWYG document.
+//
+// The clauses are all AST-derived tokens of the handler's own body, so neither a
+// comment naming an escaper nor a sibling handler's markup decides the result.
+// Requiring the concatenation itself to carry the raw property read is what
+// separates interpolation from the safe idiom of comparing `attrs.defaultattr`
+// against an allowlist of constants and emitting a fixed tag. The neutralising
+// control is an entity-escaping call in the same handler.
+binding sceditorBbcodeAttributeHtmlEscapeMissing {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and node.context.selector contains "attrs.defaultattr"
+    and node.context.literal contains "=\""
+    and containsAny(node.context.expr, ["+attrs.", "+(attrs."])
+    and not (node.context.call in ["escapeEntities", "escapeHtml", "escapeHTML", "escapeExpression", "encodeHTML", "encodeHtml", "htmlEncode", "sanitizeHtml", "sanitizeHTML"])
+    and not (containsAny(node.context.callPath, ["DOMPurify", "he.encode"]))
+  emit issue code.HtmlAttributeRewriteReview at node
+}

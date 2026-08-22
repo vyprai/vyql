@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule AmbiguousMessageBodyFraming {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_444]
+    id: "VYQL-INJ-249"
+    severity: high
+  }
+  issue code.AmbiguousMessageBodyFraming as sink
+}

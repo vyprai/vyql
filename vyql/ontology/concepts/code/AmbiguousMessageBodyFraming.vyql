@@ -1,0 +1,11 @@
+module code;
+
+concept AmbiguousMessageBodyFraming : issue {
+  cwe: [CWE_444]
+  reviewAssumption: "another HTTP/1 implementation on the same connection -- a proxy, cache or load balancer in front, or an origin behind -- frames the same bytes by the other header"
+  reviewCategory: request
+  reviewCondition: "HTTP/1 header-block parser derives the body length from both Transfer-Encoding and Content-Length without rejecting or removing the conflicting one"
+  reviewConfidence: medium
+  reviewEvidence: "message parsing context {pattern} selects chunked framing and fixed-length framing from the same header block and never rejects a message that carries both"
+  vulnerableTo: [injection.ProtocolStateConfusion]
+}

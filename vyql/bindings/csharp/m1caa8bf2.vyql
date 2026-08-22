@@ -837,6 +837,11 @@ binding weakCipher150 {
   emit issue code.WeakCipher at node
 }
 
+binding weakCipher211 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and containsAny(node.context.literal, ["_EXPORT_WITH_", "_EXPORT1024_WITH_"])
+  emit issue code.WeakCipher at node
+}
+
 binding staticIv151 {
   query pattern callExpr where callee.path ~= "CreateEncryptor" and args.any.literal contains "0000000000000000"
   emit issue code.StaticIv at call

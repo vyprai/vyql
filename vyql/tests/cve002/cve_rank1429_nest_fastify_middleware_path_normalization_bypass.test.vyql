@@ -1,0 +1,380 @@
+# Rank 1429 / CVE-2026-2293: NestJS's Fastify platform decides whether a
+# middleware applies to a request by matching a path it derives itself, and it
+# canonicalizes that path less than the router that dispatches the request does.
+# A remote client respells the path and the middleware is skipped while the
+# handler still runs.
+#
+# The weakness, in my own words. Fastify routes with find-my-way, whose match
+# is taken over a normalized path: `ignoreDuplicateSlashes` collapses `//`
+# runs, `ignoreTrailingSlash` drops a final `/`, `caseSensitive: false`
+# lower-cases the path, `useSemicolonDelimiter` cuts it at the first `;`, and
+# percent-decoding happens last. Nest reimplements middleware dispatch on top
+# of that router in two places, and both applied only the decoding step:
+#
+#   packages/platform-fastify/adapters/fastify-adapter.ts, dd90f57f
+#
+#     this.instance.use(normalizedPath, (req: any, res: any, next: Function) => {
+#       const queryParamsIndex = req.originalUrl.indexOf('?');
+#       let pathname =
+#         queryParamsIndex >= 0
+#           ? req.originalUrl.slice(0, queryParamsIndex)
+#           : req.originalUrl;
+#       pathname = safeDecodeURI(pathname).path;
+#
+#       if (!re.exec(pathname + '/') && normalizedPath) {
+#         return next();                      // <- middleware skipped
+#       }
+#       return callback(req, res, next);
+#     });
+#
+#   packages/platform-fastify/adapters/middie/fastify-middie.ts, dd90f57f
+#
+#     if (regexp) {
+#       // Decode URL before matching to avoid bypassing middleware
+#       const decodedUrl = safeDecodeURI(url).path;
+#       const result = regexp.exec(decodedUrl);
+#       if (result) { ... fn(req, res, that.done); } else { that.done(); }
+#     }
+#
+# `re`/`regexp` is `pathToRegexp` of the path the application registered with
+# `MiddlewareConsumer.forRoutes()`. So for an application configured with any of
+# the four router options, `GET /abc/def/`, `/abc//def`, `/ABC/DEF` or
+# `/abc/def;x=1` is routed by find-my-way to the handler registered at
+# `/abc/def` — the router normalized it — while the middleware regexp is tested
+# against the un-normalized spelling and declines. The middleware does not
+# error; it is skipped, and the handler answers unguarded. Where the middleware
+# is the authentication, authorization, CSRF or rate-limiting layer, that is a
+# complete bypass of it for every route it covers.
+#
+# Who the attacker is matters here, because Nest is a framework. This is not a
+# weakness in code written against Nest and it is not something an application
+# can be careless about: the matching is Nest's own, inside the platform
+# adapter, and the guarantee it breaks is the framework's — that middleware
+# registered `forRoutes(X)` runs for every request the router dispatches to X.
+# The attacker is any client that can reach the route, with no credential and
+# no application bug required.
+#
+# The fixed revision (d74e9a8c, merged as fd8d073e) makes both matchers read the four
+# options off `initialConfig`/`initialConfig.routerOptions` and apply them
+# before decoding, and passes `useSemicolonDelimiter` into `safeDecodeURI`'s
+# documented second parameter. The adapter does it in a new private
+# `sanitizeUrl()`; middie does it inline in the matching closure, threading
+# `fastify.initialConfig` through `middie(onMiddieEnd, initialConfig)`.
+#
+# Pool row: correct. `fd8d073e` is the merge of PR #16384 and its combined diff
+# is empty, but `git diff dd90f57f fd8d073e` reads the whole patch, and the
+# single commit inside it, d74e9a8c, has the same three-file stat. `dd90f57f`
+# is the fully vulnerable tree and the remediation is present at `fd8d073e`.
+# Recorded CWE is a hint worth restating: the interpretation conflict between
+# router and matcher is CWE-436, and the effect is a control that never runs,
+# CWE-863.
+#
+# FIXED. Diagnosis first. There is no taint path to want: the defect is which
+# string a regular expression is tested against, not a value reaching a sink.
+# A bounded scan of packages/platform-fastify at dd90f57f reported two findings
+# and neither is this CVE. One is VYQL-AUTH-119, rank 1388's binding, on
+# fastify-middie.ts:209 — a true positive for a *different*, still-unfixed
+# weakness, because Nest's vendored middie clone re-registers inherited
+# middleware through `(instance.use as any)(...middleware)`. The other is
+# VYQL-INJ-002 at fastify-adapter.ts:709 -> 713, which lands on the vulnerable
+# line for the wrong reason: it is the known defect that labels a regular
+# expression's `.exec()` as code.CommandExecution. Both findings are present
+# unchanged at fd8d073e, so the pre-existing state gave 174 findings on the
+# whole monorepo at each revision — no discrimination at all.
+#
+# New concept code.MiddlewarePathMatchNormalizationMismatch with its review
+# twin and VYQL-AUTH-127 (minted above the campaign's reported AUTH ceiling of
+# 126; this worktree's pack maximum is 122). Reuse is considered and did not
+# fit: code.PathMatcherNormalizationOrderBypass is about a matcher that trims
+# platform-ignored suffixes *before* canonical cleaning and is scoped to
+# redirect and traversal outcomes, whereas this matcher's ordering is fine and
+# its canonicalization is simply narrower than the dispatcher's;
+# code.EncapsulatedMiddlewarePathReprefixed is the same effect (middleware
+# mounted where it cannot match) from an unrelated cause, prefix arithmetic on
+# registration rather than path spelling at request time;
+# code.UrlPathParameterCaseNormalizationBypass covers parameter *names* stored
+# under caller-controlled case, not the route path.
+#
+# The binding is javascript/find_my_way_path_match_normalization.vyql, a
+# function-scope presence predicate keyed on find-my-way's API and on nothing
+# about Nest: `call_path:safeDecodeURI` (find-my-way/lib/url-sanitizer, the
+# percent-decoding step alone), `call:exec` or `call:test`, a `req.url` /
+# `req.originalUrl` selector, and no read of `ignoreDuplicateSlashes`,
+# `ignoreTrailingSlash`, `caseSensitive` or `useSemicolonDelimiter`. Someone who
+# has never seen this CVE can write it from find-my-way's option documentation
+# plus the signature of its own sanitizer.
+#
+# Three robustness checks, all on real files rather than the snippets below.
+#
+#   Renaming the fixed revision's own vocabulary does not bring the flag back. Rewriting
+#   `sanitizeUrl`, `removeDuplicateSlashes`, `trimLastSlash` and `bindLast` to
+#   meaningless names throughout the patched pair leaves 0 flags, because the
+#   discriminator is the router's option names and not the fixed revision'six's helpers.
+#
+#   Comments cannot silence it. Inserting `// ignoreTrailingSlash,
+#   ignoreDuplicateSlashes, caseSensitive and useSemicolonDelimiter are handled
+#   by the router.` immediately above each vulnerable `safeDecodeURI`
+#   call leaves the flags at 6, because `selector:` tokens are member accesses
+#   derived from the AST.
+#
+#   A remediation written a different way is also accepted. Normalizing inline
+#   in the two vulnerable functions — no helper at all, and the config read from
+#   a differently named property (`that.cfg`) — gives 0 flags, so the decline is
+#   attributable to the option reads rather than to the shape the fixed revision chooses.
+#
+# Measured (timeout 180, --max-ram 6GB, --cache off; counts are a union over
+# three runs and every one of these is stable across the three). The whole nest
+# monorepo scans in 22s at 1712 JavaScript/TypeScript files, so this is a
+# whole-tree measurement rather than a subtree one.
+#
+#   nest whole tree: base 174 findings at dd90f57f and 174 at fd8d073e; with
+#   this binding 180 and 174. The delta is exactly six VYQL-AUTH-127 rows on the
+#   vulnerable revision, at fastify-adapter.ts:672/678/705 and
+#   fastify-middie.ts:36/107/116. Six rows for two defects is the nested-context
+#   inheritance cost noted in the binding: 705 and 116 are the matching closures
+#   and the other four are the factory functions enclosing them. It is not
+#   suppressible from data, since an enclosing context is a superset of the
+#   inner one's tokens.
+#
+# Collateral, enumerated rather than sampled. `call_path:safeDecodeURI` is the
+# narrowest conjunct, so the reachable set is every JavaScript or TypeScript
+# file mentioning `safeDecodeURI` across the 160 clone directories on this
+# machine. There are three sources outside this rank's own probe copies:
+# nest's platform-fastify (the target), rank 1388's three derived copies of
+# nest's fastify-middie.ts, and rank 1346's vendored angular.js — where the
+# name is `safeDecodeURIComponent`, declined by the exact `==`, confirmed by
+# scanning that file alone for 0 flags. Scanned whole: rank1325 (a *later*,
+# patched nest checkout, 2160 findings) 0 flags, and rank1412,
+# rank1403, rank1381 and rank1388 0 flags each.
+#
+# Neither OWASP corpus can move: the binding is JavaScript-only and the new rule
+# consumes only the new concept, which nothing else emits, while both corpora
+# are Java and Python.
+
+test "rank1429: a Fastify middleware matcher percent-decodes the request path and matches it without the router's slash, case and delimiter normalization"
+  lang javascript
+  file fastify-adapter.ts
+  expect VYQL-AUTH-127
+  expect_review code.MiddlewarePathMatchNormalizationMismatch
+  code
+  ```
+  import { safeDecodeURI } from 'find-my-way/lib/url-sanitizer';
+  import { pathToRegexp } from 'path-to-regexp';
+
+  export class FastifyAdapter {
+    public createMiddlewareFactory(requestMethod: number) {
+      return (path: string, callback: Function) => {
+        const normalizedPath = path.endsWith('/*') ? `${path.slice(0, -1)}(.*)` : path;
+        const { regexp: re } = pathToRegexp(normalizedPath);
+
+        this.instance.use(
+          normalizedPath,
+          (req: any, res: any, next: Function) => {
+            const queryParamsIndex = req.originalUrl.indexOf('?');
+            let pathname =
+              queryParamsIndex >= 0
+                ? req.originalUrl.slice(0, queryParamsIndex)
+                : req.originalUrl;
+            pathname = safeDecodeURI(pathname).path;
+
+            if (!re.exec(pathname + '/') && normalizedPath) {
+              return next();
+            }
+            return callback(req, res, next);
+          },
+        );
+      };
+    }
+  }
+  ```
+
+test "rank1429: a connect-style middleware engine tests the registered route's regular expression against a path it only percent-decoded"
+  lang javascript
+  file fastify-middie.ts
+  expect VYQL-AUTH-127
+  expect_review code.MiddlewarePathMatchNormalizationMismatch
+  code
+  ```
+  import { safeDecodeURI } from 'find-my-way/lib/url-sanitizer';
+
+  function middie(complete) {
+    const middlewares = [];
+
+    function runMiddleware(that) {
+      const req = that.req;
+      const res = that.res;
+      const url = that.url;
+      const i = that.i++;
+
+      req.url = req.originalUrl;
+
+      const { fn, regexp } = middlewares[i];
+      if (regexp) {
+        const decodedUrl = safeDecodeURI(url).path;
+        const result = regexp.exec(decodedUrl);
+        if (result) {
+          req.url = req.url.replace(result[0], '');
+          if (req.url[0] !== '/') req.url = '/' + req.url;
+          fn(req, res, that.done);
+        } else {
+          that.done();
+        }
+      } else {
+        fn(req, res, that.done);
+      }
+    }
+
+    return { use, run: runMiddleware };
+  }
+  ```
+
+test "rank1429: the matcher reads the router's normalization options before decoding"
+  lang javascript
+  file fastify-middie.ts
+  reject VYQL-AUTH-127
+  code
+  ```
+  import { safeDecodeURI } from 'find-my-way/lib/url-sanitizer';
+
+  function middie(complete, initialConfig) {
+    const middlewares = [];
+
+    function runMiddleware(that) {
+      const req = that.req;
+      const res = that.res;
+      const url = that.url;
+      const i = that.i++;
+
+      req.url = req.originalUrl;
+
+      const { fn, regexp } = middlewares[i];
+      if (regexp) {
+        let sanitizedUrl = url;
+        if (
+          that.initialConfig.ignoreDuplicateSlashes ||
+          that.initialConfig.routerOptions?.ignoreDuplicateSlashes
+        ) {
+          sanitizedUrl = removeDuplicateSlashes(sanitizedUrl);
+        }
+
+        if (
+          that.initialConfig.ignoreTrailingSlash ||
+          that.initialConfig.routerOptions?.ignoreTrailingSlash
+        ) {
+          sanitizedUrl = trimLastSlash(sanitizedUrl);
+        }
+
+        if (
+          that.initialConfig.caseSensitive === false ||
+          that.initialConfig.routerOptions?.caseSensitive === false
+        ) {
+          sanitizedUrl = sanitizedUrl.toLowerCase();
+        }
+
+        const decodedUrl = safeDecodeURI(
+          sanitizedUrl,
+          that.initialConfig.routerOptions?.useSemicolonDelimiter ||
+            that.initialConfig.useSemicolonDelimiter,
+        ).path;
+        const result = regexp.exec(decodedUrl);
+        if (result) {
+          req.url = req.url.replace(result[0], '');
+          if (req.url[0] !== '/') req.url = '/' + req.url;
+          fn(req, res, that.done);
+        } else {
+          that.done();
+        }
+      } else {
+        fn(req, res, that.done);
+      }
+    }
+
+    return { use, run: bindLast(runMiddleware, initialConfig) };
+  }
+  ```
+
+test "rank1429: the adapter canonicalizes the path through a helper that applies the router's options, so the matching closure does not decode for itself"
+  lang javascript
+  file fastify-adapter.ts
+  reject VYQL-AUTH-127
+  code
+  ```
+  import { safeDecodeURI } from 'find-my-way/lib/url-sanitizer';
+  import { pathToRegexp } from 'path-to-regexp';
+
+  export class FastifyAdapter {
+    public createMiddlewareFactory(requestMethod: number) {
+      return (path: string, callback: Function) => {
+        const normalizedPath = path.endsWith('/*') ? `${path.slice(0, -1)}(.*)` : path;
+        const { regexp: re } = pathToRegexp(normalizedPath);
+
+        this.instance.use(
+          normalizedPath,
+          (req: any, res: any, next: Function) => {
+            const queryParamsIndex = req.originalUrl.indexOf('?');
+            let pathname =
+              queryParamsIndex >= 0
+                ? req.originalUrl.slice(0, queryParamsIndex)
+                : req.originalUrl;
+
+            pathname = this.sanitizeUrl(pathname);
+
+            if (!re.exec(pathname + '/') && normalizedPath) {
+              return next();
+            }
+            return callback(req, res, next);
+          },
+        );
+      };
+    }
+
+    private sanitizeUrl(url: string): string {
+      const initialConfig = this.instance.initialConfig;
+      const routerOptions = initialConfig.routerOptions;
+
+      if (
+        routerOptions.ignoreDuplicateSlashes ||
+        initialConfig.ignoreDuplicateSlashes
+      ) {
+        url = this.removeDuplicateSlashes(url);
+      }
+
+      if (routerOptions.ignoreTrailingSlash || initialConfig.ignoreTrailingSlash) {
+        url = this.trimLastSlash(url);
+      }
+
+      if (
+        routerOptions.caseSensitive === false ||
+        initialConfig.caseSensitive === false
+      ) {
+        url = url.toLowerCase();
+      }
+      return safeDecodeURI(
+        url,
+        routerOptions.useSemicolonDelimiter || initialConfig.useSemicolonDelimiter,
+      ).path;
+    }
+  }
+  ```
+
+test "rank1429: a URL parser that decodes and matches without deciding middleware dispatch is not this weakness"
+  lang javascript
+  file cookies.js
+  reject VYQL-AUTH-127
+  code
+  ```
+  import { safeDecodeURI } from 'find-my-way/lib/url-sanitizer';
+
+  const PAIR = /([^=]+)=(.*)/;
+
+  export function parseCookies(header) {
+    const out = {};
+    for (const cookie of header.split(';')) {
+      const match = PAIR.exec(cookie.trim());
+      if (match) {
+        out[safeDecodeURI(match[1]).path] = safeDecodeURI(match[2]).path;
+      }
+    }
+    return out;
+  }
+  ```

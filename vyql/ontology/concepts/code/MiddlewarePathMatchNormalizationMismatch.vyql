@@ -1,0 +1,11 @@
+module code;
+
+concept MiddlewarePathMatchNormalizationMismatch : issue {
+  cwe: [CWE_863, CWE_436]
+  reviewAssumption: "the router that dispatches the request canonicalizes the path before matching it, so a request whose path the middleware matcher rejects can still reach the handler the middleware was registered to guard"
+  reviewCategory: access_control
+  reviewCondition: "middleware or guard dispatch decides whether a request path matches a registered route pattern using percent-decoding alone, without the slash, case and parameter-delimiter canonicalization the router applies to the same path"
+  reviewConfidence: high
+  reviewEvidence: "path match context {pattern} decodes the request path and tests it against the route pattern's regular expression with no read of the router's duplicate-slash, trailing-slash, case-sensitivity or parameter-delimiter settings"
+  vulnerableTo: [access_control.IncorrectAuthorization, access_control.BrokenAccess]
+}

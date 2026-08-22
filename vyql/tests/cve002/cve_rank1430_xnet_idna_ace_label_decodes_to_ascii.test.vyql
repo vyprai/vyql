@@ -1,0 +1,396 @@
+# Rank 1430 / CVE-2026-39821 (GHSA-w2q5-6q6x-x959, recorded CWE-1289):
+# golang.org/x/net/idna converts a domain name between its Unicode form and its
+# ASCII-Compatible-Encoding form. Both directions run through one function,
+# (*Profile).process (idna/idna10.0.0.go, renamed idna/idna.go by the change), which
+# walks the name label by label and, whenever a label carries the ACE prefix
+# "xn--", punycode-decodes the remainder and installs the decoded text as the
+# label:
+#
+#   if strings.HasPrefix(label, acePrefix) {
+#     u, err2 := decode(label[len(acePrefix):])
+#     if err2 != nil {
+#       if err == nil { err = err2 }
+#       continue                       // spec says keep the old label
+#     }
+#     isBidi = isBidi || bidirule.DirectionString(u) != bidi.LeftToRight
+#     labels.set(u)                    // the decoded text is now the label
+#     ...
+#   }
+#
+# Punycode is only defined as an encoding for text that cannot be written in
+# ASCII. An A-label whose payload decodes to an all-ASCII string is therefore not
+# a legal encoding of anything: the same name has a direct spelling, and
+# admitting the encoded spelling too gives one name two textual forms. Nothing in
+# this loop rejects that case. `decode` succeeds, `labels.set(u)` replaces the
+# label with the ASCII text, and the second loop -- the one that re-encodes for
+# ToASCII -- skips it precisely because it is now ASCII:
+#
+#   if !ascii(label) {
+#     a, err2 := encode(acePrefix, label)
+#     ...
+#   }
+#
+# so the round trip that would have restored the original spelling never runs.
+# The result is that ToASCII("xn--example-.com") returns "example.com" with a nil
+# error, and ToUnicode does the same. Two byte strings that no equality test,
+# allowlist, denylist or origin comparison would call equal resolve to one name.
+# That is the whole weakness, and CWE-1289 -- improper validation of unsafe
+# equivalence -- names it exactly.
+#
+# The attacker is a hostile peer, not the operator: anyone who can put a host
+# name in front of a Go program that normalises it through this package. A
+# proxy's upstream allowlist, a cookie's domain scope, a CORS origin table, a
+# certificate name match and a URL denylist all compare the name theye given
+# and then hand the same name to the resolver; the encoded spelling passes the
+# comparison and the plain spelling is what gets used. The advisory scores it
+# 10.0 for that reason. This is a library defect and its blast radius is every
+# Go program that depends on x/net, which is most of them -- but the defective
+# code exists in exactly one place, x/net/idna and the copies of it vendored into
+# other repositories, so a scanner sees one shape, not a class spread over a
+# corpus.
+#
+# The advisory's fix commit, 8c4c965e02 (CL 767220), regenerates the package from
+# x/text and adds the missing rejection:
+#
+#   enc := label[len(acePrefix):]
+#   u, err2 := decode(enc)
+#   ...
+#   if unicode16 && err == nil && len(u) > 0 && isASCII(u) {
+#     err = punyError(enc)
+#   }
+#
+# At that commit the check is conditional on unicode.Version >= "16.0.0"; the
+# follow-up f05f21be59 drops the guard and rejects the label on every Go version,
+# with the comment that pre-revision-33 UTS 46 not classifying an all-ASCII xn--
+# label as an error "is a specification bug and a security issue". Both revisions
+# reject `xn--example-.com` from ToASCII and ToUnicode; that string is the
+# regression test the follow-up adds.
+#
+# Detection is unchanged in both directions and this pins why.
+#
+# The positive half of the shape is expressible and confined. Go emits
+# `call_path:`/`call:`/`call_order:`/`call_before:` for this function, so
+# "an ACE-prefixed label is punycode-decoded inside a label loop" reads as
+# `node.context.callPath contains "decode"` together with
+# `node.context.call contains "HasPrefix"`, and it is function-scoped: on the real
+# package it selects 3 functions at the parent and 2 at the fixed revision.
+#
+# The negative half is not. The remediation is "the decoded label is tested for
+# being all-ASCII", and to state that a binding must know two things the Go
+# frontend does not record:
+#
+#   1. Which local came out of the decode. `u, err2 := decode(enc)` emits no
+#      `assign:` token at all, because goAtomToken (internal/extract/frontend/
+#      golang/golang.go:1318) returns "" for every *ast.CallExpr except len(...);
+#      measured here as `assign:u=` -> 0 on both revisions while `assign:` itself
+#      is present. This is the same root defect recorded at ranks 1420 and 1427.
+#   2. Which value an ASCII test is applied to. `process` calls
+#      `ascii(label)` in the re-encode loop, at both revisions, on a different
+#      value. So the function-level fact "an ASCII test happens here" is true of
+#      the vulnerable code: `node.context.call contains "ascii"` gives 1 on the
+#      vulnerable snippet and 1 on the patched one.
+#
+# What is left is the fixed revision's own spelling. `call_arg:` does carry the argument's
+# identifier, so `node.token contains "call_arg:isASCII:u"` separates the two
+# revisions -- and it is the helper's name plus a one-letter local, nothing more.
+# Renaming isASCII to allASCII, punyError to rejectLabel and u to dec in the
+# patched snippet, changing no behaviour, makes a binding negated on that token
+# report the patched code again: 1 / 0 / 1 over vulnerable, patched and renamed
+# patched. Case (c) below is that renamed patched form, and it is a reject for
+# the same reason case (b) is.
+#
+# No concept covers the relation either. The nearest, code.DerSignatureNonCanonical
+# Import (VYQL-CRY-018), is the same weakness class for a different encoding -- a
+# decoder that accepts a non-canonical encoding of a value it will then treat as
+# canonical -- but it is written for DER integer lengths, is bound only in
+# JavaScript, and its reviewCategory is crypto. code.UncheckedDecodeResult
+# (VYQL-VAL-001) is about ignoring a decoder's error, which this code does not do:
+# it checks err2 and continues. code.UnicodeNormalizationAfterFilterBypass
+# (VYQL-VAL-009) is an ordering weakness between a filter and a normaliser, not a
+# missing rejection. Widening any of them to "a decoder must reject inputs whose
+# decoded form has a shorter canonical spelling" would need the operand-level
+# facts above before it could discriminate at all.
+#
+# Reachable set, measured over the 160 target clones under /tmp/cve-work/rank*/:
+# grepping every .go file for acePrefix or the literal xn-- finds this repository
+# and rank1399/moby/vendor/golang.org/x/net/idna, which is an unpatched vendored
+# copy of the same file. Any binding written for this shape would fire on x/net
+# and on vendored x/net, which is one piece of evidence reported twice, not two.
+#
+# Scans, --cache off, three runs each: the whole x/net tree reports 31 findings at
+# the parent and 31 at the fixed revision, none of them in idna/; scanning idna/ alone
+# reports 0 findings and 0 flags at both revisions.
+
+test "rank1430: (a) an ACE-prefixed label is punycode-decoded and installed as the label with no rejection of an all-ASCII decode"
+  lang go
+  file idna/idna10.0.0.go
+  reject VYQL-VAL-001
+  reject VYQL-VAL-009
+  reject VYQL-CRY-018
+  reject VYQL-RF-010
+  reject_review code.UncheckedDecodeResult
+  reject_review code.StructuredInputDecode
+  reject_review code.UnicodeNormalizationAfterFilterBypass
+  code
+  ```
+  package idna
+
+  import (
+  	"strings"
+
+  	"golang.org/x/text/unicode/bidi"
+  	"golang.org/x/text/secure/bidirule"
+  )
+
+  const acePrefix = "xn--"
+
+  func (p *Profile) process(s string, toASCII bool) (string, error) {
+  	var err error
+  	var isBidi bool
+  	if p.mapping != nil {
+  		s, isBidi, err = p.mapping(p, s)
+  	}
+  	if err == nil && p.verifyDNSLength && s == "" {
+  		err = &labelError{s, "A4"}
+  	}
+  	labels := labelIter{orig: s}
+  	for ; !labels.done(); labels.next() {
+  		label := labels.label()
+  		if label == "" {
+  			if err == nil && p.verifyDNSLength {
+  				err = &labelError{s, "A4"}
+  			}
+  			continue
+  		}
+  		if strings.HasPrefix(label, acePrefix) {
+  			u, err2 := decode(label[len(acePrefix):])
+  			if err2 != nil {
+  				if err == nil {
+  					err = err2
+  				}
+  				continue
+  			}
+  			isBidi = isBidi || bidirule.DirectionString(u) != bidi.LeftToRight
+  			labels.set(u)
+  			if err == nil && p.fromPuny != nil {
+  				err = p.fromPuny(p, u)
+  			}
+  			if err == nil {
+  				err = p.validateLabel(u)
+  			}
+  		} else if err == nil {
+  			err = p.validateLabel(label)
+  		}
+  	}
+  	if isBidi && p.bidirule != nil && err == nil {
+  		for labels.reset(); !labels.done(); labels.next() {
+  			if !p.bidirule(labels.label()) {
+  				err = &labelError{s, "B"}
+  				break
+  			}
+  		}
+  	}
+  	if toASCII {
+  		for labels.reset(); !labels.done(); labels.next() {
+  			label := labels.label()
+  			if !ascii(label) {
+  				a, err2 := encode(acePrefix, label)
+  				if err == nil {
+  					err = err2
+  				}
+  				label = a
+  				labels.set(a)
+  			}
+  			n := len(label)
+  			if p.verifyDNSLength && err == nil && (n == 0 || n > 63) {
+  				err = &labelError{label, "A4"}
+  			}
+  		}
+  	}
+  	return labels.result(), err
+  }
+  ```
+
+test "rank1430: (b) the fixed revision rejects an ACE label whose punycode payload decodes to an all-ASCII string"
+  lang go
+  file idna/idna.go
+  reject VYQL-VAL-001
+  reject VYQL-VAL-009
+  reject VYQL-CRY-018
+  reject VYQL-RF-010
+  reject_review code.UncheckedDecodeResult
+  reject_review code.StructuredInputDecode
+  reject_review code.UnicodeNormalizationAfterFilterBypass
+  code
+  ```
+  package idna
+
+  import (
+  	"strings"
+
+  	"golang.org/x/text/unicode/bidi"
+  	"golang.org/x/text/secure/bidirule"
+  )
+
+  const acePrefix = "xn--"
+
+  func (p *Profile) process(s string, toASCII bool) (string, error) {
+  	var err error
+  	var isBidi bool
+  	if p.mapping != nil {
+  		s, isBidi, err = p.mapping(p, s)
+  	}
+  	if err == nil && p.verifyDNSLength && s == "" {
+  		err = labelError{s, "A4"}
+  	}
+  	labels := labelIter{orig: s}
+  	for ; !labels.done(); labels.next() {
+  		label := labels.label()
+  		if label == "" {
+  			if err == nil && p.verifyDNSLength {
+  				err = labelError{s, "A4"}
+  			}
+  			continue
+  		}
+  		if strings.HasPrefix(label, acePrefix) {
+  			enc := label[len(acePrefix):]
+  			u, err2 := decode(enc)
+  			if err2 != nil {
+  				if err == nil {
+  					err = err2
+  				}
+  				continue
+  			}
+  			if err == nil && len(u) > 0 && isASCII(u) {
+  				err = punyError(enc)
+  			}
+  			isBidi = isBidi || bidirule.DirectionString(u) != bidi.LeftToRight
+  			labels.set(u)
+  			if err == nil && p.fromPuny != nil {
+  				err = p.fromPuny(p, u)
+  			}
+  			if err == nil {
+  				err = p.validateLabel(u, "A4")
+  			}
+  		} else if err == nil {
+  			err = p.validateLabel(label, "A4")
+  		}
+  	}
+  	if isBidi && p.bidirule != nil && err == nil {
+  		for labels.reset(); !labels.done(); labels.next() {
+  			if !p.bidirule(labels.label()) {
+  				err = labelError{s, "B"}
+  				break
+  			}
+  		}
+  	}
+  	if toASCII {
+  		for labels.reset(); !labels.done(); labels.next() {
+  			label := labels.label()
+  			if !ascii(label) {
+  				a, err2 := encode(acePrefix, label)
+  				if err == nil {
+  					err = err2
+  				}
+  				label = a
+  				labels.set(a)
+  			}
+  			n := len(label)
+  			if p.verifyDNSLength && err == nil && (n == 0 || n > 63) {
+  				err = labelError{label, "A4"}
+  			}
+  		}
+  	}
+  	return labels.result(), err
+  }
+
+  func isASCII(s string) bool {
+  	for _, c := range []byte(s) {
+  		if c >= 0x80 {
+  			return false
+  		}
+  	}
+  	return true
+  }
+  ```
+
+test "rank1430: (c) the same rejection written with different names is still detected, so the fixed revision's own spelling cannot be the discriminator"
+  lang go
+  file idna/idna.go
+  reject VYQL-VAL-001
+  reject VYQL-VAL-009
+  reject VYQL-CRY-018
+  reject VYQL-RF-010
+  reject_review code.UncheckedDecodeResult
+  reject_review code.StructuredInputDecode
+  reject_review code.UnicodeNormalizationAfterFilterBypass
+  code
+  ```
+  package idna
+
+  import (
+  	"strings"
+
+  	"golang.org/x/text/unicode/bidi"
+  	"golang.org/x/text/secure/bidirule"
+  )
+
+  const acePrefix = "xn--"
+
+  func (p *Profile) process(s string, toASCII bool) (string, error) {
+  	var err error
+  	var isBidi bool
+  	labels := labelIter{orig: s}
+  	for ; !labels.done(); labels.next() {
+  		label := labels.label()
+  		if label == "" {
+  			continue
+  		}
+  		if strings.HasPrefix(label, acePrefix) {
+  			payload := label[len(acePrefix):]
+  			dec, err2 := decode(payload)
+  			if err2 != nil {
+  				if err == nil {
+  					err = err2
+  				}
+  				continue
+  			}
+  			if err == nil && len(dec) > 0 && allASCII(dec) {
+  				err = rejectLabel(payload)
+  			}
+  			isBidi = isBidi || bidirule.DirectionString(dec) != bidi.LeftToRight
+  			labels.set(dec)
+  			if err == nil && p.fromPuny != nil {
+  				err = p.fromPuny(p, dec)
+  			}
+  			if err == nil {
+  				err = p.validateLabel(dec, "A4")
+  			}
+  		} else if err == nil {
+  			err = p.validateLabel(label, "A4")
+  		}
+  	}
+  	if toASCII {
+  		for labels.reset(); !labels.done(); labels.next() {
+  			label := labels.label()
+  			if !ascii(label) {
+  				a, err2 := encode(acePrefix, label)
+  				if err == nil {
+  					err = err2
+  				}
+  				labels.set(a)
+  			}
+  		}
+  	}
+  	return labels.result(), err
+  }
+
+  func allASCII(s string) bool {
+  	for i := 0; i < len(s); i++ {
+  		if s[i] >= 0x80 {
+  			return false
+  		}
+  	}
+  	return true
+  }
+  ```

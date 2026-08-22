@@ -1,0 +1,346 @@
+# Rank 1436 / CVE-2021-38598: Neutron's linuxbridge agent gives every VIF its
+# own pair of ebtables chains -- neutronARP-<vif> and neutronMAC-<vif> -- so
+# that a guest can only emit ARP and ethernet frames carrying the addresses the
+# port is allocated. Each chain is default-deny, and the deny is written as
+# the chain's *policy*:
+#
+#   ebtables(['-N', vif_chain, '-P', 'DROP'])
+#   ebtables(['-F', vif_chain])
+#   for addr in sorted(addresses):
+#       ebtables(['-A', vif_chain, '-p', 'ARP', '--arp-ip-src', addr,
+#                 '-j', 'ACCEPT'])
+#
+# A chain policy is not a rule. The nftables-backed compatibility binaries --
+# ebtables-nft on Ubuntu Focal and CentOS Stream, iptables-nft likewise --
+# implement a user chain's policy as an ordinary trailing rule rather than as a
+# persistent chain attribute, so `-F` takes the DROP away with everything else
+# and the chain reverts to RETURN. From that point the chain accepts whatever
+# matches none of its ACCEPT rules: any guest on the host can send gratuitous
+# ARP for another tenant's address, or frames sourced from another tenant's MAC,
+# and the anti-spoofing chains that are the only thing standing between two
+# tenants on a shared linux bridge do nothing. The attacker is another tenant's
+# instance on the same compute host; the reward is traffic interception or
+# denial of service against the impersonated instance (CVSS 8.8, LP#1938670).
+#
+# Step 0: the row's SHA cc0d28a3e2 is the Zuul merge of the single change
+# 0a931391d8, "Make ARP protection commands compatible with 'ebtables-nft'",
+# and both are cited by GHSA-hvm4-mc7m-22w4; `git show` reads the merge fine
+# here. The vulnerable construct is present at the parent -- two
+# `ebtables(['-N', vif_chain, '-P', 'DROP'])` calls, one per chain, and no
+# `-j DROP` rule anywhere in the module -- and the remediation is present at the
+# fix: each chain creation and each flush is now followed by
+# `ebtables(['-A', vif_chain, '-j', 'DROP'])`, and the accept rules changed from
+# `-A` to `-I` so they land ahead of that terminal rule instead of behind it.
+# No pool row correction.
+#
+# The gap is vocabulary, not taint: a packet-filter chain built by
+# shelling out is a sequence of argument vectors, and nothing labelled either
+# half of the pair. The existing `code.NetworkFilteringDisabled` issue concept
+# and its rule VYQL-CFG-015 say "network filtering is not being
+# enforced" at CWE-284 and had only three ruby bindings for the
+# `bridge-nf-call-iptables` sysctl, so this widens that concept to the
+# ebtables/iptables command family in python rather than minting a sibling. The
+# new half is the control: `core.PacketFilterDefaultDeny`, an explicit
+# `-j DROP`/`-j REJECT` rule, which post-dominates the creation call once the
+# fix installs it. `postDominates` rather than `endpoint` because the terminal
+# rule is installed *after* the chain is created, and an endpoint guard has to
+# dominate the site it covers.
+#
+# Measured: the linuxbridge subtree at 0a931391d8^ reports VYQL-CFG-015 twice,
+# on arp_protect.py:135 and :180 -- exactly the two functions the fixed revision hardened
+# -- and at 0a931391d8 reports it zero times; 2/2/2 against 0/0/0 over three
+# `--cache off` runs each. Neither needle is the fixed revision's own vocabulary: the issue
+# keys on `-N`+`-P`+DROP and the control on `-j`+DROP, all four spellings from
+# ebtables(8), and the `-A`->`-I` change the fixed revision also makes is not read at all.
+# neutron/agent/linux, which holds iptables_firewall.py and its
+# `add_rule(chain, '-j DROP')` fallback chains, reports zero -- that code builds
+# rules through the iptables_manager object rather than an argv, so neither
+# binding sees it. Across the ~100 other clones under /tmp/cve-work/rank*/ the
+# reachable set is three python files mentioning any of the four binaries
+# (mailcow's netfilter container, which drives the python-iptables `iptc`
+# bindings rather than the CLI, and one seaweedfs diagnostics script); all three
+# scan to zero findings. The four identifiers are absent from
+# /tmp/bench/BenchmarkPython, whose only "DROP" is SQL DDL in helpers.
+#
+# Residual: `postDominatesCovered` (internal/engine/engine.go:1511) falls back
+# to presence semantics when either node carries no CFG metadata, so on a
+# frontend that emits none, one terminal-deny rule anywhere in the scan would
+# clear every NetworkFilteringDisabled row. Only python emits this control
+# today, and python carries CFG, so the fallback is not reachable from here.
+
+test "rank1436: the per-VIF ARP chain's default deny is the chain policy, and the chain is flushed"
+  lang python
+  file neutron/plugins/ml2/drivers/linuxbridge/agent/arp_protect.py
+  expect VYQL-CFG-015
+  code
+  ```
+  from neutron.agent.linux import ip_lib
+
+  SPOOF_CHAIN_PREFIX = 'neutronARP-'
+
+
+  def chain_name(vif):
+      return '%s%s' % (SPOOF_CHAIN_PREFIX, vif)
+
+
+  def chain_exists(chain, current_rules):
+      for rule in current_rules:
+          if rule.startswith('Bridge chain: %s' % chain):
+              return True
+      return False
+
+
+  def vif_jump_present(vif, current_rules):
+      searches = (('-i %s' % vif), ('-j %s' % chain_name(vif)), ('-p ARP'))
+      for line in current_rules:
+          if all(s in line for s in searches):
+              return True
+      return False
+
+
+  def _install_arp_spoofing_protection(vif, addresses, current_rules):
+      # make a VIF-specific ARP chain so we don't conflict with other rules
+      vif_chain = chain_name(vif)
+      if not chain_exists(vif_chain, current_rules):
+          ebtables(['-N', vif_chain, '-P', 'DROP'])
+      # flush the chain to clear previous accepts. this will cause dropped ARP
+      # packets until the allows are installed, but that's better than leaked
+      # spoofed packets and ARP can handle losses.
+      ebtables(['-F', vif_chain])
+      for addr in sorted(addresses):
+          ebtables(['-A', vif_chain, '-p', 'ARP', '--arp-ip-src', addr,
+                    '-j', 'ACCEPT'])
+      # check if jump rule exists, if not, install it
+      if not vif_jump_present(vif, current_rules):
+          ebtables(['-A', 'PREROUTING', '-i', vif, '-j',
+                    vif_chain, '-p', 'ARP'])
+
+
+  def ebtables(comm, table='nat'):
+      execute = ip_lib.IPWrapper(None).netns.execute
+      return execute(['ebtables', '-t', table, '--concurrent'] + comm,
+                     run_as_root=True, privsep_exec=True)
+  ```
+
+test "rank1436: the per-VIF MAC chain has the same policy-only default deny"
+  lang python
+  file neutron/plugins/ml2/drivers/linuxbridge/agent/arp_protect.py
+  expect VYQL-CFG-015
+  code
+  ```
+  from neutron.agent.linux import ip_lib
+
+  MAC_CHAIN_PREFIX = 'neutronMAC-'
+
+
+  def _mac_chain_name(vif):
+      return '%s%s' % (MAC_CHAIN_PREFIX, vif)
+
+
+  def chain_exists(chain, current_rules):
+      for rule in current_rules:
+          if rule.startswith('Bridge chain: %s' % chain):
+              return True
+      return False
+
+
+  def _mac_vif_jump_present(vif, current_rules):
+      searches = (('-i %s' % vif), ('-j %s' % _mac_chain_name(vif)))
+      for line in current_rules:
+          if all(s in line for s in searches):
+              return True
+      return False
+
+
+  def _delete_vif_mac_rules(vif, current_rules):
+      chain = _mac_chain_name(vif)
+      for rule in current_rules:
+          if '-i %s' % vif in rule and '--among-src' in rule:
+              ebtables(['-D', chain] + rule.split())
+
+
+  def _install_mac_spoofing_protection(vif, port_details, current_rules):
+      mac_addresses = {port_details['mac_address']}
+      if port_details.get('allowed_address_pairs'):
+          mac_addresses |= {p['mac_address']
+                            for p in port_details['allowed_address_pairs']}
+      mac_addresses = list(mac_addresses)
+      vif_chain = _mac_chain_name(vif)
+      # mac filter chain for each vif which has a default deny
+      if not chain_exists(vif_chain, current_rules):
+          ebtables(['-N', vif_chain, '-P', 'DROP'])
+      # check if jump rule exists, if not, install it
+      if not _mac_vif_jump_present(vif, current_rules):
+          ebtables(['-A', 'PREROUTING', '-i', vif, '-j', vif_chain])
+      # we can't just feed all allowed macs at once because we can exceed
+      # the maximum argument size. limit to 500 per rule.
+      for chunk in (mac_addresses[i:i + 500]
+                    for i in range(0, len(mac_addresses), 500)):
+          new_rule = ['-A', vif_chain, '-i', vif,
+                      '--among-src', ','.join(sorted(chunk)), '-j', 'RETURN']
+          ebtables(new_rule)
+      _delete_vif_mac_rules(vif, current_rules)
+
+
+  def ebtables(comm, table='nat'):
+      execute = ip_lib.IPWrapper(None).netns.execute
+      return execute(['ebtables', '-t', table, '--concurrent'] + comm,
+                     run_as_root=True, privsep_exec=True)
+  ```
+
+test "rank1436: the fixed revision appends an explicit terminal DROP rule after creating and after flushing the ARP chain"
+  lang python
+  file neutron/plugins/ml2/drivers/linuxbridge/agent/arp_protect.py
+  reject VYQL-CFG-015
+  code
+  ```
+  from neutron.agent.linux import ip_lib
+
+  SPOOF_CHAIN_PREFIX = 'neutronARP-'
+
+
+  def chain_name(vif):
+      return '%s%s' % (SPOOF_CHAIN_PREFIX, vif)
+
+
+  def chain_exists(chain, current_rules):
+      for rule in current_rules:
+          if rule.startswith('Bridge chain: %s' % chain):
+              return True
+      return False
+
+
+  def vif_jump_present(vif, current_rules):
+      searches = (('-i %s' % vif), ('-j %s' % chain_name(vif)), ('-p ARP'))
+      for line in current_rules:
+          if all(s in line for s in searches):
+              return True
+      return False
+
+
+  def _install_arp_spoofing_protection(vif, addresses, current_rules):
+      # make a VIF-specific ARP chain so we don't conflict with other rules
+      vif_chain = chain_name(vif)
+      if not chain_exists(vif_chain, current_rules):
+          ebtables(['-N', vif_chain, '-P', 'DROP'])
+          # Append a default DROP rule at the end of the chain. This will
+          # avoid "ebtables-nft" error when listing the chain.
+          ebtables(['-A', vif_chain, '-j', 'DROP'])
+      else:
+          # Flush the chain to clear previous accepts. This will cause dropped
+          # ARP packets until the allows are installed, but that's better than
+          # leaked spoofed packets and ARP can handle losses.
+          ebtables(['-F', vif_chain])
+          ebtables(['-A', vif_chain, '-j', 'DROP'])
+      for addr in sorted(addresses):
+          ebtables(['-I', vif_chain, '-p', 'ARP', '--arp-ip-src', addr,
+                    '-j', 'ACCEPT'])
+      # check if jump rule exists, if not, install it
+      if not vif_jump_present(vif, current_rules):
+          ebtables(['-A', 'PREROUTING', '-i', vif, '-j',
+                    vif_chain, '-p', 'ARP'])
+
+
+  def ebtables(comm, table='nat'):
+      execute = ip_lib.IPWrapper(None).netns.execute
+      return execute(['ebtables', '-t', table, '--concurrent'] + comm,
+                     run_as_root=True, privsep_exec=True)
+  ```
+
+test "rank1436: the fixed revision gives the MAC chain a terminal DROP rule too"
+  lang python
+  file neutron/plugins/ml2/drivers/linuxbridge/agent/arp_protect.py
+  reject VYQL-CFG-015
+  code
+  ```
+  from neutron.agent.linux import ip_lib
+
+  MAC_CHAIN_PREFIX = 'neutronMAC-'
+
+
+  def _mac_chain_name(vif):
+      return '%s%s' % (MAC_CHAIN_PREFIX, vif)
+
+
+  def chain_exists(chain, current_rules):
+      for rule in current_rules:
+          if rule.startswith('Bridge chain: %s' % chain):
+              return True
+      return False
+
+
+  def _mac_vif_jump_present(vif, current_rules):
+      searches = (('-i %s' % vif), ('-j %s' % _mac_chain_name(vif)))
+      for line in current_rules:
+          if all(s in line for s in searches):
+              return True
+      return False
+
+
+  def _delete_vif_mac_rules(vif, current_rules):
+      chain = _mac_chain_name(vif)
+      for rule in current_rules:
+          if '-i %s' % vif in rule and '--among-src' in rule:
+              ebtables(['-D', chain] + rule.split())
+
+
+  def _install_mac_spoofing_protection(vif, port_details, current_rules):
+      mac_addresses = {port_details['mac_address']}
+      if port_details.get('allowed_address_pairs'):
+          mac_addresses |= {p['mac_address']
+                            for p in port_details['allowed_address_pairs']}
+      mac_addresses = list(mac_addresses)
+      vif_chain = _mac_chain_name(vif)
+      # mac filter chain for each vif which has a default deny
+      if not chain_exists(vif_chain, current_rules):
+          ebtables(['-N', vif_chain, '-P', 'DROP'])
+          # Append a default DROP rule at the end of the chain. This will
+          # avoid "ebtables-nft" error when listing the chain.
+          ebtables(['-A', vif_chain, '-j', 'DROP'])
+
+      # check if jump rule exists, if not, install it
+      if not _mac_vif_jump_present(vif, current_rules):
+          ebtables(['-I', 'PREROUTING', '-i', vif, '-j', vif_chain])
+
+      _delete_vif_mac_rules(vif, current_rules)
+      # we can't just feed all allowed macs at once because we can exceed
+      # the maximum argument size. limit to 500 per rule.
+      for chunk in (mac_addresses[i:i + 500]
+                    for i in range(0, len(mac_addresses), 500)):
+          new_rule = ['-I', vif_chain, '-i', vif,
+                      '--among-src', ','.join(sorted(chunk)), '-j', 'RETURN']
+          ebtables(new_rule)
+
+
+  def ebtables(comm, table='nat'):
+      execute = ip_lib.IPWrapper(None).netns.execute
+      return execute(['ebtables', '-t', table, '--concurrent'] + comm,
+                     run_as_root=True, privsep_exec=True)
+  ```
+
+test "rank1436: neutron's own iptables firewall builds its fallback chains through the rule manager, not an argv"
+  lang python
+  file neutron/agent/linux/iptables_firewall.py
+  reject VYQL-CFG-015
+  code
+  ```
+  from neutron.agent.linux import utils
+  from neutron.common import constants as ic
+
+
+  class IptablesFirewallDriver(object):
+
+      def _enable_netfilter_for_bridges(self):
+          # make sure bridge_nf_call is enabled before adding any rules
+          utils.execute(['sysctl', '-N', 'net.bridge'], run_as_root=True,
+                        check_exit_code=False, privsep_exec=True)
+
+      def _setup_chains_apply(self, ports, unfiltered_ports):
+          self._add_chain_by_name_v4v6('sg-fallback')
+          self.iptables.ipv4['filter'].add_rule('sg-fallback', '-j DROP',
+                                                comment=ic.UNMATCH_DROP)
+          self.iptables.ipv6['filter'].add_rule('sg-fallback', '-j DROP',
+                                                comment=ic.UNMATCH_DROP)
+          for port in ports.values():
+              self._setup_chain(port, 'ingress')
+  ```
