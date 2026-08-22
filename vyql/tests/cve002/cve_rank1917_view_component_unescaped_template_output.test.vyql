@@ -1,0 +1,149 @@
+# Rank 1917 / CVE-2024-21636: ViewComponent's render pipeline returned the
+# component's markup without an HTML-escape step (CWE-79). render_in in
+# lib/view_component/base.rb did
+#
+#   render_template_for(@__vc_variant).to_s + output_postamble
+#
+# so a component whose call method interpolates request data -- the documented
+# way to author a component -- had that output inserted into the page raw.
+# The fixing commit c43d8bafa7 is the 2.x backport: render_in now routes through
+# safe_render_template_for and safe_output_postamble, whose shared helper
+# maybe_escape_html returns the text untouched when it is html_safe?
+# and otherwise wraps it in html_escape. : the commit is the
+# fixing change, the vulnerable concatenation is present at its parent, and the
+# remediation is present at the commit itself.
+#
+# ATTENTION, attribution gap. Nothing labels the render pipeline at either
+# revision: vyql match on base.rb shows the only HtmlRender sink is the
+# unrelated render-delegation helper (base.rb:197 -> 202 at the vulnerable revision,
+# 202 -> 207 after the pure line shift), and a bounded scan of the checkout
+# reports the same 17 findings at both revisions. The weakness is not a
+# dataflow inside the library -- the untrusted bytes enter through
+# application-authored components, and sink positions exist only at
+# args/args.any/node/call, never at a return -- so the taint rule cannot fire,
+# and a presence binding on the render entry cannot discriminate: every
+# remediated revision still calls render_template_for (inside
+# safe_render_template_for at this fix, and directly inside render_in on
+# current main, which keeps render_template_for(...).to_s with the escaping
+# html_escape two helpers away), while the generic escape API lives outside
+# the function the fixed revision guards. That is the measured endpointGuarded family
+# (function-local control attribution: ranks 1377/1389/1399 Go, 1397 Python,
+# 1364 Rust, 1372 TypeScript, 1394 PHP, 1437 C; identical-shape non-detection
+# at 1331), and the 1380 counterweight fails because the fixed revision leaves no
+# API-documented control call in render_in -- only its own safe_* helpers and
+# output_postamble.blank?, an allocation micro-optimization with no security
+# meaning, so keying on its absence is the rank-1394 helper-name trap. The
+# adjacent application shape is covered but version-blind: params ->
+# MessageComponent.new -> render(component) reports VYQL-INJ-004 at high on a
+# two-file probe, yet the same application code is safe once the framework
+# escapes, so that finding cannot track this fix. Not an ENGINE-GAPS.md entry:
+# what is missing is either a return-position render sink with a
+# framework-output trust model or cross-function control attribution, both
+# vocabulary/engine design rather than a mechanical change.
+#
+# verify_current_expected: attention-analysis-gap, both revisions rejected
+
+test "rank1917: the render entry returns template output concatenated with the postamble, unescaped"
+  lang ruby
+  file lib/view_component/base.rb
+  reject VYQL-INJ-004
+  reject VYQL-INJ-204
+  code
+  ```
+  module ViewComponent
+    class Base < ActionView::Base
+      def render_in(view_context, &block)
+        @view_context = view_context
+
+        @lookup_context ||= view_context.lookup_context
+
+        # For template variants (+phone, +desktop, etc.)
+        @__vc_variant ||= @lookup_context.variants.first
+
+        @__vc_render_in_block = block
+
+        before_render
+
+        if render?
+          render_template_for(@__vc_variant).to_s + output_postamble
+        else
+          ""
+        end
+      end
+
+      # Optional content to be returned after the rendered template.
+      #
+      # @return [String]
+      def output_postamble
+        ""
+      end
+    end
+  end
+  ```
+
+test "rank1917: the render entry escapes template output and postamble unless html_safe"
+  lang ruby
+  file lib/view_component/base.rb
+  reject VYQL-INJ-004
+  reject VYQL-INJ-204
+  code
+  ```
+  module ViewComponent
+    class Base < ActionView::Base
+      def render_in(view_context, &block)
+        @view_context = view_context
+
+        @lookup_context ||= view_context.lookup_context
+
+        @__vc_variant ||= @lookup_context.variants.first
+
+        @__vc_render_in_block = block
+
+        before_render
+
+        if render?
+          # Avoid allocating new string when output_postamble is blank
+          if output_postamble.blank?
+            safe_render_template_for(@__vc_variant).to_s
+          else
+            safe_render_template_for(@__vc_variant).to_s + safe_output_postamble
+          end
+        else
+          ""
+        end
+      end
+
+      def maybe_escape_html(text)
+        return text if request && !request.format.html?
+        return text if text.blank?
+
+        if text.html_safe?
+          text
+        else
+          yield
+          html_escape(text)
+        end
+      end
+
+      def safe_render_template_for(variant)
+        if compiler.renders_template_for_variant?(variant)
+          render_template_for(variant)
+        else
+          maybe_escape_html(render_template_for(variant)) do
+            Kernel.warn("WARNING: The #{self.class} component rendered HTML-unsafe output. The output will be automatically escaped, but you may want to investigate.")
+          end
+        end
+      end
+
+      def safe_output_postamble
+        maybe_escape_html(output_postamble) do
+          Kernel.warn("WARNING: The #{self.class} component was provided an HTML-unsafe postamble. The postamble will be automatically escaped, but you may want to investigate.")
+        end
+      end
+
+      def output_postamble
+        @@default_output_postamble ||= "".html_safe
+      end
+    end
+  end
+  ```

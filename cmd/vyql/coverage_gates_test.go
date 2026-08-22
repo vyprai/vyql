@@ -139,24 +139,7 @@ func ruleIDs(t *testing.T, files map[string]string) map[string]string { // id ->
 // As specs are added, allowlisted ids that gain coverage must be REMOVED (asserted below).
 func TestRuleFiresCoverageGate(t *testing.T) {
 	// Every shipped rule now has an `expect` spec — the burn-down allowlist is empty.
-	// The eight ids below ship with the terminal definitions corpus ahead of their
-	// specs: their `expect` specs sit in the 1800-1999 rank batches, so they are
-	// allowlisted here and the removal assertion below forces each one out as its
-	// spec lands.
-	unspecced := map[string]bool{
-		"VYQL-AUTH-165": true,
-		"VYQL-AUTH-166": true,
-		"VYQL-AUTH-167": true,
-		"VYQL-AUTH-168": true,
-		"VYQL-AUTH-169": true,
-		"VYQL-INJ-279":  true,
-		"VYQL-MEM-068":  true,
-		"VYQL-PATH-085": true,
-		"VYQL-PATH-086": true,
-		"VYQL-PATH-087": true,
-		"VYQL-PATH-088": true,
-		"VYQL-RF-054":   true,
-	}
+	unspecced := map[string]bool{}
 
 	rules := ruleIDs(t, readDataFiles(t, "packs", ".vyql"))
 	// every .test.vyql `expect` (code AND graph specs alike — both live in one format).

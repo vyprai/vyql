@@ -1,0 +1,83 @@
+# The vditor editor's paste handler takes the clipboard's HTML flavour
+# straight from the event and renders it into the document:
+#
+#   src/ts/util/fixBrowserBehavior.ts:1261 and :1392 at the parent of
+#   1b2382d7:
+#
+#     textHTML = event.clipboardData.getData("text/html");
+#     ...
+#     const doc = new DOMParser().parseFromString(textHTML, "text/html");
+#     if (doc.body) {
+#         textHTML = doc.body.innerHTML;
+#     }
+#     ...
+#     const tempElement = document.createElement("div");
+#     tempElement.innerHTML = textHTML;
+#
+# Nothing between the clipboard read and the innerHTML assignment removes
+# active content, so pasted markup executes in the editing surface (CWE-79).
+# The fixed revision routes the parsed markup through Lute.Sanitize, the engine's
+# documented HTML sanitizer, before the assignment.
+#
+# The source and sink sides are both bound -- the clipboard getData
+# read is code.DomInput and the innerHTML assignment is code.HtmlRender --
+# so the taint rule reports the vulnerable revision on the real tree. What
+# the fixed revision adds is the sanitizer call, and a sanitizer is only a control when
+# the binding set names it: without a binding, the patched revision reports
+# the identical finding. Lute's Sanitize is a static on the engine class
+# (its type declarations publish `public static Sanitize(html: string):
+# string`), so the call path names the library the same way DOMPurify.sanitize
+# does.
+
+test "rank1912: a paste handler renders clipboard HTML into innerHTML with no sanitizer"
+  lang javascript
+  file paste-html.js
+  expect VYQL-INJ-004
+  code
+  ```
+  export const paste = async (vditor, event) => {
+      let textHTML;
+      if ("clipboardData" in event) {
+          textHTML = event.clipboardData.getData("text/html");
+      } else {
+          textHTML = event.dataTransfer.getData("text/html");
+      }
+      const doc = new DOMParser().parseFromString(textHTML, "text/html");
+      if (doc.body) {
+          textHTML = doc.body.innerHTML;
+      }
+      const tempElement = document.createElement("div");
+      tempElement.innerHTML = textHTML;
+      tempElement.querySelectorAll("[style]").forEach((e) => {
+          e.removeAttribute("style");
+      });
+      insertHTML(vditor.lute.HTML2VditorDOM(tempElement.innerHTML), vditor);
+  };
+  ```
+
+test "rank1912: the same paste handler routing the markup through Lute.Sanitize reports nothing"
+  lang javascript
+  file paste-html-sanitized.js
+  reject VYQL-INJ-004
+  code
+  ```
+  export const paste = async (vditor, event) => {
+      let textHTML;
+      if ("clipboardData" in event) {
+          textHTML = event.clipboardData.getData("text/html");
+      } else {
+          textHTML = event.dataTransfer.getData("text/html");
+      }
+      const doc = new DOMParser().parseFromString(textHTML, "text/html");
+      if (doc.body) {
+          textHTML = doc.body.innerHTML;
+      }
+      textHTML = Lute.Sanitize(textHTML);
+      const tempElement = document.createElement("div");
+      tempElement.innerHTML = textHTML;
+      tempElement.querySelectorAll("[style]").forEach((e) => {
+          e.removeAttribute("style");
+      });
+      insertHTML(vditor.lute.HTML2VditorDOM(tempElement.innerHTML), vditor);
+  };
+  ```

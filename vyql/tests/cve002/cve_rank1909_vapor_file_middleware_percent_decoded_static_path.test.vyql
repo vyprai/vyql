@@ -1,0 +1,183 @@
+# Vapor's FileMiddleware (Sources/Vapor/Middleware/FileMiddleware.swift) serves
+# a public directory: it takes the request's URL path, makes it relative,
+# screens it for parent-directory traversal, appends it to the public
+# directory and streams whatever file lands there. At the fixed revision's parent
+# 236c616 the screen and the decode ran in the wrong order --
+#     var path = request.url.path
+#     while path.hasPrefix("/") { path = String(path.dropFirst()) }
+#     guard !path.contains("../") else { return ...Abort(.forbidden) }
+#     let filePath = self.publicDirectory + (path.removingPercentEncoding ?? path)
+# so the "../" screen saw the still-encoded path and the percent decode ran
+# after it, inside the concatenation that reaches the filesystem. A request
+# for /%2e%2e/VaporTests/Utilities/foo.txt passes the screen literally and
+# resolves to ../VaporTests/Utilities/foo.txt under the public directory
+# (CVE-2020-15230). Fix cf1651f moves the decode ahead of everything --
+# `guard var path = request.url.path.removingPercentEncoding else { ... badRequest }`
+# -- so the screen reads the decoded form and the concatenation uses it
+# verbatim.
+#
+# Detection is the request path -> filesystem read pair, reported by the
+# flagship traversal rule: the request URL path is attacker-chosen text
+# (code.HttpInput, from bindings/swift/m388f23d0.vyql httpInput340/341 --
+# Swift reads it as an attribute chain, which only the presence route can
+# label) and FileIO.streamFile(at:) opens the file at its argument
+# (code.FilePathAccess, filePathAccess342). Measured with the cache off,
+# timeout 180, --max-ram 6GB, three runs per side: the vulnerable checkout
+# reports one VYQL-PATH-001 at Sources/Vapor/Middleware/FileMiddleware.swift:17
+# (70 -> 72 findings; the other new finding is VYQL-INJ-001 on
+# Sources/XCTVapor/XCTApplication.swift:46, the test client building a URL
+# string from a request path), and the fixed checkout reports nothing on the
+# file in any of three runs. Collateral across every other Swift tree in the
+# pool -- swift-corelibs-foundation 3013 -> 3013, swift-nio 695 -> 695,
+# Sparkle 379 -> 379, swift-crypto 1421 -> 1421, swift-asn1 26 -> 26,
+# thrift/lib/swift 0 -> 0. The broader `url.path` anchor is measured and
+# rejected: it taints every URL.path read in the language (+2515 findings on
+# swift-corelibs-foundation alone), so the source stays anchored on the
+# request chain.
+#
+# Honest caveat, pinned by the third and fourth cases: the reject direction
+# currently holds because the fixed revision's decode sits inside a `guard var ... else`
+# condition, which the Swift if/guard lowering drops outright (the recorded
+# gap at internal/extract/frontend/treesitter/swift.go's if_statement/
+# guard_statement case), so the fixed revision's `request.url.path` read
+# lowers to no node at all while the vulnerable one does. The traversal
+# screen `path.contains("../")` is equally invisible in both revisions for
+# the same reason, and is not bound as a control in any case -- case 3 pins
+# that. Repairing the guard lowering alone would make both revisions report;
+# at that point the screen has to be bound as the control that separates
+# them, which is exactly the relation the change modifies (screen over the
+# undecoded value vs the decoded one).
+#
+# verify_current_expected: fixed
+
+test "rank1909: static file middleware screens the encoded path and decodes it into the file path"
+  lang swift
+  file Sources/Vapor/Middleware/FileMiddleware.swift
+  expect VYQL-PATH-001
+  code
+  ```
+  import Foundation
+
+  public final class FileMiddleware: Middleware {
+      private let publicDirectory: String
+
+      public init(publicDirectory: String) {
+          self.publicDirectory = publicDirectory.hasSuffix("/") ? publicDirectory : publicDirectory + "/"
+      }
+
+      public func respond(to request: Request, chainingTo next: Responder) -> EventLoopFuture<Response> {
+          var path = request.url.path
+          while path.hasPrefix("/") {
+              path = String(path.dropFirst())
+          }
+          guard !path.contains("../") else {
+              return request.eventLoop.makeFailedFuture(Abort(.forbidden))
+          }
+          let filePath = self.publicDirectory + (path.removingPercentEncoding ?? path)
+          var isDir: ObjCBool = false
+          guard FileManager.default.fileExists(atPath: filePath, isDirectory: &isDir), !isDir.boolValue else {
+              return next.respond(to: request)
+          }
+          let res = request.fileio.streamFile(at: filePath)
+          return request.eventLoop.makeSucceededFuture(res)
+      }
+  }
+  ```
+
+test "rank1909: the patched middleware decodes the request path before screening and concatenating it"
+  lang swift
+  file Sources/Vapor/Middleware/FileMiddlewarePatched.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  import Foundation
+
+  public final class FileMiddlewarePatched: Middleware {
+      private let publicDirectory: String
+
+      public init(publicDirectory: String) {
+          self.publicDirectory = publicDirectory.hasSuffix("/") ? publicDirectory : publicDirectory + "/"
+      }
+
+      public func respond(to request: Request, chainingTo next: Responder) -> EventLoopFuture<Response> {
+          guard var path = request.url.path.removingPercentEncoding else {
+              return request.eventLoop.makeFailedFuture(Abort(.badRequest))
+          }
+          while path.hasPrefix("/") {
+              path = String(path.dropFirst())
+          }
+          guard !path.contains("../") else {
+              return request.eventLoop.makeFailedFuture(Abort(.forbidden))
+          }
+          let filePath = self.publicDirectory + path
+          var isDir: ObjCBool = false
+          guard FileManager.default.fileExists(atPath: filePath, isDirectory: &isDir), !isDir.boolValue else {
+              return next.respond(to: request)
+          }
+          let res = request.fileio.streamFile(at: filePath)
+          return request.eventLoop.makeSucceededFuture(res)
+      }
+  }
+  ```
+
+test "rank1909: the traversal screen over the encoded path is not a control, so the request path still reaches the file read"
+  lang swift
+  file Sources/Vapor/Middleware/FileMiddlewareScreened.swift
+  expect VYQL-PATH-001
+  code
+  ```
+  import Foundation
+
+  // The screen spelled as a plain if over the same undecoded value, with the
+  // decode still applied only inside the concatenation that reaches the
+  // filesystem. Pins that nothing binds `contains("../")` as a
+  // PathAccessCheck: the finding survives a correctly-shaped screen whenever
+  // the value it screened is not the value that is decoded and read.
+  public final class FileMiddlewareScreened: Middleware {
+      private let publicDirectory: String
+
+      public init(publicDirectory: String) {
+          self.publicDirectory = publicDirectory.hasSuffix("/") ? publicDirectory : publicDirectory + "/"
+      }
+
+      public func respond(to request: Request, chainingTo next: Responder) -> EventLoopFuture<Response> {
+          var path = request.url.path
+          while path.hasPrefix("/") {
+              path = String(path.dropFirst())
+          }
+          if path.contains("../") {
+              return request.eventLoop.makeFailedFuture(Abort(.forbidden))
+          }
+          let filePath = self.publicDirectory + (path.removingPercentEncoding ?? path)
+          let res = request.fileio.streamFile(at: filePath)
+          return request.eventLoop.makeSucceededFuture(res)
+      }
+  }
+  ```
+
+test "rank1909: a locally built URL's path component is not a request source"
+  lang swift
+  file Sources/Vapor/Middleware/LocalUrlPath.swift
+  reject VYQL-PATH-001
+  code
+  ```
+  import Foundation
+
+  // Pins the receiver anchor: the same `.path` property read off a URL the
+  // program built itself stays unlabelled, so only a request's URL path
+  // carries the source.
+  public final class LocalUrlPath: Middleware {
+      private let publicDirectory: String
+
+      public init(publicDirectory: String) {
+          self.publicDirectory = publicDirectory.hasSuffix("/") ? publicDirectory : publicDirectory + "/"
+      }
+
+      public func respond(to request: Request, chainingTo next: Responder) -> EventLoopFuture<Response> {
+          let url = URL(fileURLWithPath: self.publicDirectory)
+          let filePath = self.publicDirectory + (url.path.removingPercentEncoding ?? url.path)
+          let res = request.fileio.streamFile(at: filePath)
+          return request.eventLoop.makeSucceededFuture(res)
+      }
+  }
+  ```

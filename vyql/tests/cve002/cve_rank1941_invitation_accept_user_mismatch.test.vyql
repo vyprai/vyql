@@ -1,0 +1,191 @@
+# Weblate (CVE-2025-64725, CWE-286, GHSA-m6hq-f4w9-qrjj): "It is possible to
+# accept an invitation opened by a different Weblate user." The assigned fix
+# 02e904675 ("fix: validate invitation while accepting", PR 16913) extracts the
+# `get()` handler's validation into `InvitationView.validate_invitation()` and
+# calls it from `post()` immediately before `invitation.accept(request, user)`.
+#
+# What the added call does at the parent (88dd957b1) -- and identically at the
+# released weblate-5.14 tag the advisory records as affected: nothing. The
+# accept path in `post()` runs, in order,
+#
+#     if not invitation.user:        raise Http404           # has an addressee
+#     if not user.is_authenticated:  raise PermissionDenied  # caller logged in
+#     if invitation.user != user:    raise Http404           # addressee == caller
+#     invitation.accept(request, user)
+#
+# and `Invitation.accept` (weblate/auth/models.py:1276) itself raises
+# "User mismatch on accept!" when `self.user and self.user != user`. Those
+# three guards jointly falsify both branches of `validate_invitation`
+# (`request.user.is_authenticated and self.object.user != request.user`, and
+# `not self.object.user`), so the extracted call returns None for every request
+# that reaches it. `get()` is refactored, not changed. The accept path admits
+# exactly the same requests before and after the commit, so no expect/reject
+# pair over these two revisions can discriminate: the redundant-guard shape
+# measured at rank 1424, recorded here as a pinned double miss.
+#
+# Where the described weakness is actually reachable, and covered:
+# `handle_invite` in weblate/accounts/pipeline.py accepts an invitation keyed
+# on `session["invitation_link"]` -- written by `InvitationView.get` for an
+# e-mail-only invitation, whose `user` is NULL -- for whichever user completes
+# registration, with nothing tying the invitation to that user's address:
+#
+#     Invitation.objects.get(pk=invitation_pk).accept(strategy.request, user)
+#
+# `Invitation.accept` only raises when `self.user` is set, so the e-mail form
+# passes straight through and grants the team (and `is_superuser` when the
+# invitation carries it). That is the "unattended opened invitation" the
+# advisory's workaround describes, and it survives at the fixed revision commit untouched:
+# neither pipeline.py nor accounts/views.py is in the diff. The first block
+# pins the rule that reports that site on the real tree.
+#
+# Measured. weblate/auth at the parent and at the fixed revision, three `--cache off` runs
+# each (bounded subtree scan, timeout 175, --max-ram 6GB): 32 findings, 20 at
+# or above high, on both revisions with an identical rule/file/line set. On
+# views.py the only labels are `code.ExternalEntryInput` on the `get`/`post`
+# `request` parameters and `code.TrustBoundary` on the
+# `request.session["invitation_link"]` write (line 176 at the parent, 179 after
+# the fixed revision); `post` carries no label at either revision. weblate/accounts at the
+# same revision: 158 findings, 88 at or above high, including two VYQL-AUTH-002
+# rows on pipeline.py:430 with `unless endpoint coveredBy core.OwnershipCheck:
+# not satisfied`.
+#
+# The two `reject` blocks are therefore a pinned miss, not a discrimination,
+# and are guard-insensitive by construction: rescanning the same `post` body
+# with the `invitation.user != user` mismatch guard deleted entirely also
+# reports nothing, because `self.get_object()` -- the DetailView fetch the URL
+# uuid actually keys -- is not bound as an object-lookup sink and the URL
+# kwargs it reads are not a source, so no IDOR row can appear on that handler
+# in either direction. The `expect` block is the non-vacuous half: it pins the
+# rule that does report the reachable unguarded acceptance, under `profile
+# library` because the `strategy` parameter only becomes a source when a
+# profile opts into parameter entrypoints.
+#
+# Why ATTENTION rather than a binding. Two independent reasons. The change is
+# behaviorally inert, so nothing that reads code could separate the revisions:
+# this is the delegated-check / wiring-decided-authorization family (ranks
+# 1331, 1514, 1535, 1540, 1556, 1557, 1593 and the 1424 redundant-guard case),
+# and the fixed revision's own helper name is the only textual discriminator, which is
+# exactly what a binding must not key on. And the residual gap is source-side,
+# not sink-side: binding `get_object()` as an object lookup would be inert
+# without also treating Django URL kwargs as untrusted, which is a separate
+# source-concept decision that would land on all 80 `self.get_object()` call
+# sites in this tree alone and would flag the patched revision identically.
+#
+# No definition is touched, so the OWASP Java and Python numbers are
+# unaffected.
+
+test "rank1941: handle_invite accepts a session-keyed invitation for whichever user completes registration"
+  lang python
+  file pipeline.py
+  profile library
+  expect VYQL-AUTH-002
+  code
+  ```
+  from weblate.auth.models import Invitation
+
+
+  def handle_invite(strategy, backend, user, social, invitation_pk, **kwargs):
+      # Accept triggering invitation
+      if invitation_pk:
+          Invitation.objects.get(pk=invitation_pk).accept(strategy.request, user)
+      # Merge possibly pending invitations for this e-mail address
+      Invitation.objects.filter(email=user.email).update(user=user, email="")
+  ```
+
+test "rank1941: the guarded accept path in InvitationView.post is not an unowned object lookup"
+  lang python
+  file views.py
+  profile library
+  reject VYQL-AUTH-002
+  code
+  ```
+  from django.core.exceptions import PermissionDenied
+  from django.http import Http404
+
+
+  class InvitationView(DetailView):
+      model = Invitation
+
+      def post(self, request, **kwargs):
+          self.object = invitation = self.get_object()
+          user = request.user
+
+          # Handle admin actions first
+          action = request.POST.get("action", "")
+          if action in {"resend", "remove"}:
+              project = invitation.group.defining_project
+              if not user.has_perm(
+                  "project.permissions" if project else "user.edit", project
+              ):
+                  raise PermissionDenied
+              if action == "resend":
+                  invitation.send_email()
+              else:
+                  invitation.delete()
+              return redirect("manage-users")
+
+          # Check if invitation can be accepted
+          if not invitation.user:
+              # This should go via registration path
+              raise Http404
+          if not user.is_authenticated:
+              raise PermissionDenied
+          if invitation.user != user:
+              raise Http404
+
+          # Accept invitation
+          invitation.accept(request, user)
+  ```
+
+test "rank1941: the extracted validation call on the same guarded path decides nothing"
+  lang python
+  file views.py
+  profile library
+  reject VYQL-AUTH-002
+  code
+  ```
+  from django.core.exceptions import PermissionDenied
+  from django.http import Http404
+
+
+  class InvitationView(DetailView):
+      model = Invitation
+
+      def validate_invitation(self, request):
+          if request.user.is_authenticated and self.object.user != request.user:
+              # Invitation not for this user (either is for email and user is
+              # None or different user)
+              messages.error(
+                  request,
+                  gettext(
+                      "This invitation can be accepted only by the e-mail address "
+                      "chosen by the inviter; it can't be used by your account."
+                  ),
+              )
+              return redirect_param("profile", "#account")
+          if not self.object.user:
+              # When inviting new user go through registration
+              request.session["invitation_link"] = str(self.object.pk)
+              return redirect("register")
+          return None
+
+      def post(self, request, **kwargs):
+          self.object = invitation = self.get_object()
+          user = request.user
+
+          if not invitation.user:
+              # This should go via registration path
+              raise Http404
+          if not user.is_authenticated:
+              raise PermissionDenied
+          if invitation.user != user:
+              raise Http404
+
+          # Check if this is for us
+          validation_result = self.validate_invitation(request)
+          if validation_result is not None:
+              return validation_result
+
+          # Accept invitation
+          invitation.accept(request, user)
+  ```

@@ -1,0 +1,200 @@
+# Valtimo through the merge at 3c3335f1 (CVE-2025-58059,
+# valtimo-platform/valtimo-backend-libraries, kotlin; the advisory's own
+# referenced commit is 45eb60b0, the merge's second parent, and
+# `git diff abff4fb0 3c3335f1` reads the change in full). The platform runs a
+# Camunda process engine whose BPMN script tasks (scriptFormat="javascript",
+# process definitions an admin-role user can create, modify and execute
+# through the modeler) are resolved by the engine's default script-engine
+# resolution: with `configureScriptEngineHostAccess` left at its enabled
+# default and no script-engine resolver installed, the GraalJS engine
+# declared in core/build.gradle:70-71 (org.graalvm.js:js-scriptengine and
+# org.graalvm.js:js) evaluates those scripts with host access granted and
+# host class lookup unrestricted, so a script task can instantiate arbitrary
+# Java classes -- Runtime/exec on the application host, file and environment
+# reads, the Spring context and database pooling (CWE-78 with CWE-200 for
+# the secret reads; CVSS 9.1, privileges required: admin).
+#
+# The fixed revision is pure addition. A new ScriptingWhitelistPlugin
+# (AbstractProcessEnginePlugin.preInit) sets
+# setConfigureScriptEngineHostAccess(false),
+# setEnableScriptEngineLoadExternalResources(false) and installs a new
+# AllowedClassesScriptEngineResolver, whose getJavaScriptScriptEngine builds
+# the GraalJS context as Context.newBuilder("js").allowHostAccess(HostAccess.ALL)
+# .allowHostClassLookup(ALL_ALLOWED::contains) over a fixed allowlist of
+# date/collection/Math/Spin classes, extended by a
+# valtimo.camunda.scripting.allowedClasses property. CamundaContextConfiguration
+# gains an unconditional @Bean for the plugin, with the class-level
+# @ConditionalOnProperty moved onto the pre-existing beans-whitelisting bean
+# method. No pre-existing function changes its body: the only non-additive
+# hunk is that annotation move.
+#
+# Measured, bounded subtree core/ (the module carrying the change; java:253
+# kotlin:123 groovy:2 files analysed, 13 .bpmn files matched no frontend and
+# are not analysed), three `--cache off` runs per revision: a byte-stable
+# 52-finding rule histogram at the parent AND at the fixed revision (34 VYQL-INJ-009,
+# 5 VYQL-AUTH-079, 5 VYQL-AUTH-002, 2 VYQL-DESER-004, 2 VYQL-AUTH-001,
+# 1 VYQL-RF-003, 1 VYQL-DESER-002, 1 VYQL-DESER-001, 1 VYQL-CFG-001) --
+# zero delta, nothing on the autoconfiguration, the plugins or either new
+# Kotlin file. `vyql match` labels no source, sink or control on the
+# parent's CamundaWhitelistedBeansPlugin.kt or CamundaContextConfiguration.java,
+# nor on the fixed revision's AllowedClassesScriptEngineResolver.kt or
+# ScriptingWhitelistPlugin.kt.
+#
+# The exhaustive enumeration of the shape's reachable set: at the parent the
+# whole tree contains zero occurrences of HostAccess, allowHostClassLookup,
+# allowAllAccess, ScriptEngineResolver, configureScriptEngineHostAccess and
+# EnableScriptEngineLoadExternalResources -- the engine arrives only as a
+# Gradle coordinate. Across the 91 sibling clones under /tmp/cve-work/rank*/
+# that vocabulary occurs in exactly one other tree, the sibling valtimo
+# monorepo clone, in the same two fixed files. So the generic shape a future
+# detection would key on -- a GraalJS context builder granting
+# allowHostAccess(HostAccess.ALL) with no allowHostClassLookup restriction --
+# has an empty reachable set across the whole corpus: its only in-corpus
+# occurrence is the PATCHED resolver.
+#
+# This is the measured family "authorization decided by wiring or
+# configuration, not dataflow" (ranks 1514, 1535, 1540, 1556, 1557, 1593)
+# in its pure-addition form, with 1331's result reproduced exactly: every
+# pre-existing node a binding could anchor on is unchanged across the fixed revision,
+# so presence and absence variants score identically (the 52-finding
+# histogram above). The 1380 counterweight does not rescue it: the fixed revision leaves
+# no API-documented call inside any pre-existing guarded method, because
+# there is no pre-existing guarded method -- the Context.newBuilder("js")
+# chain exists only at the fixed revision. A negation keyed on the new plugin's or
+# resolver's names would be the fixing commit's own vocabulary, and the
+# engine-wide control lives in a sibling class, which the Kotlin frontend's
+# scopeCall route cannot see from another class's context.
+#
+# The Kotlin primary-constructor gap on file since rank 1857 is checked and
+# is not the blocker: the weakness at the parent crosses no constructor
+# property (the fixed revision's `private val allowedScriptingClasses` is a Spring
+# bean argument consumed by the new code only), and full primary-constructor
+# lowering would expose nothing at the parent, where no script-engine
+# construct exists to lower.
+#
+# Reuse is checked before concluding. code.CodeEval / VYQL-INJ-003 with the
+# codeEval19 `ScriptEngine.eval` sink needs an in-tree eval call fed by user
+# data; neither revision of this tree uses javax.script at all -- the eval
+# happens inside the Camunda engine dependency. code.SandboxHostObjectMemberDenylistGap
+# (CWE-749/184) is a sandbox facade forwarding a host object behind a
+# property-name denylist; here there is no sandbox facade to gap -- the
+# engine itself is unrestricted. Neither fits.
+#
+# Kinship: the sibling rank over valtimo/valtimo -- the monorepo this
+# repository migrated into -- carries the same two fix files; if that tree
+# exposes an in-tree construct for this weakness class, the detection
+# belongs there and nothing is minted here to collide with it.
+#
+# All cases assert reject VYQL-INJ-003: nothing fires today. If a
+# script-engine host-access rule ever ships (keyed on a GraalJS context
+# granting allowHostAccess(HostAccess.ALL) with no allowHostClassLookup
+# restriction, or on a scripting-enabled process engine configured without
+# a restricting resolver), the third case -- the engine construction minus
+# exactly the fixed revision's security-bearing line -- is the one that must flip to
+# expect, while the second case stays reject.
+
+test "rank1907: process engine plugin registers beans with no script engine restriction"
+  lang kotlin
+  file CamundaWhitelistedBeansPlugin.kt
+  reject VYQL-INJ-003
+  code
+  ```
+  package com.ritense.valtimo
+
+  import mu.KotlinLogging
+  import org.camunda.bpm.engine.impl.cfg.AbstractProcessEnginePlugin
+  import org.camunda.bpm.engine.impl.cfg.ProcessEngineConfigurationImpl
+  import org.camunda.bpm.engine.spring.SpringExpressionManager
+  import org.springframework.context.ApplicationContext
+
+  class CamundaWhitelistedBeansPlugin(
+      private val processBeans: Map<String, Any>,
+      private val applicationContext: ApplicationContext
+  ) : AbstractProcessEnginePlugin() {
+      override fun preInit(processEngineConfiguration: ProcessEngineConfigurationImpl?) {
+          logger.info("Registering process beans...")
+          requireNotNull(processEngineConfiguration) { "No process engine configuration found. Failed to register process beans." }
+
+          val processBeansAny = processBeans as Map<Any, Any>
+          processEngineConfiguration.beans = processBeansAny
+          processEngineConfiguration.setExpressionManager(SpringExpressionManager(applicationContext, processBeansAny))
+
+          logger.info("Successfully registered process beans.")
+      }
+
+      companion object {
+          val logger = KotlinLogging.logger {}
+      }
+  }
+  ```
+
+test "rank1907: script engine resolver restricts host class lookup to an allowlist"
+  lang kotlin
+  file AllowedClassesScriptEngineResolver.kt
+  reject VYQL-INJ-003
+  code
+  ```
+  package com.ritense.valtimo
+
+  import com.oracle.truffle.js.scriptengine.GraalJSScriptEngine
+  import org.camunda.bpm.engine.impl.scripting.engine.DefaultScriptEngineResolver
+  import org.graalvm.polyglot.Context
+  import org.graalvm.polyglot.HostAccess
+  import javax.script.ScriptEngine
+  import javax.script.ScriptEngineManager
+
+  class AllowedClassesScriptEngineResolver(
+      scriptEngineManager: ScriptEngineManager,
+      otherAllowedClasses: Set<String> = emptySet()
+  ) : DefaultScriptEngineResolver(scriptEngineManager) {
+      val ALL_ALLOWED = ALLOWED + otherAllowedClasses
+
+      override fun getJavaScriptScriptEngine(language: String?): ScriptEngine {
+          val ctx = Context.newBuilder("js")
+              .allowHostAccess(HostAccess.ALL)
+              .allowHostClassLookup(ALL_ALLOWED::contains)
+
+          return GraalJSScriptEngine.create(null, ctx)
+      }
+
+      companion object {
+          private val ALLOWED = mutableSetOf<String?>(
+              "java.util.ArrayList",
+              "java.util.Date",
+              "java.lang.Math",
+              "java.time.Instant",
+              "java.time.LocalDate",
+              "java.time.LocalDateTime",
+              "java.time.ZonedDateTime",
+          )
+      }
+  }
+  ```
+
+test "rank1907: script engine resolver grants full host access with no class lookup restriction"
+  lang kotlin
+  file UnrestrictedScriptEngineResolver.kt
+  reject VYQL-INJ-003
+  code
+  ```
+  package com.ritense.valtimo
+
+  import com.oracle.truffle.js.scriptengine.GraalJSScriptEngine
+  import org.camunda.bpm.engine.impl.scripting.engine.DefaultScriptEngineResolver
+  import org.graalvm.polyglot.Context
+  import org.graalvm.polyglot.HostAccess
+  import javax.script.ScriptEngine
+  import javax.script.ScriptEngineManager
+
+  class UnrestrictedScriptEngineResolver(
+      scriptEngineManager: ScriptEngineManager
+  ) : DefaultScriptEngineResolver(scriptEngineManager) {
+
+      override fun getJavaScriptScriptEngine(language: String?): ScriptEngine {
+          val ctx = Context.newBuilder("js")
+              .allowHostAccess(HostAccess.ALL)
+
+          return GraalJSScriptEngine.create(null, ctx)
+      }
+  }
+  ```

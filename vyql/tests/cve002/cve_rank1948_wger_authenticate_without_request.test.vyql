@@ -1,0 +1,147 @@
+# wger's registration flow (wger/core/views/user.py) creates the account and
+# then authenticates the submitted credentials before logging the user in:
+#
+#     user = User.objects.create_user(username, email, password)
+#     user.save()
+#     ...
+#     user.userprofile.save()
+#     user = authenticate(username=username, password=password)
+#     django_login(request, user)
+#
+# The whole application carried no brute-force protection: the web login form
+# is Django's own LoginView wired in core/urls.py with a plain
+# AuthenticationForm, and every credential check an attacker could drive --
+# that view, the registration-then-login flow, the API's token endpoint --
+# accepted attempts without any limit (CWE-307, the advisory's subject). The
+# fix lands in two layers: django-axes is installed project-wide through the
+# settings (INSTALLED_APPS, AxesMiddleware last in MIDDLEWARE,
+# AxesStandaloneBackend first in AUTHENTICATION_BACKENDS, AXES_FAILURE_LIMIT),
+# and the one call in application code that the middleware cannot cover on its
+# own is corrected to pass the request:
+#
+#     user = authenticate(request=request, username=username, password=password)
+#
+# Axes counts and locks out attempts by the client address and user agent it
+# reads off the request, so a credential verification the request never
+# reaches is invisible to it -- the documented contract is the kwarg, and
+# Django's own authentication docs spell it the same way. The settings half of
+# the change is wiring, invisible to any function-local detection; the call is
+# the API-documented discriminator the fixed revision leaves inside the guarded function.
+#
+# The recorded fix commit is the merge that brought the brute-force branch
+# into master: its first parent is the branch tip and carries the change,
+# so the vulnerable tree is the merge's second parent (master), f38a27c.
+#
+# Detection: bindings.python.django_authenticate_without_request labels
+# django.contrib.auth.authenticate called without the request, VYQL-AUTH-105
+# consumes the label and clears it where a rate-limit control covers the
+# endpoint. The name-keyed bindings that fired on this project
+# (python.flags on any function named login) fire identically on both
+# revisions and are not detection of this change.
+#
+# Measured on the vulnerable tree (f38a27c, three --cache off runs, timeout
+# 180, --max-ram 6GB, deterministic 3 of 3): 14 VYQL-AUTH-105 findings, of
+# which 2 are this binding's -- views/user.py:285, the CVE, and core/demo.py:78,
+# the demo-data creator authenticating a user it just made with generated
+# credentials (the stated residual). At the fixed revision (5e3167e) the
+# registration call is declined and demo.py is untouched: 1 of 1 in three
+# runs, so the registration endpoint discriminates 1 -> 0. Corpus-wide the
+# reachable set is enumerated by grep: two calls to Django's authenticate in
+# all ~140 clones, both in this project; weblate/accounts reports 35
+# pre-existing VYQL-AUTH-105 findings and zero from this binding, twisted's
+# protocol clients and vantage6's client libraries resolve to other paths and
+# report none, and the term is absent from the OWASP Python benchmark corpus.
+
+test "rank1948: the registration flow authenticates submitted credentials without the request"
+  lang python
+  file wger/core/views/user.py
+  expect VYQL-AUTH-105
+  code
+  ```
+  from django.contrib.auth import (
+      authenticate,
+      login as django_login,
+  )
+  from django.http import HttpResponseRedirect
+  from django.urls import reverse
+
+
+  def registration(request):
+      form = RegistrationForm(data=request.POST)
+
+      if form.is_valid():
+          username = form.cleaned_data['username']
+          password = form.cleaned_data['password1']
+          email = form.cleaned_data['email']
+          user = User.objects.create_user(username, email, password)
+          user.save()
+
+          user.userprofile.save()
+          user = authenticate(username=username, password=password)
+
+          django_login(request, user)
+          return HttpResponseRedirect(reverse('core:dashboard'))
+
+      return render(request, 'form.html', {'form': form})
+  ```
+
+test "rank1948: passing the request to authenticate lets request-scoped attempt limiters see the attempt"
+  lang python
+  file wger/core/views/user.py
+  reject VYQL-AUTH-105
+  code
+  ```
+  from django.contrib.auth import (
+      authenticate,
+      login as django_login,
+  )
+  from django.http import HttpResponseRedirect
+  from django.urls import reverse
+
+
+  def registration(request):
+      form = RegistrationForm(data=request.POST)
+
+      if form.is_valid():
+          username = form.cleaned_data['username']
+          password = form.cleaned_data['password1']
+          email = form.cleaned_data['email']
+          user = User.objects.create_user(username, email, password)
+          user.save()
+
+          user.userprofile.save()
+          user = authenticate(request=request, username=username, password=password)
+
+          django_login(request, user)
+          return HttpResponseRedirect(reverse('core:dashboard'))
+
+      return render(request, 'form.html', {'form': form})
+  ```
+
+test "rank1948: the request passed positionally is visible to the binding as well"
+  lang python
+  file wger/core/views/user.py
+  reject VYQL-AUTH-105
+  code
+  ```
+  from django.contrib.auth import (
+      authenticate,
+      login as django_login,
+  )
+  from django.http import HttpResponseRedirect
+  from django.urls import reverse
+
+
+  def registration(request):
+      form = RegistrationForm(data=request.POST)
+
+      if form.is_valid():
+          username = form.cleaned_data['username']
+          password = form.cleaned_data['password1']
+          user = authenticate(request, username=username, password=password)
+
+          django_login(request, user)
+          return HttpResponseRedirect(reverse('core:dashboard'))
+
+      return render(request, 'form.html', {'form': form})
+  ```

@@ -1,0 +1,133 @@
+# Rank 1915 / CVE-2024-1023: vert.x's CombinerExecutor held its task tail in a
+# per-instance netty FastThreadLocal (GHSA-5667-3wch-7q7w). Every FastThreadLocal
+# instance permanently claims a slot in netty's InternalThreadLocalMap index and
+# sizes every FastThreadLocalThread's array accordingly; the slot is never
+# reclaimed, so a class instantiated per pool or per connection converts ordinary
+# churn into unbounded growth of every event-loop thread's map. The pool package
+# builds a CombinerExecutor per ConnectionPool, and the HTTP client builds pools
+# per connection, so each connection leaks another index across all threads
+# (memory exhaustion; the advisory pairs it with CVE-2024-1300 in DoS errata).
+# The recorded CWE-119/CWE-200 does not describe the mechanism -- there is no
+# buffer and no disclosure, the axis is unbounded per-instance allocation.
+#
+# The fixed revision (dd6f6430, PR #5082; 665ceba3 is the identical change on the 4.4
+# branch via PR #5080) makes the field static -- one FastThreadLocal for the
+# class -- and threads the executor identity through the stored value so
+# interleaved executors do not interfere. The remediation is present at <fix>
+# (`private static final FastThreadLocal<InProgressTail<?>> current`, line 46)
+# and absent at <fix>^ (`private final FastThreadLocal<InProgressTail> current`,
+# line 36). The discriminating fact is one keyword: static.
+#
+# The corpus family hint (CWE-444 body framing, code.AmbiguousMessageBodyFraming
+# / VYQL-INJ-249) does not apply: this commit fixes a resource leak, not message
+# framing, and the framing binding is Java. Vocabulary considered for the
+# leak: code.UnboundedAllocationReview (VYQL-DOS-041, CWE-400/770) is the right
+# judgement -- a construction that grows a per-thread array without bound per
+# instance -- and is what this spec pins; ThreadLocalScopeOverwriteWithoutCleanup
+# is a lifecycle-overwrite race, not per-instance allocation; the
+# resource.ResourceLeak taint family (OwnerFree/ResourceHandle) needs a
+# release-ordering path, and there is none: no untrusted value flows, the
+# attacker's cost is the act of opening connections.
+#
+# Measured blocker, same family as rank 1637's engine-gap entry: a Java field
+# declaration lowers to a bare nir.Assign with no modifier fact anywhere. The
+# `field_declaration` case (java.go ~line 172) reads only the declared type;
+# nir.Assign has no token slot; classMemberContextTokens (lowering.go:1297)
+# skips Assign, so the analysis.class.context node carries class name, bases
+# and method tokens but nothing about fields. `vyql graph` on the two blocks
+# below is byte-identical -- the static keyword is erased at extraction. A
+# probe binding on the FastThreadLocal constructor (callee.path ==
+# "FastThreadLocal<>") labels exactly one node in both revisions, the same
+# line, so no binding can score the fixed revision below the parent. A text route is not
+# a substitute: the vulnerable file itself declares `protected static final
+# class InProgressTail`, so any "static appears near the field" heuristic
+# reads the vulnerable form as patched. Judged not mechanical, as at 1637 --
+# emitting the fact means a change to shared IR plus the shared lowering walk
+# plus the frontend, feeding the 512-token-capped class context node that
+# every class-scope presence binding reads scan-wide. ENGINE-GAPS.md entry
+# extends the 1637 item to field modifiers.
+#
+# Measured on the real checkout (--cache off, bounded): the change-carrying
+# pool subtree (14 files) reports 0 findings at both revisions; the wider
+# net subtree (76 files) reports 4 VYQL-SEC-002 hardcoded-secret rows at
+# both revisions, none in the pool package. The shape's reachable set is
+# exactly one site -- the only `new FastThreadLocal` in src/main/java; the
+# other three FastThreadLocal-named files extend FastThreadLocalThread.
+# Precision is therefore available; only the fact is missing. Both
+# blocks assert reject VYQL-DOS-041: when a field's static-ness becomes
+# extractable, a per-instance FastThreadLocal binding must flip the
+# non-static block to expect while the static block stays reject.
+
+test "rank1915: the combiner executor holds its task tail in a per-instance FastThreadLocal"
+  lang java
+  file src/main/java/io/vertx/core/net/impl/pool/CombinerExecutor.java
+  reject VYQL-DOS-041
+  code
+  ```
+  package io.vertx.core.net.impl.pool;
+
+  import io.netty.util.concurrent.FastThreadLocal;
+  import java.util.concurrent.atomic.AtomicInteger;
+
+  public class CombinerExecutor<S> implements Executor<S> {
+
+    protected static final class InProgressTail {
+      Task task;
+    }
+
+    private final AtomicInteger s = new AtomicInteger();
+
+    private final FastThreadLocal<InProgressTail> current = new FastThreadLocal<>();
+
+    @Override
+    public void submit(Action<S> action) {
+      s.incrementAndGet();
+      InProgressTail inProgress = current.get();
+      if (inProgress == null) {
+        inProgress = new InProgressTail();
+        current.set(inProgress);
+        current.remove();
+      }
+    }
+  }
+  ```
+
+test "rank1915: the fixed revision makes the FastThreadLocal one per class"
+  lang java
+  file src/main/java/io/vertx/core/net/impl/pool/CombinerExecutor.java
+  reject VYQL-DOS-041
+  code
+  ```
+  package io.vertx.core.net.impl.pool;
+
+  import io.netty.util.concurrent.FastThreadLocal;
+  import java.util.concurrent.atomic.AtomicInteger;
+
+  public class CombinerExecutor<S> implements Executor<S> {
+
+    protected static final class InProgressTail<S> {
+      final CombinerExecutor<S> combiner;
+      Task task;
+
+      public InProgressTail(CombinerExecutor<S> combiner, Task task) {
+        this.combiner = combiner;
+        this.task = task;
+      }
+    }
+
+    private final AtomicInteger s = new AtomicInteger();
+
+    private static final FastThreadLocal<InProgressTail<?>> current = new FastThreadLocal<>();
+
+    @Override
+    public void submit(Action<S> action) {
+      s.incrementAndGet();
+      InProgressTail<S> inProgress = (InProgressTail<S>) current.get();
+      if (inProgress == null) {
+        inProgress = new InProgressTail<>(this, null);
+        current.set(inProgress);
+        current.remove();
+      }
+    }
+  }
+  ```

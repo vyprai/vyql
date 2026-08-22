@@ -1,0 +1,186 @@
+module tests.cve.rank1916.vertx_static_handler_backslash_traversal;
+
+# Rank 1916 / CVE-2019-17640: vert.x-web's StaticHandlerImpl resolves the
+# request path against the configured web root. It reads
+# context.normalisedPath(), percent-decodes what that still carries with
+# URIDecoder.decodeURIComponent, and removes dot segments with
+# HttpUtils.removeDots -- RFC 3986 section 5.2.4, an algorithm defined over
+# slash-separated segments:
+#     String path = HttpUtils.removeDots(URIDecoder.decodeURIComponent(context.normalisedPath(), false));
+# A request for /%5c..%5cindex.html decodes to /\..\index.html, whose parent
+# segment sits behind backslashes the removal never treats as a separator,
+# and on Windows the filesystem accepts the backslash as one -- the file
+# resolves outside the web root. The fixed revision inserts the separator
+# canonicalisation ahead of the removal:
+#     String path = HttpUtils.removeDots(uriDecodedPath.replace('\\', '/'));
+#
+# This is the Java twin of the shape Labstack Echo shipped (Go's path.Clean
+# used where the platform accepts backslashes, VYQL-PATH-059), so detection
+# rides the same rule through the widened concept: the handler method
+# carrying the accessor read, the decode and the slash-only dot-segment
+# removal, with no replace call and backslash literal together standing for
+# the canonicalisation. The taint route is measured and rejected for this
+# rank: labelling normalisedPath() as a source and the vert.x FileSystem
+# operations as sinks traces the real flow and the separator-replace control
+# does suppress it on the fixed revision, but the shared helper
+# Utils.pathOffset merges its parameter taint across callers, so every
+# finding on the real tree reports TemplateHandlerImpl's call site as the
+# source on both revisions and the count does not move (5 high findings
+# either side); a second phantom through the generic wrapInTCCLSwitch
+# callable keeps the sinks occupied on the fixed revision even in
+# isolation. The presence route is immune to both merges.
+#
+# verify_current_expected: fixed
+
+test "rank1916: static handler decodes and dot-removes the request path with a slash-only cleaner"
+  lang java
+  file io/vertx/ext/web/handler/impl/StaticHandlerImpl.java
+  expect VYQL-PATH-059
+  code
+  ```
+  package io.vertx.ext.web.handler.impl;
+
+  import io.vertx.ext.web.RoutingContext;
+
+  public class StaticHandlerImpl {
+    private String webRoot = "webroot";
+
+    public void handle(RoutingContext context) {
+      String path = HttpUtils.removeDots(URIDecoder.decodeURIComponent(context.normalisedPath(), false));
+      // if the normalized path is null it cannot be resolved
+      if (path == null) {
+        context.next();
+        return;
+      }
+      // can be called recursive for index pages
+      sendStatic(context, path);
+    }
+
+    private void sendStatic(RoutingContext context, String path) {
+      String file = webRoot + Utils.pathOffset(path, context);
+      context.vertx().fileSystem().exists(file, res -> context.next());
+    }
+  }
+  ```
+
+test "rank1916: the patched handler canonicalises the backslash separator before the dot-segment removal"
+  lang java
+  file io/vertx/ext/web/handler/impl/StaticHandlerImplPatched.java
+  reject VYQL-PATH-059
+  code
+  ```
+  package io.vertx.ext.web.handler.impl;
+
+  import io.vertx.ext.web.RoutingContext;
+
+  public class StaticHandlerImplPatched {
+    private String webRoot = "webroot";
+
+    public void handle(RoutingContext context) {
+      // decode URL path
+      String uriDecodedPath = URIDecoder.decodeURIComponent(context.normalisedPath(), false);
+      // if the normalized path is null it cannot be resolved
+      if (uriDecodedPath == null) {
+        context.next();
+        return;
+      }
+      // will normalize and handle all paths as UNIX paths
+      String path = HttpUtils.removeDots(uriDecodedPath.replace('\\', '/'));
+      sendStatic(context, path);
+    }
+
+    private void sendStatic(RoutingContext context, String path) {
+      String file = webRoot + Utils.pathOffset(path, context);
+      context.vertx().fileSystem().exists(file, res -> context.next());
+    }
+  }
+  ```
+
+test "rank1916: an unrelated backslash literal does not canonicalise separators"
+  lang java
+  file io/vertx/ext/web/handler/impl/StaticHandlerImplRegex.java
+  expect VYQL-PATH-059
+  code
+  ```
+  package io.vertx.ext.web.handler.impl;
+
+  import io.vertx.ext.web.RoutingContext;
+
+  // Pins that only the conjunction silences: a backslash-bearing regex
+  // literal in the same method is not a separator canonicalisation, so the
+  // union must still report through the sibling binding that negates the
+  // replace call.
+  public class StaticHandlerImplRegex {
+    private String webRoot = "webroot";
+
+    public void handle(RoutingContext context) {
+      String path = HttpUtils.removeDots(URIDecoder.decodeURIComponent(context.normalisedPath(), false));
+      if (path == null) {
+        context.next();
+        return;
+      }
+      boolean numeric = path.matches("\\d+");
+      sendStatic(context, path);
+    }
+
+    private void sendStatic(RoutingContext context, String path) {
+      String file = webRoot + Utils.pathOffset(path, context);
+      context.vertx().fileSystem().exists(file, res -> context.next());
+    }
+  }
+  ```
+
+test "rank1916: an unrelated replace call does not canonicalise separators"
+  lang java
+  file io/vertx/ext/web/handler/impl/StaticHandlerImplSpaceReplace.java
+  expect VYQL-PATH-059
+  code
+  ```
+  package io.vertx.ext.web.handler.impl;
+
+  import io.vertx.ext.web.RoutingContext;
+
+  // The other half of the conjunction: a replace that rewrites spaces is a
+  // call without a backslash literal, so the sibling binding that negates
+  // the backslash literal must still report it.
+  public class StaticHandlerImplSpaceReplace {
+    private String webRoot = "webroot";
+
+    public void handle(RoutingContext context) {
+      String raw = URIDecoder.decodeURIComponent(context.normalisedPath(), false);
+      String path = HttpUtils.removeDots(raw.replace(' ', '+'));
+      if (path == null) {
+        context.next();
+        return;
+      }
+      sendStatic(context, path);
+    }
+
+    private void sendStatic(RoutingContext context, String path) {
+      String file = webRoot + Utils.pathOffset(path, context);
+      context.vertx().fileSystem().exists(file, res -> context.next());
+    }
+  }
+  ```
+
+test "rank1916: a handler that only decodes the request path does not dot-remove it"
+  lang java
+  file io/vertx/ext/web/handler/impl/RouteState.java
+  reject VYQL-PATH-059
+  code
+  ```
+  package io.vertx.ext.web.handler.impl;
+
+  import io.vertx.ext.web.RoutingContext;
+
+  // Pins the positive clause: vert.x-web's own RouteState decodes path
+  // parameter values the same way but never removes dot segments, because
+  // the value feeds matching rather than the filesystem -- the decode alone
+  // is not the static-file shape.
+  public class RouteState {
+    public String decodeParam(RoutingContext context, String value) {
+      final String decodedValue = URIDecoder.decodeURIComponent(value, false);
+      return decodedValue;
+    }
+  }
+  ```

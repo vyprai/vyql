@@ -1,0 +1,308 @@
+# Vite's dev server restricts which files a browser may read through the
+# `server.fs` allow list: `viteServeRawFsMiddleware`
+# (packages/vite/src/node/server/middlewares/static.ts) takes `/@fs/`-prefixed
+# request URLs, decodes the pathname and hands it to sirv, whose `shouldServe`
+# consults `checkLoadingAccess` -> `isFileLoadingAllowed`. That checker is a
+# pure string decision:
+#
+#   if (config.fsDenyGlob(filePathWithoutTrailingSlash)) return false
+#   if (config.safeModulePaths.has(filePath)) return true
+#   if (fs.allow.some((uri) => isUriInFilePath(uri, filePath))) return true
+#   return false
+#
+# On Windows two spellings of a path name the same file while comparing as
+# different strings: 8.3 short names (`DOTENV~1` for `.env`) and NTFS
+# alternate data streams (`.env:hidden`, `file.html::$DATA`). A request for
+# `/@fs/C:/.../DOTENV~1` or `/@fs/.../.env:hidden` clears the deny glob and
+# the allow-list prefix comparison as a literal string, and the filesystem
+# then resolves it to the denied file, which is served. The fixed revision inserts two
+# early rejections into the checker itself -- a path containing `~` on
+# Windows, and a `:` anywhere after the drive letter -- so no alternate
+# spelling survives the string comparison.
+#
+# The decisive property of this fix, measured: it touches nothing but
+# `isFileLoadingAllowed`'s own body (plus playground tests/config). Every
+# caller -- `viteServeRawFsMiddleware`, sirv's `shouldServe`,
+# `transformMiddleware`, `indexHtml` -- is byte-identical across the two
+# revisions, so no caller-anchored binding can separate them, and a binding
+# anchored inside the checker would have to negate on `includes('~')` /
+# `includes(':')` -- the fixing commit's own vocabulary, absent from any
+# library documentation (the genericity test fails on its face). The 1380
+# counterweight does not apply: the fixed revision leaves no API-documented call inside
+# the function it guards, only `.includes`/`.test`/`.slice` string builtins
+# on the same variable.
+#
+# Measured, bounded subtree scan of packages/vite/src/node (the change touches
+# no source outside it), three `--cache off` runs per revision, timeout 180,
+# --max-ram 6GB: a byte-stable 493 findings at the fixed revision's parent AND at the
+# fix (110 SEC-001, 87 INJ-001, 60 PATH-001, 60 INJ-013, 51 INJ-009,
+# 30 INJ-002, ...), and the only line-level difference between the two
+# outputs is the LogOutput/LogWriteSink noise row on static.ts moving
+# 332 -> 347 because the change inserts 15 lines above it. The 493 baseline is
+# the raised one (the plugin-factory lowering fix makes
+# `return { transform(id){...} }` bodies live on this tree; ~467 -> ~519
+# measured then, 493 at this revision). The 60 PATH-001 rows are
+# server/ws.ts -> build.ts flows, untouched at both revisions.
+#
+# Where detection actually stops, pinned by the third and fourth cases as a
+# minimal pair: the request URL source and the decodeURI plumbing are fully
+# labelled (`req.url` -> code.HttpInput), and with a direct `fs.readFile` on
+# the decoded path VYQL-PATH-001 fires -- but only without the guard. Two
+# independent walls stand in front of the real flow:
+#   1. the read happens inside sirv; `serveFromRoot(req, res, next)` is an
+#      unresolvable local-handler invocation carrying `req`, not the path,
+#      so no sink label exists or is bindable (binding the sirv factory
+#      labels nothing -- no request data reaches that call site);
+#   2. `checkLoadingAccess` is bound as core.PathAccessCheck
+#      (pathAccessCheck526), so even a direct read behind the guard is
+#      suppressed -- in both revisions, since the guard exists unchanged in
+#      both. The vulnerability is precisely that the guard's string
+#      comparisons admit an alternate spelling of the same file, and no
+#      taint relation can see inside them.
+#
+# Reuse is checked before concluding ATTENTION: the concept
+# code.MiddlewarePathMatchNormalizationMismatch (VYQL-AUTH-127, CWE-863/436)
+# states this weakness class exactly -- "the path it matches, opens or looks
+# up is not the path that decision is taken from" -- but both its shipped
+# bindings key on a decoder (decodeURIComponent) or a router-vs-handler
+# normalization mismatch, neither of which exists here: vite decodes with
+# decodeURI, which correctly leaves reserved delimiters encoded, and the
+# decision and the open use the same string. Reaching the concept from this
+# code needs the negation on the `~`/`:` checks, i.e. the fixed revision itself. This
+# is the URL-allowlist-bypass family (a string allow/deny decision defeated
+# by an alternate representation of the same resource) and the
+# callee-centralised-fix shape (a caller-side label cannot discriminate),
+# both measured unshippable.
+#
+# All cases assert reject VYQL-PATH-001 and reject VYQL-AUTH-127 except the
+# third, which pins the plumbing with expect VYQL-PATH-001. If an
+# alternate-path-representation rule ever ships (keyed on a path checked by
+# string membership and then opened, without rejecting the filesystem's
+# short-name and stream spellings), the first case -- the vulnerable checker
+# form -- is the one that must flip to expect; the second (patched checker)
+# and fourth (guard present) must stay reject.
+
+test "rank1920: the raw-fs middleware decodes the request path into a sirv-served file the allow list cleared as a literal string"
+  lang javascript
+  file static.ts
+  reject VYQL-PATH-001
+  reject VYQL-AUTH-127
+  code
+  ```
+  declare const config: any
+  declare const isWindows: boolean
+  const FS_PREFIX = '/@fs/'
+
+  export function isFileLoadingAllowed(config: any, filePath: string): boolean {
+    const { fs } = config.server
+
+    if (!fs.strict) return true
+
+    const filePathWithoutTrailingSlash = filePath.endsWith('/')
+      ? filePath.slice(0, -1)
+      : filePath
+    if (config.fsDenyGlob(filePathWithoutTrailingSlash)) return false
+
+    if (config.safeModulePaths.has(filePath)) return true
+
+    if (fs.allow.some((uri: string) => isUriInFilePath(uri, filePath))) return true
+
+    return false
+  }
+
+  declare function isUriInFilePath(uri: string, filePath: string): boolean
+
+  export function checkLoadingAccess(
+    config: any,
+    path: string,
+  ): 'allowed' | 'denied' | 'fallback' {
+    if (isFileLoadingAllowed(config, path)) {
+      return 'allowed'
+    }
+    return 'denied'
+  }
+
+  export function viteServeRawFsMiddleware(req: any, res: any, next: any) {
+    const serveFromRoot = sirv('/', {
+      dev: true,
+      etag: true,
+      shouldServe: (filePath: string) => {
+        const servingAccessResult = checkLoadingAccess(config, filePath)
+        return servingAccessResult === 'allowed'
+      },
+    })
+
+    if (req.url!.startsWith(FS_PREFIX)) {
+      const url = new URL(req.url!, 'http://example.com')
+      const pathname = decodeURI(url.pathname)
+      let newPathname = pathname.slice(FS_PREFIX.length)
+      if (isWindows) newPathname = newPathname.replace(/^[A-Z]:/i, '')
+      url.pathname = encodeURI(newPathname)
+      req.url = url.href.slice(url.origin.length)
+
+      serveFromRoot(req, res, next)
+    } else {
+      next()
+    }
+  }
+
+  declare function sirv(dir: string, opts: any): any
+  ```
+
+test "rank1920: the checker that rejects windows short names and stream suffixes is indistinguishable by anything but its own string tests"
+  lang javascript
+  file static-patched.ts
+  reject VYQL-PATH-001
+  reject VYQL-AUTH-127
+  code
+  ```
+  declare const config: any
+  declare const isWindows: boolean
+  const FS_PREFIX = '/@fs/'
+  const windowsDriveRE = /^[A-Z]:/i
+
+  export function isFileLoadingAllowed(config: any, filePath: string): boolean {
+    const { fs } = config.server
+
+    if (!fs.strict) return true
+
+    if (isWindows && filePath.includes('~')) {
+      // `~` is used for Windows 8.3 short names, which can be used to bypass the check.
+      return false
+    }
+
+    const hasDriveLetter = isWindows && windowsDriveRE.test(filePath)
+    const hasColon = (hasDriveLetter ? filePath.slice(2) : filePath).includes(':')
+    if (hasColon) {
+      // the `:` is included in the path which may be used for NTFS ADS
+      return false
+    }
+
+    const filePathWithoutTrailingSlash = filePath.endsWith('/')
+      ? filePath.slice(0, -1)
+      : filePath
+    if (config.fsDenyGlob(filePathWithoutTrailingSlash)) return false
+
+    if (config.safeModulePaths.has(filePath)) return true
+
+    if (fs.allow.some((uri: string) => isUriInFilePath(uri, filePath))) return true
+
+    return false
+  }
+
+  declare function isUriInFilePath(uri: string, filePath: string): boolean
+
+  export function checkLoadingAccess(
+    config: any,
+    path: string,
+  ): 'allowed' | 'denied' | 'fallback' {
+    if (isFileLoadingAllowed(config, path)) {
+      return 'allowed'
+    }
+    return 'denied'
+  }
+
+  export function viteServeRawFsMiddleware(req: any, res: any, next: any) {
+    const serveFromRoot = sirv('/', {
+      dev: true,
+      etag: true,
+      shouldServe: (filePath: string) => {
+        const servingAccessResult = checkLoadingAccess(config, filePath)
+        return servingAccessResult === 'allowed'
+      },
+    })
+
+    if (req.url!.startsWith(FS_PREFIX)) {
+      const url = new URL(req.url!, 'http://example.com')
+      const pathname = decodeURI(url.pathname)
+      let newPathname = pathname.slice(FS_PREFIX.length)
+      if (isWindows) newPathname = newPathname.replace(/^[A-Z]:/i, '')
+      url.pathname = encodeURI(newPathname)
+      req.url = url.href.slice(url.origin.length)
+
+      serveFromRoot(req, res, next)
+    } else {
+      next()
+    }
+  }
+
+  declare function sirv(dir: string, opts: any): any
+  ```
+
+test "rank1920: the same decoded request path read directly with no guard reports the traversal"
+  lang javascript
+  file direct-read.ts
+  expect VYQL-PATH-001
+  code
+  ```
+  declare const fs: { readFile(p: string, cb: (e: any, d: any) => void): void }
+  const FS_PREFIX = '/@fs/'
+
+  export function serveFromFs(req: any, res: any, next: any) {
+    if (req.url!.startsWith(FS_PREFIX)) {
+      const url = new URL(req.url!, 'http://example.com')
+      const pathname = decodeURI(url.pathname)
+      let newPathname = pathname.slice(FS_PREFIX.length)
+      url.pathname = encodeURI(newPathname)
+      req.url = url.href.slice(url.origin.length)
+      fs.readFile(newPathname, (err, data) => {
+        res.end(data)
+      })
+    } else {
+      next()
+    }
+  }
+  ```
+
+test "rank1920: a direct read behind the allow-list guard is suppressed on both revisions of the guard"
+  lang javascript
+  file guarded-read.ts
+  reject VYQL-PATH-001
+  code
+  ```
+  declare const fs: { readFile(p: string, cb: (e: any, d: any) => void): void }
+  declare const config: any
+  const FS_PREFIX = '/@fs/'
+
+  export function isFileLoadingAllowed(config: any, filePath: string): boolean {
+    const { fs } = config.server
+    if (!fs.strict) return true
+    const filePathWithoutTrailingSlash = filePath.endsWith('/')
+      ? filePath.slice(0, -1)
+      : filePath
+    if (config.fsDenyGlob(filePathWithoutTrailingSlash)) return false
+    if (config.safeModulePaths.has(filePath)) return true
+    if (fs.allow.some((uri: string) => isUriInFilePath(uri, filePath))) return true
+    return false
+  }
+
+  declare function isUriInFilePath(uri: string, filePath: string): boolean
+
+  export function checkLoadingAccess(
+    config: any,
+    path: string,
+  ): 'allowed' | 'denied' | 'fallback' {
+    if (isFileLoadingAllowed(config, path)) {
+      return 'allowed'
+    }
+    return 'denied'
+  }
+
+  export function serveFromFs(req: any, res: any, next: any) {
+    if (req.url!.startsWith(FS_PREFIX)) {
+      const url = new URL(req.url!, 'http://example.com')
+      const pathname = decodeURI(url.pathname)
+      const filePath = pathname.slice(FS_PREFIX.length)
+      if (checkLoadingAccess(config, filePath) === 'allowed') {
+        fs.readFile(filePath, (err, data) => {
+          res.end(data)
+        })
+        return
+      }
+      res.statusCode = 403
+      res.end('denied')
+    } else {
+      next()
+    }
+  }
+  ```

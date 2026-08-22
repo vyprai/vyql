@@ -1,0 +1,222 @@
+# Symfony UX Toolkit installs "kits" -- downloadable component packages whose
+# recipes carry a `copy-files` map in manifest.json. Both halves of each entry
+# are attacker-chosen when the kit is crafted: the source says which file the
+# installer reads, the destination says where it lands in the victim project.
+# The only screen the vulnerable revision applies is
+# `Path::isRelative($source)` / `Path::isRelative($destination)`:
+#
+#   foreach ($this->copyFiles as $source => $destination) {
+#       if (!Path::isRelative($source)) { throw ... }
+#       if (!Path::isRelative($destination)) { throw ... }
+#   }
+#
+# (src/Toolkit/src/Recipe/RecipeManifest.php:43-49 at the parent of d9996ebe,
+#  and the same pair in File.php:30-37.) `Path::isRelative()` is satisfied by
+# `../../../etc` -- "relative" says nothing about dot segments. The copy loop
+# then hands both components to `Path::join()`:
+#
+#   $sourceAbsolutePathName = Path::join($recipeAbsolutePath, $file->sourceRelativePathName);
+#   $destinationAbsolutePathName = Path::join($destinationPath, $file->destinationRelativePathName);
+#   if ($this->copyFile($kit, $sourceAbsolutePathName, $destinationAbsolutePathName, $force)) { ... }
+#
+# (src/Toolkit/src/Installer/Installer.php:52-56.) Symfony documents
+# `Path::join()` as joining "two or more path strings into a canonical path",
+# and canonicalization resolves `..` lexically -- so the joined result simply
+# leaves its base directory, and `Filesystem::copy()` then reads and writes
+# wherever the recipe says. The fixed revision rejects `..` segments at the validation
+# sites and, inside the copy loop itself, re-checks the fully resolved paths:
+#
+#   if (!Path::isBasePath($recipeAbsolutePath, $sourceAbsolutePathName)) { throw ... }
+#   if (!Path::isBasePath($destinationPath, $destinationAbsolutePathName)) { throw ... }
+#
+# `Path::isBasePath()` is the documented containment check: it canonicalizes
+# both paths and tests that one is a prefix of the other. The detection below
+# keys on that documented pair of facts -- a copy fed by `Path::join()` with
+# no containment call in the function -- and not on the fixed revision's own helper
+# names: renaming `pathDoesNotEscapeDirectory()` or moving it around leaves
+# the flag decided by `Path::isBasePath()` alone.
+#
+# A taint route is not available for this chain today: no source concept
+# labels manifest file contents (file_get_contents is bound as a FilePathAccess
+# sink, not a source), `RecipeManifest::fromJson(...)` is an unresolved static
+# call, and the copy sinks on `$this->filesystem` receivers do not resolve --
+# `vyql resolve` on a minimal repro of the whole chain terminates at the
+# static call before any store is reached.
+
+test "rank1901: a copy loop joining recipe components with no containment check"
+  lang php
+  file installer.php
+  expect VYQL-PATH-085
+  code
+  ```
+  <?php
+
+  use Symfony\Component\Filesystem\Filesystem;
+  use Symfony\Component\Filesystem\Path;
+
+  final class Installer
+  {
+      public function __construct(private readonly Filesystem $filesystem)
+      {
+      }
+
+      public function handlePool(string $recipeAbsolutePath, array $files, string $destinationPath): array
+      {
+          $installedFiles = [];
+
+          foreach ($files as $file) {
+              $sourceAbsolutePathName = Path::join($recipeAbsolutePath, $file->sourceRelativePathName);
+              $destinationAbsolutePathName = Path::join($destinationPath, $file->destinationRelativePathName);
+
+              if ($this->copyFile($sourceAbsolutePathName, $destinationAbsolutePathName)) {
+                  $installedFiles[] = $file;
+              }
+          }
+
+          return $installedFiles;
+      }
+
+      private function copyFile(string $sourceAbsolutePathName, string $destinationAbsolutePathName): bool
+      {
+          $this->filesystem->copy($sourceAbsolutePathName, $destinationAbsolutePathName);
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1901: a copy straight off the joined path in one function"
+  lang php
+  file inline-copy.php
+  expect VYQL-PATH-085
+  code
+  ```
+  <?php
+
+  use Symfony\Component\Filesystem\Filesystem;
+  use Symfony\Component\Filesystem\Path;
+
+  final class AssetInstaller
+  {
+      public function __construct(private readonly Filesystem $filesystem)
+      {
+      }
+
+      public function installAsset(string $assetPath, string $relativeName, string $destinationPath): void
+      {
+          $target = Path::join($destinationPath, $relativeName);
+
+          $this->filesystem->copy(Path::join($assetPath, $relativeName), $target);
+      }
+  }
+  ```
+
+test "rank1901: containment checks on the resolved paths stop the copy"
+  lang php
+  file installer-patched.php
+  reject VYQL-PATH-085
+  code
+  ```
+  <?php
+
+  use Symfony\Component\Filesystem\Filesystem;
+  use Symfony\Component\Filesystem\Path;
+
+  final class Installer
+  {
+      public function __construct(private readonly Filesystem $filesystem)
+      {
+      }
+
+      public function handlePool(string $recipeAbsolutePath, array $files, string $destinationPath): array
+      {
+          $installedFiles = [];
+
+          foreach ($files as $file) {
+              $sourceAbsolutePathName = Path::join($recipeAbsolutePath, $file->sourceRelativePathName);
+              $destinationAbsolutePathName = Path::join($destinationPath, $file->destinationRelativePathName);
+
+              if (!Path::isBasePath($recipeAbsolutePath, $sourceAbsolutePathName)) {
+                  throw new \RuntimeException(\sprintf('Refusing to read "%s": source escapes the recipe directory.', $file->sourceRelativePathName));
+              }
+              if (!Path::isBasePath($destinationPath, $destinationAbsolutePathName)) {
+                  throw new \RuntimeException(\sprintf('Refusing to write "%s": destination escapes the target directory.', $file->destinationRelativePathName));
+              }
+
+              if ($this->copyFile($sourceAbsolutePathName, $destinationAbsolutePathName)) {
+                  $installedFiles[] = $file;
+              }
+          }
+
+          return $installedFiles;
+      }
+
+      private function copyFile(string $sourceAbsolutePathName, string $destinationAbsolutePathName): bool
+      {
+          $this->filesystem->copy($sourceAbsolutePathName, $destinationAbsolutePathName);
+
+          return true;
+      }
+  }
+  ```
+
+test "rank1901: reducing the component to a basename before the join is containment"
+  lang php
+  file basename-copy.php
+  reject VYQL-PATH-085
+  code
+  ```
+  <?php
+
+  use Symfony\Component\Filesystem\Filesystem;
+  use Symfony\Component\Filesystem\Path;
+
+  final class AssetInstaller
+  {
+      public function __construct(private readonly Filesystem $filesystem)
+      {
+      }
+
+      public function installAsset(string $assetPath, string $relativeName, string $destinationPath): void
+      {
+          $safeName = basename($relativeName);
+
+          $this->filesystem->copy(Path::join($assetPath, $safeName), Path::join($destinationPath, $safeName));
+      }
+  }
+  ```
+
+test "rank1901: a join without a copy and a copy without a join in one file stay apart"
+  lang php
+  file split-pair.php
+  reject VYQL-PATH-085
+  code
+  ```
+  <?php
+
+  use Symfony\Component\Filesystem\Filesystem;
+  use Symfony\Component\Filesystem\Path;
+
+  final class SplitInstaller
+  {
+      public function __construct(private readonly Filesystem $filesystem)
+      {
+      }
+
+      public function resolveSources(string $recipeAbsolutePath, array $files): array
+      {
+          $sources = [];
+
+          foreach ($files as $file) {
+              $sources[] = Path::join($recipeAbsolutePath, $file->sourceRelativePathName);
+          }
+
+          return $sources;
+      }
+
+      public function copyFixed(string $sourceAbsolutePathName, string $destinationAbsolutePathName): void
+      {
+          $this->filesystem->copy($sourceAbsolutePathName, $destinationAbsolutePathName);
+      }
+  }
+  ```

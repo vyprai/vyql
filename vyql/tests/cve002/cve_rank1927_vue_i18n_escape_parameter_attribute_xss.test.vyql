@@ -1,0 +1,180 @@
+# Rank 1927 / CVE-2025-53892 (GHSA-x8qp-wqqm-57ph): vue-i18n's escapeParameter
+# option escapes interpolation parameters with a markup-only entity set, and a
+# translation message that places a parameter inside a tag attribute hands the
+# escaped value to a context the set does not cover.
+#
+# packages/core-base/src/translate.ts (fix parent a470996^) resolves the
+# documented escapeParameter option, calls escapeParams(options) — which maps
+# every list/named parameter through @intlify/shared escapeHtml, at that
+# revision a four-replacement chain over < > " ' — and returns the assembled
+# message from a postTranslation ternary with no further treatment. The
+# advisory's own regression tests give the two exploit spellings:
+# 'Click <a href="{url}">here</a>' with url = 'javascript:alert(1)' contains
+# none of the four escaped characters, and 'Caution: <img src=x
+# onerror="{payload}">' decodes the escaped payload back to markup when the
+# handler attribute compiles. The fixed revision strengthens escapeHtml (& / =) and, the
+# load-bearing half, applies a new sanitizeTranslatedHtml(ret) to the final
+# translated string whenever escapeParameter is set: attribute-value escaping,
+# on*-handler neutralisation and javascript: scheme rewriting, implemented in
+# packages/shared/src/utils.ts.
+#
+# Both cases assert reject VYQL-INJ-199 (code.HtmlAttributeRewriteReview, the
+# attribute-context escape class this belongs to): nothing fires today, and
+# nothing can fire without keying on the fixed revision's own vocabulary.
+#
+# The positive facts are visible: probes confirm escapeParams as an exact
+# call token and escapeParameter as an identifier token in translate's
+# function context, and javascript.controls labels the escapeHtml
+# calls core.HtmlEscape. The remediation is what is invisible. Its only trace
+# inside translate is the new call's name: the sanitizer body lives in
+# another file, outside every lexical scope a context clause can reach
+# (the TypeScript delegated-check attribution gap, rank 1372), and the
+# JavaScript frontend emits no call-argument tokens at all (ranks 1360 and
+# 1388), so "the returned message is an argument of a call" — the
+# rename-proof discriminator — is inexpressible. A generic sanitizer-vocabulary
+# negation (the iframe/sceditor idiom) discriminates 1 -> 0 on the real tree
+# over three --cache off runs, vulnerable packages/core-base/src/translate.ts:615,
+# fixed zero; renaming the fixed revision's helper to deepCleanTranslatedHtml on the fixed
+# tree brings the flag back, and the fixed revision leaves no API-documented call inside
+# translate for the counterweight route (the helper is new internal code), so
+# the discrimination rests entirely on the fixing commit's own name.
+#
+# The in-file alternative — keying escapeHtml's entity set in
+# packages/shared/src/utils.ts — is measured precision-dead and does not cover
+# the advisory's vectors: across the corpus clones 79 files carry an
+# entity-escape literal set (&lt; and &quot;) and exactly one escapes "="
+# (&#x3D;/&#61;), so a missing-"="-escape binding fires on every standard
+# escaper including tinymce's own Entities; the missing-"&" variant fires on
+# seven files, six of them tests or fixtures, and the ampersand omission is
+# not this CVE's vector (both exploit spellings contain no "&").
+#
+# When JavaScript call-argument facts land, the first case must flip to
+# expect VYQL-INJ-199 behind a negation on the assembled value never being an
+# argument of a call, while the patched form stays reject under any callee
+# name.
+
+test "rank1927: interpolation parameters escaped by a markup-only entity set return through tag attributes unsanitised"
+  lang javascript
+  file translate.ts
+  reject VYQL-INJ-199
+  code
+  ```
+  import { escapeHtml } from '@intlify/shared'
+
+  function isBoolean(v: unknown): v is boolean {
+    return typeof v === 'boolean'
+  }
+  function isString(v: unknown): v is string {
+    return typeof v === 'string'
+  }
+  function isArray(v: unknown): v is unknown[] {
+    return Array.isArray(v)
+  }
+  function isObject(v: unknown): v is Record<string, unknown> {
+    return typeof v === 'object'
+  }
+
+  function parseTranslateArgs(...args: unknown[]): [string, any] {
+    return [args[0] as string, (args[1] as any) || {}]
+  }
+
+  function escapeParams(options: any) {
+    if (isArray(options.list)) {
+      options.list = options.list.map(item =>
+        isString(item) ? escapeHtml(item) : item
+      )
+    } else if (isObject(options.named)) {
+      Object.keys(options.named).forEach(key => {
+        if (isString(options.named[key])) {
+          options.named[key] = escapeHtml(options.named[key])
+        }
+      })
+    }
+  }
+
+  function evaluateMessage(context: any, msg: any, msgContext: any): string {
+    return msg(msgContext)
+  }
+
+  export function translate(context: any, ...args: unknown[]): string {
+    const { postTranslation } = context
+    const [key, options] = parseTranslateArgs(...args)
+    const escapeParameter = isBoolean(options.escapeParameter)
+      ? options.escapeParameter
+      : context.escapeParameter
+    // escape params
+    escapeParameter && escapeParams(options)
+    const messaged = evaluateMessage(context, msg, msgContext)
+    // if use post translation option, proceed it with handler
+    const ret = postTranslation
+      ? postTranslation(messaged, key as string)
+      : messaged
+    return ret
+  }
+  ```
+
+test "rank1927: the sanitiser applied to the final translated string is visible only as its own call name"
+  lang javascript
+  file translate-patched.ts
+  reject VYQL-INJ-199
+  code
+  ```
+  import { escapeHtml, sanitizeTranslatedHtml } from '@intlify/shared'
+
+  function isBoolean(v: unknown): v is boolean {
+    return typeof v === 'boolean'
+  }
+  function isString(v: unknown): v is string {
+    return typeof v === 'string'
+  }
+  function isArray(v: unknown): v is unknown[] {
+    return Array.isArray(v)
+  }
+  function isObject(v: unknown): v is Record<string, unknown> {
+    return typeof v === 'object'
+  }
+
+  function parseTranslateArgs(...args: unknown[]): [string, any] {
+    return [args[0] as string, (args[1] as any) || {}]
+  }
+
+  function escapeParams(options: any) {
+    if (isArray(options.list)) {
+      options.list = options.list.map(item =>
+        isString(item) ? escapeHtml(item) : item
+      )
+    } else if (isObject(options.named)) {
+      Object.keys(options.named).forEach(key => {
+        if (isString(options.named[key])) {
+          options.named[key] = escapeHtml(options.named[key])
+        }
+      })
+    }
+  }
+
+  function evaluateMessage(context: any, msg: any, msgContext: any): string {
+    return msg(msgContext)
+  }
+
+  export function translate(context: any, ...args: unknown[]): string {
+    const { postTranslation } = context
+    const [key, options] = parseTranslateArgs(...args)
+    const escapeParameter = isBoolean(options.escapeParameter)
+      ? options.escapeParameter
+      : context.escapeParameter
+    // escape params
+    escapeParameter && escapeParams(options)
+    const messaged = evaluateMessage(context, msg, msgContext)
+    // if use post translation option, proceed it with handler
+    let ret = postTranslation
+      ? postTranslation(messaged, key as string)
+      : messaged
+
+    // apply HTML sanitization for security
+    if (escapeParameter && isString(ret)) {
+      ret = sanitizeTranslatedHtml(ret)
+    }
+
+    return ret
+  }
+  ```

@@ -1,0 +1,251 @@
+# Rank 1931 / CVE-2024-49768: waitress serves HTTP pipelines through one
+# HTTPChannel shared by two threads. With channel_request_lookahead above its
+# default of 0, the main thread's readable() (src/waitress/channel.py:140 at
+# the parent of the change) answers the event loop's read poll with
+#
+#     return not (
+#         self.will_close
+#         or self.close_when_flushed
+#         or len(self.requests) > self.adj.channel_request_lookahead
+#         or self.total_outbufs_len
+#     )
+#
+# without holding requests_lock, while the service thread -- having decided the
+# first request is invalid -- sets will_close or close_when_flushed under that
+# same lock in service() (channel.py:455). A client that sizes its first
+# request to exactly recv_bytes (8192 by default) and pipelines a second one
+# behind it can land between the poll and the read: handle_read recv's the
+# second request anyway, and received() (channel.py:189) drains the buffer
+# under requests_lock -- building requests, appending to self.requests, and
+# handing the channel to server.add_task -- without ever re-reading the close
+# flags. The pipelined request is serviced on a connection that is
+# condemned: CWE-367 with a CWE-444 consequence, critical. The fixed revision re-checks
+# the two flags inside the critical section and returns False before the
+# drain loop.
+#
+# Measured miss on the real checkout, union of three --cache off runs per
+# revision: 36 findings at the parent and the identical 36 at the fixed revision, the
+# same rule histogram (18 RES-001, 4 PATH-001, 4 INJ-009, ...), nothing at or
+# near received(), readable() or service() in either revision. The only
+# channel.py row is a log-injection false positive in service() (VYQL-INJ-009,
+# channel.py:425). `vyql match` on the file labels 31 nodes -- params, one
+# HttpInput on request.headers, log sinks, resource releases -- and nothing on
+# the lock, the flags or either thread's half of the race. The concurrency
+# pack has no Python arm at all: no binding labels threading.Lock or a `with
+# lock:` region, and even VYQL-RACE-001 is inert because code.FileUse has no
+# Python binding (code.FileCheck does, for Tornado static-file probes).
+#
+# Three probe bindings measured the expression ceiling, each in a worktree
+# probe file, since removed:
+#
+# (a) Naming the flags -- a function whose selectors carry self.requests_lock
+#     but neither will_close nor close_when_flushed -- separates the minimal
+#     pair 1 -> 0, but on the real file it reports 2 -> 1, not 1 -> 0: the
+#     constructor that creates the lock (channel.py:56) never reads the flags
+#     in either revision, so the name-keyed form needs a third clause of pure
+#     layout to reach the real tree. The rename test kills it outright:
+#     renaming the two flags throughout (will_close -> shutting_down,
+#     close_when_flushed -> flush_and_close, a change with no semantic effect)
+#     takes the patched snippet from 0 findings to 2. The flags are the
+#     channel's private attributes, undocumented outside the source; the only
+#     other clone in the pool carrying either name is a vendored Python 2
+#     httplib whose will_close is an unrelated response heuristic.
+#
+# (b) The name-free structural candidates are the fixing commit's own layout.
+#     The vulnerable drain loop reads boolean attributes
+#     (self.request.completed, self.request.empty) and boolean operators
+#     (the expect_continue conjunction), so "reads no boolean" does not
+#     separate the pair; what does separate it is the presence of an or-
+#     conjunction or a return inside the locked region -- spelling choices of
+#     this particular patch, which a fix written as two if-statements defeats.
+#
+# (c) Labelling the reader instead -- readable() deciding over shared
+#     attributes while not holding the lock -- fires identically on both
+#     revisions, because the fixed revision does not touch readable().
+#
+# The relation that would be needed is not just unbound, it is not
+# well-defined structurally: the guard has four terms, the remediated form
+# re-reads exactly two of them, and it still does not re-read
+# total_outbufs_len or the lookahead comparison, yet is considered fixed.
+# Which subset is load-bearing is the developer's intent, not a property of
+# the code, so even a cross-function guard/action correlation would not
+# separate remediated from vulnerable here. No binding, concept or rule
+# change is shipped; the cases below pin the miss and hold the safe forms
+# clean for any future lock-guard vocabulary.
+#
+# Cases: 1 pins the miss on the real vulnerable shape, trimmed to the
+# load-bearing statements; it flips only if a lock-guard revalidation rule
+# ever reaches Python. 2 is the patched form, 3 the service-thread writer that
+# sets the flags under the same lock; both must stay reject under any future
+# capability, because holding requests_lock is exactly what they are for.
+
+test "rank1931: pipelined drain under the channel lock without re-reading the close flags"
+  lang python
+  file channel.py
+  reject VYQL-RACE-002
+  reject_review code.LocklessSharedMutation
+  code
+  ```
+  import threading
+
+
+  class HTTPChannel:
+      def __init__(self, server, adj):
+          self.server = server
+          self.adj = adj
+          self.requests_lock = threading.Lock()
+          self.requests = []
+          self.request = None
+          self.sent_continue = False
+
+      def readable(self):
+          # We might want to read more requests. We can only do this if:
+          # 1. We're not about to close the connection.
+          # 2. We're not waiting to flush remaining data before closing
+          # 3. There are not too many tasks queued
+          # 4. There's no data in the output buffer
+          return not (
+              self.will_close
+              or self.close_when_flushed
+              or len(self.requests) > self.adj.channel_request_lookahead
+              or self.total_outbufs_len
+          )
+
+      def received(self, data):
+          """
+          Receives input asynchronously and assigns one or more requests to
+          the channel.
+          """
+
+          if not data:
+              return False
+
+          with self.requests_lock:
+              while data:
+                  if self.request is None:
+                      self.request = self.parser_class(self.adj)
+                  n = self.request.received(data)
+
+                  if self.request.completed:
+                      # The request (with the body) is ready to use.
+                      self.sent_continue = False
+
+                      if not self.request.empty:
+                          self.requests.append(self.request)
+
+                          if len(self.requests) == 1:
+                              # self.requests is empty before, so the main
+                              # thread is in charge of starting the task.
+                              self.server.add_task(self)
+                      self.request = None
+
+                  if n >= len(data):
+                      break
+                  data = data[n:]
+
+          return True
+  ```
+
+test "rank1931: patched drain re-checks the close flags inside the channel lock"
+  lang python
+  file channel.py
+  reject VYQL-RACE-002
+  reject_review code.LocklessSharedMutation
+  code
+  ```
+  import threading
+
+
+  class HTTPChannel:
+      def __init__(self, server, adj):
+          self.server = server
+          self.adj = adj
+          self.requests_lock = threading.Lock()
+          self.requests = []
+          self.request = None
+          self.sent_continue = False
+
+      def received(self, data):
+          """
+          Receives input asynchronously and assigns one or more requests to
+          the channel.
+          """
+
+          if not data:
+              return False
+
+          with self.requests_lock:
+              # Don't bother processing anymore data if this connection is
+              # about to close. This may happen if readable() returned True,
+              # on the main thread before the service thread set the
+              # close_when_flushed flag, and we read data but our service
+              # thread is attempting to shut down the connection due to an
+              # error. We want to make sure we do this while holding the
+              # request_lock so that we can't race
+              if self.will_close or self.close_when_flushed:
+                  return False
+
+              while data:
+                  if self.request is None:
+                      self.request = self.parser_class(self.adj)
+                  n = self.request.received(data)
+
+                  if self.request.completed:
+                      self.sent_continue = False
+
+                      if not self.request.empty:
+                          self.requests.append(self.request)
+
+                          if len(self.requests) == 1:
+                              self.server.add_task(self)
+                      self.request = None
+
+                  if n >= len(data):
+                      break
+                  data = data[n:]
+
+          return True
+  ```
+
+test "rank1931: the service thread sets the close flags under the channel lock"
+  lang python
+  file channel.py
+  reject VYQL-RACE-002
+  reject_review code.LocklessSharedMutation
+  code
+  ```
+  import threading
+
+
+  class HTTPChannel:
+      def __init__(self, server, adj):
+          self.server = server
+          self.adj = adj
+          self.requests_lock = threading.Lock()
+          self.requests = []
+          self.request = None
+          self.will_close = False
+          self.close_when_flushed = False
+
+      def service(self):
+          while True:
+              task = self.requests[0]
+
+              if task.close_on_finish:
+                  with self.requests_lock:
+                      self.close_when_flushed = True
+
+                      for request in self.requests:
+                          request.close()
+                      self.requests = []
+
+              if task.close_on_finish:
+                  break
+
+              # Add new task to process the next request
+              with self.requests_lock:
+                  self.requests.pop(0)
+
+                  if self.connected and self.requests:
+                      self.server.add_task(self)
+  ```

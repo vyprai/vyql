@@ -1,0 +1,316 @@
+# A package installer's zip unpackers build each extracted file's path from
+# the archive's own entry names: uv's streaming unzip reads
+# `entry.reader().entry().filename().as_str()` out of the local header and the
+# central directory (crates/uv-extract/src/stream.rs:99/:366 at the parent of
+# the fixed revision), the parallel unzip reads `file.enclosed_name()` after
+# `archive.by_index()` (crates/uv-extract/src/sync.rs:27), and both join the
+# name onto the target directory and write through it. The names a wheel
+# carries are chosen by the wheel's author, and a name another zip
+# implementation would not produce -- empty, or carrying control characters --
+# extracts differently here than in the scanners and installers expected to
+# vet the same wheel: the archive a reviewer sees is not the archive that
+# lands, so a malicious payload hides behind an improbable filename
+# (CWE-20; the advisory is a zip parsing differential).
+#
+# The fixed revision validates the member name before it is used -- reject empty names
+# and any name matching `\p{C}` -- at all three sites, in a new crate-local
+# helper `validate_archive_member_name` consulted behind the existing
+# `UV_INSECURE_NO_ZIP_VALIDATION` opt-out. The traversal walk (`enclosed_name`
+# with its ParentDir/CurDir arms) is present in both
+# revisions, and the fixed revision's own comment states the defect is not traversal.
+#
+# Measured, both revisions of crates/uv-extract, three `--cache off` runs
+# each: 6 findings on the parent and 6 on the fixed revision, the same rule mix
+# (VYQL-DOS-042 x2 on the two `unzip` contexts, VYQL-PATH-083 and
+# VYQL-DOS-042 on the tar unpacker, VYQL-MEM-006 x2, VYQL-CRY-001 on md5) --
+# nothing on either zip unzip, no difference between the revisions. Findings
+# in the crate are not coverage of the defect.
+#
+# Two stacked blockers, both measured:
+#
+# (a) The writes are not in the IR at all. Rust lowers `let x = if c { A }
+#     else { B }` through `blockTail` (internal/extract/frontend/treesitter/
+#     rust.go:1091 `if_expression` -> :1232 `blockTail`), which keeps only
+#     each arm's final expression; every statement before the arm's tail --
+#     the nested `if directories.insert(...) { create_dir_all(path) }` and
+#     the whole `match File::create_new(&path)` of the streaming unzip --
+#     emits no node. The graph of the vulnerable stream.rs holds zero nodes
+#     for lines 128-155 and 159-262, which is where both writes live, and
+#     zero nodes for the parallel unzip's `by_index` closure body. Cases 1-2
+#     are the minimal pair at the finding level: the identical
+# `env::var` -> `Command::new` route fires when the spawn sits in a plain if
+#     statement and dies when the same statement moves one arm deep into a
+#     let-bound if expression. Case 2 flips to expect when the branch
+#     statements lower; that is an engine change, not a binding.
+#
+# (b) No vocabulary expresses the fixed revision's discriminator. A probe binding both
+#     ends the way the taint route would want -- `code.ArchiveEntryName` on
+#     `filename()`/`name()`/`enclosed_name()`, `code.ArchiveEntryWrite` on
+#     `create`/`create_new`/`create_dir_all` -- labels four sources in
+#     stream.rs and still reports zero VYQL-PATH-004, because of (a). With
+#     (a) closed the route fires on both revisions identically: the fixed revision keeps
+#     the same name flowing to the same join and create, and only the new
+#     helper's error return gates it. That helper is the fixing commit's own
+#     crate-local name -- the rename test kills any binding keyed on it --
+#     and the pre-fix stream.rs carries 25 `validate`-named tokens
+#     (`insecure_no_validate`, `skip_validation` x24) to the fixed revision's own
+#     `insecure_no_validate` moved to lib.rs: a "validate"-named marker
+#     suppresses the vulnerable streaming unzip outright and credits the
+#     parallel one for an env-var opt-out reader, wrong in both directions.
+#     std has no character-validation vocabulary to key a neutraliser on
+#     (`is_empty` is ordinary Rust everywhere), and the traversal vocabulary
+#     the existing path-join siblings key on (`ParentDir`, `CurDir`,
+#     `components`) is present in both revisions because the traversal walk
+#     is never the defect.
+#
+# Reach: 8 .rs files in the whole uv tree carry the by_index /
+# next_with_entry / enclosed_name shape, and 0 files across the ~86 other
+# corpus clones -- a binding family for archive member names would fire on
+# this tree alone, a concept per case.
+#
+# Cases 3-5 model the real unpackers (the streaming local-header site, the
+# parallel by_index site, and the patched form) and pin the miss: all three
+# stay reject today, and 3-4 flip to expect only when (a) closes AND an
+# archive-entry-name source binding exists in Rust; case 5 stays reject
+# because the patched form carries the same flow through the same join, so
+# without a neutraliser vocabulary the route cannot separate the revisions at
+# all.
+
+test "rank1900: environment command spawn inside a plain if statement -- the route control"
+  lang rust
+  file src/main.rs
+  code
+  ```
+  use std::process::Command;
+
+  pub fn run_stmt(flag: bool) -> Result<(), std::io::Error> {
+      let cmd = std::env::var("SH_CMD").map_err(|e| std::io::Error::other(e))?;
+      if flag {
+          let child = Command::new(&cmd).spawn()?;
+          let _ = child;
+      }
+      Ok(())
+  }
+
+  fn main() {
+      let _ = run_stmt(true);
+  }
+  ```
+  expect VYQL-INJ-002
+
+test "rank1900: the same spawn one statement deep in a let-bound if expression"
+  lang rust
+  file src/main.rs
+  code
+  ```
+  use std::process::Command;
+
+  pub fn run_expr(flag: bool) -> Result<u32, std::io::Error> {
+      let cmd = std::env::var("SH_CMD").map_err(|e| std::io::Error::other(e))?;
+      let out = if flag {
+          let child = Command::new(&cmd).spawn()?;
+          let _ = child;
+          1u32
+      } else {
+          0u32
+      };
+      Ok(out)
+  }
+
+  fn main() {
+      let _ = run_expr(true);
+  }
+  ```
+  reject VYQL-INJ-002
+
+test "rank1900: archive member name joined and written by the streaming unzip"
+  lang rust
+  file src/stream.rs
+  code
+  ```
+  use std::path::{Component, Path, PathBuf};
+
+  pub struct Entry { pub name: String, pub is_dir: bool }
+  pub struct ZipEntryReader { entry: Entry }
+  pub struct WithEntry { reader: ZipEntryReader }
+  pub struct ZipFileReader { offset: usize }
+
+  impl ZipFileReader {
+      pub async fn next_with_entry(&mut self) -> Result<Option<WithEntry>, Error> { Ok(None) }
+  }
+
+  impl ZipEntryReader {
+      pub fn entry(&mut self) -> &Entry { &self.entry }
+  }
+
+  fn enclosed_name(file_name: &str) -> Option<PathBuf> {
+      if file_name.contains('\0') {
+          return None;
+      }
+      let path = PathBuf::from(file_name);
+      let mut depth = 0usize;
+      for component in path.components() {
+          match component {
+              Component::Prefix(_) | Component::RootDir => return None,
+              Component::ParentDir => depth = depth.checked_sub(1)?,
+              Component::Normal(_) => depth += 1,
+              Component::CurDir => (),
+          }
+      }
+      Some(path)
+  }
+
+  pub async fn unzip(reader: &[u8], target: &Path) -> Result<(), Error> {
+      let mut zip = ZipFileReader::new(reader);
+      while let Some(mut entry) = zip.next_with_entry().await? {
+          // Construct the (expected) path to the file on-disk.
+          let path = match entry.reader().entry().name.as_str() {
+              Ok(path) => path,
+              Err(_) => return Err(Error::LocalHeaderNotUtf8 { offset: 0 }),
+          };
+
+          // Sanitize the file name to prevent directory traversal attacks.
+          let Some(relpath) = enclosed_name(path) else {
+              continue;
+          };
+
+          let path = target.join(&relpath);
+          let is_dir = entry.reader().entry().is_dir;
+          let computed = if is_dir {
+              std::fs::create_dir_all(&path)?;
+              0u64
+          } else {
+              let outfile = std::fs::File::create_new(&path)?;
+              1u64
+          };
+          let _ = computed;
+      }
+      Ok(())
+  }
+  ```
+  reject VYQL-PATH-004
+
+test "rank1900: archive member name joined and written by the parallel unzip"
+  lang rust
+  file src/sync.rs
+  code
+  ```
+  use std::path::Path;
+
+  pub struct ZipArchive { len: usize }
+
+  pub struct ZipFile { name: String, dir: bool }
+
+  impl ZipArchive {
+      pub fn by_index(&mut self, i: usize) -> Result<ZipFile, Error> { Ok(ZipFile { name: String::new(), dir: false }) }
+      pub fn enclosed_name(&self) -> Option<std::path::PathBuf> { None }
+  }
+
+  impl ZipFile {
+      pub fn name(&self) -> &str { &self.name }
+      pub fn enclosed_name(&self) -> Option<std::path::PathBuf> { None }
+      pub fn is_dir(&self) -> bool { false }
+  }
+
+  pub fn unzip(archive: &mut ZipArchive, target: &Path) -> Result<(), Error> {
+      for file_number in 0..archive.len {
+          let mut file = archive.by_index(file_number)?;
+
+          // Determine the path of the file within the wheel.
+          let Some(enclosed_name) = file.enclosed_name() else {
+              return Ok(());
+          };
+
+          let path = target.join(enclosed_name);
+          if file.is_dir() {
+              std::fs::create_dir_all(&path)?;
+              return Ok(());
+          }
+
+          // Copy the file contents.
+          let outfile = std::fs::File::create(&path)?;
+      }
+      Ok(())
+  }
+  ```
+  reject VYQL-PATH-004
+
+test "rank1900: the patched form validates the member name before the join"
+  lang rust
+  file src/patched.rs
+  code
+  ```
+  use std::path::{Component, Path, PathBuf};
+
+  pub struct Entry { pub name: String, pub is_dir: bool }
+  pub struct ZipEntryReader { entry: Entry }
+  pub struct WithEntry { reader: ZipEntryReader }
+  pub struct ZipFileReader { offset: usize }
+
+  impl ZipFileReader {
+      pub async fn next_with_entry(&mut self) -> Result<Option<WithEntry>, Error> { Ok(None) }
+  }
+
+  impl ZipEntryReader {
+      pub fn entry(&mut self) -> &Entry { &self.entry }
+  }
+
+  fn validate_archive_member_name(name: &str) -> Result<(), Error> {
+      if name.is_empty() {
+          return Err(Error::EmptyFilename);
+      }
+      if name.chars().any(|c| c.is_control()) {
+          return Err(Error::UnacceptableFilename { filename: name.to_string() });
+      }
+      Ok(())
+  }
+
+  fn enclosed_name(file_name: &str) -> Option<PathBuf> {
+      if file_name.contains('\0') {
+          return None;
+      }
+      let path = PathBuf::from(file_name);
+      let mut depth = 0usize;
+      for component in path.components() {
+          match component {
+              Component::Prefix(_) | Component::RootDir => return None,
+              Component::ParentDir => depth = depth.checked_sub(1)?,
+              Component::Normal(_) => depth += 1,
+              Component::CurDir => (),
+          }
+      }
+      Some(path)
+  }
+
+  pub async fn unzip(reader: &[u8], target: &Path) -> Result<(), Error> {
+      let mut zip = ZipFileReader::new(reader);
+      while let Some(mut entry) = zip.next_with_entry().await? {
+          let path = match entry.reader().entry().name.as_str() {
+              Ok(path) => path,
+              Err(_) => return Err(Error::LocalHeaderNotUtf8 { offset: 0 }),
+          };
+
+          // Apply sanity checks to the file names in local headers.
+          if let Err(e) = validate_archive_member_name(path) {
+              return Err(e);
+          }
+
+          let Some(relpath) = enclosed_name(path) else {
+              continue;
+          };
+
+          let path = target.join(&relpath);
+          let is_dir = entry.reader().entry().is_dir;
+          let computed = if is_dir {
+              std::fs::create_dir_all(&path)?;
+              0u64
+          } else {
+              let outfile = std::fs::File::create_new(&path)?;
+              1u64
+          };
+          let _ = computed;
+      }
+      Ok(())
+  }
+  ```
+  reject VYQL-PATH-004

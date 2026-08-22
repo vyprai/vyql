@@ -1,0 +1,156 @@
+# Pi-hole's settings screen (v5, scripts/pi-hole/php/savesettings.php) builds
+# every `pihole` CLI invocation through its own helper:
+#
+#   function pihole_execute($argument_string) {
+#       $escaped = escapeshellcmd($argument_string);
+#       ...
+#       $command = 'sudo pihole '.$escaped;
+#       exec($command, $output, $return_status);
+#   }
+#
+# Twenty call sites in the same switch go through it. The webUI case is the
+# one exception -- it calls exec() itself and splices the submitted theme
+# name straight into the command:
+#
+#   case 'webUI':
+#       ...
+#       if (isset($_POST['webtheme'])) {
+#           global $available_themes;
+#           if (array_key_exists($_POST['webtheme'], $available_themes)) {
+#               exec('sudo pihole -a theme '.$_POST['webtheme']);
+#           }
+#       }
+#
+# A POST body of webtheme=default; <command> reaches the shell under sudo
+# (CWE-78, critical). The array_key_exists() membership test gates the branch
+# but is not argument validation: it never inspects the value that lands in
+# the command string, and the scanner agrees -- core.CommandArgumentValidation
+# is unsatisfied on the sink, so the finding stands. The advisory's fix
+# version (6.0) deletes the whole PHP settings screen rather than patching
+# the line: the recorded fix commit is the v6.0.0 release merge, whose
+# combined diff is empty, and whose first parent 5c8945c is the vulnerable
+# tree scanned here. v6 sets the theme through the FTL API instead; at the
+# fixing commit scripts/pi-hole/php/savesettings.php is absent at the fixing commit and the
+# tree contains no PHP at all.
+#
+# Detection is shipped: php.input labels $_POST as code.HttpInput,
+# php.sinks labels the exec() argument as code.CommandExecution, and
+# VYQL-INJ-002 reports the path at critical. The reject direction models the
+# route every sibling setting in the same switch takes -- the project's own
+# pihole_execute() helper, whose escapeshellcmd() is labelled core.ShellEscape
+# -- and the inline escapeshellarg() encoder, both of which clear VYQL-INJ-002.
+#
+# Measured on the vulnerable tree (5c8945c, three --cache off runs, timeout
+# 180, --max-ram 6GB): 165 findings, and VYQL-INJ-002 at
+# scripts/pi-hole/php/savesettings.php:428 (fp e14be27d8f03c628) in 3 of 3
+# runs. The reachable set is enumerated exhaustively: 52 non-vendor PHP
+# files, 17 direct execution sites (11 shell -- exec, shell_exec, popen --
+# plus 6 SQLite $db->exec), of which exactly one concatenates request input
+# into the command without the escaping helper -- this line. The remaining
+# sites run constant commands, or pass through pihole_execute()'s
+# escapeshellcmd (queryads.php:64 splices $_GET['domain'] into popen but
+# behind validDomain()). At the fixed revision
+# (v6 tree) the scan reports 32 findings over javascript/config/textpattern
+# and zero command-execution findings, so the pair discriminates 1 -> 0.
+
+test "rank1939: the webUI setting concatenates the submitted theme into exec() past the membership check"
+  lang php
+  file scripts/pi-hole/php/savesettings.php
+  expect VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  require_once 'func.php';
+
+  $error = '';
+  $success = '';
+
+  if (isset($_POST['field'])) {
+      switch ($_POST['field']) {
+          case 'webUI':
+              if (isset($_POST['boxedlayout'])) {
+                  pihole_execute('-a layout boxed');
+              } else {
+                  pihole_execute('-a layout traditional');
+              }
+              if (isset($_POST['webtheme'])) {
+                  global $available_themes;
+                  if (array_key_exists($_POST['webtheme'], $available_themes)) {
+                      exec('sudo pihole -a theme '.$_POST['webtheme']);
+                  }
+              }
+              $success .= 'The webUI settings have been updated';
+
+              break;
+      }
+  }
+  ```
+
+test "rank1939: the same call routed through the project's escapeshellcmd helper clears it"
+  lang php
+  file scripts/pi-hole/php/savesettings.php
+  reject VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  function pihole_execute($argument_string)
+  {
+      $escaped = escapeshellcmd($argument_string);
+      $output = null;
+      $return_status = -1;
+      $command = 'sudo pihole '.$escaped;
+      exec($command, $output, $return_status);
+      if ($return_status !== 0) {
+          trigger_error("Executing {$command} failed.", E_USER_WARNING);
+      }
+
+      return $output;
+  }
+
+  $error = '';
+  $success = '';
+
+  if (isset($_POST['field'])) {
+      switch ($_POST['field']) {
+          case 'webUI':
+              if (isset($_POST['webtheme'])) {
+                  global $available_themes;
+                  if (array_key_exists($_POST['webtheme'], $available_themes)) {
+                      pihole_execute('-a theme '.$_POST['webtheme']);
+                  }
+              }
+              $success .= 'The webUI settings have been updated';
+
+              break;
+      }
+  }
+  ```
+
+test "rank1939: encoding the value with escapeshellarg at the exec() call clears it too"
+  lang php
+  file scripts/pi-hole/php/savesettings.php
+  reject VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  $error = '';
+  $success = '';
+
+  if (isset($_POST['field'])) {
+      switch ($_POST['field']) {
+          case 'webUI':
+              if (isset($_POST['webtheme'])) {
+                  global $available_themes;
+                  if (array_key_exists($_POST['webtheme'], $available_themes)) {
+                      exec('sudo pihole -a theme '.escapeshellarg($_POST['webtheme']));
+                  }
+              }
+              $success .= 'The webUI settings have been updated';
+
+              break;
+      }
+  }
+  ```

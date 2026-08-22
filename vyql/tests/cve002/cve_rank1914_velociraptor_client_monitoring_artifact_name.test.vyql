@@ -1,0 +1,218 @@
+# velocidex/velociraptor CVE-2026-5329 (GHSA-3wq5-x8p8-2v3p): a client's
+# monitoring response carries the name of the artifact its rows belong to, and
+# the server trusted it. Both protocol paths took the client-supplied name and
+# published the client's rows into that named server artifact with no check
+# that clients may write it. ClientFlowRunner.MonitoringVQLResponse
+# (flows/client_flow_runner.go) read `query_name := response.Query.Name` off a
+# message that arrived over the client communication channel, kept only the
+# trivial guards (`== ""`, `strings.HasPrefix(query_name, "$")`), and passed
+# the name straight to `journal.PushJsonlToArtifact(ctx, config, data, rows,
+# query_name, client_id, flow_id)`; the legacy path
+# (flows/monitoring.go MonitoringProcessMessage -> batchRows ->
+# flushMonitoringLogs) did the same through the monitoring_batch map. A
+# compromised client could therefore write rows into any server-side artifact
+# queue -- Server.Internal.Alerts, Server.Internal.ClientInfo -- spoofing
+# alerts and poisoning the indexes server components consume (CWE-20,
+# CWE-501).
+#
+# The fixed revision (1ef6ede80361de9bab6fd49df5b67369c9e3789f, "Restrict client
+# monitoring messages to client event artifacts") adds an `IsClientEvent(ctx,
+# config, artifact_name)` helper -- services.GetRepositoryManager ->
+# GetGlobalRepository -> repository.GetArtifactType plus
+# strings.EqualFold(type, "CLIENT_EVENT") -- and calls it in front of both
+# pushes, returning an error when the name is not a CLIENT_EVENT artifact. It
+# also retypes Server/Internal/ClientInfo.yaml from INTERNAL to CLIENT_EVENT,
+# the type clients legitimately send.
+#
+# Pinned as a miss: nothing labels either end of the flow. `vyql match` on the
+# vulnerable flows/client_flow_runner.go holds no source label anywhere near
+# the handler (the Go source bindings are HTTP-framework and CLI shaped) and
+# no sink on PushJsonlToArtifact; `vyql scan --cache off` of the whole flows/
+# subtree reports zero findings at both revisions under both the api and the
+# generic profile.
+#
+# The taint route itself is built and measured, and it works -- but it cannot
+# discriminate the fixed revision. With a parameter-entry source on the
+# actions_proto.VQLResponse parameter emitting code.HttpInput (the concept
+# VYQL-CFG-014 consumes and the api profile this tree resolves names in its
+# entrypoints) and a code.TrustBoundary sink on PushJsonlToArtifact's
+# artifact-name argument, the real flows/ subtree reports exactly 1
+# VYQL-CFG-014 finding at the vulnerable parent (client_flow_runner.go:211 ->
+# :242, source parameter entry -> response -> Query -> Name -> push argument,
+# "unless path coveredBy core.InputValidation: not satisfied") and exactly 1
+# at the fixed revision (:234 -> :271) -- the same function, the same path shape, three
+# --cache off runs per revision, 1 -> 1. The two-snippet pair below scores the
+# same way (2 findings, one per snippet), and stays at 2 when the helper is
+# renamed and the "CLIENT_EVENT" literal changed, so nothing about the current
+# behaviour keys on the fixed revision's vocabulary.
+#
+# No control binding can supply the missing discrimination:
+#
+# - The guard the fixed revision installs is a call to a project-internal helper, and it
+#   is the *only* delta between the revisions inside the guarded functions.
+#   No API-documented call remains in the method it guards, so the
+#   documented-call counterweight does not apply; keying a core.InputValidation
+#   control on IsClientEvent, repository.GetArtifactType or the "CLIENT_EVENT"
+#   literal is keying on the fixing commit's own vocabulary, and the rename
+#   test above shows the discrimination would live in that name alone.
+# - A generic "the value is checked before use" control clears the vulnerable
+#   code too: the vulnerable revision returns early on
+#   `query_name == "" || strings.HasPrefix(query_name, "$")`, so any control
+#   shape weaker than the helper's own semantics fires on both revisions.
+# - The remediation's semantics live in a named helper no generic binding can
+#   read -- the measured named-helper-control family (1331), not an engine
+#   defect: taint flows end to end and the engine correctly reports that no
+#   neutralising control dominates the path.
+#
+# Two further measured blockers for any future attempt from the vocabulary
+# side: code.NetworkData (the concept that refines core.UserControlledData and
+# would satisfy every generic taint rule) is named in no profile's
+# entrypoints, so every profile-resolved scan prunes a source emitting it --
+# the api profile resolves on this tree and the single-file `vyql match` label
+# disappears in the directory scan; and code.MessageInput (which the generic
+# profile does name) is consumed by no rule in packs/, so a source emitting it
+# is inert. The legacy monitoring_batch path reports nothing under either
+# probe form: the name passes through a map field and the taint dies there,
+# so the old-protocol half of the change is unreachable even with both ends
+# labelled.
+
+test "rank1914: a client monitoring response's artifact name reaches the journal push unvalidated"
+  lang go
+  file flows/client_flow_runner.go
+  reject VYQL-CFG-014
+  code
+  ```
+  package flows
+
+  import (
+  	"context"
+  	"strings"
+
+  	config_proto "www.velocidex.com/golang/velociraptor/config/proto"
+  	actions_proto "www.velocidex.com/golang/velociraptor/actions/proto"
+  	"www.velocidex.com/golang/velociraptor/artifacts"
+  	"www.velocidex.com/golang/velociraptor/json"
+  	"www.velocidex.com/golang/velociraptor/services"
+  )
+
+  type ClientFlowRunner struct {
+  	config_obj *config_proto.Config
+  }
+
+  // A monitoring response from the client. The client chooses which artifact
+  // the rows belong to; the server publishes them under that name.
+  func (self *ClientFlowRunner) MonitoringVQLResponse(
+  	ctx context.Context, client_id, flow_id string,
+  	response *actions_proto.VQLResponse) error {
+
+  	if response == nil || response.Query == nil ||
+  		response.Query.Name == "" || response.JSONLResponse == "" {
+  		return nil
+  	}
+
+  	_ = artifacts.Deobfuscate(self.config_obj, response)
+
+  	query_name := response.Query.Name
+  	if query_name == "" || strings.HasPrefix(query_name, "$") {
+  		return nil
+  	}
+
+  	journal, err := services.GetJournal(self.config_obj)
+  	if err != nil {
+  		return err
+  	}
+
+  	data := json.AppendJsonlItem(
+  		[]byte(response.JSONLResponse), "ClientId", client_id)
+
+  	return journal.PushJsonlToArtifact(ctx,
+  		self.config_obj, data, int(response.TotalRows),
+  		query_name, client_id, flow_id)
+  }
+  ```
+
+test "rank1914: the client monitoring name checked against the artifact type before the push is not reported"
+  lang go
+  file flows/client_flow_runner.go
+  reject VYQL-CFG-014
+  code
+  ```
+  package flows
+
+  import (
+  	"context"
+  	"strings"
+
+  	errors "github.com/go-errors/errors"
+
+  	config_proto "www.velocidex.com/golang/velociraptor/config/proto"
+  	actions_proto "www.velocidex.com/golang/velociraptor/actions/proto"
+  	"www.velocidex.com/golang/velociraptor/artifacts"
+  	"www.velocidex.com/golang/velociraptor/json"
+  	"www.velocidex.com/golang/velociraptor/services"
+  )
+
+  type ClientFlowRunner struct {
+  	config_obj *config_proto.Config
+  }
+
+  func IsClientEvent(ctx context.Context,
+  	config_obj *config_proto.Config,
+  	artifact_name string) (bool, error) {
+
+  	manager, err := services.GetRepositoryManager(config_obj)
+  	if err != nil {
+  		return false, err
+  	}
+
+  	repository, err := manager.GetGlobalRepository(config_obj)
+  	if err != nil {
+  		return false, err
+  	}
+
+  	artifact_type, err := repository.GetArtifactType(ctx, config_obj,
+  		artifact_name)
+  	if err != nil {
+  		return false, err
+  	}
+
+  	return strings.EqualFold(artifact_type, "CLIENT_EVENT"), nil
+  }
+
+  // A monitoring response from the client, restricted to client event
+  // artifacts by the type check in front of the push.
+  func (self *ClientFlowRunner) MonitoringVQLResponse(
+  	ctx context.Context, client_id, flow_id string,
+  	response *actions_proto.VQLResponse) error {
+
+  	if response == nil || response.Query == nil ||
+  		response.Query.Name == "" || response.JSONLResponse == "" {
+  		return nil
+  	}
+
+  	_ = artifacts.Deobfuscate(self.config_obj, response)
+
+  	query_name := response.Query.Name
+  	if query_name == "" || strings.HasPrefix(query_name, "$") {
+  		return nil
+  	}
+
+  	is_client_event, err := IsClientEvent(
+  		ctx, self.config_obj, query_name)
+  	if !is_client_event || err != nil {
+  		return errors.New("Invalid client monitoring name")
+  	}
+
+  	journal, err := services.GetJournal(self.config_obj)
+  	if err != nil {
+  		return err
+  	}
+
+  	data := json.AppendJsonlItem(
+  		[]byte(response.JSONLResponse), "ClientId", client_id)
+
+  	return journal.PushJsonlToArtifact(ctx,
+  		self.config_obj, data, int(response.TotalRows),
+  		query_name, client_id, flow_id)
+  }
+  ```
