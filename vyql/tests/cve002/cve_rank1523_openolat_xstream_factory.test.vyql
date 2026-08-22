@@ -1,0 +1,89 @@
+# Rank 1523 / CVE-2021-39181: OpenOLAT handed out XStream instances
+# with no type restrictions, so deserializing a crafted XML file
+# instantiated arbitrary classes (unsafe deserialization to remote
+# code execution, CWE-502/CWE-94; OO-5548). createXStreamInstance in
+# src/main/java/org/olat/core/util/xml/XStreamHelper.java did `return
+# new EnhancedXStream(false);` -- no setupDefaultSecurity, no
+# allowTypes -- and the module's other streams build the same
+# way (some callers called XStream.setupDefaultSecurity ad hoc, the
+# factory itself never did). the fixing commit is the fixing change
+# (confirmed, "OO-5548: setup security of XStream by default", 73
+# files): the factory now runs `XStream.setupDefaultSecurity(xstream)`
+# before returning, a new allowDefaultPackage(xstream) helper applies
+# allowTypesByWildcard(DEFAULT_PACKAGES) for the project's own
+# packages, and every manager stream is audited to permissions or
+# aliases. .
+#
+# ATTENTION, factory-shaped deserialization. The corpus HAS an
+# XStream presence rule -- VYQL-DESER-007 (binding
+# unrestrictedRequestParamDeserialization138, java/m420f6b67.vyql:
+# 730) -- but its shape requires the factory to call
+# registerConverter, which OpenOLAT's bare factory never does
+# (converters register on the EnhancedXStream superclass or at call
+# sites), so the rule cannot fire here; what is missing is the
+# observation "an XStream instance is returned from a factory
+# without any addPermission/setupDefaultSecurity" -- the
+# converter-condition excludes exactly the bare-factory form this
+# CVE shipped. Measured on the real code: scanning XStreamHelper.java
+# reports zero findings at both revisions. A binding on OpenOLAT's
+# own factory would detect this application rather than the
+# weakness. No ENGINE-GAPS.md entry (loosening the presence rule's
+# converter condition is a measured design decision, not a missing
+# construct). No definition change shipped. Spec cve_rank1523
+# records the bare factory and the setupDefaultSecurity form, both
+# asserting reject VYQL-DESER-007: when the factory observation
+# lands, the bare form must flip to expect.
+
+test "rank1523: the factory returns an unrestricted stream"
+  lang java
+  file src/main/java/org/olat/core/util/xml/XStreamHelper.java
+  reject VYQL-DESER-007
+  code
+  ```
+  package org.olat.core.util.xml;
+
+  import com.thoughtworks.xstream.XStream;
+
+  public class XStreamHelper {
+
+      public static XStream createXStreamInstance() {
+          return new EnhancedXStream(false);
+      }
+
+      public static XStream createXStreamInstanceForDBObjects() {
+          return new EnhancedXStream(true);
+      }
+  }
+  ```
+
+test "rank1523: the fixed revision locks the factory to default security"
+  lang java
+  file src/main/java/org/olat/core/util/xml/XStreamHelper.java
+  reject VYQL-DESER-007
+  code
+  ```
+  package org.olat.core.util.xml;
+
+  import com.thoughtworks.xstream.XStream;
+
+  public class XStreamHelper {
+
+      public static final String[] DEFAULT_PACKAGES = new String[] { "org.olat.**" };
+
+      public static final void allowDefaultPackage(XStream xstream) {
+          xstream.allowTypesByWildcard(DEFAULT_PACKAGES);
+      }
+
+      public static XStream createXStreamInstance() {
+          XStream xstream = new EnhancedXStream(false);
+          XStream.setupDefaultSecurity(xstream);
+          return xstream;
+      }
+
+      public static XStream createXStreamInstanceForDBObjects() {
+          XStream xstream = new EnhancedXStream(true);
+          XStream.setupDefaultSecurity(xstream);
+          return xstream;
+      }
+  }
+  ```

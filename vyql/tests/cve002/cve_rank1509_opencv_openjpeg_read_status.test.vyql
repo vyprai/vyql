@@ -1,0 +1,79 @@
+# Rank 1509 / CVE-2025-53644: OpenCV's vendored OpenJPEG used the image a
+# failed header read left behind (out-of-bounds reads on malformed JPEG2000
+# input). opj_jp2_read_header in 3rdparty/openjpeg/openjp2/jp2.c assigned
+#   ret = opj_jp2_read_header's inner opj_j2k_read_header(..., p_image, ...)
+# and then branched on `if (p_image && *p_image)` -- the pointers are
+# guarded but the call's status is not, so a read that fails with the
+# image partially set proceeded to write (*p_image)->color_space and read
+# image data from an invalid structure. The fixing commit a39db41390
+# ("Cherry-pick OpenJPEG deconding status fix.", one line):
+# the guard becomes `if (ret && p_image && *p_image)`. .
+#
+# ATTENTION, guard-judgement gap (Medium in ENGINE-GAPS.md). The shape is
+# an out-parameter used without the producing call's return status gating
+# it -- the null guards on the pointers are credited, the status is not a
+# guard at all. The adjacent rule family does reach the site but cannot
+# distinguish: scanning the real jp2.c at both revisions reports the same
+# 25 findings, including VYQL-MEM-006 (code.NullableDeref by c.flags) at
+# jp2.c:2876, 2879, 2881 and 2883 -- exactly the vulnerable block -- at
+# BOTH revisions, because the double-pointer null guard is itself not
+# credited (the same low-confidence report fires on the guarded form). The
+# minimal pair below isolates it: the two snippets differ only in `ret &&`
+# and report identically, four VYQL-MEM-006 rows, two per file. What is
+# missing is a fact tying the use of a call's out-parameter to that call's
+# status variable -- deciding that `ret` from the call that takes
+# `&p_image`-style output is the guard the use needs -- which is the
+# "needing a judgement call about what counts as a guard" family, like the
+# lower-bound and macro-body rows in the Medium table.
+# definition change shipped: the deref family fires; making it
+# fire for the right reason and suppressing on the status gate is the
+# engine change this entry asks for. Spec cve_rank1509 records both forms
+# expecting VYQL-MEM-006 -- the report that exists today at the vulnerable
+# site -- so the pair pins the gap: when status-gating lands, the fixed
+# form's test must flip to reject.
+
+test "rank1509: the image from an unchecked read is used through its guards"
+  lang c
+  file 3rdparty/openjpeg/openjp2/jp2.c
+  expect VYQL-MEM-006
+  code
+  ```
+  typedef int OPJ_BOOL;
+  typedef struct { int color_space; } opj_image_t;
+  typedef struct { int dummy; } opj_stream_private_t;
+  typedef struct { int dummy; } opj_jp2_codec;
+
+  OPJ_BOOL opj_j2k_read_header(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image, int *manager);
+
+  int process(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image) {
+      int manager = 0;
+      OPJ_BOOL ret = opj_j2k_read_header(stream, codec, p_image, &manager);
+      if (p_image && *p_image) {
+          (*p_image)->color_space = 18;
+      }
+      return ret;
+  }
+  ```
+
+test "rank1509: the fixed revision gates the same use on the read status, which today still reports"
+  lang c
+  file 3rdparty/openjpeg/openjp2/jp2.c
+  expect VYQL-MEM-006
+  code
+  ```
+  typedef int OPJ_BOOL;
+  typedef struct { int color_space; } opj_image_t;
+  typedef struct { int dummy; } opj_stream_private_t;
+  typedef struct { int dummy; } opj_jp2_codec;
+
+  OPJ_BOOL opj_j2k_read_header(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image, int *manager);
+
+  int process(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image) {
+      int manager = 0;
+      OPJ_BOOL ret = opj_j2k_read_header(stream, codec, p_image, &manager);
+      if (ret && p_image && *p_image) {
+          (*p_image)->color_space = 18;
+      }
+      return ret;
+  }
+  ```

@@ -1,0 +1,129 @@
+# Rank 1569 / CVE-2020-36326: PHPMailer's attachment and language
+# file reads validated paths through scattered per-site checks that
+# behaved differently for UNC paths, so a \\host\share-style
+# attachment could sidestep the readable-path expectations the other
+# sites enforced (improper path validation, CWE-22/668 family; issue
+# #2069 is the UNC regression after the isPermittedPath guard landed
+# in 6.1.6 -- the CVE fix proper). The four sites in src/
+# PHPMailer.php each spelled their own guard -- `!static::
+# isPermittedPath($lang_file) || !file_exists($lang_file)`,
+# `!static::isPermittedPath($path) || !@is_file($path) ||
+# !is_readable($path)` twice over -- with inconsistent is_file/
+# file_exists and is_readable usage and no UNC awareness. Pool
+# commit e2e07a355e consolidates the fixing changes (confirmed --
+# "Proposed fix for #2069"): a single protected static
+# fileIsAccessible($path) -- isPermittedPath($path) &&
+# file_exists($path), with UNC paths skipping is_readable, which
+# hangs or misbehaves on shares -- replaces all four spellings, and
+# the language file, attachment, string attachment and embedded image
+# paths now share one validation. .
+#
+# ATTENTION, path-validation consistency. isPermittedPath (the CVE's
+# actual guard) is PHPMailer's own API and present at the
+# parent -- a binding on it would detect this library rather than the
+# weakness, and nothing can ask "do all file-read sites share one
+# path policy", the same decision-consistency family as rank 1556's
+# sibling-middleware shape. Measured on the real code: scanning src/
+# reports the same 6 findings at both revisions (php heuristics
+# across the 5 files; the consolidation shifts nothing). No
+# ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1569 records the scattered per-site checks and the unified
+# fileIsAccessible form, both asserting reject VYQL-PATH-001: when
+# path-policy-consistency vocabulary lands, the scattered form must
+# flip to expect.
+
+test "rank1569: each read site spells its own path guard"
+  lang php
+  file src/PHPMailer.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  class PHPMailer
+  {
+      protected static function isPermittedPath($path)
+      {
+          return !preg_match('#^[a-z][a-z0-9+.-]*://#i', $path);
+      }
+
+      public function setLanguage($lang_path)
+      {
+          $lang_file = $lang_path . 'phpmailer.lang.php';
+          if (!static::isPermittedPath($lang_file) || !file_exists($lang_file)) {
+              return false;
+          }
+          require $lang_file;
+          return true;
+      }
+
+      public function addAttachment($path, $name)
+      {
+          if (!static::isPermittedPath($path) || !@is_file($path) || !is_readable($path)) {
+              throw new Exception($this->lang('file_access') . $name);
+          }
+          return true;
+      }
+
+      public function addStringEmbeddedImage($path, $cid)
+      {
+          if (!static::isPermittedPath($path) || !file_exists($path) || !is_readable($path)) {
+              throw new Exception($this->lang('file_access') . $cid);
+          }
+          return true;
+      }
+  }
+  ```
+
+test "rank1569: the fixed revision routes every read through one accessible check"
+  lang php
+  file src/PHPMailer.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  class PHPMailer
+  {
+      protected static function isPermittedPath($path)
+      {
+          return !preg_match('#^[a-z][a-z0-9+.-]*://#i', $path);
+      }
+
+      protected static function fileIsAccessible($path)
+      {
+          $readable = file_exists($path);
+          //If not a UNC path (expected to start with \\\\), check read permission, see #2069
+          if (strpos($path, '\\\\\\\\') !== 0) {
+              $readable = $readable && is_readable($path);
+          }
+          return static::isPermittedPath($path) && $readable;
+      }
+
+      public function setLanguage($lang_path)
+      {
+          $lang_file = $lang_path . 'phpmailer.lang.php';
+          if (!static::fileIsAccessible($lang_file)) {
+              return false;
+          }
+          require $lang_file;
+          return true;
+      }
+
+      public function addAttachment($path, $name)
+      {
+          if (!static::fileIsAccessible($path)) {
+              throw new Exception($this->lang('file_access') . $name);
+          }
+          return true;
+      }
+
+      public function addStringEmbeddedImage($path, $cid)
+      {
+          if (!static::fileIsAccessible($path)) {
+              throw new Exception($this->lang('file_access') . $cid);
+          }
+          return true;
+      }
+  }
+  ```

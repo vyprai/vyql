@@ -1,0 +1,97 @@
+# Rank 1562 / CVE-2019-16915: pfSense's picture widget read its image
+# by a path built from the raw widgetkey request parameter, so a
+# crafted widgetkey traversed out of /conf and read arbitrary files
+# (path traversal, CWE-22; issue #9610). picture.widget.php did `if
+# ($user_settings['widgets'][$_GET['widgetkey']]['picturewidget']) {
+# if (file_exists("/conf/widget_image." . $_GET['widgetkey'])) { $data
+# = file_get_contents("/conf/widget_image." . $_GET['widgetkey']); }`
+# -- the widgetkey is concatenated unescaped into the read path, and
+# the image type came from the stored filename's extension besides.
+# The fixing commit (confirmed -- "Picture
+# widget corrections. Fixes #9610: Sanitize user input before using
+# as path/filenames; Use a more accurate method of determining image
+# type on read; More sanity checks before reading images"): the
+# widgetkey is passed through basename() first, the settings entry
+# and file existence are validated before any read, and the image
+# type is determined by getimagesize() rather than the filename. No
+
+#
+# CAUGHT by VYQL-PATH-001. The php path rule covers the shape end to
+# end: source code.HttpInput by php.input at $_GET (the widgetkey
+# subscript) -> Format concatenation -> sink code.FilePathAccess at
+# the file_exists/file_get_contents calls, `unless
+# core.PathCanonicalization` satisfied by the fixed revision's basename() (bound
+# as the canonicalization control in mfbe84119.vyql:1910). Measured
+# on the real code: scanning picture.widget.php at the vulnerable revision
+# reports VYQL-PATH-001 HIGH at picture.widget.php:33 -- exactly the
+# traversal line (`file_exists("/conf/widget_image." .
+# $_GET['widgetkey'])`) -- and the fixed revision's PATH-001 row sits
+# at :75 on the unrelated upload temp-file fopen ($_FILES tmp_name),
+# the original traversal finding gone: the basename-cleared path no
+# longer reports. The scan also carries one VYQL-INJ-004 and three
+# VYQL-INJ-010 rows at both revisions (reflection and path heuristics
+# elsewhere in the widget). No definition change shipped, no
+# benchmark impact. Spec cve_rank1562 records the raw widgetkey read
+# expecting VYQL-PATH-001 and the basename-validated form rejecting
+# it.
+
+test "rank1562: the widget reads its image through a raw request key"
+  lang php
+  file src/usr/local/www/widgets/widgets/picture.widget.php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  require_once('guiconfig.inc');
+
+  if ($_GET['getpic']) {
+      if ($user_settings['widgets'][$_GET['widgetkey']]['picturewidget']) {
+          if (file_exists("/conf/widget_image." . $_GET['widgetkey'])) {
+              $data = file_get_contents("/conf/widget_image." . $_GET['widgetkey']);
+          } else {
+              $data = "";
+          }
+          header("Content-Type: image/" . $pic_type);
+          echo $data;
+          exit;
+      }
+  }
+  ```
+
+test "rank1562: the fixed revision validates the key before reading"
+  lang php
+  file src/usr/local/www/widgets/widgets/picture.widget.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  require_once('guiconfig.inc');
+
+  if ($_GET['getpic']) {
+      $wk = basename($_GET['widgetkey']);
+      $image_filename = "/conf/widget_image.{$wk}";
+      if (empty($wk) ||
+          !isset($user_settings['widgets'][$wk]) ||
+          !is_array($user_settings['widgets'][$wk]) ||
+          !file_exists($image_filename)) {
+          echo null;
+          exit;
+      }
+
+      $img_info = getimagesize($image_filename);
+      switch ($img_info[2]) {
+          case IMAGETYPE_PNG:
+              $pic_type = "png";
+              break;
+          default:
+              echo null;
+              exit;
+      }
+
+      header("Content-Type: image/" . $pic_type);
+      readfile($image_filename);
+      exit;
+  }
+  ```

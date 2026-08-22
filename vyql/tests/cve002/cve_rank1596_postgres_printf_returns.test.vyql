@@ -1,0 +1,70 @@
+# Rank 1596 / CVE-2015-3166: PostgreSQL's code base called the
+# printf family without checking their return values, and every
+# standard library implementation can fail with ENOMEM -- a failed
+# fprintf would silently omit output, expose trailing buffer
+# contents, or crash, with callers none the wiser (unchecked
+# function returns to information exposure, CWE-252/CWE-200; fixed
+# by the May 2015 security release). The pool row held 0c071936e9 --
+# the REVERT of the change ("This leaves us again exposed to the
+# possibility of the type of failure envisioned in CVE-2015-3166")
+# -- so the row is corrected in place: the fixing commit is
+# 16304a013432931e61e623c8d85e9fe24709d9ba, "Add error-throwing
+# wrappers for the printf family of functions": src/port/syswrap.c
+# renames the printf functions to pg_ wrappers that check the
+# return and panic (exit(1) via pg_fatal-style handling) on
+# failure, so a formatting failure aborts the process rather than
+# emitting partial or stale output.n.
+#
+# ATTENTION, checked-error-returns for the printf family. The
+# corpus's unchecked-result concept (VYQL-VAL-001
+# UncheckedDecodeResult) judges decode calls; the printf family's
+# error contract (returns negative on failure) is exercised by no
+# binding, and the failure mode is a rare errno path invisible to
+# dataflow -- the same rare-path-return family as rank 1590's
+# uninitialized variant exit. A binding on postgres's own syswrap
+# would detect this database rather than the weakness. Measured on
+# the real code: scanning src/port/snprintf.c reports zero findings
+# at both revisions. No ENGINE-GAPS.md entry. No definition change
+# shipped. Spec cve_rank1596 records the unchecked fprintf return
+# and the panic-wrapper form, both asserting reject VYQL-VAL-001:
+# when checked-return vocabulary lands for standard functions, the
+# unchecked form must flip to expect.
+
+test "rank1596: the printf family is called without its return"
+  lang c
+  file src/backend/main/main.c
+  reject VYQL-VAL-001
+  code
+  ```
+  #include <stdio.h>
+
+  void report_startup(const char *progname, const char *msg)
+  {
+      fprintf(stderr, "%s: %s\\n", progname, msg);
+      printf("%s started\\n", progname);
+  }
+  ```
+
+test "rank1596: the fixed revision aborts on printf failure"
+  lang c
+  file src/backend/main/main.c
+  reject VYQL-VAL-001
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  static void check_printf(int result)
+  {
+      if (result < 0) {
+          fputs("printf family function failed\\n", stderr);
+          exit(1);
+      }
+  }
+
+  void report_startup(const char *progname, const char *msg)
+  {
+      check_printf(fprintf(stderr, "%s: %s\\n", progname, msg));
+      check_printf(printf("%s started\\n", progname));
+  }
+  ```

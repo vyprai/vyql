@@ -1,0 +1,117 @@
+# Rank 1540 / CVE-2024-55470: Oqtane's settings controller defaulted
+# its authorization flag to true and only computed a real decision
+# for one permission name, so every other permission (View among
+# them) passed open for any authenticated user (broken access
+# control, CWE-862; PR #4878 "User Settings should only be
+# accessible to individual users or administrators"; the task list's
+# nocommit flag reflects advisory-side absence). The entity branch of
+# Oqtane.Server/Controllers/SettingController.cs did `authorized =
+# true; if (permissionName == PermissionNames.Edit) { authorized =
+# _userPermissions.IsAuthorized(User, _alias.SiteId, entityName, -1,
+# PermissionNames.Write, RoleNames.Admin) ||
+# (_userPermissions.GetUser(User).UserId == entityId); }` -- a
+# default-open variable whose only guarded branch is Edit -- and the
+# listing filter checked `!User.IsInRole(RoleNames.Admin) &&
+# UserId != entityId`, missing the permission path entirely. Pool
+# commit cdd03bf3d4 carries the change (the merge diffries
+# the controller change): the authorization applies to every
+# permission name unconditionally (`authorized = IsAuthorized(...,
+# Write, Admin) || UserId == entityId`) and the filter uses the same
+# permission decision. .
+#
+# ATTENTION, default-open authorization branches. The defect is an
+# authorization variable that starts true and is narrowed in only one
+# branch of a permission conditional -- decision-completeness over
+# the permission vocabulary, the same family as ranks 1519
+# (capability gates), 1535 (startup guards) and 1556 (sibling route
+# groups): no rule can ask "does every permission name receive an
+# authorization decision" -- the default-true initialization is not
+# an observable guard shape. A binding on Oqtane's own
+# _userPermissions would detect this application rather than the
+# weakness. Measured on the real code: scanning SettingController.cs
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1540 records the
+# default-open branch and the unconditional decision, both asserting
+# reject VYQL-AUTH-079: when decision-completeness vocabulary lands,
+# the default-open form must flip to expect.
+
+test "rank1540: only one permission name gets a decision"
+  lang csharp
+  file Oqtane.Server/Controllers/SettingController.cs
+  reject VYQL-AUTH-079
+  code
+  ```
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+
+  [Authorize]
+  [ApiController]
+  public class SettingController : Controller
+  {
+      private readonly IUserPermissions _userPermissions;
+      private readonly UserPermissions _user;
+
+      [HttpGet("{entity}/{entityId}")]
+      public IActionResult Get(string entityName, int entityId, string permissionName)
+      {
+          bool authorized;
+          if (entityName == EntityNames.User)
+          {
+              authorized = true;
+              if (permissionName == PermissionNames.Edit)
+              {
+                  authorized = _userPermissions.IsAuthorized(User, SiteId, entityName, -1, PermissionNames.Write, RoleNames.Admin)
+                      || (_userPermissions.GetUser(User).UserId == entityId);
+              }
+          }
+          else
+          {
+              authorized = _userPermissions.IsAuthorized(User, SiteId, entityName, entityId, PermissionNames.View, RoleNames.Admin);
+          }
+
+          if (authorized)
+          {
+              return Ok(_settings.GetSettings(entityName, entityId));
+          }
+          return NotFound();
+      }
+  }
+  ```
+
+test "rank1540: the fixed revision decides for every permission name"
+  lang csharp
+  file Oqtane.Server/Controllers/SettingController.cs
+  reject VYQL-AUTH-079
+  code
+  ```
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+
+  [Authorize]
+  [ApiController]
+  public class SettingController : Controller
+  {
+      private readonly IUserPermissions _userPermissions;
+
+      [HttpGet("{entity}/{entityId}")]
+      public IActionResult Get(string entityName, int entityId, string permissionName)
+      {
+          bool authorized;
+          if (entityName == EntityNames.User)
+          {
+              authorized = _userPermissions.IsAuthorized(User, SiteId, entityName, -1, PermissionNames.Write, RoleNames.Admin)
+                  || (_userPermissions.GetUser(User).UserId == entityId);
+          }
+          else
+          {
+              authorized = _userPermissions.IsAuthorized(User, SiteId, entityName, entityId, PermissionNames.View, RoleNames.Admin);
+          }
+
+          if (authorized)
+          {
+              return Ok(_settings.GetSettings(entityName, entityId));
+          }
+          return NotFound();
+      }
+  }
+  ```

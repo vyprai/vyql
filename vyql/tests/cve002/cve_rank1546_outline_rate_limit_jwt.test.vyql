@@ -1,0 +1,92 @@
+# Rank 1546 / CVE-2026-41649: Outline's rate limiter keyed its
+# buckets on a user id taken from an unsigned JWT decode, so any
+# client forged a token with a fresh payload.id and received a fresh
+# bucket, defeating the limits entirely (rate-limiting bypass through
+# unverified claims, CWE-347/CWE-307; PR #12114). getRateLimiter
+# Identifier in server/middlewares/rateLimiter.ts did `// Note: JWT
+# is not validated here which would require a DB request, just
+# decoded to extract the user ID... const payload =
+# getJWTPayload(token); if (payload.id) { return "user:" +
+# payload.id + ":" + ctx.ip; }` -- the identifier trusts the
+# token's unverified body. the fixing commit is the fixing change
+# (confirmed, "fix: Use verified JWT for rate limiting"): the
+# identifier resolves the user through getUserForJWT(token) --
+# signature verification and user lookup -- with RateLimiter.
+# getCachedUserIdForToken caching the mapping, and API-key or OAuth
+# tokens fall back to the client IP. .
+#
+# ATTENTION, unverified-JWT claim consumption. The corpus's JWT
+# rules judge verification flags on session configurations
+# (VYQL-CRY-007-adjacent shapes), not the consumption of decoded
+# claims: nothing can ask "is this value read from a verified token
+# rather than a decoded one" -- decode-vs-verify is API vocabulary
+# (jwt.decode vs jwt.verify) that appears here only inside the
+# project's own getJWTPayload helper, the same helper-boundary as
+# rank 1542. Measured on the real code: scanning rateLimiter.ts
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1546 records the
+# unsigned-decode identifier and the verified form, both asserting
+# reject VYQL-AUTH-079: when claim-provenance vocabulary lands, the
+# unsigned form must flip to expect.
+
+test "rank1546: the limit bucket is keyed by an unsigned claim"
+  lang javascript
+  file server/middlewares/rateLimiter.ts
+  reject VYQL-AUTH-079
+  code
+  ```
+  import { getJWTPayload } from "@server/utils/jwt";
+
+  function getRateLimiterIdentifier(ctx) {
+      const token = ctx.headers.authorization;
+      if (token && !ApiKey.match(token) && !OAuthAuthentication.match(token)) {
+          // Note: JWT is not validated here which would require a DB request,
+          // just decoded to extract the user ID for separating rate limits by user
+          // on shared networks.
+          const payload = getJWTPayload(token);
+          if (payload.id) {
+              return "user:" + payload.id + ":" + ctx.ip;
+          }
+      }
+      return ctx.ip;
+  }
+
+  function rateLimiter(ctx, next) {
+      const identifier = getRateLimiterIdentifier(ctx);
+      return limiter.consume(identifier, 1).then(next);
+  }
+  ```
+
+test "rank1546: the fixed revision keys on the verified user"
+  lang javascript
+  file server/middlewares/rateLimiter.ts
+  reject VYQL-AUTH-079
+  code
+  ```
+  import { getUserForJWT } from "@server/utils/jwt";
+
+  async function getRateLimiterIdentifier(ctx) {
+      const token = ctx.headers.authorization;
+      if (!token) {
+          return ctx.ip;
+      }
+
+      if (ApiKey.match(token) || OAuthAuthentication.match(token)) {
+          return ctx.ip;
+      }
+
+      let userId = await RateLimiter.getCachedUserIdForToken(token);
+      if (!userId) {
+          const { user } = await getUserForJWT(token);
+          userId = user.id;
+          void RateLimiter.cacheUserForToken(token, userId);
+      }
+      return userId;
+  }
+
+  function rateLimiter(ctx, next) {
+      return getRateLimiterIdentifier(ctx).then((identifier) =>
+          limiter.consume(identifier, 1).then(next)
+      );
+  }
+  ```

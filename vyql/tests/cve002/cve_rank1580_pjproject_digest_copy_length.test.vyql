@@ -1,0 +1,90 @@
+# Rank 1580 / CVE-2026-40892: pjsip's digest authentication copied
+# pre-hashed credential data into a fixed stack buffer using the
+# credential's own length field, with only a lower-bound check, so an
+# over-long digest string overflowed the 128-byte ha1 buffer (stack
+# buffer overflow, CWE-121/CWE-787; PR #4912). The pre-computed
+# branch of pjsip_auth_create_digest2 in pjsip/src/pjsip/
+# sip_auth_client.c validated `cred_info->data.slen >= digest_strlen`
+# -- enough bytes, never too many -- and then did `pj_memcpy( ha1,
+# cred_info->data.ptr, cred_info->data.`;`. The fixing commit c82123ea6f
+# ("Fix stack buffer overflow
+# in pjsip_auth_create_digest2()"): the copy takes exactly
+# digest_strlen bytes, capping it to the expected digest hex length
+# regardless of trailing bytes the caller included. No pool
+# correction.
+#
+# ATTENTION, lower-bound-only length checks. The guard exists and
+# runs -- its comparison direction is wrong for the copy it protects:
+# >= proves the source suffices but the destination's size is the
+# binding constraint, and no observation asks "is the memcpy length
+# bounded by the destination" -- the copy-length family the memory
+# rules do not carry (rank 1530's multiply and rank 1576's counters
+# are siblings: sizes and bounds that diverge on one path). A
+# binding on pjsip's own create_digest2 would detect this library
+# rather than the weakness. Measured on the real code: scanning
+# sip_auth_client.c reports 14 findings at both revisions (memory
+# heuristics; none change across revisions). No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1580 records the
+# source-length copy and the digest_strlen-capped form, both
+# asserting reject VYQL-MEM-006: when copy-bound vocabulary lands,
+# the source-length form must flip to expect.
+
+test "rank1580: the digest is copied by its own length"
+  lang c
+  file pjsip/src/pjsip/sip_auth_client.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <string.h>
+  #include <stddef.h>
+
+  typedef struct { const char *ptr; size_t slen; } pj_str_t;
+
+  typedef struct {
+      int data_type;
+      pj_str_t data;
+  } pjsip_cred_info;
+
+  #define PJSIP_CRED_DATA_DIGEST 2
+
+  void create_digest(char ha1[128], const pjsip_cred_info *cred_info, size_t digest_strlen)
+  {
+      if (cred_info->data_type != PJSIP_CRED_DATA_DIGEST) {
+          return;
+      }
+
+      if (cred_info->data.slen >= digest_strlen) {
+          memcpy(ha1, cred_info->data.ptr, cred_info->data.slen);
+      }
+  }
+  ```
+
+test "rank1580: the fixed revision copies exactly the digest length"
+  lang c
+  file pjsip/src/pjsip/sip_auth_client.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <string.h>
+  #include <stddef.h>
+
+  typedef struct { const char *ptr; size_t slen; } pj_str_t;
+
+  typedef struct {
+      int data_type;
+      pj_str_t data;
+  } pjsip_cred_info;
+
+  #define PJSIP_CRED_DATA_DIGEST 2
+
+  void create_digest(char ha1[128], const pjsip_cred_info *cred_info, size_t digest_strlen)
+  {
+      if (cred_info->data_type != PJSIP_CRED_DATA_DIGEST) {
+          return;
+      }
+
+      if (cred_info->data.slen >= digest_strlen) {
+          memcpy(ha1, cred_info->data.ptr, digest_strlen);
+      }
+  }
+  ```

@@ -1,0 +1,90 @@
+# Rank 1595 / CVE-2023-44270: PostCSS's tokenizer recognised every
+# line terminator except a bare carriage return in its bad-bracket
+# pattern, so input using \r line endings kept an unclosed bracket
+# token open across lines and confused every tool relying on
+# PostCSS's token positions (incorrect parsing enabling downstream
+# bypasses, CWE-74/CWE-1284 family; the advisory notes security
+# tools that sanitize CSS through PostCSS). RE_BAD_BRACKET in
+# lib/tokenize.js read `/.[\n"'(/\\]/` -- \n but not \r -- while
+# RE_AT_END and RE_WORD_END carry both. The fixing commit 58cc860b4c
+# ("Fix carrier return parsing"): the
+# class gains \r, `/.[\r\n"'(/\\]/`, with parse tests for
+# \r-terminated input. .
+#
+# ATTENTION, terminator-class completeness. The parser exists and
+# its terminator handling is mostly right -- one character class
+# omitted a terminator the CSS grammar defines, the same
+# grammar-completeness family as rank 1573 (single-quote encoding
+# declarations): no rule can ask "does every character class that
+# enumerates line terminators include all of them" -- class
+# completeness against a grammar is enumeration vocabulary. A
+# binding on PostCSS's own tokenizer would detect this library
+# rather than the weakness. Measured on the real code: scanning
+# lib/tokenize.js reports zero findings at both revisions. No
+# ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1595 records the \n-only bad-bracket class and the
+# \r\n-complete form, both asserting reject VYQL-VAL-016: when
+# grammar-completeness vocabulary lands, the incomplete class must
+# flip to expect.
+
+test "rank1595: the bad bracket class omits the carriage return"
+  lang javascript
+  file lib/tokenize.js
+  reject VYQL-VAL-016
+  code
+  ```
+  const RE_NEWLINE = /\r?\n|\r/;
+  const RE_BAD_BRACKET = /.[\n"'(/\\]/;
+
+  function tokenizer(input) {
+      const tokens = [];
+      let pos = 0;
+      while (pos < input.length) {
+          const code = input.charCodeAt(pos);
+          if (code === 40) {
+              const match = input.slice(pos).match(RE_BAD_BRACKET);
+              if (match === null) {
+                  pos++;
+                  continue;
+              }
+              const end = pos + match.index + 1;
+              tokens.push(['bracket', input.slice(pos, end)]);
+              pos = end;
+          } else {
+              pos++;
+          }
+      }
+      return tokens;
+  }
+  ```
+
+test "rank1595: the fixed revision includes every line terminator"
+  lang javascript
+  file lib/tokenize.js
+  reject VYQL-VAL-016
+  code
+  ```
+  const RE_NEWLINE = /\r?\n|\r/;
+  const RE_BAD_BRACKET = /.[\r\n"'(/\\]/;
+
+  function tokenizer(input) {
+      const tokens = [];
+      let pos = 0;
+      while (pos < input.length) {
+          const code = input.charCodeAt(pos);
+          if (code === 40) {
+              const match = input.slice(pos).match(RE_BAD_BRACKET);
+              if (match === null) {
+                  pos++;
+                  continue;
+              }
+              const end = pos + match.index + 1;
+              tokens.push(['bracket', input.slice(pos, end)]);
+              pos = end;
+          } else {
+              pos++;
+          }
+      }
+      return tokens;
+  }
+  ```

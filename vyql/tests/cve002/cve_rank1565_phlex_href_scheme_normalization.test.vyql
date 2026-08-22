@@ -1,0 +1,87 @@
+# Rank 1565 / CVE-2024-32970: Phlex's javascript:-URL guard normalized
+# href values by stripping only tabs, spaces and newlines, so a scheme
+# carrying other control characters bypassed the check and executed
+# script through the rendered attribute (XSS, CWE-79; fixed alongside
+# the XSS browser-test suite). The attribute writer in lib/phlex/
+# sgml.rb did `next if lower_name == "href" && v.to_s.downcase.tr(
+# "\t \n", "").start_with?("javascript:")` -- browsers strip the full
+# control-character set when parsing URLs, so "jav\x01ascript:" or
+# scheme spellings with embedded controls survive the tr and reach
+# the href values. The fixing commit
+# (confirmed, its lib/phlex/sgml.rb hunk is the security change,
+# bundled with 6613 lines of XSS fixtures and browser tests): the
+# normalization becomes `v.to_s.downcase.tr("^a-z:", "").start_with?(
+# "javascript:")` -- only lowercase letters and the colon survive, so
+# no control character can hide inside the scheme -- and the unsafe
+# attribute-name check normalizes with tr("^a-z-", ""). No pool
+# correction.
+#
+# ATTENTION, guard-normalization strength. The check exists and runs
+# -- its defect is that the character class it strips is weaker than
+# the parser it defends against, the same present-but-incomplete
+# family as ranks 1551 (first-quote-only escaping), 1522
+# (bracket-blind host checks) and 1564 (unquoted bind types): nothing
+# can ask "does this scheme normalization remove everything the
+# downstream URL parser ignores", which requires knowing both
+# vocabularies. A binding on Phlex's own href writer would detect
+# this library rather than the weakness. Measured on the real code:
+# scanning lib/ reports the same 3 findings at both revisions
+# (VYQL-INJ-004 heuristics on phlex/kit.rb's const_added -- nothing
+# on sgml.rb's attribute path). No ENGINE-GAPS.md entry: the piece is
+# normalization-strength vocabulary, not a localised construct. No
+# definition change shipped. Spec cve_rank1565 records the weak tr
+# form and the strict normalization, both asserting reject
+# VYQL-INJ-004: when normalization-strength vocabulary lands, the
+# weak-tr form must flip to expect.
+
+test "rank1565: the href scheme check strips three characters only"
+  lang ruby
+  file lib/phlex/sgml.rb
+  reject VYQL-INJ-004
+  code
+  ```
+  module Phlex
+    module SGML
+      def unsafe_write_attributes(attributes)
+        attributes.each do |k, v|
+          if k == :href
+            lower_name = "href"
+            next if lower_name == "href" && v.to_s.downcase.tr("\t \n", "").start_with?("javascript:")
+          end
+
+          if HTML::EVENT_ATTRIBUTES.include?(k.to_s.downcase) || k.to_s.match?(/[<>&"']/)
+            raise ArgumentError, "Unsafe attribute name detected: #{k}."
+          end
+
+          yield %( #{k}="#{v}")
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1565: the fixed revision keeps only letters and the colon"
+  lang ruby
+  file lib/phlex/sgml.rb
+  reject VYQL-INJ-004
+  code
+  ```
+  module Phlex
+    module SGML
+      def unsafe_write_attributes(attributes)
+        attributes.each do |k, v|
+          if k == :href
+            lower_name = "href"
+            next if lower_name == "href" && v.to_s.downcase.tr("^a-z:", "").start_with?("javascript:")
+          end
+
+          if HTML::EVENT_ATTRIBUTES.include?(k.to_s.downcase.tr("^a-z-", "")) || k.to_s.match?(/[<>&"']/)
+            raise ArgumentError, "Unsafe attribute name detected: #{k}."
+          end
+
+          yield %( #{k}="#{v}")
+        end
+      end
+    end
+  end
+  ```

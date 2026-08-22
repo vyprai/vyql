@@ -1,0 +1,113 @@
+# Rank 1534 / CVE-2026-29181: OpenTelemetry Go's Baggage propagator
+# accumulated members from every baggage header without any W3C
+# limit, so a request carrying many headers (or huge ones) drove
+# unbounded parsing and memory growth in every service using the
+# propagator (resource exhaustion, CWE-400/CWE-770; PR #7880).
+# extractMultiBaggage in propagation/baggage.go did `for _, bStr :=
+# range bVals { currBag, err := baggage.Parse(bStr); if err != nil {
+# continue }; members = append(members, currBag.Members()...) }` --
+# nothing caps the accumulated member count or the combined bytes
+# across headers. The fixing commit (confirmed --
+# -- "Comply with W3C Baggage specification limits (#7880)"): the
+# loop breaks once len(members) >= maxMembers (64, the W3C
+# compliance number), the parse layer enforces the combined 8192
+# byte budget, per-member byte limits are dropped as non-spec, and
+# empty results are reported through the error handler. No pool
+# correction.
+#
+# ATTENTION, cross-iteration accumulation budget. The defect is an
+# accumulation loop whose only bound is the attacker's header count
+# -- the same cross-iteration budget family as ranks 1554 (route
+# combination explosion) and 1560 (a continue skipping the counter),
+# here across parse results rather than within one parse: the
+# corpus's CWE-400 rules judge per-iteration progress
+# (VYQL-DOS-029 parsers, VYQL-DOS-028 buffered reads), not a budget
+# carried across loop iterations, so nothing can ask "does the
+# accumulation of parsed members stop at a cap". A binding on
+# otel-go's own extractMultiBaggage would detect this SDK rather
+# than the weakness. Measured on the real code: scanning
+# propagation/baggage.go reports zero findings at both revisions.
+# No ENGINE-GAPS.md entry: the piece is budget-vocabulary design,
+# not a localised construct. No definition change shipped. Spec
+# cve_rank1534 records the unbounded accumulation and the capped
+# form, both asserting reject VYQL-DOS-029: when accumulation-budget
+# vocabulary lands, the unbounded form must flip to expect.
+
+test "rank1534: members accumulate from every header unbounded"
+  lang go
+  file propagation/baggage.go
+  reject VYQL-DOS-029
+  code
+  ```
+  package propagation
+
+  import (
+      "context"
+
+      "go.opentelemetry.io/otel/baggage"
+  )
+
+  func extractMultiBaggage(parent context.Context, getter ValuesGetter) context.Context {
+      bVals := getter.Values("baggage")
+      if len(bVals) == 0 {
+          return parent
+      }
+
+      var members []baggage.Member
+      for _, bStr := range bVals {
+          currBag, err := baggage.Parse(bStr)
+          if err != nil {
+              continue
+          }
+          members = append(members, currBag.Members()...)
+      }
+
+      b, err := baggage.New(members...)
+      if err != nil || b.Len() == 0 {
+          return parent
+      }
+      return baggage.ContextWithBaggage(parent, b)
+  }
+  ```
+
+test "rank1534: the fixed revision stops at the member budget"
+  lang go
+  file propagation/baggage.go
+  reject VYQL-DOS-029
+  code
+  ```
+  package propagation
+
+  import (
+      "context"
+
+      "go.opentelemetry.io/otel/baggage"
+  )
+
+  const maxMembers = 64
+
+  func extractMultiBaggage(parent context.Context, getter ValuesGetter) context.Context {
+      bVals := getter.Values("baggage")
+      if len(bVals) == 0 {
+          return parent
+      }
+
+      var members []baggage.Member
+      for _, bStr := range bVals {
+          currBag, err := baggage.Parse(bStr)
+          if err != nil {
+              continue
+          }
+          members = append(members, currBag.Members()...)
+          if len(members) >= maxMembers {
+              break
+          }
+      }
+
+      b, err := baggage.New(members...)
+      if err != nil || b.Len() == 0 {
+          return parent
+      }
+      return baggage.ContextWithBaggage(parent, b)
+  }
+  ```

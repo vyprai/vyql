@@ -1,0 +1,107 @@
+# Rank 1527 / CVE-2023-2977: OpenSC's CardOS initializer walked the
+# card's ASN.1 TLV packages with a cursor variable that doubled as
+# the tag-search result pointer, so the walk's position and its
+# remaining-length bookkeeping desynchronized and the next search
+# read past the response buffer (out-of-bounds read, CWE-125; issue
+# #2785; the task list's nocommit flag reflects advisory-side absence --
+# the commit message names the bug and the linked issue). The loop in
+# cardos_have_verifyrc_package (src/pkcs15init/pkcs15-cardos.c) did
+# `p = sc_asn1_find_tag(card->ctx, p, len, 0xe1, &tlen); if (p ==
+# NULL) return 0; ... q = sc_asn1_find_tag(card->ctx, p, tlen, 0x01,
+# &ilen);` then advanced `p += tlen; len -= tlen + 2;` -- after the
+# first assignment p names not the package start but the found
+# tag's value, so the += tlen advance and the len -= tlen + 2
+# accounting step from different bases, and a crafted package layout
+# walks the cursor out of rbuf. The fixing commit 81944d1529
+# ("pkcs15init: correct left length calculation to
+# fix buffer overrun bug"): the outer result goes to a separate pp,
+# every inner search reads from pp, and p remains only the loop's
+# cursor. .
+#
+# ATTENTION, cursor-role separation. The defect is one variable
+# serving two roles -- walk cursor and search result -- so the
+# length arithmetic and the pointer arithmetic do not describe the
+# same bytes; that is a pointer-discipline judgement the corpus has
+# no observation for (the memory rules label derefs and frees, not
+# role confusion in a walk), the same parser-walk family as rank
+# 1559's wire-budget note. A binding on OpenSC's own sc_asn1_find_tag
+# would flag the whole library's walks. Measured on the real code:
+# scanning pkcs15-cardos.c reports the same 15 findings at both
+# revisions (memory-family heuristics; none change across revisions).
+# ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1527 records the cursor-clobbering walk and the
+# pp-separated form, both asserting reject VYQL-MEM-006: when
+# pointer-role vocabulary lands, the clobbering form must flip to
+# expect.
+
+test "rank1527: the tag search clobbers its own cursor"
+  lang c
+  file src/pkcs15init/pkcs15-cardos.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  #define SC_MAX_APDU_BUFFER_SIZE 261
+
+  const uint8_t *sc_asn1_find_tag(void *ctx, const uint8_t *buf, size_t len, unsigned int tag, size_t *taglen);
+
+  int have_verifyrc_package(uint8_t *rbuf, size_t len, int card_type)
+  {
+      const uint8_t *p = rbuf, *q;
+      size_t tlen = 0, ilen = 0;
+
+      while (len != 0) {
+          p = sc_asn1_find_tag(NULL, p, len, 0xe1, &tlen);
+          if (p == NULL)
+              return 0;
+          if (card_type == 1) {
+              q = sc_asn1_find_tag(NULL, p, tlen, 0x01, &ilen);
+              if (q == NULL || ilen != 4)
+                  return 0;
+              if (q[0] == 0x07)
+                  return 1;
+          }
+          p += tlen;
+          len -= tlen + 2;
+      }
+      return 0;
+  }
+  ```
+
+test "rank1527: the fixed revision keeps the cursor and the result separate"
+  lang c
+  file src/pkcs15init/pkcs15-cardos.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  #define SC_MAX_APDU_BUFFER_SIZE 261
+
+  const uint8_t *sc_asn1_find_tag(void *ctx, const uint8_t *buf, size_t len, unsigned int tag, size_t *taglen);
+
+  int have_verifyrc_package(uint8_t *rbuf, size_t len, int card_type)
+  {
+      const uint8_t *p = rbuf, *q, *pp;
+      size_t tlen = 0, ilen = 0;
+
+      while (len != 0) {
+          pp = sc_asn1_find_tag(NULL, p, len, 0xe1, &tlen);
+          if (pp == NULL)
+              return 0;
+          if (card_type == 1) {
+              q = sc_asn1_find_tag(NULL, pp, tlen, 0x01, &ilen);
+              if (q == NULL || ilen != 4)
+                  return 0;
+              if (q[0] == 0x07)
+                  return 1;
+          }
+          p += tlen;
+          len -= tlen + 2;
+      }
+      return 0;
+  }
+  ```

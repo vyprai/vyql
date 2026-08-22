@@ -1,0 +1,94 @@
+# Rank 1598 / CVE-2024-9710: PostHog's external data source creation
+# passed the request's subdomain into its credential validation and
+# outbound URL construction without any character check, so a crafted
+# subdomain redirected the server's own connections (host segment
+# injection toward SSRF, CWE-20/CWE-918; PR #25388). The Zendesk and
+# Vitally branches of ExternalDataSourceViewSet in
+# posthog/warehouse/api/external_data_source.py did `subdomain =
+# request.data.get("subdomain", "")` then straight into
+# validate_zendesk_credentials(subdomain=subdomain, ...) -- the
+# helper builds https://{subdomain}.zendesk.com/... and the segment
+# accepts slashes, dots and query characters. The fixing commit 3732c0fd95
+# ("fix(data-warehouse): Check source
+# subdomains are correct (#25388)"): both branches compile
+# `^[a-zA-Z-]+$` and reject with 400 before any validation or URL
+# construction. .
+#
+# ATTENTION, host-segment validation at project boundaries. The
+# subdomain crosses from request.data into PostHog's own credential
+# helper whose URL construction is invisible to the scanner -- the
+# project-API boundary of ranks 1545/1579 -- and the corpus's
+# request-data sources label the input while no sink labels the
+# helper's outbound call, so no taint path forms (scanning the file
+# reports the same findings at both revisions; none on the subdomain
+# flow). The fixed revision's control -- a character-class allowlist on the
+# host segment -- is the general shape. No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1598 records the raw
+# subdomain reaching the credential helper and the regex-gated form,
+# both asserting reject VYQL-RF-001: when helper-boundary vocabulary
+# lands, the raw form must flip to expect.
+
+test "rank1598: the subdomain reaches the helper unchecked"
+  lang python
+  file posthog/warehouse/api/external_data_source.py
+  reject VYQL-RF-001
+  code
+  ```
+  from rest_framework import request, status
+  from rest_framework.response import Response
+
+
+  class ExternalDataSourceViewSet(viewsets.ModelViewSet):
+      def create(self, request):
+          if source_type == "Zendesk":
+              subdomain = request.data.get("subdomain", "")
+              api_key = request.data.get("api_key", "")
+              email_address = request.data.get("email_address", "")
+
+              if not validate_zendesk_credentials(
+                  subdomain=subdomain, api_key=api_key, email_address=email_address
+              ):
+                  return Response(
+                      status=status.HTTP_400_BAD_REQUEST,
+                      data={"message": "Invalid credentials: Zendesk credentials are incorrect"},
+                  )
+
+          return Response(status=status.HTTP_201_CREATED)
+  ```
+
+test "rank1598: the fixed revision allowlists the subdomain characters"
+  lang python
+  file posthog/warehouse/api/external_data_source.py
+  reject VYQL-RF-001
+  code
+  ```
+  import re
+
+  from rest_framework import request, status
+  from rest_framework.response import Response
+
+
+  class ExternalDataSourceViewSet(viewsets.ModelViewSet):
+      def create(self, request):
+          if source_type == "Zendesk":
+              subdomain = request.data.get("subdomain", "")
+              api_key = request.data.get("api_key", "")
+              email_address = request.data.get("email_address", "")
+
+              subdomain_regex = re.compile("^[a-zA-Z-]+$")
+              if not subdomain_regex.match(subdomain):
+                  return Response(
+                      status=status.HTTP_400_BAD_REQUEST,
+                      data={"message": "Invalid credentials: Zendesk subdomain is incorrect"},
+                  )
+
+              if not validate_zendesk_credentials(
+                  subdomain=subdomain, api_key=api_key, email_address=email_address
+              ):
+                  return Response(
+                      status=status.HTTP_400_BAD_REQUEST,
+                      data={"message": "Invalid credentials: Zendesk credentials are incorrect"},
+                  )
+
+          return Response(status=status.HTTP_201_CREATED)
+  ```

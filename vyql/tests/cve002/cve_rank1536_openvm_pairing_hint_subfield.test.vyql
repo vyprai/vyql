@@ -1,0 +1,88 @@
+# Rank 1536 / CVE-2026-46669: OpenVM's pairing-check guest accepted
+# the host's hinted scalar factor without verifying it lies in the
+# proper subfield, so a malicious hint could make the zkVM's pairing
+# check pass on invalid arguments (cryptographic verification
+# unsoundness, CWE-347/CWE-310; GHSA-76mq-v757-53gr; the task list's
+# nocommit flag reflects advisory-side absence -- the commit message names
+# the advisory). verify_pairing in guest-libs/pairing/src/
+# bls12_381/pairing.rs (and the bn254 twin) did `let (c, s) =
+# Self::pairing_check_hint(P, Q);` and went straight to the final
+# exponentiation identity -- the Fp12 element s must lie in the Fp6
+# subfield for the hint to be honest, and nothing checked. Pool
+# commit a720e2c7ba is the fixing commit: the odd coefficients
+# of s are required to be zero -- `for i in [1, 3, 5] { if s.c[i] !=
+# Fp2::ZERO { return None; } }` -- matching gnark's E12 pairing
+# subfield check, with host tests proving prank hints are rejected.
+
+#
+# ATTENTION, hint-membership verification. The defect is a
+# verification path trusting an external hint without its domain
+# membership check -- protocol-level soundness vocabulary the corpus
+# has no observation for (the crypto rules judge signature shapes:
+# VYQL-CRY-016 scalar bounds, VYQL-CRY-024 digest suffix; none can
+# ask "is the prover-supplied hint constrained to the expected
+# algebraic domain"), the same verification-pairing family as rank
+# 1524. A binding on OpenVM's own pairing_check_hint would detect
+# this project rather than the weakness. Measured on the real code:
+# scanning pairing.rs reports zero findings at both revisions. No
+# ENGINE-GAPS.md entry. No definition change shipped. Spec
+# cve_rank1536 records the unchecked hint and the subfield-checked
+# form, both asserting reject VYQL-CRY-016: when domain-membership
+# vocabulary lands, the unchecked form must flip to expect.
+
+test "rank1536: the hinted factor is used without its subfield check"
+  lang rust
+  file guest-libs/pairing/src/bls12_381/pairing.rs
+  reject VYQL-CRY-016
+  code
+  ```
+  pub fn verify_pairing(
+      p: &[AffinePoint],
+      q: &[AffinePoint],
+  ) -> Option<Result<(), PairingCheckError>> {
+      let (c, s) = Self::pairing_check_hint(p, q);
+
+      // We check an equivalent condition: f * c^x * s = c^q.
+      let f = Self::multi_miller_loop(p, q);
+      let cx = c.pow_by_seed();
+      let mut lhs = f * cx * s;
+      lhs.final_exponentiation()?;
+      if lhs != Fp12::ONE {
+          return Some(Err(PairingCheckError));
+      }
+      Some(Ok(()))
+  }
+  ```
+
+test "rank1536: the fixed revision rejects hints outside the subfield"
+  lang rust
+  file guest-libs/pairing/src/bls12_381/pairing.rs
+  reject VYQL-CRY-016
+  code
+  ```
+  pub fn verify_pairing(
+      p: &[AffinePoint],
+      q: &[AffinePoint],
+  ) -> Option<Result<(), PairingCheckError>> {
+      let (c, s) = Self::pairing_check_hint(p, q);
+
+      // Hint is only honest if `s` lies in proper subfield Fp6.
+      // The Fp6 representation is fp6_c0 = [s.c[0], s.c[2], s.c[4]]
+      // and fp6_c1 = [s.c[1], s.c[3], s.c[5]].
+      for i in [1, 3, 5] {
+          if s.c[i] != Fp2::ZERO {
+              return None;
+          }
+      }
+
+      // We check an equivalent condition: f * c^x * s = c^q.
+      let f = Self::multi_miller_loop(p, q);
+      let cx = c.pow_by_seed();
+      let mut lhs = f * cx * s;
+      lhs.final_exponentiation()?;
+      if lhs != Fp12::ONE {
+          return Some(Err(PairingCheckError));
+      }
+      Some(Ok(()))
+  }
+  ```

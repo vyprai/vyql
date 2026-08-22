@@ -1,0 +1,145 @@
+# Rank 1539 / CVE-2019-1010295: OP-TEE's syscall layer copied
+# memory-reference parameters from a user Trusted Application without
+# checking the TA's access rights to those ranges, so a user TA could
+# pass hostile pointers that a pseudo TA (running with the TEE's own
+# privileges) then read or wrote (missing pointer validation at a
+# trust boundary, CWE-20/CWE-822). utee_param_to_param in
+# core/tee/tee_svc.c took the raw utee_params values and stuffed them
+# into the callee's tee_ta_param -- for TEE_PARAM_TYPE_MEMREF_* it
+# copied the address and size with no validation, and
+# tee_ta_invoke_ta calls it for every TA. The fixing commit d5c5b0b77b
+# ("core: svc: always check TA parameters.
+# Always check TA parameters from a user TA. This prevents a user TA
+# from passing invalid pointers to a pseudo TA."): the function
+# gains the user TA context and returns TEE_Result, and every
+# memref case runs `tee_mmu_check_access_rights(utc, flags, a, b)` --
+# TEE_MEMORY_ACCESS_READ | TEE_MEMORY_ACCESS_ANY_OWNER, plus WRITE
+# for output refs -- returning TEE_ERROR_ACCESS_DENIED on failure,
+# with the caller propagating. .
+#
+# ATTENTION, trust-boundary pointer validation. The defect is a
+# trust-boundary crossing whose pointer arguments are trusted by
+# construction -- the same boundary vocabulary the corpus lacks for
+# IPC-ish layers (no rule can ask "are memory references from the
+# untrusted side validated against the caller's address space
+# before entering the trusted side"); the memory rules label derefs,
+# not parameter crossings. A binding on OP-TEE's own
+# tee_mmu_check_access_rights would detect this platform rather than
+# the weakness. Measured on the real code: scanning tee_svc.c reports
+# the same 47 findings at both revisions (memory heuristics over the
+# 2000-line file; none change). No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1539 records the unchecked
+# parameter copy and the access-checked form, both asserting reject
+# VYQL-MEM-006: when trust-boundary vocabulary lands, the unchecked
+# form must flip to expect.
+
+test "rank1539: ta parameters cross without access checks"
+  lang c
+  file core/tee/tee_svc.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <stdint.h>
+
+  #define TEE_PARAM_TYPE_MEMREF_INPUT 5
+  #define TEE_PARAM_TYPE_MEMREF_OUTPUT 6
+
+  struct utee_params {
+      unsigned long types;
+      unsigned long vals[4];
+  };
+
+  struct tee_ta_param {
+      unsigned int types;
+      unsigned long vals[4];
+  };
+
+  static void utee_param_to_param(struct tee_ta_param *p, struct utee_params *up)
+  {
+      size_t n;
+
+      p->types = up->types;
+      for (n = 0; n < 4; n++) {
+          switch (p->types >> (n * 4) & 0xf) {
+          case TEE_PARAM_TYPE_MEMREF_INPUT:
+          case TEE_PARAM_TYPE_MEMREF_OUTPUT:
+              p->vals[n * 2] = up->vals[n * 2];
+              p->vals[n * 2 + 1] = up->vals[n * 2 + 1];
+              break;
+          default:
+              p->vals[n * 2] = up->vals[n * 2];
+              p->vals[n * 2 + 1] = up->vals[n * 2 + 1];
+              break;
+          }
+      }
+  }
+  ```
+
+test "rank1539: the fixed revision validates every memory reference"
+  lang c
+  file core/tee/tee_svc.c
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <stdint.h>
+
+  #define TEE_PARAM_TYPE_MEMREF_INPUT 5
+  #define TEE_PARAM_TYPE_MEMREF_OUTPUT 6
+  #define TEE_MEMORY_ACCESS_READ 1
+  #define TEE_MEMORY_ACCESS_WRITE 2
+  #define TEE_MEMORY_ACCESS_ANY_OWNER 4
+  #define TEE_SUCCESS 0
+  #define TEE_ERROR_ACCESS_DENIED 0x00000006
+
+  struct utee_params {
+      unsigned long types;
+      unsigned long vals[4];
+  };
+
+  struct tee_ta_param {
+      unsigned int types;
+      unsigned long vals[4];
+  };
+
+  struct user_ta_ctx;
+
+  int tee_mmu_check_access_rights(struct user_ta_ctx *utc, uint32_t flags,
+                                  unsigned long addr, size_t size);
+
+  static int utee_param_to_param(struct user_ta_ctx *utc,
+                                 struct tee_ta_param *p,
+                                 struct utee_params *up)
+  {
+      size_t n;
+
+      p->types = up->types;
+      for (n = 0; n < 4; n++) {
+          switch (p->types >> (n * 4) & 0xf) {
+          case TEE_PARAM_TYPE_MEMREF_OUTPUT: {
+              uint32_t flags = TEE_MEMORY_ACCESS_READ |
+                               TEE_MEMORY_ACCESS_ANY_OWNER |
+                               TEE_MEMORY_ACCESS_WRITE;
+              if (tee_mmu_check_access_rights(utc, flags, up->vals[n * 2], up->vals[n * 2 + 1]))
+                  return TEE_ERROR_ACCESS_DENIED;
+              p->vals[n * 2] = up->vals[n * 2];
+              p->vals[n * 2 + 1] = up->vals[n * 2 + 1];
+              break;
+          }
+          case TEE_PARAM_TYPE_MEMREF_INPUT: {
+              uint32_t flags = TEE_MEMORY_ACCESS_READ |
+                               TEE_MEMORY_ACCESS_ANY_OWNER;
+              if (tee_mmu_check_access_rights(utc, flags, up->vals[n * 2], up->vals[n * 2 + 1]))
+                  return TEE_ERROR_ACCESS_DENIED;
+              p->vals[n * 2] = up->vals[n * 2];
+              p->vals[n * 2 + 1] = up->vals[n * 2 + 1];
+              break;
+          }
+          default:
+              p->vals[n * 2] = up->vals[n * 2];
+              p->vals[n * 2 + 1] = up->vals[n * 2 + 1];
+              break;
+          }
+      }
+      return TEE_SUCCESS;
+  }
+  ```

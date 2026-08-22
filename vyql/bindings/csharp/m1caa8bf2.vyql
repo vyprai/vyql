@@ -1198,3 +1198,7 @@ binding ambiguousArchiveManifestSelection260 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and containsAny(node.context.selector, [".Entries"]) and containsAny(node.context.call, ["EndsWith", "Equals", "StartsWith"]) and containsAny(node.context.literal, [".nuspec", ".gemspec", ".podspec", "META-INF/MANIFEST.MF", "AndroidManifest.xml", "package.json"]) and not (containsAny(node.context.call, ["Single", "Count"]))
   emit issue code.AmbiguousArchiveManifestSelection at node
 }
+binding certValidationDisabledDelegate {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.callPath contains "ServerCertificateCustomValidationCallback" and node.context.literal contains "true" and not (node.context.functionName contains "Validate")
+  emit issue code.CertValidationDisabled at node
+}

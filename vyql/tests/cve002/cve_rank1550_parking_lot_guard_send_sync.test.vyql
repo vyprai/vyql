@@ -1,0 +1,73 @@
+# Rank 1550 / CVE-2020-35910: parking_lot's lock guards carried
+# unsafe Send/Sync impls with bounds too weak for the data they
+# expose, so a guard over non-Send data could cross threads and race
+# on its target (thread-safety soundness hole, CWE-662/CWE-362; PR
+# #262 "Fix bounds on Send and Sync impls for lock guards"). The
+# impls in src/lock_api.rs read `unsafe impl<'a, R: RawRwLock + 'a,
+# T: ?Sized + Sync + 'a> Sync for RwLockReadGuard<'a, R, T> {}` and
+# -- decisively -- `unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized +
+# 'a> Send for MappedRwLockReadGuard<'a, R, T>` with NO T bound at
+# all: moving the guard to another thread moves its reference to T
+# with it, whatever T is. the fixing commit is the fixing change
+# (confirmed, the guard_sync merge): every Send impl now requires
+# `T: ?Sized + Send`, the read/write guards' Sync impls sit behind
+# the right bounds, and a GuardNoSend marker opt-out is added.
+
+#
+# ATTENTION, unsafe impl bounds. The defect lives in trait-safety
+# declarations -- which generic bounds make an unsafe impl sound is
+# Rust type-system semantics no observation models: the corpus's
+# concurrency rules judge dataflow races (VYQL-RACE-002
+# LocklessSharedMutation, RACE-001 FileToctou), not the correctness
+# of unsafe impl declarations. A binding on parking_lot's own guards
+# would detect this crate rather than the weakness. Measured on the
+# real code: scanning src/ reports the same 55 findings at both
+# revisions (13 rust files; none change with the bounds). No
+# ENGINE-GAPS.md entry: unsafe-impl bound checking is language
+# semantics, not a localised construct. No definition change
+# shipped. Spec cve_rank1550 records the unbounded Send impl and the
+# T: Send-bounded form, both asserting reject VYQL-RACE-002: when
+# unsafe-impl vocabulary lands, the unbounded form must flip to
+# expect.
+
+test "rank1550: the mapped guard sends whatever it wraps"
+  lang rust
+  file src/lock_api.rs
+  reject VYQL-RACE-002
+  code
+  ```
+  use crate::raw_rwlock::RawRwLock;
+
+  pub struct MappedRwLockReadGuard<'a, R: RawRwLock, T: ?Sized> {
+      raw: &'a R,
+      data: *const T,
+  }
+
+  unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized + 'a> Send
+      for MappedRwLockReadGuard<'a, R, T>
+  where
+      R::GuardMarker: Send,
+  {
+  }
+  ```
+
+test "rank1550: the fixed revision bounds send on the wrapped data"
+  lang rust
+  file src/lock_api.rs
+  reject VYQL-RACE-002
+  code
+  ```
+  use crate::raw_rwlock::RawRwLock;
+
+  pub struct MappedRwLockReadGuard<'a, R: RawRwLock, T: ?Sized> {
+      raw: &'a R,
+      data: *const T,
+  }
+
+  unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized + Sync + 'a> Send
+      for MappedRwLockReadGuard<'a, R, T>
+  where
+      R::GuardMarker: Send,
+  {
+  }
+  ```

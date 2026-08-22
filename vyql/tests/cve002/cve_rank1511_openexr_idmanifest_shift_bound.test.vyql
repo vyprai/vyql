@@ -1,0 +1,95 @@
+# Rank 1511 / CVE-2026-42217: OpenEXR's IDManifest variable-length integer
+# reader shifted by an unbounded amount (CWE-758 use of undefined behavior
+# feeding out-of-bounds parsing). readVariableLengthInteger in
+# src/lib/OpenEXR/ImfIDManifest.cpp loops
+#   do { ...bounds-check readPtr against endPtr...
+#        value |= (uint64_t (byte & 127)) << shift;
+#        shift += 7;
+#   } while (byte & 128);
+# so a manifest chunk with ten or more continuation bytes drives shift to
+# 64 and beyond: shifting a uint64_t by its width is undefined behavior,
+# the corrupted value then feeds string-list length decoding and indexes
+# past the buffer. The fixing commit (confirmed --
+# "Harden IDManifest parsing against illegal shift and string prefix OOB
+# (#2378)"): a `if (shift >= 64) throw InputExc` before the shift; the
+# common-prefix out-of-bounds half named in the message moves to PR
+# #2377 and is not in this diff. .
+#
+# ATTENTION, no feature observes a shift amount. The bounds discipline in
+# the loop is otherwise real -- readPtr is guarded against endPtr -- so
+# the missing piece is specifically the shift-amount bound, and no rule
+# family asks about it: VYQL-NUM-003 (TaintedIntegerSizeArithmetic) is the
+# numeric family's nearest rule and covers size arithmetic on tainted
+# values, not shift widths. Measured on the real code: scanning
+# ImfIDManifest.cpp at both revisions reports the same low-confidence
+#NullableDeref noise (the loop's deref at parent line 118 / fix line 125
+# among them) and the same RawMemoryCopySize rows far below; nothing
+# differs between the revisions and nothing touches the shift. A binding
+# cannot express "the shift amount of this << is not provably below the
+# type width" because no context token carries the amount or its bound --
+# entered in ENGINE-GAPS.md (Medium: deciding what counts as a bounded
+# shift is a guard judgement, like the lower-bound row). No definition
+# change shipped. Spec cve_rank1511 records the unbounded-shift loop and
+# the guarded form, both asserting reject VYQL-NUM-003.
+
+test "rank1511: continuation bytes shift past the type width"
+  lang cpp
+  file src/lib/OpenEXR/ImfIDManifest.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <cstdint>
+  #include <stdexcept>
+
+  static uint64_t
+  readVariableLengthInteger (const char*& readPtr, const char* endPtr)
+  {
+      uint64_t value = 0;
+      int shift = 0;
+      unsigned char byte = 0;
+      do
+      {
+          if (readPtr >= endPtr)
+          {
+              throw std::runtime_error ("IDManifest too small for variable length integer");
+          }
+          byte = *(unsigned char*) readPtr++;
+          value |= (uint64_t (byte & 127)) << shift;
+          shift += 7;
+      } while (byte & 128);
+      return value;
+  }
+  ```
+
+test "rank1511: the fixed revision rejects shifts at the type width"
+  lang cpp
+  file src/lib/OpenEXR/ImfIDManifest.cpp
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <cstdint>
+  #include <stdexcept>
+
+  static uint64_t
+  readVariableLengthInteger (const char*& readPtr, const char* endPtr)
+  {
+      uint64_t value = 0;
+      int shift = 0;
+      unsigned char byte = 0;
+      do
+      {
+          if (readPtr >= endPtr)
+          {
+              throw std::runtime_error ("IDManifest too small for variable length integer");
+          }
+          if (shift >= 64)
+          {
+              throw std::runtime_error ("Invalid variable-length integer in IDManifest");
+          }
+          byte = *(unsigned char*) readPtr++;
+          value |= (uint64_t (byte & 127)) << shift;
+          shift += 7;
+      } while (byte & 128);
+      return value;
+  }
+  ```

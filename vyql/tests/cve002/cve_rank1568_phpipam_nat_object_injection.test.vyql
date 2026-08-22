@@ -1,0 +1,86 @@
+# Rank 1568 / CVE-2018-1000869: phpIPAM's NAT item-add form passed
+# raw POST values into its database helper as the object type, which
+# becomes the SQL table name, so a crafted object_type injected SQL
+# (SQL injection, CWE-89; issue #2344). app/admin/nat/
+# item-add-submit.php did `$obj_type = $_POST['object_type']; $obj_id
+# = $_POST['object_id']; ... $item = $Tools->fetch_object($obj_type,
+# "id", $obj_id);` -- fetch_object interpolates its first argument
+# into `SELECT ... FROM <table> WHERE ...`, and neither the type nor
+# the id is validated. The fixing commit (confirmed --ange
+# ("Bugfix: Possible SQL injection in nat/
+# item-add-submit.php. Fixes #2344"): an allowlist gates the type --
+# `if (!in_array($obj_type, ['subnets', 'ipaddresses'])) {
+# $Result->show("danger", _("Invalid object type"), true); }` -- and
+# `if (!is_numeric($obj_id))` gates the id, both before any fetch. No
+
+#
+# ATTENTION, ORM table-name interpolation. The injection crosses
+# through phpIPAM's own Tools::fetch_object, whose first argument
+# becomes a table name in assembled SQL -- the same project-ORM
+# boundary rank 1545 recorded for osTicket (nothing labels an
+# application ORM's lookup as a SqlExecution, so the taint from
+# $_POST stops at the call). The corpus's php INJ rules fire on the
+# file's template echoes instead: three VYQL-INJ-004 rows at :25,
+# :43 and :50, identical at both revisions and untouched by the change.
+# A binding on phpIPAM's own fetch_object would detect this
+# application rather than the weakness; the generic piece -- ORM
+# lookup arguments as SQL construction sites, table names
+# especially -- is the missing-concept family. No ENGINE-GAPS.md
+# entry. No definition change shipped. Spec cve_rank1568 records the
+# raw POST pair reaching fetch_object and the allowlist-gated form,
+# both asserting reject VYQL-INJ-001: when ORM-boundary vocabulary
+# lands, the raw form must flip to expect.
+
+test "rank1568: the nat form passes raw post values as the object type"
+  lang php
+  file app/admin/nat/item-add-submit.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  require '../../functions/functions.php';
+
+  if (isset($_POST['object_type']) && isset($_POST['object_id'])) {
+      $obj_type = $_POST['object_type'];
+      $obj_id   = $_POST['object_id'];
+      $nat_id   = $_POST['id'];
+      $nat_type = $_POST['type'];
+
+      // validate object
+      $item = $Tools->fetch_object($obj_type, "id", $obj_id);
+      if ($item !== false) {
+          $Admin->object_modify("nat", "edit", "id", $nat_id);
+      }
+  }
+  ```
+
+test "rank1568: the fixed revision allowlists the type and numerics the id"
+  lang php
+  file app/admin/nat/item-add-submit.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  require '../../functions/functions.php';
+
+  if (isset($_POST['object_type']) && isset($_POST['object_id'])) {
+      $obj_type = $_POST['object_type'];
+      $obj_id   = $_POST['object_id'];
+      $nat_id   = $_POST['id'];
+      $nat_type = $_POST['type'];
+
+      // validate object type
+      if (!in_array($obj_type, ['subnets', 'ipaddresses'])) { $Result->show("danger", _("Invalid object type"), true); }
+
+      // validate object id
+      if (!is_numeric($obj_id)) { $Result->show("danger", _("Invalid object id"), true); }
+
+      // validate object
+      $item = $Tools->fetch_object($obj_type, "id", $obj_id);
+      if ($item !== false) {
+          $Admin->object_modify("nat", "edit", "id", $nat_id);
+      }
+  }
+  ```

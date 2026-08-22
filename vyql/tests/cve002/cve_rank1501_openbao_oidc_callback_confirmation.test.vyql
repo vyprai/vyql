@@ -1,0 +1,120 @@
+# Rank 1501 / CVE-2026-33757: OpenBao's OIDC direct callback mode issued a
+# login token on the strength of the authorization code alone, so a link sent
+# to a logged-in browser is enough to mint a token for the attacker's client
+# (CWE-384). pathCallback in builtin/credential/jwt/path_oidc.go read state,
+# code and client_nonce from the request, checked the OAuth state and the
+# client nonce, and went straight to the code exchange that issues the token;
+# no step asked the user to confirm the sign-in. The fixed revision e321039519 inserts a
+# confirmation gate in front of the exchange: when the role's callback mode is
+# direct and the request carries no confirmation parameter, the handler
+# returns an HTML confirmation page naming the requester IP and role and keeps
+# the OAuth state alive, and only a second request carrying confirmation=...
+# proceeds; role parameter oidc_disable_confirmation can turn the gate off.
+# the commit is the squash-merge of openbao#2710, named by advisory
+# GHSA-7q7g-x6vg-xpc3. .
+#
+# ATTENTION, analysis gap. Scanning builtin/credential/jwt at both revisions
+# reports the same rows -- VYQL-SEC-002 at high confidence on a hardcoded
+# constant in path_config.go and DomInput-driven INJ/RF rows inside the fixed revision's
+# own embedded confirmation HTML -- and nothing on pathCallback at either
+# revision, because the weakness is not a dataflow: the callback validates
+# everything it is given and the missing thing is an interaction step between
+# the browser and the user. code.AuthenticationRequiredOp with VYQL-AUTH-001
+# is the sanctioned route for authz weaknesses with no taint path, but its
+# bindings are name-based on operation names such as ChangePassword, and the
+# only identifiers a binding could key on here are openbao's own
+# callbackModeDirect and oidc_disable_confirmation, which detect this server
+# rather than the weakness: the same fail-open login written over another
+# provider's callback walks past it. Recording the gap rather than shipping a
+# repro-shaped label; not an ENGINE-GAPS.md entry, since what is missing is a
+# way to state 'an authentication flow completes without a user-presence
+# signal', which is vocabulary design, not a mechanical engine change.
+#
+# verify_current_expected: attention-analysis-gap, both revisions rejected
+
+test "rank1501: the callback exchanges the code and issues the token with no user confirmation"
+  lang go
+  file builtin/credential/jwt/path_oidc.go
+  reject VYQL-AUTH-001
+  code
+  ```
+  package jwt
+
+  import (
+	  "github.com/openbao/openbao/vault/helper/consts"
+	  "github.com/openbao/openbao/vault/logical"
+  )
+
+  func (b *jwtAuthBackend) pathCallback(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+	  stateID := d.Get("state").(string)
+
+	  oidcReq := b.getOIDCRequest(stateID)
+	  if oidcReq == nil || oidcReq.auth != nil {
+		  return logical.ErrorResponse(errLoginFailed + " Expired or missing OAuth state."), nil
+	  }
+
+	  roleName := oidcReq.rolename
+	  role, err := b.role(ctx, req.Storage, roleName)
+	  if err != nil {
+		  return nil, err
+	  }
+
+	  clientNonce := d.Get("client_nonce").(string)
+	  if oidcReq.clientNonce != "" && clientNonce != oidcReq.clientNonce && role.CallbackMode != callbackModeDirect {
+		  return logical.ErrorResponse("invalid client_nonce"), nil
+	  }
+
+	  oidcToken, err := b.exchangeCode(oidcReq, role, d.Get("code").(string))
+	  if err != nil {
+		  return logical.ErrorResponse(errLoginFailed + " OAuth exchange failed."), nil
+	  }
+	  return b.handle_oidc_login(oidcToken)
+  }
+  ```
+
+test "rank1501: the fixed revision requires a confirmation round before the exchange"
+  lang go
+  file builtin/credential/jwt/path_oidc.go
+  reject VYQL-AUTH-001
+  code
+  ```
+  package jwt
+
+  import (
+	  "github.com/openbao/openbao/vault/logical"
+  )
+
+  func (b *jwtAuthBackend) pathCallback(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+	  stateID := d.Get("state").(string)
+
+	  oidcReq := b.getOIDCRequest(stateID)
+	  if oidcReq == nil || oidcReq.auth != nil {
+		  return logical.ErrorResponse(errLoginFailed + " Expired or missing OAuth state."), nil
+	  }
+
+	  roleName := oidcReq.rolename
+	  role, err := b.role(ctx, req.Storage, roleName)
+	  if err != nil {
+		  return nil, err
+	  }
+
+	  if role.CallbackMode == callbackModeDirect && !role.OIDCDisableConfirmation {
+		  confirmation := d.Get("confirmation").(string)
+		  if confirmation == "" {
+			  deleteRequest = false
+			  resp := &logical.Response{}
+			  resp.Data = map[string]interface{}{
+				  logical.HTTPContentType: "text/html",
+				  logical.HTTPRawBody:     []byte(confirmHTML(oidcReq.requesterIP, oidcReq.rolename)),
+			  }
+			  return resp, nil
+		  }
+	  }
+
+	  oidcToken, err := b.exchangeCode(oidcReq, role, d.Get("code").(string))
+	  if err != nil {
+		  return logical.ErrorResponse(errLoginFailed + " OAuth exchange failed."), nil
+	  }
+	  return b.handle_oidc_login(oidcToken)
+  }
+  ```

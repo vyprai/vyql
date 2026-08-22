@@ -1,0 +1,100 @@
+# Rank 1574 / CVE-2026-54328: pi's coding agent unpacked extension
+# packages into a predictable folder under the system temp directory,
+# so another local user could pre-plant or race the cache path and
+# have the agent load attacker-chosen code (insecure temporary
+# directory, CWE-377/CWE-424; PR #5345). getTemporaryDir in
+# packages/coding-agent/src/core/package-manager.ts did `const root =
+# this.resolveManagedPath(join(tmpdir(), "pi-extensions"), prefix)`
+# -- /tmp is world-writable and world-readable, the subpath is a
+# fixed name, and the payload hash derives from known strings.
+# The fixing commit (confirmed, "fix
+# (coding-agent): move temporary extension cache"): a
+# getExtensionTempFolder helper places the cache at join(agentDir,
+# "tmp", "extensions") -- inside the agent's own state directory --
+# created with `mkdirSync(tempFolder, { recursive: true, mode:
+# 0o700 })` plus an explicit chmodSync(0o700) for pre-existing
+# directories, and getTemporaryDir builds on it. .
+#
+# ATTENTION, shared-temp placement. The defect is a cache for
+# executable content sited in the shared world-writable directory
+# with a predictable name -- placement vocabulary, not a dataflow:
+# no rule can ask "does this extraction path live outside the shared
+# temp directory with private permissions", and the corpus's path
+# rules judge traversal, not directory ownership. A binding on pi's
+# own getTemporaryDir would detect this agent rather than the
+# weakness. Measured on the real code: scanning package-manager.ts
+# reports zero findings at the parent and one at the fixed revision (a heuristic
+# row on the newly added code -- fix-direction noise; the placement
+# itself is never visible). No ENGINE-GAPS.md entry. No definition
+# change shipped. Spec cve_rank1574 records the tmpdir-joined cache
+# and the 0o700 agent-dir form, both asserting reject VYQL-PATH-001:
+# when temp-placement vocabulary lands, the tmpdir form must flip to
+# expect.
+
+test "rank1574: the extension cache sits in the shared temp dir"
+  lang javascript
+  file packages/coding-agent/src/core/package-manager.ts
+  reject VYQL-PATH-001
+  code
+  ```
+  import { mkdirSync, writeFileSync } from "node:fs";
+  import { tmpdir } from "node:os";
+  import { createHash } from "node:crypto";
+  import { join } from "node:path";
+
+  export class DefaultPackageManager {
+    private agentDir: string;
+
+    private getTemporaryDir(prefix, suffix) {
+      const root = this.resolveManagedPath(join(tmpdir(), "pi-extensions"), prefix);
+      const hash = createHash("sha256")
+        .update(`${prefix}-${suffix ?? ""}`)
+        .digest("hex");
+
+      const dir = join(root, hash);
+      mkdirSync(dir, { recursive: true });
+      return dir;
+    }
+
+    private resolveManagedPath(root, prefix) {
+      return join(root, prefix);
+    }
+  }
+  ```
+
+test "rank1574: the fixed revision caches under the agent dir with 0700"
+  lang javascript
+  file packages/coding-agent/src/core/package-manager.ts
+  reject VYQL-PATH-001
+  code
+  ```
+  import { chmodSync, mkdirSync, writeFileSync } from "node:fs";
+  import { createHash } from "node:crypto";
+  import { join } from "node:path";
+
+  export function getExtensionTempFolder(agentDir) {
+    const tempFolder = join(agentDir, "tmp", "extensions");
+    mkdirSync(tempFolder, { recursive: true, mode: 0o700 });
+    chmodSync(tempFolder, 0o700);
+    return tempFolder;
+  }
+
+  export class DefaultPackageManager {
+    private agentDir: string;
+
+    private getTemporaryDir(prefix, suffix) {
+      const root = this.resolveManagedPath(getExtensionTempFolder(this.agentDir), prefix);
+      const hash = createHash("sha256")
+        .update(`${prefix}-${suffix ?? ""}`)
+        .digest("hex");
+
+      const dir = join(root, hash);
+      mkdirSync(dir, { recursive: true, mode: 0o700 });
+      return dir;
+    }
+
+    private resolveManagedPath(root, prefix) {
+      return join(root, prefix);
+    }
+  }
+  ```

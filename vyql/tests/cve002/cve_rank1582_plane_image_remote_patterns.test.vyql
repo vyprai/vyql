@@ -1,0 +1,64 @@
+# Rank 1582 / CVE-2024-47830: Plane's web frontend whitelisted every
+# https host as a Next.js remote image source, so the server-side
+# image optimizer fetched attacker-chosen URLs -- including internal
+# addresses -- on behalf of any viewer (server-side request forgery
+# through a wildcard pattern, CWE-918; PR #5452). web/next.config.js
+# configured `images: { remotePatterns: [{ protocol: "https",
+# hostname: "**" }], unoptimized: true }` -- the "**" hostname admits
+# every host, making the allowlist a formality. The fixing commit
+# b9f78ba42b ("chore: next image config
+# updated"): the remotePatterns block is deleted entirely (with
+# unoptimized images, no server-side fetch happens). No pool
+# correction.
+#
+# ATTENTION, wildcard allowlist configuration. The guard (an
+# allowlist) exists -- its pattern matches everything, the
+# same over-permissive-normalization family as rank 1522's host
+# checks from the configuration side: no rule can ask "does this
+# allowlist entry exclude anything at all" -- a wildcard that admits
+# all values is degenerate allowlist vocabulary. A binding on
+# Plane's next.config would detect this application rather than the
+# weakness. Measured on the real code: scanning next.config.js
+# reports zero findings at both revisions. No ENGINE-GAPS.md entry.
+# No definition change shipped. Spec cve_rank1582 records the
+# wildcard pattern and the removed form, both asserting reject
+# VYQL-RF-001: when allowlist-degeneracy vocabulary lands, the
+# wildcard form must flip to expect.
+
+test "rank1582: every https host is an allowed image source"
+  lang javascript
+  file web/next.config.js
+  reject VYQL-RF-001
+  code
+  ```
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    images: {
+      remotePatterns: [
+        {
+          protocol: "https",
+          hostname: "**",
+        },
+      ],
+      unoptimized: true,
+    },
+  };
+
+  module.exports = nextConfig;
+  ```
+
+test "rank1582: the fixed revision removes the wildcard pattern"
+  lang javascript
+  file web/next.config.js
+  reject VYQL-RF-001
+  code
+  ```
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    images: {
+      unoptimized: true,
+    },
+  };
+
+  module.exports = nextConfig;
+  ```

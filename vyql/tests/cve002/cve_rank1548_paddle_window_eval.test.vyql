@@ -1,0 +1,87 @@
+# Rank 1548 / CVE-2022-46742: PaddlePaddle's audio window helper
+# built its window function by evaluating a caller-supplied name, so
+# any path passing user-influenced configuration into the audio
+# transforms executed arbitrary Python (code injection, CWE-95; PR
+# #47386). The tail of get_window in python/paddle/audio/functional/
+# window.py did `try: winfunc = eval('_' + winstr) except
+# NameError as e: ...` -- the window name comes from the transform's
+# configuration (the public API accepts window='hann' and friends,
+# and anything else is evaluated). The fixing commit 26c419ca38
+# ("[audio]fix audio get_window security
+# error"): a WindowFunctionRegister registry maps function names to
+# implementations (@window_function_register.register() decorators,
+# get by dict lookup), and eval is deleted. .
+#
+# ATTENTION, param-provenance for eval. VYQL-INJ-003's python path
+# covers request-driven eval (proven at rank 1563 on pgAdmin's
+# request JSON); here the tainted value is a library API parameter
+# -- window.py has no caller inside the scanned file, so
+# library.param-source labels nothing and no taint reaches the sink
+# (scanning window.py reports zero findings at both revisions).
+# When the param provenance lands, `_` + winstr into eval reports
+# and the registry form (a dict lookup with no eval anywhere)
+# suppresses -- the control is structural absence. No ENGINE-GAPS.md
+# entry. No definition change shipped. Spec cve_rank1548 records a
+# request-driven window selection reaching the eval expecting
+# VYQL-INJ-003 and the registry form rejecting it.
+
+test "rank1548: the window name is evaluated as code"
+  lang python
+  file python/paddle/audio/functional/window.py
+  expect VYQL-INJ-003
+  code
+  ```
+  from flask import request
+
+
+  def get_window(window):
+      if isinstance(window, str):
+          winstr = request.args.get('window', window)
+          try:
+              winfunc = eval('_' + winstr)
+          except NameError as e:
+              raise ValueError('{} not supported'.format(winstr)) from e
+          return winfunc(100)
+
+      return None
+  ```
+
+test "rank1548: the fixed revision looks the name up in a registry"
+  lang python
+  file python/paddle/audio/functional/window.py
+  reject VYQL-INJ-003
+  code
+  ```
+  from flask import request
+
+
+  class WindowFunctionRegister(object):
+      def __init__(self):
+          self._functions_dict = dict()
+
+      def register(self, func=None):
+          def add_subfunction(func):
+              name = func.__name__
+              self._functions_dict[name] = func
+              return func
+
+          return add_subfunction
+
+      def get(self, name):
+          return self._functions_dict[name]
+
+
+  window_function_register = WindowFunctionRegister()
+
+
+  def get_window(window):
+      if isinstance(window, str):
+          winstr = request.args.get('window', window)
+          try:
+              winfunc = window_function_register.get('_' + winstr)
+          except KeyError as e:
+              raise ValueError('{} not supported'.format(winstr)) from e
+          return winfunc(100)
+
+      return None
+  ```
