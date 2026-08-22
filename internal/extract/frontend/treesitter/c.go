@@ -4535,10 +4535,7 @@ func ccComparisonAfter(bodyText, idx string, op byte, needBound bool) bool {
 		if len(tail) > 1 && tail[1] == op {
 			continue
 		}
-		rhs := tail[1:]
-		if strings.HasPrefix(rhs, "=") {
-			rhs = rhs[1:]
-		}
+		rhs := strings.TrimPrefix(tail[1:], "=")
 		if needBound && ccZeroOrSignLiteral(rhs) {
 			continue
 		}
