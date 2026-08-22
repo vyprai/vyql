@@ -1,0 +1,104 @@
+# CVE-2017-17790: Resolv::Hosts read the hosts file through Ruby's receiverless
+# `open`. `Kernel#open` is a private instance method mixed into Object, so
+# `open path, "rb"` is `Kernel.open path, "rb"`, and Ruby documents that method
+# as running the path as a subprocess command line whenever its first character
+# is `|`. `Hosts.new(filename)` takes the path from its caller and stores it in
+# @filename, and lazy_initialize opens it on first use, so an application that
+# resolved names through a caller-supplied hosts path ran `id` for a path
+# spelled `|id` (CWE-78). The fixed revision switches the call to `File.open`, the
+# spelling that has no pipe behaviour.
+#
+# The fixing commit 6781840f6c is the merge of the change into master; its combined
+# diff is empty, so the change is unreadable from the row. The fixing change itself is its
+# second parent 2267e0e785, which changes exactly this one call, and the
+# merge's first parent 6df552eaee carries the vulnerable form.
+#
+# The weakness class is existing vocabulary: code.RubyPipeOpenCommandExecution,
+# its review twin and VYQL-INJ-042, with the receiverless spelling bound
+# exactly (callee.path == "open"), because `~=` is segment-aware in both
+# directions and would otherwise pull in the patched `File.open` as well.
+#
+# The path arrives as a constructor argument stored in an instance variable
+# rather than from a labelled source, so this is the review direction: the flag
+# names the call for a caller audit, and the taint rule stays silent until a
+# source reaches it.
+
+test "rank1693: a hosts path stored by the constructor and opened through bare open can run a piped path"
+  lang ruby
+  profile library
+  expect_review code.RubyPipeOpenCommandExecution
+  file lib/resolv.rb
+  code
+  ```
+  module Resolv
+    class Hosts
+      def initialize(filename = DefaultFileName)
+        @filename = filename
+        @mutex = Thread::Mutex.new
+        @initialized = nil
+      end
+
+      def lazy_initialize # :nodoc:
+        @mutex.synchronize {
+          unless @initialized
+            @name2addr = {}
+            @addr2name = {}
+            open(@filename, 'rb') {|f|
+              f.each {|line|
+                line.sub!(/#.*/, '')
+                addr, hostname, *aliases = line.split(/\s+/)
+                next unless addr
+                @addr2name[addr] = [] unless @addr2name.include? addr
+                @addr2name[addr] << hostname
+                @name2addr[hostname] = [] unless @name2addr.include? hostname
+                @name2addr[hostname] << addr
+              }
+            }
+            @initialized = true
+          end
+        }
+        self
+      end
+    end
+  end
+  ```
+
+test "rank1693: the patched Hosts opens the same path through File.open"
+  lang ruby
+  profile library
+  reject_review code.RubyPipeOpenCommandExecution
+  file lib/resolv.rb
+  code
+  ```
+  module Resolv
+    class Hosts
+      def initialize(filename = DefaultFileName)
+        @filename = filename
+        @mutex = Thread::Mutex.new
+        @initialized = nil
+      end
+
+      def lazy_initialize # :nodoc:
+        @mutex.synchronize {
+          unless @initialized
+            @name2addr = {}
+            @addr2name = {}
+            File.open(@filename, 'rb') {|f|
+              f.each {|line|
+                line.sub!(/#.*/, '')
+                addr, hostname, *aliases = line.split(/\s+/)
+                next unless addr
+                @addr2name[addr] = [] unless @addr2name.include? addr
+                @addr2name[addr] << hostname
+                @name2addr[hostname] = [] unless @name2addr.include? hostname
+                @name2addr[hostname] << addr
+              }
+            }
+            @initialized = true
+          end
+        }
+        self
+      end
+    end
+  end
+  ```

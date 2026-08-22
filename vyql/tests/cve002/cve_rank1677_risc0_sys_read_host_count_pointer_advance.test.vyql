@@ -1,0 +1,169 @@
+# Rank 1677 / CVE-2025-61588 (GHSA-jqq4-c7wq-36h7, CWE-94 recorded; the defect
+# is an out-of-bounds write, CWE-787/191): the risc0 zkVM guest's sys_read loop
+# trusted the byte count the host returned from the read ecall. In
+# sys_read_internal (risc0/zkvm/platform/src/syscall.rs), the count is bound out
+# of the syscall return, converted to words, and then drives the destination
+# pointer and both remaining-capacity counters with no check that it is at most
+# the requested chunk:
+#
+#   let Return(nread_bytes, last_word) = syscall_2(nr::SYS_READ, recv_ptr, .., fd, chunk_len);
+#   recv_ptr = unsafe { recv_ptr.add(nread_words) };
+#   nwords_remain -= nread_words;
+#   nbytes_remain -= nread_bytes;
+#
+# A malicious host returns more bytes than requested, so recv_ptr.add
+# advances past the buffer, the usize subtractions wrap, and the next iteration
+# has the host write at an attacker-chosen guest address. The v1compat kernel's
+# chunked read loop (risc0/zkos/v1compat/src/main.rs) advanced its buffer by the
+# host-returned rlen the same way. The fixed revision 3f00e1fa deletes both loops: the
+# kernel reads into bounds-checked chunks_mut slices and rejects the count with
+# illegal_instruction() when nread_bytes > nbytes.
+#
+# ATTENTION, two gaps, both measured.
+#
+# 1. Vocabulary: the untrusted value is the *return value* of the host
+# interface call, and no generic fact marks it. The only distinguishing
+# features of sys_read_internal are visible to a binding as (a) the syscall
+# call name, a macro-generated private identifier undocumented even inside the
+# crate, and (b) the pointer-advance spelling `.add(`, which the safe sibling
+# sys_write in the same file shares while advancing by a locally min()-bounded
+# count. Binding either names this incident's identifiers rather than a
+# documented API, and no Rust memory sink exists for a raw-pointer offset, so
+# the shape has no rule to reach. Both forms below are rejected.
+#
+# 2. Engine: the vulnerable line binds its count through a tuple-destructure
+# let, and the Rust frontend drops every name a destructuring let binds
+# (rsConv.patName returns "" for tuple/tuple-struct/struct patterns, so
+# stmtH's let_declaration case lowers to a bare expression). Taint therefore
+# dies at the construct: the same env source reaches the same command sink
+# through .unwrap() but not through `let Ok(cmd) = ..`, and the fourth case
+# pins that. The naive repair -- collecting the bound names into one
+# multi-target nir.Assign the way the Python frontend's targets() does
+# -- is written and measured: it recovers the taint path but regresses
+# VYQL-CRY-006 on the real CVE-2026-26275 code from 2 findings to 0, because
+# binding a name makes later reads resolve to the assigned value node and the
+# read-position code.Name that operand.identifier matches disappears. Keeping
+# both the binding and the name surface is a lowering-wide change to how reads
+# resolve, not a missing case, so the gap stands unworked.
+#
+# verify_current_expected: attention-engine-gap; cases one and two rejected on
+# both revisions, case three is the passing half of the minimal pair, case four
+# is the failing half and flips to expect when a destructuring let carries its
+# binding without losing the read's name node.
+
+test "rank1677: guest read loop advances the destination pointer by the host-returned count"
+  lang rust
+  file risc0/zkvm/platform/src/syscall.rs
+  reject VYQL-NUM-006
+  code
+  ```
+  pub struct Return(pub u32, pub u32);
+
+  unsafe fn sys_read_internal(
+      fd: u32,
+      recv_ptr: *mut u32,
+      nwords: usize,
+      nbytes: usize,
+  ) -> (usize, u32) {
+      let mut nwords_remain = nwords;
+      let mut nbytes_remain = nbytes;
+      let mut nread_total_bytes = 0;
+      let mut recv_ptr = recv_ptr;
+      let mut final_word = 0;
+      while nbytes_remain > 0 {
+          let chunk_len = min(nbytes_remain, MAX_BUF_BYTES) as u32;
+          let Return(nread_bytes, last_word) = unsafe {
+              syscall_2(
+                  nr::SYS_READ,
+                  recv_ptr,
+                  min(nwords_remain, MAX_BUF_WORDS),
+                  fd,
+                  chunk_len,
+              )
+          };
+          let nread_bytes = nread_bytes as usize;
+          let nread_words = nread_bytes / WORD_SIZE;
+          recv_ptr = unsafe { recv_ptr.add(nread_words) };
+          final_word = last_word;
+          nwords_remain -= nread_words;
+          nread_total_bytes += nread_bytes;
+          nbytes_remain -= nread_bytes;
+          if nread_bytes < chunk_len as usize {
+              break;
+          }
+      }
+      (nread_total_bytes, final_word)
+  }
+  ```
+
+test "rank1677: kernel read validates the returned count before copying the final word"
+  lang rust
+  file risc0/zkos/v1compat/src/main.rs
+  reject VYQL-NUM-006
+  code
+  ```
+  fn sys_read(fd: u32, buf: *mut u8, nbytes: u32) {
+      assert_user_raw_slice(buf, nbytes);
+      let slice = unsafe { core::slice::from_raw_parts_mut(buf as *mut u8, nbytes as usize) };
+
+      let mut total_bytes = 0u32;
+      for chunk in slice.chunks_mut(MAX_IO_BYTES as usize) {
+          let nbytes = chunk.len() as u32;
+          set_ureg(REG_A4, nbytes);
+
+          let nbytes_main = (nbytes / WORD_SIZE) * WORD_SIZE;
+          host_ecall_read(fd, chunk.as_mut_ptr(), nbytes_main);
+
+          let (nread_bytes, final_word) = read_a0_a1();
+          if nread_bytes > nbytes {
+              // Host returned an invalid number of bytes read.
+              illegal_instruction()
+          }
+
+          total_bytes += nread_bytes;
+
+          if nread_bytes > nbytes_main {
+              let final_bytes = final_word.to_le_bytes();
+              let pos = nbytes_main as usize;
+              let bytes_remain = (nread_bytes - nbytes_main) as usize;
+              chunk[pos..pos + bytes_remain].copy_from_slice(&final_bytes[..bytes_remain]);
+          }
+
+          if (nread_bytes as usize) < chunk.len() {
+              break;
+          }
+      }
+
+      set_ureg(REG_A0, total_bytes);
+  }
+  ```
+
+test "rank1677: an environment value reaches a command through the non-destructured spelling"
+  lang rust
+  file risc0/xkunbound.rs
+  expect VYQL-INJ-002
+  code
+  ```
+  use std::env;
+  use std::process::Command;
+
+  pub fn run_tool() {
+      let cmd = env::var("TOOL").unwrap();
+      Command::new("sh").arg(cmd).status();
+  }
+  ```
+
+test "rank1677: the same value bound by a destructuring let loses its taint path"
+  lang rust
+  file risc0/xkdestructured.rs
+  reject VYQL-INJ-002
+  code
+  ```
+  use std::env;
+  use std::process::Command;
+
+  pub fn run_tool() {
+      let Ok(cmd) = env::var("TOOL");
+      Command::new("sh").arg(cmd).status();
+  }
+  ```

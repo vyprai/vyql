@@ -1,0 +1,146 @@
+# Rank 1690 / CVE-2022-31161: Roxy-WI's /app/options.py accepted an SSL
+# certificate upload from an unauthenticated request and used the caller's
+# `ssl_name` both as the path of the file it wrote and as a component of the
+# shell command that moved that file into place (CWE-77 command injection and
+# CWE-434 unrestricted file upload; GHSA-pg3w-8p63-x483, CVSS 10.0). The
+# handler read `name = form.getvalue('ssl_name')`, stripped only `;` and `&`
+# from it -- leaving backticks, `$(...)`, `|` and whitespace live -- then ran
+# `open(name, "w")` over attacker-chosen certificate bytes and finally
+# `os.system("mv %s %s" % (name, cert_local_dir))`.
+#
+# The pool row records fix 2e060eb8019ff5b6b1644cb9f93d25465111440b, which is
+# the v6.1.1.0 release tip: it removes a now-redundant shlex.quote from
+# funct.ssh_command and rewords a toastr check in inc/users.js, and its parent
+# 791802e carries the remediation, so no revision pair is available at
+# that SHA. The remediation for this CVE is cfb65d9c6bd5724a74d5cb356709aa586
+# ecd7b83, which introduces `funct.checkAjaxInput` (reject `[&;|$`]`, then
+# `shlex.quote`) and applies it across options.py; 82666df1e60c45dd6aa533b01a
+# 392f015d32f755 turns the guard into the assignment
+# `name = funct.checkAjaxInput(form.getvalue('ssl_name'))`, which is the first
+# revision whose parent still feeds the raw value to both sinks. Measured on
+# the real checkout: 43f116f (last fully raw revision) reports
+# VYQL-INJ-002 from code.HttpInput at options.py:92 to code.CommandExecution
+# at options.py:111 and VYQL-PATH-001 to code.FilePathAccess at options.py:95;
+# 82666df reports neither. The row's language field is also wrong: the
+# weakness and both fixes are entirely in app/options.py and app/funct.py, and
+# the JavaScript the release does touch is unrelated escapeHtml XSS work.
+#
+# Nothing labelled the source. `cgi.FieldStorage` and its accessors had no
+# Python binding at all, so `form.getvalue('ssl_name')` carried no source and
+# both sinks sat unreachable. bindings/python/cgi_form_field_read.vyql now
+# records the receiver type `cgi.FieldStorage` and labels `getvalue`,
+# `getfirst` and `getlist` reads on it, plus the field-name-keyed `getvalue`
+# and `getfirst` forms for the common shape where the form object is built in
+# one module and read in another -- as here, where funct.py constructs it and
+# options.py reaches it through `form = funct.form`, which a receiver type
+# stamped in another file cannot see. The field-name argument is the
+# discriminator on that route: `getvalue` with no argument is the flush idiom
+# on io.StringIO and io.BytesIO, which outnumber form reads by an order of
+# magnitude (measured over the corpus clones: 3173 `form.getvalue(<arg>)`
+# against 6 on any other receiver, and zero argument-bearing `getvalue` or
+# `getfirst` calls in the OWASP Python benchmark, whose 16 `.getvalue(` sites
+# are all argumentless `strIO.getvalue()`).
+#
+# Collateral measured with --cache off over three runs each, fingerprints
+# unioned: roxy-wi/app 163 -> 306, the added findings concentrated on the other
+# injection sites the same release fixed; roundup/cgi, whose templating reads
+# the same accessors, 98 -> 98 with 12 new form-read labels and no new finding.
+#
+# The reject carries `checkAjaxInput` itself rather than a re-spelling, because
+# the fixed revision's neutraliser is that helper and not a bare library call. It rejects
+# VYQL-INJ-002 only. On the real checkout both findings from `ssl_name` are
+# gone at 82666df, but in a self-contained snippet the file-path finding
+# survives `shlex.quote` -- correctly, since shell quoting is not path
+# canonicalisation and `"../x"` quoted is still a traversal -- so asserting it
+# here would pin a suppression the snippet cannot honestly claim.
+
+test "rank1690: the ssl_cert upload moves the requested name through a shell command"
+  lang python
+  file app/options.py
+  expect VYQL-INJ-002
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+  import sys
+
+  import funct
+  import sql
+
+  form = funct.form
+
+  if form.getvalue('ssl_cert'):
+      cert_local_dir = os.path.dirname(os.getcwd()) + "/" + sql.get_setting('ssl_local_path')
+      cert_path = sql.get_setting('cert_path')
+      name = ''
+
+      if not os.path.exists(cert_local_dir):
+          os.makedirs(cert_local_dir)
+
+      if form.getvalue('ssl_name') is None:
+          print('error: Please enter a desired name')
+      else:
+          name = form.getvalue('ssl_name').replace(';', '').replace('&', '')
+
+      try:
+          with open(name, "w") as ssl_cert:
+              ssl_cert.write(form.getvalue('ssl_cert'))
+      except IOError as e:
+          print('error: Cannot save the SSL key file')
+
+      try:
+          os.system("mv %s %s" % (name, cert_local_dir))
+      except OSError as e:
+          funct.logging('localhost', e.args[0], haproxywi=1)
+  ```
+
+test "rank1690: quoting the requested name before it reaches the command is clean"
+  lang python
+  file app/options.py
+  reject VYQL-INJ-002
+  code
+  ```
+  import os
+  import re
+  import sys
+  from shlex import quote
+
+  import funct
+  import sql
+
+
+  def checkAjaxInput(ajax_input):
+      pattern = re.compile('[&;|$`]')
+      if pattern.search(ajax_input):
+          print('error: nice try')
+          sys.exit()
+      else:
+          return quote(ajax_input)
+
+
+  form = funct.form
+
+  if form.getvalue('ssl_cert'):
+      cert_local_dir = os.path.dirname(os.getcwd()) + "/" + sql.get_setting('ssl_local_path')
+      cert_path = sql.get_setting('cert_path')
+      name = ''
+
+      if not os.path.exists(cert_local_dir):
+          os.makedirs(cert_local_dir)
+
+      if form.getvalue('ssl_name') is None:
+          print('error: Please enter a desired name')
+      else:
+          name = checkAjaxInput(form.getvalue('ssl_name'))
+
+      try:
+          with open(name, "w") as ssl_cert:
+              ssl_cert.write(form.getvalue('ssl_cert'))
+      except IOError as e:
+          print('error: Cannot save the SSL key file')
+
+      try:
+          os.system("mv %s %s" % (name, cert_local_dir))
+      except OSError as e:
+          funct.logging('localhost', e.args[0], haproxywi=1)
+  ```

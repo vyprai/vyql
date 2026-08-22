@@ -1,0 +1,11 @@
+module code;
+
+concept CondvarNotifyWithoutGuard : issue {
+  cwe: [CWE_667, CWE_362]
+  reviewAssumption: "a waiter re-checks the predicate and blocks while holding the mutex, so a notify sent after the guard is dropped can land before the waiter sleeps and be lost"
+  reviewCategory: concurrency
+  reviewCondition: "a condition-variable notify is sent from a function whose only mutex guard is a dropped store temporary"
+  reviewConfidence: medium
+  reviewEvidence: "condvar notify {pattern} follows a predicate store through the lock temporary"
+  vulnerableTo: [concurrency.Deadlock, concurrency.RaceCondition]
+}

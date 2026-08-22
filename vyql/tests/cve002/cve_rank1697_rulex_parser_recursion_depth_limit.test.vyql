@@ -1,0 +1,343 @@
+# Rank 1697 / CVE-2022-31099: rulex compiles its own regex language to
+# regexes through a hand-written recursive-descent parser, and the descent
+# had no depth budget. parse_modified calls parse_or, parse_or calls
+# parse_sequence, parse_sequence calls parse_fixes, and parse_fixes
+# re-enters parse_modified (lookaround and group arms) and itself (the
+# `Token::Not` fix arm), so every nesting level of the input -- each `(((`,
+# each `!!`, each lookaround -- costs another turn around a four-function
+# call cycle on the native stack, and a short deeply-nested expression
+# aborts the process with a stack overflow (denial of service through
+# uncontrolled recursion, CWE-400/CWE-674). The fixing commit is 60aa2dc0 ("Add
+# recursion limit") threads a `recursion: u16` through the parser Input:
+# Rulex::parse passes 256, a local `recurse` wrapper around each
+# re-entry point calls Input::recursion_start, which does
+# `self.recursion.checked_sub(1).ok_or(RecursionLimit)`, and recursion_end
+# restores the budget on the way out. Verified in both directions: the
+# parent (330b353) carries the full unbounded cycle and no counter, and
+# the fixed revision carries recursion_start/recursion_end plus the 256 at the entry
+# (lib.rs:87, input.rs:40, parsers.rs:97/105/156/167/303). No pool
+# correction.
+#
+# What fires today: nothing, on either revision. `scan --cache off` over
+# the parent reports 43 findings (18 VYQL-MEM-005, 22 VYQL-MEM-006,
+# 2 VYQL-PATH-001, 1 VYQL-CFG-014 -- deref/subscript heuristics in
+# features.rs, range.rs, group.rs, token.rs) and the fixed tree reports 46
+# of the same families, none in rulex-lib/src/parse/parsers.rs at either
+# revision. `vyql match` on the vulnerable parsers.rs labels exactly five
+# code.IndexAccessSink nodes, all inside parse_quoted_text (lines 586-623)
+# -- nothing on any member of the recursive cycle.
+#
+# Why no binding can express the discriminating question, measured:
+#
+# (1) The cycle is mutual across four functions, so no single function
+#     context contains it. The Rust frontend emits per-function
+#     call:/call_path:/call_arg: tokens (rust.go rsStructuredContextTokens)
+#     and no fact for a call-graph cycle; the one direct self-call
+#     (parse_fixes -> parse_fixes at the `Token::Not` arm) is present at
+#     BOTH revisions -- the fixed revision wraps it in recurse(parse_fixes) rather
+#     than removing it -- so even a self-recursion label discriminates
+#     nothing here.
+# (2) A presence binding cannot ask "does this function call itself"
+#     at all: predicate right sides must be string literals
+#     (internal/bindings/compile_presence.go:236), so
+#     node.context.name == node.context.call does not compile. This is
+#     1320's C measurement, reconfirmed on the current engine for Rust.
+# (3) The budget itself is delegated out of the file: the comparison
+#     lives in Input::recursion_start in input.rs, the cap value (256) is
+#     passed at Rulex::parse in lib.rs, and within parsers.rs the only
+#     trace of the remediation is calls to the fixed revision's own new `recurse`
+#     helper. A binding keyed on recurse/recursion_start fails the rename
+#     test -- it is the fixing commit's vocabulary, not API vocabulary
+#     (the generic shape, "budgeted by an argument passed at the entry",
+#     is satisfied by spelling the wrapper anything at all). The
+#     delegated-check invisibility is 1364's Rust family.
+# (4) The nearest concepts are each library-bound with no Rust binding
+#     and none expresses "recursive descent without a depth budget":
+#     RecursiveCompressedPacketDecompression (VYQL-DOS-045, cpp/js,
+#     zlib wire format), RecursionGuardIndexedByUnnormalizedKey
+#     (VYQL-DOS-036, cpp, seven identifiers of one codebase),
+#     RecursiveObjectParentResolveWithoutCycleGuard (VYQL-DOS-035, PHP),
+#     GsonObjectTypeAdapterRecursiveRead (VYQL-DOS-016, Java, CWE-502),
+#     NestedExtglobExpansionWithoutDepthLimit (VYQL-DOS-047, JS). The
+#     generic CWE-400 progress rule VYQL-DOS-029 consumes an engine
+#     numeric_parser.missing_progress_check analysis that a structural
+#     token parser produces nowhere. code.UnboundedResourceOperation,
+#     which the two hand-written Rust bindings emit, is config-shaped
+#     (chunk-count/message-size sentinels and response caps) and would
+#     only restate (1)-(3) with no judgment.
+#
+# This is the depth-budget family -- 1320 (C, self-recursion fact),
+# 1612 (Python, budget bypassed by dispatch), 1634 (C++, explicit-stack
+# push without a size bound) and pool ranks 1534/1554/1559/1572/1586 --
+# in its Rust recursive-descent form. Extraction and resolution are NOT
+# the blocker, measured on the real file: the USG carries the cycle
+# (parse_fixes#ret FLOWS to its call sites and the recursive argument
+# Arg#3687 FLOWS back into parse_fixes#param#input), so what is missing
+# is a cross-procedural classification -- "is this call cycle bounded by
+# a depth budget" -- which is new vocabulary over a new relation, not a
+# localised construct the engine mishandles (1634's conclusion). A bare
+# unbounded-recursion label is unshippable for the same reason 1320
+# measured (165 function bodies in libzmq/src alone): recursion is
+# Rust's ordinary tree-walk idiom. No definition change shipped.
+#
+# verify_current_expected: both forms reject -- nothing fires on either.
+# When recursion-depth budget vocabulary lands, the unbounded form must
+# flip to expect.
+
+test "rank1697: the descent re-enters itself with no depth budget"
+  lang rust
+  file rulex-lib/src/parse/parsers.rs
+  reject VYQL-DOS-029
+  reject VYQL-DOS-045
+  code
+  ```
+  use nom::{
+      branch::alt,
+      combinator::{cut, map, opt},
+      multi::{many0, many1},
+      sequence::{pair, tuple},
+      IResult,
+  };
+
+  pub(crate) struct Input<'i, 'b> {
+      source: &'i str,
+      tokens: &'b [(Token, Span)],
+  }
+
+  impl<'i, 'b> Input<'i, 'b> {
+      pub(super) fn from(
+          source: &'i str,
+          tokens: &'b [(Token, Span)],
+      ) -> Result<Self, ParseError> {
+          Ok(Input { source, tokens })
+      }
+  }
+
+  pub(crate) fn parse(source: &str) -> Result<Rule<'_>, ParseError> {
+      let tokens = super::tokenize::tokenize(source);
+      let input = Input::from(source, &tokens)?;
+
+      let (rest, rules) = parse_modified(input)?;
+      if rest.is_empty() {
+          Ok(rules)
+      } else {
+          Err(ParseErrorKind::LeftoverTokens.at(rest.span()))
+      }
+  }
+
+  pub(super) fn parse_modified<'i, 'b>(input: Input<'i, 'b>) -> PResult<'i, 'b, Rule<'i>> {
+      try_map2(
+          pair(
+              many0(alt((
+                  map(
+                      tuple((
+                          "let",
+                          cut(Token::Identifier),
+                          cut(Token::Equals),
+                          cut(parse_or),
+                          cut(Token::Semicolon),
+                      )),
+                      |(stmt, span)| (stmt, span),
+                  ),
+              ))),
+              parse_or,
+          ),
+          |(stmts, rule)| Ok(rule),
+          nom::Err::Failure,
+      )(input)
+  }
+
+  pub(super) fn parse_or<'i, 'b>(input: Input<'i, 'b>) -> PResult<'i, 'b, Rule<'i>> {
+      map(separated_list0(Token::Pipe, parse_sequence), |mut rules| {
+          if rules.len() == 1 {
+              rules.pop().unwrap()
+          } else {
+              Alternation::new_rulex(rules)
+          }
+      })(input)
+  }
+
+  pub(super) fn parse_sequence<'i, 'b>(input: Input<'i, 'b>) -> PResult<'i, 'b, Rule<'i>> {
+      map(many1(parse_fixes), |mut rules| rules.pop().unwrap())(input)
+  }
+
+  pub(super) fn parse_fixes<'i, 'b>(input: Input<'i, 'b>) -> PResult<'i, 'b, Rule<'i>> {
+      alt((
+          try_map(
+              pair(Token::Not, opt(parse_fixes)),
+              |(_, rule)| {
+                  if let Some(mut rule) = rule {
+                      rule.negate()?;
+                      Ok(rule)
+                  } else {
+                      Err(ParseErrorKind::Expected("expression"))
+                  }
+              },
+              nom::Err::Failure,
+          ),
+          map(pair(parse_lookaround, parse_modified), |((kind, span), rule)| {
+              let span = span.join(rule.span());
+              Rule::Lookaround(Box::new(Lookaround::new(rule, kind, span)))
+          }),
+          try_map2(
+              pair(parse_atom, many0(parse_repetition)),
+              |(rule, _)| Ok(rule),
+              nom::Err::Failure,
+          ),
+      ))(input)
+  }
+
+  pub(super) fn parse_group<'i, 'b>(input: Input<'i, 'b>) -> PResult<'i, 'b, Rule<'i>> {
+      map(
+          pair(opt(parse_capture), tuple((Token::OpenParen, parse_modified, cut(Token::CloseParen)))),
+          |(capture, (_, rule, _))| rule,
+      )(input)
+  }
+  ```
+
+test "rank1697: the fixed revision bounds every re-entry with a recursion budget"
+  lang rust
+  file rulex-lib/src/parse/parsers.rs
+  reject VYQL-DOS-029
+  reject VYQL-DOS-045
+  code
+  ```
+  use nom::{
+      branch::alt,
+      combinator::{cut, map, opt},
+      multi::{many0, many1},
+      sequence::{pair, tuple},
+      IResult, Parser,
+  };
+
+  pub(crate) struct Input<'i, 'b> {
+      source: &'i str,
+      tokens: &'b [(Token, Span)],
+      recursion: u16,
+  }
+
+  impl<'i, 'b> Input<'i, 'b> {
+      pub(super) fn from(
+          source: &'i str,
+          tokens: &'b [(Token, Span)],
+          recursion: u16,
+      ) -> Result<Self, ParseError> {
+          Ok(Input { source, tokens, recursion })
+      }
+
+      pub(super) fn recursion_start(&mut self) -> Result<(), ParseError> {
+          self.recursion = self
+              .recursion
+              .checked_sub(1)
+              .ok_or_else(|| ParseErrorKind::RecursionLimit.at(self.span()))?;
+          Ok(())
+      }
+
+      pub(super) fn recursion_end(&mut self) {
+          self.recursion += 1;
+      }
+  }
+
+  pub(crate) fn parse(source: &str, recursion: u16) -> Result<Rule<'_>, ParseError> {
+      let tokens = super::tokenize::tokenize(source);
+      let input = Input::from(source, &tokens, recursion)?;
+
+      let (rest, rules) = parse_modified(input)?;
+      if rest.is_empty() {
+          Ok(rules)
+      } else {
+          Err(ParseErrorKind::LeftoverTokens.at(rest.span()))
+      }
+  }
+
+  fn recurse<'i, 'b, O>(
+      mut parser: impl Parser<Input<'i, 'b>, O, ParseError>,
+  ) -> impl FnMut(Input<'i, 'b>) -> PResult<'i, 'b, O> {
+      move |mut input| {
+          input.recursion_start().map_err(nom::Err::Failure)?;
+
+          match parser.parse(input) {
+              Ok((mut input, output)) => {
+                  input.recursion_end();
+                  Ok((input, output))
+              }
+              Err(e) => Err(e),
+          }
+      }
+  }
+
+  pub(super) fn parse_modified<'i, 'b>(input: Input<'i, 'b>) -> PResult<'i, 'b, Rule<'i>> {
+      try_map2(
+          pair(
+              many0(alt((
+                  map(
+                      tuple((
+                          "let",
+                          cut(Token::Identifier),
+                          cut(Token::Equals),
+                          cut(recurse(parse_or)),
+                          cut(Token::Semicolon),
+                      )),
+                      |(stmt, span)| (stmt, span),
+                  ),
+              ))),
+              recurse(parse_or),
+          ),
+          |(stmts, rule)| Ok(rule),
+          nom::Err::Failure,
+      )(input)
+  }
+
+  pub(super) fn parse_or<'i, 'b>(input: Input<'i, 'b>) -> PResult<'i, 'b, Rule<'i>> {
+      map(separated_list0(Token::Pipe, parse_sequence), |mut rules| {
+          if rules.len() == 1 {
+              rules.pop().unwrap()
+          } else {
+              Alternation::new_rulex(rules)
+          }
+      })(input)
+  }
+
+  pub(super) fn parse_sequence<'i, 'b>(input: Input<'i, 'b>) -> PResult<'i, 'b, Rule<'i>> {
+      map(many1(parse_fixes), |mut rules| rules.pop().unwrap())(input)
+  }
+
+  pub(super) fn parse_fixes<'i, 'b>(input: Input<'i, 'b>) -> PResult<'i, 'b, Rule<'i>> {
+      alt((
+          try_map(
+              pair(Token::Not, opt(recurse(parse_fixes))),
+              |(_, rule)| {
+                  if let Some(mut rule) = rule {
+                      rule.negate()?;
+                      Ok(rule)
+                  } else {
+                      Err(ParseErrorKind::Expected("expression"))
+                  }
+              },
+              nom::Err::Failure,
+          ),
+          map(
+              pair(parse_lookaround, recurse(parse_modified)),
+              |((kind, span), rule)| {
+                  let span = span.join(rule.span());
+                  Rule::Lookaround(Box::new(Lookaround::new(rule, kind, span)))
+              },
+          ),
+          try_map2(
+              pair(parse_atom, many0(parse_repetition)),
+              |(rule, _)| Ok(rule),
+              nom::Err::Failure,
+          ),
+      ))(input)
+  }
+
+  pub(super) fn parse_group<'i, 'b>(input: Input<'i, 'b>) -> PResult<'i, 'b, Rule<'i>> {
+      map(
+          pair(
+              opt(parse_capture),
+              tuple((Token::OpenParen, recurse(parse_modified), cut(Token::CloseParen))),
+          ),
+          |(capture, (_, rule, _))| rule,
+      )(input)
+  }
+  ```

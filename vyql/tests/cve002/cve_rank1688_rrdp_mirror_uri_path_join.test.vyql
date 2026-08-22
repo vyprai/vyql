@@ -1,0 +1,270 @@
+# An RPKI validator mirrors every RRDP response it fetches to a local copy of
+# the repository tree. src/collector/rrdp.rs's HttpResponse::open_file derives
+# the mirror location from the request URI: strip the scheme and join what is
+# left -- host and path -- onto the operator-configured response directory,
+# then create the parent directories and the file. The URIs it is handed are
+# not the operator's: they come out of the notification file and delta list
+# the RRDP server itself publishes, so a repository decides both the host and
+# the path of a file that lands under the local mirror root. A URI whose path
+# carries `..` segments walks the join out of the mirror directory, and the
+# write happens with the validator's privileges -- path traversal, CWE-22.
+#
+# The fixed revision moves the path construction into a helper that walks the URI's
+# segments and refuses `.` and `..`, and confirms the joined path still starts
+# at the base. The storing function keeps the directory creation and the file
+# create but does not join the URI itself.
+#
+# What fires without this change: nothing. The tree reports 46 findings, all
+# NullableDeref noise and one WeakRandomValue, with not one PATH row and
+# nothing at all inside open_file. The fs::File::create call is labelled
+# code.FilePathAccess (rust.sinks filePathAccess107), but no Rust source
+# concept can reach the URI: the notification file is parsed by the external
+# rpki crate, so the URIs enter this crate constructed, and the only
+# Rust sources are env/args and web-framework entry parameters.
+#
+# Nothing is minted. The concept (code.RemoteListingDownloadPath) and the rule
+# (VYQL-PATH-006) exist and cover exactly this weakness -- a
+# remote listing's names joined into local download paths -- for C (scp/ftp
+# remote filenames) and JavaScript. The addition is the Rust binding
+# vyql/bindings/rust/remote_uri_mirror_path_join.vyql: a function that joins
+# the string form of a URI or URL into a local path and materialises that path
+# with a file or directory creation, without any of std's containment or
+# traversal checks in the same function. The neutralising markers are std's
+# own vocabulary -- starts_with / strip_prefix containment, a components()
+# walk, ParentDir / CurDir arms, canonicalize, is_absolute, a sanitizer, or a
+# literal "." / ".." segment comparison -- so a fix written in place is
+# honoured, not just the helper-extraction shape this repository happened to
+# choose.
+#
+# Measured. The vulnerable revision of src/collector/rrdp.rs reports open_file
+# as VYQL-PATH-006 and the patched revision reports none, three --cache off
+# runs each; renaming the fixed revision's get_mirror_path helper in the patched tree
+# changes nothing on either side, so the discrimination rides on the
+# join/create co-location and the std containment markers, not on the fixed revision's
+# names. Precision, enumerated rather than sampled: every Rust file under the
+# sibling clones that names a join and a create call and any uri/url marker
+# (8 files across 5 trees, from 4816 .rs files in 299 clones) plus the four
+# largest Rust trees scanned whole -- one true positive (the target) and no
+# other row. A first revision of the binding also matched the Display render
+# spellings (to_string, and to_str as its prefix): apollo-router's changeset
+# tool renders p.url.to_string() into markdown in the same function that joins
+# a locally typed slug, which read as a second row and is not a remote name
+# reaching a path. Dropping the render spellings removed it; the borrow
+# accessors (as_str, path) are what a join actually consumes.
+
+test "rank1688: (a) a URI's string form joined into a mirror path and written with no containment check"
+  lang rust
+  file src/collector/rrdp.rs
+  expect VYQL-PATH-006
+  code
+  ```
+  use std::fs;
+  use std::path::{Path, PathBuf};
+
+  struct HttpResponse;
+
+  impl HttpResponse {
+      fn open_file(
+          base: &Path, uri: &uri::Https, multi: bool
+      ) -> Result<fs::File, Failed> {
+          let path = base.join(&uri.as_str()[8..]);
+          let path = if multi {
+              path.join(Utc::now().to_rfc3339())
+          }
+          else {
+              path
+          };
+
+          let parent = match path.parent() {
+              Some(parent) => parent,
+              None => {
+                  return Err(Failed)
+              }
+          };
+          if let Err(_err) = fs::create_dir_all(parent) {
+              return Err(Failed)
+          }
+          fs::File::create(&path).map_err(|_err| {
+              Failed
+          })
+      }
+  }
+  ```
+
+test "rank1688: (b) the patched helper rejects dot segments and requires the joined path to stay at the base"
+  lang rust
+  file src/collector/rrdp.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::fs;
+  use std::path::{Path, PathBuf};
+
+  struct HttpResponse;
+
+  impl HttpResponse {
+      fn open_file(
+          base: &Path, uri: &uri::Https, multi: bool
+      ) -> Option<fs::File> {
+          let path = Self::get_mirror_path(base, uri, multi)?;
+          let parent = match path.parent() {
+              Some(parent) => parent,
+              None => {
+                  return None
+              }
+          };
+          if let Err(_err) = fs::create_dir_all(parent) {
+              return None
+          }
+          fs::File::create(&path).map_err(|_err| {
+              Failed
+          }).ok()
+      }
+
+      fn get_mirror_path(
+          base: &Path, uri: &uri::Https, multi: bool
+      ) -> Option<PathBuf> {
+          let rel = &uri.as_str()[8..];
+          for segment in rel.split('/') {
+              if segment == "." || segment == ".." {
+                  return None
+              }
+          }
+          let path = base.join(rel);
+          if !path.starts_with(base) {
+              return None
+          }
+          if multi {
+              Some(path.join(Utc::now().to_rfc3339()))
+          }
+          else {
+              Some(path)
+          }
+      }
+  }
+  ```
+
+test "rank1688: (c) a dot-segment rejection written in place also silences the join"
+  lang rust
+  file src/collector/rrdp.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::fs;
+  use std::path::{Path, PathBuf};
+
+  struct HttpResponse;
+
+  impl HttpResponse {
+      fn open_file(
+          base: &Path, uri: &uri::Https, multi: bool
+      ) -> Result<fs::File, Failed> {
+          let rel = &uri.as_str()[8..];
+          for segment in rel.split('/') {
+              if segment == "." || segment == ".." {
+                  return Err(Failed)
+              }
+          }
+          let path = base.join(rel);
+          let parent = match path.parent() {
+              Some(parent) => parent,
+              None => {
+                  return Err(Failed)
+              }
+          };
+          if let Err(_err) = fs::create_dir_all(parent) {
+              return Err(Failed)
+          }
+          fs::File::create(&path).map_err(|_err| {
+              Failed
+          })
+      }
+  }
+  ```
+
+test "rank1688: (d) a strip_prefix containment check is the same control"
+  lang rust
+  file src/collector/rrdp.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::fs;
+  use std::path::Path;
+
+  struct HttpResponse;
+
+  impl HttpResponse {
+      fn open_file(
+          base: &Path, uri: &uri::Https, multi: bool
+      ) -> Option<fs::File> {
+          let path = base.join(&uri.as_str()[8..]);
+          if !path.strip_prefix(base).is_ok() {
+              return None
+          }
+          let parent = path.parent()?;
+          fs::create_dir_all(parent).ok()?;
+          fs::File::create(&path).ok()
+      }
+  }
+  ```
+
+test "rank1688: (e) a url crate path component joined into a cache directory is the same weakness"
+  lang rust
+  file fetch_cache.rs
+  expect VYQL-PATH-006
+  code
+  ```
+  use std::fs;
+  use std::path::Path;
+
+  fn store_response(base: &Path, url: &Url) -> std::io::Result<()> {
+      let path = base.join(url.path());
+      if let Some(parent) = path.parent() {
+          fs::create_dir_all(parent)?;
+      }
+      fs::write(&path, b"")
+  }
+  ```
+
+test "rank1688: (f) joining a URI but only reading it back stays with the taint rules"
+  lang rust
+  file src/collector/rrdp.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::fs;
+  use std::path::Path;
+
+  struct HttpResponse;
+
+  impl HttpResponse {
+      fn load_mirror(
+          base: &Path, uri: &uri::Https
+      ) -> std::io::Result<String> {
+          let path = base.join(&uri.as_str()[8..]);
+          fs::read_to_string(&path)
+      }
+  }
+  ```
+
+test "rank1688: (g) a join of purely local components creates files without the remote name"
+  lang rust
+  file src/store.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::fs;
+  use std::path::Path;
+
+  struct Store;
+
+  impl Store {
+      fn state_path(dir: &Path) -> std::io::Result<()> {
+          let path = dir.join("repository.state");
+          if let Some(parent) = path.parent() {
+              fs::create_dir_all(parent)?;
+          }
+          fs::write(&path, b"")
+      }
+  }
+  ```

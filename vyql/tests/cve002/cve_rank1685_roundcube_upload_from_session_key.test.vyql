@@ -1,0 +1,147 @@
+# CVE-2025-49113: Roundcube's settings upload action read the _from
+# GET parameter and passed the derived $type as the session variable
+# NAME -- `$rcmail->session->append($type . '.files', $id,
+# $attachment)` in program/actions/settings/upload.php.
+# rcube_session::append writes the dotted path as a key into the
+# session store, and the store's custom serializer concatenates the
+# key raw (`$var . '|' . serialize($value)`), so a _from value
+# carrying serialized-object syntax is embedded verbatim in the
+# session blob. On the next request rcube_session::unserialize() --
+# a custom decoder that mis-handles the `!` prefix and finally calls
+# native unserialize() on the rebuilt string -- materialised the
+# injected object (Crypt_GPG_Engine -> proc_open), a post-auth PHP
+# object injection: an attacker-controlled request value crossing
+# into server-side trusted state (CWE-501) that realises CWE-502
+# gadget deserialization. The fixed revision rejects any $type that is not
+# rcube_utils::is_simple_string() -- a `^[\w.-]+$` allowlist --
+# before the append, and reads the parameter with the string-coercing
+# get_input_string().
+#
+# The pool row's commit c50a07d8 is the second of the two commits
+# that backport the 1.6.11 fix to release-1.5; its parent 7408f313
+# carries the is_simple_string() rejection guard that blocks
+# the documented payload, so the fully vulnerable parent is 522e20f3
+# (7408f313 is the release-1.5 twin of the advisory-referenced
+# 0376f69e, same patch). The 1.6 branch at 1.6.10 read _from with
+# get_input_string() and no validation, which the third test
+# models: the reader form is not the discriminator, the guard is.
+#
+# Detection is the CWE-501 shape itself: rcube_utils::get_input_value
+# and rcube_utils::get_input_string (the documented request-parameter
+# readers) label the read as code.HttpInput, a ->session->append call
+# labels its arguments as code.TrustBoundary, and VYQL-CFG-014 judges
+# the crossing. The patched form's is_simple_string() guard is bound
+# as core.InputValidation with dominance coverage, and the rule gains
+# a dominance clause so a check that dominates the crossing
+# neutralises it -- no non-advisory InputValidation binding used
+# dominates coverage before, so the clause changes nothing on trees
+# that do not call the validator.
+#
+# Measured on the real program/ subtree (timeout 180, --cache off):
+# the TrustBoundary row at actions/settings/upload.php:89 fires at
+# 522e20f3 in 3/3 runs and is absent at 7408f313 and c50a07d8 in 3/3
+# runs (VYQL-CFG-014 total 37 vulnerable vs 36 fixed). Without the
+# new bindings the vulnerable subtree reports 33 -- the four added
+# rows are exactly the four ->session->append() call sites in the
+# tree (upload.php:89, mail/attachment_upload.php:132,
+# mail/attachment_rename.php:47, mail/compose.php:1707); the other
+# three are the same CWE-501 letter on the value side (an uploaded
+# filename stored as a session value -- the second half of this
+# CVE's own PoC) and on the key side (a _uid-derived compose id
+# becoming part of a session variable name), and they predate this
+# fix in both revisions. ->session->append( appears nowhere else in
+# the corpus clones, and rcube_utils::get_input_value is
+# Roundcube-only, so the bindings' reach outside this project is
+# zero. The dominance guard is sink-keyed, so at the fixed revision
+# it also folds the $_FILES-name flow into the same suppressed sink
+# -- the standard imprecision of guard coverage, recorded here
+# rather than hidden.
+
+test "roundcube upload: an unvalidated _from parameter reaches the session store as a variable name"
+  lang php
+  file program/actions/settings/upload.php
+  expect VYQL-CFG-014
+  code
+  ```
+  <?php
+
+  class rcmail_action_settings_upload extends rcmail_action
+  {
+      public function run($args = [])
+      {
+          $rcmail = rcmail::get_instance();
+          $from   = rcube_utils::get_input_value('_from', rcube_utils::INPUT_GET);
+          $type   = preg_replace('/(add|edit)-/', '', $from);
+
+          // Make sure it does not contain a dot, which is a special character
+          // when using rcube_session::append() below
+          $type = str_replace('.', '-', $type);
+
+          $attachment = ['id' => 'abc123', 'name' => 'image.png'];
+
+          // store new file in session
+          $rcmail->session->append($type . '.files', $attachment['id'], $attachment);
+      }
+  }
+  ```
+
+test "roundcube upload: the string-coerced read with the is_simple_string rejection guard stays clean"
+  lang php
+  file program/actions/settings/upload.php
+  reject VYQL-CFG-014
+  code
+  ```
+  <?php
+
+  class rcmail_action_settings_upload extends rcmail_action
+  {
+      public function run($args = [])
+      {
+          $rcmail = rcmail::get_instance();
+          $from   = rcube_utils::get_input_string('_from', rcube_utils::INPUT_GET);
+          $type   = preg_replace('/(add|edit)-/', '', $from);
+
+          // Validate URL input.
+          if (!rcube_utils::is_simple_string($type)) {
+              rcmail::write_log('errors', 'The URL parameter "_from" contains disallowed characters and the request is thus rejected.');
+              $rcmail->output->command('display_message', 'Invalid input', 'error');
+              $rcmail->output->send('iframe');
+          }
+
+          $type = str_replace('.', '-', $type);
+
+          $attachment = ['id' => 'abc123', 'name' => 'image.png'];
+
+          // store new file in session
+          $rcmail->session->append($type . '.files', $attachment['id'], $attachment);
+      }
+  }
+  ```
+
+test "roundcube upload: a string-coerced read with no validation still crosses the boundary"
+  lang php
+  file program/actions/settings/upload.php
+  expect VYQL-CFG-014
+  code
+  ```
+  <?php
+
+  class rcmail_action_settings_upload extends rcmail_action
+  {
+      public function run($args = [])
+      {
+          $rcmail = rcmail::get_instance();
+          $from   = rcube_utils::get_input_string('_from', rcube_utils::INPUT_GET);
+          $type   = preg_replace('/(add|edit)-/', '', $from);
+
+          // Make sure it does not contain a dot, which is a special character
+          // when using rcube_session::append() below
+          $type = str_replace('.', '-', $type);
+
+          $attachment = ['id' => 'abc123', 'name' => 'image.png'];
+
+          // store new file in session
+          $rcmail->session->append($type . '.files', $attachment['id'], $attachment);
+      }
+  }
+  ```

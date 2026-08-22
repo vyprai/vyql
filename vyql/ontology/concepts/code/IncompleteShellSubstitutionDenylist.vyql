@@ -1,0 +1,11 @@
+module code;
+
+concept IncompleteShellSubstitutionDenylist : issue {
+  cwe: [CWE_77]
+  reviewAssumption: "attacker-influenced command text can reach a shell or terminal through commands the screening is meant to hold for approval"
+  reviewCategory: command
+  reviewCondition: "shell command screening matches command and process substitution forms but omits the zsh eval glob qualifier that executes code during glob expansion"
+  reviewConfidence: medium
+  reviewEvidence: "command screening context {pattern} tests for substitution forms such as $(...) and =(...) but carries no glob qualifier pattern such as *(e:cmd:)"
+  vulnerableTo: [injection.CommandInjection]
+}

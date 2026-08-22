@@ -1,0 +1,196 @@
+# Rank 1678 / CVE-2024-31668 (GHSA-w87m-4q2m-g66w): rizin parses attacker
+# supplied binaries, and every string the DWARF reader lifts out of the
+# file's debug sections -- compile unit names, producer strings, line table
+# paths -- is kept verbatim until the console prints it. A binary whose
+# .debug_str carries ANSI escape sequences therefore drives rizin's own
+# terminal: the escape bytes written into comments and info dumps move the
+# cursor, rewrite the screen, and in some terminal emulators execute the
+# OSC 8 / paste sequences the attacker chose. The advisory's CWE-78 reading
+# comes from that terminal-command effect; the defect itself is unescaped
+# control characters from a parsed file reaching terminal output
+# (CWE-150/CWE-117).
+#
+# Commit c025dcee40c8 fixes it at the parser's string boundary, not at any
+# print site: read_string() in librz/bin/dwarf/endian_reader.c (the reader
+# every inline DWARF string and, through rz_bin_dwarf_str_get(), every
+# .debug_str/.debug_line_str/.debug_str_offsets lookup goes through) gains
+#     str_escape(&x);
+# before its return, and rz_bin_dwarf_attr_string(), until then a
+# static-inline helper in librz/include/rz_bin_dwarf.h, moves to
+# librz/bin/dwarf/attr.c and returns str_escape_copy(orig) instead of
+# rz_str_dup(orig). Both helpers are new one-line wrappers in
+# librz/bin/dwarf/dwarf_private.h whose bodies call the documented
+# pre-existing API rz_str_escape_utf8(). No display file changes:
+# librz/core/cdwarf.c, which formats these strings into the output buffer,
+# is byte-identical at both revisionsix.
+#
+# ATTENTION, delegated-check attribution gap, measured three ways on the
+# real checkout (c025dcee40c8^ vs c025dcee40c8).
+#
+# 1. Presence route. A binding that labels a DWARF string accessor
+#    returning buffer/table strings with no escape call in its body is the
+#    natural shape, and code.UnneutralizedDiagnosticValue / VYQL-INJ-036
+#    (CWE-150/CWE-117) is the exact existing concept and rule, consumed and
+#    not inert. The negation is the problem. Keyed on the documented API
+#    (not containsAny(callPath, ["rz_str_escape"])) it does not discriminate
+#    at all: the patched read_string's context tokens carry exactly the
+#    fix's own helper name `str_escape`, and rz_str_escape_utf8 sits one hop
+#    down inside str_escape_copy's body in dwarf_private.h, so the finding
+#    fires on the patched file too (measured, 1 label at
+#    endian_reader.c:238 on both revisions). Keyed on `str_escape` instead,
+#    the substring also matches the documented rz_str_escape* family, but
+#    the discrimination then rests on the fixed revision's own helper names: rename
+#    str_escape and the flag returns on patched code. And it still gets the
+#    fix wrong in the other direction -- at c025dcee40c8 the binding
+#    continues to fire on rz_bin_dwarf_line_str_get (line_str.c:21) and
+#    rz_bin_dwarf_str_offsets_get (str_offsets.c:44), whose strings are now
+#    escaped, but only transitively through read_string() one call down,
+#    invisible to function-local facts. That is the C instance of the
+#    delegated-check attribution gap (1437; Go 1377/1389/1399, Python 1397,
+#    Rust 1364, TypeScript 1372, PHP 1394), in the unescaped-display variant
+#    recorded at 1441. The 1380 counterweight fails: neither guarded
+#    function keeps a documented escape call in its own body at the fixed revision.
+# 2. Taint route. With throwaway bindings putting a source on
+#    rz_buf_get_string's result, a console sink on rz_cons_printf and a
+#    control on rz_str_escape_utf8, `vyql trace` reports 2 sources, 0
+#    reaching a sink: flow dies at the RET_NULL_IF_FAIL(x) macro (never
+#    expanded -- the 1203/1307/1318 gap), at read_string's
+#    analysis.function.return edge (no outgoing flow), and callers inside
+#    the same scanned subtree report read_string/read_string_not_empty as
+#    "callee not traced -- external or cross-package".
+# 3. Display-site route. cdwarf.c formats the strings with
+#    rz_strbuf_appendf(sb, "%s", rz_bin_dwarf_attr_string(...)) at both
+#    revisions, so no in-file discriminator exists there either.
+#
+# Nothing shippable: the positive key (rz_buf_get_string and the
+# rz_bin_dwarf_*_get getters) exists only inside rizin, and rizin's
+# documentation for it ("get a string from a buffer") says nothing about
+# display or escaping -- the judgement that every parsed-binary string is
+# display-bound comes from this incident, not from the API, so the binding
+# fails the genericity test; its negation is a name substring, the shape
+# rejected at 1364/1394.
+#
+# The three cases below pin that state. The first is the vulnerable reader
+# at c025dcee40c8^. The second is the fixed revision, helper escape and all. The third
+# writes the documented API directly in the reader -- the form any future
+# binding must treat as remediation. All three are silent today.
+#
+# verify_current_expected: attention-engine-gap, all three cases rejected
+
+test "rank1678: the DWARF reader returns strings lifted from the parsed binary verbatim"
+  lang c
+  file dwarf/endian_reader.c
+  reject VYQL-INJ-036
+  code
+  ```
+  #include <string.h>
+
+  typedef struct { long addr; } RzBuffer;
+  char *rz_buf_get_string(RzBuffer *b, unsigned long addr);
+  int rz_buf_seek(RzBuffer *b, long delta, int whence);
+  unsigned long rz_buf_tell(RzBuffer *b);
+
+  #define RET_NULL_IF_FAIL(x) if (!(x)) { return NULL; }
+
+  typedef struct {
+      RzBuffer *buffer;
+  } RzBinEndianReader;
+
+  /* every inline DWARF string, and through rz_bin_dwarf_str_get() every
+   * .debug_str / .debug_line_str / .debug_str_offsets lookup, passes here */
+  char *read_string(RzBinEndianReader *reader) {
+      long offset = (long)rz_buf_tell(reader->buffer);
+      RET_NULL_IF_FAIL(offset != -1);
+      char *x = rz_buf_get_string(reader->buffer, offset);
+      RET_NULL_IF_FAIL(x);
+      unsigned long len = strlen(x) + 1;
+      rz_buf_seek(reader->buffer, (long)len, 1);
+      return x;
+  }
+  ```
+
+test "rank1678: the fixed revision escapes the string through a one-line helper before returning it"
+  lang c
+  file dwarf/endian_reader.c
+  reject VYQL-INJ-036
+  code
+  ```
+  #include <stdbool.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct { long addr; } RzBuffer;
+  char *rz_buf_get_string(RzBuffer *b, unsigned long addr);
+  int rz_buf_seek(RzBuffer *b, long delta, int whence);
+  unsigned long rz_buf_tell(RzBuffer *b);
+
+  typedef struct { bool dot_nl, esc_bslash, esc_double_quotes, show_asciidot; } RzStrEscOptions;
+  char *rz_str_escape_utf8(const char *p, RzStrEscOptions *opt);
+
+  #define RET_NULL_IF_FAIL(x) if (!(x)) { return NULL; }
+
+  typedef struct {
+      RzBuffer *buffer;
+  } RzBinEndianReader;
+
+  static char *str_escape_copy(const char *p) {
+      RzStrEscOptions opt = { true, true, true, false };
+      return rz_str_escape_utf8(p, &opt);
+  }
+
+  static void str_escape(char **p) {
+      if (!(p && *p)) {
+          return;
+      }
+      char *out = str_escape_copy(*p);
+      free(*p);
+      *p = out;
+  }
+
+  char *read_string(RzBinEndianReader *reader) {
+      long offset = (long)rz_buf_tell(reader->buffer);
+      RET_NULL_IF_FAIL(offset != -1);
+      char *x = rz_buf_get_string(reader->buffer, offset);
+      RET_NULL_IF_FAIL(x);
+      unsigned long len = strlen(x) + 1;
+      rz_buf_seek(reader->buffer, (long)len, 1);
+      str_escape(&x);
+      return x;
+  }
+  ```
+
+test "rank1678: the documented escape API called directly in the reader is the remediation shape"
+  lang c
+  file dwarf/endian_reader.c
+  reject VYQL-INJ-036
+  code
+  ```
+  #include <stdbool.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct { long addr; } RzBuffer;
+  char *rz_buf_get_string(RzBuffer *b, unsigned long addr);
+  int rz_buf_seek(RzBuffer *b, long delta, int whence);
+  unsigned long rz_buf_tell(RzBuffer *b);
+
+  typedef struct { bool dot_nl, esc_bslash, esc_double_quotes, show_asciidot; } RzStrEscOptions;
+  char *rz_str_escape_utf8(const char *p, RzStrEscOptions *opt);
+
+  #define RET_NULL_IF_FAIL(x) if (!(x)) { return NULL; }
+
+  typedef struct {
+      RzBuffer *buffer;
+  } RzBinEndianReader;
+
+  char *read_string(RzBinEndianReader *reader) {
+      long offset = (long)rz_buf_tell(reader->buffer);
+      RET_NULL_IF_FAIL(offset != -1);
+      char *x = rz_buf_get_string(reader->buffer, offset);
+      RET_NULL_IF_FAIL(x);
+      unsigned long len = strlen(x) + 1;
+      rz_buf_seek(reader->buffer, (long)len, 1);
+      RzStrEscOptions opt = { true, true, true, false };
+      return rz_str_escape_utf8(x, &opt);
+  }
+  ```

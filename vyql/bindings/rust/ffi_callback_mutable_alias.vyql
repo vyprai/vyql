@@ -1,0 +1,24 @@
+module bindings.rust.ffi_callback_mutable_alias;
+
+// A callback declared with a foreign ABI receives its pointers from C, and C
+// carries no exclusivity provenance: the caller may have registered the same
+// pointer more than once (SQLite's unlock-notify registration API explicitly
+// allows several registrations of one object) or may still hold it while the
+// callback runs. Casting such a pointer and dereferencing it as `&mut`
+// creates a mutable reference with no exclusivity guarantee -- an aliasing
+// violation and undefined behaviour whenever the same object is also reachable
+// from another thread, which is exactly the situation a mutex-guarded
+// callback structure exists for. Interior mutability is the sound form: the
+// callback takes `&` and the Mutex provides the mutation.
+//
+// The double-cast form (`&mut *(x as *const _ as *mut _)`) is already
+// labelled by the resolved rust flags; this binding extends the same review
+// point to the single-cast form inside a foreign-ABI body, where the pointer's
+// provenance is foreign by construction. Round-trips of Rust-owned data in
+// ordinary functions stay unlabelled. The compacted body keeps comments, so a
+// commented-out copy of the pattern still reads as present -- false positive
+// direction only.
+binding ffiCallbackMutableAlias {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.abi == "C" and node.token contains "&mut*(" and node.token contains "as*mut"
+  emit issue code.UnsafeMutableAlias at node
+}

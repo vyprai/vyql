@@ -1,0 +1,176 @@
+# Rank 1681 / CVE-2022-34632: the unreviewed advisory (GHSA-hg7j-9h3g-36x3,
+# July 2022, one of the bulk filings against RISC-V core generators) claims
+# rocket-chip "contains insufficient cryptography via the component
+# /rocket/RocketCore.scala" (recorded CWE-327, CVSS 9.1). The commit the
+# advisory references, 4f81143 ("Add aes64ks1i exception"), is a development
+# commit on the Zk-chisel-fixes branch of PR #2950; the pool's 4ecc497 is that
+# PR's squash-merge into master, the only master commit that carries the
+# remediation, so the commit? flag resolves to the squash-merge case and no
+# verification stands. Verified in both directions: at 4ecc497^ the
+# core contains no cryptography at all -- no AES, SHA-2, SM3 or SM4 datapath
+# and no Zk/Zb entries in RocketCore.scala's decode_table -- and 4ecc497
+# lands the Zk/Zb scalar cryptography and bitmanip extension (+2098 lines:
+# CryptoNIST.scala, CryptoSM.scala, SBox.scala, ABLU.scala, BarrelShifter.
+# scala, ZK decode tables in IDecode.scala, wiring in RocketCore.scala,
+# ALU.scala and Multiplier.scala) behind four new RocketCoreParams --
+# useBitManip, useBitManipCrypto, useCryptoNIST, useCryptoSM -- every one
+# defaulting to false.
+#
+# ATTENTION, capability-absence claim with no discriminating revision pair,
+# the same no-pair shape as 1424 and the absence-detector family measured
+# unshippable at 1331/1417/1433/1442. The recorded CWE-327 class (a broken
+# or risky algorithm in use) does not match the claim (no algorithm exists
+# anywhere in the parent; Zk is an optional extension whose absence is a
+# legitimate, RISC-V-spec-blessed configuration): three aggravations.
+# First, no revision pair differs in behaviour -- under the default
+# configuration the core generates at the fixed revision has the same instruction set
+# as the parent's, because the remediation ships disabled, so nothing that
+# observes behaviour can separate them. Second, no taint route exists:
+# there is no source, no sink and no construct to label at the parent --
+# the weakness is the absence of two thousand lines that only exist at the
+# fix. Third, the only conceivable binding is an absence detector (a core
+# decode table with no ZK entries), which fires on the remediation's own
+# default configuration and on every hardware design that does not
+# implement the optional Zk extension, i.e. essentially all of them; keying
+# instead on the fixed revision's added vocabulary (ZKNHDecode, usingCryptoNIST) is
+# the fixing-commit's-own-layout anti-pattern. Measured with --cache off
+# and --max-ram 6GB: the parent tree reports 33 findings in each of three
+# runs, the fixed tree 33 in each of three, and the fingerprint sets differ
+# only in two VYQL-AUTH-079 rows on RocketCore.scala whose lines move
+# 809/810 -> 867/868 as the file grows -- they key on io.dmem.perf.grant
+# and fp_sboard.clear signal reads through the JVM grant/clear vocabulary
+# of auditreview.marks, unrelated to this claim. The six new crypto files
+# at the fixed revision draw zero findings, and the only CRY finding on the tree at
+# either revision is VYQL-CRY-003 WeakRandomValue on the cache-replacement
+# LCG in util/Replacement.scala. The crypto the fixed revision adds is standard
+# (NIST AES/SHA-2, SM3/SM4 national standards), so the fixed block draws no
+# weak-crypto finding correctly. No ENGINE-GAPS.md entry: the Scala
+# frontend parses all 345 files and reports the unrelated findings; what is
+# missing is not a mishandled construct but any rule class for "design
+# lacks a capability", which is ontology design this campaign measured
+# against shipping. Spec cve_rank1681 pins the decode table without and
+# with its ZK entries, both rejecting the CWE-327 rules: no VYQL-CRY-001 or
+# VYQL-CRY-002 finding may ever appear on a design that contains no
+# cryptographic algorithm, and none does.
+#
+# verify_current_expected: attention-capability-absence, both blocks rejected.
+
+test "rank1681: the core decode table carries no scalar cryptography entries"
+  lang scala
+  file src/main/scala/rocket/RocketCore.scala
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  code
+  ```
+  package rocket
+
+  class RocketCoreParams(
+    useVM: Boolean = true,
+    useAtomics: Boolean = true,
+    useMulDiv: Boolean = true,
+    useSCIE: Boolean = false)
+
+  trait HasRocketCoreParameters {
+    val rocketParams = new RocketCoreParams
+    val xLen = 64
+    val fLen = 64
+    val usingVM = true
+    val usingAtomics = true
+    val usingMulDiv = true
+    val usingRoCC = false
+  }
+
+  abstract class RocketDecode { def table: Seq[RocketDecode] }
+  class MDecode extends RocketDecode { def table = Seq(this) }
+  class ADecode extends RocketDecode { def table = Seq(this) }
+  class FDecode extends RocketDecode { def table = Seq(this) }
+  class RoCCDecode extends RocketDecode { def table = Seq(this) }
+  class SCIEDecode extends RocketDecode { def table = Seq(this) }
+  class I64Decode extends RocketDecode { def table = Seq(this) }
+  class SVMDecode extends RocketDecode { def table = Seq(this) }
+  class SDecode extends RocketDecode { def table = Seq(this) }
+  class IDecode extends RocketDecode { def table = Seq(this) }
+
+  class Rocket extends HasRocketCoreParameters {
+    val decode_table = {
+      (if (usingMulDiv) new MDecode +: Nil else Nil) ++:
+      (if (usingAtomics) new ADecode +: Nil else Nil) ++:
+      (if (fLen >= 32) new FDecode +: Nil else Nil) ++:
+      (usingRoCC.option(new RoCCDecode)) ++:
+      (rocketParams.useSCIE.option(new SCIEDecode)) ++:
+      (if (xLen == 32) new I64Decode else new I64Decode) +:
+      (usingVM.option(new SVMDecode)) ++:
+      (usingVM.option(new SDecode)) ++:
+      Seq(new IDecode)
+    } flatMap (_.table)
+  }
+  ```
+
+test "rank1681: the fixed revision wires ZkN and ZkS decode entries behind default-false params"
+  lang scala
+  file src/main/scala/rocket/RocketCore.scala
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  code
+  ```
+  package rocket
+
+  class RocketCoreParams(
+    useVM: Boolean = true,
+    useAtomics: Boolean = true,
+    useMulDiv: Boolean = true,
+    useSCIE: Boolean = false,
+    useBitManip: Boolean = false,
+    useBitManipCrypto: Boolean = false,
+    useCryptoNIST: Boolean = false,
+    useCryptoSM: Boolean = false)
+
+  trait HasRocketCoreParameters {
+    val rocketParams = new RocketCoreParams
+    val xLen = 64
+    val fLen = 64
+    val usingVM = true
+    val usingAtomics = true
+    val usingMulDiv = true
+    val usingRoCC = false
+    val usingBitManip = rocketParams.useBitManip
+    val usingBitManipCrypto = rocketParams.useBitManipCrypto
+    val usingCryptoNIST = rocketParams.useCryptoNIST
+    val usingCryptoSM = rocketParams.useCryptoSM
+  }
+
+  abstract class RocketDecode { def table: Seq[RocketDecode] }
+  class MDecode extends RocketDecode { def table = Seq(this) }
+  class ADecode extends RocketDecode { def table = Seq(this) }
+  class FDecode extends RocketDecode { def table = Seq(this) }
+  class RoCCDecode extends RocketDecode { def table = Seq(this) }
+  class SCIEDecode extends RocketDecode { def table = Seq(this) }
+  class I64Decode extends RocketDecode { def table = Seq(this) }
+  class SVMDecode extends RocketDecode { def table = Seq(this) }
+  class SDecode extends RocketDecode { def table = Seq(this) }
+  class IDecode extends RocketDecode { def table = Seq(this) }
+  class ZBKB64Decode extends RocketDecode { def table = Seq(this) }
+  class ZBKXDecode extends RocketDecode { def table = Seq(this) }
+  class ZKND64Decode extends RocketDecode { def table = Seq(this) }
+  class ZKNE64Decode extends RocketDecode { def table = Seq(this) }
+  class ZKNH64Decode extends RocketDecode { def table = Seq(this) }
+  class ZKSDecode extends RocketDecode { def table = Seq(this) }
+
+  class Rocket extends HasRocketCoreParameters {
+    val decode_table = {
+      (if (usingMulDiv) new MDecode +: Nil else Nil) ++:
+      (if (usingAtomics) new ADecode +: Nil else Nil) ++:
+      (if (fLen >= 32) new FDecode +: Nil else Nil) ++:
+      (usingRoCC.option(new RoCCDecode)) ++:
+      (rocketParams.useSCIE.option(new SCIEDecode)) ++:
+      (if (xLen == 32) new I64Decode else new I64Decode) +:
+      (usingVM.option(new SVMDecode)) ++:
+      (usingVM.option(new SDecode)) ++:
+      (if (usingBitManipCrypto) new ZBKXDecode +: new ZBKB64Decode +: Nil else Nil) ++:
+      (if (usingCryptoNIST) new ZKND64Decode +: new ZKNE64Decode +: Nil else Nil) ++:
+      (if (usingCryptoNIST) new ZKNH64Decode +: Nil else Nil) ++:
+      (usingCryptoSM.option(new ZKSDecode)) ++:
+      Seq(new IDecode)
+    } flatMap (_.table)
+  }
+  ```

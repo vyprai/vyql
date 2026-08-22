@@ -1,0 +1,144 @@
+# Rank 1684 / CVE-2022-2714: RosarioSIS accepted an unbounded $_POST body.
+# PHP caps the raw request at post_max_size, but that budget is shared with
+# $_FILES and must be greater than upload_max_filesize, so an installation
+# that allows large uploads also allows a 100MB textarea body: the whole
+# $_POST array is walked by array_rwalk in Warehouse.php (escaped for the
+# database and stripped of tags) and the values are later stored, past
+# MySQL's 16MB max_allowed_packet default (CWE-130 recorded by the reporter,
+# CWE-400/CWE-770 in substance). The fixing commit 4022954c3f carries the change; the same
+# SHA the advisory references: it defines ROSARIO_POST_MAX_SIZE_LIMIT (16MB,
+# overridable in config.inc.php) and gates the sanitize walk on
+# strlen(serialize($_POST)) > ROSARIO_POST_MAX_SIZE_LIMIT, resetting any
+# value over limit/4 before the HackingLog mail could echo it back. The
+# vulnerable walk is present at the parent and the gate is not; the gate is
+# present at the fixed revision.
+#
+# ATTENTION, request-size-budget vocabulary. The request superglobals are
+# labelled (vyql match on the minimal file below reports $_REQUEST
+# as code.HttpInput via php.input, with no sink and no control), and taint
+# flows from there to every store; what no rule can ask is "does the
+# handler cap the request body at N bytes". The one CWE-400 concept whose
+# reviewCondition carries this shape almost word for word,
+# code.ConduitHyperUnboundedBodyToBytes ("HTTP request bodies are fully
+# collected ... before a request-size limit is enforced"), is named and
+# bound for one Rust framework, and the same vocabulary gap is
+# recorded at rank 1135 for Go (json.NewDecoder(r.Body) with no
+# MaxBytesReader wrap) and at rank 1559 as a wire budget threaded through
+# recursion. Measured on the real checkout: the per-rule finding histograms
+# of the vulnerable and patched revisions are identical (1495 findings,
+# diff empty) and no finding has a source or sink in Warehouse.php. The
+# precision denominator settles the direct route: 242 PHP files (5221
+# reads) touch $_POST/$_REQUEST in this one tree and exactly one -- the
+# patched Warehouse.php -- contains any size-limit vocabulary, so a binding
+# emitting on "request input read with no size cap" fires on 242 files for
+# one true positive, the request-body byte-cap shape measured unshippable
+# in Go (rank 1355: 1 -> 124 findings on one tree). No positive PHP API
+# fact distinguishes the file either: array_rwalk is the application's own
+# helper and the strlen(serialize(...)) gate is the fixing commit's own
+# spelling, so keying on either detects this application, not the weakness.
+# No ENGINE-GAPS.md entry: taint and the source label are intact, the
+# missing piece is a bound fact on request-input size, which is vocabulary
+# design rather than a localized construct the engine mishandles.
+#
+# Spec records the unbounded walk and the capped form, both asserting
+# reject_review code.ConduitHyperUnboundedBodyToBytes: when generic
+# request-size-budget vocabulary lands, the unbounded walk must flip to
+# expect.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1684: the whole request body is walked and stored with no size cap"
+  lang php
+  file Warehouse.php
+  reject_review code.ConduitHyperUnboundedBodyToBytes
+  code
+  ```
+  <?php
+  /**
+   * Array recursive walk (values AND keys!)
+   */
+  function array_rwalk( &$array, $function )
+  {
+  	$key = array_keys( $array );
+
+  	$size = count( $key );
+
+  	for ( $i = 0; $i < $size; $i++ )
+  	{
+  		if ( is_array( $array[$key[$i]] ) )
+  		{
+  			array_rwalk( $array[$key[$i]], $function );
+  		}
+  		else
+  		{
+  			$array[$key[$i]] = $function( $array[$key[$i]] );
+  		}
+  	}
+  }
+
+  /**
+   * Sanitize $_REQUEST array ($_POST + $_GET)
+   */
+  // Escape strings for DB queries.
+  array_rwalk( $_REQUEST, 'DBEscapeString' );
+
+  // Remove HTML tags.
+  array_rwalk( $_REQUEST, 'strip_tags' );
+  ```
+
+test "rank1684: the request body is capped before the walk"
+  lang php
+  file Warehouse.php
+  reject_review code.ConduitHyperUnboundedBodyToBytes
+  code
+  ```
+  <?php
+  function array_rwalk( &$array, $function )
+  {
+  	$key = array_keys( $array );
+
+  	$size = count( $key );
+
+  	for ( $i = 0; $i < $size; $i++ )
+  	{
+  		if ( is_array( $array[$key[$i]] ) )
+  		{
+  			array_rwalk( $array[$key[$i]], $function );
+  		}
+  		else
+  		{
+  			$array[$key[$i]] = $function( $array[$key[$i]] );
+  		}
+  	}
+  }
+
+  if ( ! defined( 'ROSARIO_POST_MAX_SIZE_LIMIT' ) )
+  {
+  	define( 'ROSARIO_POST_MAX_SIZE_LIMIT', 16 * 1024 * 1024 );
+  }
+
+  if ( $_POST
+  	&& strlen( serialize( $_POST ) ) > ROSARIO_POST_MAX_SIZE_LIMIT )
+  {
+  	$post_max_size_limit = function( $value ) {
+  		if ( strlen( $value ) > ( ROSARIO_POST_MAX_SIZE_LIMIT / 4 ) )
+  		{
+  			return 'ROSARIO_POST_MAX_SIZE_LIMIT / 4 reached.';
+  		}
+
+  		return $value;
+  	};
+
+  	array_rwalk( $_POST, $post_max_size_limit );
+
+  	array_rwalk( $_REQUEST, $post_max_size_limit );
+
+  	$error[] = 'You are submitting too much data';
+  }
+
+  // Escape strings for DB queries.
+  array_rwalk( $_REQUEST, 'DBEscapeString' );
+
+  // Remove HTML tags.
+  array_rwalk( $_REQUEST, 'strip_tags' );
+  ```

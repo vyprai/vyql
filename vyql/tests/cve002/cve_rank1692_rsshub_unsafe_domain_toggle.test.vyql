@@ -1,0 +1,131 @@
+# Rank 1692 / CVE-2023-22493: RSSHub route handlers interpolated
+# user-supplied route and query parameters into the host segment of
+# the URLs they fetched, so any caller redirected the server's own
+# fetch to an arbitrary destination (server-side request forgery,
+# CWE-918). lib/routes/craigslist/search.js built
+# `https://${ctx.params.location}.craigslist.org/...`, fanbox built
+# `https://${ctx.params.user}.fanbox.cc`, javbus built
+# `https://www.${ctx.query.domain}`, and biquge fetched a URL cut
+# straight out of ctx.path -- nothing constrained the host the value
+# could name. Fix a66cbcf ("feat(config)!: unsafe domain toggle")
+# adds lib/utils/valid-host.js and guards each handler with
+# `if (!isValidHost(ctx.params.location)) throw Error(...)` (the
+# helper rejects anything that is not a single DNS label, so the
+# value cannot escape the fixed suffix), or with an
+# allowDomain.includes(...) allowlist behind the
+# ALLOW_USER_SUPPLY_UNSAFE_DOMAIN config toggle. Verified: the
+# unguarded interpolation is present at a66cbcf^ and the guard is
+# present at a66cbcf. .
+#
+# FIXED. The taint rule covers the weakness -- on the real
+# code at a66cbcf^ VYQL-RF-001 reports source code.HttpInput at
+# craigslist/search.js:5 (ctx.params.location) through the template
+# literal to sink code.UrlFetch at :8 (got.get), among 388 RF-001
+# rows across lib/ (stable over three --cache off runs), because
+# RSSHub builds URLs from input by design, and the count sat
+# identical on both revisions: the fixed revision's guard carried no
+# SSRF-neutralising label. JavaScript recognized isValidHost only
+# as core.CommandArgumentValidation (rank 948, GenieACS ping),
+# which neutralizes command injection, not request_forgery.Ssrf.
+# Added allowlistValidation1912 crediting an isValidHost call as
+# core.AllowlistValidation with `covers endpoint`, mirroring the
+# shipped isAllowedHost binding, which emits both concepts;
+# the helper name recurs across unrelated projects (GenieACS
+# lib/ping.ts, lobehub networkProxy/validator.ts:39), so it names
+# the check, not the fixed revision's layout. After the binding the fixed revision
+# revision drops to 382 rows (stable over three runs): seven
+# isValidHost-guarded routes carried a row at the parent and the
+# guarded sink clears in all seven -- six files go to zero
+# (biobio/others, craigslist/search, pornhub/category_url, model,
+# pornstar, users) and caixin/blog keeps one row whose sink is a
+# got.get inside the sibling load(link) helper while the guard sits
+# in the route handler, the function-local guard attribution
+# limitation (endpointGuarded, internal/engine/engine.go:1160).
+# The other remediation forms stay reported, by design: a bare
+# allowLang.includes(...) / allowDomain.includes(...) test is not a
+# credited control because crediting Array.includes would credit
+# every substring test in the language (engadget, 91porn, javbus,
+# javdb, biquge); the hexo and mastodon routes stay reachable
+# behind the ALLOW_USER_SUPPLY_UNSAFE_DOMAIN opt-in, and 91porn's
+# domainValidation helper is the delegated-check shape whose name
+# is this fix's own vocabulary. Collateral measured: isValidHost
+# occurs in one other file across the rank clones (lobehub
+# validator.ts), and a bounded A/B of that subtree reports the same
+# 136 findings with and without the binding.
+
+test "rank1692: route parameter reaches the fetched url host unchecked"
+  lang javascript
+  file lib/routes/craigslist/search.js
+  expect VYQL-RF-001
+  code
+  ```
+  const got = require('@/utils/got');
+  const cheerio = require('cheerio');
+
+  module.exports = async (ctx) => {
+      const queryParams = ctx.request.querystring;
+      const queryUrl = `https://${ctx.params.location}.craigslist.org/search/${ctx.params.type}?${queryParams}`;
+      const { data } = await got.get(queryUrl);
+      const $ = cheerio.load(data);
+      return $('h2').text();
+  };
+  ```
+
+test "rank1692: host validator guards the interpolated subdomain"
+  lang javascript
+  file lib/routes/craigslist/search.js
+  reject VYQL-RF-001
+  code
+  ```
+  const got = require('@/utils/got');
+  const cheerio = require('cheerio');
+  const { isValidHost } = require('@/utils/valid-host');
+
+  module.exports = async (ctx) => {
+      if (!isValidHost(ctx.params.location)) {
+          throw Error('Invalid location');
+      }
+
+      const queryParams = ctx.request.querystring;
+      const queryUrl = `https://${ctx.params.location}.craigslist.org/search/${ctx.params.type}?${queryParams}`;
+      const { data } = await got.get(queryUrl);
+      const $ = cheerio.load(data);
+      return $('h2').text();
+  };
+  ```
+
+test "rank1692: query parameter reaches the fetched url host unchecked"
+  lang javascript
+  file lib/routes/fanbox/main.js
+  expect VYQL-RF-001
+  code
+  ```
+  const got = require('@/utils/got');
+
+  module.exports = async (ctx) => {
+      const user = ctx.params.user || 'official';
+      const box_url = `https://${user}.fanbox.cc`;
+      const response = await got.get(`${box_url}/api/post.list?limit=10`);
+      return response.data;
+  };
+  ```
+
+test "rank1692: host validator guards the interpolated subdomain the caller names"
+  lang javascript
+  file lib/routes/fanbox/main.js
+  reject VYQL-RF-001
+  code
+  ```
+  const got = require('@/utils/got');
+  const { isValidHost } = require('@/utils/valid-host');
+
+  module.exports = async (ctx) => {
+      const user = ctx.params.user || 'official';
+      if (!isValidHost(user)) {
+          throw Error('Invalid user');
+      }
+      const box_url = `https://${user}.fanbox.cc`;
+      const response = await got.get(`${box_url}/api/post.list?limit=10`);
+      return response.data;
+  };
+  ```

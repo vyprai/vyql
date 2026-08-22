@@ -1,0 +1,40 @@
+module bindings.python.cgi_form_field_read;
+
+// `cgi.FieldStorage` is the standard library's HTTP form object. Its
+// documentation reads the submitted fields exclusively through three
+// accessors -- `getvalue(name)`, `getfirst(name)` and `getlist(name)` -- each
+// keyed by a field name the client chose. Whatever one of them returns was
+// typed into the request, so it is `code.HttpInput`, the same treatment the
+// framework request objects already get.
+//
+// Two routes, because the form object is usually built once and then handed
+// around. Where the construction is visible the accessors are recognised by
+// receiver type, which is exact and keeps the label off everything else that
+// spells `getvalue`. Where it is not -- a form imported from another module,
+// the common `form = helper.form` shape -- the field-name argument carries the
+// discrimination instead: an argument is what makes the call a field read.
+// `getvalue` with no argument is the flush idiom on `io.StringIO` and
+// `io.BytesIO`, and those buffers dominate the name by an order of magnitude,
+// so the argumentless form is excluded on both routes.
+//
+// `getlist` stays on the receiver-type route alone. It is the same field read
+// on the framework mapping types (`QueryDict`, the Werkzeug `MultiDict`), but
+// those receivers are already labelled as request data by their own bindings,
+// and re-labelling the accessor underneath them would double-report.
+
+binding cgiFieldStorageReceiverType {
+  query pattern callExpr where callee.path in ["cgi.FieldStorage"]
+  emit fact runtime.ReceiverType at call.result {
+    about: cgi.FieldStorage
+  }
+}
+
+binding cgiFormFieldValueRead {
+  query pattern callExpr where callee.method in ["getvalue", "getfirst", "getlist"] and callee.receiver.type == "cgi.FieldStorage"
+  emit source code.HttpInput at call.result
+}
+
+binding formFieldValueKeyedRead {
+  query pattern callExpr where callee.method in ["getvalue", "getfirst"] and args.count >= 1
+  emit source code.HttpInput at call.result
+}
