@@ -1,0 +1,130 @@
+# Rank 1756 / CVE-2020-10232 (CWE-121): the Sleuthkit YAFFS2 istat
+# formatter asked a documented 128-byte writer for its output into a
+# 32-byte stack array. tsk_fs_time_to_str (tsk/fs/fs_name.c) formats a
+# timestamp into its out-parameter and states the contract twice in its
+# own declaration: the parameter is spelled `char buf[128]` and the body
+# writes through snprintf(buf, 128, ...)/strncpy(buf, ..., 128), with the
+# doc comment "Buffer to print into (must be 128 byes or larger)". C
+# array parameters decay to pointers, so nothing at compile time checks a
+# caller against that contract. yaffsfs_istat (tsk/fs/yaffs.cpp:2442)
+# declared `char timeBuf[32]` and passed it to six tsk_fs_time_to_str
+# calls (mtime/atime/ctime, plain and sec_skew-adjusted) -- 96 bytes past
+# the array on every istat of a YAFFS2 image, with the timestamps read
+# from the image under analysis. 459ae818fc8dae717549810150de4d191ce158f1
+# widens the one declaration to `char timeBuf[128]`. Remediation
+# confirmed present at the fixed revision; the 32-byte declaration confirmed at its
+# parent. The call-site census across the clone: nine files call
+# tsk_fs_time_to_str/_subsecs (yaffs.cpp, ext2fs.c, ffs.c, fatfs_meta.c,
+# iso9660.c, hfs.c, ntfs.c, usnjls_lib.c, apfs_pool_compat.cpp) and
+# every one of the others declares [128] or larger -- exactly one
+# undersized caller in the reachable set.
+#
+# ATTENTION, engine gap, the output-buffer-capacity family of rank 1370
+# ("an output buffer's capacity never correlated with a write length"),
+# this instance the declared-array-declarator form. Neither half of the
+# capacity relation survives extraction, measured on a graph dump of a
+# minimal repro: the caller's `char timeBuf[32];` emits no node at all
+# (the C/C++ walk's init_declarator case only fires for declarations
+# with initializers, and no declaration case exists otherwise -- node
+# types present are Arg/Const/Call/Name/Param/BinOp/Subscript/Phi only),
+# and the callee's `char buf[128]` reaches context only as
+# `param_type:char` because cleanTypeName
+# (internal/extract/frontend/treesitter/paramtypes.go:31) truncates at
+# the first '[' for every tree-sitter frontend. The interprocedural half
+# works -- Name path=timeBuf --FLOWS--> Arg --FLOWS-->
+# tsk_fs_time_to_str#param#buf -- so the correlation point exists; what
+# is missing is any fact for a declared element count on either side and
+# any binding construct comparing an argument's capacity with the
+# callee's documented write size. The only textual trace of the 32 is
+# the raw function-body token, which cannot be tied to the specific call
+# argument (a `[128]` on any other local would satisfy a negation keyed
+# on it) and is silenceable by a comment, the 1378 defect. The
+# callee-side route is unsound in the other direction: labelling
+# tsk_fs_time_to_str's own buffer writes reports fs_name.c identically
+# at both revisions because the callee is unchanged at both revisions. A/B on
+# the real checkout, tsk/fs subtree, three --cache off runs per side:
+# 691 findings at the parent and 691 at the fixed revision, byte-identical counts,
+# zero findings anywhere in yaffsfs_istat's range (yaffs.cpp:2436-2599)
+# and zero rows mentioning timeBuf at either revision; the 128
+# VYQL-MEM-016 rows on the subtree are strncpy sites elsewhere. Not
+# mechanical: a fix needs declarator-capacity facts, an unstripped array
+# parameter type through the shared cleanTypeName, and a matching
+# relation between an argument and the callee's required size -- new
+# facts plus a shared-frontend change plus a new relation, not a
+# confined correction to a known construct. Spec pins the miss: both
+# revisions reject VYQL-MEM-016 (the copy-size review, nearest shipped
+# rule to a write-length-versus-capacity mismatch) and VYQL-MEM-020;
+# when declared-capacity facts land, the 32-byte form must flip to
+# expect while the 128-byte form stays reject.
+
+test "yaffsfs_istat passes a 32-byte stack array to the 128-byte time formatter"
+  lang cpp
+  file yaffs.cpp
+  reject VYQL-MEM-016
+  reject VYQL-MEM-020
+  code
+  ```
+  typedef long time_t;
+
+  typedef struct {
+      time_t atime;
+      time_t mtime;
+      time_t ctime;
+  } TSK_FS_META;
+
+  extern int tsk_fprintf(void *hFile, const char *fmt, ...);
+
+  char *tsk_fs_time_to_str(time_t time, char buf[128]) {
+      buf[0] = '\0';
+      snprintf(buf, 128, "%.4d-%.2d-%.2d (%s)",
+          (int) time, "UTC");
+      return buf;
+  }
+
+  static void yaffsfs_istat(void *hFile, TSK_FS_META *fs_meta) {
+      char timeBuf[32];
+
+      tsk_fprintf(hFile, "Accessed:\t%s\n",
+          tsk_fs_time_to_str(fs_meta->atime, timeBuf));
+      tsk_fprintf(hFile, "File Modified:\t%s\n",
+          tsk_fs_time_to_str(fs_meta->mtime, timeBuf));
+      tsk_fprintf(hFile, "Inode Modified:\t%s\n",
+          tsk_fs_time_to_str(fs_meta->ctime, timeBuf));
+  }
+  ```
+
+test "the patched istat widens the declaration to the documented 128 bytes"
+  lang cpp
+  file yaffs.cpp
+  reject VYQL-MEM-016
+  reject VYQL-MEM-020
+  code
+  ```
+  typedef long time_t;
+
+  typedef struct {
+      time_t atime;
+      time_t mtime;
+      time_t ctime;
+  } TSK_FS_META;
+
+  extern int tsk_fprintf(void *hFile, const char *fmt, ...);
+
+  char *tsk_fs_time_to_str(time_t time, char buf[128]) {
+      buf[0] = '\0';
+      snprintf(buf, 128, "%.4d-%.2d-%.2d (%s)",
+          (int) time, "UTC");
+      return buf;
+  }
+
+  static void yaffsfs_istat(void *hFile, TSK_FS_META *fs_meta) {
+      char timeBuf[128];
+
+      tsk_fprintf(hFile, "Accessed:\t%s\n",
+          tsk_fs_time_to_str(fs_meta->atime, timeBuf));
+      tsk_fprintf(hFile, "File Modified:\t%s\n",
+          tsk_fs_time_to_str(fs_meta->mtime, timeBuf));
+      tsk_fprintf(hFile, "Inode Modified:\t%s\n",
+          tsk_fs_time_to_str(fs_meta->ctime, timeBuf));
+  }
+  ```

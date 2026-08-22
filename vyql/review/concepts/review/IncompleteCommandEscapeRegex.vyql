@@ -4,5 +4,5 @@ review code.IncompleteCommandEscapeRegex {
   category: command
   expected: [core.ShellEscape]
   kind: attention
-  text: "review command sanitizer regexes that use alternation where a character class is required to remove shell metacharacters"
+  text: "review command sanitizer regexes that use alternation where a character class is required to remove shell metacharacters, or that escape separator metacharacters while leaving line terminators intact"
 }

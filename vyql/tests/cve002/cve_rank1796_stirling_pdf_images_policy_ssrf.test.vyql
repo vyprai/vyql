@@ -1,0 +1,128 @@
+# Rank 1796 / CVE-2025-55150: Stirling-PDF converts uploaded HTML, EML and
+# Markdown to PDF by sanitizing the markup and handing it to the WeasyPrint
+# renderer, which fetches external resources while it lays out the document.
+# The sanitizer (app/common/.../util/CustomHtmlSanitizer.java) composed its
+# policy out of the OWASP Java HTML Sanitizer's stock factories:
+#   Sanitizers.FORMATTING
+#       .and(Sanitizers.BLOCKS)
+#       .and(Sanitizers.STYLES)
+#       .and(Sanitizers.LINKS)
+#       .and(Sanitizers.TABLES)
+#       .and(Sanitizers.IMAGES)
+#       .and(new HtmlPolicyBuilder().disallowElements("noscript").toFactory());
+# The library's own javadoc says what `Sanitizers.IMAGES` is worth: it allows
+# `img` elements whose `src` accepts http, https and relative URLs -- any host
+# at all, with no attribute value policy attached. An `<img
+# src="http://169.254.169.254/latest/meta-data/...">` in the uploaded file
+# therefore survives sanitization, and the renderer, running on the server,
+# performs the fetch: server-side request forgery through markup the
+# application itself cleans. The fixed revision (7d6b7087) drops the stock IMAGES factory
+# from the composition and replaces it with a builder that re-allows `img src`
+# only through an attribute policy consulted per URL:
+#   new HtmlPolicyBuilder()
+#       .allowElements("img")
+#       .allowAttributes("alt", "width", "height", "title").onElements("img")
+#       .allowAttributes("src").matching(SSRF_SAFE_URL_POLICY).onElements("img")
+#       .toFactory();
+# What clears the finding is the image-source URL does not being admitted by
+# an unguarded stock policy: the composition either carries a value policy on
+# the attribute or it does not carry the attribute. `Sanitizers.LINKS` stays in
+# the patched composition -- an anchor href is navigated by a reader, not
+# fetched by the renderer, so it is not this recognition.
+
+test "rank1796: stock image policy in a sanitizer composition concedes the fetched URLs"
+  lang java
+  file CustomHtmlSanitizer.java
+  expect VYQL-RF-051
+  expect_review code.SanitizerImageUrlWithoutSsrfGuard
+  code
+  ```
+  public class CustomHtmlSanitizer {
+  	private static final PolicyFactory POLICY =
+  			Sanitizers.FORMATTING
+  					.and(Sanitizers.BLOCKS)
+  					.and(Sanitizers.STYLES)
+  					.and(Sanitizers.LINKS)
+  					.and(Sanitizers.TABLES)
+  					.and(Sanitizers.IMAGES)
+  					.and(new HtmlPolicyBuilder().disallowElements("noscript").toFactory());
+
+  	public static String sanitize(String html) {
+  		String htmlAfter = POLICY.sanitize(html);
+  		return htmlAfter;
+  	}
+  }
+  ```
+
+test "rank1796: image source allowed through an attribute value policy"
+  lang java
+  file CustomHtmlSanitizerPatched.java
+  reject VYQL-RF-051
+  reject_review code.SanitizerImageUrlWithoutSsrfGuard
+  code
+  ```
+  public class CustomHtmlSanitizerPatched {
+
+  	private final AttributePolicy SSRF_SAFE_URL_POLICY =
+  			new AttributePolicy() {
+  				@Override
+  				public String apply(String elementName, String attributeName, String value) {
+  					if (value == null || value.trim().isEmpty()) {
+  						return null;
+  					}
+  					String trimmedValue = value.trim();
+  					if (!ssrfProtectionService.isUrlAllowed(trimmedValue)) {
+  						return null;
+  					}
+  					return trimmedValue;
+  				}
+  			};
+
+  	private final PolicyFactory SSRF_SAFE_IMAGES_POLICY =
+  			new HtmlPolicyBuilder()
+  					.allowElements("img")
+  					.allowAttributes("alt", "width", "height", "title")
+  					.onElements("img")
+  					.allowAttributes("src")
+  					.matching(SSRF_SAFE_URL_POLICY)
+  					.onElements("img")
+  					.toFactory();
+
+  	private final PolicyFactory POLICY =
+  			Sanitizers.FORMATTING
+  					.and(Sanitizers.BLOCKS)
+  					.and(Sanitizers.STYLES)
+  					.and(Sanitizers.LINKS)
+  					.and(Sanitizers.TABLES)
+  					.and(SSRF_SAFE_IMAGES_POLICY)
+  					.and(new HtmlPolicyBuilder().disallowElements("noscript").toFactory());
+
+  	public String sanitize(String html) {
+  		boolean disableSanitize =
+  				Boolean.TRUE.equals(applicationProperties.getSystem().getDisableSanitize());
+  		return disableSanitize ? html : POLICY.sanitize(html);
+  	}
+  }
+  ```
+
+test "rank1796: an anchor-link policy is navigated, not fetched, and stays outside this recognition"
+  lang java
+  file LinkOnlySanitizer.java
+  reject VYQL-RF-051
+  reject_review code.SanitizerImageUrlWithoutSsrfGuard
+  code
+  ```
+  public class LinkOnlySanitizer {
+  	private static final PolicyFactory POLICY =
+  			Sanitizers.FORMATTING
+  					.and(Sanitizers.BLOCKS)
+  					.and(Sanitizers.STYLES)
+  					.and(Sanitizers.LINKS)
+  					.and(Sanitizers.TABLES)
+  					.and(new HtmlPolicyBuilder().disallowElements("noscript").toFactory());
+
+  	public static String sanitize(String html) {
+  		return POLICY.sanitize(html);
+  	}
+  }
+  ```

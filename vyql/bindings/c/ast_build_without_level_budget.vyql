@@ -1,0 +1,32 @@
+module bindings.c.ast_build_without_level_budget;
+
+// A parser that builds a tree-shaped AST from attacker-supplied text hands
+// the peer control of the tree's depth: every binary node it stacks makes
+// the later recursive walks -- emit, destroy, optimise -- one frame deeper,
+// so a pattern a few thousand tokens long turns into a few thousand stack
+// frames and kills the process. YARA's own headers document both halves of
+// the shape: re.h declares yr_re_node_create as the AST node constructor,
+// and limits.h defines RE_MAX_AST_LEVELS as the "Maximum number of levels
+// in regexp's AST" that the grammar is expected to count every CONCAT/ALT
+// reduction against and abort past. The two node kinds keyed here are the
+// binary constructors -- they take two children, so tree depth grows with
+// input length; the leaf constructors (LITERAL, RANGE_ANY, ...) pass NULL
+// children and do not.
+//
+// The anchor is module-scope on purpose. The generated parser keeps every
+// action inside one yyparse switch, and a #line directive sits between each
+// case label and its action, which drops the action from node-level
+// analysis entirely (recorded as the orphaned-switch-action extraction
+// gap); the structured context tokens and the whole-file text survive, so
+// the question "does this translation unit's parser build AST nodes without
+// its AST-level budget" is asked over the file. The control is the
+// constant, not any one spelling of the check: the capped grammars guard
+// their reductions through a macro whose body carries RE_MAX_AST_LEVELS,
+// so the negation reads the whole translation unit and a differently
+// named counter using the documented constant still clears the finding.
+// Residual, false-negative direction only: the whole-file token keeps
+// comments, so a comment naming the cap suppresses.
+binding astBuildWithoutLevelBudget {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "c" and containsAny(node.context.call, ["yr_re_node_create"]) and containsAny(node.context.callArg, ["RE_NODE_CONCAT", "RE_NODE_ALT"]) and not (node.token contains "RE_MAX_AST_LEVELS")
+  emit issue code.UnboundedResourceOperation at node
+}

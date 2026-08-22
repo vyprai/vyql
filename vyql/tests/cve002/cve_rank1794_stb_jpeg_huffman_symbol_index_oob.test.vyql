@@ -1,0 +1,252 @@
+# stb_image.h's JPEG entropy decoder computes a Huffman symbol id from data the
+# image supplies and uses it to index fixed-capacity tables with no range check.
+# The merge this comes from is a multi-fix merge of four commits whose combined
+# diff `git show` will not print; `git diff <first-parent> <merge>` reads it, and
+# the child that carries this fix is 96fe76c2 ("Add range checks to fix a few
+# crash issues in stb_image issues 1289 and 1291"), which is what the advisory's
+# issue reference points at. The merge row works as a scan target unchanged: its
+# first parent 4d160de is fully vulnerable and the merge tree carries the guards.
+#
+# stbi__jpeg_huff_decode (stb_image.h, ~2113) does
+#
+#   c = ((j->code_buffer >> (32 - k)) & stbi__bmask[k]) + h->delta[k];
+#   STBI_ASSERT(((j->code_buffer >> (32 - h->size[c])) & stbi__bmask[h->size[c]]) == h->code[c]);
+#   return h->values[c];
+#
+# j->code_buffer is the entropy-coded scan the decoder has buffered
+# (stbi__grow_buffer_unsafe: `j->code_buffer = (j->code_buffer << 8) | b;` where
+# b comes from stbi__get8), and h->delta[] is built by stbi__build_huffman from
+# the DHT marker's per-length symbol counts. Both are image-controlled. `c` is
+# therefore attacker-controlled and indexes stbi__huffman's fixed arrays
+# (code[256], values[256], size[257]) with no bound, so a crafted JPEG reads past
+# the table -- a heap over-read, not the use-after-free the advisory's CWE-416
+# records. The fixed revision adds `if (c < 0 || c >= 256) return -1;` before the assert.
+# Two sibling sites in the same patch share the shape: stbi__build_huffman's
+# `h->size[k++]` loop has no cap on k, and stbi__process_marker's DHT handler
+# reads `n` sizes into a 256-byte table with only `if(n > 256) return` added.
+#
+# Detection is blocked twice, both times at the engine, and neither is a
+# definition away from working.
+#
+# 1. The header is routed to the C++ frontend. headerLooksCPP
+#    (internal/extract/frontend/registry.go:167) classifies a .h as C++ on a
+#    whole-file substring match over markers including "new " and "::", with no
+#    comment awareness, and stb_image.h contains "new " in five English prose
+#    comments ("addition of new decoders", "we add new fields", "malloc a new
+#    one", "start new block", "the new background") and no C++ at all. Under
+#    that routing the file emits 3467 sink/control labels through cpp.flags and
+#    zero source labels: `vyql match` on stb_image.h reports "(none)" for
+#    sources even though fread at stb_image.h:849 is bound to code.HttpInput by
+#    vyql/bindings/cpp/m4e783666.vyql:33. Minimal pair, four lines, one fread:
+#    the header alone labels code.HttpInput through c.input; the identical
+#    header with one comment line mentioning "new " routes to cpp and labels
+#    nothing at all; the same content in a .hpp labels code.HttpInput through
+#    cpp.input. So a .h that headerLooksCPP claims is denied the C sources and
+#    does not get the cpp ones either. Measured also with a genuine `class`
+#    marker, so it is not specific to the prose false positive.
+# 2. Even with the C frontend forced and a source supplied, taint stops before
+#    the index. A throwaway binding labelling stbi__get8's result
+#    code.HttpInput, run against stb_image.h copied to a .c so the C frontend
+#    claims it, propagates interprocedurally -- `vyql trace -from
+#    code.HttpInput -to code.IndexAccessSink` reaches z.huff_dc.__subscript at
+#    stb_image.h:3108, in the DHT arm of stbi__process_marker -- and then
+#    dead-ends at
+#    `BinOp stb_image.h:2065 call=__binop.shl`, the right-hand side of
+#    `j->code_buffer = (j->code_buffer << 8) | b;`. The index c needs taint
+#    through j->code_buffer (a struct field store) and through h->delta[k] (an
+#    array element store in stbi__build_huffman), and neither store is modelled.
+#    That is the C lvalue gap on file: exprStmt in
+#    internal/extract/frontend/treesitter/c.go recognises a bare identifier as
+#    an assignment target, and a field written through obj->field=x is dropped
+#    rather than modelled, because nir.Assign.Targets is []string and
+#    identifier-only. Same-function minimal pair below: the identical dataflow
+#    through a plain local pointer reports VYQL-MEM-005 at high confidence, and
+#    through one struct-field hop reports nothing.
+#
+# The rule itself is the right one and is live: VYQL-MEM-005 (TaintedIndexAccess,
+# vyql/packs/memory/vypr/memory/TaintedIndexAccess.vyql) is
+# `taint core.UserControlledData -> code.IndexAccessSink`, the vulnerable
+# subscript h->values[c] at stb_image.h:2120 is labelled
+# code.IndexAccessSink by c.flags, and the control case below fires today.
+# What is missing is the source reaching it: a source binding for the header's
+# byte path (stbi__get8 and the stbi_load* entry points are unbound, and
+# cReaders' hardcoded eight libc names do not cover an in-house accessor), and
+# the field-store hop. The first snippet below is the control that fires; the
+# second is the vulnerable form from the real code and the third is the patched
+# form, and neither reports VYQL-MEM-005 today, which is the miss this spec
+# pins: when the field-store hop and the header routing are corrected, the
+# second must flip to expect VYQL-MEM-005 and the third must stay rejected,
+# since its guard `c >= 256` is exactly the capacity of the table it indexes.
+# The fourth snippet isolates the construct: the control's dataflow with the
+# local replaced by one struct-field hop. It reports only a low-confidence
+# VYQL-MEM-006 row on the dereference, never the index rule.
+#
+# Scanned the real checkout at the fixed revision's parent (4d160de) and at the merge
+# (b15b0432): 2582 findings over c:62 cpp:21, of which 148 fall in stb_image.h
+# -- all VYQL-MEM-006 nullable-deref rows elsewhere in the file, plus one
+# VYQL-NUM-017. Zero findings inside stbi__build_huffman, stbi__jpeg_huff_decode
+# or the DHT arm of stbi__process_marker, at either revision.
+
+test "rank1794: a decoded byte indexing a fixed table through a local reaches the index rule"
+  lang c
+  file stb_image.h
+  expect VYQL-MEM-005
+  code
+  ```
+  typedef unsigned char stbi_uc;
+  typedef unsigned short stbi__uint16;
+
+  typedef struct
+  {
+     stbi__uint16 code[256];
+     stbi_uc  values[256];
+     stbi_uc  size[257];
+     unsigned int maxcode[18];
+     int    delta[17];
+  } stbi__huffman;
+
+  // control: the same index arithmetic through a plain local, which carries
+  // taint from the reader to the subscript without a field store in between
+  static int decode_symtab(void *input, int n, stbi__huffman *h)
+  {
+     stbi_uc buf[512];
+     stbi_uc *p;
+
+     fread(buf, 1, n, input);
+     p = buf;
+     return h->values[p[0] + h->delta[1]];
+  }
+  ```
+
+test "rank1794: the huffman symbol id indexes values[256] with no range check"
+  lang c
+  file stb_image.h
+  reject VYQL-MEM-005
+  code
+  ```
+  typedef unsigned char stbi_uc;
+  typedef unsigned short stbi__uint16;
+
+  typedef struct
+  {
+     stbi__uint16 code[256];
+     stbi_uc  values[256];
+     stbi_uc  size[257];
+     unsigned int maxcode[18];
+     int    delta[17];
+  } stbi__huffman;
+
+  typedef struct
+  {
+     unsigned int code_buffer;
+     int code_bits;
+     stbi__huffman huff_dc[4];
+     stbi__huffman huff_ac[4];
+  } stbi__jpeg;
+
+  static const stbi__uint16 stbi__bmask[17] = {0,1,3,7,15,31,63,127,255,511,1023};
+
+  static int stbi__jpeg_huff_decode(stbi__jpeg *j, stbi__huffman *h)
+  {
+     unsigned int temp;
+     int c,k;
+
+     temp = j->code_buffer >> 16;
+     for (k=10 ; ; ++k)
+        if (temp < h->maxcode[k])
+           break;
+     if (k == 17)
+        return -1;
+     if (k > j->code_bits)
+        return -1;
+
+     // convert the huffman code to the symbol id
+     c = ((j->code_buffer >> (32 - k)) & stbi__bmask[k]) + h->delta[k];
+     j->code_bits -= k;
+     j->code_buffer <<= k;
+     return h->values[c];
+  }
+  ```
+
+test "rank1794: the fixed revision bounds the symbol id against the table capacity"
+  lang c
+  file stb_image.h
+  reject VYQL-MEM-005
+  code
+  ```
+  typedef unsigned char stbi_uc;
+  typedef unsigned short stbi__uint16;
+
+  typedef struct
+  {
+     stbi__uint16 code[256];
+     stbi_uc  values[256];
+     stbi_uc  size[257];
+     unsigned int maxcode[18];
+     int    delta[17];
+  } stbi__huffman;
+
+  typedef struct
+  {
+     unsigned int code_buffer;
+     int code_bits;
+     stbi__huffman huff_dc[4];
+     stbi__huffman huff_ac[4];
+  } stbi__jpeg;
+
+  static const stbi__uint16 stbi__bmask[17] = {0,1,3,7,15,31,63,127,255,511,1023};
+
+  static int stbi__jpeg_huff_decode(stbi__jpeg *j, stbi__huffman *h)
+  {
+     unsigned int temp;
+     int c,k;
+
+     temp = j->code_buffer >> 16;
+     for (k=10 ; ; ++k)
+        if (temp < h->maxcode[k])
+           break;
+     if (k == 17)
+        return -1;
+     if (k > j->code_bits)
+        return -1;
+
+     // convert the huffman code to the symbol id
+     c = ((j->code_buffer >> (32 - k)) & stbi__bmask[k]) + h->delta[k];
+     if (c < 0 || c >= 256) // symbol id out of bounds
+         return -1;
+     j->code_bits -= k;
+     j->code_buffer <<= k;
+     return h->values[c];
+  }
+  ```
+
+test "rank1794: the same dataflow through a struct field reports nothing today"
+  lang c
+  file stb_image.h
+  reject VYQL-MEM-005
+  code
+  ```
+  typedef unsigned char stbi_uc;
+  typedef unsigned short stbi__uint16;
+
+  typedef struct
+  {
+     stbi__uint16 code[256];
+     stbi_uc  values[256];
+     stbi_uc  size[257];
+     int    delta[17];
+  } stbi__huffman;
+
+  typedef struct { unsigned char *img_buffer; } stbi__context;
+
+  static stbi_uc stbi__get8(stbi__context *s)
+  {
+     return *s->img_buffer++;
+  }
+
+  static int use_symtab(stbi__context *s, stbi__huffman *h)
+  {
+     int c = stbi__get8(s) + h->delta[1];
+     return h->values[c];
+  }
+  ```

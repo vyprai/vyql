@@ -1,0 +1,30 @@
+module bindings.javascript.urlAuthoritySplitBackslashNormalization;
+
+// Browsers resolve URLs under WHATWG semantics, where a backslash is a path
+// separator equal to a slash inside the scheme delimiter and the authority.
+// A hand-rolled parser that splits the raw string on the URL delimiters
+// without first normalizing backslashes to slashes therefore reports a
+// hostname no browser will connect to: `http://good.com:80\@evil.com/` keeps
+// everything before the `@` as userinfo for the browser while the parser
+// takes it as port and host, so every host check downstream of the parse is
+// bypassable (CWE-20 with SSRF/open-redirect consequences). The canonical
+// remediation is to replace backslash with slash before splitting.
+//
+// The positive clauses read the authority split itself: the URL component
+// names carried as string literals (host, userinfo, port family), the `@`
+// userinfo delimiter, and a call that divides a string. The negation reads
+// the normalization: `String.replace`/`replaceAll` is the only standard
+// spelling of the rewrite, and JavaScript emits no call-argument tokens, so
+// the presence of any replace call is taken as the normalizer. That
+// deliberately errs false-negative — a parser calling replace for an
+// unrelated purpose is left unflagged rather than reporting code that
+// normalizes through a helper the tokens cannot see.
+//
+// Regex literals also land in the `literal` token set, so a backslash inside
+// the parser's own pattern (a `\/\/` scheme match, say) cannot serve as the
+// normalization signal; only the replace call can.
+
+binding jsUrlAuthoritySplitWithoutBackslashNormalization {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal in ["hostname", "host"] and node.context.literal in ["auth", "username", "password", "userinfo"] and node.context.literal in ["port", "pathname", "protocol"] and node.context.literal in ["@"] and node.context.call in ["indexOf", "split", "exec", "substring", "lastIndexOf", "substr", "match"] and not (node.context.call in ["replace", "replaceAll"])
+  emit issue code.UrlAuthoritySplitWithoutBackslashNormalization at node
+}

@@ -1,0 +1,187 @@
+# Rank 1780 / CVE-2023-20873: Spring Boot's Cloud Foundry actuator
+# support told Spring Security to skip its filter chain for every
+# path under one hardcoded whole-prefix wildcard. The servlet stack
+# did
+#   web.ignoring().requestMatchers(new AntPathRequestMatcher("/cloudfoundryapplication/**"))
+# (CloudFoundryActuatorAutoConfiguration) and the reactive stack
+#   ServerWebExchangeMatchers.pathMatchers("/cloudfoundryapplication/**")
+# feeding a MatcherSecurityWebFilterChain with a no-op filter
+# (ReactiveCloudFoundryActuatorAutoConfiguration). The endpoints under
+# that prefix are guarded by their own Cloud Foundry security
+# interceptor, but only on the concrete paths the endpoint mappings
+# register: any other handler that happens to live under the prefix is
+# served with every security filter removed and no interceptor at all.
+# The fixed revision (32444fed4, carrying 3522714c1) derives the exemption's
+# patterns from the endpoint mappings discovered at runtime
+# (PathMappedEndpoints.getAllPaths(), one pattern per endpoint plus the
+# base path) instead of one hardcoded prefix wildcard, so the exemption
+# can does not be broader than the guarded set. What clears the finding
+# is the pattern does not being a hardcoded whole-prefix wildcard:
+# either the matcher takes computed patterns, or the wildcard is
+# appended to a prefix the code derives.
+
+test "rank1780: servlet exemption matched by a hardcoded whole-prefix wildcard"
+  lang java
+  file CloudFoundryActuatorAutoConfiguration.java
+  expect VYQL-AUTH-155
+  expect_review code.HardcodedWildcardFilterChainExemption
+  code
+  ```
+  public class CloudFoundryActuatorAutoConfiguration {
+
+  	@Order(SecurityProperties.IGNORED_ORDER)
+  	static class IgnoredCloudFoundryPathsWebSecurityCustomizer implements WebSecurityCustomizer {
+
+  		@Override
+  		public void customize(WebSecurity web) {
+  			web.ignoring().requestMatchers(new AntPathRequestMatcher("/cloudfoundryapplication/**"));
+  		}
+
+  	}
+
+  }
+  ```
+
+test "rank1780: servlet exemption derives its patterns from the endpoint mappings"
+  lang java
+  file CloudFoundryActuatorAutoConfigurationPatched.java
+  reject VYQL-AUTH-155
+  reject_review code.HardcodedWildcardFilterChainExemption
+  code
+  ```
+  public class CloudFoundryActuatorAutoConfigurationPatched {
+
+  	private static final String BASE_PATH = "/cloudfoundryapplication";
+
+  	@Order(SecurityProperties.IGNORED_ORDER)
+  	static class IgnoredCloudFoundryPathsWebSecurityCustomizer implements WebSecurityCustomizer {
+
+  		private final PathMappedEndpoints pathMappedEndpoints;
+
+  		IgnoredCloudFoundryPathsWebSecurityCustomizer(CloudFoundryWebEndpointServletHandlerMapping handlerMapping) {
+  			this.pathMappedEndpoints = new PathMappedEndpoints(BASE_PATH, handlerMapping::getAllEndpoints);
+  		}
+
+  		@Override
+  		public void customize(WebSecurity web) {
+  			List<RequestMatcher> requestMatchers = new ArrayList<>();
+  			this.pathMappedEndpoints.getAllPaths()
+  				.forEach((path) -> requestMatchers.add(new AntPathRequestMatcher(path + "/**")));
+  			requestMatchers.add(new AntPathRequestMatcher(BASE_PATH));
+  			requestMatchers.add(new AntPathRequestMatcher(BASE_PATH + "/"));
+  			if (!CollectionUtils.isEmpty(requestMatchers)) {
+  				web.ignoring().requestMatchers(new OrRequestMatcher(requestMatchers));
+  			}
+  		}
+
+  	}
+
+  }
+  ```
+
+test "rank1780: reactive no-op chain matched by a hardcoded whole-prefix wildcard"
+  lang java
+  file ReactiveCloudFoundryActuatorAutoConfiguration.java
+  expect VYQL-AUTH-155
+  expect_review code.HardcodedWildcardFilterChainExemption
+  code
+  ```
+  public class ReactiveCloudFoundryActuatorAutoConfiguration {
+
+  	static class WebFilterChainPostProcessor implements BeanPostProcessor {
+
+  		@Override
+  		public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
+  			if (bean instanceof WebFilterChainProxy webFilterChainProxy) {
+  				return postProcess(webFilterChainProxy);
+  			}
+  			return bean;
+  		}
+
+  		private WebFilterChainProxy postProcess(WebFilterChainProxy existing) {
+  			ServerWebExchangeMatcher cloudFoundryRequestMatcher = ServerWebExchangeMatchers
+  				.pathMatchers("/cloudfoundryapplication/**");
+  			WebFilter noOpFilter = (exchange, chain) -> chain.filter(exchange);
+  			MatcherSecurityWebFilterChain ignoredRequestFilterChain = new MatcherSecurityWebFilterChain(
+  					cloudFoundryRequestMatcher, Collections.singletonList(noOpFilter));
+  			MatcherSecurityWebFilterChain allRequestsFilterChain = new MatcherSecurityWebFilterChain(
+  					ServerWebExchangeMatchers.anyExchange(), Collections.singletonList(existing));
+  			return new WebFilterChainProxy(ignoredRequestFilterChain, allRequestsFilterChain);
+  		}
+
+  	}
+
+  }
+  ```
+
+test "rank1780: reactive exemption takes the derived endpoint paths"
+  lang java
+  file ReactiveCloudFoundryActuatorAutoConfigurationPatched.java
+  reject VYQL-AUTH-155
+  reject_review code.HardcodedWildcardFilterChainExemption
+  code
+  ```
+  public class ReactiveCloudFoundryActuatorAutoConfigurationPatched {
+
+  	private static final String BASE_PATH = "/cloudfoundryapplication";
+
+  	static class WebFilterChainPostProcessor implements BeanPostProcessor {
+
+  		private WebFilterChainProxy postProcess(WebFilterChainProxy existing, PathMappedEndpoints pathMappedEndpoints) {
+  			List<String> paths = getPaths(pathMappedEndpoints);
+  			ServerWebExchangeMatcher cloudFoundryRequestMatcher = ServerWebExchangeMatchers
+  				.pathMatchers(paths.toArray(new String[] {}));
+  			WebFilter noOpFilter = (exchange, chain) -> chain.filter(exchange);
+  			MatcherSecurityWebFilterChain ignoredRequestFilterChain = new MatcherSecurityWebFilterChain(
+  					cloudFoundryRequestMatcher, Collections.singletonList(noOpFilter));
+  			MatcherSecurityWebFilterChain allRequestsFilterChain = new MatcherSecurityWebFilterChain(
+  					ServerWebExchangeMatchers.anyExchange(), Collections.singletonList(existing));
+  			return new WebFilterChainProxy(ignoredRequestFilterChain, allRequestsFilterChain);
+  		}
+
+  		private static List<String> getPaths(PathMappedEndpoints pathMappedEndpoints) {
+  			List<String> paths = new ArrayList<>();
+  			pathMappedEndpoints.getAllPaths().forEach((path) -> paths.add(path + "/**"));
+  			paths.add(BASE_PATH);
+  			paths.add(BASE_PATH + "/");
+  			return paths;
+  		}
+
+  	}
+
+  }
+  ```
+
+test "rank1780: a wildcard matcher in an authorization rule is not an exemption"
+  lang java
+  file AuthorizationRuleWildcard.java
+  reject VYQL-AUTH-155
+  reject_review code.HardcodedWildcardFilterChainExemption
+  code
+  ```
+  public class AuthorizationRuleWildcard extends WebSecurityConfigurerAdapter {
+
+  	@Override
+  	protected void configure(HttpSecurity http) throws Exception {
+  		http.authorizeHttpRequests(
+  				(requests) -> requests.requestMatchers(new AntPathRequestMatcher("/admin/**")).hasRole("ADMIN"));
+  	}
+
+  }
+  ```
+
+test "rank1780: the antMatchers DSL exemption stays outside this recognition"
+  lang java
+  file AntMatchersExemption.java
+  reject VYQL-AUTH-155
+  reject_review code.HardcodedWildcardFilterChainExemption
+  code
+  ```
+  public class AntMatchersExemption {
+
+  	public void customize(WebSecurity web) {
+  		web.ignoring().antMatchers("/resources/**", "/static/**", "/css/**");
+  	}
+
+  }
+  ```

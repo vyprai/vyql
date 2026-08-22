@@ -1,0 +1,46 @@
+module bindings.rust.ffi_callback_length_unbounded;
+
+// A C library that hands a buffer to a caller-supplied callback takes the
+// returned length on trust: OpenSSL's pem_password_cb, SQLite's xInput and
+// every other fill-buffer callback documents "return the number of bytes
+// written", and the caller then reads that many bytes from the buffer it
+// handed out. The Rust side of that contract is an `extern "C"` trampoline
+// that builds the buffer view with slice::from_raw_parts /
+// from_raw_parts_mut (the standard library's only raw-slice constructors),
+// hands it to a user closure and forwards the closure's returned length
+// back across the ABI.
+//
+// The closure is user code and nothing in its signature bounds what it may
+// return -- std::io::Read documents `n <= buf.len()`, but an arbitrary
+// `Fn(&mut [u8]) -> Result<usize, _>` does not -- so a trampoline that
+// forwards the returned length with no comparison against the handed-out
+// size lets the foreign caller read past the buffer (CWE-125: adjacent
+// stack bytes end up wherever the length is consumed, EVP_BytesToKey key
+// derivation for the password callback).
+//
+// The clauses, each at function scope:
+//   - abi "C" is the boundary itself, recorded from the declaration.
+//   - from_raw_parts is how the handed-out buffer is built.
+//   - the Ok-pattern match arm is how a length-returning callback reports
+//     success in Rust; it excludes callbacks whose return is an enum the
+//     trampoline maps to fixed constants (a collation returning Ordering)
+//     or no value at all.
+//   - the cast to an ABI-width integer (libc's c_int family, size_t, or
+//     the raw u32/i32 widths c_uint/c_int alias) is the act of crossing --
+//     the length has to take the foreign width to be returned or written,
+//     and the needle lists both the bare spelling (`as c_int`) and the
+//     path-qualified one (`as libc::c_int`).
+//   - the negated clauses are the bound: any lowered comparison in the
+//     function (a match-arm guard `Ok(Ok(len)) if len > size => 0` or the
+//     same test as an if-condition) suppresses, and so does a .min()
+//     clamp, read as an exact final call segment. Both read node-level
+//     facts -- the comparison from the lowered BinOp nodes, the clamp from
+//     the body's own call tokens -- so a bound in a comment or in a
+//     sibling function does not suppress. The finding is about the length
+//     crossing unbounded, not about which spelling bounds it; a bound
+//     written only as an assert! does not suppress, because macro argument
+//     lowering drops the comparison operator, and stays a residual.
+binding ffiCallbackLengthUnbounded214 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.abi == "C" and containsAny(node.context.call, ["from_raw_parts"]) and node.context.matchArm contains "Ok(" and containsAny(node.token, ["asc_int", "asc_uint", "asc_uchar", "asc_char", "asc_long", "asc_ulong", "asc_short", "asc_ushort", "assize_t", "asu32", "asi32", "::c_int", "::c_uint", "::c_uchar", "::c_char", "::c_long", "::c_ulong", "::c_short", "::c_ushort", "::size_t"]) and not (containsAny(node.context.binary, ["<", ">", "==", "!="])) and not (node.context.call in ["min"])
+  emit issue code.UnboundedFfiCallbackLength at node
+}

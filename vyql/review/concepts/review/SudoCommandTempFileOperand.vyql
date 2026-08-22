@@ -1,0 +1,7 @@
+module code;
+
+review code.SudoCommandTempFileOperand {
+  category: auth
+  kind: attention
+  text: "review sudo commands that operate on tempfile-created files for a fixed operand path, because the sudoers grant authorizing the command has to cover the file's path and a generated name forces a wildcard on the shared temporary directory that any local user can satisfy"
+}

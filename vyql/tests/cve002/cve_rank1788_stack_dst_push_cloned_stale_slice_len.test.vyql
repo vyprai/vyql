@@ -1,0 +1,256 @@
+# stack_dst through 0.6.0 (CVE-2021-28034, CWE-415) stores unsized values in a
+# flat usize array and keeps each item's fat-pointer metadata in the words
+# immediately below it. push_inner publishes that metadata when it reserves the
+# slot:
+#
+#     let (meta, rv) = slot.split_at_mut(Self::meta_words());
+#     let mut ptr_raw: *const T = fat_ptr;
+#     let ptr_words = ::ptr_as_slice(&mut ptr_raw);
+#     meta.clone_from_slice(&ptr_words[1..]);
+#
+# For T = [T] the metadata word is the slice length, and it is copied from the
+# *source* slice, so the slot claims v.len() elements before any of them
+# exists. push_cloned then fills the slot one element at a time:
+#
+#     self.push_inner(&v).map(|d| unsafe {
+#         let mut ptr = d.as_mut_ptr() as *mut T;
+#         for val in v {
+#             ptr::write(ptr, val.clone());
+#             ptr = ptr.offset(1);
+#         }
+#     })
+#
+# T: Clone means val.clone() is the caller's code, and the test the fixed revision adds
+# panics from the second of two elements. Unwinding leaves the loop half done
+# and the stack's destructor runs: Drop pops every item, and pop's
+# ptr::drop_in_place on a [T] drops the claimed length -- the stale tail of
+# whatever occupied the backing array, a double drop. The length is
+# the defect; nothing is read out of bounds.
+#
+# 2a4d53809e3000f40085f2b229b6b1a33759881d makes push_inner hand back the
+# metadata slot separately and rewrites push_cloned to treat the slot as empty
+# until an element lands in it:
+#
+#     let (meta, d) = self.push_inner(&v)?;
+#     meta[0] = 0;
+#     for w in d.iter_mut() { *w = 0; }
+#     unsafe {
+#         let mut ptr = d.as_mut_ptr() as *mut T;
+#         for val in v {
+#             ptr::write(ptr, val.clone());
+#             meta[0] += 1;
+#             ptr = ptr.offset(1);
+#         }
+#     }
+#
+# Pool row verified: the commit is a real targeted fix, the vulnerable
+# construct is present at 807e9d4 (its parent) and the remediation at 2a4d538,
+# and the language field is right -- the whole diff lands in src/stack.rs.
+#
+# What fired before: nothing on the defect. `scan --cache off` over the
+# vulnerable checkout reports nine findings, every one a LOW VYQL-MEM-006
+# NullableDeref, one of them in stack.rs but inside pop() at the deref of the
+# pointer drop_in_place receives -- findings in the file, none on the length.
+# `vyql match` on src/stack.rs labels four subscripts and two derefs and
+# nothing at all in push_cloned.
+#
+# Vocabulary checked for reuse before minting. code.ClosureUnwindStaleLength
+# (VYQL-MEM-052, CWE-415) is this weakness class and its review text
+# prescribes the exact remediation the fixed revision applies -- "zero the length before
+# the loop or restore it from a drop guard". It binds only through the
+# frontend fact for the retain family, which requires ptr::copy and set_len and
+# an Fn* parameter, so a partial-initialisation loop with no set_len and a
+# Clone bound never reached it. Reused, and its condition wording widened from
+# compaction to fill-or-compaction; no sibling concept minted.
+# code.UninitializedBufferExposure is the read-side variant (capacity exposed
+# as initialised storage), not the drop side; code.ReentrantCallbackStaleSlotWrite
+# is a cached interior pointer across caller code, not a published length.
+#
+# The binding anchors on four things at once, which is what keeps it off
+# ordinary initialisation: the exact ptr::write call paths, a pointer
+# arithmetic cursor advance, the value reaching the write as a call argument,
+# and the absence of all three documented disciplines (advance the count per
+# element, zero the length first, restore it from a drop guard).
+#
+# Measured: the vulnerable checkout 1 finding, the fixed checkout 0, stable
+# over three `--cache off` runs each. Collateral, every .rs file under
+# /tmp/cve-work/rank*/ containing ptr::write (65 files) scanned together: one
+# further finding, a synthetic two-function probe whose second function is
+# this exact shape with the count published by reserve and never advanced --
+# a true positive of the class, not a repository file. Twenty-one real Rust
+# repositories (matrix-rust-sdk, mio, mongo-rust-driver, ntpd-rs, opcua,
+# qdrant, risc0, routinator, rs-soroban-sdk, rulex, rusqlite, russh,
+# rust-openssl, rust-phonenumber, rust-smallvec, rust-yamux, rustfs,
+# simple-slab, slack-morphism-rust, sliver, and library/alloc across five
+# revisions of the in-place-collect trees) report zero.
+
+test "stack_dst: push_cloned walks a raw cursor over a slot whose slice length is published"
+  lang rust
+  file src/stack.rs
+  expect VYQL-MEM-052
+  expect_review code.ClosureUnwindStaleLength
+  code
+  ```
+  use std::ptr;
+
+  pub struct StackA<T: ?Sized, D> {
+      next_ofs: usize,
+      data: D,
+  }
+
+  impl<D, T: Clone> StackA<[T], D> {
+      /// Pushes a set of items (cloning out of the input slice)
+      pub fn push_cloned(&mut self, v: &[T]) -> Result<(), ()> {
+          self.push_inner(&v).map(|d| unsafe {
+              let mut ptr = d.as_mut_ptr() as *mut T;
+              for val in v {
+                  ptr::write(ptr, val.clone());
+                  ptr = ptr.offset(1);
+              }
+          })
+      }
+  }
+  ```
+
+test "stack_dst: patched push_cloned zeroes the metadata and advances it per written element"
+  lang rust
+  file src/stack.rs
+  reject VYQL-MEM-052
+  reject_review code.ClosureUnwindStaleLength
+  code
+  ```
+  use std::ptr;
+
+  pub struct StackA<T: ?Sized, D> {
+      next_ofs: usize,
+      data: D,
+  }
+
+  impl<D, T: Clone> StackA<[T], D> {
+      /// Pushes a set of items (cloning out of the input slice)
+      pub fn push_cloned(&mut self, v: &[T]) -> Result<(), ()> {
+          let (meta, d) = self.push_inner(&v)?;
+          // Prepare the slot with zeros (as if it's an empty slice)
+          meta[0] = 0;
+          for w in d.iter_mut() {
+              *w = 0;
+          }
+
+          unsafe {
+              let mut ptr = d.as_mut_ptr() as *mut T;
+              for val in v {
+                  ptr::write(ptr, val.clone());
+                  meta[0] += 1;
+                  ptr = ptr.offset(1);
+              }
+          }
+
+          Ok(())
+      }
+  }
+  ```
+
+test "a value in hand from an earlier call is not this bug: the panicking call finished before the first write"
+  lang rust
+  file src/spec_from_iter_nested.rs
+  reject VYQL-MEM-052
+  reject_review code.ClosureUnwindStaleLength
+  code
+  ```
+  use std::ptr;
+
+  pub fn spec_from_iter_nested<T>(mut iterator: impl Iterator<Item = T>) -> Vec<T> {
+      let mut vector = match iterator.next() {
+          None => return Vec::new(),
+          Some(element) => {
+              let mut vector = Vec::with_capacity(1);
+              unsafe {
+                  ptr::write(vector.as_mut_ptr(), element);
+                  vector.set_len(1);
+              }
+              vector
+          }
+      };
+      vector
+  }
+  ```
+
+test "a length guard that advances the count inside the loop keeps a panic from claiming unwritten elements"
+  lang rust
+  file src/extend_with.rs
+  reject VYQL-MEM-052
+  reject_review code.ClosureUnwindStaleLength
+  code
+  ```
+  use std::ptr;
+
+  struct SetLenOnDrop<'a> {
+      len: &'a mut usize,
+      local_len: usize,
+  }
+
+  impl<'a> SetLenOnDrop<'a> {
+      fn new(len: &'a mut usize) -> Self {
+          SetLenOnDrop { local_len: *len, len }
+      }
+      fn increment_len(&mut self, increment: usize) {
+          self.local_len += increment;
+      }
+  }
+
+  impl<'a> Drop for SetLenOnDrop<'a> {
+      fn drop(&mut self) {
+          *self.len = self.local_len;
+      }
+  }
+
+  pub fn extend_with<T>(out: &mut Vec<T>, n: usize, mut value: impl FnMut() -> T) {
+      out.reserve(n);
+      unsafe {
+          let mut ptr = out.as_mut_ptr().add(out.len());
+          let mut local_len = SetLenOnDrop::new(&mut out.len);
+
+          for _ in 1..n {
+              ptr::write(ptr, value());
+              ptr = ptr.offset(1);
+              local_len.increment_len(1);
+          }
+      }
+  }
+  ```
+
+test "the fully qualified ::std::ptr::write spelling under the same guard discipline"
+  lang rust
+  file src/from_elem.rs
+  reject VYQL-MEM-052
+  reject_review code.ClosureUnwindStaleLength
+  code
+  ```
+  struct SetLenOnDrop<'a> {
+      len: &'a mut usize,
+      local_len: usize,
+  }
+
+  impl<'a> SetLenOnDrop<'a> {
+      fn new(len: &'a mut usize) -> Self {
+          SetLenOnDrop { local_len: *len, len }
+      }
+      fn increment_len(&mut self, increment: usize) {
+          self.local_len += increment;
+      }
+  }
+
+  impl<'a> Drop for SetLenOnDrop<'a> {
+      fn drop(&mut self) {
+          *self.len = self.local_len;
+      }
+  }
+
+  pub fn from_elem<T: Clone>(elem: &T, n: usize, ptr: *mut T, len_ptr: &mut usize) {
+      let mut local_len = SetLenOnDrop::new(len_ptr);
+      for i in 0..n as isize {
+          unsafe { ::std::ptr::write(ptr.offset(i), elem.clone()) };
+          local_len.increment_len(1);
+      }
+  }
+  ```

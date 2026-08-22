@@ -1,0 +1,7 @@
+module code;
+
+review code.HardcodedWildcardFilterChainExemption {
+  category: access_control
+  kind: attention
+  text: "review filter-chain exemptions matched by a hardcoded whole-prefix wildcard for paths the replacing control does not guard"
+}

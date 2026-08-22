@@ -1,0 +1,13 @@
+module vypr.request_forgery;
+
+rule ExternalResponseRedirectTarget {
+  meta {
+    benchmark: redirect
+    cwe: [CWE_601]
+    id: "VYQL-RF-050"
+    severity: medium
+  }
+  taint code.ExternalApiResponse -> code.RedirectTargetSink
+  unless path coveredBy core.RedirectAllowlist
+  unless endpoint coveredBy core.RedirectAllowlist
+}

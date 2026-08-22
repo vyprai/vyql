@@ -1,0 +1,18 @@
+module bindings.php.smarty_security_php_function_denylist;
+
+// Smarty's security policy is an allow-list by construction: the documented
+// `$php_functions` / `$php_modifiers` properties are arrays of *trusted* PHP
+// functions and modifiers, and the base `Smarty_Security::isTrustedPhpFunction`
+// trusts a name only when the array is empty-unrestricted or lists it —
+// everything else triggers a compiler error. An application that subclasses
+// `Smarty_Security` and overrides the trust hook to consult a list of
+// *denied* function names inverts that contract: every function nobody
+// thought to name stays callable from template markup, so the policy has to
+// be extended again for each new escape that is found. That is the same
+// incomplete template validation already reported for a Twig sandbox driven
+// by blocked names and for a renderer running untrusted templates with no
+// sandbox at all.
+binding smartySecurityPhpFunctionDenylist {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "Smarty_Security" and containsAny(node.token, ["isTrustedPhpFunction", "isTrustedPhpModifier"]) and containsAny(node.token, ["dangerous_php", "dangerous_functions", "dangerousFunctions", "banned_php", "banned_functions", "bannedFunctions", "blocked_php", "blocked_functions", "blockedFunctions", "disallowed_php", "disallowed_functions", "disallowedFunctions", "forbidden_php", "forbidden_functions", "forbiddenFunctions", "php_blacklist", "php_denylist", "function_blacklist", "function_denylist", "blacklisted_functions", "blacklistedFunctions", "denied_functions", "deniedFunctions"]) and not containsAny(node.token, ["this->php_functions", "this->php_modifiers", "allowed_functions", "allowedFunctions", "trusted_functions", "trustedFunctions"])
+  emit issue code.IncompleteTemplateValidation at node
+}

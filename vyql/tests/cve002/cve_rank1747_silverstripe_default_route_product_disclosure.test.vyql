@@ -1,0 +1,178 @@
+# Rank 1747 / CVE-2020-6164: Silverstripe framework shipped four
+# default top-level routes in _config/routes.yml (`interactive`,
+# `InstallerTest//$Action/$ID/$OtherID`, `SapphireInfo//...`,
+# `SapphireREPL//...`), reachable unauthenticated over the web. Hitting
+# /interactive ran SapphireREPL::index(), whose non-CLI branch returns
+# "The SilverStripe Interactive Command-line doesn't work in a web
+# browser. Use 'sake interactive'..." -- the response itself is the
+# payload, disclosing that the domain runs Silverstripe (CWE-200;
+# GHSA-gm5x-hpmw-xpxg: "no disclosure of the specific version"; the
+# REPL's eval loop is "limited to execution in a CLI context, and is
+# not known to present a vulnerability through web-based access").
+# Pool SHA 91d30db88f resolves only in silverstripe/silverstripe-
+# framework and names this CVE in its message; the cms clone carries
+# all 7047 commits and no such object (GitHub "not our ref"), and the
+# advisory lists framework among the affected packages with its own
+# patched versions (4.4.7, 4.5.4) -- the repo! flag is the multi-
+# repository-advisory case, not a mislink. The fixed revision removes the four
+# route registrations and deletes SapphireREPL.php; InstallerTest.php
+# and SapphireInfo.php survive byte-identical except an added
+# @deprecated docblock. Remediation verified present at the fixed revision.
+#
+# ATTENTION, authorization decided by wiring/configuration, the family
+# of ranks 1514, 1535, 1540, 1556, 1557 and 1593. The defect is a YAML
+# route registration plus a static response string; there is no dataflow
+# for a scanner to follow, and the remediation lives in a file no PHP
+# frontend reads. Measured on both revisions (three --cache off runs per
+# side, stable): 919 findings at the parent, 916 at the fixed revision; the only
+# rows touching these controllers are three VYQL-INJ-004 HtmlRender hits
+# on the REPL's `echo CLI::text(...)` colour lines (63/64/98), sourced
+# by cross-file library-param taint from FileField.php:175 through
+# MarkedSet.getSubtreeAsArray into CLI.text -- param-source noise on
+# both sides of nothing relevant, gone at the fixed revision only because the whole
+# file is deleted. The sink half works: `vyql match` labels
+# `eval($command)` at SapphireREPL.php:92 code.CodeEval (php.sinks@
+# resolved), and the source list is empty -- nothing treats fgets(STDIN)
+# as untrusted. Two candidate bindings are measured and not shipped.
+# A STDIN source: 72 PHP files across the sibling clones read STDIN and
+# two co-occur with eval, both MediaWiki maintenance REPLs
+# (maintenance/eval.php, benchmarks/benchmarkEval.php) -- by-design CLI
+# evaluators identical in kind to SapphireREPL, and flagging them
+# contradicts the advisory's own scoping of the weakness to the web
+# route. An allowed_actions gate: SilverStripe documents the
+# `'action' => 'ADMIN'` permission form, but 22 framework classes use
+# the bare-name form, all of them authorizing elsewhere (init(),
+# extensions, not being routed), and InstallerTest is byte-identical at
+# both revisions, so the binding cannot separate them and fires on 20+
+# legitimate internals (the measured identical-on-both-revisions family
+# of 1331). The 1380 counterweight fails: the fixed revision deletes the guarded
+# method rather than leaving an API call inside it. Disclosure concepts
+# considered and rejected: code.ErrorDetailDisclosure, code.Absolute-
+# PathDisclosure, code.VerboseHttpErrorObjectDisclosure -- none covers a
+# static product-identity string, and "controller action returns a
+# literal" fires on ordinary content actions at both revisions.
+#
+# Spec cve_rank1747 pins the miss against the rules of the right
+# classes that exist today: the REPL's eval loop against VYQL-INJ-003
+# (the sink is labelled; the member must flip to expect only if
+# console input ever becomes core.UserControlledData, which the
+# precision measurement above argues against), and the routed
+# disclosure actions against VYQL-SEC-004. The guarded member is
+# SapphireInfo's own ADMIN gate, drawn from the same tree at both
+# revisions, and must stay reject under all of them.
+
+test "rank1747: the routed repl controller evals console input and answers web requests with product-identifying text"
+  lang php
+  file src/Dev/SapphireREPL.php
+  reject VYQL-INJ-003
+  code
+  ```
+  <?php
+
+  namespace SilverStripe\Dev;
+
+  use SilverStripe\Control\Controller;
+  use SilverStripe\Control\Director;
+
+  class SapphireREPL extends Controller
+  {
+      private static $allowed_actions = array(
+          'index'
+      );
+
+      public function index()
+      {
+          if (!Director::is_cli()) {
+              return "The SilverStripe Interactive Command-line doesn't work in a web browser."
+                  . " Use 'sake interactive' from the command-line to run.";
+          }
+
+          while (true) {
+              $command = trim(fgets(STDIN, 4096));
+
+              if ($command == 'quit' || $command == '\q') {
+                  break ;
+              }
+
+              if (substr($command, -1) == ';') {
+                  $command = substr($command, 0, -1);
+              }
+              $is_print = preg_match('/^\s*print/i', $command);
+              if (!$is_print) {
+                  $command = "return ($command)";
+              }
+              $command .= ";";
+
+              $result = eval($command);
+              print_r($result);
+          }
+      }
+  }
+  ```
+
+test "rank1747: the installer test route echoes unauthenticated to any visitor"
+  lang php
+  file src/Dev/InstallerTest.php
+  reject VYQL-SEC-004
+  code
+  ```
+  <?php
+
+  namespace SilverStripe\Dev;
+
+  use SilverStripe\Control\Controller;
+
+  class InstallerTest extends Controller
+  {
+      private static $allowed_actions = array(
+          'testrewrite'
+      );
+
+      public function testrewrite()
+      {
+          echo "OK";
+      }
+  }
+  ```
+
+test "rank1747: an info controller that gates its actions on an ADMIN permission check in init"
+  lang php
+  file src/Dev/SapphireInfo.php
+  reject VYQL-SEC-004
+  code
+  ```
+  <?php
+
+  namespace SilverStripe\Dev;
+
+  use SilverStripe\Control\Controller;
+  use SilverStripe\Control\Director;
+  use SilverStripe\Security\Permission;
+  use SilverStripe\Security\Security;
+
+  class SapphireInfo extends Controller
+  {
+      private static $allowed_actions = array(
+          'baseurl',
+          'version',
+          'environmenttype',
+      );
+
+      protected function init()
+      {
+          parent::init();
+          if (!Director::is_cli() && !Permission::check('ADMIN')) {
+              Security::permissionFailure();
+          }
+      }
+
+      public function Version()
+      {
+          $sapphireVersion = file_get_contents(FRAMEWORK_PATH . '/silverstripe_version');
+          if (!$sapphireVersion) {
+              $sapphireVersion = 'unknown';
+          }
+          return $sapphireVersion;
+      }
+  }
+  ```

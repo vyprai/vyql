@@ -1,0 +1,38 @@
+module bindings.php.compiler_node_attribute_generated_method_call;
+
+// A template engine that compiles to PHP turns markup the template author
+// wrote into generated code, and whatever that code declares runs when the
+// compiled template is included. A name the engine's parser stored from
+// markup — read back through the documented Node::getAttribute() accessor —
+// is author-chosen text, and the one position it may never occupy unquoted
+// is a bare identifier in generated code. Twig's macro reference is the
+// shape: `_self.('greet')` and `{% import %}` references store the name on
+// the node, and compile() emits it raw at a method-call position,
+//
+//   $compiler->raw(\sprintf('->%s', $this->getAttribute('name')))
+//
+// so a template naming its macro reference `foo + 1; trigger_error("BAD") //`
+// splices PHP into the compiled output — a sandbox escape from inside a
+// sandboxed environment. The engine's own safe route is Compiler::repr(),
+// which quotes the value; the splice above is not that.
+//
+// The splice and the attribute read must be one expression, so the clause
+// matches the sprintf argument token of the raw-emission call itself. Two
+// separate clauses (any `->%s` splice plus any attribute read anywhere in
+// the unit) cross-satisfy: measured on this engine's own CallExpression,
+// where a reflected-callable splice `sprintf('->%s', $callable[1])` and an
+// unrelated error-message sprintf over getAttribute() 255 lines apart
+// together satisfied both. The same engine also splices `->%s` formats from
+// engine-internal values (a literal-validated local method name, a reflected
+// PHP callable); those carry no attribute read inside the splice argument
+// and do not match. The validation clause is over call tokens, which are
+// AST-derived, so a commented-out preg_match does not count as validation
+// and neither does prose naming one. A unit that preg_matches any string is
+// quiet even when the spliced name is unvalidated — false-negative
+// direction, the same residual the Smarty compile-plugin binding carries.
+binding compilerNodeAttributeGeneratedMethodCall {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php"
+    and containsAny(node.context.callArg, ["sprintf('->%s',$this->getAttribute('", "sprintf(\"->%s\",$this->getAttribute(\""])
+    and not containsAny(node.context.call, ["preg_match", "ctype_alnum", "ctype_alpha", "ctype_digit", "ctype_xdigit", "filter_var"])
+  emit issue code.IncompleteTemplateValidation at node
+}

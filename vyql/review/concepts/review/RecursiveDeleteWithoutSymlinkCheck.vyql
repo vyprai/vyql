@@ -1,0 +1,7 @@
+module code;
+
+review code.RecursiveDeleteWithoutSymlinkCheck {
+  category: path
+  kind: attention
+  text: "review listing-driven recursive deletes for a symbolic-link test or a no-follow resolution before each delete"
+}

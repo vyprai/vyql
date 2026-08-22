@@ -1004,8 +1004,12 @@ binding secretComparisonReview184 {
   emit issue code.SecretComparisonReview at node
 }
 
+// A verification hash, token hash or recovery code held in a plain variable
+// carries the same secret material the credential names do; the camelCase
+// spellings cover givenHash/tokenHash style names and the lowercase ones
+// snake_case hashes.
 matcher secretComparisonSensitiveIdentifier185 {
-  containsAny: ["token", "secret", "signature", "key", "password", "pass", "username", "user"]
+  containsAny: ["token", "secret", "signature", "key", "password", "pass", "username", "user", "Token", "Secret", "Signature", "Key", "Password", "Pass", "Username", "User", "hash", "Hash", "recoveryCode", "RecoveryCode"]
 }
 
 binding secretComparisonReview185 {
@@ -4119,4 +4123,151 @@ binding allowlistValidation1912 {
       anchor: call
     }
   }
+}
+
+// Headers.get is documented to return whatever the client sent, and an
+// environment read is `string | undefined` in every wrapper that exposes one
+// (process.env, t3-env, next-runtime-env): comparing the two decides a
+// credential check, and an unset configuration makes the expected side a
+// guessable literal -- `Bearer ${undefined}` is the text "Bearer undefined",
+// an unset secret compares equal to an empty header value. The documented
+// fail-closed idioms are a presence rejection (`if (!env.X) reject`) or the
+// presence as a conjunct of the acceptance (`env.X && supplied === env.X`).
+// The rejection is labelled by the check binding below so the rule can hold
+// the comparison to it; the conjunct is read off the comparison itself,
+// because a `&&` can never dominate its own operand.
+binding optionalSecretComparisonFailOpen2410 {
+  query pattern presenceNode where node.kind == "binop" and node.op in ["==", "===", "!=", "!=="] and operand(node, where: operand.path ~= "env") and not (node.flowTo.path contains "__binop.and") and operand(node, where: operand.path ~= "headers.get" and containsAny(operand.key, ["authorization", "proxy-authorization", "x-api-key", "api-key", "auth-token", "x-auth-token", "x-signature", "x-hub-signature", "signature", "secret", "csrf-token", "x-csrf-token"]))
+  emit issue code.OptionalSecretComparisonFailOpen at node
+}
+
+binding configuredSecretPresenceCheck2411 {
+  query pattern presenceNode where node.path ~= "__unary.not" and operand(node, where: operand.path ~= "env") and node.context.scopeCall contains "headers.get"
+  emit check core.ConfiguredSecretPresenceCheck at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}
+
+// Element.getAttribute returns the raw attribute value of a DOM node, and
+// the attribute text of page markup is untrusted input the same way the
+// URL and cookie are: any script or server-side template that reflects
+// content into the page controls it. Every other DOM read route is bound
+// as DomInput except this one.
+binding domInput2650 {
+  query pattern callExpr where callee.method == "getAttribute"
+  emit source code.DomInput at call.result
+}
+
+// Buffer.prototype.equals is Node's byte-for-byte buffer comparison and is
+// not constant time, so a verification hash compared through it has the same
+// timing exposure as an === comparison of the same values. The receiver or
+// its peer naming the secret or hash is the signal, on the identifiers the
+// call form exposes.
+binding secretComparisonBufferEquals2700 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.call in ["equals"] and containsAny(node.context.identifier, ["hash", "Hash", "token", "Token", "secret", "Secret", "password", "Password", "signature", "Signature", "recoveryCode", "RecoveryCode"])
+  emit issue code.SecretComparisonReview at node
+}
+
+// Credential verification functions compare a submitted password hash, token
+// hash or recovery code against the stored value, and in JavaScript those
+// values sit in local variables that carry no graph node of their own — the
+// comparison's own operand text is the only node-confined signal naming the
+// secret. The needles pair each credential word with a comparison operator,
+// so the credential name must be an operand of the comparison itself rather
+// than a type enum, a parameter name or a quoted literal elsewhere in the
+// function; the verification-function gate keeps ordinary hash-to-hash
+// consistency checks (sync diffs, cache invalidation) quiet, and an
+// undefined/null comparison is a presence guard, not a secret comparison.
+binding secretComparisonVerificationReview2701 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.functionName, ["verify", "Verify", "validate", "Validate", "authenticate", "Authenticate", "login", "Login", "auth", "Auth"]) and containsAny(node.context.expr, [
+    "hash==", "==hash", "hash!=", "!=hash", "Hash==", "==Hash", "Hash!=", "!=Hash", "token==",
+    "==token", "token!=", "!=token", "Token==", "==Token", "Token!=", "!=Token", "secret==",
+    "==secret", "secret!=", "!=secret", "Secret==", "==Secret", "Secret!=", "!=Secret",
+    "password==", "==password", "password!=", "!=password", "Password==", "==Password",
+    "Password!=", "!=Password", "signature==", "==signature", "signature!=", "!=signature",
+    "Signature==", "==Signature", "Signature!=", "!=Signature", "recoveryCode==", "==recoveryCode",
+    "recoveryCode!=", "!=recoveryCode", "RecoveryCode==", "==RecoveryCode", "RecoveryCode!=",
+    "!=RecoveryCode", "passphrase==", "==passphrase", "passphrase!=", "!=passphrase",
+    "Passphrase==", "==Passphrase", "Passphrase!=", "!=Passphrase"
+  ]) and not (containsAny(node.context.expr, ["undefined", "null"])) and not (containsAny(node.context.scopeCall, [scmp, tsscmp, timingSafeEqual, safeCompare, timingSafeCompare]))
+  emit issue code.SecretComparisonReview at node
+}
+
+// Rich-text editors hand views markup through a content getter on the
+// model object: attachment.getContent(), editor.getContent(). That markup
+// originates in pasted or serialized HTML, and a view that assigns it to
+// innerHTML without passing a sanitizer in the same function renders it
+// live in the document. The sanitizer named here is whatever the code
+// itself calls -- DOMPurify, escapeHtml, the editor's own sanitizer class
+// -- not any one spelling, and textContent is the DOM-safe alternative
+// that needs none.
+binding unsanitizedEditorContentHtmlRender2700 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.assign contains ".innerHTML=" and node.context.assign contains "getContent()" and not (containsAny(node.context.callPath, ["sanitiz", "Sanitiz", "DOMPurify", "escapeHTML", "escapeHtml"])) and not (node.context.selector contains "textContent")
+  emit issue code.UnsanitizedEditorContentHtmlRender at node
+}
+
+// TypeORM's SelectQueryBuilder takes a raw SQL expression string as the
+// first argument of its select/group-by/order-by methods: the documented
+// signature is addSelect(selection: string, alias?), groupBy(groupBy: string),
+// addGroupBy(...), addOrderBy(sort: string, ...) — anything spliced into
+// that string joins the executed query unescaped, unlike the where/having
+// overloads that accept :name bind parameters. knex and sequelize share the
+// groupBy spelling for the same raw-expression role.
+binding sqlExecution2660 {
+  query pattern callExpr where callee.method == "addSelect"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2661 {
+  query pattern callExpr where callee.method == "groupBy"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2662 {
+  query pattern callExpr where callee.method == "addGroupBy"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2663 {
+  query pattern callExpr where callee.method == "addOrderBy"
+  emit sink code.SqlExecution at args[0]
+}
+
+// Lute is the structured Markdown engine embedded by the vditor editor, and
+// its JavaScript build exposes a static HTML sanitizer: Lute.Sanitize(html)
+// returns the markup with active content stripped, the documented way to
+// clean untrusted HTML in an editor built on the engine. The call path names
+// the library, so no import gate is needed -- the same shape as
+// DOMPurify.sanitize.
+binding htmlEscape2800 {
+  query pattern callExpr where callee.path ~= "Lute.Sanitize"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding codeEval2901 {
+  // A spread argument expands into the constructor's parameter list:
+  // Function(...parts) runs the LAST element of the spread array as the
+  // generated body, the same MDN-documented signature the plain args.any
+  // anchor follows. The spread lowers as a collection-typed argument,
+  // which the plain anchor skips, so this anchor uses the collection form.
+  query pattern callExpr where callee.path ~= "Function"
+  emit sink code.CodeEval at args.any.collection
+}
+
+binding certValidationDisabled3126 {
+  // pkijs documents SignedData.verify's checkChain option as defaulting to
+  // false, and the documented verification example turns it on alongside a
+  // trustedCerts anchor list. With the option left false the CMS signature is
+  // only checked against the certificate carried inside the signed message
+  // itself, so a self-signed certificate verifies. Mirrors the rejectUnauthorized
+  // family: the disabled spelling of the documented toggle is the anchor.
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.call == "verify" and node.context.prop contains "checkChain=false"
+  emit issue code.CertValidationDisabled at node
 }

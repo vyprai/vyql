@@ -6,6 +6,6 @@ concept IncompleteDangerousUploadExtensionBlocklist : issue {
   reviewCategory: upload
   reviewCondition: "dangerous upload extension blocklist omits an executable extension handled by common PHP deployments"
   reviewConfidence: high
-  reviewEvidence: "upload processing context {pattern} decides which extensions are executable from a list naming neither PHAR nor the alternative PHP extensions common deployments still execute"
+  reviewEvidence: "upload processing context {pattern} decides which extensions are executable from a list naming neither PHAR nor the alternative PHP extensions common deployments still execute, or from a PHP-family entry that quantifies a letter instead of a wildcard so variant extensions never match"
   vulnerableTo: [injection.UnrestrictedUpload]
 }

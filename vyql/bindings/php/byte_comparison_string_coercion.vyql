@@ -1,0 +1,29 @@
+module bindings.php.byte_comparison_string_coercion;
+
+// A string offset read in PHP yields a one-character string, not a byte
+// value, and the bitwise operators follow: two raw offsets XOR to a string,
+// and OR-ing that string into an integer accumulator coerces it to 0. The
+// hand-rolled constant-time comparison that circulates as the hash_equals()
+// fallback is built exactly that way -- a strlen-bounded loop accumulating
+// $diff |= $a[$i] ^ $b[$i] -- so its accumulator never differs and every
+// two strings of equal length compare equal. The documented correct form
+// converts each offset with ord() before the XOR, or delegates to
+// hash_equals().
+//
+// The shape read here: a function whose assignments XOR a bracketed read
+// directly (the unconverted offset entering the operator), that also takes
+// a string length -- the byte-wise string loop's bound, which integer-array
+// and ArrayAccess byte-buffer variants do not use (they count() instead).
+// Assignments that store into an offset rather than accumulate into a
+// scalar are excluded: bytewise output building is correct per-character
+// string XOR, and its result is stored, not OR-ed. Residual, both in the
+// false-negative direction: a function that also assigns a nested array
+// literal suppresses through the offset-store exclusion, and a loop that
+// converts only one side of the XOR keeps no bracketed-read-then-caret
+// text and passes unnoticed. One false-positive residual: a comparison
+// built on indexed unpack() results keeps the bracket-then-caret text and
+// reads as unconverted, even though unpack converts.
+binding byteComparisonStringCoercionBypass {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.context.assign, ["]^"]) and containsAny(node.context.call, ["strlen"]) and not (containsAny(node.context.assign, ["]="]))
+  emit issue code.ByteComparisonStringCoercionBypass at node
+}

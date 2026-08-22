@@ -1,0 +1,38 @@
+module bindings.java.servlet_request_path_screen;
+
+// A servlet request path arrives in three spellings the container documents:
+// getRequestURI() is the raw undecoded URI, while getServletPath() and
+// getPathInfo() are the decoded parts the container routed on. Whatever later
+// resolves that path to a resource -- static file handlers, classpath and
+// nested-JAR resource lookups, template loaders -- treats dot segments and
+// their percent-encoded forms as traversal, which is why request firewalls
+// (Spring Security's StrictHttpFirewall is the documented archetype) reject
+// encoded dot and separator octets alongside the control characters.
+//
+// A screen that deny-lists some character sequences from a request path has
+// declared itself the control standing between the URI and that resolution,
+// so what it fails to screen for is the weakness: a class reading the
+// request path and matching it against percent-encoded control sequences --
+// semicolon, backslash, NUL, CR/LF, percent -- while no dot-segment form
+// ("..", "./"), no encoded dot or separator ("%2e", "%2f", in either case),
+// and no path normalization call appears anywhere in the class, passes
+// traversal segments through untouched.
+//
+// The judgement lives in the pack rule; this binding only recognises the
+// shape of the screen. The path read is matched by exact call name, so a
+// same-shaped helper (getRequestUri, getPathInfoX) is not a screen read, and
+// the evidence is node-level -- literals and call paths come from AST nodes,
+// so prose in a comment cannot satisfy the negated clauses. Each negation is
+// independently sufficient: a screen that checks any traversal spelling, or
+// normalizes the path instead, is not reported.
+//
+// Residual, measured: a class-context literal clause spans every top-level
+// class in the file, so a sibling class's traversal literal can silence a
+// screen (false-negative direction) and a sibling's deny-list literal can
+// complete a non-screen class's positive clauses (false-positive direction);
+// the two clauses never cross files.
+
+binding servletRequestPathScreenMissingTraversal {
+  query pattern presenceNode where node.scope == "class" and node.context.call in ["getRequestURI", "getServletPath", "getPathInfo"] and containsAny(node.context.literal, ["%3b", "%3B", "%5c", "%5C", "%00", "%0a", "%0A", "%0d", "%0D", "%25"]) and not (containsAny(node.context.literal, ["%2e", "%2E", "%2f", "%2F", "..", "../"])) and not (containsAny(node.context.callPath, ["normalize", "Normalize", "canonical", "Canonical"]))
+  emit issue code.IncompleteDotSegmentRequestScreen at node
+}

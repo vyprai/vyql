@@ -1,0 +1,8 @@
+module code;
+
+review code.SanitizerImageUrlWithoutSsrfGuard {
+  category: request_forgery
+  expected: [core.AllowlistValidation]
+  kind: target
+  text: "review sanitizer policies that allow image-source URLs for markup consumed by server-side fetchers; restrict the attribute with a value policy or an SSRF-safe URL check"
+}

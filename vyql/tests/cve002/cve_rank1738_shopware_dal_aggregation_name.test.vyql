@@ -1,0 +1,190 @@
+# Rank 1738 / CVE-2024-22406: Shopware's DAL interpolated the
+# aggregation name from the API search criteria into its SELECT
+# clause inside hand-rolled backticks, so a crafted name containing
+# a backtick broke out of the quoting and injected SQL (blind SQL
+# injection, CWE-89; GHSA-qmp9-2xwj-m6m9). The chain:
+# RequestCriteriaBuilder::handleRequest reads $request->query->all(),
+# AggregationParser builds `new SumAggregation($aggregation['name'],
+# ...)` and stores it with $criteria->addAggregation(), which does
+# `$this->aggregations[$aggregation->getName()] = $aggregation;` --
+# and later EntityAggregator does `$query->addSelect(sprintf('SUM(%s)
+# as `%s`', $accessor, $aggregation->getName()))` (src/Core/Framework/
+# DataAbstractionLayer/Dbal/EntityAggregator.php:296 and siblings),
+# with only the literal backticks around %s for quoting. The fixing commit
+# 5005213e60 carries the change ("NEXT-32887 - Improve SQL
+# escaping in DAL"): every identifier position now routes through
+# EntityDefinitionQueryHelper::escape(), which throws
+# InvalidArgumentException('Backtick not allowed in identifier')
+# (escape() carried that rejection at the parent; the fixed revision is
+# the call sites). The same commit hardens the accessor builders
+# (JsonFieldAccessorBuilder, PriceFieldAccessorBuilder) the same way
+# for `$root` and the storage name. .
+#
+# ATTENTION, ORM/query-builder assembly, the family of ranks 1545,
+# 1551, 1555, 1564, 1568, 1571, 1579 and 1602. Two measured pieces.
+# Sink side: Doctrine DBAL's QueryBuilder clause methods carry no
+# sink binding (the generated doctrine_dbal package binds only
+# query/exec/executeQuery/executeStatement/execute), so the sprintf
+# into addSelect reports nothing (vyql match on the assembly: source
+# labelled, no sink). Binding `callee.method == "addSelect"` as
+# SqlExecution is measured and NOT shipped: it takes the DAL subtree
+# from 142 to 182 findings (41 INJ-001 rows, including the exact
+# vulnerable lines 296/300/329/334/357...) but every row is sourced
+# from library.param-source object-parameter taint ($criteria /
+# $definition), not the request name, and the identical 41 rows fire
+# at the patched revision (182 = 182, zero discrimination) because
+# escape() is project-local and the taint rides $accessor regardless
+# -- it flags ordinary ORM assembly on both revisions of every
+# Doctrine-heavy tree. Source side: the true request-driven path dies
+# in the engine -- a value stored into an object property through a
+# method has no outgoing flow (`$this->aggregations[$k] = $v` ->
+# "call=$this.aggregations.__setitem__ ... no outgoing flow"), so
+# getAggregations() never yields tainted data, while the
+# constructor-argument routes (a promoted parameter and a
+# constructor-body `$this->name = $name` alike) DO carry taint to
+# getName(). The dying hop is the cross-method object-field write
+# behind the ENGINE-GAPS entry for rank 1198, not a new gap. Spec
+# cve_rank1738 records the full request
+# chain into the addSelect sprintf and the escape()-routed fix form,
+# both asserting reject VYQL-INJ-001: when query-builder clause
+# vocabulary (with a credited escape gate) or property-store taint
+# lands, the raw form must flip to expect.
+
+test "rank1738: the dal splices the api aggregation name into the select clause inside hand-rolled backticks"
+  lang php
+  file src/Core/Framework/DataAbstractionLayer/Dbal/EntityAggregator.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace Shopware\Core\Framework\DataAbstractionLayer;
+
+  use Shopware\Core\Framework\DataAbstractionLayer\Dbal\QueryBuilder;
+
+  class RequestCriteriaBuilder
+  {
+      public function handleRequest($request, Criteria $criteria): Criteria
+      {
+          $payload = $request->query->all();
+
+          foreach ($payload['aggregations'] as $aggregation) {
+              $criteria->addAggregation(new SumAggregation($aggregation['name'], $aggregation['field']));
+          }
+
+          return $criteria;
+      }
+  }
+
+  class Criteria
+  {
+      public array $aggregations = [];
+
+      public function addAggregation(SumAggregation ...$aggregations): self
+      {
+          foreach ($aggregations as $aggregation) {
+              $this->aggregations[$aggregation->getName()] = $aggregation;
+          }
+
+          return $this;
+      }
+
+      public function getAggregations(): array
+      {
+          return $this->aggregations;
+      }
+  }
+
+  class EntityAggregator
+  {
+      private function parseSumAggregation(SumAggregation $aggregation, QueryBuilder $query): void
+      {
+          $accessor = 'product.tax_rate';
+
+          $query->addSelect(sprintf('SUM(%s) as `%s`', $accessor, $aggregation->getName()));
+      }
+
+      public function aggregate(Criteria $criteria, QueryBuilder $query): void
+      {
+          foreach ($criteria->getAggregations() as $aggregation) {
+              $this->parseSumAggregation($aggregation, $query);
+          }
+      }
+  }
+  ```
+
+test "rank1738: the fixed revision routes every identifier through the backtick-rejecting escape helper"
+  lang php
+  file src/Core/Framework/DataAbstractionLayer/Dbal/EntityAggregator.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php declare(strict_types=1);
+
+  namespace Shopware\Core\Framework\DataAbstractionLayer;
+
+  use Shopware\Core\Framework\DataAbstractionLayer\Dbal\EntityDefinitionQueryHelper;
+  use Shopware\Core\Framework\DataAbstractionLayer\Dbal\QueryBuilder;
+
+  class RequestCriteriaBuilder
+  {
+      public function handleRequest($request, Criteria $criteria): Criteria
+      {
+          $payload = $request->query->all();
+
+          foreach ($payload['aggregations'] as $aggregation) {
+              $criteria->addAggregation(new SumAggregation($aggregation['name'], $aggregation['field']));
+          }
+
+          return $criteria;
+      }
+  }
+
+  class Criteria
+  {
+      public array $aggregations = [];
+
+      public function addAggregation(SumAggregation ...$aggregations): self
+      {
+          foreach ($aggregations as $aggregation) {
+              $this->aggregations[$aggregation->getName()] = $aggregation;
+          }
+
+          return $this;
+      }
+
+      public function getAggregations(): array
+      {
+          return $this->aggregations;
+      }
+  }
+
+  class EntityAggregator
+  {
+      private function parseSumAggregation(SumAggregation $aggregation, QueryBuilder $query): void
+      {
+          $accessor = 'product.tax_rate';
+
+          $query->addSelect(sprintf('SUM(%s) as %s', $accessor, EntityDefinitionQueryHelper::escape($aggregation->getName())));
+      }
+
+      public function aggregate(Criteria $criteria, QueryBuilder $query): void
+      {
+          foreach ($criteria->getAggregations() as $aggregation) {
+              $this->parseSumAggregation($aggregation, $query);
+          }
+      }
+  }
+
+  class EntityDefinitionQueryHelper
+  {
+      public static function escape(string $string): string
+      {
+          if (mb_strpos($string, '`') !== false) {
+              throw new \InvalidArgumentException('Backtick not allowed in identifier');
+          }
+
+          return '`' . $string . '`';
+      }
+  }
+  ```

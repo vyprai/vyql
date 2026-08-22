@@ -522,3 +522,56 @@ binding lockRelease88 {
     }
   }
 }
+
+// Swift's two unconditional process-termination entry points: the standard
+// library documents both preconditionFailure and fatalError as stopping
+// execution outright, so a reachable call is a denial-of-service boundary on
+// whatever input reaches it. Labelled as an attention review because whether
+// the trap is externally reachable stays with the reviewer; `==` keeps the
+// receiverless stdlib spelling and leaves dotted receiver methods
+// (logger.fatalError and friends) unlabelled.
+binding reachableAssertionReview200 {
+  query pattern callExpr where callee.path == "preconditionFailure"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview201 {
+  query pattern callExpr where callee.path == "fatalError"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding httpInput300 {
+  query pattern callExpr where callee.path ~= "readInteger"
+  emit source code.HttpInput at call
+}
+
+binding indexAccess301 {
+  query pattern callExpr where callee.path ~= "moveWriterIndex.to"
+  emit sink code.IndexAccessSink at args[0]
+}
+
+// The path component of a server request's URL is attacker-chosen text on
+// the wire. Server-side Swift reads it as an attribute chain rather than a
+// call, so the call-argument source route cannot see it; the presence route
+// labels the attribute read itself. Anchored on the `request`/`req` receiver
+// chain because Swift's URL type exposes the same `.path` property on every
+// URL a program builds locally: labelling `url.path` generally measured
+// +2515 findings on swift-corelibs-foundation alone (tainting executableURL,
+// NSURL and UserDefaults paths), while the request-anchored pair added
+// nothing there, on swift-nio, Sparkle, swift-crypto or swift-asn1.
+binding httpInput340 {
+  query pattern presenceNode where node.path ~= "request.url.path"
+  emit source code.HttpInput at node
+}
+
+binding httpInput341 {
+  query pattern presenceNode where node.path ~= "req.url.path"
+  emit source code.HttpInput at node
+}
+
+// FileIO.streamFile(at:) opens the file at the supplied path and streams it
+// as the response body, so the path argument decides what gets read.
+binding filePathAccess342 {
+  query pattern callExpr where callee.method == "streamFile"
+  emit sink code.FilePathAccess at args[0]
+}

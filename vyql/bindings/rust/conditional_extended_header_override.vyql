@@ -1,0 +1,37 @@
+module bindings.rust.conditional_extended_header_override;
+
+// POSIX pax extended headers exist to carry values the fixed ustar fields
+// cannot, and the format gives the size record plain precedence: when an
+// extended header precedes an entry, its size value is the size of that
+// entry's data, overriding the octal field in the base header. Go's
+// archive/tar and the astral-tokio-tar parser apply it unconditionally. A
+// parser that applies the override only when the base header's size field is
+// zero frames the same archive differently from both -- an entry can declare
+// a small header size and a large extended size, and the lenient reader ends
+// the entry early, exposing whatever the inflated region hides (a second
+// header, a symlink) to its own entry walk while a validating reader that
+// honours the record never sees it.
+//
+// The tar crate publishes both halves of the shape: Header::entry_size reads
+// the base header's size field, and pax_extensions_value with the PAX_SIZE
+// key returns the extended header's size record. What is recognised here is
+// the function that reads the base size, consults the size record, and
+// zero-compares the value it read before the override may land: the
+// zero-comparison is the conditional half, and it is the only atom the
+// unconditional form lacks. The uid and gid records consulted in the same
+// function show that unconditional form -- their values land in set_uid and
+// set_gid with no guard -- and stay unreported.
+//
+// The zero-comparison is matched on its operands rather than its whole text,
+// so the guard is still recognised when the local carrying the size is
+// renamed to anything containing size, when the header read is inlined into
+// the comparison, and in either operand order. The judgement lives in the
+// pack rule; this binding only recognises the atoms. Every clause is an
+// exact-token or operand match over the parsing function's own context, so
+// prose in a comment satisfies neither side and a sibling function's
+// unconditional override does not clear the comparison.
+
+binding conditionalExtendedHeaderOverride {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["entry_size"] and node.context.call in ["pax_extensions_value"] and containsAny(node.context.binary, ["size == 0", "size==0"])
+  emit issue code.ConditionalExtendedHeaderOverride at node
+}

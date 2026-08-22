@@ -1,0 +1,8 @@
+module code;
+
+review code.SamlAssertionReplayBypass {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review SAML assertion validation for replay detection: the same captured assertion is accepted every time it is presented, so enable the validation stack's token replay check or reject remembered assertion IDs"
+}

@@ -951,3 +951,32 @@ binding incompleteCsrfTokenValidation780 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.literal in ["csrf", "csrf_token", "csrfmiddlewaretoken", "csrftoken", "CSRFToken", "csrf-token", "_csrf", "authenticity_token", "xsrf"] and node.context.call in ["strcmp", "strcasecmp", "strncmp", "strncasecmp", "memcmp"] and node.context.call in ["strtok", "strtok_r", "strsep"] and not containsAny(node.context.assign, ["=true", "=1", "=TRUE"])
   emit issue code.IncompleteCsrfTokenValidation at node
 }
+
+binding wsrepToiBeginBeforeEventExecutor862 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.call in ["WSREP_TO_ISOLATION_BEGIN"] and containsAny(node.context.callPath, ["Events.create_event", "Events.update_event", "Events.drop_event"])
+  emit issue code.ProtocolStateReview at node
+}
+
+// The C++ spelling of certValidationDisabled1040: GnuTLS documents
+// gnutls_session_set_verify_cert(session, hostname, flags) as skipping
+// hostname verification entirely "if no hostname is provided", so a NULL
+// hostname verifies the chain but never the peer's identity.
+binding certValidationDisabled940 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and containsAny(node.context.callArgAt, ["gnutls_session_set_verify_cert:1:NULL"])
+  emit issue code.CertValidationDisabled at node
+}
+
+// TON's StackEntry::as_tuple() and as_tuple_range() are checked casts: the
+// underlying as<Tuple, t_tuple>() hands back a null Ref<Tuple> whenever the
+// entry is not a tuple, and tuple_index() has no null handling of its own --
+// it evaluates tup->size() on entry (vm/stack.cpp) while its sibling
+// tuple_extend_index() does check -- so a cast result indexed through
+// tuple_index() without an intervening null guard dereferences a null Ref.
+// The null guards are td::Ref's own API, is_null() and not_null(), and no
+// other spelling appears on Ref values in the VM sources, so both are
+// accepted. Residual, in the false-positive direction: a guard spelled some
+// other way would still report.
+binding tonUncheckedTupleCastIndex1201 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.call in ["tuple_index"] and containsAny(node.context.call, ["as_tuple"]) and not (node.context.call in ["is_null", "not_null"])
+  emit issue code.UncheckedNullableResultDeref at node
+}

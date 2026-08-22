@@ -1,0 +1,33 @@
+module bindings.go.sbiRouteIdentifierValidation;
+
+// free5gc's util/validator package documents one format validator per 3GPP
+// identifier (TS 23.003 / TS 29.571): SUPI, GPSI, SUCI, PEI, PLMN ID, S-NSSAI
+// and PDU session ID. Each rejects the null bytes and control characters its
+// identifier grammar forbids, so a value that passes one is validated input on
+// every path through the call.
+binding free5gcUtilValidatorIsInputValidation {
+  requires {
+    dependency("github.com/free5gc/util")
+  }
+  query pattern callExpr where callee.path in ["validator.IsValidSupi", "validator.IsValidGpsi", "validator.IsValidSuci", "validator.IsValidPei", "validator.IsValidPlmnId", "validator.IsValidPlmnIdParts", "validator.IsValidSnssai", "validator.IsValidPduSessionID"]
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+// A service handler that reads a 3GPP identifier from the route path and
+// forwards it into request processing with none of the ecosystem's identifier
+// format validators in the handling function. The identifier grammars forbid
+// control characters, so a raw route value carrying one breaks the downstream
+// request construction the value feeds, and the failure surfaces as a server
+// error instead of a client rejection.
+binding sbiRouteIdentifierForwardedWithoutValidator {
+  requires {
+    dependency("github.com/free5gc/util")
+  }
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "c.Param" and containsAny(node.context.literal, ["supi", "ueId", "gpsi", "suci", "pei"]) and not (node.context.callPath contains "IsValidSupi") and not (node.context.callPath contains "IsValidGpsi") and not (node.context.callPath contains "IsValidSuci") and not (node.context.callPath contains "IsValidPei")
+  emit issue code.UnvalidatedRouteIdentifier at node
+}

@@ -1,0 +1,31 @@
+module bindings.javascript.deeplink_terminal_input_without_confirmation;
+
+// A desktop application that registers a URL scheme hands every document that
+// can name that scheme a way to reach its handlers: the main process parses
+// `scheme://command?param=value` into an argument object, and the renderer
+// dispatches on it. The argument object's fields are therefore chosen by
+// whoever crafted the link, which is the same trust position as a request
+// parameter -- with the difference that the value is usually acted on
+// immediately, in an already-running, already-authenticated application.
+//
+// Writing such a value into an interactive terminal session is the sharpest
+// form of that: the terminal's input API types the bytes into whatever shell
+// is focused, so the payload is interpreted as keyboard input and not as
+// data. Escaping offered as a link-chosen flag does not help -- the attacker
+// simply omits it -- and even a correctly quoted argument arrives at a shell
+// that may already be mid-command. The control that does help is the one a
+// user can exert: an interactive confirmation naming the payload before it is
+// dispatched, which the platform's message-box API provides.
+//
+// The two facts this binding needs live in sibling methods of one handler
+// class -- the argv read sits in the dispatch method and the session write in
+// the paste helper it calls -- and JavaScript emits no class-scope context
+// node, so the module is the smallest scope where both are visible. The
+// conjunction is what carries the judgement: reading a deep-link field alone
+// is ordinary dispatch, and writing to a terminal session alone is what every
+// hotkey and drag-drop handler does. Both `callPath` and `selector` tokens are
+// AST-derived, so the negation is not silenceable by a comment.
+binding deepLinkTerminalInputWithoutConfirmation1 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.selector contains "event.argv" and node.context.callPath contains "sendInput" and not (node.context.callPath contains "showMessageBox")
+  emit issue code.DeepLinkTerminalInputWithoutConfirmation at node
+}

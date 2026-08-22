@@ -1,0 +1,11 @@
+module code;
+
+concept BindMountPathSourceWithoutFdAnchor : issue {
+  cwe: [CWE_61, CWE_367]
+  reviewAssumption: "the process mounts inside a mount namespace whose contents an attacker influences, as a container runtime does once it has entered a container's root filesystem, so a path that resolved to the intended object a moment earlier can resolve to a planted link at mount time"
+  reviewCategory: path
+  reviewCondition: "a bind mount names its source as a path, so the kernel resolves that name again when the mount runs and whatever an earlier validation of the path established is not the object that gets mounted"
+  reviewConfidence: medium
+  reviewEvidence: "bind mount context {pattern} mounts a fixed path source by name with no fd anchoring the source object"
+  vulnerableTo: [path.LinkFollowing, concurrency.Toctou]
+}

@@ -1,0 +1,272 @@
+# Rank 1743 / CVE-2025-66398 (GHSA-w3x5-7c4c-66p9, CWE-913 + CWE-78):
+# Signal K server's backup-restore pair shared one module-level mutable
+# variable across requests. validateBackup streamed an uploaded .backup zip
+# into a fresh temp directory and published that directory by plain
+# assignment to `restoreFilePath`, captured from the enclosing route-setup
+# closure --
+#
+#   let restoreFilePath: string
+#   ...
+#   app.post(`${SERVERROUTESPREFIX}/validateBackup`, (req, res) => {
+#     const bb = busboy({ headers: req.headers })
+#     bb.on('file', (fieldname, file, { filename }) => {
+#       ...
+#       restoreFilePath = fs.mkdtempSync(`${tmpDir}${path.sep}`)
+#       ...unzipper.Extract({ path: restoreFilePath })...
+#   ...
+#   app.post(`${SERVERROUTESPREFIX}/restore`, (req, res) => {
+#     listSafeRestoreFiles(restoreFilePath).then((files) => {
+#       ...ncp(path.join(restoreFilePath, name), path.join(app.config.configPath, name))...
+#
+# -- and neither endpoint asked whether the caller may configure the server,
+# while the sibling security-config routes in the same file did call
+# app.securityStrategy.allowConfigure(req). Any unauthenticated client could
+# therefore populate the shared restore directory with its own zip, and the
+# administrator's later /restore copied that content over security.json and
+# the plugin list, which is the account-takeover step the advisory chains
+# into the app-store command injection. The fixed revision 5c211eaf gates both handlers
+# with `!isDummy() && !allowConfigure(req)` answering 401, and deletes the
+# shared state: each validateBackup now allocates a local
+# `const restoreFilePath` recorded in a per-session Map keyed by a cookie.
+#
+# The row's commit is the GitHub security-advisory merge of the
+# private fork fix; the diff reads in full with `git show` and the
+# vulnerable construct is present at its parent. The same merge carries the
+# unrelated runNpm command-injection fix in src/modules.ts (the CVE-78 leg
+# of the chain); this rank is the state-pollution leg in src/serverroutes.ts.
+
+#
+# ATTENTION, analysis gap, both revisions pinned as misses. Measured: the
+# vulnerable tree scans 422 findings and the fixed tree 434 (union over
+# three `--cache off` runs each, identical counts within each revision);
+# every row that touches serverroutes.ts at either revision is an
+# error-message/XSS row on res.status(...).send(err.message) lines or a
+# line-shifted copy of it, and `vyql trace` over the file reports 55
+# sources, 0 reaching any sink -- the uploaded zip's content moves through
+# the filesystem, not a dataflow edge, so the weakness is authorization
+# plus cross-request state, the `code.AuthenticationRequiredOp` /
+# VYQL-AUTH-001 route per the layering. The per-handler anchor exists and
+# works: markCallLambdaParams puts `call_path:app.post` into the handler
+# lambda's own context, and a probe binding keyed on it fires on exactly
+# the validateBackup and restore handlers. No discrimination is reachable
+# from there:
+#
+#   * the fixed revision's guard calls app.securityStrategy.allowConfigure /
+#     isDummy, which are this application's own SecurityStrategy interface
+#     (src/security.ts), not a published library API -- a negation naming
+#     them detects this server, not the weakness, the same verdict recorded
+#     for openbao's callbackModeDirect at rank 1501;
+#   * the generic "answers unauthorized" signal, res.status(401), is
+#     invisible: the JS frontend emits no call-argument tokens (rank 1360)
+#     and no numeric-literal context tokens at all, so 401/403 leave no
+#     token in the handler's context;
+#   * the remaining delta -- the vulnerable handler assigns
+#     `restoreFilePath = fs.mkdtempSync(...)` where the fixed revision declares
+#     `const restoreFilePath = ...` -- does separate the revisions
+#     (assignment_expression emits an `assign:` token, a declarator emits
+#     none) but states the fixed revision's own layout, not the weakness: the patched
+#     /restore handler still matches the same clause through an unrelated
+#     `hasError = true` inside its ncp callback, and a fix that kept the
+#     mutable global but added the guard would be remediated yet reported.
+#
+# The unstatable fact is scope: nothing distinguishes an assignment to a
+# name declared outside the handler lambda (cross-request shared state,
+# CWE-913's own axis) from a reassignment of a local, because `identifier:`
+# and `assign:` tokens are scope-blind and a `let x` at closure scope
+# produces the same `identifier:x` token as any use. See the ENGINE-GAPS
+# entry for this rank.
+#
+# verify_current_expected: attention-analysis-gap, both revisions rejected
+
+test "rank1743: unauthenticated backup upload repopulates the shared restore state"
+  lang javascript
+  file src/serverroutes.ts
+  reject VYQL-AUTH-001
+  reject_review code.AuthenticationRequiredOp
+  code
+  ```
+  import * as fs from 'fs'
+  import * as os from 'os'
+  import * as path from 'path'
+  import busboy from 'busboy'
+  import unzipper from 'unzipper'
+
+  module.exports = function (app: App) {
+    let restoreFilePath: string
+
+    app.post(`${SERVERROUTESPREFIX}/restore`, (req: Request, res: Response) => {
+      if (!restoreFilePath) {
+        res.status(400).send('not exting restore file')
+      } else if (!fs.existsSync(restoreFilePath)) {
+        res.status(400).send('restore file does not exist')
+      } else {
+        res.status(202).send()
+      }
+
+      listSafeRestoreFiles(restoreFilePath)
+        .then((files) => {
+          const wanted = files.filter((name) => req.body[name])
+          for (let i = 0; i < wanted.length; i++) {
+            const name = wanted[i]
+            ncp(
+              path.join(restoreFilePath, name),
+              path.join(app.config.configPath, name),
+              { stopOnErr: true },
+              () => undefined
+            )
+          }
+        })
+        .catch((err) => res.status(500).send(err.message))
+    })
+
+    app.post(
+      `${SERVERROUTESPREFIX}/validateBackup`,
+      (req: Request, res: Response) => {
+        const bb = busboy({ headers: req.headers })
+        bb.on(
+          'file',
+          (fieldname: string, file: any, { filename }) => {
+            if (!filename.endsWith('.backup')) {
+              res.status(400).send('the backup file does not have the .backup extension')
+              return
+            }
+            const tmpDir = os.tmpdir()
+            restoreFilePath = fs.mkdtempSync(`${tmpDir}${path.sep}`)
+            const zipFileDir = fs.mkdtempSync(`${tmpDir}${path.sep}`)
+            const zipFile = path.join(zipFileDir, 'backup.zip')
+            const unzipStream = unzipper.Extract({ path: restoreFilePath })
+
+            file
+              .pipe(fs.createWriteStream(zipFile))
+              .on('error', (err) => res.status(500).send(err.message))
+              .on('close', () => {
+                fs.createReadStream(zipFile)
+                  .pipe(unzipStream)
+                  .on('error', (err) => res.status(500).send(err.message))
+                  .on('close', () => {
+                    fs.unlinkSync(zipFile)
+                    listSafeRestoreFiles(restoreFilePath)
+                      .then((files) => res.type('text/plain').send(files))
+                      .catch((err) => res.status(500).send(err.message))
+                  })
+              })
+          }
+        )
+        req.pipe(bb)
+      }
+    )
+  }
+  ```
+
+test "rank1743: the fixed revision gates both endpoints and scopes the restore path per session"
+  lang javascript
+  file src/serverroutes.ts
+  reject VYQL-AUTH-001
+  reject_review code.AuthenticationRequiredOp
+  code
+  ```
+  import * as fs from 'fs'
+  import * as os from 'os'
+  import * as path from 'path'
+  import busboy from 'busboy'
+  import unzipper from 'unzipper'
+
+  module.exports = function (app: App) {
+    const restoreSessions = new Map<string, string>()
+
+    app.post(`${SERVERROUTESPREFIX}/restore`, (req: Request, res: Response) => {
+      if (
+        !app.securityStrategy.isDummy() &&
+        !app.securityStrategy.allowConfigure(req)
+      ) {
+        res.status(401).send('Restore not allowed')
+        return
+      }
+      const sessionId = getCookie(req, 'restoreSession')
+      const restoreFilePath = sessionId ? restoreSessions.get(sessionId) : undefined
+
+      if (!restoreFilePath) {
+        res.status(400).send('not exting restore file')
+      } else if (!fs.existsSync(restoreFilePath)) {
+        res.status(400).send('restore file does not exist')
+      } else {
+        res.status(202).send()
+      }
+
+      listSafeRestoreFiles(restoreFilePath)
+        .then((files) => {
+          const wanted = files.filter((name) => req.body[name])
+          for (let i = 0; i < wanted.length; i++) {
+            const name = wanted[i]
+            ncp(
+              path.join(restoreFilePath, name),
+              path.join(app.config.configPath, name),
+              { stopOnErr: true },
+              () => undefined
+            )
+          }
+        })
+        .catch((err) => res.status(500).send(err.message))
+    })
+
+    app.post(
+      `${SERVERROUTESPREFIX}/validateBackup`,
+      (req: Request, res: Response) => {
+        if (
+          !app.securityStrategy.isDummy() &&
+          !app.securityStrategy.allowConfigure(req)
+        ) {
+          res.status(401).send('Validate backup not allowed')
+          return
+        }
+        const bb = busboy({ headers: req.headers })
+        bb.on(
+          'file',
+          (fieldname: string, file: any, { filename }) => {
+            if (!filename.endsWith('.backup')) {
+              res.status(400).send('the backup file does not have the .backup extension')
+              return
+            }
+            const tmpDir = os.tmpdir()
+            const restoreFilePath = fs.mkdtempSync(`${tmpDir}${path.sep}`)
+            const sessionId = Date.now() + '_' + Math.random().toString(36).substr(2, 9)
+            restoreSessions.set(sessionId, restoreFilePath)
+            setTimeout(() => restoreSessions.delete(sessionId), 15 * 60 * 1000)
+            res.cookie('restoreSession', sessionId, { httpOnly: true, sameSite: 'strict' })
+
+            const zipFileDir = fs.mkdtempSync(`${tmpDir}${path.sep}`)
+            const zipFile = path.join(zipFileDir, 'backup.zip')
+            const unzipStream = unzipper.Extract({ path: restoreFilePath })
+
+            file
+              .pipe(fs.createWriteStream(zipFile))
+              .on('error', (err) => res.status(500).send(err.message))
+              .on('close', () => {
+                fs.createReadStream(zipFile)
+                  .pipe(unzipStream)
+                  .on('error', (err) => res.status(500).send(err.message))
+                  .on('close', () => {
+                    fs.unlinkSync(zipFile)
+                    listSafeRestoreFiles(restoreFilePath)
+                      .then((files) => res.type('text/plain').send(files))
+                      .catch((err) => res.status(500).send(err.message))
+                  })
+              })
+          }
+        )
+        req.pipe(bb)
+      }
+    )
+  }
+
+  function getCookie(req: Request, name: string): string | undefined {
+    if (req.headers.cookie) {
+      const value = '; ' + req.headers.cookie
+      const parts = value.split('; ' + name + '=')
+      if (parts.length === 2) {
+        return parts.pop()?.split(';').shift()
+      }
+    }
+    return undefined
+  }
+  ```

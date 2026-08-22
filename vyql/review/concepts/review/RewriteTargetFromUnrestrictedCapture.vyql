@@ -1,0 +1,8 @@
+module code;
+
+review code.RewriteTargetFromUnrestrictedCapture {
+  category: request_forgery
+  expected: [core.AllowlistValidation]
+  kind: attention
+  text: "review request-rewrite targets assembled from request-matched captures: restrict each capture to the identifier's own alphabet, or the requester chooses the host and path the server forwards to"
+}

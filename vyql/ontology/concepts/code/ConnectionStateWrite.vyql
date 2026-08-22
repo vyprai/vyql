@@ -1,0 +1,16 @@
+module code;
+
+// A value committed into per-connection state that outlives the callback
+// writing it. Transport libraries hand the same store to the authentication
+// callbacks and to the established session, so whatever a pre-verification
+// callback writes is still there when the session starts.
+//
+// Declares no vulnerableTo on purpose. The sink labels every value written
+// through the store's setter; the finding comes from the pairing with
+// code.UnverifiedCredential, and a correct program has no path between them
+// because the identity is derived after authentication. The clearing control
+// is the dataflow, so there is no check concept to bind per language.
+concept ConnectionStateWrite : sink {
+  cwe: [CWE_287]
+  enabledBy: [taint.UntrustedData]
+}

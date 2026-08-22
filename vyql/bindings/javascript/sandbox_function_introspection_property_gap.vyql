@@ -1,0 +1,47 @@
+module bindings.javascript.sandbox_function_introspection_property_gap;
+
+// A sandbox that interprets author-supplied code has to decide, for every
+// property read its interpreter performs on a live host value, which names
+// are safe to hand back. The JavaScript specification makes one part of that
+// decision non-optional: `caller`, `callee` and `arguments` are the
+// introspection properties (Function.prototype.caller,
+// Function.prototype.arguments, arguments.callee) whose native getters
+// disclose the function that is running -- and inside a sandbox the function
+// that is running is the interpreter's own runtime callback, a host function
+// holding host privileges. Strict mode and CSP disable them for exactly this
+// reason, and every documented JS sandbox denies them by name.
+//
+// The interpreter read path shows its name denylist in the guards around the
+// read: it compares the computed key against the prototype-machinery names
+// (`prototype`, `__proto__`) and throws the sandbox's own access-denial
+// signal. A guard set that covers those and never names the introspection
+// trio forwards the callback itself to sandboxed code -- `(function fn() {
+// return fn.caller; })()` recovers it, and invoking it directly with a
+// crafted interpreter argument object performs reads and calls outside every
+// guard.
+//
+// Every fact is library documentation, not incident vocabulary: the
+// access-denial signal is the library's exported error class, the two
+// prototype names are the guard the read path already documents, and the
+// trio is the specification's own list. The omission clause matches names
+// exactly (`in`, not `contains`) so a name list, a Set lookup and an explicit
+// comparison satisfy it equally -- the discriminator is which names the guard
+// covers, not the spelling a particular fix chose.
+//
+// Module scope rather than function scope, because the denied names may be a
+// module-level Set or constant whose consuming membership test is a two-line
+// check inside the op: a function-scope query sees the test and none of the
+// names. All three clauses read AST-derived tokens (call sites and string
+// literals), so the module's comments cannot satisfy the anchor or silence
+// the omission -- prose naming `caller` is not a guard. The residual runs in
+// the false-negative direction only: a module that spells one of the three
+// names in a quoted literal for an unrelated reason is not reported.
+binding sandboxFunctionIntrospectionPropertyNotDenied {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "javascript"
+    and node.context.call in ["SandboxAccessError"]
+    and node.context.literal in ["prototype"]
+    and node.context.literal in ["__proto__"]
+    and not (node.context.literal in ["caller", "callee", "arguments"])
+  emit issue code.SandboxHostObjectMemberDenylistGap at node
+}

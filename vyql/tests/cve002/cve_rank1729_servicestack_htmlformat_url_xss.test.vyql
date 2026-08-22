@@ -1,0 +1,108 @@
+# Rank 1729 / CVE-2019-1010199: the HTML reply format renders a snapshot
+# page for any DTO response. The page substitutes the absolute request URL
+# into the template at ${ServiceUrl}, and that URL is built from
+# IRequest.ResolveAbsoluteUrl(), which reflects the request's own query
+# string, so a query such as ?format=html&q=<script>alert(1)</script> is
+# echoed into the HTML response unencoded. The neighbouring DTO payload is
+# escaped (its < and > are replaced), the URL is not, which is the defect.
+# Fix a0e0d7de20f5 wraps the URL chain in the library's own HtmlEncode
+# extension (and switches the DTO escaping to the same call).
+#
+# FIXED, two layers.
+#
+# The frontend now lowers a compound assignment to AugAssign, so the
+# vulnerable code's `url += url.Contains("?") ? "&" : "?"` keeps the read
+# of the URL instead of dropping it; a plain Assign modelled only the
+# write and the tainted URL died on that statement. The library's
+# HtmlEncode extension is also a core.HtmlEscape control now
+# (htmlEscape340), so the patched chain that ends `.HtmlEncode()` is
+# suppressed while the unencoded original is reported.
+#
+# verify_current_expected: fixed
+
+test "rank1729: request URL echoed into the html snapshot page unencoded"
+  lang csharp
+  file src/ServiceStack/Formats/HtmlFormat.cs
+  expect VYQL-INJ-004
+  code
+  ```
+  using ServiceStack;
+  using System.IO;
+  using System.Threading.Tasks;
+
+  public class HtmlFormat
+  {
+      public async Task SerializeToStreamAsync(IRequest req, object response, Stream outputStream)
+      {
+          string html;
+          var dto = response.GetDto();
+          if (!(dto is string))
+          {
+              var json = JsonDataContractSerializer.Instance.SerializeToString(dto) ?? "null";
+              json = json.Replace("<", "&lt;").Replace(">", "&gt;");
+
+              var url = req.ResolveAbsoluteUrl()
+                  .Replace("format=html", "")
+                  .Replace("format=shtm", "")
+                  .TrimEnd('?', '&');
+
+              url += url.Contains("?") ? "&" : "?";
+
+              html = HtmlTemplates.GetHtmlFormatTemplate()
+                  .Replace("${Dto}", json)
+                  .Replace("${ServiceUrl}", url);
+          }
+          else
+          {
+              html = (string)dto;
+          }
+
+          var utf8Bytes = html.ToUtf8Bytes();
+          await outputStream.WriteAsync(utf8Bytes, 0, utf8Bytes.Length);
+      }
+  }
+  ```
+
+test "rank1729: the fixed page encodes the URL before substituting it"
+  lang csharp
+  file src/ServiceStack/Formats/HtmlFormat.cs
+  reject VYQL-INJ-004
+  code
+  ```
+  using ServiceStack;
+  using System.IO;
+  using System.Threading.Tasks;
+
+  public class HtmlFormat
+  {
+      public async Task SerializeToStreamAsync(IRequest req, object response, Stream outputStream)
+      {
+          string html;
+          var dto = response.GetDto();
+          if (!(dto is string))
+          {
+              var json = JsonDataContractSerializer.Instance.SerializeToString(dto) ?? "null";
+              json = json.HtmlEncode();
+
+              var url = req.ResolveAbsoluteUrl()
+                  .Replace("format=html", "")
+                  .Replace("format=shtm", "")
+                  .TrimEnd('?', '&')
+                  .HtmlEncode();
+
+              url += url.Contains("?") ? "&" : "?";
+
+              html = HtmlTemplates.GetHtmlFormatTemplate()
+                  .Replace("${Dto}", json)
+                  .Replace("${ServiceUrl}", url);
+          }
+          else
+          {
+              html = (string)dto;
+          }
+
+          var utf8Bytes = html.ToUtf8Bytes();
+          await outputStream.WriteAsync(utf8Bytes, 0, utf8Bytes.Length);
+      }
+  }
+  ```

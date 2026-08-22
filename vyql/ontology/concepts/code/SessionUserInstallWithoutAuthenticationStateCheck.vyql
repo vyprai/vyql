@@ -1,0 +1,11 @@
+module code;
+
+concept SessionUserInstallWithoutAuthenticationStateCheck : issue {
+  cwe: [CWE_613, CWE_384]
+  reviewAssumption: "a request that arrives without credentials can still reach the session-identity write, and the identity it installs is written into shared session state that outlives the request"
+  reviewCategory: auth
+  reviewCondition: "an unauthenticated route resolves a user from client-supplied material and installs them as the session's authenticated user without consulting whether a session already holds one"
+  reviewConfidence: medium
+  reviewEvidence: "session identity context {pattern} installs a resolved user into the user session with no logged-in or active-user check in scope"
+  vulnerableTo: [authentication.ImproperAuthentication, session.SessionFixation]
+}

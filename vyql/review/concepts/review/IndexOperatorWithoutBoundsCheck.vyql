@@ -1,0 +1,7 @@
+module code;
+
+review code.IndexOperatorWithoutBoundsCheck {
+  category: memory
+  kind: attention
+  text: "review this Index implementation for a bounds comparison against the container length before the raw-pointer dereference; the indexing operator's panic-on-out-of-bounds contract is the implementor's to provide"
+}

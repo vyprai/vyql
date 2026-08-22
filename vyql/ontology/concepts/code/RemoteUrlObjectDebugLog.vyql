@@ -4,8 +4,8 @@ concept RemoteUrlObjectDebugLog : issue {
   cwe: [CWE_200, CWE_532, CWE_598]
   reviewAssumption: "remote source URLs may contain credentials, tokens, query strings, or fragments supplied by users or package metadata"
   reviewCategory: secret
-  reviewCondition: "remote repository URL objects are written to debug logs before credential-bearing components are removed"
+  reviewCondition: "remote URL objects -- repository URLs, HTTP request URIs -- are written to log events before credential-bearing components are removed"
   reviewConfidence: high
-  reviewEvidence: "remote fetch context {pattern} passes a URL object into logger.debug"
+  reviewEvidence: "remote fetch or client send context {pattern} passes a URL object or request URI into a log event"
   vulnerableTo: [secrets.SecretLeak]
 }

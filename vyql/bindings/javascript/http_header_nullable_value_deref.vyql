@@ -1,0 +1,54 @@
+module bindings.javascript.httpHeaderNullableValueDeref;
+
+// Node documents `http.IncomingMessage.headers` -- and the client-side
+// response object -- as a plain record where every header the message does
+// not carry is simply missing: `req.headers.upgrade` is `undefined` for a
+// request without that header, and a request may also exceed
+// `maxHeadersCount`, in which case a header that was sent, even one that
+// triggered the 'upgrade' event, is still absent from the map. Express, Koa,
+// Fastify and Hapi surface the same record under their own request and
+// response spellings. Calling a String method on such a value
+// (`req.headers.upgrade.toLowerCase()`) throws `TypeError: Cannot read
+// properties of undefined` on the request path, and the exception is
+// unhandled, so one crafted request crashes an otherwise healthy server or
+// client.
+//
+// The dereference is pinned by two function-scope facts about the same call
+// shape: a call whose path runs through a header map (`req.headers.` and the
+// documented sibling spellings) whose final segment is a String method. The
+// `Headers` class methods (`get`, `has`, `set`, ...) never appear as final
+// segments here because they are functions of the header object itself, which
+// always exists, so `response.headers.get(...)` is not this crash and does
+// not match. Bracket access (`headers['name']`) lowers to a bracketed path
+// segment and stays out of scope. The two facts are read at function scope,
+// so a function that reads one header while calling a String method on an
+// unrelated local also matches; that shape measured once across the corpus
+// trees here, in a vendored bundle, and the finding is a low-severity review
+// prompt, not an alert.
+//
+// The exclusion is credited by the comparison's own operator shape, read from
+// the `expr:` tokens (each binary expression's compacted text):
+//   - absence forms: `x === undefined`, `x == null`, `x === null`,
+//     `typeof x === 'undefined'`, as an early-abort `if` or chained ahead of
+//     the call with `||`, which short-circuits before the dereference;
+//   - proceed forms that shield the call they are chained to:
+//     `x !== undefined && x.m()`, `x != null &&`, `x !== null &&`;
+//   - the truthiness guard on the header object itself
+//     (`if (req.headers && req.headers.authorization)`), whose compacted
+//     comparison keeps `headers&&` -- when that check holds, every property
+//     read inside its block was itself required to be truthy first;
+//   - optional chaining, whose `?.` is invisible in the call path but
+//     survives in the comparison text.
+// A proceed-form comparison a bare ternary condition emits (`x !== undefined`)
+// carries no trailing operator and is deliberately not credited: it shields
+// only the branches of its own ternary, and a function that guards one header
+// that way while calling a String method on another must still report. That
+// is the shape of the original crash. A truthiness `if (x)`, a
+// `typeof x === 'string'` scalar check and an `in`-operator probe emit no
+// matching token; those are recall holes in the safe direction only, as is
+// hoisting the read into a checked local, which leaves no header-path call to
+// match in the first place.
+binding jsHttpHeaderNullableValueDeref {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["req.headers.", "request.headers.", "res.headers.", "response.headers.", "ctx.headers.", "ctx.request.headers."]) and node.context.call in ["toLowerCase", "toUpperCase", "toLocaleLowerCase", "toLocaleUpperCase", "trim", "trimStart", "trimEnd", "split", "startsWith", "endsWith", "includes", "indexOf", "lastIndexOf", "replace", "replaceAll", "match", "matchAll", "search", "substring", "substr", "slice", "charAt", "charCodeAt", "codePointAt", "padStart", "padEnd", "repeat", "concat", "normalize", "localeCompare"] and not (containsAny(node.context.expr, ["===undefined", "==null", "===null", "==='undefined'", "===\"undefined\"", "!==undefined&&", "!=null&&", "!==null&&", "!=='undefined'&&", "!==\"undefined\"&&", "headers&&", "?."]))
+  emit issue code.NullableDeref at node
+}

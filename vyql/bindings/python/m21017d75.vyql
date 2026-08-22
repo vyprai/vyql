@@ -4358,3 +4358,39 @@ binding webhookUrlFetchMissingSsrfGuard960 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.selector, ["payload_url", "callback_url", "target_url", "webhook_url", "hook_url"]) and containsAny(node.context.callPath, ["requests.Session", "requests.request", "requests.post", "requests.put", "requests.patch", "requests.get", "httpx.Client", "httpx.AsyncClient", "httpx.post", "httpx.request", "aiohttp.ClientSession", "urlopen"]) and not (containsAny(node.context.callPath, ["urlsplit", "urlparse", "socket.getaddrinfo", "socket.gethostbyname", "ipaddress.ip_address", "ipaddress.ip_network", "netaddr.IPAddress", "URLValidator"]))
   emit issue code.WebhookUrlFetchMissingSsrfGuard at node
 }
+
+// `is_valid_url` is the conventional spelling of a project-local redirect
+// guard that checks the URL against a validator before handing it to a
+// redirect or browser destination -- the same family as is_safe_url,
+// is_safe_redirect_url and url_has_allowed_host_and_scheme above. It joins
+// that allowlist of recognised validator names: what the call means
+// ("this URL was checked") does not depend on which project defines it.
+binding redirectAllowlist1000 {
+  query pattern callExpr where callee.path ~= "is_valid_url"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+// A project-local `Popen` wrapper (a subclass of subprocess.Popen that keeps the
+// stdlib name) run with shell=True takes an interpolated command string, the same
+// shape as subprocess.Popen itself; the wrapper spelling simply hid the sink.
+binding commandExecution1102 {
+  query pattern callExpr where callee.path ~= "Popen.run" and args.any.literal contains "shell=True"
+  emit sink code.CommandExecution at args[0]
+}
+
+// `all(x in <set> for x in value)` is the canonical Python character- or
+// membership-allowlist idiom: every element of the value is asserted to belong
+// to a fixed set before the value is used. Anchored at the all() call, it
+// validates the arguments of a command assembled in the same function.
+binding commandArgumentValidation1103 {
+  query pattern presenceNode where node.kind == "call" and node.path == "all" and operand(node, where: operand.path ~= "__binop.in")
+  emit check core.CommandArgumentValidation at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

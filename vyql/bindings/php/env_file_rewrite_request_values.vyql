@@ -4,3 +4,13 @@ binding envFileRewriteWithRequestValues {
   query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.literal contains ".env" and containsAny(node.context.callPath, ["File.put", "file_put_contents"]) and containsAny(node.context.callPath, ["$request.validated", "$request.input", "$request.all", "$request.post", "$request.query", "$request.json", "$request.string", "$request.getParsedBody", "$_POST", "$_GET", "$_REQUEST"]) and not (containsAny(node.context.callPath, ["str_replace", "strtr", "addslashes", "addcslashes", "json_encode", "var_export", "escapeshellarg", "filter_var", "preg_match", "str_contains"]))
   emit issue code.EnvFileVariableInjection at node
 }
+
+binding envPhpFileRewriteWithRequestValues {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.literal contains "env.php" and containsAny(node.context.callPath, ["File.put", "file_put_contents"]) and containsAny(node.context.callPath, ["$this.request.", "$request.validated", "$request.input", "$request.all", "$request.post", "$request.query", "$request.json", "$request.string", "$request.getParsedBody"]) and not (containsAny(node.context.callPath, ["strtr", "addslashes", "addcslashes", "escapeshellarg", "filter_var", "sanitizeFileName", "sanitize_file_name"]))
+  emit issue code.EnvFileVariableInjection at node
+}
+
+binding envPhpFileRewriteWithRequestSubscripts {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "php" and node.context.literal contains "env.php" and containsAny(node.context.callPath, ["File.put", "file_put_contents"]) and containsAny(node.context.subscript, ["request->post[", "request->get[", "request->query[", "request->request[", "request->cookie[", "$_POST[", "$_GET[", "$_REQUEST[", "$_COOKIE["]) and not (containsAny(node.context.callPath, ["strtr", "addslashes", "addcslashes", "escapeshellarg", "filter_var", "sanitizeFileName", "sanitize_file_name"]))
+  emit issue code.EnvFileVariableInjection at node
+}

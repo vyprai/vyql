@@ -555,3 +555,13 @@ binding xpathEscape94 {
     }
   }
 }
+
+binding secretFilePermissionReview201 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.assign, ["SecureRandom"]) and containsAny(node.context.expr, ["writeAll", "appendAll"]) and not (containsAny(node.context.callPath, ["setReadable", "setWritable", "setExecutable", "setPosixFilePermissions", "PosixFilePermissions", "chmod"]))
+  emit issue code.SecretFilePermissionReview at node
+}
+
+binding secretFilePermissionReview202 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.assign, ["SecureRandom"]) and containsAny(node.context.callPath, ["writeAll", "appendAll", "FileOutputStream", "FileWriter", "Files.write", "PrintWriter", "printWriter"]) and not (containsAny(node.context.callPath, ["setReadable", "setWritable", "setExecutable", "setPosixFilePermissions", "PosixFilePermissions", "chmod"]))
+  emit issue code.SecretFilePermissionReview at node
+}

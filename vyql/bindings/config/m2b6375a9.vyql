@@ -15,10 +15,12 @@ pattern bindingMetadata {
       config_template_escape_active_contains_jelly: ["escapeEntryTitleAndDescription\" value=\"true"]
       config_template_escape_active_contains_jsp_scriptlet: ["leftPropertyValue = Encode.forHtml(leftPropertyValue)"]
       config_template_escape_event_jelly: "analysis.template.jelly.escape"
+      config_template_escape_event_jsp: "analysis.template.jsp.escape"
       config_template_escape_event_jsp_scriptlet: "analysis.template.jsp.escape"
       config_template_escape_line_contains_jelly: ["title=", "description="]
       config_template_escape_line_contains_jsp_scriptlet: ["<%=leftPropertyValue%>", "<%=rightPropertyValue%>", "<%=mediaType%>", "<%=filterMediaType%>", "<%=leftOp%>", "<%=rightOp%>"]
       config_template_escape_prefix_jelly: "h.escape("
+      config_template_escape_prefix_jsp: "fn:escapeXml("
       config_template_escape_prefix_jsp_scriptlet: "Utils.addEntities("
       config_template_expr_end: "}"
       config_template_expr_end_jsp_scriptlet: "%>"
@@ -37,6 +39,7 @@ pattern bindingMetadata {
       config_template_skip_contains_jelly: ["<j:set", "<j:when", "<j:if", " test=", "markupFormatter.translate", "<f:password", "<f:checkbox", "<f:textarea", "<f:textbox", "<select"]
       config_template_skip_contains_jsp: ["<%@", "<c:out", "<c:forEach", "<c:if", " items=", " test="]
       config_template_skip_contains_jsp_scriptlet: ["<%@", "<%--", "Encode.forHtml"]
+      config_template_skip_not_contains_jsp: ["escapeXml=\"false\"", "escapeXml='false'"]
       config_text_template_assign_events_xwiki_velocity: ["#set\\s*\\(\\s*\\$([A-Za-z_][A-Za-z0-9_]*)\\s*=.*\\$!?request\\.[A-Za-z0-9_]+\\b|\\$!?request\\.[A-Za-z0-9_]+\\b|analysis.template.xwiki_velocity.input"]
       config_text_template_extensions_django: [".html"]
       config_text_template_extensions_django_safe: [".html"]
@@ -50,7 +53,7 @@ pattern bindingMetadata {
       config_text_template_line_events_django_session_key_exposure: ["object.pk|analysis.template.django.session_key_action_exposure"]
       config_text_template_line_events_erb: ["raw comment.content|analysis.template.erb.raw_comment_html", "vect[\"note\"]%>|analysis.template.erb.unescaped_tooltip_html", "value[:description] %>|analysis.template.erb.unescaped_tooltip_html", "\"_last_status_message\").to_s if|analysis.template.erb.unescaped_tooltip_html"]
       config_text_template_line_events_svelte: ["{@html|analysis.template.svelte.raw_html"]
-      config_text_template_line_events_xwiki_velocity: ["$services.csrf.isTokenValid|analysis.template.xwiki_velocity.csrf_check"]
+      config_text_template_line_events_xwiki_velocity: ["$services.csrf.isTokenValid|analysis.template.xwiki_velocity.csrf_check", "{{{$escapetool|analysis.template.xwiki_velocity.escape", "{{{$|analysis.template.xwiki_velocity.wiki_embed"]
       config_text_template_required_contains_django: ["{% autoescape off %}"]
       config_text_template_required_contains_django_safe: ["{{", "|safe"]
       config_text_template_required_contains_django_session_key_exposure: ["session_key", "{% url", "object.pk"]
@@ -273,4 +276,18 @@ binding storedHtmlWrite37 {
 binding storedHtmlWrite38 {
   query pattern presenceNode where node.analysis ~= "template.erb.unescaped_tooltip_html"
   emit issue code.StoredHtmlWrite at node
+}
+
+binding storedHtmlWriteWikiEmbed100 {
+  query pattern callExpr where callee.analysis ~= "template.xwiki_velocity.wiki_embed"
+  emit issue code.StoredHtmlWrite at call
+}
+
+binding htmlEscapeWikiEmbed101 {
+  query pattern callExpr where callee.analysis ~= "template.xwiki_velocity.escape"
+  emit check core.HtmlEscape at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
 }

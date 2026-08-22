@@ -1,0 +1,25 @@
+module bindings.javascript.markdown_render_markup_source;
+
+// markdown-it documents MarkdownIt#render(src[, env]) as "render markdown
+// string into HTML" and its `html` option as "enable HTML tags in source":
+// the returned string is browser markup carrying whatever tags the source
+// text contained, so its trust equals the source text's trust -- a fact no
+// call site can verify. The documented control is a sanitizer between the
+// renderer and the DOM (DOMPurify and the like), which the existing
+// core.HtmlEscape bindings already recognise, so the label states only the
+// library fact and leaves the judgement to the taint rules: the rendered
+// string reports when it reaches an HTML sink unsanitized and not otherwise.
+//
+// The binding keys on the final segment `render` gated by the markdown-it
+// import rather than on the receiver, because the engine instance routinely
+// travels through a field or a factory call before render is invoked, and
+// the receiver carries no library identity by then. That width is contained
+// by the taint path: a render result only reports where it flows into an
+// HTML sink.
+binding markdownRenderedMarkup {
+  requires {
+    import("markdown-it")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit source code.RenderedMarkup at call.result
+}

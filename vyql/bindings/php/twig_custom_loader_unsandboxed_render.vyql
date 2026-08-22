@@ -1,0 +1,35 @@
+module bindings.php.twig_custom_loader_unsandboxed_render;
+
+// Twig's documented boundary for a template whose source the program did
+// not write is the sandbox: the security chapter of Twig's own
+// documentation requires the sandbox extension whenever template authors
+// are untrusted. An environment built on one of the engine's documented
+// loaders renders templates the program shipped -- a FilesystemLoader
+// reads the application's own template files, an ArrayLoader holds source
+// strings the program wrote -- but an environment built on a loader of the
+// application's own serves template source that arrived from outside the
+// codebase: CMS framework markup stored in a database, admin-authored
+// snippets, stored email bodies. With no sandbox over that environment,
+// the array filters `filter`, `map`, `reduce` and `sort` each accept an
+// arrow function or a PHP callable name as their argument, so template
+// markup can execute a callable the program never chose. That is the same
+// incomplete template validation already reported for Jinja2 compiling a
+// source it was handed, a Twig policy driven by blocked names, and a
+// Smarty policy that inverts its allow-list.
+//
+// The shape is read at module scope because the common layout builds the
+// environment in a factory method and renders from a sibling helper, so no
+// single function context carries both. Three families of clauses clear
+// it: sandbox vocabulary (SandboxExtension and every SecurityPolicy
+// spelling live under Twig\Sandbox), a documented engine loader (the
+// templates then came from the program or its own tree), and a filter
+// registration targeting a callback-accepting filter -- spelled either
+// with a literal name, the guarded-override form, or with a computed name,
+// the loop or helper form an application uses to override several filter
+// names at once. All clauses are text-level over the module context, so a
+// comment naming the sandbox, or a commented-out override, clears too:
+// false-negative direction only.
+binding twigCustomLoaderUnsandboxedRender {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and containsAny(node.token, ["Twig\\Environment(", "Twig_Environment(", "new Environment("]) and containsAny(node.token, ["->render(", "->display("]) and not containsAny(node.token, ["Sandbox"]) and not containsAny(node.token, ["FilesystemLoader", "ArrayLoader", "ChainLoader"]) and not containsAny(node.token, ["TwigFilter('filter'", "TwigFilter('map'", "TwigFilter('reduce'", "TwigFilter('sort'", "TwigFilter(\"filter\"", "TwigFilter(\"map\"", "TwigFilter(\"reduce\"", "TwigFilter(\"sort\""]) and not containsAny(node.token, ["TwigFilter($", "Twig_Filter($"])
+  emit issue code.IncompleteTemplateValidation at node
+}

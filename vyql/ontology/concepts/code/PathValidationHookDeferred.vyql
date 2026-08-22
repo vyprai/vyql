@@ -1,0 +1,11 @@
+module code;
+
+concept PathValidationHookDeferred : issue {
+  cwe: [CWE_22]
+  reviewAssumption: "the request-derived path can carry segments that escape the serving root, so the override's own containment gate is the first check an escaping path reaches"
+  reviewCategory: path
+  reviewCondition: "an override of a framework static-file validation hook probes filesystem state on the path before delegating to the framework's path validator"
+  reviewConfidence: medium
+  reviewEvidence: "validation hook {pattern} defers the framework's path validation until after its own filesystem state probes"
+  vulnerableTo: [path.PathTraversal]
+}

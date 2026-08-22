@@ -1,0 +1,177 @@
+# Smarty's `{function name='...'}` tag is compiled by two handlers in one
+# file: Smarty_Internal_Compile_Function::compile() opens the tag, reads the
+# template-supplied attributes through Smarty_Internal_CompileBase::getAttributes()
+# and registers the name; Smarty_Internal_Compile_Functionclose::compile()
+# closes it and emits the generated PHP. The close handler interpolates the
+# name into a function declaration:
+#   $_name = trim($_attr['name'], '\'"');
+#   $_funcName = "smarty_template_function_{$_name}_{$compiler->template->compiled->nocache_hash}";
+#   $output .= "function {$_funcName}(Smarty_Internal_Template \$_smarty_tpl,\$params) {\n";
+# Nothing restricted the name to identifier characters, so a template carrying
+# {function name='rce(){};echo "hi";function '} closed the generated
+# declaration early and injected arbitrary PHP into the compiled template,
+# which Smarty then includes. The fixed revision validates the name against
+# /^[a-zA-Z0-9_\x80-\xff]+$/ in the opening handler and raises a compiler
+# error.
+#
+# The two halves live in different methods of different classes, so the
+# binding reads the file: a unit that reads template tag attributes through the
+# documented getAttributes() accessor AND declares a generated PHP function
+# from an interpolated local, with no identifier validation anywhere in the
+# unit, is the same incomplete template validation reported for an
+# unsandboxed renderer.
+
+test "rank1759: template tag name interpolated into a generated function declaration"
+  lang php
+  file libs/sysplugins/smarty_internal_compile_function.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class Smarty_Internal_Compile_Function extends Smarty_Internal_CompileBase
+  {
+      public $required_attributes = array('name');
+      public $shorttag_order = array('name');
+      public $optional_attributes = array('_any');
+
+      public function compile($args, Smarty_Internal_TemplateCompilerBase $compiler)
+      {
+          $_attr = $this->getAttributes($compiler, $args);
+          if ($_attr['nocache'] === true) {
+              $compiler->trigger_template_error('nocache option not allowed', null, true);
+          }
+          unset($_attr['nocache']);
+          $_name = trim($_attr['name'], '\'"');
+          $compiler->parent_compiler->tpl_function[$_name] = array();
+          $save = array(
+              $_attr, $compiler->parser->current_buffer, $compiler->template->compiled->has_nocache_code,
+              $compiler->template->caching
+          );
+          $this->openTag($compiler, 'function', $save);
+          return true;
+      }
+  }
+
+  class Smarty_Internal_Compile_Functionclose extends Smarty_Internal_CompileBase
+  {
+      public function compile($args, Smarty_Internal_TemplateCompilerBase $compiler)
+      {
+          $saved_data = $this->closeTag($compiler, array('function'));
+          $_attr = $saved_data[0];
+          $_name = trim($_attr['name'], '\'"');
+          $_funcName = "smarty_template_function_{$_name}_{$compiler->template->compiled->nocache_hash}";
+          $output = "<?php\n";
+          $output .= "/* {$_funcName} */\n";
+          $output .= "if (!function_exists('{$_funcName}')) {\n";
+          $output .= "function {$_funcName}(Smarty_Internal_Template \$_smarty_tpl,\$params) {\n";
+          $output .= "foreach (\$params as \$key => \$value) {\n";
+          $output .= "\$_smarty_tpl->tpl_vars[\$key] = new Smarty_Variable(\$value, \$_smarty_tpl->isRenderingCache);\n}\n";
+          $output .= "?>\n";
+          $output = "<?php\n}}\n";
+          return true;
+      }
+  }
+  ```
+
+test "rank1759: the tag name validated against an identifier charset before registration"
+  lang php
+  file libs/sysplugins/smarty_internal_compile_function.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class Smarty_Internal_Compile_Function extends Smarty_Internal_CompileBase
+  {
+      public $required_attributes = array('name');
+      public $shorttag_order = array('name');
+      public $optional_attributes = array('_any');
+
+      public function compile($args, Smarty_Internal_TemplateCompilerBase $compiler)
+      {
+          $_attr = $this->getAttributes($compiler, $args);
+          if ($_attr['nocache'] === true) {
+              $compiler->trigger_template_error('nocache option not allowed', null, true);
+          }
+          unset($_attr['nocache']);
+          $_name = trim($_attr['name'], '\'"');
+
+          if (!preg_match('/^[a-zA-Z0-9_\x80-\xff]+$/', $_name)) {
+              $compiler->trigger_template_error("Function name contains invalid characters: {$_name}", null, true);
+          }
+
+          $compiler->parent_compiler->tpl_function[$_name] = array();
+          $save = array(
+              $_attr, $compiler->parser->current_buffer, $compiler->template->compiled->has_nocache_code,
+              $compiler->template->caching
+          );
+          $this->openTag($compiler, 'function', $save);
+          return true;
+      }
+  }
+
+  class Smarty_Internal_Compile_Functionclose extends Smarty_Internal_CompileBase
+  {
+      public function compile($args, Smarty_Internal_TemplateCompilerBase $compiler)
+      {
+          $saved_data = $this->closeTag($compiler, array('function'));
+          $_attr = $saved_data[0];
+          $_name = trim($_attr['name'], '\'"');
+          $_funcName = "smarty_template_function_{$_name}_{$compiler->template->compiled->nocache_hash}";
+          $output = "<?php\n";
+          $output .= "/* {$_funcName} */\n";
+          $output .= "if (!function_exists('{$_funcName}')) {\n";
+          $output .= "function {$_funcName}(Smarty_Internal_Template \$_smarty_tpl,\$params) {\n";
+          $output .= "?>\n";
+          $output = "<?php\n}}\n";
+          return true;
+      }
+  }
+  ```
+
+test "rank1759: generated function whose name is the compiler's own unifunc property"
+  lang php
+  file libs/sysplugins/smarty_internal_compile_include.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class Smarty_Internal_Compile_Include extends Smarty_Internal_CompileBase
+  {
+      public function compile($args, Smarty_Internal_SmartyTemplateCompiler $compiler)
+      {
+          $_attr = $this->getAttributes($compiler, $args);
+          $fullResourceName = $source_resource = $_attr['file'];
+          $tpl = $compiler->template->smarty->createTemplate($source_resource, null, null, null, null, false);
+          $compiled_code = "<?php\n\n";
+          $compiled_code .= "/* Start inline template \"{$sourceInfo}\" =============*/\n";
+          $compiled_code .= "function {$tpl->compiled->unifunc} (Smarty_Internal_Template \$_smarty_tpl) {\n";
+          $compiled_code .= "?>\n" . $tpl->compiler->compileTemplateSource($tpl, null, $compiler->parent_compiler);
+          $compiled_code .= "<?php\n";
+          $compiled_code .= "}\n?>\n";
+          return $compiled_code;
+      }
+  }
+  ```
+
+test "rank1759: generated handler string built outside a template tag compiler"
+  lang php
+  file lib/navigationlib.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class navigation_node
+  {
+      public function add_action($action, $url, $text, $shorttext, $icon) {
+          $functionname = 'nav_handler_' . md5($url);
+          $propogrationhandler = "if (event.preventDefault) { event.preventDefault(); }";
+          $onclick = "Y.use('node-event-simulate', function(Y) { Y.one('#navpanel').simulate('click'); });";
+          $jscode = "function {$functionname}(e) { $propogrationhandler $onclick }";
+          return $jscode;
+      }
+  }
+  ```

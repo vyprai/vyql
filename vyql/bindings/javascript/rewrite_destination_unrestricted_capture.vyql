@@ -1,0 +1,43 @@
+module bindings.javascript.rewrite_destination_unrestricted_capture;
+
+// A declarative rewrite rule answers one question per matched request: where
+// does this request go next? The config-driven routers -- Next.js `rewrites`
+// and `redirects` are the shape's largest deployment -- express that as an
+// object holding a matcher and a target. The matcher is `source` plus
+// `has`/`missing` entries whose `type` is one of the four documented request
+// sources (query, host, header, cookie) and whose `value` is a regex whose
+// named captures become parameters. The target is `destination`, and the
+// request's captured values land in it as `:name`. A destination carrying a
+// scheme is absolute, and a rewrite to an absolute destination is a
+// server-side forward: the server issues the request and hands the response
+// back to whoever matched.
+//
+// The matcher regex is the only thing standing between the requester and the
+// bytes of that outbound target. A capture written `(?<id>.*)` accepts every
+// character -- dots, slashes, at-signs, percent-encodings -- so the value the
+// requester supplied becomes the authority and the path of the URL the server
+// fetches, and the rule is an open proxy: it reaches internal targets the
+// requester cannot and reflects the response. Writing the capture over the
+// identifier's own alphabet is the control, and it is a property of the
+// pattern: `(?<id>[a-f0-9]*)`, `(?<n>\d*)`, an anchored form, or a bounded
+// alternative all stop the value from moving the target.
+//
+// The binding reads three literal facts about the rule and judges none of
+// them: a documented matcher type, a capture that accepts any character, and
+// a URL with a scheme. Restricting the capture removes the any-character
+// literal and stops the report, whichever alphabet the author chooses. A rule
+// whose destination carries no scheme stays inside the origin, so the
+// requester cannot move the target off the host, and is not reported; a
+// matcher with no capture at all feeds the destination nothing. All three
+// clauses read string-literal tokens, which the frontend derives from the
+// AST, so a comment describing the rule cannot satisfy them. The clauses sit
+// at function scope, so a rule object split across a shared helper still
+// reports on the helper that assembles it.
+binding rewriteTargetFromUnrestrictedCapture {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and node.context.literal in ["query", "host", "header", "cookie"]
+    and node.context.literal contains "://"
+    and node.context.literal contains ">.*"
+  emit issue code.RewriteTargetFromUnrestrictedCapture at node
+}

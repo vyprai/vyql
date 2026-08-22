@@ -1,0 +1,80 @@
+# Rank 1744 / CVE-2026-22705: ML-DSA Decompose divided a secret-derived
+# field-element coefficient in place with the hardware division operator
+# (r1.0 /= TwoGamma2::U32) instead of the constant-time Barrett reduction the
+# module uses for its other moduli; the NTT loops derived their
+# step_by bounds the same way. Hardware division is variable-time in its
+# operands, so signing leaks the key through operation duration.
+
+test "rank1744: ml-dsa decompose divides a field coefficient in place"
+  lang rust
+  file algebra.rs
+  expect VYQL-CRY-056
+  expect_review code.CryptoVariableTimeDivision
+  code
+  ```
+  pub(crate) trait Decompose {
+      fn decompose<TwoGamma2: Unsigned>(self) -> (Elem, Elem);
+  }
+
+  impl Decompose for Elem {
+      // Algorithm 36 Decompose
+      fn decompose<TwoGamma2: Unsigned>(self) -> (Elem, Elem) {
+          let r_plus = self.clone();
+          let r0 = r_plus.mod_plus_minus::<TwoGamma2>();
+
+          if r_plus - r0 == Elem::new(BaseField::Q - 1) {
+              (Elem::new(0), r0 - Elem::new(1))
+          } else {
+              let mut r1 = r_plus - r0;
+              r1.0 /= TwoGamma2::U32;
+              (r1, r0)
+          }
+      }
+  }
+  ```
+
+test "rank1744: ml-dsa decompose reduces through constant-time division"
+  lang rust
+  file algebra.rs
+  reject VYQL-CRY-056
+  reject_review code.CryptoVariableTimeDivision
+  code
+  ```
+  pub(crate) trait Decompose {
+      fn decompose<TwoGamma2: Unsigned>(self) -> (Elem, Elem);
+  }
+
+  impl Decompose for Elem {
+      // Algorithm 36 Decompose
+      fn decompose<TwoGamma2: Unsigned>(self) -> (Elem, Elem) {
+          let r_plus = self.clone();
+          let r0 = r_plus.mod_plus_minus::<TwoGamma2>();
+
+          if r_plus - r0 == Elem::new(BaseField::Q - 1) {
+              (Elem::new(0), r0 - Elem::new(1))
+          } else {
+              let diff = r_plus - r0;
+              // Barrett reduction: q = (x * MULTIPLIER) >> SHIFT
+              let r1 = Elem::new(TwoGamma2::ct_div(diff.0));
+              (r1, r0)
+          }
+      }
+  }
+  ```
+
+test "rank1744: compound division of public totals is not field arithmetic"
+  lang rust
+  file average.rs
+  reject VYQL-CRY-056
+  reject_review code.CryptoVariableTimeDivision
+  code
+  ```
+  pub fn average(values: &[u32]) -> u32 {
+      let mut total = 0;
+      for v in values {
+          total += v;
+      }
+      total /= values.len() as u32;
+      total
+  }
+  ```

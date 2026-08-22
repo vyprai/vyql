@@ -412,7 +412,7 @@ binding commandExecution73 {
 
 binding commandExecution74 {
   query pattern callExpr where callee.path ~= "exec.CommandContext"
-  emit sink code.CommandExecution at args[0]
+  emit sink code.CommandExecution at args[1]
 }
 
 binding commandExecution75 {
@@ -777,7 +777,7 @@ binding unicodeNormalizationAfterFilterBypass146 {
 
 binding leadingDotSegmentOnlyRouteFilter147 {
   query pattern presenceNode where node.kind == "any" and node.analysis == "function.context" and node.context.callPath contains "strings.HasPrefix" and node.context.literal contains "/." and node.context.selector contains "ctx.R.URL.Path" and not (node.context.callPath contains "strings.Contains")
-  emit issue code.LeadingDotSegmentOnlyRouteFilter at node
+  emit issue code.IncompleteDotSegmentRequestScreen at node
 }
 
 binding authAttemptLimitReview148 {
@@ -1900,7 +1900,7 @@ binding publicUserListRouteMissingAuthentication343 {
 
 binding goStaticPosixCleanWindowsTraversal344 {
   query pattern presenceNode where node.scope == "function" and node.context.callPath contains "url.PathUnescape" and node.context.callPath contains "filepath.Join" and node.context.callPath contains "path.Clean" and containsAny(node.context.callPath, ["os.Stat", "File"]) and not (node.context.callPath contains "filepath.Clean")
-  emit issue code.GoStaticPosixCleanWindowsTraversal at node
+  emit issue code.StaticServerPosixOnlyCleanWindowsTraversal at node
 }
 
 binding tlsWeakClientAuth345 {

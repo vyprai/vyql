@@ -1,0 +1,27 @@
+module bindings.go.delegatedDirectoryWriteWithoutNoFollow;
+
+// os.Chown's documented meaning is a transfer of control: the named path
+// belongs to the new owner afterwards, and an owner of a directory can change
+// its mode however they like. os.OpenFile's documented meaning is that it
+// opens the named file, following a symbolic link at the final component
+// unless O_NOFOLLOW is set, and with O_CREATE it creates the file when it is
+// absent -- which for an attacker is indistinguishable from "create or follow
+// whatever I placed at that name". Put the two in one function -- hand a
+// directory to a looked-up uid, then open a file for creation under it -- and
+// the write is going through ground the recipient controls: the new owner can
+// plant a symlink where the file will be created, and the creating open
+// follows it. The setuid programs that manage per-user state on behalf of
+// their caller (container instance registries, device nodes, spool
+// directories) are exactly this shape, and the remediation is the flag:
+// O_NOFOLLOW on the delegated write (CWE-59/CWE-276).
+//
+// The flags must be visible at the call for the absence of O_NOFOLLOW to mean
+// anything, so the binding reads the explicit os.OpenFile/syscall.Open form
+// with an O_CREATE selector. os.Create and os.WriteFile imply the same
+// O_CREATE|O_TRUNC semantics with the flags hidden inside the stdlib, so a
+// delegation through those spellings is a residual gap rather than a covered
+// form.
+binding goDelegatedDirectoryCreateWithoutNoFollow {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "os.Chown" and containsAny(node.context.callPath, ["os.OpenFile", "syscall.Open"]) and containsAny(node.context.selector, ["os.O_CREATE", "syscall.O_CREATE"]) and not (node.context.selector contains "O_NOFOLLOW")
+  emit issue code.DelegatedDirectoryWriteWithoutNoFollow at node
+}

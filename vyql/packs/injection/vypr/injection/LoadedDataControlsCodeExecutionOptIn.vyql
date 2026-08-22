@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule LoadedDataControlsCodeExecutionOptIn {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_829, CWE_94]
+    id: "VYQL-INJ-277"
+    severity: high
+  }
+  issue code.LoadedDataControlsCodeExecutionOptIn as sink
+}

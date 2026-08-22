@@ -1,0 +1,11 @@
+module code;
+
+concept UnboundedFfiCallbackLength : issue {
+  cwe: [CWE_125]
+  reviewAssumption: "the callback is not contractually bounded: user-supplied closure code can return a length larger than the buffer it was handed, unlike a documented fill contract such as io::Read"
+  reviewCategory: memory
+  reviewCondition: "an extern-ABI trampoline hands a from_raw_parts buffer view to a callback and forwards the callback-supplied length to the foreign caller with no comparison bounding it against that buffer"
+  reviewConfidence: medium
+  reviewEvidence: "FFI callback context {pattern} builds the buffer with from_raw_parts and forwards the callback's Ok length with no bound in the body"
+  vulnerableTo: [memory.OobRead]
+}

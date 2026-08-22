@@ -1278,11 +1278,9 @@ binding jenkinsRemoteValidationMissingPostPermission231 {
 }
 
 binding jenkinsRemoteValidationMissingPostPermission760 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTest" and containsAny(node.context.callPath, ["getConnection", "testConnection", "buildClient"]) and not (node.context.annotation contains "POST") and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTest" and node.context.callPath contains "SshConnectionFactory.getConnection" and not (node.context.annotation contains "POST") and not (node.context.scopeCall contains "checkPermission") and not (node.context.scopeCall contains "hasPermission")
   emit issue code.JenkinsRemoteValidationMissingPostPermission at node
 }
-
-
 
 binding jenkinsDescriptorPropertyFileValidationMissingPost232 {
   query pattern presenceNode where node.scope == "function" and node.context.classBase contains "ParameterDescriptor" and node.context.functionName contains "doCheckPropertyFile" and node.context.identifier contains "QueryParameter" and node.context.call contains "Property" and node.context.call contains "File" and node.context.call contains "URL" and node.context.call contains "execute" and not (node.context.annotation contains "POST") and not (node.context.annotation contains "RequirePOST")
@@ -2610,42 +2608,6 @@ binding authenticationRequiredOp457 {
   emit issue code.AuthenticationRequiredOp at node
 }
 
-binding csrfProtection351 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTest" and containsAny(node.context.annotation, ["POST", "RequirePOST"])
-  emit check core.CsrfProtection at node {
-    covers endpoint {
-      anchor: node
-    }
-  }
-}
-
-binding authorizationCheck216 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "doTest" and containsAny(node.context.scopeCall, ["checkPermission", "hasPermission"])
-  emit check core.AuthorizationCheck at node {
-    covers endpoint {
-      anchor: node
-    }
-  }
-}
-
-binding authenticationCheck458 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "intercept" and node.context.paramType contains "ActionInvocation" and containsAny(node.context.literal, ["login", "error", "input", "none"])
-  emit check core.AuthenticationCheck at node {
-    covers endpoint {
-      anchor: node
-    }
-  }
-}
-
-binding authenticationCheck459 {
-  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "intercept" and node.context.paramType contains "ActionInvocation" and containsAny(node.context.identifier, ["LOGIN", "ERROR", "INPUT", "NONE"])
-  emit check core.AuthenticationCheck at node {
-    covers endpoint {
-      anchor: node
-    }
-  }
-}
-
 binding h2oJdbcDisallowedParameterDenylistGap458 {
   query pattern presenceNode where node.scope == "class" and node.context.className contains "SQLManager" and node.context.identifier contains "DEFAULT_JDBC_DISALLOWED_PARAMETERS" and node.context.literal contains "autoDeserialize" and node.context.literal contains "allowLoadLocalInfile" and not (containsAny(node.context.literal, ["socketFactory", "sslfactory", "statementInterceptors"]))
   emit issue code.H2oJdbcDisallowedParameterDenylistGap at node
@@ -2815,4 +2777,58 @@ binding jenkinsScmCheckoutAllowsLocalSource469 {
 binding httpInput810 {
   query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.classAnnotation contains "Provider" and args.any.context.functionName contains "readFrom" and args.any.context.paramIndex contains "5" and args.any.context.paramType contains "InputStream"
   emit source code.HttpInput at call.result
+}
+
+binding unsafeConvertedExpressionEvaluation890 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.callPath, ["parseExpression"]) and containsAny(node.context.callPath, ["convertExpression"])
+  emit issue code.UnsafeConvertedExpressionEvaluation at node
+}
+
+binding httpInput955 {
+  // ServletRequest.getLocale returns the client's preferred locale,
+  // parsed from the Accept-Language header.
+  query pattern callExpr where callee.method == "getLocale"
+  emit source code.HttpInput at call.result
+}
+
+binding filePathAccess956 {
+  // ServletContext/Class/ClassLoader resource lookups resolve a
+  // caller-supplied path against a resource root.
+  query pattern callExpr where callee.method in ["getResource", "getResourceAsStream"]
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding jenkinsRootDirFileNameTraversal981 {
+  // Jenkins.getInstance().getRootDir() is the documented accessor for the
+  // controller's root directory, and Jenkins persists plugin classes in job
+  // and configuration XML, reconstituting them with XStream without running
+  // constructors -- so a name field the constructor derived (a random id, a
+  // hash) is caller-supplied on the persisted path, and whoever can edit the
+  // configuration reaches any path the name's segments name once it is joined
+  // as `new File(parent, name)`, where '/' or '\' in the name leaves parent
+  // entirely. The storage idiom this happens in is mkdirs() on a directory
+  // under the controller root followed by a File joined under it, and the
+  // separator check that keeps such a join inside its directory is a String
+  // inspection: contains, indexOf, matches, charAt, split, replace,
+  // startsWith/endsWith, or the containment idioms getName/normalize/
+  // getFileName. A function that sets up the storage directory and performs
+  // none of those has not looked at the name it is joining. Binding the
+  // literal-joined variants would flag every fixed storage file name, so the
+  // runtime-join half is what the mkdirs+File pair marks.
+  query pattern presenceNode where node.scope == "function" and node.context.call == "File" and node.context.call == "getRootDir" and node.context.call == "mkdirs" and not (node.context.call == "contains") and not (node.context.call == "indexOf") and not (node.context.call == "matches") and not (node.context.call == "charAt") and not (node.context.call == "split") and not (node.context.call == "replace") and not (node.context.call == "startsWith") and not (node.context.call == "endsWith") and not (node.context.call == "getName") and not (node.context.call == "normalize") and not (node.context.call == "getFileName")
+  emit issue code.JenkinsRootDirFileNameTraversal at node
+}
+
+// Jenkins descriptor form-validation endpoints that resolve a stored
+// credential and open a connection with it are required to carry both a
+// POST requirement and an administrator permission check, because a
+// low-privilege or forged request can otherwise drive the connection. The
+// doValidate*/doTest*/doCheck* family here is the sibling of the
+// doTestConnection shapes bound above: unlike those, a checkPermission
+// call does not clear it — a checked permission stops the
+// unauthenticated caller, not the cross-site one, so only an observed
+// @POST/@RequirePOST requirement neutralises the forgery window.
+binding jenkinsRemoteValidationMissingPostPermission990 {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.functionName, ["doValidate", "doTest", "doCheck"]) and node.context.identifier contains "QueryParameter" and containsAny(node.context.call, ["getPlainText", "lookupCredentials", "lookupSystemCredentials"]) and containsAny(node.context.call, ["validateConnection", "testConnection", "checkConnection", "getConnection"]) and not (node.context.annotation contains "POST") and not (node.context.annotation contains "RequirePOST")
+  emit issue code.JenkinsRemoteValidationMissingPostPermission at node
 }

@@ -1,0 +1,43 @@
+module bindings.python.django_authenticate_without_request;
+
+// Django's authenticate() runs every configured authentication backend and
+// returns the user whose credentials matched. Since Django 1.11 the call
+// takes the request as its first argument, and the contract is documented in
+// two places at once: Django's own authentication docs pass
+// `authenticate(request=request, ...)`, and the brute-force protection that
+// layers onto this hook -- django-axes is the canonical one, installed as an
+// authentication backend and a middleware -- reads the client's address and
+// user agent off that request to count and lock out attempts. A backend that
+// limits attempts by client identity can only do its job when the request
+// reaches it; a credential verification made without the request is counted
+// nowhere and throttled by nothing request-scoped, so the endpoint that
+// routes it can be driven at machine speed.
+//
+// The binding reports the call itself. `callee.path ==` keeps it to Django's
+// documented function, resolved through the usual
+// `from django.contrib.auth import authenticate` import; a credential
+// submission spelled as a method on some other object -- an IMAP client's
+// `proto.authenticate(...)`, a PAM helper, a test harness's
+// `self.authenticate()` -- does not resolve to that path and stays with the
+// bindings that judge those APIs. The negation reads the call's own
+// arguments, so `authenticate(username=..., password=...)` is flagged while
+// `authenticate(request=request, ...)` is not; the request passed
+// positionally declines too, because the argument tokens a binding sees are
+// flow-expanded and carry the request expression's own text. The value
+// tokens a keyword contributes are its name, which is why the request's
+// keyword is visible here and a credentials-only call is not.
+//
+// VYQL-AUTH-105 consumes the label and clears it wherever a rate-limit
+// control covers the endpoint. Residual, stated rather than hidden: a
+// request-less authenticate in a management command or fixture generator --
+// the demo-data creator in a Django project is the usual one, authenticating
+// a user it just created with generated credentials -- carries no
+// attacker-driven attempt surface but is flagged with the endpoint it would
+// have, one review flag per project; and the credentials-only positional
+// spelling `authenticate(user, password)` is flagged as well, which is the
+// pre-1.11 idiom and the same uncounted attempt either way.
+binding djangoAuthenticateWithoutRequest {
+  query pattern callExpr where callee.path == "django.contrib.auth.authenticate"
+    and not args.any.literal contains "request"
+  emit issue code.RateLimitRequiredOp at call
+}

@@ -1,0 +1,248 @@
+# An implant built by Sliver up to v1.5.39 transported its fresh session
+# key to the server with NaCl box under a *static* Diffie-Hellman sender
+# key: implant/sliver/cryptography/implant.go embedded
+#   eccPrivateKey = "{{.Config.ECCPrivateKey}}"
+# at build time, GetECCKeyPair() base64-decoded it into an ECCKeyPair, and
+# ECCEncryptToServer() sealed the session key with
+#   box.Seal(nonce[:], plaintext, &nonce, recipientPublicKey, keyPair.Private)
+# where recipientPublicKey is the server's *public* key. The box shared
+# secret is DH(serverPublic, implantPrivate), both of which an attacker
+# holds once they have the implant binary -- the server's half because it
+# is public, the implant's half because it ships inside the artifact. So
+# possession of the build decrypts the transported session key and the
+# peer can be impersonated (CWE-321 / CWE-327). The server half of the
+# exchange is the mirror image in server/cryptography/cryptography.go
+# (box.Open with the server's long-term private key). The fixed revision
+# (2d1ea619, GHSA-8jxm-xp43-qh3q) replaces the whole primitive with
+# filippo.io/age, whose X25519 recipient wrapping generates a fresh
+# ephemeral sender key per message so no long-term private key ever
+# enters the encryption, drops the TOTP factor entirely, and re-binds the
+# implant's identity as an HMAC keyed on sha256(implantPrivateKey) that
+# the server verifies after decrypting.
+#
+# Nothing here is a dataflow defect: the plaintext is a locally generated
+# key, the nonce is drawn from crypto/rand, the AEAD is ChaCha20-Poly1305.
+# The discriminator is the *provenance* of the sender key -- build-time
+# constant versus a fresh box.GenerateKey(rand.Reader) -- plus the
+# deployment fact that the artifact is handed to an adversary. Both are
+# invisible to a call-site binding:
+#   * `vyql match` on implant/sliver/cryptography labels nothing at
+#     crypto.go:88; box.Seal carries no binding in any language.
+#   * The nearest existing detection, VYQL-SEC-002 code.HardcodedSecret,
+#     fires on the embedded literal at implant.go:35 -- and keeps firing
+#     at the fixed revision, because the patched tree still embeds
+#     peerAgePrivateKey = "{{.Config.PeerPrivateKey}}" for the peer
+#     decryption role. Measured (three --cache off runs per side, stable):
+#     implant/sliver/cryptography 3 findings at 2d1ea619^ versus 2 at
+#     2d1ea619, the delta being the deleted totpSecret literal; the whole
+#     implant/sliver subtree (220 Go files) 18 versus 16, the extra delta
+#     an incidental VYQL-INJ-009 HttpInput->LogOutput path through the
+#     removed TOTP helpers.
+#   * A call-shape binding on box.Seal has no discriminator. Netmaker's
+#     BoxEncrypt/BoxDecrypt (netclient/ncutils/netclientutils.go:614) is
+#     structurally identical to ECCEncrypt/ECCDecrypt -- same signature,
+#     same crypto/rand nonce, same box.Seal -- and is correct, because its
+#     traffic keys come from box.GenerateKey(crand.Reader) at join time
+#     (netclient/functions/join.go:46, database/database.go:211). Across
+#     every clone under /tmp/cve-work/rank*/, nacl/box appears outside
+#     vendor/ in exactly those two projects, so the flag would fire on the
+#     correct implementation and the vulnerable one alike.
+#   * Joining the two halves needs a value relation between the embedded
+#     literal and the private-key argument. `reaches` is a CFG order
+#     relation (internal/solvers/cfg.go:35) and the credential-literal
+#     presence node carries no region/order and sits at package scope:
+#     with code.FileCheck on the literal and code.FileUse on a later call
+#     in the same file, VYQL-RACE-001 still did not fire. Go's taint
+#     sources are all untrusted-input kinds (HttpInput, CliArgument,
+#     EnvVariable, SecretValue); there is no source concept for key
+#     material derived from a source literal, and minting one would put
+#     the judgement in the binding rather than the rule.
+#
+# The spec pins the miss against the crypto rules of the right classes:
+# the box seal, the peer open, and the age replacement must not fire any
+# of them. VYQL-SEC-002 is deliberately not pinned on the embedded
+# literals -- it does fire there, at both revisions, which is exactly why
+# it is not coverage of this weakness.
+
+test "rank1757: session key sealed to the server under the implant's build-time private key"
+  lang go
+  file implant/sliver/cryptography/crypto.go
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-CRY-003
+  reject VYQL-CRY-004
+  reject VYQL-CRY-015
+  code
+  ```
+  package cryptography
+
+  import (
+  	"crypto/rand"
+  	"crypto/sha256"
+  	"encoding/base64"
+  	"io"
+
+  	"golang.org/x/crypto/nacl/box"
+  )
+
+  var (
+  	// ECCPublicKey - The implant's ECC public key
+  	ECCPublicKey = "{{.Config.ECCPublicKey}}"
+  	// eccPrivateKey - The implant's ECC private key
+  	eccPrivateKey = "{{.Config.ECCPrivateKey}}"
+  	// eccServerPublicKey - Server's ECC public key
+  	eccServerPublicKey = "{{.Config.ECCServerPublicKey}}"
+  )
+
+  // ECCKeyPair - Holds the public/private key pair
+  type ECCKeyPair struct {
+  	Public  *[32]byte
+  	Private *[32]byte
+  }
+
+  // GetECCKeyPair - Get the implant's key pair
+  func GetECCKeyPair() *ECCKeyPair {
+  	publicRaw, _ := base64.RawStdEncoding.DecodeString(ECCPublicKey)
+  	var public [32]byte
+  	copy(public[:], publicRaw)
+  	privateRaw, _ := base64.RawStdEncoding.DecodeString(eccPrivateKey)
+  	var private [32]byte
+  	copy(private[:], privateRaw)
+  	return &ECCKeyPair{Public: &public, Private: &private}
+  }
+
+  // GetServerECCPublicKey - Get the decoded server public key
+  func GetServerECCPublicKey() *[32]byte {
+  	publicRaw, _ := base64.RawStdEncoding.DecodeString(eccServerPublicKey)
+  	var public [32]byte
+  	copy(public[:], publicRaw)
+  	return &public
+  }
+
+  // ECCEncrypt - Encrypt using Nacl Box
+  func ECCEncrypt(recipientPublicKey *[32]byte, senderPrivateKey *[32]byte, plaintext []byte) ([]byte, error) {
+  	var nonce [24]byte
+  	if _, err := io.ReadFull(rand.Reader, nonce[:]); err != nil {
+  		return nil, err
+  	}
+  	encrypted := box.Seal(nonce[:], plaintext, &nonce, recipientPublicKey, senderPrivateKey)
+  	return encrypted, nil
+  }
+
+  // ECCEncryptToServer - Encrypt using the server's public key
+  func ECCEncryptToServer(plaintext []byte) ([]byte, error) {
+  	recipientPublicKey := GetServerECCPublicKey()
+  	keyPair := GetECCKeyPair()
+  	ciphertext, err := ECCEncrypt(recipientPublicKey, keyPair.Private, plaintext)
+  	if err != nil {
+  		return nil, err
+  	}
+  	digest := sha256.Sum256((*keyPair.Public)[:])
+  	msg := make([]byte, 32+len(ciphertext))
+  	copy(msg, digest[:])
+  	copy(msg[32:], ciphertext)
+  	return msg, nil
+  }
+  ```
+
+test "rank1757: server opens the transported session key with its long-term private key"
+  lang go
+  file server/cryptography/cryptography.go
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-CRY-015
+  code
+  ```
+  package cryptography
+
+  import (
+  	"golang.org/x/crypto/nacl/box"
+  )
+
+  // ECCServerKeyPair - The server's long-term key pair
+  type ECCServerKeyPair struct {
+  	Public  *[32]byte
+  	Private *[32]byte
+  }
+
+  // ECCDecrypt - Decrypt using Curve 25519 + ChaCha20Poly1305
+  func ECCDecrypt(senderPublicKey *[32]byte, recipientPrivateKey *[32]byte, ciphertext []byte) ([]byte, error) {
+  	var decryptNonce [24]byte
+  	copy(decryptNonce[:], ciphertext[:24])
+  	plaintext, ok := box.Open(nil, ciphertext[24:], &decryptNonce, senderPublicKey, recipientPrivateKey)
+  	if !ok {
+  		return nil, ErrDecryptFailed
+  	}
+  	return plaintext, nil
+  }
+
+  // ECCKeyExFromImplant - Recover the session key an implant sent us
+  func ECCKeyExFromImplant(keyPair *ECCServerKeyPair, senderPublicKey *[32]byte, ciphertext []byte) ([]byte, error) {
+  	sessionKey, err := ECCDecrypt(senderPublicKey, keyPair.Private, ciphertext)
+  	if err != nil {
+  		return nil, err
+  	}
+  	return sessionKey, nil
+  }
+  ```
+
+test "rank1757: session key wrapped for the server with a fresh ephemeral sender key"
+  lang go
+  file implant/sliver/cryptography/crypto.go
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-CRY-003
+  reject VYQL-CRY-004
+  reject VYQL-CRY-015
+  code
+  ```
+  package cryptography
+
+  import (
+  	"bytes"
+  	"crypto/rand"
+  	"strings"
+
+  	"filippo.io/age"
+  )
+
+  var (
+  	ageMsgPrefix       = []byte("age-encryption.org/v1\n-> X25519 ")
+  	agePublicKeyPrefix = "age1"
+  )
+
+  // AgeEncrypt - Encrypt to a recipient with an ephemeral sender key
+  func AgeEncrypt(recipientPublicKey string, plaintext []byte) ([]byte, error) {
+  	if !strings.HasPrefix(recipientPublicKey, agePublicKeyPrefix) {
+  		recipientPublicKey = agePublicKeyPrefix + recipientPublicKey
+  	}
+  	recipient, err := age.ParseX25519Recipient(recipientPublicKey)
+  	if err != nil {
+  		return nil, err
+  	}
+  	buf := bytes.NewBuffer([]byte{})
+  	stream, err := age.Encrypt(buf, recipient)
+  	if err != nil {
+  		return nil, err
+  	}
+  	if _, err := stream.Write(plaintext); err != nil {
+  		return nil, err
+  	}
+  	if err := stream.Close(); err != nil {
+  		return nil, err
+  	}
+  	return bytes.TrimPrefix(buf.Bytes(), ageMsgPrefix), nil
+  }
+
+  // AgeKeyExToServer - Wrap the session key for the server
+  func AgeKeyExToServer(plaintext []byte) ([]byte, error) {
+  	return AgeEncrypt(serverAgePublicKey(), plaintext)
+  }
+
+  // RandomSymmetricKey - Generate a random session key
+  func RandomSymmetricKey() [32]byte {
+  	randBuf := make([]byte, 64)
+  	rand.Read(randBuf)
+  	return deriveKeyFrom(randBuf)
+  }
+  ```

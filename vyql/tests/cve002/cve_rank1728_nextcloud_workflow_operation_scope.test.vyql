@@ -1,0 +1,129 @@
+# Rank 1728 / CVE-2023-26482: the Nextcloud workflow engine's Manager
+# accepted an operation class by resolving it from the container and
+# checking it implemented IOperation, but never consulted the
+# interface's documented per-scope availability gate, so a user-scope
+# request could persist an admin-only operation. The settings UI
+# filtered operators through isAvailableForScope; the server-side
+# validator did not.
+
+test "rank1728: workflow operation validated by type alone, no scope availability check"
+  lang php
+  file Manager.php
+  expect VYQL-AUTH-080
+  expect_review code.AccessPolicyReview
+  code
+  ```
+  <?php
+
+  class Manager implements IManager {
+      protected $container;
+
+      public function addOperation(
+          string $class,
+          string $name,
+          array $checks,
+          string $operation,
+          ScopeContext $scope,
+          string $entity,
+          array $events
+      ) {
+          $this->validateOperation($class, $name, $checks, $operation, $entity, $events);
+
+          $id = $this->insertOperation($class, $name, $checkIds, $operation, $entity, $events);
+          $this->addScope($id, $scope);
+
+          return $this->getOperation($id);
+      }
+
+      public function validateOperation($class, $name, array $checks, $operation, string $entity, array $events) {
+          try {
+              $instance = $this->container->query($class);
+          } catch (QueryException $e) {
+              throw new \UnexpectedValueException('Operation %s does not exist', [$class]);
+          }
+
+          if (!($instance instanceof IOperation)) {
+              throw new \UnexpectedValueException('Operation %s is invalid', [$class]);
+          }
+
+          $this->validateEvents($entity, $events, $instance);
+
+          if (count($checks) === 0) {
+              throw new \UnexpectedValueException('At least one check needs to be provided');
+          }
+
+          $instance->validateOperation($name, $checks, $operation);
+
+          foreach ($checks as $check) {
+              $checkInstance = $this->container->query($check['class']);
+              if (!($checkInstance instanceof ICheck)) {
+                  throw new \UnexpectedValueException('Check %s is invalid', [$class]);
+              }
+              $checkInstance->validateCheck($check['operator'], $check['value']);
+          }
+      }
+  }
+  ```
+
+test "rank1728: workflow operation validation rejects classes unavailable for the scope"
+  lang php
+  file Manager.php
+  reject VYQL-AUTH-080
+  reject_review code.AccessPolicyReview
+  code
+  ```
+  <?php
+
+  class Manager implements IManager {
+      protected $container;
+
+      public function addOperation(
+          string $class,
+          string $name,
+          array $checks,
+          string $operation,
+          ScopeContext $scope,
+          string $entity,
+          array $events
+      ) {
+          $this->validateOperation($class, $name, $checks, $operation, $scope, $entity, $events);
+
+          $id = $this->insertOperation($class, $name, $checkIds, $operation, $entity, $events);
+          $this->addScope($id, $scope);
+
+          return $this->getOperation($id);
+      }
+
+      public function validateOperation($class, $name, array $checks, $operation, ScopeContext $scope, string $entity, array $events) {
+          try {
+              $instance = $this->container->query($class);
+          } catch (QueryException $e) {
+              throw new \UnexpectedValueException('Operation %s does not exist', [$class]);
+          }
+
+          if (!($instance instanceof IOperation)) {
+              throw new \UnexpectedValueException('Operation %s is invalid', [$class]);
+          }
+
+          if (!$instance->isAvailableForScope($scope->getScope())) {
+              throw new \UnexpectedValueException('Operation %s is invalid', [$class]);
+          }
+
+          $this->validateEvents($entity, $events, $instance);
+
+          if (count($checks) === 0) {
+              throw new \UnexpectedValueException('At least one check needs to be provided');
+          }
+
+          $instance->validateOperation($name, $checks, $operation);
+
+          foreach ($checks as $check) {
+              $checkInstance = $this->container->query($check['class']);
+              if (!($checkInstance instanceof ICheck)) {
+                  throw new \UnexpectedValueException('Check %s is invalid', [$class]);
+              }
+              $checkInstance->validateCheck($check['operator'], $check['value']);
+          }
+      }
+  }
+  ```

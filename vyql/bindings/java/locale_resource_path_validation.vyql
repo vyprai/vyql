@@ -1,0 +1,33 @@
+module bindings.java.locale_resource_path_validation;
+
+// Locale-driven resource selection joins the locale's subtags into the
+// resource path with underscores -- the localized-resource naming
+// convention documented on java.util.Locale and ResourceBundle
+// (base_language_country_variant.ext). Hand-rolled joiners concatenate
+// Locale.getLanguage()/getCountry()/getVariant() straight into the path
+// they resolve, and a request-derived locale (Accept-Language via
+// ServletRequest.getLocale) lets subtags carry '/' and '..' into the
+// joined path, escaping the resource root once the path reaches
+// ServletContext.getResource, a ClassLoader resource lookup or a URL.
+// The documented safe forms keep the subtag validation in the joining
+// code: a syntax check on the subtag values (String.matches against
+// the Locale JavaDoc grammar) or a locale-parsing API that rejects
+// malformed tags (Locale.forLanguageTag, Locale.Builder setters).
+// ResourceBundle.getBundle applies the fallback chain itself and never
+// lets the caller build the path.
+//
+// The judgement lives in the pack rule; this binding only recognises
+// the shape. The getter clauses read binary-expression tokens, which
+// the AST produces only for real concatenations -- prose in a comment
+// satisfies neither side, and a getter compared or assigned rather
+// than joined emits no such token. The validation clause is an
+// exact-token call match, so a subtag check in a sibling method does
+// not clear the join.
+
+binding localeSubtagResourcePathWithoutValidation {
+  query pattern presenceNode where node.scope == "function"
+    and containsAny(node.context.expr, ["getLanguage()", "getCountry()", "getVariant()"])
+    and containsAny(node.context.expr, ["+'_'+", "+\"_\"+"])
+    and not (node.context.call in ["matches", "forLanguageTag", "setLanguage", "setLanguageTag"])
+  emit issue code.UnvalidatedLocaleFileInclude at node
+}

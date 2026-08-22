@@ -1,0 +1,46 @@
+module bindings.php.zip_member_write_without_containment;
+
+// ZipArchive hands the extracting code whatever the archive declares:
+// getNameIndex/locateName return member names, getFromName and getStream
+// return member content, and a manifest stored inside the archive (a
+// mapping.json, a package descriptor) can carry a destination name as
+// content just as freely. PHP's concatenation joins such a value onto a
+// destination directory with no semantics of its own -- `$base . $name`
+// keeps every `..` component the name carries -- so a manual extraction
+// loop that opens the joined path for writing lets the archive decide
+// where the bytes land with the writing process's privileges (CWE-22).
+// The convenience API is the other discipline: ZipArchive::extractTo
+// strips absolute paths and `..` components itself, and is labelled
+// code.ArchiveEntryWrite separately.
+//
+// The loop is recognised by its documented parts together: a member
+// read -- getFromName, getStream, getNameIndex or locateName, the
+// ZipArchive calls that hand out member names and content -- and the
+// destination write pair, fopen plus fwrite or file_put_contents. A
+// member read alone is a read-only walk (report imports, template
+// parsers whose `getStream` is a token stream rather than an archive),
+// and a write alone never touched the archive. The
+// neutralising forms are the documented path reductions: basename()
+// reduces a member-derived name to a single component, realpath()
+// resolves the joined path against the filesystem. Either call in the
+// function means the destination was reduced or checked before use,
+// which is what the review flag asks about.
+//
+// Residual, stated rather than hidden: the containment test is by call
+// name, so a project that hand-rolls a dot-segment rejection with
+// str_contains() or a preg_ loop over segments is not recognised and
+// the flag stands -- the reduction has to go through one of the
+// documented path APIs to be visible from the function's context. And
+// the member read is required in the same function as the write, so an
+// extraction split across a reader method and a writer method reports
+// nothing here (the taint route through a labelled member-read source
+// would be the way to reach it; no source concept for archive member
+// content exists yet). In the other direction, a function that writes
+// files and then reads them back out of an archive it opened -- a
+// fixture round-trip in a test -- matches all three clauses; measured
+// across the corpus that is the one shape this fires on beside real
+// extraction loops.
+binding zipMemberWriteWithoutContainment {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.context.call, ["getFromName", "getStream", "getNameIndex", "locateName"]) and containsAny(node.context.call, ["fopen", "file_put_contents"]) and containsAny(node.context.call, ["fwrite", "file_put_contents"]) and not containsAny(node.context.call, ["basename", "realpath"])
+  emit issue code.ManualZipEntryFileWrite at node
+}

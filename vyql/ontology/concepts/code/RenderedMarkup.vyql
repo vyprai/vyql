@@ -1,0 +1,11 @@
+module code;
+
+concept RenderedMarkup : source {
+  cwe: [CWE_79]
+  refines: core.UserControlledData
+  sourceAssumption: "the rendered source text is authored outside the trust boundary of the context that displays the markup"
+  sourceCondition: "a markup renderer returns HTML embedding the source text's own markup at {pattern}"
+  sourceConditionCategory: "renderer-output-markup"
+  sourceConfidence: medium
+  taint: [taint.UntrustedData]
+}

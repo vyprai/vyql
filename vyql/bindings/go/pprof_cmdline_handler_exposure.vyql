@@ -1,0 +1,36 @@
+module bindings.go.pprof_cmdline_handler_exposure;
+
+// net/http/pprof documents Cmdline as the handler that "responds with the
+// running program's command line, with arguments separated by NUL bytes",
+// and documents the package as a set of handlers to be registered on a
+// mux, serving them under /debug/pprof/ by default. Four of the five
+// handlers in that set -- Index, Profile, Symbol, Trace -- report runtime
+// profiling state; Cmdline alone answers with the process's own
+// arguments. A server that takes its configuration as flags -- a shared
+// key, a datastore URI with inline credentials, a TLS key path -- carries
+// all of it in argv, so wiring pprof.Cmdline onto a served mux publishes
+// the operator's arguments to whoever can reach that port. The debug
+// exposure concept covers it: the command line is the program's
+// configuration, serialized into an HTTP response (CWE-215).
+//
+// The Go frontend records each call argument's selector path as a call_arg
+// token on the registering function's context, so the handler value handed
+// to a router's registration method is visible here. The predicate is
+// AST-routed and function-confined in Go, so a selector reference anywhere
+// in the same function satisfies it, which also covers a handler held in a
+// local variable before registration -- the route stays inside the
+// function that wires the handler. The other four pprof handlers are
+// deliberately not matched: none of them answers with the process's
+// arguments, and serving them behind the same mux is a documented,
+// supported configuration.
+//
+// Two recall residuals, stated rather than hidden. An import of the
+// package under another name spells the selector differently and is not
+// matched, and the blank side-effect import registers the default-mux
+// routes without referencing Cmdline at all, so neither form is covered.
+binding goPprofCmdlineHandlerExposure {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "go"
+    and node.context.callArg contains "pprof.Cmdline"
+  emit issue code.DebugInfoExposure at node
+}

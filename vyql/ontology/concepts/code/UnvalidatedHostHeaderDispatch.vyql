@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedHostHeaderDispatch : issue {
+  cwe: [CWE_20, CWE_444]
+  reviewAssumption: "the Host header (or the HTTP/2 :authority copied into it) is client-supplied, and downstream handlers, redirects, cache keys and proxies consume the exchange's authority as well-formed"
+  reviewCategory: input_validation
+  reviewCondition: "a server transport's request dispatch point consults the request Host header and hands the exchange to the application handler chain without checking the value against the authority grammar"
+  reviewConfidence: medium
+  reviewEvidence: "request dispatch context {pattern} reads the Host header and executes the root handler while naming no host-value grammar check"
+  vulnerableTo: [validation.ImproperInputValidation, injection.ProtocolStateConfusion]
+}

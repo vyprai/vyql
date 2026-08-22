@@ -1,0 +1,133 @@
+# Rank 1786 / CVE-2023-0642 (CWE-352): the Squidex IdentityServer area serves
+# browser-facing, cookie-authenticated profile and account pages from plain
+# MVC controllers (`IdentityServerController : Controller`) whose state-changing
+# actions -- profile update, property update, login add/remove, password
+# set/change, client-secret generation, picture upload, consent, setup --
+# are all `[HttpPost]` and none of the three controllers carried any
+# antiforgery validation, so every one of those actions accepted cross-site
+# requests riding the ambient session cookie. The fixed revision (2da3c41,
+# "Antiforgery for profile pages") puts `[AutoValidateAntiforgeryToken]` on
+# `AccountController`, `ProfileController` and `SetupController` and adds
+# `@Html.AntiForgeryToken()` to the eleven Razor forms (the .cshtml half is
+# uningested -- no frontend matches those files).
+#
+# ATTENTION, csrf-decision completeness -- the same family as ranks 1501
+# (login CSRF), 1567, 1581, 1592, 1601 and 1649, with the C# instance of
+# 1649's two aggravations. First, no sink exists: `code.StateChangingOpSink`
+# has no C# emitter, and the state changes here go through the application's
+# own `IUserService.UpdateAsync`/`SetPasswordAsync` wrappers rather than any
+# documented library call, so VYQL-RF-003 has nothing to reach; a verb-keyed
+# sink (any `[HttpPost]`/`[HttpPut]`/`[HttpDelete]` action) fires on 24 of
+# this tree's 24 POST controllers, of which 20 are bearer-token API
+# controllers where antiforgery does not apply (their `[ApiController]` sits
+# on a base class in another file, so only the application's own base-class
+# name could exclude them), and corpus-wide it fires on SmartStore's benign
+# search/filter POST actions whose base classes are named differently again.
+# Second, the safe configuration is invisible: Microsoft's documented global
+# pattern (`options.Filters.Add<AutoValidateAntiforgeryTokenAttribute>()` in
+# Program.cs) and MVC 5's global-filter registrations leave the controller
+# file textually identical to the unprotected one, and endpoint coverage for
+# a control in another file is the attribution-gap family, so a negation
+# cannot reach them.
+#
+# What did ship is the suppression half. The attribute forms of
+# `AutoValidateAntiforgeryToken` and `ValidateAntiForgeryToken` are entirely
+# unlabelled (the existing `csrfProtection32` matches only the rare
+# call-expression spelling and only under a `dependency("Microsoft.AspNetCore.Mvc")`
+# gate that no FrameworkReference-based ASP.NET Core app satisfies), so
+# bindings csrfProtection420/421 in `vyql/bindings/csharp/m1caa8bf2.vyql`
+# now emit `core.CsrfProtection` over the parameter entries of an attributed
+# action, minus `[IgnoreAntiforgeryToken]` overrides. No C# rule output
+# changes today (VYQL-RF-003 has no C# sink to pair with), but measured with
+# a throwaway `UpdateAsync` sink the rule reports the vulnerable form below
+# and not the patched one, and without the control binding it reports both:
+# the attribute control is the discriminator for whatever state-changing sink
+# lands. On the real tree both revisions report 14 findings over three
+# cache-off runs each, identical except for the line-shifted fingerprint of a
+# pre-existing VYQL-INJ-115.
+#
+# Both tests assert reject VYQL-RF-003: the vulnerable form passes only
+# because the sink half is missing and must flip to expect when a C#
+# state-changing-action sink lands; the patched form stays rejected forever
+# because the control covers its endpoint from then on.
+
+test "rank1786: identity profile POST actions carry no antiforgery validation"
+  lang csharp
+  file backend/src/Squidex/Areas/IdentityServer/Controllers/Profile/ProfileController.cs
+  reject VYQL-RF-003
+  code
+  ```
+  using System.Threading.Tasks;
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+
+  namespace Squidex.Areas.IdentityServer.Controllers.Profile;
+
+  [Authorize]
+  public sealed class ProfileController : IdentityServerController
+  {
+      private readonly IUserService userService;
+
+      public ProfileController(IUserService userService)
+      {
+          this.userService = userService;
+      }
+
+      [HttpPost]
+      [Route("account/profile/update/")]
+      public Task<IActionResult> UpdateProfile(ChangeProfileModel model)
+      {
+          return MakeChangeAsync((id, ct) => userService.UpdateAsync(id, model.ToValues(), ct: ct),
+              T.Get("users.profile.updateProfileDone"), model);
+      }
+
+      [HttpPost]
+      [Route("account/profile/password-set/")]
+      public Task<IActionResult> SetPassword(SetPasswordModel model)
+      {
+          return MakeChangeAsync((id, ct) => userService.SetPasswordAsync(id, model.Password, ct: ct),
+              T.Get("users.profile.setPasswordDone"), model);
+      }
+  }
+  ```
+
+test "rank1786: the fixed revision validates antiforgery tokens for the whole controller"
+  lang csharp
+  file backend/src/Squidex/Areas/IdentityServer/Controllers/Profile/ProfileController.cs
+  reject VYQL-RF-003
+  code
+  ```
+  using System.Threading.Tasks;
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+
+  namespace Squidex.Areas.IdentityServer.Controllers.Profile;
+
+  [Authorize]
+  [AutoValidateAntiforgeryToken]
+  public sealed class ProfileController : IdentityServerController
+  {
+      private readonly IUserService userService;
+
+      public ProfileController(IUserService userService)
+      {
+          this.userService = userService;
+      }
+
+      [HttpPost]
+      [Route("account/profile/update/")]
+      public Task<IActionResult> UpdateProfile(ChangeProfileModel model)
+      {
+          return MakeChangeAsync((id, ct) => userService.UpdateAsync(id, model.ToValues(), ct: ct),
+              T.Get("users.profile.updateProfileDone"), model);
+      }
+
+      [HttpPost]
+      [Route("account/profile/password-set/")]
+      public Task<IActionResult> SetPassword(SetPasswordModel model)
+      {
+          return MakeChangeAsync((id, ct) => userService.SetPasswordAsync(id, model.Password, ct: ct),
+              T.Get("users.profile.setPasswordDone"), model);
+      }
+  }
+  ```

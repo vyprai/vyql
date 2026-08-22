@@ -1,0 +1,31 @@
+module bindings.javascript.incomplete_command_escape_regex_terminators;
+
+// A shell argument escaper that neutralizes the separator metacharacters a
+// shell reads — `$`, `;`, `&`, `|` for POSIX shells, `&` and `|` for cmd.exe,
+// backtick and `,`/`;`/`&`/`|` for PowerShell — writes its patterns as an
+// alternation whose members are individually backslash-escaped
+// (`(\$|\;|\&|\|)`, `(\&|\|)`). Every shell in that list also treats a line
+// terminator as command separation: a line feed ends the current command in
+// Bash, Dash, Zsh, PowerShell and cmd.exe, and cmd.exe additionally lets a
+// carriage return change how the rest of the line is read. An escape chain
+// that leaves line terminators unescaped therefore neutralizes the
+// metacharacters it named and keeps the one separator it never listed, so
+// text after a line feed inside a single "escaped" argument runs as a new
+// command.
+//
+// The escaper is identified by its own signature rather than by a library
+// name: the escaped-separator alternation (a regex that backslash-escapes
+// `&` or `|` as alternation members) together with a replacement literal
+// that prefixes the matched characters with an escape character through a
+// backreference (`\\$1`, `` `$1 ``, `^$1`) and a `replace` call in the same
+// function. Lexer and tokenizer rules also escape alternation members, but
+// their regexes feed `match` and their replaces strip whitespace, so the
+// escape-inserting replacement is what keeps this on substitution escapers
+// (regex patterns mirror into the literal tokens, so the needle has to be
+// the backreference form only a replacement carries). Any pattern in the
+// same function covering a line feed or carriage return completes the chain
+// and suppresses this.
+binding incompleteCommandEscapeRegexTerminators {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.call in ["replace", "replaceAll"] and containsAny(node.context.regex, ["\\&|", "\\|\\&"]) and containsAny(node.context.literal, ["\\$1", "\\$2", "\\$&", "`$1", "`$2", "`$&", "^$1", "^$2"]) and not (containsAny(node.context.regex, ["\\n", "\\r"]))
+  emit issue code.IncompleteCommandEscapeRegex at node
+}

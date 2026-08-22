@@ -1,0 +1,43 @@
+module bindings.python.static_file_validation_order;
+
+// Tornado's StaticFileHandler documents validate_absolute_path(root,
+// absolute_path) as the hook where the framework validates the request-derived
+// path against the configured root, raising 403 when the path escapes it. A
+// subclass override that defers the super() delegation until after its own
+// checks makes those checks the first gate an escaping path reaches: the
+// framework's containment verdict never runs for any request the override
+// rejects first, and every probe the override performs on the raw path
+// (os.path.isdir, os.path.exists, os.path.getsize, ...) runs before the path
+// has been validated at all. Delegating first is the documented contract, and
+// the ordering is exactly what separates the two forms, so the two halves are
+// bound as facts and the order rule in packs/ judges them:
+//
+//   * the os.path state predicates below are filesystem probes, emitted as
+//     the existing code.FileCheck issue the C bindings already use for
+//     access/stat/lstat. They are bound unconfined because the reachability
+//     relation that consumes them is region-scoped: a probe in a sibling
+//     function or sibling method of the same file cannot reach the
+//     delegation, measured both ways.
+//   * the super().validate_absolute_path call is the framework's path
+//     validation, emitted as code.PathValidationHookDeferred. callee.path ==
+//     is exact-token, so the binding answers to the documented hook and not
+//     to any other method whose last segment happens to match.
+//
+// Residuals: os.path.realpath, abspath and normpath are lexical canonicalizers
+// rather than probes and are deliberately not bound, which is also what keeps
+// a correctly-delegating override clean when it canonicalizes before
+// delegating. The pathlib spellings (Path(p).is_file(), Path(p).stat()) lower
+// with an unresolved receiver and are not covered. Python emits no
+// call-argument shape tokens, so a probe the override runs on a value other
+// than the hook's path is indistinguishable from one on the path itself; both
+// still run before the framework's validation, which is what the rule reports.
+
+binding staticFileStateProbe {
+  query pattern callExpr where callee.path in ["os.path.isdir", "os.path.isfile", "os.path.islink", "os.path.exists", "os.path.getsize"]
+  emit issue code.FileCheck at call
+}
+
+binding staticPathValidationDelegation {
+  query pattern callExpr where callee.path == "super.validate_absolute_path"
+  emit issue code.PathValidationHookDeferred at call
+}

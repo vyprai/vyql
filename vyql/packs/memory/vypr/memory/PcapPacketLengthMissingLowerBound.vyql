@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule PcapPacketLengthMissingLowerBound {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20, CWE_125, CWE_787]
+    id: "VYQL-MEM-067"
+    severity: high
+  }
+  issue code.PcapPacketLengthMissingLowerBound as len
+}

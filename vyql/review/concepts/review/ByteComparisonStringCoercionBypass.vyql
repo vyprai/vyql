@@ -1,0 +1,7 @@
+module code;
+
+review code.ByteComparisonStringCoercionBypass {
+  category: auth
+  kind: attention
+  text: "review constant-time comparisons that XOR raw string offsets into an integer accumulator; the string result of the XOR coerces to 0, so every equal-length pair compares equal -- convert each offset with ord() or call hash_equals()"
+}

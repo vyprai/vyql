@@ -1,0 +1,29 @@
+module bindings.javascript.typeormEagerUserRelationSerialized;
+
+// TypeORM documents `eager: true` on a relation as "the relation is always
+// loaded automatically": every `find*` on the owning entity embeds the related
+// entity, and entity objects serialize their relations by default. An entity
+// that eagerly relates the user model therefore returns the whole user row --
+// password digest, reset token, MFA secret, whatever the user entity carries --
+// wherever the owning entity reaches a response. The documented way to ship a
+// restricted shape is the opposite of eager: leave the relation lazy and
+// project the fields explicitly (`addSelect(['user.id', ...])`, a dedicated
+// serializer, or `relations` per query).
+//
+// The relation decorators themselves are invisible to the call graph -- they
+// sit on entity fields, which lower no nodes -- so the module context is the
+// scope: the decorator reads as a `call:` token, its options object as
+// `prop:` tokens, and the relation target as an identifier. Any of the four
+// relation forms can carry `eager`, so all four names are read. The
+// user/account spelling is matched as a substring of any identifier, so
+// `AdminUser` and `UserAccount` read the same as `User`; the eager flag plus a
+// relation decorator plus the typeorm dependency already narrow the module to
+// an entity declaration, so the identifier clause is what makes the embedded
+// model a privileged one rather than an ordinary lookup table.
+binding jsTypeormEagerUserRelation {
+  requires {
+    dependency("typeorm")
+  }
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.call in ["OneToOne", "OneToMany", "ManyToOne", "ManyToMany"] and containsAny(node.context.prop, ["eager=true"]) and containsAny(node.context.identifier, ["User", "Account", "Member", "Admin", "Profile"])
+  emit issue code.SensitiveModelJsonSerializationExposure at node
+}

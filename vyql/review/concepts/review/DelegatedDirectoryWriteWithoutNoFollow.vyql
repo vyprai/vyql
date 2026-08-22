@@ -1,0 +1,7 @@
+module code;
+
+review code.DelegatedDirectoryWriteWithoutNoFollow {
+  category: path
+  kind: attention
+  text: "review writes through directories this function hands to another owner for no-follow protection on the creating open"
+}

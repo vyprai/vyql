@@ -1,0 +1,297 @@
+# Rank 1799 / CVE-2026-35523: both of strawberry's WebSocket subscription
+# protocol handlers registered every incoming operation into a per-connection
+# collection keyed by the client-supplied message id — `self.operations
+# [message["id"]] = operation` in graphql-transport-ws's handle_subscribe
+# (strawberry/subscriptions/protocols/graphql_transport_ws/handlers.py:205)
+# and `self.tasks[operation_id] = asyncio.create_task(result_handler)` in
+# legacy graphql-ws's handle_start (graphql_ws/handlers.py:131) — and spawned
+# one asyncio task per entry, with no bound on how many operations one
+# connection may hold. A GraphQL subscription task runs until the peer
+# completes it, so a client that keeps sending new operation ids grows the
+# registry and its task set indefinitely: uncontrolled resource consumption
+# from a single connection (CWE-400). The fixed revision threads a
+# max_subscriptions_per_connection parameter through every view (default 100)
+# and rejects with an error message once `len(self.operations)` /
+# `len(self.tasks)` reaches it, in the same function that registers. The
+# commit bundles the sibling CVE-2026-35526 (graphql-ws accepted `start`
+# before connection_init completed); that half is the connection_acknowledged
+# close(4401) at the top of the patched handle_start below, present in
+# graphql-transport-ws before the fixed revision, and is not what this spec pins.
+#
+# Detection is the unboundedConcurrentOperationRegistration binding
+# (vyql/bindings/python/unbounded_concurrent_operations.vyql) emitting the
+# existing code.UnboundedResourceOperation (VYQL-DOS-042), whose review text
+# names the missing control directly — "message limits". Reused rather than
+# minting: UnboundedProtocolStateByIdentifier (VYQL-DOS-008) is considered
+# and left alone, because its condition turns on per-identifier size/type
+# limits while this defect turns on the count of concurrent entries
+# (the same reading rank 1640 recorded when it declined the concept). The
+# anchor is structural: an asyncio create_task/ensure_future spawn, an
+# assignment into a keyed target, an instance collection subscripted in the
+# same function, and the incoming-message destructuring that marks the
+# entries per-message rather than once-per-connection bookkeeping. The
+# negations are the language's count-bound idioms — a len() call anywhere in
+# the handler, or an acquire() call for semaphore- or pool-gated admission —
+# not the fixed revision's own parameter vocabulary, so a cap spelled with any other
+# name still clears the finding.
+#
+# Measured, timeout 180 / --max-ram 6GB / --cache off, package subtree of the
+# real checkout: the vulnerable parent 36a2d53 reports VYQL-DOS-042 exactly
+# twice, on the two handler lines above, 30 findings total; the fixed revision 0977a4e
+# reports zero, 27 total — the sole delta in both directions, stable across
+# three runs each. Collateral, exhaustively over every file in the ~420-clone
+# corpus that carries a create_task or ensure_future call (331 files, scanned
+# in batches): zero findings; an AST enumeration of the looser shape (spawn
+# plus any keyed self-collection write, before the len and Semaphore
+# negations) also matches zero functions corpus-wide, so the binding's
+# positive clauses alone sit below the corpus's noise floor.
+# BenchmarkPython contains no create_task or ensure_future call at all, so
+# the +0.90 gate cannot move. Residuals are recorded in the binding: a cap
+# kept as an explicit counter rather than a len() comparison stays flagged,
+# and an `async with semaphore:` admission emits no call token, so that
+# spelling of a bounded handler stays flagged too — pinned by the last expect
+# below, to flip when the frontend surfaces the async-with manager. The
+# once-per-connection connection_init shape (literal-slot context write plus
+# a single guarded keep-alive task) is held out by the message-destructuring
+# clause, pinned by the reject below.
+
+test "rank1799: graphql-transport-ws registers every subscribe id as a live operation with no count bound"
+  lang python
+  file subscriptions/protocols/graphql_transport_ws/handlers.py
+  expect VYQL-DOS-042
+  code
+  ```
+  import asyncio
+
+
+  class BaseGraphQLTransportWSHandler:
+      def __init__(self):
+          self.operations: dict[str, Operation] = {}
+
+      async def handle_subscribe(self, message: SubscribeMessage) -> None:
+          if not self.connection_acknowledged:
+              await self.websocket.close(code=4401, reason="Unauthorized")
+              return
+
+          if message["id"] in self.operations:
+              reason = f"Subscriber for {message['id']} already exists"
+              await self.websocket.close(code=4409, reason=reason)
+              return
+
+          operation = Operation(self, message["id"])
+          operation.task = asyncio.create_task(self.run_operation(operation))
+          self.operations[message["id"]] = operation
+  ```
+
+test "rank1799: legacy graphql-ws spawns a task per start id into the connection's task map"
+  lang python
+  file subscriptions/protocols/graphql_ws/handlers.py
+  expect VYQL-DOS-042
+  code
+  ```
+  import asyncio
+
+
+  class BaseGraphQLWSHandler:
+      def __init__(self):
+          self.subscriptions: dict[str, AsyncGenerator] = {}
+          self.tasks: dict[str, asyncio.Task] = {}
+
+      async def handle_start(self, message: StartMessage) -> None:
+          operation_id = message["id"]
+          payload = message["payload"]
+
+          result_handler = self.handle_async_results(operation_id, payload)
+          self.tasks[operation_id] = asyncio.create_task(result_handler)
+  ```
+
+test "rank1799: a len() in a sibling method is not the handler's count bound"
+  lang python
+  file subscriptions/protocols/graphql_transport_ws/handlers.py
+  expect VYQL-DOS-042
+  code
+  ```
+  import asyncio
+
+
+  class BaseGraphQLTransportWSHandler:
+      def __init__(self):
+          self.operations: dict[str, Operation] = {}
+
+      def operation_count(self) -> int:
+          return len(self.operations)
+
+      async def handle_subscribe(self, message: SubscribeMessage) -> None:
+          if message["id"] in self.operations:
+              await self.websocket.close(code=4409, reason="already exists")
+              return
+
+          operation = Operation(self, message["id"])
+          operation.task = asyncio.create_task(self.run_operation(operation))
+          self.operations[message["id"]] = operation
+  ```
+
+test "rank1799: the fixed revision rejects subscribe once the registry reaches the per-connection limit"
+  lang python
+  file subscriptions/protocols/graphql_transport_ws/handlers.py
+  reject VYQL-DOS-042
+  code
+  ```
+  import asyncio
+
+
+  class BaseGraphQLTransportWSHandler:
+      def __init__(self):
+          self.operations: dict[str, Operation] = {}
+          self.max_subscriptions_per_connection: int | None = 100
+
+      async def handle_subscribe(self, message: SubscribeMessage) -> None:
+          if not self.connection_acknowledged:
+              await self.websocket.close(code=4401, reason="Unauthorized")
+              return
+
+          if message["id"] in self.operations:
+              reason = f"Subscriber for {message['id']} already exists"
+              await self.websocket.close(code=4409, reason=reason)
+              return
+
+          if (
+              self.max_subscriptions_per_connection is not None
+              and len(self.operations) >= self.max_subscriptions_per_connection
+          ):
+              error = GraphQLError("Subscription limit reached")
+              await self.send_message(
+                  {
+                      "id": message["id"],
+                      "type": "error",
+                      "payload": [error.formatted],
+                  }
+              )
+              return
+
+          operation = Operation(self, message["id"])
+          operation.task = asyncio.create_task(self.run_operation(operation))
+          self.operations[message["id"]] = operation
+  ```
+
+test "rank1799: the fixed legacy handler checks the handshake and the task count before starting"
+  lang python
+  file subscriptions/protocols/graphql_ws/handlers.py
+  reject VYQL-DOS-042
+  code
+  ```
+  import asyncio
+
+
+  class BaseGraphQLWSHandler:
+      def __init__(self):
+          self.tasks: dict[str, asyncio.Task] = {}
+          self.connection_acknowledged: bool = False
+          self.max_subscriptions_per_connection: int | None = 100
+
+      async def handle_start(self, message: StartMessage) -> None:
+          if not self.connection_acknowledged:
+              await self.websocket.close(code=4401, reason="Unauthorized")
+              return
+
+          operation_id = message["id"]
+
+          if operation_id in self.tasks:
+              await self.cleanup_operation(operation_id)
+
+          if (
+              self.max_subscriptions_per_connection is not None
+              and len(self.tasks) >= self.max_subscriptions_per_connection
+          ):
+              await self.send_message(
+                  ErrorMessage(
+                      type="error",
+                      id=operation_id,
+                      payload={"message": "Subscription limit reached"},
+                  )
+              )
+              return
+
+          payload = message["payload"]
+
+          result_handler = self.handle_async_results(operation_id, payload)
+          self.tasks[operation_id] = asyncio.create_task(result_handler)
+  ```
+
+test "rank1799: once-per-connection bookkeeping with a single guarded task is not per-message accumulation"
+  lang python
+  file subscriptions/protocols/graphql_ws/handlers.py
+  reject VYQL-DOS-042
+  code
+  ```
+  import asyncio
+
+
+  class BaseGraphQLWSHandler:
+      def __init__(self):
+          self.context: dict = {}
+          self.keep_alive: bool = True
+          self.keep_alive_task: asyncio.Task | None = None
+
+      async def handle_connection_init(self, message: ConnectionInitMessage) -> None:
+          payload = message.get("payload")
+
+          if isinstance(self.context, dict):
+              self.context["connection_params"] = payload
+          elif hasattr(self.context, "connection_params"):
+              self.context.connection_params = payload
+
+          if self.keep_alive:
+              keep_alive_handler = self.handle_keep_alive()
+              self.keep_alive_task = asyncio.create_task(keep_alive_handler)
+
+      async def handle_keep_alive(self) -> None:
+          while True:
+              await self.send_message({"type": "ka"})
+              await asyncio.sleep(1)
+  ```
+
+test "rank1799: operations admitted through an explicit semaphore acquire are bounded by construction"
+  lang python
+  file subscriptions/protocols/graphql_transport_ws/handlers.py
+  reject VYQL-DOS-042
+  code
+  ```
+  import asyncio
+
+
+  class BaseGraphQLTransportWSHandler:
+      def __init__(self):
+          self.operations: dict[str, Operation] = {}
+          self.admission = asyncio.Semaphore(100)
+
+      async def handle_subscribe(self, message: SubscribeMessage) -> None:
+          await self.admission.acquire()
+          try:
+              operation = Operation(self, message["id"])
+              operation.task = asyncio.create_task(self.run_operation(operation))
+              self.operations[message["id"]] = operation
+          finally:
+              self.admission.release()
+  ```
+
+test "rank1799: an async-with semaphore admission emits no call token and stays flagged until the manager is visible"
+  lang python
+  file subscriptions/protocols/graphql_transport_ws/handlers.py
+  expect VYQL-DOS-042
+  code
+  ```
+  import asyncio
+
+
+  class BaseGraphQLTransportWSHandler:
+      def __init__(self):
+          self.operations: dict[str, Operation] = {}
+          self.admission = asyncio.Semaphore(100)
+
+      async def handle_subscribe(self, message: SubscribeMessage) -> None:
+          async with self.admission:
+              operation = Operation(self, message["id"])
+              operation.task = asyncio.create_task(self.run_operation(operation))
+              self.operations[message["id"]] = operation
+  ```

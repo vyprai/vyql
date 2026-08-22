@@ -1,0 +1,193 @@
+# Rank 1704 / CVE-2018-20997 (sfackler/rust-openssl, pre-rename home of
+# rust-openssl/rust-openssl; GHSA-xjxc-vfw2-cg96, CWE-416): CmsContentInfo::sign
+# in openssl/src/cms.rs built the data BIO for CMS_sign with
+#
+#   let data_bio_ptr = match data {
+#       Some(data) => MemBioSlice::new(data)?.as_ptr(),
+#       None => ptr::null_mut(),
+#   };
+#
+# MemBioSlice::new returns an owned value; the `?` unwraps it into a temporary
+# whose lifetime ends at the semicolon, and as_ptr hands CMS_sign a raw pointer
+# into it. Raw pointers carry no lifetime, so nothing in the borrow checker
+# objects, and the FFI call reads the BIO after its Drop has freed it --
+# use after free driven by attacker-supplied CMS data. The same file's
+# smime_read_cms shows the correct shape two functions up: the MemBioSlice is
+# bound to a local first (`let bio = MemBioSlice::new(smime)?;`) and outlives
+# the call that consumes bio.as_ptr().
+#
+# The fixed revision (63afe30, "Fix use-after-free in cms") binds the MemBioSlice to a
+# local before taking the pointer:
+#
+#   let data_bio = match data {
+#       Some(data) => Some(MemBioSlice::new(data)?),
+#       None => None,
+#   };
+#   let data_bio_ptr = data_bio.as_ref().map_or(ptr::null_mut(), |p| p.as_ptr());
+#
+# so every as_ptr in the function reads a named, still-live binding.
+#
+# FIXED by a new Rust binding, vyql/bindings/rust/raw_pointer_from_temporary.vyql,
+# emitting code.RawPointerFromTemporary (VYQL-MEM-065, high). The Rust frontend
+# lowers every as_ptr whose receiver is not a name to the same call path
+# (?.as_ptr) whether the receiver is a try-expression or a macro, so the call
+# tokens cannot separate the dropped temporary from concat!(file!(), "\0")
+# pointing at static data; the function's compacted body text can, because the
+# try operator survives compaction directly in front of the borrow:
+# `)?.as_ptr(` / `)?.as_mut_ptr(`. The finding is the pointer-borrow-from-a-
+# temporary class, not any crate's vocabulary: any constructor returning Result
+# or Option, unwrapped with ?, then borrowed with as_ptr/as_mut_ptr inside a
+# statement whose binding outlives it, fires -- the same class clippy pins as
+# temporary_cstring_as_ptr.
+#
+# Measured, three `--cache off --max-ram 6GB` runs per revision over the real
+# checkout at /tmp/cve-work/rank1704/rust-openssl: 63afe30^ (vulnerable) one
+# VYQL-MEM-065, high, reported on the sign function itself (cms.rs:133, the
+# function context node; the borrowed temporary is at :150); 63afe30 (patched)
+# zero. Stable across all three runs each.
+# Collateral: across the ~5867 .rs files under the other /tmp/cve-work/rank*/
+# clones, `?.as_ptr(`/`?.as_mut_ptr(` occurs exactly three times excluding
+# tests/benches/examples -- two are a doc-comment example in a duplicated
+# library/alloc clone (outside every function body), the third is this CVE.
+# The named-receiver form (get_arg(pc, 0).as_ptr() and friends, 96 occurrences)
+# never fires, and rust-openssl's own concat!(file!(), "\0").as_ptr() call
+# sites -- which lower to the identical ?.as_ptr call path -- never fire either.
+
+test "rank1704: (a) a raw pointer is kept from a try-unwrapped temporary that is dropped at the end of the statement"
+  lang rust
+  file openssl/src/cms.rs
+  expect VYQL-MEM-065
+  code
+  ```
+  use std::ptr;
+
+  pub struct ErrorStack;
+
+  pub struct MemBioSlice {
+      bio: *mut u8,
+  }
+
+  impl MemBioSlice {
+      pub fn new(data: &[u8]) -> Result<MemBioSlice, ErrorStack> {
+          let _ = data;
+          Ok(MemBioSlice { bio: ptr::null_mut() })
+      }
+
+      pub fn as_ptr(&self) -> *mut u8 {
+          self.bio
+      }
+  }
+
+  pub struct CmsContentInfo;
+
+  fn CMS_sign(bio: *mut u8) -> i32 {
+      let _ = bio;
+      0
+  }
+
+  impl CmsContentInfo {
+      pub fn sign(data: Option<&[u8]>) -> Result<CmsContentInfo, ErrorStack> {
+          unsafe {
+              let data_bio_ptr = match data {
+                  Some(data) => MemBioSlice::new(data)?.as_ptr(),
+                  None => ptr::null_mut(),
+              };
+
+              CMS_sign(data_bio_ptr);
+
+              Ok(CmsContentInfo)
+          }
+      }
+  }
+  ```
+
+test "rank1704: (b) the fixed revision binds the temporary to a local so the pointer's pointee outlives the call"
+  lang rust
+  file openssl/src/cms.rs
+  reject VYQL-MEM-065
+  code
+  ```
+  use std::ptr;
+
+  pub struct ErrorStack;
+
+  pub struct MemBioSlice {
+      bio: *mut u8,
+  }
+
+  impl MemBioSlice {
+      pub fn new(data: &[u8]) -> Result<MemBioSlice, ErrorStack> {
+          let _ = data;
+          Ok(MemBioSlice { bio: ptr::null_mut() })
+      }
+
+      pub fn as_ptr(&self) -> *mut u8 {
+          self.bio
+      }
+  }
+
+  pub struct CmsContentInfo;
+
+  fn CMS_sign(bio: *mut u8) -> i32 {
+      let _ = bio;
+      0
+  }
+
+  impl CmsContentInfo {
+      pub fn sign(data: Option<&[u8]>) -> Result<CmsContentInfo, ErrorStack> {
+          unsafe {
+              let data_bio = match data {
+                  Some(data) => Some(MemBioSlice::new(data)?),
+                  None => None,
+              };
+              let data_bio_ptr = data_bio.as_ref().map_or(ptr::null_mut(), |p| p.as_ptr());
+
+              CMS_sign(data_bio_ptr);
+
+              Ok(CmsContentInfo)
+          }
+      }
+  }
+  ```
+
+test "rank1704: (c) a pointer taken from compile-time static data borrows nothing that dies"
+  lang rust
+  file openssl/src/log.rs
+  reject VYQL-MEM-065
+  code
+  ```
+  fn log(file: *const i8) {
+      let _ = file;
+  }
+
+  pub fn info_callback() {
+      let file_name = concat!(file!(), "\0").as_ptr() as *const i8;
+      log(file_name);
+  }
+  ```
+
+test "rank1704: (d) a pointer taken from a named, still-live binding is a borrow the compiler can see"
+  lang rust
+  file openssl/src/zjit.rs
+  reject VYQL-MEM-065
+  code
+  ```
+  pub struct Opaque;
+
+  fn get_arg(pc: *const u8, at: usize) -> Opaque {
+      let _ = (pc, at);
+      Opaque
+  }
+
+  impl Opaque {
+      pub fn as_ptr(&self) -> *const u8 {
+          std::ptr::null()
+      }
+  }
+
+  pub fn decode(pc: *const u8) {
+      let arg = get_arg(pc, 0);
+      let ptr = arg.as_ptr();
+      let _ = ptr;
+  }
+  ```

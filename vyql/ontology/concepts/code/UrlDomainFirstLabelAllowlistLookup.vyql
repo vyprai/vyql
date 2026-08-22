@@ -1,0 +1,11 @@
+module code;
+
+concept UrlDomainFirstLabelAllowlistLookup : issue {
+  cwe: [CWE_346, CWE_290]
+  reviewAssumption: "the URL whose domain reaches this lookup comes from the request side, so its labels are chosen by whoever sent the page, redirect or callback"
+  reviewCategory: auth
+  reviewCondition: "an origin-trust decision looks up a fragment of the request URL's domain in a trusted registry instead of matching the full host, so any sibling host sharing the fragment passes"
+  reviewConfidence: medium
+  reviewEvidence: "origin gate context {pattern} splits the request domain and uses a fragment as the registry lookup key with no suffix or whole-host anchor"
+  vulnerableTo: [access_control.OriginValidationError, access_control.IncorrectAuthorization]
+}

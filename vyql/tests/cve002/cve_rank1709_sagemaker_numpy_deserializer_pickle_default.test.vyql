@@ -1,0 +1,253 @@
+# src/sagemaker/base_deserializers.py's NumpyDeserializer takes the bytes a
+# SageMaker inference endpoint returned and hands them to numpy.load:
+#
+#   def __init__(self, dtype=None, accept="application/x-npy", allow_pickle=True):
+#       ...
+#       self.allow_pickle = allow_pickle
+#
+#   def deserialize(self, stream, content_type):
+#       ...
+#       return np.load(io.BytesIO(stream.read()), allow_pickle=self.allow_pickle)
+#
+# numpy.load only unpickles when the caller opts in, and since NumPy 1.16.3 the
+# flag's own default is allow_pickle=False precisely because loading a pickled
+# object array executes whatever the artifact's pickle stream names. The
+# wrapper's constructor defaults that opt-in to True, so every caller that
+# never mentions the flag unpickles the endpoint's response -- the stream may
+# name any class, with no filter standing between it and the unpickler. The
+# fix flips the constructor default to False and keeps the call itself
+# unchanged (`allow_pickle=self.allow_pickle` at both revisions), so the
+# default, not the call, is what a detector has to see.
+#
+# What fires without this change: nothing. The np.load call carries no label at
+# all -- the sink binding for numpy.load matches only the full module spelling,
+# not the `import numpy as np` form every real caller uses -- and even
+# relabelled, the taint rule fires identically at both revisions because the
+# call is textually the same. The default is a constructor signature, which
+# Python emits no structured token for, so the binding reads it from the
+# enclosing class's body text, spelled with the punctuation the signature
+# itself carries: `allow_pickle=True):` is the def-line default with the flag
+# trailing. The fixed revision's own remediation message ("Please set the param
+# allow_pickle=True to deserialize pickle objects") does not match it -- the
+# discrimination rides on the signature, not on the fixed revision's vocabulary -- and
+# neither does the documented call-site opt-in `np.load(f, allow_pickle=True)`,
+# which closes with `)` and no colon; flagging that form would report every
+# legitimate load of a local artifact, and three sibling trees carry exactly
+# that spelling on genuinely local data (ray's numpy_datasource and rllib
+# serialization, torch's numpy test suite).
+#
+# Nothing is minted. code.UnrestrictedClassDeserialization, its review twin
+# and VYQL-DESER-023 exist for the Java arm of the same weakness (a
+# helper that takes serialized bytes and reconstructs the graph with no class
+# restriction); the addition is the Python binding for the wrapper-default
+# form, vyql/bindings/python/deserialization.vyql, matching both documented
+# import spellings (np.load and numpy.load). The signature is read from the
+# class body text because Python emits no structured token for a parameter
+# default, so the usual two-sided text residual applies and is stated in the
+# binding: a docstring quoting the exact spelling `allow_pickle=True):` fires,
+# and a default True in a non-trailing parameter position is missed.
+#
+# Measured. The vulnerable revision of base_deserializers.py reports one new
+# VYQL-DESER-023 row on NumpyDeserializer.deserialize and the patched revision
+# reports none, three identical --cache off runs each; np.loadtxt in the same
+# defaulting wrapper stays quiet, so the callee match is exact. Across every
+# Python file under the sibling clones /tmp/cve-work/rank*/ (~100 trees), the
+# signature spelling `allow_pickle=True):` appears only in this repository's
+# base_deserializers.py, and the four files that carry the call-site spelling
+# report no DESER-023 row when scanned together (35 findings, none from this
+# rule). BenchmarkPython contains neither np.load nor allow_pickle, so the
+# +0.90 gate cannot move.
+
+test "rank1709: (a) an inference-endpoint deserializer whose constructor defaults the numpy pickle opt-in to True"
+  lang python
+  file src/sagemaker/base_deserializers.py
+  expect VYQL-DESER-023
+  expect_review code.UnrestrictedClassDeserialization
+  code
+  ```
+  import io
+
+  import numpy as np
+
+
+  class NumpyDeserializer:
+      def __init__(self, dtype=None, accept="application/x-npy", allow_pickle=True):
+          self.dtype = dtype
+          self.allow_pickle = allow_pickle
+
+      def deserialize(self, stream, content_type):
+          try:
+              if content_type == "application/x-npy":
+                  return np.load(io.BytesIO(stream.read()), allow_pickle=self.allow_pickle)
+          finally:
+              stream.close()
+  ```
+
+test "rank1709: (b) the patched default keeps the call and rejects pickled payloads by default"
+  lang python
+  file src/sagemaker/base_deserializers.py
+  reject VYQL-DESER-023
+  reject_review code.UnrestrictedClassDeserialization
+  code
+  ```
+  import io
+
+  import numpy as np
+
+
+  class NumpyDeserializer:
+      def __init__(self, dtype=None, accept="application/x-npy", allow_pickle=False):
+          self.dtype = dtype
+          self.allow_pickle = allow_pickle
+
+      def deserialize(self, stream, content_type):
+          try:
+              if content_type == "application/x-npy":
+                  try:
+                      return np.load(io.BytesIO(stream.read()), allow_pickle=self.allow_pickle)
+                  except ValueError as ve:
+                      raise ValueError(
+                          "Please set the param allow_pickle=True \
+                          to deserialize pickle objects in NumpyDeserializer"
+                      ).with_traceback(ve.__traceback__)
+          finally:
+              stream.close()
+  ```
+
+test "rank1709: (c) the documented call-site opt-in on a local artifact is not the wrapper default"
+  lang python
+  file examples/load_object_array.py
+  reject VYQL-DESER-023
+  reject_review code.UnrestrictedClassDeserialization
+  code
+  ```
+  import numpy as np
+
+
+  class ArtifactStore:
+      def __init__(self, root):
+          self.root = root
+
+      def load_tokens(self, name):
+          return np.load(self.root / name, allow_pickle=True)
+  ```
+
+test "rank1709: (d) a wrapper with the safe default under the full module spelling is quiet too"
+  lang python
+  file src/sagemaker/base_deserializers.py
+  reject VYQL-DESER-023
+  reject_review code.UnrestrictedClassDeserialization
+  code
+  ```
+  import io
+
+  import numpy
+
+
+  class NumpyDeserializer:
+      def __init__(self, dtype=None, accept="application/x-npy", allow_pickle=False):
+          self.dtype = dtype
+          self.allow_pickle = allow_pickle
+
+      def deserialize(self, stream, content_type):
+          try:
+              if content_type == "application/x-npy":
+                  return numpy.load(io.BytesIO(stream.read()), allow_pickle=self.allow_pickle)
+          finally:
+              stream.close()
+  ```
+
+test "rank1709: (e) the wrapper default under the full module spelling is the same weakness"
+  lang python
+  file src/sagemaker/base_deserializers.py
+  expect VYQL-DESER-023
+  expect_review code.UnrestrictedClassDeserialization
+  code
+  ```
+  import io
+
+  import numpy
+
+
+  class NumpyDeserializer:
+      def __init__(self, dtype=None, accept="application/x-npy", allow_pickle=True):
+          self.dtype = dtype
+          self.allow_pickle = allow_pickle
+
+      def deserialize(self, stream, content_type):
+          try:
+              if content_type == "application/npz":
+                  return numpy.load(io.BytesIO(stream.read()), allow_pickle=self.allow_pickle)
+          finally:
+              stream.close()
+  ```
+
+test "rank1709: (f) the load in a helper method of the same defaulting class is the same weakness"
+  lang python
+  file src/sagemaker/base_deserializers.py
+  expect VYQL-DESER-023
+  expect_review code.UnrestrictedClassDeserialization
+  code
+  ```
+  import io
+
+  import numpy as np
+
+
+  class NumpyDeserializer:
+      def __init__(self, dtype=None, accept="application/x-npy", allow_pickle=True):
+          self.dtype = dtype
+          self.allow_pickle = allow_pickle
+
+      def _load_npy(self, stream):
+          return np.load(io.BytesIO(stream.read()), allow_pickle=self.allow_pickle)
+
+      def deserialize(self, stream, content_type):
+          return self._load_npy(stream)
+  ```
+
+test "rank1709: (g) an unsafe-default sibling class never loads, and the loader with the safe default stays quiet"
+  lang python
+  file src/sagemaker/base_deserializers.py
+  reject VYQL-DESER-023
+  reject_review code.UnrestrictedClassDeserialization
+  code
+  ```
+  import io
+
+  import numpy as np
+
+
+  class LegacyDeserializer:
+      def __init__(self, dtype=None, allow_pickle=True):
+          self.allow_pickle = allow_pickle
+
+
+  class SafeNumpyDeserializer:
+      def __init__(self, dtype=None, accept="application/x-npy", allow_pickle=False):
+          self.allow_pickle = allow_pickle
+
+      def deserialize(self, stream, content_type):
+          return np.load(io.BytesIO(stream.read()), allow_pickle=self.allow_pickle)
+  ```
+
+test "rank1709: (h) a defaulting wrapper that only ever calls np.loadtxt stays quiet -- the callee match is exact"
+  lang python
+  file src/sagemaker/base_deserializers.py
+  reject VYQL-DESER-023
+  reject_review code.UnrestrictedClassDeserialization
+  code
+  ```
+  import io
+
+  import numpy as np
+
+
+  class NumpyDeserializer:
+      def __init__(self, dtype=None, accept="text/csv", allow_pickle=True):
+          self.dtype = dtype
+          self.allow_pickle = allow_pickle
+
+      def deserialize(self, stream, content_type):
+          return np.loadtxt(io.TextIOWrapper(stream), allow_pickle=self.allow_pickle)
+  ```

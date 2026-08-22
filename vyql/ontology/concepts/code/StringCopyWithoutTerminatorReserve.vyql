@@ -1,0 +1,11 @@
+module code;
+
+concept StringCopyWithoutTerminatorReserve : issue {
+  cwe: [CWE_170, CWE_120]
+  reviewAssumption: "the source string can be at least as long as the destination capacity"
+  reviewCategory: memory
+  reviewCondition: "a bounded string copy's length can equal its destination's capacity, leaving no room for a NUL terminator"
+  reviewConfidence: medium
+  reviewEvidence: "saturating bound on {pattern} reserves no terminator byte"
+  vulnerableTo: [memory.OobRead, memory.OobWrite]
+}

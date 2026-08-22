@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule RecursiveDeleteWithoutSymlinkCheck {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_59, CWE_22]
+    id: "VYQL-PATH-082"
+    severity: high
+  }
+  issue code.RecursiveDeleteWithoutSymlinkCheck as sink
+}

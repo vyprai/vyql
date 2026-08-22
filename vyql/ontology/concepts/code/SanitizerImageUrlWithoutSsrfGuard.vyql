@@ -1,0 +1,11 @@
+module code;
+
+concept SanitizerImageUrlWithoutSsrfGuard : issue {
+  cwe: [CWE_918]
+  reviewAssumption: "the sanitized markup reaches a consumer that fetches the URLs it carries -- a document renderer, HTML-to-image converter, preview or mail-rendering service running server-side"
+  reviewCategory: request_forgery
+  reviewCondition: "a sanitizer policy admits fetched-resource URL attributes with no attribute value policy, so every URL the markup carries survives cleaning and the downstream fetcher requests attacker-chosen hosts"
+  reviewConfidence: medium
+  reviewEvidence: "sanitizer policy composition {pattern} admits image-source URLs through an unguarded stock image policy"
+  vulnerableTo: [request_forgery.Ssrf]
+}

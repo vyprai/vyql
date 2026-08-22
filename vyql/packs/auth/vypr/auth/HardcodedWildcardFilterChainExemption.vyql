@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule HardcodedWildcardFilterChainExemption {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862, CWE_863]
+    id: "VYQL-AUTH-155"
+    severity: high
+  }
+  issue code.HardcodedWildcardFilterChainExemption as exemption
+}

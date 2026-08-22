@@ -1,0 +1,11 @@
+module code;
+
+concept UnqualifiedPosixProgramLaunch : issue {
+  cwe: [CWE_426]
+  reviewAssumption: "a directory in the platform program search path is writable by a lower-privileged account than the process launching the program"
+  reviewCategory: path
+  reviewCondition: "a POSIX-only desktop utility is launched by unqualified program name in launching code with no Windows platform handling, so on a Windows host the executable can only resolve from a PATH directory"
+  reviewConfidence: high
+  reviewEvidence: "program launch {pattern} names a POSIX-only utility by bare command token with no Windows platform guard"
+  vulnerableTo: [path.UncontrolledSearchPath]
+}

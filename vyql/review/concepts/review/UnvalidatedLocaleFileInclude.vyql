@@ -4,5 +4,5 @@ review code.UnvalidatedLocaleFileInclude {
   category: path
   expected: [core.PathAccessCheck]
   kind: attention
-  text: "review locale-derived PHP include paths for locale validation before including language files"
+  text: "review locale-derived resource paths for locale validation before resolving the resource"
 }

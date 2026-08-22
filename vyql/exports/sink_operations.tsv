@@ -96,3 +96,4 @@ WebViewLoad	html_output	# CWE-749 content rendered in an embedded browser
 #   RequestPolicyStrippedSink  --  CWE-200 as above
 #   ZeroSizeReallocationSink  --  CWE-415 matches double_free, but a zero-size
 #     reallocation is not a double free; near in CWE, wrong as an operation
+#   ConnectionStateWrite  --  CWE-287 authentication; the vocabulary has no session-identity operation

@@ -1,0 +1,35 @@
+module bindings.swift.nio_outbound_header_validation_disabled;
+
+// SwiftNIO's HTTP/1.1 pipeline polices outbound header fields: a handler
+// added by configureHTTPServerPipeline and addHTTPClientHeaders rejects a
+// field name or value carrying CR, LF, NUL or any other ASCII control
+// character (HTAB excepted), which is what stops a header value from
+// terminating the header block early and injecting a second message --
+// response splitting toward the browser, request smuggling against the
+// upstream. Both entry points document the switch in their parameter lists:
+// `withOutboundHeaderValidation` / `enableOutboundHeaderValidation`, "Whether
+// the pipeline should confirm that outbound headers are well-formed",
+// defaulting to true, and passing false is the documented way to opt out for
+// projects that run the validation themselves.
+//
+// Swift appends a call's argument labels to the call node's path as dotted
+// segments, so `callee.path ~= "withOutboundHeaderValidation"` holds exactly
+// when the call passes that labelled argument, whatever receiver it is made
+// on and however many arguments precede it. Paired with a false literal in
+// the argument list, it means the pipeline is being configured with the
+// header validation switched off. The residual is the case where the call
+// passes false to a different parameter (withErrorHandling,
+// withPipeliningAssistance) and a computed value to the validation label
+// itself; that call is left unreported rather than guessed at positionally,
+// mirroring how the Netty binding for this concept excludes constructors
+// with a second unrelated boolean.
+
+binding outboundHeaderValidationDisabled233 {
+  query pattern callExpr where callee.path ~= "withOutboundHeaderValidation" and args.any.literal contains "false"
+  emit issue code.HttpHeaderValidationDisabled at call
+}
+
+binding clientOutboundHeaderValidationDisabled234 {
+  query pattern callExpr where callee.path ~= "enableOutboundHeaderValidation" and args.any.literal contains "false"
+  emit issue code.HttpHeaderValidationDisabled at call
+}

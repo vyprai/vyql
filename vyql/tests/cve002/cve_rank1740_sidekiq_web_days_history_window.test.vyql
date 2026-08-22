@@ -1,0 +1,244 @@
+# Rank 1740 / CVE-2022-23837: Sidekiq's Web UI dashboard passed the `days`
+# query parameter straight into the stats-history window. `params["days"]` is
+# request input, and Ruby's `to_i` never raises -- `"1000000"` coerces to a
+# million, garbage to 0 -- so `Sidekiq::Stats::History.new((params["days"] ||
+# 30).to_i)` handed the peer an unbounded window count, and `date_stat_hash`
+# iterated `@start_date.downto(@start_date - @days_previous + 1)`, building a
+# date-keyed array and one Redis MGET of that size per request (CWE-400 DoS in
+# the Web UI). Fix 7785ac13 bounds the window twice: the route validates
+# `days < 1 || days > 180` and halts 401, and `History#initialize` raises
+# ArgumentError outside 1..(5*365). The parent 0a4de94 is vulnerable and the
+# remediation is present at the fixed revision, so the row is sound.
+#
+# ATTENTION, two independent blockers, both measured.
+#
+# 1. No iteration-count sink vocabulary exists in any language, so even the
+# one-function form reports nothing today. A throwaway in-tree sink on
+# `downto`/`upto` args[0] emitting a consumed sink concept makes
+# VYQL-INJ-002 report the one-function form below (`params["days"].to_i`
+# flows through the `|| 30` default, the assignment and the arithmetic into
+# the loop argument -- `vyql match` labels `params` and `params.__subscript`
+# as code.HttpInput, `ruby.input`), proving the source half and the taint
+# half work and isolating the missing half to the sink. Emitting the sink as
+# code.UnboundedResourceOperation does not compile: the corpus validator
+# rejects `emit sink` on a concept of kind issue, and VYQL-DOS-042's rule is
+# presence-shaped (`issue ... as sink`), so riding it from a taint path would
+# need a new sink-kind concept plus a consuming `taint core.UserControlledData
+# -> ...` rule, and that is a minted rule whose precision has not been
+# measured here. A route-level presence binding is unshippable instead:
+# `params[...].to_i` occurs 107 times across the other cloned trees
+# (mastodon, redmine, open-build-service, rails -- the pagination idiom), all
+# without a halt, and keying the consumer (`Stats.History.new`) fails the
+# rename test and names the incident rather than the API. Same family as the
+# measured-unshippable CWE-400 shapes (1517, 1534, 1554, 1559, 1572, 1586,
+# 1612, and 1355's 1 -> 124).
+#
+# 2. Even with a sink, the count never reaches the loop across the class
+# boundary. Full `--cache off` scans of both revisions (three runs per side,
+# stable): 64 findings at the parent, 64 at the fixed revision, nothing on
+# web/application.rb:53 or api.rb:161-190 in either. `vyql trace` on the
+# parent shows the HttpInput at application.rb:53 flowing through `to_i`,
+# into `Sidekiq.Stats.History.new` and onto the `stats_history` receiver --
+# then dead: `stats_history.processed` / `.failed` report "callee not traced
+# -- external or cross-package" (cross-file receiver-typed dispatch through a
+# local assigned from a namespaced constructor). From the callee side the
+# `days_previous` parameter of History#initialize is itself labelled
+# code.ExternalEntryInput (api.rb:163) and its taint stops at the very next
+# statement: `@days_previous = days_previous` never flows to the `@days_previous`
+# read inside date_stat_hash. A one-file collapse with the resolution present
+# (below) reproduces the same dead end -- taint passes through `h.processed`
+# into the caller's return but the callee body's loop argument stays clean --
+# while the identical count through a plain method argument reports under the
+# throwaway sink. So the engine is missing two relations: constructor-argument
+# taint entering the resolved initialize body, and instance-variable
+# write -> read across methods (the aliasReceiverSelf field-crossing family
+# recorded for 1198/1287, here in Ruby form). Both are new dataflow
+# relations, not localized corrections, so this is not a mechanical fix.
+#
+# Spec cve_rank1740 pins all four directions against VYQL-DOS-042, the rule
+# of the right weakness class that exists today. When iteration-count sink
+# vocabulary lands, the one-function member must flip to expect; when the
+# constructor-argument -> instance-variable hop lands, the same-file member
+# must flip too; when cross-file receiver resolution lands, the two-file
+# member follows. The patched member must stay reject under all of them.
+
+test "rank1740: the dashboard passes the unvalidated days parameter straight into the stats history window"
+  lang ruby
+  file sidekiq/web/application.rb
+  reject VYQL-DOS-042
+  code
+  ```
+  module Sidekiq
+    class WebApplication
+      get "/" do
+        @redis_info = redis_info.select { |k, v| REDIS_KEYS.include? k }
+        stats_history = Sidekiq::Stats::History.new((params["days"] || 30).to_i)
+        @processed_history = stats_history.processed
+        @failed_history = stats_history.failed
+
+        erb(:dashboard)
+      end
+    end
+  end
+  ```
+  file sidekiq/api.rb
+  code
+  ```
+  module Sidekiq
+    module Stats
+      class History
+        def initialize(days_previous, start_date = nil)
+          @days_previous = days_previous
+          @start_date = start_date || Time.now.utc.to_date
+        end
+
+        def processed
+          @processed ||= date_stat_hash("processed")
+        end
+
+        def failed
+          @failed ||= date_stat_hash("failed")
+        end
+
+        private
+
+        def date_stat_hash(stat)
+          stat_hash = {}
+          dates = @start_date.downto(@start_date - @days_previous + 1).map { |date|
+            date.strftime("%Y-%m-%d")
+          }
+
+          keys = dates.map { |datestr| "stat:#{stat}:#{datestr}" }
+
+          Sidekiq.redis do |conn|
+            conn.mget(keys).each_with_index do |value, idx|
+              stat_hash[dates[idx]] = value ? value.to_i : 0
+            end
+          end
+
+          stat_hash
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1740: the fixed revision bounds the window at the route and raises in the constructor"
+  lang ruby
+  file sidekiq/web/application.rb
+  reject VYQL-DOS-042
+  code
+  ```
+  module Sidekiq
+    class WebApplication
+      get "/" do
+        @redis_info = redis_info.select { |k, v| REDIS_KEYS.include? k }
+        days = (params["days"] || 30).to_i
+        return halt(401) if days < 1 || days > 180
+
+        stats_history = Sidekiq::Stats::History.new(days)
+        @processed_history = stats_history.processed
+        @failed_history = stats_history.failed
+
+        erb(:dashboard)
+      end
+    end
+  end
+  ```
+  file sidekiq/api.rb
+  code
+  ```
+  module Sidekiq
+    module Stats
+      class History
+        def initialize(days_previous, start_date = nil)
+          # we only store five years of data in Redis
+          raise ArgumentError if days_previous < 1 || days_previous > (5 * 365)
+          @days_previous = days_previous
+          @start_date = start_date || Time.now.utc.to_date
+        end
+
+        def processed
+          @processed ||= date_stat_hash("processed")
+        end
+
+        def failed
+          @failed ||= date_stat_hash("failed")
+        end
+
+        private
+
+        def date_stat_hash(stat)
+          stat_hash = {}
+          dates = @start_date.downto(@start_date - @days_previous + 1).map { |date|
+            date.strftime("%Y-%m-%d")
+          }
+
+          keys = dates.map { |datestr| "stat:#{stat}:#{datestr}" }
+
+          Sidekiq.redis do |conn|
+            conn.mget(keys).each_with_index do |value, idx|
+              stat_hash[dates[idx]] = value ? value.to_i : 0
+            end
+          end
+
+          stat_hash
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1740: the same count inline in one function is the shape a sink can reach"
+  lang ruby
+  file inline_history.rb
+  reject VYQL-DOS-042
+  code
+  ```
+  def history_keys(days)
+    today = Time.now.utc.to_date
+    dates = today.downto(today - days + 1).map { |date| date.strftime("%Y-%m-%d") }
+    dates.map { |datestr| "stat:processed:#{datestr}" }
+  end
+
+  get "/export" do
+    days = (params["days"] || 30).to_i
+    history_keys(days)
+  end
+  ```
+
+test "rank1740: the count crossing a constructor into an instance variable keeps the loop bound unreachable"
+  lang ruby
+  file same_file_history.rb
+  reject VYQL-DOS-042
+  code
+  ```
+  module Sidekiq
+    module Stats
+      class History
+        def initialize(days_previous, start_date = nil)
+          @days_previous = days_previous
+          @start_date = start_date || Time.now.utc.to_date
+        end
+
+        def processed
+          @processed ||= date_stat_hash("processed")
+        end
+
+        private
+
+        def date_stat_hash(stat)
+          dates = @start_date.downto(@start_date - @days_previous + 1).map { |date|
+            date.strftime("%Y-%m-%d")
+          }
+          dates.map { |datestr| "stat:#{stat}:#{datestr}" }
+        end
+      end
+    end
+  end
+
+  def dashboard
+    stats_history = Sidekiq::Stats::History.new((params["days"] || 30).to_i)
+    @processed_history = stats_history.processed
+  end
+  ```

@@ -825,3 +825,108 @@ binding uncaughtFfiUnwind200 {
   query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.abi == "C" and not (node.context.call == "catch_unwind")
   emit issue code.UncaughtFfiUnwind at node
 }
+
+binding reachableAssertionReview220 {
+  query pattern callExpr where callee.path ~= "checked_add.expect"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview221 {
+  query pattern callExpr where callee.path ~= "checked_add.unwrap"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview222 {
+  query pattern callExpr where callee.path ~= "checked_sub.expect"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview223 {
+  query pattern callExpr where callee.path ~= "checked_sub.unwrap"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview224 {
+  query pattern callExpr where callee.path ~= "checked_mul.expect"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview225 {
+  query pattern callExpr where callee.path ~= "checked_mul.unwrap"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview226 {
+  query pattern callExpr where callee.path ~= "checked_div.expect"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview227 {
+  query pattern callExpr where callee.path ~= "checked_div.unwrap"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview228 {
+  query pattern callExpr where callee.path ~= "checked_rem.expect"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview229 {
+  query pattern callExpr where callee.path ~= "checked_rem.unwrap"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview230 {
+  query pattern callExpr where callee.path ~= "checked_neg.expect"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview231 {
+  query pattern callExpr where callee.path ~= "checked_neg.unwrap"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview232 {
+  query pattern callExpr where callee.path ~= "checked_pow.expect"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview233 {
+  query pattern callExpr where callee.path ~= "checked_pow.unwrap"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview234 {
+  query pattern callExpr where callee.path ~= "checked_shl.expect"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview235 {
+  query pattern callExpr where callee.path ~= "checked_shl.unwrap"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview236 {
+  query pattern callExpr where callee.path ~= "checked_shr.expect"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding reachableAssertionReview237 {
+  query pattern callExpr where callee.path ~= "checked_shr.unwrap"
+  emit issue code.ReachableAssertionReview at call
+}
+
+binding insecureTempFile300 {
+  query pattern callExpr where callee.path ~= "UnixListener.bind" and containsAny(args.any.literal, ["/tmp/", "/var/tmp/", "/dev/shm/"])
+  emit issue code.InsecureTempFile at call
+}
+
+binding insecureTempFile301 {
+  query pattern callExpr where callee.path ~= "UnixStream.connect" and containsAny(args.any.literal, ["/tmp/", "/var/tmp/", "/dev/shm/"])
+  emit issue code.InsecureTempFile at call
+}
+
+binding insecureTempFile302 {
+  query pattern callExpr where callee.path ~= "UnixDatagram.bind" and containsAny(args.any.literal, ["/tmp/", "/var/tmp/", "/dev/shm/"])
+  emit issue code.InsecureTempFile at call
+}

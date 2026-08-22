@@ -1,0 +1,11 @@
+module code;
+
+concept ResultStageAccessDecision : issue {
+  cwe: [CWE_284, CWE_863]
+  reviewAssumption: "the hook guards a request whose page or controller handler performs state-changing work before its result is produced"
+  reviewCategory: auth
+  reviewCondition: "an access decision is issued from a result-stage filter hook, so the handler it intends to gate has already executed by the time the decision runs"
+  reviewConfidence: medium
+  reviewEvidence: "access decision context {pattern} replaces the action result inside a result-stage filter hook"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

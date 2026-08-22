@@ -1,0 +1,39 @@
+module bindings.go.ssh_offered_key_connection_state;
+
+// `PublicKeyHandler` is the public-key half of an SSH server's authentication:
+// the library declares it as `func(ctx Context, key PublicKey) bool` and calls
+// it from inside gossh's `PublicKeyCallback`, which runs for every key a
+// client *offers*, with the signature verified only afterwards by the
+// transport. Returning true does not authenticate the connection. The `key`
+// parameter is therefore a claim, not a credential: a client that offers a
+// victim's public key and then cannot sign with it still reaches this callback
+// with that key.
+//
+// `Context` is the same object on both sides of that gap -- the package
+// documents it as "used in authentication handlers and callbacks" and its
+// underlying context as the one the session handler reads, and `SetValue` is
+// its write. A value a public-key callback derives from the offered key and
+// commits there survives the failed attempt and is still present when a later
+// key does authenticate, so the session inherits state established by a key
+// that never proved anything (CWE-287).
+//
+// The two bindings are deliberately independent: the source labels every
+// `ssh.PublicKey`-typed parameter (the substring also covers the common
+// `gossh.PublicKey` spelling), because the offered key reaches helpers by
+// ordinary argument passing and the callback itself is not distinguishable
+// from the helpers it calls; the sink labels the value argument of a
+// `Context.SetValue`. Whether a derivation from the claim reached the
+// connection store is the taint engine's question, and it is the right one --
+// the same library documents storing the key's *fingerprint* in
+// `Context.Permissions().Extensions` as the sanctioned pattern, which is a
+// derivation from the offered key that commits to the same context and is
+// exactly what the post-authentication middleware compares against.
+binding sshOfferedPublicKeySource {
+  query pattern presenceNode where node.context.paramType contains "ssh.PublicKey"
+  emit source code.UnverifiedCredential at node
+}
+
+binding sshContextSetValueSink {
+  query pattern callExpr where callee.method == "SetValue" and callee.receiver.type == "ssh.Context"
+  emit sink code.ConnectionStateWrite at args[1]
+}

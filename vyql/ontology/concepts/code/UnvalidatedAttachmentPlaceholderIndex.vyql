@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedAttachmentPlaceholderIndex : issue {
+  cwe: [CWE_1287, CWE_129, CWE_20]
+  reviewAssumption: "the placeholder marker and its index travel inside the decoded packet payload, so the index can be a string, negative, or beyond the attachment list"
+  reviewCategory: input_validation
+  reviewCondition: "a packet reconstructor substitutes placeholder markers by indexing the attachment list with the decoded index field, without validating that the field is an in-range number"
+  reviewConfidence: high
+  reviewEvidence: "reconstructor context {pattern} reads the placeholder marker and subscripts the attachment list with the decoded index field, with no numeric type or bounds comparison on that field"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

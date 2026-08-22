@@ -1,0 +1,65 @@
+module bindings.java.xstream_type_permissions;
+
+// XStream turns XML into live Java objects by instantiating whatever classes
+// the document names, so whoever chooses the document chooses the code that
+// runs: the library's own security documentation is built on restricting that
+// class set before anything is read. The restriction API is instance-scoped
+// and documented on XStream itself -- addPermission/allowTypes*/
+// denyTypes*/denyPermission, plus the static setupDefaultSecurity -- and it is
+// configured on the instance wherever that instance is built, which in real
+// code is a factory method, a static initializer or a field initializer of the
+// consuming class, not necessarily the method that deserializes. So the unit
+// that either owns the obligation or has discharged it is the class: a class
+// that deserializes through XStream while none of its members configures a
+// type permission hands every document it is given to unrestricted class
+// instantiation.
+//
+// fromXML is XStream's own name for the read and belongs to no other Java API;
+// unmarshal is shared with JAXB, so that arm requires a second XStream-typed
+// token in the same class -- the constructor, a subclass constructor or an
+// accessor whose name carries XStream -- to fire. The negation is over the
+// class's collected member call tokens, so a permission configured in any
+// member of the class declines the issue, and a permission configured in a
+// sibling class or a nested class of its own does not: per-class is the
+// smallest scope that carries both facts, the same residual shape the class-
+// scoped JMatIO binding documents. The class context keeps the first 512
+// member tokens, so a permission call late in a very large class can fall
+// outside it; that is the false-positive direction of a documented cap.
+//
+// Whether a configured set actually bounds the classes an attacker cares
+// about is the rule's question, not this binding's: deny-only configuration
+// still leaves every unnamed type open, and the check below reports the
+// documented configuration calls without judging them.
+
+binding unrestrictedClassDeserialization990 {
+  query pattern presenceNode where node.scope == "class" and node.context.call in ["fromXML"] and not (node.context.call in ["addPermission", "allowTypes", "allowTypesByWildcard", "allowTypesByRegExp", "denyPermission", "denyTypes", "denyTypesByRegExp", "denyTypesByWildcard", "setupDefaultSecurity"])
+  emit issue code.UnrestrictedClassDeserialization at node
+}
+
+binding unrestrictedClassDeserialization991 {
+  query pattern presenceNode where node.scope == "class" and node.context.call in ["unmarshal"] and containsAny(node.context.call, ["XStream"]) and not (node.context.call in ["addPermission", "allowTypes", "allowTypesByWildcard", "allowTypesByRegExp", "denyPermission", "denyTypes", "denyTypesByRegExp", "denyTypesByWildcard", "setupDefaultSecurity"])
+  emit issue code.UnrestrictedClassDeserialization at node
+}
+
+binding deserialization992 {
+  query pattern callExpr where callee.method == "fromXML"
+  emit sink code.Deserialization at args[0]
+}
+
+// The type-permission configuration calls are the documented way to bound the
+// class set an XStream instance may instantiate, so they neutralise a
+// deserialization sink the configured instance reads. The configuration runs
+// on the instance rather than being passed to the read, so the check covers
+// the endpoint of the scope it runs in, the same shape the object-input
+// filter hooks use; a raw ObjectInputStream read in the same function would
+// be covered with it, the residual of an instance-scoped control expressed as
+// a scope-scoped check.
+
+binding safeDeserialization993 {
+  query pattern callExpr where callee.method in ["addPermission", "allowTypes", "allowTypesByWildcard", "allowTypesByRegExp", "denyPermission", "denyTypes", "denyTypesByRegExp", "denyTypesByWildcard", "setupDefaultSecurity"]
+  emit check core.SafeDeserialization at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

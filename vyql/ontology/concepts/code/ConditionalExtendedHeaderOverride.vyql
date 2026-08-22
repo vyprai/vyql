@@ -1,0 +1,11 @@
+module code;
+
+concept ConditionalExtendedHeaderOverride : issue {
+  cwe: [CWE_436, CWE_20]
+  reviewAssumption: "another implementation of the same archive format applies the extended header's size record unconditionally, so the same archive frames an entry differently for each reader and one of them can be made to stop an entry where the other keeps reading"
+  reviewCategory: input_validation
+  reviewCondition: "an archive parser consults an extended-header size record for an entry but applies the value only when the base header's size field compares equal to zero, where the format's precedence makes the override unconditional"
+  reviewConfidence: medium
+  reviewEvidence: "archive parsing context {pattern} reads an entry size from the base header, zero-compares it, and only then assigns the extended-header size value"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

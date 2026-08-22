@@ -1,0 +1,8 @@
+module code;
+
+review code.JenkinsRootDirFileNameTraversal {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review Jenkins controller-root file joins for a path-separator check on the name component"
+}

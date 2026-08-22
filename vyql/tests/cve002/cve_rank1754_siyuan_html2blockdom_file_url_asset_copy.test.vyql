@@ -1,0 +1,355 @@
+# Rank 1754 / CVE-2026-32938 (GHSA-fq2j-j8hc-8vw8): SiYuan's desktop
+# POST /api/lute/html2BlockDOM took pasted HTML, walked the parsed tree's
+# link destinations, turned each `file://` link into an absolute local path
+# and copied that file into the workspace assets directory with
+# filelock.Copy -- after only strings.TrimPrefix("file://"), url.PathUnescape,
+# filepath.IsAbs and an existence check, none of which constrains *which*
+# local file is named. The route carried model.CheckAuth alone, and the
+# publish read-only role is unrestricted, so a publish-service visitor could
+# submit markup referencing /etc/passwd or ~/.ssh/id_rsa, read the returned
+# data-href="assets/<id>" and fetch the copy back over GET /assets/*path
+# (CWE-22, arbitrary file read by copy). The pool row named fe4523ff, the
+# v3.6.1 release bump (a one-line go-humanize import in
+# kernel/util/working.go); the fixing change is 294b8b42, the only commit in the
+# v3.6.0..v3.6.1 range whose message names this advisory. It adds
+# `if util.IsSensitivePath(localPath) { return ast.WalkContinue }` ahead of
+# the copy, registers the route with model.CheckAdminRole and
+# model.CheckReadonly as well, and dedupes a repeated "/etc" entry in
+# IsSensitivePath's own prefix list. Remediation confirmed present at the
+# fix and the unguarded copy at its parent.
+#
+# ATTENTION. Bounded --cache off scans of kernel/ at both revisions, three
+# runs per side, are byte-identical: 60 findings, 19 at or above high, the
+# same fingerprint multiset (md5 a9732fcd729e4e58b25b9d3c022c10cf) on all
+# six runs. The one finding in api/lute.go at either revision is a
+# VYQL-CRY-006 secret-comparison row on an unrelated `!=` at line 166.
+#
+# The taint route dies three constructs deep, and no one of them is the
+# whole story:
+#
+# 1. util.JsonArg (kernel/util/net.go:205) is the project's JSON-body helper
+#    and declares named results exited by bare `return`. The Go frontend's
+#    ReturnStmt case (internal/extract/frontend/golang/golang.go:1600)
+#    emits nir.Return{} with no value when len(st.Results) == 0, so the
+#    BindJSON-filled map never flows to the result and the caller's `arg`
+#    is clean. Minimal pair below: the identical helper spelling its result
+#    out (`return arg`) reports VYQL-PATH-001, the named-result bare-return
+#    form does not.
+# 2. arg["dom"].(string): *ast.TypeAssertExpr is absent from c.expr's switch
+#    (golang.go:1741) and falls to the nir.Const{} default, so the map
+#    subscript's taint is dropped at the assertion. Minimal pair below: the
+#    same body over a map[string]string reports, over a
+#    map[string]interface{} read through .(string) it does not.
+# 3. Even with both fixed, the payload only exists as an attribute of a node
+#    reached through a walk callback: model.HTML2Tree(dom) -> tree.Root ->
+#    ast.Walk(tree.Root, func(n *ast.Node, ...)) -> n.TokensStr(). The
+#    FuncLit is hoisted as a synthetic anonymous FuncDef (golang.go:1762)
+#    and its parameter `n` is an entry fact with no relation to the walked
+#    structure, so no def-use chain connects `dom` to `localPath`. That is
+#    the primary blocker and it is a modelling decision, not a localized
+#    correction.
+#
+# The presence route labels the shape but cannot discriminate. A throwaway
+# function-scope binding on (strings.TrimPrefix + filelock.Copy) fires at
+# api/lute.go:146 -- the hoisted closure carries its own function context,
+# so the walk body is reachable -- and at nine sibling functions in
+# kernel/model (assets.go, import.go, mount.go, history.go, export.go,
+# attribute_view.go), all identical across revisions. Adding
+# `not (callPath contains "IsSensitivePath")` gives 10 -> 9 across the fixed revision,
+# but renaming util.IsSensitivePath to util.HasGuardedPath in the patched
+# file alone brings it back to 10: it detects this application's spelling
+# of the check, not the weakness. IsSensitivePath is the project's own
+# helper (present unpatched at five other call sites), so no
+# API-documented control remains inside the guarded function and the 1380
+# counterweight does not apply; the CheckAdminRole/CheckReadonly half of
+# the change is route wiring, the 1514/1535/1540/1556/1557/1593 family. A
+# filelock.Copy -> code.FilePathAccess sink binding measures inert on this
+# tree (0 findings with and without it over kernel/api) and filelock.Copy
+# occurs in no other clone, so there is no sink to ship either.
+#
+# This spec pins all four directions. Both handler forms assert reject
+# VYQL-PATH-001: nothing can report them today, and when the
+# walk-callback relation lands the vulnerable form must flip to expect
+# while the guarded form stays reject. The two minimal pairs isolate the
+# lowering gaps in front of it: the reporting member of each pair must
+# keep firing, and when the named-result return and the type assertion are
+# lowered, the silent members must flip to expect too.
+
+test "rank1754: html2BlockDOM copies a file:// link target from pasted HTML into the assets directory"
+  lang go
+  file siyuan/lute_vuln.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package api
+
+  import (
+  	"net/url"
+  	"path/filepath"
+  	"strings"
+
+  	"github.com/88250/filelock"
+  	"github.com/88250/gulu"
+  	"github.com/gin-gonic/gin"
+  	"github.com/siyuan-note/siyuan/kernel/model"
+  	"github.com/siyuan-note/siyuan/kernel/treenode"
+  	"github.com/siyuan-note/siyuan/kernel/util"
+  	"github.com/yuin/goldmark/ast"
+  )
+
+  type Result struct {
+  	Code int
+  	Msg  string
+  }
+
+  func html2BlockDOM(c *gin.Context) {
+  	ret := &Result{}
+  	arg, ok := util.JsonArg(c, ret)
+  	if !ok {
+  		return
+  	}
+
+  	dom := arg["dom"].(string)
+  	luteEngine := util.NewLute()
+  	tree, _ := model.HTML2Tree(dom, luteEngine)
+  	if tree == nil {
+  		return
+  	}
+
+  	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+  		if !entering || ast.NodeLinkDest != n.Type {
+  			return ast.WalkContinue
+  		}
+  		if "" == n.TokensStr() {
+  			return ast.WalkContinue
+  		}
+
+  		localPath := n.TokensStr()
+  		if strings.HasPrefix(localPath, "http") {
+  			return ast.WalkContinue
+  		}
+
+  		localPath = strings.TrimPrefix(localPath, "file://")
+  		if gulu.OS.IsWindows() {
+  			localPath = strings.TrimPrefix(localPath, "/")
+  		}
+
+  		unescaped, _ := url.PathUnescape(localPath)
+  		if unescaped != localPath {
+  			localPath = unescaped
+  		}
+
+  		if !filepath.IsAbs(localPath) {
+  			return ast.WalkContinue
+  		}
+  		if !gulu.File.IsExist(localPath) {
+  			return ast.WalkContinue
+  		}
+
+  		name := filepath.Base(localPath)
+  		ext := filepath.Ext(name)
+  		name = name[0 : len(name)-len(ext)]
+  		name = name + "-" + treenode.NewNodeID() + ext
+  		targetPath := filepath.Join(util.DataDir, "assets", name)
+  		if err := filelock.Copy(localPath, targetPath); err != nil {
+  			return ast.WalkStop
+  		}
+  		n.Tokens = gulu.Str.ToBytes("assets/" + name)
+  		return ast.WalkContinue
+  	})
+  }
+  ```
+
+test "rank1754: the fixed revision refuses the copy when the local path is sensitive"
+  lang go
+  file siyuan/lute_fixed.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package api
+
+  import (
+  	"net/url"
+  	"path/filepath"
+  	"strings"
+
+  	"github.com/88250/filelock"
+  	"github.com/88250/gulu"
+  	"github.com/gin-gonic/gin"
+  	"github.com/siyuan-note/siyuan/kernel/logging"
+  	"github.com/siyuan-note/siyuan/kernel/model"
+  	"github.com/siyuan-note/siyuan/kernel/treenode"
+  	"github.com/siyuan-note/siyuan/kernel/util"
+  	"github.com/yuin/goldmark/ast"
+  )
+
+  type Result struct {
+  	Code int
+  	Msg  string
+  }
+
+  func html2BlockDOM(c *gin.Context) {
+  	ret := &Result{}
+  	arg, ok := util.JsonArg(c, ret)
+  	if !ok {
+  		return
+  	}
+
+  	dom := arg["dom"].(string)
+  	luteEngine := util.NewLute()
+  	tree, _ := model.HTML2Tree(dom, luteEngine)
+  	if tree == nil {
+  		return
+  	}
+
+  	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+  		if !entering || ast.NodeLinkDest != n.Type {
+  			return ast.WalkContinue
+  		}
+  		if "" == n.TokensStr() {
+  			return ast.WalkContinue
+  		}
+
+  		localPath := n.TokensStr()
+  		if strings.HasPrefix(localPath, "http") {
+  			return ast.WalkContinue
+  		}
+
+  		localPath = strings.TrimPrefix(localPath, "file://")
+  		if gulu.OS.IsWindows() {
+  			localPath = strings.TrimPrefix(localPath, "/")
+  		}
+
+  		unescaped, _ := url.PathUnescape(localPath)
+  		if unescaped != localPath {
+  			localPath = unescaped
+  		}
+
+  		if !filepath.IsAbs(localPath) {
+  			return ast.WalkContinue
+  		}
+  		if !gulu.File.IsExist(localPath) {
+  			return ast.WalkContinue
+  		}
+
+  		if util.IsSensitivePath(localPath) {
+  			logging.LogWarnf("skip copying asset [%s] due to sensitive path", localPath)
+  			return ast.WalkContinue
+  		}
+
+  		name := filepath.Base(localPath)
+  		ext := filepath.Ext(name)
+  		name = name[0 : len(name)-len(ext)]
+  		name = name + "-" + treenode.NewNodeID() + ext
+  		targetPath := filepath.Join(util.DataDir, "assets", name)
+  		if err := filelock.Copy(localPath, targetPath); err != nil {
+  			return ast.WalkStop
+  		}
+  		n.Tokens = gulu.Str.ToBytes("assets/" + name)
+  		return ast.WalkContinue
+  	})
+  }
+  ```
+
+test "rank1754: a body-binding helper that spells its result out reaches the caller's subscript"
+  lang go
+  file siyuan/pair_named_return_reports.go
+  expect VYQL-PATH-001
+  code
+  ```
+  package api
+
+  import (
+  	"os"
+
+  	"github.com/gin-gonic/gin"
+  )
+
+  func getArgExplicit(c *gin.Context) map[string]string {
+  	arg := map[string]string{}
+  	if err := c.BindJSON(&arg); err != nil {
+  		return nil
+  	}
+  	return arg
+  }
+
+  func handlerExplicit(c *gin.Context) {
+  	arg := getArgExplicit(c)
+  	os.ReadFile(arg["path"])
+  }
+  ```
+
+test "rank1754: the identical helper with named results and bare returns loses the filled map"
+  lang go
+  file siyuan/pair_named_return_silent.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package api
+
+  import (
+  	"os"
+
+  	"github.com/gin-gonic/gin"
+  )
+
+  func getArgNamed(c *gin.Context) (arg map[string]string, ok bool) {
+  	arg = map[string]string{}
+  	if err := c.BindJSON(&arg); err != nil {
+  		return
+  	}
+  	ok = true
+  	return
+  }
+
+  func handlerNamed(c *gin.Context) {
+  	arg, _ := getArgNamed(c)
+  	os.ReadFile(arg["path"])
+  }
+  ```
+
+test "rank1754: a subscript on a typed map carries the bound body"
+  lang go
+  file siyuan/pair_type_assert_reports.go
+  expect VYQL-PATH-001
+  code
+  ```
+  package api
+
+  import (
+  	"os"
+
+  	"github.com/gin-gonic/gin"
+  )
+
+  func handlerTypedMap(c *gin.Context) {
+  	m := map[string]string{}
+  	if err := c.BindJSON(&m); err != nil {
+  		return
+  	}
+  	os.ReadFile(m["path"])
+  }
+  ```
+
+test "rank1754: the identical body reading through a type assertion loses the taint"
+  lang go
+  file siyuan/pair_type_assert_silent.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package api
+
+  import (
+  	"os"
+
+  	"github.com/gin-gonic/gin"
+  )
+
+  func handlerInterfaceMap(c *gin.Context) {
+  	arg := map[string]interface{}{}
+  	if err := c.BindJSON(&arg); err != nil {
+  		return
+  	}
+  	os.ReadFile(arg["path"].(string))
+  }
+  ```

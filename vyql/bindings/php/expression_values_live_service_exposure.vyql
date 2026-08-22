@@ -1,0 +1,48 @@
+module bindings.php.expression_values_live_service_exposure;
+
+// Symfony's ExpressionLanguage — and every evaluator that shares its shape —
+// runs the expression text over a values map the caller supplies, and the
+// component's documentation is explicit that the expression may call any
+// public method on every object in that map: the values map is the
+// evaluator's security boundary. Sulu's route generator passed its shared
+// translator service straight through, so a route schema expression could
+// call `translator.addResource('php', $path)` — the translator's documented
+// resource registration, whose `php` loader includes the file — and turn a
+// URL pattern into arbitrary file inclusion. The remediation passes a
+// purpose-built facade whose only members are the calls the expression
+// needs; the same hardening is the advisory's own workaround for users who
+// cannot upgrade.
+//
+// The binding states the API fact rather than the incident: an evaluator
+// call whose values argument is an array literal binding an entry to a
+// property of the enclosing object — `['name' => $this->service]` — exposes
+// that service's whole public API to expression text. A value computed for
+// the evaluation does not carry the `=>$this->` spelling, because the
+// property sits inside the expression that computes the value (a facade
+// constructor, a factory call) rather than directly after the `=>`; a local
+// variable carries no `$this->` at all. That is the same incomplete template
+// validation already reported when a renderer runs untrusted templates with
+// no sandbox at all.
+//
+// `node.context.call == "evaluate"` is exact-token and function-confined in
+// PHP class methods, and it is what keeps the flag off sibling methods of a
+// class whose one method builds the exposure; the `callArg` needles then
+// read the compacted argument text of that function's calls. Both the
+// bracketed and the legacy `array(...)` spellings of the values map are
+// matched. Residuals, both directions stated rather than hidden: the
+// `=>$this->` witness may come from any call argument of the same function,
+// so a function that evaluates over a values map while also passing a
+// service property inside another call's array is reported once for the
+// pair; and a values map built into a variable or merged from another array
+// (`array_merge($context, [...])`) carries no `=>$this->` of its own and is
+// not reported, while a facade reached through a factory call
+// (`['t' => $this->buildFacade()]`) still spells `=>$this->` and is — the
+// value is computed from the service, and the review is where that settles.
+binding expressionValuesLiveServiceExposure {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "php"
+    and node.context.call == "evaluate"
+    and containsAny(node.context.callArg, ["evaluate:['", "evaluate:array("])
+    and node.context.callArg contains "=>$this->"
+  emit issue code.IncompleteTemplateValidation at node
+}

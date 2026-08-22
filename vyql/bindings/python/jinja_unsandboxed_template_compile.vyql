@@ -11,12 +11,13 @@ module bindings.python.jinja_unsandboxed_template_compile;
 // the right-hand side's text with its quotes, so a literal argument reads
 // as =Template(" while a dynamic one does not.
 //
-// Three forms stay out of reach and are not covered: an Environment-based
-// compile (env.from_string(source)) leaves the receiver unresolved, so it
-// is indistinguishable from SandboxedEnvironment().from_string(source);
-// a concatenation that begins with a literal ("Hello " + name) reads as
-// the literal form and does not report; and a compile at module scope
-// (script-style code) sits outside the function scope this binds to.
+// Two further forms stay out of this binding's reach: a concatenation that
+// begins with a literal ("Hello " + name) reads as the literal form and
+// does not report, and a compile at module scope (script-style code) sits
+// outside the function scope this binds to. The Environment-based compile
+// (env.from_string(source)) also leaves the receiver unresolved inside any
+// one function, so the bindings below read that shape at module scope
+// instead.
 //
 // The scopeCall clause matches the resolved call path, so a from-import of
 // jinja2's Template is recognised however the file spells the import, and
@@ -24,5 +25,48 @@ module bindings.python.jinja_unsandboxed_template_compile;
 
 binding unsandboxedJinjaTemplateCompile {
   query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.scopeCall, ["jinja2.Template"]) and not (containsAny(node.context.assign, ["=Template(\"", "=Template('", "=jinja2.Template(\"", "=jinja2.Template('"]))
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+// The same documented boundary in the Environment spelling: a file that
+// constructs jinja2's default Environment and compiles a template through
+// from_string is rendering a source the program did not write in the
+// environment jinja2's sandboxing documentation names as requiring
+// jinja2.sandbox.SandboxedEnvironment for exactly that case. The compile is
+// read at module scope because the common layout splits the two: a factory
+// function returns jinja2.Environment(...) and sibling render helpers call
+// env.from_string(source), so no function context carries both and the
+// compile site's receiver never resolves -- the residual the function-scoped
+// binding above documents. The call_path tokens are AST-derived, so the
+// sandbox negation holds both ways regardless of the spelling of the import
+// or of ImmutableSandboxedEnvironment (the needle is a substring of both),
+// and a commented-out environment construction cannot satisfy either side.
+// The compile callee is matched on its exact last segment (in, not contains)
+// so an unrelated callee merely ending in from_string -- strutils
+// bool_from_string, SpeculativeAlgorithm.from_string -- does not read as a
+// template compile. A from_string call whose argument is a string literal
+// is the quickstart form -- the program wrote that template -- and the
+// assign token keeps the right-hand side's text with its quotes, so
+// from_string:" recognises it the same way the function-scoped binding
+// above reads =Template("; a concatenation that begins with a literal
+// reads as the literal form too, the residual that binding already
+// documents, and an unassigned literal compile (env.from_string("...").
+// render(...)) stays out of reach. All are false-negative direction only.
+// A module context carries at most 512 structured tokens, so a file whose
+// environment construction or compile sits deep in a long file is past the
+// cap and does not report.
+binding unsandboxedJinjaEnvironmentCompile {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "python" and containsAny(node.context.callPath, ["jinja2.Environment"]) and node.context.call in ["from_string"] and not (containsAny(node.context.callPath, ["SandboxedEnvironment"])) and not (containsAny(node.context.assign, ["from_string(\"", "from_string('"]))
+  emit issue code.IncompleteTemplateValidation at node
+}
+
+// The same shape in jinja2's canonical from-import spelling, which the
+// quickstart itself uses: `from jinja2 import Environment` then
+// Environment(...). The construction is matched on the exact last segment so
+// neither SandboxedEnvironment nor ImmutableSandboxedEnvironment counts as
+// the unsandboxed class, and the sandbox negation again covers every import
+// spelling of it.
+binding unsandboxedJinjaEnvironmentImportCompile {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "python" and node.context.call in ["Environment"] and node.context.call in ["from_string"] and not (containsAny(node.context.callPath, ["SandboxedEnvironment"])) and not (containsAny(node.context.assign, ["from_string(\"", "from_string('"]))
   emit issue code.IncompleteTemplateValidation at node
 }

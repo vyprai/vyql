@@ -1,0 +1,115 @@
+# Rank 1719 / CVE-2020-2279: the Jenkins script-security plugin runs untrusted
+# Groovy through the org.kohsuke:groovy-sandbox library, whose InvokerChain built
+# its interceptor chain from a per-thread registry with no emptiness check, so
+# sandbox-transformed code that ran on a thread without a registered interceptor
+# took the unmediated fallback in every Checker.checked* branch and escaped the
+# sandbox entirely (a script class overriding toString, returned to unsandboxed
+# code). The plugin's own tree holds no vulnerable statement — the library
+# coordinate is the whole evidence, so the pinned release is what the scan has to
+# read. The fixed revision pins groovy-sandbox 1.27, whose InvokerChain substitutes a
+# rejecting interceptor when the registry is empty.
+
+test "rank1719: a groovy-sandbox pin below the fixed release is reported"
+  lang java
+  expect VYQL-SCA-001
+  file src/main/java/org/jenkinsci/plugins/scriptsecurity/sandbox/groovy/GroovySandbox.java
+  code
+  ```
+  package org.jenkinsci.plugins.scriptsecurity.sandbox.groovy;
+
+  public class GroovySandbox {
+      public static void enter() {
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.jenkins-ci.plugins</groupId>
+    <artifactId>script-security</artifactId>
+    <version>1.74</version>
+    <dependencies>
+      <dependency>
+        <groupId>org.kohsuke</groupId>
+        <artifactId>groovy-sandbox</artifactId>
+        <version>1.26</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+
+test "rank1719: the same coordinate at the fixed release is clean"
+  lang java
+  reject VYQL-SCA-001
+  file src/main/java/org/jenkinsci/plugins/scriptsecurity/sandbox/groovy/GroovySandbox.java
+  code
+  ```
+  package org.jenkinsci.plugins.scriptsecurity.sandbox.groovy;
+
+  public class GroovySandbox {
+      public static void enter() {
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.jenkins-ci.plugins</groupId>
+    <artifactId>script-security</artifactId>
+    <version>1.75</version>
+    <dependencies>
+      <dependency>
+        <groupId>org.kohsuke</groupId>
+        <artifactId>groovy-sandbox</artifactId>
+        <version>1.27</version>
+        <exclusions>
+          <exclusion>
+            <groupId>org.codehaus.groovy</groupId>
+            <artifactId>groovy</artifactId>
+          </exclusion>
+        </exclusions>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+
+test "rank1719: a different artifact at the old release is clean"
+  lang java
+  reject VYQL-SCA-001
+  file src/main/java/org/jenkinsci/plugins/scriptsecurity/sandbox/groovy/GroovySandbox.java
+  code
+  ```
+  package org.jenkinsci.plugins.scriptsecurity.sandbox.groovy;
+
+  public class GroovySandbox {
+      public static void enter() {
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>org.jenkins-ci.plugins</groupId>
+    <artifactId>script-security</artifactId>
+    <version>1.74</version>
+    <dependencies>
+      <dependency>
+        <groupId>com.github.ben-manes.caffeine</groupId>
+        <artifactId>caffeine</artifactId>
+        <version>2.8.2</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```

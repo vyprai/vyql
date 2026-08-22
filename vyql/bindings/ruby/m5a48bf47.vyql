@@ -1496,3 +1496,40 @@ binding logEscape342 {
     }
   }
 }
+
+binding requestViewVariableHtmlEscapeMissing380 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "ruby"
+    and node.context.assign startsWith "@"
+    and node.context.assign contains "=params["
+    and node.context.call == "erb"
+    and not (node.context.call in ["h", "html_escape", "escape_html", "escapeHTML", "sanitize"])
+  emit issue code.RequestViewVariableHtmlEscapeMissing at node
+}
+
+binding requestViewVariableHtmlEscapeMissing1601 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "ruby" and node.context.assign contains "=params" and node.context.call == "erb"
+  emit issue code.RequestViewVariableHtmlEscapeMissing at node
+}
+
+// A regex literal the ambiguity analysis flags (lowered as a `__regex.match`
+// call), hoisted into a class- or module-level constant and applied to input
+// through Regexp#match / Regexp#match? on the receiver. The taint route stops at
+// the call -- the input flows into the application, never back into the literal
+// the sink labels -- so judge the application where both facts live: the body
+// that declares the constant and calls it. URI::MailTo::EMAIL_REGEXP-style
+// references carry no literal and no `__regex.match` synthesis, so the bounded
+// spelling stays clean.
+binding catastrophicRegex1701 {
+  query pattern presenceNode where node.scope == "class" and node.context.language == "ruby" and (node.context.callPath contains "__regex.match") and containsAny(node.context.callPath, [".match"])
+  emit issue code.CatastrophicRegex at node
+}
+
+binding catastrophicRegex1703 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "ruby" and (node.context.callPath contains "__regex.match") and containsAny(node.context.callPath, [".match"])
+  emit issue code.CatastrophicRegex at node
+}
+
+binding sqlExecution1701 {
+  query pattern callExpr where callee.method == "searchlogic"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,235 @@
+# free5GC's SMF mounted its User Plane Information route group without the
+# authorization middleware the same router installs for every other service
+# group, so a peer that can reach the SBI address reads and rewrites the
+# user-plane topology with no Authorization header at all (missing
+# function-level access control, CWE-306/862). newRouter
+# (internal/sbi/server.go:68) did
+#
+#   upiGroup := router.Group(factory.UpiUriPrefix)
+#   upiRoutes := s.getUPIRoutes()
+#   applyRoutes(upiGroup, upiRoutes)
+#
+# with nothing between the Group and the applyRoutes, while the same
+# function's PDU-Session, Event-Exposure and OAM cases each construct a
+# util_oauth.NewRouterAuthorizationCheck and install it with a
+# group.Use(func(c *gin.Context) { check.Check(c, smf_context.GetSelf()) })
+# before their routes apply. api_upi.go mounts four handlers on that group --
+# a status index, GetUpNodesLinks, PostUpNodesLinks and DeleteUpNodeLink over
+# /upi/v1/upNodesLinks -- so the exposed operation set is the whole user-plane
+# configuration, including the two state-changing ones. Fix commit e23ce97
+# (merge of PR #197, "fix: add authorization check for UPI routes in
+# newRouter function", +4 lines) installs the same middleware on upiGroup for
+# ServiceName_NSMF_OAM. The SHA is the merge, the parent
+# 8385c00 is the fully vulnerable tree, and the remediation is present at
+# <fix> and absent at <fix>^.
+#
+# ATTENTION, route-authorization completeness. The third free5GC network
+# function with this exact newRouter shape -- 1427 is NEF, 1556 is PCF --
+# and the diagnosis is unchanged: the vulnerable code is the ABSENCE of a
+# middleware on one of five sibling groups, the expected pattern is visible
+# three times in the same function, and the defect is that one group skips
+# it. That is the per-resource decision-completeness family (1540, 1541,
+# 1556) at route registration, and the unit that needs the decision is the
+# route group, which is not a fact anywhere.
+#
+# router.Group(prefix) is an ordinary call returning a value, and
+# group.Use(h) / applyRoutes(group, routes) are ordinary calls on that value;
+# the only thing tying the three together is the receiver variable's name.
+# goAtomToken returns "" for any *ast.CallExpr except len(...), so
+# `upiGroup := router.Group(...)` emits no assign: token at all -- the root
+# defect 1420 and 1427 measured -- and no relation says which routes a
+# middleware protects. And the control itself is a func(c *gin.Context)
+# *ast.FuncLit, for which goFunctionTokens returns false, so the .Check call
+# contributes no fact to newRouter at either revision.
+#
+# Measured here, not inherited. Scanning the real tree reports 7 findings at
+# both revisions, identical over three --cache off runs each, none of them in
+# internal/sbi/server.go or api_upi.go; `vyql match` on server.go shows no
+# source, no sink and no control at either revision, and on api_upi.go shows
+# the HttpInput sources (ShouldBindJSON, c.Params.ByName) with no
+# authorization control to distinguish. Both counterweights fail:
+# 1380's documented-API call is (*gin.RouterGroup).Use, and a negation on it
+# gives 0/0 because router.Use(metrics.InboundMetrics()) and the three
+# sibling group installs carry it at both revisions. The receiver-qualified
+# form does discriminate -- a probe keyed on `not contains "upiGroup.Use"`
+# scores 1 at 8385c00 and 0 at e23ce97 -- but renaming the fixed revision's own locals
+# (upiGroup -> g, upiAuthCheck -> ac) with the middleware otherwise intact
+# brings it straight back to 1, so the whole delta is the fixing commit's
+# variable naming, the genericity failure 1427 recorded on NEF.
+#
+# The positive half is worse on this tree than 1427's chaos-mesh 12: a probe
+# over the Go function context matching any Group call with no
+# authorization-named call in the body reports four functions -- applyRoutes
+# (internal/sbi/routes.go:12, the mounting helper), findPSAandAllocUeIP
+# (sm_context.go:556) and GetUEPreConfigPaths / CheckUEHasPreConfig
+# (ue_datapath.go:83,109, where "Group" is a substring of
+# GetULCLGroupNameFromSUPI) -- and not newRouter itself, which the three
+# sibling checks suppress. Four false positives and zero true positives on
+# the repository that contains the bug. A group-completeness rule does not
+# separate the revisions either: smfCallbackGroup still mounts no
+# authorization middleware at the fixed revision, so "a group with no check"
+# is true of the patched tree too. Which groups need the decision is
+# application semantics, which is why a binding on free5gc's own
+# RouterAuthorizationCheck would detect this platform rather than the
+# weakness.
+#
+# No ENGINE-GAPS.md entry, as at 1427 and 1556: the piece is ontology design
+# (a route-group relation and route-authorization completeness), not a
+# localised construct in one function. No definition change shipped.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1760: the UPI group mounts its routes with no authorization middleware"
+  lang go
+  file internal/sbi/server.go
+  reject VYQL-AUTH-079
+  code
+  ```
+  package sbi
+
+  import (
+  	"github.com/gin-gonic/gin"
+
+  	"github.com/free5gc/openapi/models"
+  	smf_context "github.com/free5gc/smf/internal/context"
+  	"github.com/free5gc/smf/internal/sbi/processor"
+  	util_oauth "github.com/free5gc/smf/internal/util/oauth"
+  	"github.com/free5gc/smf/pkg/factory"
+  	logger_util "github.com/free5gc/util/logger"
+  )
+
+  func newRouter(s *Server) *gin.Engine {
+  	router := logger_util.NewGinWithLogrus(logger.GinLog)
+
+  	router.Use(metrics.InboundMetrics())
+  	smfCallbackGroup := router.Group(factory.SmfCallbackUriPrefix)
+  	smfCallbackRoutes := s.getCallbackRoutes()
+  	applyRoutes(smfCallbackGroup, smfCallbackRoutes)
+
+  	upiGroup := router.Group(factory.UpiUriPrefix)
+  	upiRoutes := s.getUPIRoutes()
+  	applyRoutes(upiGroup, upiRoutes)
+
+  	for _, serviceName := range factory.SmfConfig.Configuration.ServiceNameList {
+  		switch models.ServiceName(serviceName) {
+  		case models.ServiceName_NSMF_PDUSESSION:
+  			smfPDUSessionGroup := router.Group(factory.SmfPdusessionResUriPrefix)
+  			smfPDUSessionRoutes := s.getPDUSessionRoutes()
+  			routerAuthorizationCheck := util_oauth.NewRouterAuthorizationCheck(models.ServiceName_NSMF_PDUSESSION)
+  			smfPDUSessionGroup.Use(func(c *gin.Context) {
+  				routerAuthorizationCheck.Check(c, smf_context.GetSelf())
+  			})
+  			applyRoutes(smfPDUSessionGroup, smfPDUSessionRoutes)
+  		case models.ServiceName_NSMF_OAM:
+  			smfOAMGroup := router.Group(factory.SmfOamUriPrefix)
+  			smfOAMRoutes := s.getOAMRoutes()
+  			routerAuthorizationCheck := util_oauth.NewRouterAuthorizationCheck(models.ServiceName_NSMF_OAM)
+  			smfOAMGroup.Use(func(c *gin.Context) {
+  				routerAuthorizationCheck.Check(c, smf_context.GetSelf())
+  			})
+  			applyRoutes(smfOAMGroup, smfOAMRoutes)
+  		}
+  	}
+
+  	return router
+  }
+  ```
+
+test "rank1760: the fixed revision installs the check on the UPI group like its siblings"
+  lang go
+  file internal/sbi/server.go
+  reject VYQL-AUTH-079
+  code
+  ```
+  package sbi
+
+  import (
+  	"github.com/gin-gonic/gin"
+
+  	"github.com/free5gc/openapi/models"
+  	smf_context "github.com/free5gc/smf/internal/context"
+  	"github.com/free5gc/smf/internal/sbi/processor"
+  	util_oauth "github.com/free5gc/smf/internal/util/oauth"
+  	"github.com/free5gc/smf/pkg/factory"
+  	logger_util "github.com/free5gc/util/logger"
+  )
+
+  func newRouter(s *Server) *gin.Engine {
+  	router := logger_util.NewGinWithLogrus(logger.GinLog)
+
+  	router.Use(metrics.InboundMetrics())
+  	smfCallbackGroup := router.Group(factory.SmfCallbackUriPrefix)
+  	smfCallbackRoutes := s.getCallbackRoutes()
+  	applyRoutes(smfCallbackGroup, smfCallbackRoutes)
+
+  	upiGroup := router.Group(factory.UpiUriPrefix)
+  	upiAuthCheck := util_oauth.NewRouterAuthorizationCheck(models.ServiceName_NSMF_OAM)
+  	upiGroup.Use(func(c *gin.Context) {
+  		upiAuthCheck.Check(c, smf_context.GetSelf())
+  	})
+  	upiRoutes := s.getUPIRoutes()
+  	applyRoutes(upiGroup, upiRoutes)
+
+  	for _, serviceName := range factory.SmfConfig.Configuration.ServiceNameList {
+  		switch models.ServiceName(serviceName) {
+  		case models.ServiceName_NSMF_PDUSESSION:
+  			smfPDUSessionGroup := router.Group(factory.SmfPdusessionResUriPrefix)
+  			smfPDUSessionRoutes := s.getPDUSessionRoutes()
+  			routerAuthorizationCheck := util_oauth.NewRouterAuthorizationCheck(models.ServiceName_NSMF_PDUSESSION)
+  			smfPDUSessionGroup.Use(func(c *gin.Context) {
+  				routerAuthorizationCheck.Check(c, smf_context.GetSelf())
+  			})
+  			applyRoutes(smfPDUSessionGroup, smfPDUSessionRoutes)
+  		case models.ServiceName_NSMF_OAM:
+  			smfOAMGroup := router.Group(factory.SmfOamUriPrefix)
+  			smfOAMRoutes := s.getOAMRoutes()
+  			routerAuthorizationCheck := util_oauth.NewRouterAuthorizationCheck(models.ServiceName_NSMF_OAM)
+  			smfOAMGroup.Use(func(c *gin.Context) {
+  				routerAuthorizationCheck.Check(c, smf_context.GetSelf())
+  			})
+  			applyRoutes(smfOAMGroup, smfOAMRoutes)
+  		}
+  	}
+
+  	return router
+  }
+  ```
+
+test "rank1760: the middleware that performs the inbound token check"
+  lang go
+  file internal/util/oauth/router_auth_check.go
+  reject VYQL-AUTH-079
+  code
+  ```
+  package oauth
+
+  import (
+  	"net/http"
+
+  	smf_context "github.com/free5gc/smf/internal/context"
+  	"github.com/free5gc/smf/internal/logger"
+  	"github.com/free5gc/openapi/models"
+  	"github.com/gin-gonic/gin"
+  )
+
+  type RouterAuthorizationCheck struct {
+  	serviceName models.ServiceName
+  }
+
+  func NewRouterAuthorizationCheck(serviceName models.ServiceName) *RouterAuthorizationCheck {
+  	return &RouterAuthorizationCheck{serviceName: serviceName}
+  }
+
+  func (rac *RouterAuthorizationCheck) Check(c *gin.Context, smfContext smf_context.NFContext) {
+  	token := c.Request.Header.Get("Authorization")
+  	err := smfContext.AuthorizationCheck(token, rac.serviceName)
+  	if err != nil {
+  		logger.UtilLog.Debugf("RouterAuthorizationCheck: Check Unauthorized: %s", err.Error())
+  		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+  		c.Abort()
+  		return
+  	}
+
+  	logger.UtilLog.Debugf("RouterAuthorizationCheck: Check Authorized")
+  }
+  ```

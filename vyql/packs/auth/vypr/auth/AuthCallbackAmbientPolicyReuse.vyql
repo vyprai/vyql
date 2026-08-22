@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule AuthCallbackAmbientPolicyReuse {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_287, CWE_255]
+    id: "VYQL-AUTH-162"
+    severity: high
+  }
+  issue code.AuthCallbackAmbientPolicyReuse as callback
+}

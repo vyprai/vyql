@@ -1,0 +1,295 @@
+# Rank 1772 / CVE-2020-13957 (SOLR-14663, CWE-306):
+# apache/solr's ConfigSets API dispatches each action to an enum constant of
+# ConfigSetsHandler.ConfigSetOperation overriding `call` (an anonymous
+# class body per constant). The CREATE constant
+# (solr/core/src/java/org/apache/solr/handler/admin/ConfigSetsHandler.java:272
+# at the parent) reads the request-controlled `baseConfigSet` parameter and
+# returns props the overseer applies by copying that base configset into a
+# new one -- with no authentication anywhere in the body. The UPLOAD action
+# does authenticate: `getTrusted(req)` (the same file, :191) returns true only
+# when `authcPlugin != null && req.getUserPrincipal() != null`, and the
+# configset's trust flag decides whether its config may declare executable
+# components (RunExecutableListener et al). An unauthenticated CREATE from a
+# trusted base produced a configset that inherited nothing of the base's root
+# node (the `{"trusted": ...}` marker is never copied) and so landed with the
+# permissive default, handing an unauthenticated caller the trusted-configset
+# path to arbitrary component execution.
+#
+# e001c2221812a0ba9e9378855040ce72f93eced4 (SOLR-14663) fixes it inside the
+# same enum-constant body: CREATE_OP.call gains
+#
+#   if (!DISABLE_CREATE_AUTH_CHECKS &&
+#           !isTrusted(req, h.coreContainer.getAuthenticationPlugin()) &&
+#           isCurrentlyTrusted(h.coreContainer.getZkController().getZkClient(),
+#                              ZkConfigManager.CONFIGS_ZKNODE + "/" + baseConfigSetName)) {
+#     throw new SolrException(ErrorCode.UNAUTHORIZED, ...);
+#   }
+#
+# plus existence checks on the new and base names, and ZkConfigManager.copyConfigDir
+# now copies the base's root node data so the trust flag propagates. The
+# remediation is present at the commit and absent at its parent a50c10843, so
+# both halves of the 1390 check hold and the pool row is correct in every
+# field; no correction needed.
+#
+# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# over solr/core/src/java/org/apache/solr/handler/admin at both revisions,
+# three runs per side, reports byte-identical output: 8 findings and 34 flags
+# each (3 at or above high), and `scan -flags only` likewise identical. Not
+# one finding or flag lands in ConfigSetsHandler.java on either side -- the
+# subtree's rows are SolrInfoMBeanHandler/ZookeeperStatusHandler XSS and
+# resource noise. Findings in the file would not be coverage anyway; there are
+# none.
+#
+# The blocker is the Java anonymous-body extraction gap, in its enum-constant
+# form. jvConv.stmt (internal/extract/frontend/treesitter/java.go:138) handles
+# class/interface/enum/record declarations but has no case for `enum_constant`,
+# and c.decls feeds every named child of the enum body to that switch, whose
+# default returns nil -- so a constant-specific body, and every method it
+# declares, produces no FuncDef, no call nodes and no context tokens. The
+# sibling anonymous form is the same: jvConv.expr's `object_creation_expression`
+# case (java.go:1241) lowers the constructor and its arguments but ignores the
+# trailing `class_body` field. Measured with a probe file holding the identical
+# `req.getParameter("x")` call in an enum-constant body and in an ordinary
+# method of the same class: `vyql match` labels only the ordinary method
+# (code.HttpInput, java.input@syntactic), and `vyql graph` shows the enum
+# constant contributing zero nodes -- case (d) below pins this pair. This is
+# the gap ranks 1230 and 1260 filed for anonymous classes; the enum-constant
+# form reaches it without an `new` anywhere in sight.
+#
+# The 1380 counterweight cannot be exercised. The fixed revision does leave an
+# API-documented call inside the method it guards --
+# `h.coreContainer.getAuthenticationPlugin()` is inline in CREATE_OP.call --
+# but that method has no node, so no function-scoped binding can key on it.
+# Nor can a class-scope binding discriminate: `req.getUserPrincipal()` is
+# present in the named (extracted) code of BOTH revisions -- in `getTrusted`
+# at the parent, in the static `isTrusted` at the fixed revision -- so any text-level
+# negation over the class body fires identically before and after. The only
+# extracted code that differs between the revisions is the fixed revision's own new
+# symbols (`isTrusted`, `isCurrentlyTrusted`, the
+# `solr.disableConfigSetsCreateAuthChecks` property read), which a binding
+# must not key on. Both the weakness and its remediation live entirely inside
+# the unextracted construct: a double miss with no revision-discriminating
+# fact available in any layer.
+#
+# Not judged mechanical. Lowering enum-constant bodies would add facts to
+# every Java scan that has one: 119 sites across 11 of the 1347 files in
+# solr/core/src/java alone, 919 sites across 137 of the 98,997 Java files in
+# the rank clones under /tmp/cve-work/rank*/, plus the anonymous-class form in
+# 169 solr-core files. New FuncDefs mean new function contexts that existing
+# presence bindings start matching inside, so the change moves findings on
+# trees that have nothing to do with this weakness -- a scan-wide behavior
+# change, not a confined correction to a known construct. Unsure = not
+# mechanical.
+#
+# The four cases: (a) and (b) are the two real revisions and record the double
+# miss; (c) is the same vulnerable body as (a) written as a named method,
+# holding the fact that even the extracted form fires nothing today -- marking
+# a config-mutating admin action as requiring an authenticated principal is a
+# vocabulary decision that cannot be made keying on this fix's layout, and is
+# only worth making once the body is visible at all; (d) is the frontend pair
+# isolating the construct, using a servlet request read that an existing
+# binding labels (java.input@syntactic on getParameter) so the asymmetry is
+# observable in today's output.
+#
+# verify_current_expected: attention-engine-gap, all four cases rejected. (b)
+# is correct code and must remain a reject; (a) and (c) flip to expect only
+# once enum-constant bodies lower into FuncDefs AND a binding marks the
+# configset-create action as an operation requiring authentication.
+
+test "rank1772: (a) the ConfigSets CREATE action body reads the request-controlled base configset and performs no authenticated-principal check, so an unauthenticated request creates a trusted-derived configset"
+  lang java
+  file solr/core/src/java/org/apache/solr/handler/admin/ConfigSetsHandler.java
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.solr.handler.admin;
+
+  import java.util.Map;
+  import org.apache.solr.common.params.SolrParams;
+  import org.apache.solr.request.SolrQueryRequest;
+  import org.apache.solr.response.SolrQueryResponse;
+
+  public class ConfigSetsHandler {
+    protected void invokeAction(SolrQueryRequest req, SolrQueryResponse rsp, String action) throws Exception {
+      ConfigSetOperation operation = ConfigSetOperation.get(action);
+      Map<String, Object> result = operation.call(req, rsp, this);
+    }
+
+    static Map<String, Object> copyPropertiesWithPrefix(SolrParams params, Map<String, Object> props, String prefix) {
+      // The configset created via an API should be mutable.
+      props.put("immutable", "false");
+      return props;
+    }
+
+    enum ConfigSetOperation {
+      CREATE_OP("create") {
+        @Override
+        Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception {
+          String baseConfigSetName = req.getParams().get("baseConfigSet", "_default");
+          Map<String, Object> props = CollectionsHandler.copy(req.getParams().required(), null, "name");
+          props.put("baseConfigSet", baseConfigSetName);
+          return copyPropertiesWithPrefix(req.getParams(), props, "property.");
+        }
+      },
+      DELETE_OP("delete") {
+        @Override
+        Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception {
+          return CollectionsHandler.copy(req.getParams().required(), null, "name");
+        }
+      };
+
+      String action;
+      ConfigSetOperation(String action) { this.action = action; }
+      abstract Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception;
+      static ConfigSetOperation get(String action) { return CREATE_OP; }
+    }
+  }
+  ```
+
+test "rank1772: (b) the fixed revision rejects an unauthenticated CREATE from a trusted base inside the same enum-constant body"
+  lang java
+  file solr/core/src/java/org/apache/solr/handler/admin/ConfigSetsHandler.java
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.solr.handler.admin;
+
+  import java.util.Map;
+  import org.apache.solr.common.SolrException;
+  import org.apache.solr.common.cloud.ZkConfigManager;
+  import org.apache.solr.common.params.SolrParams;
+  import org.apache.solr.request.SolrQueryRequest;
+  import org.apache.solr.response.SolrQueryResponse;
+
+  public class ConfigSetsHandler {
+    final static boolean DISABLE_CREATE_AUTH_CHECKS = Boolean.getBoolean("solr.disableConfigSetsCreateAuthChecks");
+
+    static class CoreContainer {
+      Object getAuthenticationPlugin() { return null; }
+      Object getZkController() { return null; }
+    }
+
+    static boolean isTrusted(SolrQueryRequest req, Object authPlugin) {
+      if (authPlugin != null && req.getUserPrincipal() != null) {
+        return true;
+      }
+      return false;
+    }
+
+    static boolean isCurrentlyTrusted(Object zkClient, String configSetZkPath) {
+      return true;
+    }
+
+    protected void invokeAction(SolrQueryRequest req, SolrQueryResponse rsp, String action) throws Exception {
+      ConfigSetOperation operation = ConfigSetOperation.get(action);
+      Map<String, Object> result = operation.call(req, rsp, this);
+    }
+
+    static Map<String, Object> copyPropertiesWithPrefix(SolrParams params, Map<String, Object> props, String prefix) {
+      props.put("immutable", "false");
+      return props;
+    }
+
+    enum ConfigSetOperation {
+      CREATE_OP("create") {
+        @Override
+        Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception {
+          String baseConfigSetName = req.getParams().get("baseConfigSet", "_default");
+          String newConfigSetName = req.getParams().get("name");
+          if (newConfigSetName == null || newConfigSetName.length() == 0) {
+            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "ConfigSet name not specified");
+          }
+          ZkConfigManager zkConfigManager = new ZkConfigManager(new CoreContainer().getZkController());
+          if (zkConfigManager.configExists(newConfigSetName)) {
+            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "ConfigSet already exists: " + newConfigSetName);
+          }
+          if (!zkConfigManager.configExists(baseConfigSetName)) {
+            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Base ConfigSet does not exist: " + baseConfigSetName);
+          }
+          if (!DISABLE_CREATE_AUTH_CHECKS &&
+                  !isTrusted(req, new CoreContainer().getAuthenticationPlugin()) &&
+                  isCurrentlyTrusted(new CoreContainer().getZkController(), "/configs/" + baseConfigSetName)) {
+            throw new SolrException(SolrException.ErrorCode.UNAUTHORIZED,
+                "Can't create a configset with an unauthenticated request from a trusted baseConfigSet");
+          }
+          Map<String, Object> props = CollectionsHandler.copy(req.getParams().required(), null, "name");
+          props.put("baseConfigSet", baseConfigSetName);
+          return copyPropertiesWithPrefix(req.getParams(), props, "property.");
+        }
+      };
+
+      String action;
+      ConfigSetOperation(String action) { this.action = action; }
+      abstract Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception;
+      static ConfigSetOperation get(String action) { return CREATE_OP; }
+    }
+  }
+  ```
+
+test "rank1772: (c) the same vulnerable action body as a named method of the handler -- extracted today, still unlabelled, because no vocabulary marks a config-mutating admin action as requiring an authenticated principal"
+  lang java
+  file solr/core/src/java/org/apache/solr/handler/admin/ConfigSetsHandler.java
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.solr.handler.admin;
+
+  import java.util.Map;
+  import org.apache.solr.common.params.SolrParams;
+  import org.apache.solr.request.SolrQueryRequest;
+  import org.apache.solr.response.SolrQueryResponse;
+
+  public class ConfigSetsHandler {
+    Map<String, Object> createOp(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception {
+      String baseConfigSetName = req.getParams().get("baseConfigSet", "_default");
+      Map<String, Object> props = CollectionsHandler.copy(req.getParams().required(), null, "name");
+      props.put("baseConfigSet", baseConfigSetName);
+      return copyPropertiesWithPrefix(req.getParams(), props, "property.");
+    }
+
+    static Map<String, Object> copyPropertiesWithPrefix(SolrParams params, Map<String, Object> props, String prefix) {
+      props.put("immutable", "false");
+      return props;
+    }
+  }
+  ```
+
+test "rank1772: (d) the construct pair -- the identical servlet request read in an enum-constant body and in a named method, labelled only in the named method"
+  lang java
+  file solr/core/src/java/org/apache/solr/handler/admin/EnumBodyProbe.java
+  reject VYQL-AUTH-001
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.apache.solr.handler.admin;
+
+  import java.util.Map;
+
+  public class EnumBodyProbe {
+    enum Ops {
+      ANON_OP("a") {
+        @Override
+        Map<String, Object> call(javax.servlet.http.HttpServletRequest req) throws Exception {
+          String baseConfigSetName = req.getParameter("baseConfigSet");
+          Map<String, Object> props = new java.util.HashMap<>();
+          props.put("baseConfigSet", baseConfigSetName);
+          return props;
+        }
+      };
+
+      String action;
+      Ops(String action) { this.action = action; }
+      abstract Map<String, Object> call(javax.servlet.http.HttpServletRequest req) throws Exception;
+    }
+
+    Map<String, Object> namedOp(javax.servlet.http.HttpServletRequest req) {
+      String baseConfigSetName = req.getParameter("baseConfigSet");
+      Map<String, Object> props = new java.util.HashMap<>();
+      props.put("baseConfigSet", baseConfigSetName);
+      return props;
+    }
+  }
+  ```

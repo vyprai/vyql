@@ -1,0 +1,289 @@
+# Rank 1749 / CVE-2026-11975 (CWE-79): simplcommerce/simplcommerce stores the
+# news item's rich-text fields from a model-bound admin API body without
+# sanitising them. The fixed revision, 6142d3b5147899e0edb41663ae20183878ab39f7 ("Use
+# HtmlSanitizer in NewsItemApiController"), adds a Ganss.Xss.HtmlSanitizer
+# field and wraps exactly the two content properties in both write actions:
+#
+#   -   ShortContent = model.ShortContent,
+#   -   FullContent = model.FullContent,
+#   +   ShortContent = _htmlSanitizer.Sanitize(model.ShortContent),
+#   +   FullContent = _htmlSanitizer.Sanitize(model.FullContent),
+#
+# and the same two substitutions in Put. The other model properties the
+# actions copy (Name, Slug, MetaTitle, MetaKeywords, MetaDescription,
+# IsPublished) stay raw, so the fixed revision itself marks the content pair as the
+# HTML-carrying subset. The render half is real and is where the markup
+# executes: the anonymous-facing views hand the stored fields straight to
+# Razor's raw sink -- @Html.Raw(Model.FullContent) at
+# Areas/News/Views/NewsItem/NewsItemDetail.cshtml:15 and
+# @Html.Raw(Model.ShortContent) at Areas/News/Views/Shared/_NewsThumbnail.cshtml:13.
+#
+# The pool row is correct: the commit is the whole fix, the vulnerable
+# construct is present at its parent (raw stores at :132-133 and :175-176),
+# and the remediation is present at the fixed revision itself. No metadata flag, no
+# corpus correction.
+#
+# What fires today, union over three `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` runs per revision (identical counts within each revision):
+# 767 findings / 406 at or above high on the vulnerable tree and the same
+# 767/406 on the fixed tree -- the fixed revision moves nothing the scanner can see. The
+# only rows touching the vulnerable file at either revision are two
+# code.UnsanitizedSvgUpload flags on the thumbnail upload actions (:206/:214)
+# and a VYQL-CFG-014 code.TrustBoundary row whose sink is Categories.Add in
+# Models/NewsItem.cs:21, fed by model.NewsCategoryIds -- incidental to the
+# content stores. `vyql match` on the controller shows the sources are
+# labelled (parameter.entry code.HttpInput for `model` at :114 and :151, so
+# taint reaches the property reads) and the sink side is empty: no HtmlRender,
+# no StoredHtmlWrite, nothing at the four changed lines.
+#
+# ATTENTION, engine gap plus an unshippable store-side judgement, both
+# revisions pinned as misses.
+#
+# Blocker 1 -- the raw-HTML boundary is in Razor, which no frontend parses.
+# `@Html.Raw` is where stored markup becomes page markup, and every one of
+# this application's raw renders lives in .cshtml: the scan warns `181 .cshtml`
+# files matched no frontend (the C# registry takes `.cs` only,
+# internal/extract/frontend/registry.go:50). The C# HtmlRender binding for the
+# same call shape (callee.method == "Raw", htmlRender97) fires only inside .cs
+# files, so case 1 below reports while the real render never can. This is the
+# same gap family as rank 1376's Mustache instance: the boundary the weakness
+# crosses sits in a template language the engine does not ingest.
+#
+# Blocker 2 -- the store side has no HTML-ness discriminator. Within the .cs
+# file the facts are: a model-bound parameter (labelled), property writes
+# `newsItem.ShortContent = model.ShortContent` (lowered to a Call on
+# newsItem.ShortContent carrying the tainted Attr as its argument), and a
+# persistence call. Nothing in the file says the field is markup -- no
+# [AllowHtml], no sanitizer, no editor hint; the only signal is the
+# application's own property naming. Measured on this tree: 405
+# `<entity>.<P> = model.<P>` sites across 55 controller files carry exactly
+# this shape (user.Email, country.Code3, customerGroup.IsActive ...), and the
+# name-narrowed variant (Content|Body|Description|Html|Markup|Summary) still
+# matches 15 sites of which roughly four render raw in this application
+# (page.Body, newsItem.ShortContent/FullContent, widgetInstance.HtmlData).
+# A binding keyed on that shape flags ordinary CRUD writes everywhere, and a
+# binding keyed on content-ish property names is keyed on application naming
+# with no library documentation behind it -- the measured-unshippable family
+# of ranks 1311/1331/1343, not re-derived here beyond the count.
+#
+# What ships: the standard .NET HTML sanitizer itself is missing from the C#
+# vocabulary. Ganss.Xss.HtmlSanitizer's documented API is an instance
+# `Sanitize` (the README usage is `var sanitizer = new HtmlSanitizer();
+# sanitizer.Sanitize(html)`), and the one spelling the binding surface can
+# type-qualify without knowing the receiver's name is the constructor-chained
+# form `new HtmlSanitizer().Sanitize(x)`, whose call node lowers with
+# callee.path=HtmlSanitizer.Sanitize. htmlEscape380 binds that spelling as
+# core.HtmlEscape. Measured: a four-spelling file (raw / local-receiver
+# sanitize / constructor-chained sanitize / WebUtility.HtmlEncode) reports
+# VYQL-INJ-004 3 -> 2 with the binding (the chained false positive clears;
+# raw and the local-receiver spelling still report), stable over three runs
+# each way; both real revisions scan 767 -> 767 (the fixed revision's own field spelling
+# is receiver-named, so the binding correctly matches nothing there); and
+# NuGetGallery's Ganss usage (MarkdownService.cs, injected
+# IHtmlSanitizer _htmlSanitizer) gains no label it should not have.
+#
+# What remains, for the sweep: the canonical instance spellings
+# (`_htmlSanitizer.Sanitize(x)`, DI'd interface receivers) need a check
+# binding gated on the receiver's type, and the check arm drops that gate
+# today -- controlSpec carries no Constraint (bindings_spec.go:539), the
+# emit-check arm of compile_binding.go never passes shape.Constraint, while
+# the source and sink arms enforce it (bindings_apply.go:294, :525-548). The
+# stamping route exists and is generic (a runtime.ReceiverType fact feeds
+# CtorTypesFor and lowering stamps recv_type), but no C# binding declares one
+# and the C# extractor stamps no declared types -- corroborated by the
+# type-constrained archive-entry arms matching nothing on real C# (a declared
+# ZipArchiveEntry foreach labels no ArchiveEntryName). Case 4 below pins the
+# field-receiver spelling as the miss that route would close.
+#
+# verify_current_expected: attention-engine-gap; case 1 expected, cases 2-4
+# rejected.
+
+test "rank1749: a controller rendering model-bound news content through Html.Raw reports the xss the Razor view actually commits"
+  lang csharp
+  file src/Modules/SimplCommerce.Module.News/Areas/News/Controllers/NewsItemApiController.cs
+  expect VYQL-INJ-004
+  code
+  ```
+  using System.Threading.Tasks;
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+  using SimplCommerce.Module.News.Areas.News.ViewModels;
+  using SimplCommerce.Module.News.Models;
+
+  namespace SimplCommerce.Module.News.Areas.News.Controllers
+  {
+      [Area("News")]
+      [Authorize(Roles = "admin")]
+      [Route("api/news-items")]
+      public class NewsItemApiController : Controller
+      {
+          [HttpGet("{id}/preview")]
+          public IActionResult Preview(NewsItemForm model)
+          {
+              // The view the real application returns renders this same field
+              // through @Html.Raw(Model.FullContent); Html.Raw here is the
+              // same raw-HTML sink, spelled where a frontend can see it.
+              return Content(Html.Raw(model.FullContent).ToString());
+          }
+      }
+  }
+  ```
+
+test "rank1749: the same render through the sanitizer the fixed revision installs, in the constructor-chained spelling"
+  lang csharp
+  file src/Modules/SimplCommerce.Module.News/Areas/News/Controllers/NewsItemApiController.cs
+  reject VYQL-INJ-004
+  code
+  ```
+  using Ganss.Xss;
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+  using SimplCommerce.Module.News.Areas.News.ViewModels;
+
+  namespace SimplCommerce.Module.News.Areas.News.Controllers
+  {
+      [Area("News")]
+      [Authorize(Roles = "admin")]
+      [Route("api/news-items")]
+      public class NewsItemApiController : Controller
+      {
+          [HttpGet("{id}/preview")]
+          public IActionResult Preview(NewsItemForm model)
+          {
+              return Content(Html.Raw(new HtmlSanitizer().Sanitize(model.FullContent)).ToString());
+          }
+      }
+  }
+  ```
+
+test "rank1749: the news item's content fields stored raw from the model-bound body, as the vulnerable revision writes them"
+  lang csharp
+  file src/Modules/SimplCommerce.Module.News/Areas/News/Controllers/NewsItemApiController.cs
+  reject_review code.StoredHtmlWrite
+  code
+  ```
+  using System.Linq;
+  using System.Threading.Tasks;
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+  using Microsoft.EntityFrameworkCore;
+  using SimplCommerce.Infrastructure.Data;
+  using SimplCommerce.Module.News.Areas.News.ViewModels;
+  using SimplCommerce.Module.News.Models;
+  using SimplCommerce.Module.News.Services;
+
+  namespace SimplCommerce.Module.News.Areas.News.Controllers
+  {
+      [Area("News")]
+      [Authorize(Roles = "admin")]
+      [Route("api/news-items")]
+      public class NewsItemApiController : Controller
+      {
+          private readonly IRepository<NewsItem> _newsItemRepository;
+          private readonly INewsItemService _newsItemService;
+
+          public NewsItemApiController(IRepository<NewsItem> newsItemRepository, INewsItemService newsItemService)
+          {
+              _newsItemRepository = newsItemRepository;
+              _newsItemService = newsItemService;
+          }
+
+          [HttpPost]
+          public IActionResult Post(NewsItemForm model)
+          {
+              var newsItem = new NewsItem
+              {
+                  Name = model.Name,
+                  ShortContent = model.ShortContent,
+                  FullContent = model.FullContent,
+                  IsPublished = model.IsPublished
+              };
+              _newsItemService.Create(newsItem);
+              return Accepted();
+          }
+
+          [HttpPut("{id}")]
+          public async Task<IActionResult> Put(long id, NewsItemForm model)
+          {
+              var newsItem = await _newsItemRepository.Query()
+                  .FirstOrDefaultAsync(x => x.Id == id);
+              if (newsItem == null)
+              {
+                  return NotFound();
+              }
+
+              newsItem.ShortContent = model.ShortContent;
+              newsItem.FullContent = model.FullContent;
+              _newsItemService.Update(newsItem);
+              return Accepted();
+          }
+      }
+  }
+  ```
+
+test "rank1749: the same stores wrapped in the fixed revision's sanitizer field, whose receiver-named spelling no check binding can type today"
+  lang csharp
+  file src/Modules/SimplCommerce.Module.News/Areas/News/Controllers/NewsItemApiController.cs
+  reject_review code.StoredHtmlWrite
+  code
+  ```
+  using System.Linq;
+  using System.Threading.Tasks;
+  using Ganss.Xss;
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+  using Microsoft.EntityFrameworkCore;
+  using SimplCommerce.Infrastructure.Data;
+  using SimplCommerce.Module.News.Areas.News.ViewModels;
+  using SimplCommerce.Module.News.Models;
+  using SimplCommerce.Module.News.Services;
+
+  namespace SimplCommerce.Module.News.Areas.News.Controllers
+  {
+      [Area("News")]
+      [Authorize(Roles = "admin")]
+      [Route("api/news-items")]
+      public class NewsItemApiController : Controller
+      {
+          private readonly IRepository<NewsItem> _newsItemRepository;
+          private readonly INewsItemService _newsItemService;
+          private readonly HtmlSanitizer _htmlSanitizer = new();
+
+          public NewsItemApiController(IRepository<NewsItem> newsItemRepository, INewsItemService newsItemService)
+          {
+              _newsItemRepository = newsItemRepository;
+              _newsItemService = newsItemService;
+          }
+
+          [HttpPost]
+          public IActionResult Post(NewsItemForm model)
+          {
+              var newsItem = new NewsItem
+              {
+                  Name = model.Name,
+                  ShortContent = _htmlSanitizer.Sanitize(model.ShortContent),
+                  FullContent = _htmlSanitizer.Sanitize(model.FullContent),
+                  IsPublished = model.IsPublished
+              };
+              _newsItemService.Create(newsItem);
+              return Accepted();
+          }
+
+          [HttpPut("{id}")]
+          public async Task<IActionResult> Put(long id, NewsItemForm model)
+          {
+              var newsItem = await _newsItemRepository.Query()
+                  .FirstOrDefaultAsync(x => x.Id == id);
+              if (newsItem == null)
+              {
+                  return NotFound();
+              }
+
+              newsItem.ShortContent = _htmlSanitizer.Sanitize(model.ShortContent);
+              newsItem.FullContent = _htmlSanitizer.Sanitize(model.FullContent);
+              _newsItemService.Update(newsItem);
+              return Accepted();
+          }
+      }
+  }
+  ```

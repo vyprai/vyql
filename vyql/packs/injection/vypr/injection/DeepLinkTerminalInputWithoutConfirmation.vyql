@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule DeepLinkTerminalInputWithoutConfirmation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78, CWE_20]
+    id: "VYQL-INJ-276"
+    severity: high
+  }
+  issue code.DeepLinkTerminalInputWithoutConfirmation as sink
+}

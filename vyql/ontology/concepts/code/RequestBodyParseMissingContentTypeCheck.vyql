@@ -1,0 +1,11 @@
+module code;
+
+concept RequestBodyParseMissingContentTypeCheck : issue {
+  cwe: [CWE_352]
+  reviewAssumption: "the endpoint is reachable from a browser and cached or ambient authentication lets a cross-site page drive it with a simple request"
+  reviewCategory: csrf
+  reviewCondition: "a request handler reads the request body without enforcing the request content type"
+  reviewConfidence: high
+  reviewEvidence: "request handler context {pattern} reads the request body stream and never names the content-type header or an expected media type"
+  vulnerableTo: [request_forgery.Csrf]
+}

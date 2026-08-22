@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule ArgvTrustedOnEmptyGet {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_807, CWE_20]
+    id: "VYQL-VAL-032"
+    severity: high
+  }
+  issue code.ArgvTrustedOnEmptyGet as notification
+}

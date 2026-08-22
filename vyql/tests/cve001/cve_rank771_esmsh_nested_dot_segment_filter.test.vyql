@@ -5,7 +5,7 @@ test "rank771: route filter rejects only leading dot segments"
   lang go
   file router.go
   expect VYQL-PATH-041
-  expect_review code.LeadingDotSegmentOnlyRouteFilter
+  expect_review code.IncompleteDotSegmentRequestScreen
   code
   ```
   package server
@@ -33,7 +33,7 @@ test "rank771: route filter rejects nested dot segments"
   lang go
   file router.go
   reject VYQL-PATH-041
-  reject_review code.LeadingDotSegmentOnlyRouteFilter
+  reject_review code.IncompleteDotSegmentRequestScreen
   code
   ```
   package server

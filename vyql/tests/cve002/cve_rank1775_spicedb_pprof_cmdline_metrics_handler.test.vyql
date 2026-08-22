@@ -1,0 +1,173 @@
+# Rank 1775 / CVE-2023-29193 (GHSA-cjr9-mr35-7xh6): spicedb's metrics HTTP
+# handler registered the whole net/http/pprof set on the ops mux.
+# MetricsHandler in pkg/cmd/server/defaults.go (line 78 at 9bbd7d7^) wired
+# `mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)` alongside
+# /metrics; pprof.Cmdline answers with the running program's command line,
+# NUL-separated, and spicedb takes its secrets as flags -- its own help
+# text shows `--grpc-preshared-key` and `--datastore-conn-uri
+# "postgres-connection-string-here"` -- so the unauthenticated metrics
+# port handed out the operator's credentials. The fixed revision replaces exactly
+# that one registration with a closure returning 404 ("This profile type
+# has been disabled to avoid leaking private command-line arguments") and
+# keeps Index, Profile, Symbol and Trace registered. The pool row is
+# correct: the merge prints an empty combined diff (multi-fix PR merge),
+# and `git diff 7ecd240 f2b1f9c` reads the change in full; the construct is
+# present at <fix>^ and the remediation at <fix>.
+#
+# Detection keys on the handler value, not the route literal: the route
+# string "/debug/pprof/cmdline" survives at the fixed revisioned revision, so only the pprof.Cmdline
+# selector discriminates. The Go frontend emits the argument's selector
+# path as a call_arg token on the registering function's context, and the
+# predicate is AST-routed and function-confined in Go, so the indirect
+# form (handler held in a local before registration) is covered too, while
+# a sibling function in the same file stays clean. Concept reuse, no mint:
+# code.DebugInfoExposure (VYQL-SEC-043) names the class -- "environment
+# or configuration values are serialized into an HTTP response" -- and the
+# command line is the program's configuration. Considered first:
+# code.SensitiveDataInResponse (presumes credential material known present
+# in the response; argv carries credentials only conditionally),
+# code.ConfigExposureReview (config-object serialization without redaction,
+# not a fixed stdlib responder), code.DebugMediaExposure (media via debug
+# static handler), code.InheritedProcessEnvironmentLeak (environment
+# inherited by a child process, a different axis).
+#
+# Measured: the vulnerable tree (7ecd240) reports exactly one VYQL-SEC-043
+# at pkg/cmd/server/defaults.go:74 in each of three --cache off runs; the
+# fixed tree reports zero in each of three. The shape's reachable set
+# across the sibling clones is fifteen Go files (mattermost, argo-cd,
+# chaos-mesh, moby, nomad, omni, opa, siyuan, snapd); full-tree scans of
+# mattermost and bounded package scans of argo-cd, snapd, siyuan, moby,
+# opa and omni report exactly one finding each, on the function that
+# registers pprof.Cmdline -- same weakness, unrelated codebases, no stray
+# firings. pprof2.Cmdline (a selector that merely shares the method name)
+# does not match.
+
+test "rank1775: the metrics handler registers pprof's command-line responder on the served mux"
+  lang go
+  file defaults.go
+  expect VYQL-SEC-043
+  code
+  ```
+  package server
+
+  import (
+  	"net/http"
+  	"net/http/pprof"
+  )
+
+  // MetricsHandler sets up an HTTP server that handles serving Prometheus
+  // metrics and pprof endpoints.
+  func MetricsHandler() http.Handler {
+  	mux := http.NewServeMux()
+  	mux.HandleFunc("/metrics", serveMetrics)
+  	mux.HandleFunc("/debug/pprof/", pprof.Index)
+  	mux.HandleFunc("/debug/pprof/cmdline", pprof.Cmdline)
+  	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+  	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+  	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+  	return mux
+  }
+
+  func serveMetrics(w http.ResponseWriter, r *http.Request) {}
+  ```
+
+test "rank1775: the fixed revision answers the cmdline route with a closed handler"
+  lang go
+  file defaults.go
+  reject VYQL-SEC-043
+  code
+  ```
+  package server
+
+  import (
+  	"fmt"
+  	"net/http"
+  	"net/http/pprof"
+  )
+
+  // MetricsHandler sets up an HTTP server that handles serving Prometheus
+  // metrics and pprof endpoints.
+  func MetricsHandler() http.Handler {
+  	mux := http.NewServeMux()
+  	mux.HandleFunc("/metrics", serveMetrics)
+  	mux.HandleFunc("/debug/pprof/", pprof.Index)
+  	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+  	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+  	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+  	mux.HandleFunc("/debug/pprof/cmdline", func(w http.ResponseWriter, r *http.Request) {
+  		w.WriteHeader(http.StatusNotFound)
+  		fmt.Fprintf(w, "This profile type has been disabled to avoid leaking private command-line arguments")
+  	})
+  	return mux
+  }
+
+  func serveMetrics(w http.ResponseWriter, r *http.Request) {}
+  ```
+
+test "rank1775: the pprof family without the command-line responder stays clean"
+  lang go
+  file defaults.go
+  reject VYQL-SEC-043
+  code
+  ```
+  package server
+
+  import (
+  	"net/http"
+  	"net/http/pprof"
+  )
+
+  func MetricsHandler() http.Handler {
+  	mux := http.NewServeMux()
+  	mux.HandleFunc("/metrics", serveMetrics)
+  	mux.HandleFunc("/debug/pprof/", pprof.Index)
+  	mux.HandleFunc("/debug/pprof/profile", pprof.Profile)
+  	mux.HandleFunc("/debug/pprof/symbol", pprof.Symbol)
+  	mux.HandleFunc("/debug/pprof/trace", pprof.Trace)
+  	return mux
+  }
+
+  func serveMetrics(w http.ResponseWriter, r *http.Request) {}
+  ```
+
+test "rank1775: the command-line responder held in a local before registration"
+  lang go
+  file defaults.go
+  expect VYQL-SEC-043
+  code
+  ```
+  package server
+
+  import (
+  	"net/http"
+  	"net/http/pprof"
+  )
+
+  func MetricsHandler() http.Handler {
+  	mux := http.NewServeMux()
+  	handler := pprof.Cmdline
+  	mux.HandleFunc("/debug/pprof/cmdline", handler)
+  	return mux
+  }
+  ```
+
+test "rank1775: a selector that only shares the method name is not the pprof responder"
+  lang go
+  file defaults.go
+  reject VYQL-SEC-043
+  code
+  ```
+  package server
+
+  import "net/http"
+
+  type pprof2 struct{}
+
+  func (pprof2) Cmdline(w http.ResponseWriter, r *http.Request) {}
+
+  func MetricsHandler() http.Handler {
+  	mux := http.NewServeMux()
+  	mux.HandleFunc("/debug/pprof/cmdline", pprof2.Cmdline)
+  	return mux
+  }
+  ```

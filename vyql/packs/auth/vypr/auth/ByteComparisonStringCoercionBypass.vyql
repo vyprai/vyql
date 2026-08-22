@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ByteComparisonStringCoercionBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_697, CWE_670]
+    id: "VYQL-AUTH-151"
+    severity: high
+  }
+  issue code.ByteComparisonStringCoercionBypass as compare
+}

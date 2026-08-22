@@ -919,3 +919,23 @@ binding filePathAccess412 {
   query pattern callExpr where callee.path ~= "Files.copy"
   emit sink code.FilePathAccess at args[0]
 }
+
+// Spring's documented boundary for evaluating a SpEL expression the program
+// did not write is SimpleEvaluationContext: the class exists so an expression
+// from configuration or a caller cannot resolve T(...) type references or
+// invoke reflective methods, which StandardEvaluationContext -- the default
+// context -- grants freely. The scope-call clauses keep both halves in one
+// lexical scope, so a function that hands a parsed expression to an
+// unrestricted context reports, and one that builds the restricted context
+// does not, whatever the surrounding class names. The parse call is the
+// anchor, so one report sits on each evaluation site. Residual, stated
+// rather than hidden: an expression the program wrote as a literal under an
+// unrestricted context also reports -- Kotlin call-argument tokens strip a
+// literal's quotes, so the argument's form cannot be read here -- and an
+// unrestricted context constructed outside the evaluating function, the
+// constructor-parameter default of the form-flow processor shape, is out of
+// reach of a scope-call clause.
+binding unsafeExpressionContextEvaluation900 {
+  query pattern presenceNode where node.kind == "call" and node.method == "parseExpression" and containsAny(node.context.scopeCall, ["StandardEvaluationContext"]) and not containsAny(node.context.scopeCall, ["SimpleEvaluationContext"])
+  emit issue code.UnsafeExpressionContextEvaluation at node
+}
