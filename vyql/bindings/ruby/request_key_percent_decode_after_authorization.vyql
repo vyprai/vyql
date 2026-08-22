@@ -1,0 +1,65 @@
+module bindings.ruby.request_key_percent_decode_after_authorization;
+
+// A request path can be named in more than one spelling: percent-encoded
+// (`/node/foo%2520bar`), decoded once (`/node/foo%20bar`), and decoded twice
+// (`/node/foo bar`). Whichever spelling reaches an authorization decision is
+// the one the policy was written against, and any decoding performed after
+// that decision names a resource the policy never saw.
+//
+// The Ruby standard library documents the decoders: `URI.unescape` (and
+// `decode_www_form_component`, its modern spelling) and `CGI.unescape` turn
+// escape sequences into the characters they stand for, Rack ships
+// `Rack::Utils.unescape` for the same job, and Addressable names its decoder
+// `unencode`. The authorization
+// hooks are the conventional ones -- Pundit's `authorize`, CanCanCan's
+// `authorize!`, the framework hooks `check_authorization`, `action_auth_level`,
+// `check_ownership`, `require_owner`, `owns_resource?` and `can?` -- the same
+// vocabulary the Ruby `core.AuthorizationCheck` bindings already treat as an
+// access decision.
+//
+// So a function that assigns a percent-decoded value while an authorization
+// hook runs in it has the two spellings in one place: the hook matched the
+// pre-decode string and whatever the function returns or looks up carries the
+// post-decode one. Fix 6592a816 for puppet's `IndirectedRoutes#
+// uri2indirection` is the canonical case: it authorized
+// `check_authorization(method, "#{url_prefix}/#{indirection_name}/#{key}",
+// params)` and only then ran `key = URI.unescape(key)` before returning the
+// key that drives `indirection.find`. The fix removes the decode from the
+// function and performs it once at the HTTP edge instead, so the decode
+// conjunct stops holding however the remediation is spelled -- the decode
+// leaves the function, or the authorization does.
+//
+// The two conjuncts deliberately take different routes:
+//
+//   * the decode is read from the function's own `assign:` tokens
+//     (`key = URI.unescape(key)` emits `assign:key=URI.unescape(key)`), which
+//     are matched against the function context's own facts and nothing else;
+//   * the authorization hook is a call fact, and in Ruby a positive call
+//     conjunct on a function context cannot be confined today: the context
+//     node carries no lexical scope, and a scope-call miss falls back to the
+//     file-wide call search, so any hook anywhere in the file satisfies it.
+//     Requiring the decode assignment first keeps the reported function one
+//     that decodes; the residual is a sibling method's hook crediting a
+//     function that decodes and never authorizes.
+//
+// The tokens are AST-derived, so a comment naming either side cannot stand in
+// for the call or the assignment.
+//
+// Further costs, stated rather than hidden. The context token set carries no
+// order, so a function that decodes first and authorizes the decoded value
+// afterwards -- the correct inline arrangement -- reports as well; the
+// edge-decode arrangement the puppet fix uses is the one that stops
+// reporting. A decode nested inside another call (`find(URI.unescape(k))`) or
+// returned bare emits no `assign:` token and is not reported. And the two
+// facts combine by co-occurrence, so a function that decodes one value and
+// authorizes an unrelated one reports too. On the reachable set -- every
+// non-test Ruby file across the corpus clones -- a percent-decode assignment
+// and an authorization hook co-occur in one file only in the code that
+// motivated this binding.
+binding requestKeyPercentDecodeAfterAuthorization {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "ruby"
+    and containsAny(node.context.assign, ["=URI.unescape(", "=CGI.unescape(", "=Rack.Utils.unescape(", "=unencode(", "=decode_www_form_component(", "=unescape("])
+    and node.scopeCall.method in ["authorize", "authorize!", "can?", "check_authorization", "action_auth_level", "check_ownership", "require_owner", "owns_resource?"]
+  emit issue code.MiddlewarePathMatchNormalizationMismatch at node
+}

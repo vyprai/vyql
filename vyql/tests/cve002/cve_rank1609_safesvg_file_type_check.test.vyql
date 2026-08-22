@@ -16,7 +16,7 @@
 # CVE-2024-11680 (CISA KEV, unauthenticated options.php config
 # modification, fixed in release r1720). The pool row's commit
 # 193367d937 does not exist in the repository or any remote ref, the
-# r-series releases were distributed as archives that never reachhe remote andit,
+# r-series releases ship as archives that never reach the remote and it,
 # and only tag v2.0.0 (August 2026) exists -- the change is not
 # reviewable from source, so per the pool protocol the row is
 # replaced IN PLACE with the next unranked php candidate from

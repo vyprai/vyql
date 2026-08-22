@@ -1,0 +1,174 @@
+# Rank 1618 / CVE-2019-25055 (GHSA-xvcg-2q82-r87j, RUSTSEC-2019-0038):
+# the libpulse-binding crate registered Rust closures as C callbacks through
+# `extern "C"` proxy functions that ran the closure directly, so a panic raised
+# inside application callback code unwound through the proxy into the
+# PulseAudio C frames that had invoked it -- undefined behaviour per the Rust
+# reference, with the corruption landing in foreign memory. 7fd282aef ("use
+# `catch_unwind` with callbacks") wraps the body of every `extern "C"`
+# function in the crate in `std::panic::catch_unwind`, which contains the
+# panic at the boundary. NVD files this under CWE-244; the honest class is
+# CWE-248 -- an uncaught panic -- escaping across an FFI boundary.
+#
+# Pool row verified in every field: 7fd282aef is a real, readable, non-merge
+# commit; the parent (c1e20e8) carries 33 `extern "C"` function definitions
+# and zero `catch_unwind` calls, and the fixed revision carries `catch_unwind` in all 33
+# of those bodies (verified by brace-matched extraction over every definition,
+# not by line counts). Both halves of the 1390 check hold. .
+#
+# What fires without this change: nothing on any proxy. `scan --cache off` over
+# the parent reports 119 findings, byte-stable over three runs -- 77
+# VYQL-MEM-006, 24 VYQL-MEM-014, 18 VYQL-RACE-003 -- and the rows landing in
+# the files the fixed revision touches are `unsafe impl Send/Sync` and enum-repr noise
+# (ext_device_manager.rs:114, introspect.rs:258, mod.rs:112/137, ...). Findings
+# in the file are not coverage.
+#
+# Vocabulary: nothing in the ontology expresses a panic crossing a foreign
+# ABI. The CWE-248 concepts read and rejected on shape -- ClosureUnwindStale
+# Length is the in-collection consequence of an unwind (stale vec length), not
+# the boundary; CookieMaxAgeDurationSecondsPanic, NilMapMergeWritePanic and
+# Free5gcChfRechargeInfoSplitPanic are panic *triggers* in specific parsers.
+# UncaughtFfiUnwind is minted for the class, after the FfiEnumLayoutRisk /
+# UncheckedFfiLengthNarrowing naming family. The containment key is
+# std::panic::catch_unwind -- the standard library's documented and only
+# mechanism for this, so the discriminator is API vocabulary, not the fixing
+# commit's: renaming nothing in the patched form can reintroduce the flag.
+#
+# Engine gap: the Rust frontend emits no token for a function's ABI -- the
+# signature's function_modifiers -> extern_modifier path is never read, and the
+# function context carries only body-derived tokens -- so no binding can scope
+# to `extern "C"` definitions. That scoping is the load-bearing fact for
+# precision, since "calls a closure with no panic containment" describes
+# ordinary higher-order Rust everywhere. Every case below is therefore a
+# reject: this file pins the miss. The count that motivates the fact: the
+# parent carries 33 `extern "C"` function definitions (a brace-matched
+# extraction, not a line count) and the fixed revision wraps all 33 of them, so the ABI
+# declaration alone discriminates the revisions. Collateral across the 220
+# sibling rank clones (3156 Rust files): exactly one `extern "C"` function
+# definition outside this repository -- next.js
+# examples/with-webassembly/src/add.rs, a four-line `x + 1` demo -- and one
+# foreign-module block (matrix-sdk tracing.rs) that is a type position, not a
+# definition.
+#
+# The four cases: (a) is the real proxy from context/subscribe.rs:212 with the
+# crate's own naming and helper shapes stripped to the language-level facts;
+# (b) is the same function unchanged at both revisions; (c) is (a) without the ABI
+# modifier, the minimal pair isolating that the flag must key on the boundary
+# declaration and not on the closure call; (d) is the unwind-permitting ABI
+# spelling of the same body.
+#
+# verify_current_expected: attention-engine-gap, all four cases rejected.
+
+test "rank1618: (a) an extern C callback proxy runs the retrieved closure with no panic containment at the boundary"
+  lang rust
+  file pulse-binding/src/context/subscribe.rs
+  reject VYQL-MEM-063
+  reject VYQL-MEM-014
+  reject VYQL-RACE-003
+  code
+  ```
+  use std::os::raw::c_void;
+
+  pub struct ContextInternal { _unused: u32 }
+  pub enum EventType { Facility, Operation }
+
+  fn get_facility(et: EventType) -> u32 { 0 }
+  fn get_operation(et: EventType) -> u32 { 0 }
+
+  struct Callback;
+  impl Callback {
+      fn get_callback(userdata: *mut c_void) -> fn(u32, u32, u32) { |_, _, _| {} }
+  }
+
+  extern "C"
+  fn cb_proxy(_: *mut ContextInternal, et: EventType, index: u32, userdata: *mut c_void) {
+      let facility = get_facility(et);
+      let operation = get_operation(et);
+      let callback = Callback::get_callback(userdata);
+      callback(facility, operation, index);
+  }
+  ```
+
+test "rank1618: (b) the fixed revision contains the panic inside the proxy with catch_unwind"
+  lang rust
+  file pulse-binding/src/context/subscribe.rs
+  reject VYQL-MEM-063
+  code
+  ```
+  use std::os::raw::c_void;
+
+  pub struct ContextInternal { _unused: u32 }
+  pub enum EventType { Facility, Operation }
+
+  fn get_facility(et: EventType) -> u32 { 0 }
+  fn get_operation(et: EventType) -> u32 { 0 }
+
+  struct Callback;
+  impl Callback {
+      fn get_callback(userdata: *mut c_void) -> fn(u32, u32, u32) { |_, _, _| {} }
+  }
+
+  extern "C"
+  fn cb_proxy(_: *mut ContextInternal, et: EventType, index: u32, userdata: *mut c_void) {
+      let _ = std::panic::catch_unwind(|| {
+          let facility = get_facility(et);
+          let operation = get_operation(et);
+          let callback = Callback::get_callback(userdata);
+          (callback)(facility, operation, index);
+      });
+  }
+  ```
+
+test "rank1618: (c) the same body in a plain Rust function is not an FFI boundary and must not be flagged"
+  lang rust
+  file pulse-binding/src/context/dispatch.rs
+  reject VYQL-MEM-063
+  code
+  ```
+  use std::os::raw::c_void;
+
+  pub struct ContextInternal { _unused: u32 }
+  pub enum EventType { Facility, Operation }
+
+  fn get_facility(et: EventType) -> u32 { 0 }
+  fn get_operation(et: EventType) -> u32 { 0 }
+
+  struct Callback;
+  impl Callback {
+      fn get_callback(userdata: *mut c_void) -> fn(u32, u32, u32) { |_, _, _| {} }
+  }
+
+  fn cb_proxy(_: *mut ContextInternal, et: EventType, index: u32, userdata: *mut c_void) {
+      let facility = get_facility(et);
+      let operation = get_operation(et);
+      let callback = Callback::get_callback(userdata);
+      callback(facility, operation, index);
+  }
+  ```
+
+test "rank1618: (d) the C-unwind ABI spelling permits the unwind and must not be flagged"
+  lang rust
+  file pulse-binding/src/context/dispatch_unwind.rs
+  reject VYQL-MEM-063
+  code
+  ```
+  use std::os::raw::c_void;
+
+  pub struct ContextInternal { _unused: u32 }
+  pub enum EventType { Facility, Operation }
+
+  fn get_facility(et: EventType) -> u32 { 0 }
+  fn get_operation(et: EventType) -> u32 { 0 }
+
+  struct Callback;
+  impl Callback {
+      fn get_callback(userdata: *mut c_void) -> fn(u32, u32, u32) { |_, _, _| {} }
+  }
+
+  extern "C-unwind"
+  fn cb_proxy(_: *mut ContextInternal, et: EventType, index: u32, userdata: *mut c_void) {
+      let facility = get_facility(et);
+      let operation = get_operation(et);
+      let callback = Callback::get_callback(userdata);
+      callback(facility, operation, index);
+  }
+  ```

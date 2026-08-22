@@ -1,0 +1,169 @@
+# Rank 1624 / CVE-2026-32597: PyJWT's JWS consumer accepted a token
+# whose JOSE header carried a crit (critical extensions) array naming
+# extensions the library does not implement -- RFC 7515 §4.1.11
+# requires a consumer to reject any token whose crit lists an
+# extension it does not understand, so the signature could verify
+# while a mandatory-to-process extension went unenforced (improper
+# verification of cryptographic signature, CWE-347; GHSA-752w-
+# 5fwx-jx9f). decode_complete in jwt/api_jws.py parsed the header,
+# handled the one supported extension (b64) and verified the
+# signature, but never called _validate_headers, and _validate_headers
+# itself checks only kid. The fixed revision adds self._validate_headers(header)
+# to the decode path, an encoding flag so encode keeps the old
+# behaviour, and _validate_crit rejecting a non-list, empty,
+# non-string or unsupported crit entry and any entry missing from the
+# headers.
+#
+# The row's commit bd9700cca7f9 is NOT this CVE's
+# fix -- it is the PyJWK-algorithm-default fix (#1148) committed 22
+# minutes after the security merge and touching the same files, a
+# same-release-window mislink (failure mode 3). The real fix is
+# 051ea341b5 ("Merge commit from fork", GHSA-752w-5fwx-jx9f), the
+# direct parent of the recorded commit; its parent 1451d70 is the
+# vulnerable state and the remediation is confirmed present at
+# 051ea34.
+#
+# ATTENTION, critical-header validation is invisible as dataflow. The
+# weakness is the absence of a control inside the library's own
+# verification routine, and the remediation's only trace inside the
+# guarded function is a call to the library's private
+# _validate_headers -- no API-documented call remains in
+# decode_complete for a binding to key on (the 1380 counterweight
+# fails), and the check itself lives in a new sibling method, the
+# delegated-check family measured at ranks 1397 (Python) among Go
+# 1377/1389/1399, Rust 1364, TS 1372, PHP 1394, C 1437. Keying on
+# the fixed revision's own helper name fails the rename test (1394). A
+# consumer-side binding on jwt.decode would fire identically at both
+# revisions -- the caller has no crit knob -- flagging every PyJWT
+# consumer, the measured-unshippable "no authorization signal in its
+# body" shape (1331) and the wiring-not-dataflow family of ranks
+# 1514/1535/1540/1556/1557/1593. Concepts considered and rejected:
+# code.UnverifiedJwt / code.JwtUnverified (signature verification is
+# not disabled here), code.OptionalTokenClaimValidation (no claim
+# guard exists to be optional), code.HeaderControlledJwkReview (no
+# header-driven key selection), code.OptionalClientSignatureVerification
+# (verification is unconditional). Measured on the real code: scanning
+# the checkout at 1451d70 and at 051ea34 (three --cache off runs
+# each, 369 and 385 findings at or above high -- the delta is the
+# fix's added test literals) reports the identical four findings on
+# jwt/api_jws.py (VYQL-AUTH-099, 2x VYQL-AUTH-105, VYQL-CRY-001),
+# none about the header; vyql match on the decode routine labels
+# nothing. No ENGINE-GAPS.md entry -- the engine handles the
+# constructs; the vocabulary for "a JOSE consumer rejects unsupported
+# critical extensions" does not exist. No definition change shipped.
+# Spec cve_rank1624 records the unvalidated decode path and the
+# crit-checking form, both asserting reject VYQL-AUTH-108: when
+# critical-extension vocabulary lands, the unvalidated form must
+# flip to expect.
+
+test "rank1624: decode path never validates the crit header"
+  lang python
+  file jwt/api_jws.py
+  reject VYQL-AUTH-108
+  code
+  ```
+  import json
+
+
+  class PyJWS:
+      header_typ = "JWT"
+
+      def decode_complete(self, jwt, key="", algorithms=None, options=None,
+                          detached_payload=None):
+          merged_options = self.options if options is None else {
+              **self.options, **options
+          }
+          verify_signature = merged_options["verify_signature"]
+
+          payload, signing_input, header, signature = self._load(jwt)
+
+          if header.get("b64", True) is False:
+              if detached_payload is None:
+                  raise DecodeError(
+                      "pass in a value for the detached_payload argument"
+                  )
+              payload = detached_payload
+
+          if verify_signature:
+              self._verify_signature(
+                  signing_input, header, signature, key, algorithms
+              )
+
+          return {"payload": payload, "header": header, "signature": signature}
+
+      def get_unverified_header(self, jwt):
+          headers = self._load(jwt)[2]
+          self._validate_headers(headers)
+          return headers
+
+      def _validate_headers(self, headers):
+          if "kid" in headers:
+              self._validate_kid(headers["kid"])
+
+      def _validate_kid(self, kid):
+          if not isinstance(kid, str):
+              raise InvalidTokenError("Key ID header parameter must be a string")
+  ```
+
+test "rank1624: the fixed revision validates crit on the decode path"
+  lang python
+  file jwt/api_jws.py
+  reject VYQL-AUTH-108
+  code
+  ```
+  import json
+
+
+  class PyJWS:
+      header_typ = "JWT"
+      _supported_crit = {"b64"}
+
+      def decode_complete(self, jwt, key="", algorithms=None, options=None,
+                          detached_payload=None):
+          merged_options = self.options if options is None else {
+              **self.options, **options
+          }
+          verify_signature = merged_options["verify_signature"]
+
+          payload, signing_input, header, signature = self._load(jwt)
+
+          self._validate_headers(header)
+
+          if header.get("b64", True) is False:
+              if detached_payload is None:
+                  raise DecodeError(
+                      "pass in a value for the detached_payload argument"
+                  )
+              payload = detached_payload
+
+          if verify_signature:
+              self._verify_signature(
+                  signing_input, header, signature, key, algorithms
+              )
+
+          return {"payload": payload, "header": header, "signature": signature}
+
+      def _validate_headers(self, headers, *, encoding=False):
+          if "kid" in headers:
+              self._validate_kid(headers["kid"])
+          if not encoding and "crit" in headers:
+              self._validate_crit(headers)
+
+      def _validate_crit(self, headers):
+          crit = headers["crit"]
+          if not isinstance(crit, list) or len(crit) == 0:
+              raise InvalidTokenError(
+                  "Invalid 'crit' header: must be a non-empty list"
+              )
+          for ext in crit:
+              if not isinstance(ext, str):
+                  raise InvalidTokenError(
+                      "Invalid 'crit' header: values must be strings"
+                  )
+              if ext not in self._supported_crit:
+                  raise InvalidTokenError(f"Unsupported critical extension: {ext}")
+              if ext not in headers:
+                  raise InvalidTokenError(
+                      f"Critical extension '{ext}' is missing from headers"
+                  )
+  ```

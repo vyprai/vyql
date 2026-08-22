@@ -1,0 +1,146 @@
+# Rank 1621 / CVE-2021-31590: PwnDoc's access control trusted the
+# JWT's baked-in claims for the token's whole lifetime. The
+# middleware in backend/src/lib/auth.js verified the signature and
+# expiry but decided authorization from decoded.role alone, and
+# updateProfile in backend/src/models/user.js minted that token with
+# expiresIn '24h', so a user downgraded from admin, or deleted
+# entirely, kept every privilege for up to a day -- with the
+# hard-coded dev secret in backend/src/config/config.json, even
+# across redeploys (stale session claims deciding access control,
+# CWE-613/CWE-284). The fixing commit ff1b868 is the vendor's fix inside
+# 0.4.0, the version the advisory names as patched (verified: the
+# commit is an ancestor of the v0.4.0 tag and nothing else touches
+# the auth files between them). It never changes the authorization
+# decision -- hasPermission is byte-identical at both revisions. It
+# shrinks the claim's authority window from 24h to 15 minutes, re-keys
+# the refresh token on the immutable userId (findById instead of
+# findOne on the username claim), and moves the session-removal
+# endpoint from GET /api/users/destroytoken to DELETE
+# /api/users/refreshtoken. .
+#
+# ATTENTION, stale-claim authority. The same family as rank 1599
+# (Postiz's verified payload used as the principal) and rank 1546
+# (rate limiting on a decoded claim), the change comes from the
+# configuration side like 1514/1535/1540/1556/1557/1593: the decision
+# site is unchanged between revisions, so no detection aimed at it
+# can discriminate. The 1380 counterweight fails here: the fixed revision leaves
+# the documented jwt.sign inside the guarded methods, but the patched
+# code itself signs refresh tokens with expiresIn '7 days', so
+# neither the call nor a duration threshold separates the forms
+# without keying on the project's own secret-variable naming, and a
+# day-scale threshold would flag the password-reset-shaped tokens for
+# which a day is the recommended lifetime. The GET-to-DELETE verb
+# change on the session-removal endpoint is the settled
+# csrf-on-state-changing-endpoint family (1501, 1567, 1581, 1592,
+# 1601). Measured on the real code: the tree reports 54 findings at
+# both revisions with identical 15-rule histograms, and the three
+# auth-carrying files carry only code.WeakJwtSecret rows -- the
+# callArg substring matching the jwtSecret variable name, not the
+# secret handling -- identical before and after. No ENGINE-GAPS.md
+# entry: no taint path is interrupted, the vocabulary to ask the
+# question is what is missing. No definition change shipped. Spec
+# cve_rank1621 records the role-claim decision and the re-keyed
+# short-window mint, both asserting reject VYQL-AUTH-079: when
+# session-claim vocabulary lands, the role-claim form must flip to
+# expect.
+
+test "rank1621: authorization decided from the token's role claim"
+  lang javascript
+  file backend/src/lib/auth.js
+  reject VYQL-AUTH-079
+  code
+  ```
+  var jwt = require('jsonwebtoken');
+  var jwtSecret = config[env].jwtSecret;
+
+  class ACL {
+      isAllowed(role, permission) {
+          return this.roles[role].allows.indexOf(permission) !== -1;
+      }
+
+      hasPermission(permission) {
+          return (req, res, next) => {
+              if (!req.cookies['token']) {
+                  Response.Unauthorized(res, 'No token provided');
+                  return;
+              }
+              var cookie = req.cookies['token'].split(' ')
+              if (cookie.length !== 2 || cookie[0] !== 'JWT') {
+                  Response.Unauthorized(res, 'Bad token type')
+                  return
+              }
+              var token = cookie[1]
+              jwt.verify(token, jwtSecret, (err, decoded) => {
+                  if (err) {
+                      if (err.name === 'TokenExpiredError')
+                          Response.Unauthorized(res, 'Expired token')
+                      else
+                          Response.Unauthorized(res, 'Invalid token')
+                      return
+                  }
+                  if ( permission === "validtoken" || this.isAllowed(decoded.role, permission)) {
+                      req.decodedToken = decoded
+                      return next()
+                  }
+                  else {
+                      Response.Forbidden(res, 'Insufficient privileges')
+                      return
+                  }
+              })
+          }
+      }
+  }
+  ```
+
+test "rank1621: the fixed revision re-keys the refresh and shortens the window"
+  lang javascript
+  file backend/src/models/user.js
+  reject VYQL-AUTH-079
+  code
+  ```
+  var jwt = require('jsonwebtoken');
+  var auth = require('../lib/auth.js');
+
+  UserSchema.statics.updateRefreshToken = function (refreshToken, userAgent) {
+      return new Promise((resolve, reject) => {
+          var token = ""
+          var newRefreshToken = ""
+          try {
+              var decoded = jwt.verify(refreshToken, auth.jwtRefreshSecret)
+              var userId = decoded.userId
+              var sessionId = decoded.sessionId
+              var expiration = decoded.exp
+          }
+          catch (err) {
+              throw({fn: 'Unauthorized', message: 'Invalid refreshToken'})
+          }
+          var query = this.findById(userId)
+          query.exec()
+          .then(row => {
+              if (row) {
+                  if (sessionId !== null) {
+                      var sessionExist = row.refreshTokens.findIndex(e => e.sessionId === sessionId && e.token === refreshToken)
+                      if (sessionExist === -1)
+                          throw({fn: 'Unauthorized', message: 'Session not found'})
+                  }
+                  var payload = {}
+                  payload.id = row._id
+                  payload.username = row.username
+                  payload.role = row.role
+                  payload.roles = auth.acl.getRoles(payload.role)
+
+                  token = jwt.sign(payload, auth.jwtSecret, {expiresIn: '15 minutes'})
+                  sessionId = generateUUID()
+                  newRefreshToken = jwt.sign({sessionId: sessionId, userId: userId}, auth.jwtRefreshSecret, {expiresIn: '7 days'})
+                  row.refreshTokens.push({sessionId: sessionId, userAgent: userAgent, token: newRefreshToken})
+                  return row.save()
+              }
+              else
+                  reject({fn: 'NotFound', message: 'Session not found'})
+          })
+          .then(() => {
+              resolve({token: token, refreshToken: newRefreshToken})
+          })
+      })
+  }
+  ```

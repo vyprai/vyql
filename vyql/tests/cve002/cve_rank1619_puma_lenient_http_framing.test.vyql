@@ -1,0 +1,181 @@
+# Rank 1619 / CVE-2022-24790: Puma read the request's framing values
+# and converted them leniently, so a request whose declared framing
+# disagreed with its bytes is accepted (HTTP request smuggling
+# through lenient header and chunk parsing, CWE-444;
+# GHSA-h99w-9q5r-gjq9). Three places in lib/puma/client.rb: setup_body
+# read @env[TRANSFER_ENCODING2] and fell through to the Content-Length
+# reading whenever the value is neither comma-listed-with-chunked nor
+# chunked itself -- "identity" or any unknown encoding is silently
+# ignored; the same method read @env[CONTENT_LENGTH] and converted
+# with String#to_i, which stops at the first non-digit, so "5abc"
+# framed five bytes; and read_chunked_body parsed each chunk-size line
+# with line.strip.to_i(16), the same lenient stop at the first
+# non-hex-digit, and wrote part[0..-3] without checking the part ends
+# with \r\n. A proxy in front and Puma behind then drew the message
+# boundary in different places. The fixing commit 5bb7d202e real fix
+# (the advisory's own reference, "Merge pull request from
+# GHSA-h99w-9q5r-gjq9"): an ALLOWED_TRANSFER_ENCODING allowlist with
+# the last value required to be chunked exactly once, a /[^\d]/
+# rejection before the Content-Length conversion, a /[^\h]/ rejection
+# and a \r\n-ending check on chunked segments, raising HttpParserError
+# or HttpParserError501 on each.ata
+# the remediation is present at the fixed revision and absent at its
+# parent c6340d1).
+
+#
+# ATTENTION, framing-value validation vocabulary. The lenient
+# conversions (cl.to_i, line.strip.to_i(16)) are still present in the
+# patched revision -- the fixed revision only adds the regex guards ahead of them
+# -- so no taint path can separate the pair, and the discriminating
+# construct is `value =~ CONSTANT` in both operand orders, which the
+# Ruby frontend does not extract as a call (rank 1352's measured gap,
+# reconfirmed here: vyql match on a probe holding `v =~ /[^\d]/`,
+# `raise` and `v.to_i` reports no labels at all). The nearest concept,
+# code.AmbiguousMessageBodyFraming (CWE-444, rank 1434/Netty), judges
+# the Transfer-Encoding-versus-Content-Length conflict, which this
+# pair does not change: both revisions accept the two headers
+# together, and its Java binding identifies the parser by accumulating
+# header lines, asking is-chunked and asking the length in one
+# method -- Puma's Ruby parser splits header accumulation (the C
+# extension) from the framing decision, so the identification triple
+# has no Ruby spelling here; the available tokens (env subscripts,
+# casecmp, a raise-absent negation) would fire on ordinary Rack
+# middleware (the corpus holds 7 Ruby files reading these env keys,
+# rack/deflater.rb and rack/content_length.rb among them), the
+# over-broad form 1434's triple exists to avoid. Measured on the real
+# code: scanning the tree reports an identical 178 findings with an
+# identical rule histogram at both revisions; the two client.rb
+# appearances are ProcessArgVector sibling-path noise. No
+# ENGINE-GAPS.md entry beyond 1352's (=~ unextracted). No definition
+# change shipped. Spec cve_rank1619 records the lenient framing form
+# and the guarded form, both asserting reject VYQL-INJ-249: when
+# framing-validation vocabulary lands, the lenient form must flip to
+# expect.
+
+test "rank1619: the framing values are converted leniently"
+  lang ruby
+  file lib/puma/client.rb
+  reject VYQL-INJ-249
+  code
+  ```
+  class Client
+    CHUNKED = "chunked".freeze
+
+    def setup_body(body)
+      te = @env[TRANSFER_ENCODING2]
+      if te
+        if te.include?(",")
+          te.split(",").each do |part|
+            if CHUNKED.casecmp(part.strip) == 0
+              return setup_chunked_body(body)
+            end
+          end
+        elsif CHUNKED.casecmp(te) == 0
+          return setup_chunked_body(body)
+        end
+      end
+
+      cl = @env[CONTENT_LENGTH]
+      remain = cl.to_i - body.bytesize
+      @body_remain = remain
+      false
+    end
+
+    def read_chunked_body(chunk)
+      io = StringIO.new(chunk)
+      while !io.eof?
+        line = io.gets
+        if line.end_with?("\r\n")
+          len = line.strip.to_i(16)
+          len += 2
+          part = io.read(len)
+          got = part.size
+          if got == len
+            write_chunk(part[0..-3]) # to skip the ending \r\n
+          end
+        else
+          @prev_chunk = line
+          return false
+        end
+      end
+      false
+    end
+  end
+  ```
+
+test "rank1619: the fixed revision rejects unsupported and malformed framing values"
+  lang ruby
+  file lib/puma/client.rb
+  reject VYQL-INJ-249
+  code
+  ```
+  class Client
+    CHUNKED = "chunked".freeze
+    ALLOWED_TRANSFER_ENCODING = %w[compress deflate gzip].freeze
+    CONTENT_LENGTH_VALUE_INVALID = /[^\d]/.freeze
+    CHUNK_SIZE_INVALID = /[^\h]/.freeze
+
+    def setup_body(body)
+      te = @env[TRANSFER_ENCODING2]
+      if te
+        te_lwr = te.downcase
+        if te.include? ','
+          te_ary = te_lwr.split ','
+          te_count = te_ary.count CHUNKED
+          te_valid = te_ary[0..-2].all? { |e| ALLOWED_TRANSFER_ENCODING.include? e }
+          if te_ary.last == CHUNKED && te_count == 1 && te_valid
+            @env.delete TRANSFER_ENCODING2
+            return setup_chunked_body body
+          elsif te_count >= 1
+            raise HttpParserError, "Invalid Transfer-Encoding, multiple chunked: '#{te}'"
+          elsif !te_valid
+            raise HttpParserError501, "Invalid Transfer-Encoding, unknown value: '#{te}'"
+          end
+        elsif te_lwr == CHUNKED
+          @env.delete TRANSFER_ENCODING2
+          return setup_chunked_body body
+        elsif ALLOWED_TRANSFER_ENCODING.include? te_lwr
+          raise HttpParserError, "Invalid Transfer-Encoding, single value must be chunked: '#{te}'"
+        else
+          raise HttpParserError501, "Invalid Transfer-Encoding, unknown value: '#{te}'"
+        end
+      end
+
+      cl = @env[CONTENT_LENGTH]
+      if cl
+        if cl =~ CONTENT_LENGTH_VALUE_INVALID
+          raise HttpParserError, "Invalid Content-Length: #{cl.inspect}"
+        end
+      end
+      remain = cl.to_i - body.bytesize
+      @body_remain = remain
+      false
+    end
+
+    def read_chunked_body(chunk)
+      io = StringIO.new(chunk)
+      while !io.eof?
+        line = io.gets
+        if line.end_with?("\r\n")
+          chunk_hex = line.strip[/\A[^;]+/]
+          if chunk_hex =~ CHUNK_SIZE_INVALID
+            raise HttpParserError, "Invalid chunk size: '#{chunk_hex}'"
+          end
+          len = chunk_hex.to_i(16)
+          len += 2
+          part = io.read(len)
+          got = part.size
+          if got == len && part.end_with?("\r\n")
+            write_chunk(part[0..-3]) # to skip the ending \r\n
+          else
+            raise HttpParserError, "Chunk size mismatch"
+          end
+        else
+          @prev_chunk = line
+          return false
+        end
+      end
+      false
+    end
+  end
+  ```
