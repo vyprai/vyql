@@ -1,0 +1,308 @@
+# Rank 1828 / CVE-2023-42810: systeminformation's wifiConnections()
+# reads the connected network's SSID out of the output of the very
+# commands it shells out to, then hands that SSID straight back to
+# another shell command (lib/wifi.js at the parent of 7972565):
+#
+#   const nmiDetails = nmiDeviceLinux(ifaceSanitized);
+#   const wpaDetails = wpaConnectionLinux(ifaceSanitized);
+#   const ssid = nmiDetails.ssid || wpaDetails.ssid;
+#   const nmiConnection = nmiConnectionLinux(ssid);
+#
+# nmiDeviceLinux runs `nmcli ... device show <iface>` and lifts
+# GENERAL.CONNECTION into its return object; wpaConnectionLinux does
+# the same for `wpa_cli -i <iface> status`. nmiConnectionLinux then
+# runs
+#
+#   const cmd = `nmcli -t --show-secrets connection show ${ssid} 2>/dev/null`;
+#   const lines = execSync(cmd).toString().split('\n');
+#
+# so whoever names the network controls a fragment of a shell command:
+# a crafted SSID carrying `;`, a backtick, `$()` or friends executes in
+# the library's process (CWE-78). The advisory names wifiConnections()
+# and wifiNetworks(); the fixed revision, 7972565, routes the SSID through
+# util.sanitizeShellString and rebuilds it one character at a time
+# before the call, exactly as the two preceding commits
+# done for the interface name:
+#
+#   let ssidSanitized = '';
+#   const t = util.isPrototypePolluted() ? '---' : util.sanitizeShellString(ssid, true);
+#   for (let i = 0; i <= util.mathMin(t.length, 2000); i++) {
+#     if (t[i] !== undefined) { ssidSanitized = ssidSanitized + t[i]; }
+#   }
+#   const nmiConnection = nmiConnectionLinux(ssidSanitized);
+#
+# Detection is in place and lands on the defect: VYQL-INJ-002
+# reports critical at the nmiConnectionLinux sink with the whole real
+# path -- code.StoredDataRead on ifaceListLinux's
+# execSync().toString().split().map() chain, through nmiDeviceLinux's
+# return object and its .ssid attribute, into the || merge, into
+# nmiConnectionLinux's ssid parameter, into the template literal, into
+# execSync's argument. Confirmed on the real checkout: the vulnerable
+# parent (d93a0ce) reports that finding at lib/wifi.js:196.
+#
+# The remediation is invisible, and that is the residual this spec
+# pins. Bounded scans (timeout 180, --cache off --max-ram 6GB), three
+# runs per revision: 599 findings on the vulnerable parent and the
+# identical 599 on the fixed revision, the fingerprint sets differing only where
+# the ten inserted lines moved a line number; the finding at the
+# nmiConnectionLinux sink carries the same fingerprint at both
+# revisions. Taint survives the per-character rebuild. The character
+# allowlist inside sanitizeShellString is a disjunction of
+# character-literal comparisons and the caller accumulates the
+# surviving characters with plain concatenation, and neither is a form
+# the char-filter kill recognises. That kill exists and works: a node
+# labelled with the char_filter role whose removed set covers the
+# sink's excluded characters kills the flow
+# (internal/solvers/taint.go:145). The only producer of those labels
+# is filterApplicator (internal/bindings/bindings_apply.go:155), which
+# matches `.replace(...)` call nodes and reads their literal pattern
+# and replacement through replaceCharEffects; a loop has no call node
+# to label, no literal pattern/replacement pair to read, and no
+# anchorable node among its subscript, guard and accumulator
+# assignment that any binding query family matches. Cases 2 and 3
+# isolate exactly that on the real code shape: two spellings of one
+# helper that remove the shell metacharacters, one reported and one
+# killed, differing only in the loop versus the replace. This is the
+# JavaScript command-injection instance of the family on
+# record for traversal neutralizers (a project's own scrubbing helper
+# is invisible to every core.*Escape binding, which names documented
+# APIs only). Not mechanical: closing it means deriving a
+# removed-character set from a loop guard's comparisons and landing a
+# control label on a loop-carried accumulator, which is new extraction
+# and a new dataflow relation rather than a correction to an existing
+# handler. Labelling util.sanitizeShellString itself as
+# core.ShellEscape is the workaround this spec deliberately does not
+# take: the name is this project's private helper, absent from its
+# documented API surface, and a rename of it would take the flag with
+# it.
+#
+# verify_current_expected: caught; case 2 pins the invisible
+# remediation and must flip to reject once the loop form is modelled.
+
+test "rank1828: the connected SSID lifted out of nmcli output is interpolated into the next shell command"
+  lang javascript
+  file wifi.js
+  expect VYQL-INJ-002
+  code
+  ```
+  const { execSync } = require('child_process');
+
+  function ifaceListLinux() {
+    const cmd = 'iw dev 2>/dev/null';
+    const all = execSync(cmd).toString().split('\n').map(line => line.trim()).join('\n');
+    return all.split('\nInterface ')[1] || '';
+  }
+
+  function getValue(lines, what) {
+    for (const line of lines) {
+      if (line.startsWith(what)) { return line.slice(what.length); }
+    }
+    return '';
+  }
+
+  function nmiDeviceLinux(iface) {
+    const cmd = `nmcli -t -f general,wifi-properties device show ${iface} 2>/dev/null`;
+    const lines = execSync(cmd).toString().split('\n');
+    const ssid = getValue(lines, 'GENERAL.CONNECTION');
+    return { iface, ssid: ssid !== '--' ? ssid : null };
+  }
+
+  function wpaConnectionLinux(iface) {
+    const cmd = `wpa_cli -i ${iface} status 2>&1`;
+    const lines = execSync(cmd).toString().split('\n');
+    return { ssid: getValue(lines, 'ssid') };
+  }
+
+  function nmiConnectionLinux(ssid) {
+    const cmd = `nmcli -t --show-secrets connection show ${ssid} 2>/dev/null`;
+    try {
+      const lines = execSync(cmd).toString().split('\n');
+      return { ssid: ssid !== '--' ? ssid : null, type: getValue(lines, 'connection.type') };
+    } catch (e) { return {}; }
+  }
+
+  export function wifiConnections() {
+    const iface = ifaceListLinux();
+    const nmiDetails = nmiDeviceLinux(iface);
+    const wpaDetails = wpaConnectionLinux(iface);
+    const ssid = nmiDetails.ssid || wpaDetails.ssid;
+    const nmiConnection = nmiConnectionLinux(ssid);
+    return { ssid, type: nmiConnection.type };
+  }
+  ```
+
+test "rank1828: the fixed revision's per-character rebuild of the sanitized SSID, which the char-filter kill cannot see"
+  lang javascript
+  file wifi.js
+  expect VYQL-INJ-002
+  code
+  ```
+  const { execSync } = require('child_process');
+
+  function ifaceListLinux() {
+    const cmd = 'iw dev 2>/dev/null';
+    const all = execSync(cmd).toString().split('\n').map(line => line.trim()).join('\n');
+    return all.split('\nInterface ')[1] || '';
+  }
+
+  function mathMin(a, b) { return Math.min(a, b); }
+  function isPrototypePolluted() { return false; }
+
+  function getValue(lines, what) {
+    for (const line of lines) {
+      if (line.startsWith(what)) { return line.slice(what.length); }
+    }
+    return '';
+  }
+
+  function sanitizeShellString(str, strict) {
+    if (typeof strict === 'undefined') { strict = false; }
+    const s = str || '';
+    let result = '';
+    for (let i = 0; i <= mathMin(s.length, 2000); i++) {
+      if (!(s[i] === undefined ||
+        s[i] === '>' ||
+        s[i] === '<' ||
+        s[i] === '*' ||
+        s[i] === '?' ||
+        s[i] === '[' ||
+        s[i] === ']' ||
+        s[i] === '|' ||
+        s[i] === '$' ||
+        s[i] === ';' ||
+        s[i] === '&' ||
+        s[i] === '(' ||
+        s[i] === ')' ||
+        s[i] === '#' ||
+        s[i] === '\\' ||
+        s[i] === '\t' ||
+        s[i] === '\n' ||
+        s[i] === '\'' ||
+        s[i] === '`')) {
+        result = result + s[i];
+      }
+    }
+    return result;
+  }
+
+  function nmiDeviceLinux(iface) {
+    const cmd = `nmcli -t -f general,wifi-properties device show ${iface} 2>/dev/null`;
+    const lines = execSync(cmd).toString().split('\n');
+    const ssid = getValue(lines, 'GENERAL.CONNECTION');
+    return { iface, ssid: ssid !== '--' ? ssid : null };
+  }
+
+  function wpaConnectionLinux(iface) {
+    const cmd = `wpa_cli -i ${iface} status 2>&1`;
+    const lines = execSync(cmd).toString().split('\n');
+    return { ssid: getValue(lines, 'ssid') };
+  }
+
+  function nmiConnectionLinux(ssid) {
+    const cmd = `nmcli -t --show-secrets connection show ${ssid} 2>/dev/null`;
+    try {
+      const lines = execSync(cmd).toString().split('\n');
+      return { ssid: ssid !== '--' ? ssid : null, type: getValue(lines, 'connection.type') };
+    } catch (e) { return {}; }
+  }
+
+  export function wifiConnections() {
+    const iface = ifaceListLinux();
+    let ifaceSanitized = '';
+    const s = isPrototypePolluted() ? '---' : sanitizeShellString(iface, true);
+    for (let i = 0; i <= mathMin(s.length, 2000); i++) {
+      if (s[i] !== undefined) {
+        ifaceSanitized = ifaceSanitized + s[i];
+      }
+    }
+    const nmiDetails = nmiDeviceLinux(ifaceSanitized);
+    const wpaDetails = wpaConnectionLinux(ifaceSanitized);
+    const ssid = nmiDetails.ssid || wpaDetails.ssid;
+    let ssidSanitized = '';
+    const t = isPrototypePolluted() ? '---' : sanitizeShellString(ssid, true);
+    for (let i = 0; i <= mathMin(t.length, 2000); i++) {
+      if (t[i] !== undefined) {
+        ssidSanitized = ssidSanitized + t[i];
+      }
+    }
+
+    const nmiConnection = nmiConnectionLinux(ssidSanitized);
+    return { ssid, type: nmiConnection.type };
+  }
+  ```
+
+test "rank1828: the same helper removing the same shell metacharacters as one replace, which the char-filter kill does see"
+  lang javascript
+  file wifi.js
+  reject VYQL-INJ-002
+  code
+  ```
+  const { execSync } = require('child_process');
+
+  function ifaceListLinux() {
+    const cmd = 'iw dev 2>/dev/null';
+    const all = execSync(cmd).toString().split('\n').map(line => line.trim()).join('\n');
+    return all.split('\nInterface ')[1] || '';
+  }
+
+  function mathMin(a, b) { return Math.min(a, b); }
+  function isPrototypePolluted() { return false; }
+
+  function getValue(lines, what) {
+    for (const line of lines) {
+      if (line.startsWith(what)) { return line.slice(what.length); }
+    }
+    return '';
+  }
+
+  function sanitizeShellString(str, strict) {
+    if (typeof strict === 'undefined') { strict = false; }
+    const s = str || '';
+    return s.replace(/[;|&$<>()]/g, '');
+  }
+
+  function nmiDeviceLinux(iface) {
+    const cmd = `nmcli -t -f general,wifi-properties device show ${iface} 2>/dev/null`;
+    const lines = execSync(cmd).toString().split('\n');
+    const ssid = getValue(lines, 'GENERAL.CONNECTION');
+    return { iface, ssid: ssid !== '--' ? ssid : null };
+  }
+
+  function wpaConnectionLinux(iface) {
+    const cmd = `wpa_cli -i ${iface} status 2>&1`;
+    const lines = execSync(cmd).toString().split('\n');
+    return { ssid: getValue(lines, 'ssid') };
+  }
+
+  function nmiConnectionLinux(ssid) {
+    const cmd = `nmcli -t --show-secrets connection show ${ssid} 2>/dev/null`;
+    try {
+      const lines = execSync(cmd).toString().split('\n');
+      return { ssid: ssid !== '--' ? ssid : null, type: getValue(lines, 'connection.type') };
+    } catch (e) { return {}; }
+  }
+
+  export function wifiConnections() {
+    const iface = ifaceListLinux();
+    let ifaceSanitized = '';
+    const s = isPrototypePolluted() ? '---' : sanitizeShellString(iface, true);
+    for (let i = 0; i <= mathMin(s.length, 2000); i++) {
+      if (s[i] !== undefined) {
+        ifaceSanitized = ifaceSanitized + s[i];
+      }
+    }
+    const nmiDetails = nmiDeviceLinux(ifaceSanitized);
+    const wpaDetails = wpaConnectionLinux(ifaceSanitized);
+    const ssid = nmiDetails.ssid || wpaDetails.ssid;
+    let ssidSanitized = '';
+    const t = isPrototypePolluted() ? '---' : sanitizeShellString(ssid, true);
+    for (let i = 0; i <= mathMin(t.length, 2000); i++) {
+      if (t[i] !== undefined) {
+        ssidSanitized = ssidSanitized + t[i];
+      }
+    }
+
+    const nmiConnection = nmiConnectionLinux(ssidSanitized);
+    return { ssid, type: nmiConnection.type };
+  }
+  ```

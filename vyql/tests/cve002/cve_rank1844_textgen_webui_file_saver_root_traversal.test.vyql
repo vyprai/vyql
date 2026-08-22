@@ -1,0 +1,151 @@
+# CVE-2026-35050: text-generation-webui's generic file saver trusted a
+# directory root that round-trips through the browser (CWE-22). The confirm
+# handler in modules/ui_file_saving.py did
+#
+#   def handle_save_confirm_click(root, filename, contents):
+#       filename = sanitize_filename(filename)
+#       utils.save_file(root + filename, contents)
+#
+# wired as shared.gradio['save_confirm'].click(
+#     handle_save_confirm_click, gradio('save_root', 'save_filename', 'save_contents'), ...)
+#
+# so `root` is the value of a Gradio component the opener handler fills in
+# (`str(shared.user_data_dir / 'instruction-templates') + '/'`) and the client
+# sends back on confirm. The component is rendered disabled, but that is a
+# front-end attribute only: with dev tools or a proxy the client sets the
+# folder to `./` and the filename to `download-model.py`, and the write lands
+# outside the intended tree (on releases before the user-data containment,
+# directly in the application root, where helper scripts execute). The fixed revision
+# 256431f25869fb89326021b8051e340ef275a416 stores the root in a server-side
+# per-session gr.State instead of a component value, and adds a backend
+# extension allowlist to utils.save_file. The advisory is
+# GHSA-jg96-p5p6-q3cv; the same commit also hardens the image-URL fetch,
+# which is a separate SSRF fix.
+#
+# Everything except the source works: with the root arriving as an ordinary
+# request parameter, VYQL-PATH-001 reports at high from code.HttpInput through
+# handle_save_confirm_click's parameter into utils.save_file and onto the
+# open(abs_path_str, 'w'), with both `unless` clauses correctly unsatisfied --
+# the _is_path_allowed containment lives in a sibling function and its
+# core.PathAccessCheck never guards the sink. What is missing is the source:
+# the root is a parameter of a callback passed by reference to a framework,
+# registered imperatively (`.click(fn, inputs, outputs)`), so the handler has
+# no decorator, no analysis.parameter.entry fact, and nothing the binding
+# language can key a source on. This is the same source gap recorded for the
+# ChuanhuChatGPT upload and the Nextcloud AppFramework.
+#
+# The missing source is measured rather than assumed. Simulating "every
+# Gradio-wired handler parameter is client input" on the real tree (100 wired
+# handlers, 248 registrations) adds ~139 findings per run for this one true
+# path: 54 VYQL-PATH-001, 37 VYQL-AUTH-099, 35 VYQL-INJ-009, 8 VYQL-RF-001
+# and a critical VYQL-INJ-002, mostly handler parameters reaching shared
+# state dicts and logs. No second real Gradio application exists in the
+# available corpus (ray carries only tests and doc examples), so the broad
+# source cannot be validated anywhere else either.
+#
+# The fixed revision's extension allowlist is not a path control and does not clear the
+# request-sourced form: Path(...).suffix checks restrict the file type, not
+# the directory, and the third case pins that the report survives it, which
+# is right while the root itself is still caller-chosen.
+#
+# verify_current_expected: attention-source-gap
+
+test "rank1844: the file saver reports when the root comes from a request"
+  lang python
+  file modules/ui_file_saving.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+  from pathlib import Path
+
+  from modules import shared
+  from modules.utils import sanitize_filename
+
+
+  def _is_path_allowed(abs_path_str):
+      abs_path = Path(abs_path_str).resolve()
+      user_data_resolved = shared.user_data_dir.resolve()
+      try:
+          abs_path.relative_to(user_data_resolved)
+          return True
+      except ValueError:
+          return False
+
+
+  def save_file(fname, contents):
+      abs_path_str = os.path.abspath(fname)
+      if not _is_path_allowed(abs_path_str):
+          return
+
+      with open(abs_path_str, 'w', encoding='utf-8') as f:
+          f.write(contents)
+
+
+  def handle_save_confirm_click(root, filename, contents):
+      filename = sanitize_filename(filename)
+      save_file(root + filename, contents)
+
+
+  def confirm(request):
+      handle_save_confirm_click(
+          request.args["save_root"], request.args["save_filename"], request.args["save_contents"])
+  ```
+
+test "rank1844: the same save is silent when the root arrives through the wiring"
+  lang python
+  file modules/ui_file_saving.py
+  reject VYQL-PATH-001
+  code
+  ```
+  import gradio as gr
+
+  from modules import utils
+  from modules.utils import gradio, sanitize_filename
+
+
+  def handle_save_confirm_click(root, filename, contents):
+      filename = sanitize_filename(filename)
+      utils.save_file(root + filename, contents)
+      return gr.update(visible=False)
+
+
+  def create_event_handlers():
+      shared.gradio['save_confirm'].click(
+          handle_save_confirm_click,
+          gradio('save_root', 'save_filename', 'save_contents'),
+          gradio('file_saver'),
+          show_progress=False)
+  ```
+
+test "rank1844: the fixed revision's extension allowlist is not a path control, and reporting survives it"
+  lang python
+  file modules/ui_file_saving.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+  from pathlib import Path
+
+  from modules.utils import sanitize_filename
+
+
+  def save_file(fname, contents):
+      abs_path_str = os.path.abspath(fname)
+
+      if Path(abs_path_str).suffix.lower() not in ('.yaml', '.yml', '.json', '.txt', '.gbnf'):
+          return
+
+      with open(abs_path_str, 'w', encoding='utf-8') as f:
+          f.write(contents)
+
+
+  def handle_save_confirm_click(root, filename, contents):
+      filename = sanitize_filename(filename)
+      save_file(root + filename, contents)
+
+
+  def confirm(request):
+      handle_save_confirm_click(
+          request.args["save_root"], request.args["save_filename"], request.args["save_contents"])
+  ```

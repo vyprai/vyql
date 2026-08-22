@@ -1,0 +1,138 @@
+# Traefik's domain-fronting protection works by comparing two TLS option
+# names per request: the SNICheck middleware (pkg/middlewares/snicheck)
+# returns 421 when the option actually used for the connection (resolved
+# from the SNI in the ClientHello) differs from the option the matched
+# router's Host rule resolves to. Those router-side names are computed by
+# resolveHTTPTLSOptions in pkg/server/aggregator.go, which walks every
+# HTTP router's rule domains and writes router.TLS.ResolvedOptions. The
+# defect: applyConfigurations in pkg/server/configurationwatcher.go ran
+# that resolution inside mergeConfiguration, i.e. BEFORE applyModel
+# expands each router into per-entrypoint copies and gives routers with
+# no router-level TLS section the entrypoint model's TLS block. For a
+# router whose mTLS-bearing options arrive only through the entrypoint
+# model (RequireAndVerifyClientCert declared at the entrypoint or under a
+# wildcard Host rule), the resolved option is therefore computed against
+# absent TLS state, and the SNI-vs-Host comparison that fronts mTLS
+# enforcement happens against the wrong name -- a client could handshake
+# under a permissive SNI on the same entrypoint and reach the protected
+# host with no client certificate (CWE-288; the affected symbol is
+# SNICheck.ServeHTTP). The fixed revision, a664812e9c30f8c9705ce16f0d2f2d96e017bccd,
+# is two moved lines: mergeConfiguration returns conf untouched and the
+# watcher calls resolveHTTPTLSOptions after applyModel instead. The
+# middleware itself is byte-identical across the fixed revision.
+#
+# Pinned as a miss: nothing reports either revision. Measured over three
+# --cache off runs of pkg/server per revision: 32 findings each time, same
+# rule histogram (8 CFG-006, 7 RES-001, 6 CFG-004, 3 INJ-010, 3 CRY-003,
+# 2 CFG-001, LIFE-001, CRY-001, CFG-014), zero findings on aggregator.go,
+# configurationwatcher.go, snicheck.go or tcp/manager.go. vyql match on
+# the snicheck package labels only the request parameter as HttpInput
+# (source, no sink, no control), and on configurationwatcher.go and
+# aggregator.go labels nothing at all.
+#
+# This is the measured family "authorization decided by wiring or
+# configuration, not dataflow" (ranks 1514, 1535, 1540, 1556, 1557,
+# 1593): the enforcement code is present and correct in both revisions
+# and the fixed revision reorders two calls in a configuration pipeline, so no taint
+# path, guard text or sink differs. The 1380 counterweight does not
+# rescue it: the call the fixed revision leaves inside the guarded method is
+# resolveHTTPTLSOptions, a package-private Traefik internal with no
+# documentation, not an API-documented library call. The exhaustive
+# enumeration of the shape's reachable set: across the whole tree
+# resolveHTTPTLSOptions and applyModel each appear at exactly two non-test
+# sites (definition plus the single call the fixed revision moves), and across every
+# sibling clone under /tmp/cve-work/rank*/ the name exists nowhere outside
+# this repository -- a binding keyed on it fires on one function in one
+# codebase, dies under the rename test, and is the fixing commit's own
+# layout as discriminator (the shape AGENT-CONTEXT records as rejected).
+# The nearest adjacent shipped rule, VYQL-AUTH-077
+# (code.PostTlsIdentityRebindingMissingCheck), covers the missing-check
+# form of domain fronting; here the check exists and is fed mis-ordered
+# inputs, so it is rejected on both snippets deliberately. The
+# attribution-gap family (1377/1389/1399) does not apply: no check left
+# the function -- the check never changed.
+
+test "rank1867: tls options resolved before entrypoint models expand the routers"
+  lang go
+  file pkg/server/configurationwatcher.go
+  reject VYQL-AUTH-077
+  code
+  ```
+  package server
+
+  import (
+  	"context"
+  	"reflect"
+
+  	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+  )
+
+  func mergeConfiguration(configurations dynamic.Configurations, defaultEntryPointName string) dynamic.Configuration {
+  	conf := dynamic.Merge(configurations)
+  	return resolveHTTPTLSOptions(conf)
+  }
+
+  func (c *ConfigurationWatcher) applyConfigurations(ctx context.Context) {
+  	var lastConfigurations dynamic.Configurations
+  	for {
+  		select {
+  		case <-ctx.Done():
+  			return
+  		case newConfigs, ok := <-c.newConfigs:
+  			if !ok {
+  				return
+  			}
+  			conf := mergeConfiguration(newConfigs.DeepCopy(), c.defaultEntryPoints)
+  			conf = applyModel(conf)
+
+  			for _, listener := range c.configurationListeners {
+  				listener(conf)
+  			}
+  			lastConfigurations = newConfigs
+  		}
+  	}
+  }
+  ```
+
+test "rank1867: tls options resolved after entrypoint models expand the routers"
+  lang go
+  file pkg/server/configurationwatcher.go
+  reject VYQL-AUTH-077
+  code
+  ```
+  package server
+
+  import (
+  	"context"
+  	"reflect"
+
+  	"github.com/traefik/traefik/v2/pkg/config/dynamic"
+  )
+
+  func mergeConfiguration(configurations dynamic.Configurations, defaultEntryPointName string) dynamic.Configuration {
+  	conf := dynamic.Merge(configurations)
+  	return conf
+  }
+
+  func (c *ConfigurationWatcher) applyConfigurations(ctx context.Context) {
+  	var lastConfigurations dynamic.Configurations
+  	for {
+  		select {
+  		case <-ctx.Done():
+  			return
+  		case newConfigs, ok := <-c.newConfigs:
+  			if !ok {
+  				return
+  			}
+  			conf := mergeConfiguration(newConfigs.DeepCopy(), c.defaultEntryPoints)
+  			conf = applyModel(conf)
+  			conf = resolveHTTPTLSOptions(conf)
+
+  			for _, listener := range c.configurationListeners {
+  				listener(conf)
+  			}
+  			lastConfigurations = newConfigs
+  		}
+  	}
+  }
+  ```

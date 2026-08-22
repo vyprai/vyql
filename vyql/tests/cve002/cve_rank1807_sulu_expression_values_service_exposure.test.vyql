@@ -1,0 +1,190 @@
+# Rank 1807 / CVE-2021-43836 (advisory class CWE-22, the impact): Sulu's
+# route generator turns a route schema's `{...}` tokens into path segments by
+# evaluating each token as a Symfony ExpressionLanguage expression, and it
+# hands the evaluator a values map containing the application's shared
+# translator service:
+#
+#   $result = $this->expressionLanguage->evaluate(
+#       $name,
+#       ['object' => $entity, 'translator' => $this->translator]
+#   );
+#
+# ExpressionLanguage is not a sandbox — the component's documentation states
+# that an expression may call any public method on every object in the
+# values map — so whatever the map carries is the boundary. The Symfony
+# translator's documented public surface includes `addResource($format,
+# $resource, ...)`, which registers a translation resource the loader for
+# `$format` reads; the `php` loader includes the file. A backend user who
+# controls the route schema can therefore write an expression calling
+# `translator.addResource('php', '/path')` and reach arbitrary file
+# inclusion, which is the advisory's arbitrary-file-read-to-RCE chain. The
+# fix (9c948f9) keeps the expression and the entity exposure and replaces
+# the map's translator entry with a purpose-built `TranslatorWrapper`
+# facade whose members are only `trans`, `transChoice` and `getLocale`
+# (`setLocale` throws), so the expression's reachable object graph no
+# longer includes resource registration.
+#
+# What fires without this change: VYQL-INJ-006 reports the file at the
+# vulnerable revision — `library.param-source` labels `provide`'s `$name`
+# parameter as external entry input and `php.sinks` labels every
+# `->evaluate(` first argument `code.XpathQuery` — but it reports the fixed
+# revision identically, because the remediation constrains the object graph
+# and not the dataflow, so the finding cannot separate the revisions. The
+# new binding keys on what the values map carries: an evaluator call whose
+# values argument is an array literal binding an entry to a property of the
+# enclosing object (`=>$this->`) exposes that service's whole public API to
+# expression text; any value computed for the evaluation — a facade
+# constructor, a local variable — does not spell `=>$this->`. It reuses
+# code.IncompleteTemplateValidation (VYQL-INJ-024), the concept the
+# unsandboxed-renderer and Twig-sandbox-policy bindings emit: the
+# values map is the expression engine's sandbox, and passing a live service
+# through it is the same incomplete restriction.
+#
+# Measured: the binding fires once at 9c948f9^ (the provider's `provide`)
+# and zero at 9c948f9, verified with `vyql match` on the real file at both
+# revisions; a facade renamed to `RenamedFacade` still suppresses (no
+# needle names the wrapper), and a facade built by a factory call
+# (`$this->buildFacade()`) still reports, since that value is computed from
+# the service — the documented residual, in the review direction. Across
+# the 430 campaign clones (126,660 PHP files) there is no other `->evaluate(`
+# call site at all, so the shape's reachable set outside this repository is
+# empty and the collateral measurement is the enumeration itself.
+
+test "rank1807: route schema expressions evaluate over the live translator service"
+  lang php
+  file SymfonyExpressionTokenProvider.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace Sulu\Bundle\RouteBundle\Generator;
+
+  use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
+  use Symfony\Component\Translation\TranslatorInterface;
+
+  class SymfonyExpressionTokenProvider implements TokenProviderInterface
+  {
+      private $translator;
+
+      private $expressionLanguage;
+
+      public function __construct(TranslatorInterface $translator)
+      {
+          $this->translator = $translator;
+          $this->expressionLanguage = new ExpressionLanguage();
+      }
+
+      public function provide($entity, $name)
+      {
+          $locale = $this->translator->getLocale();
+
+          if (\method_exists($entity, 'getLocale')) {
+              $this->translator->setLocale($entity->getLocale());
+          }
+
+          $result = $this->expressionLanguage->evaluate($name, ['object' => $entity, 'translator' => $this->translator]);
+          $this->translator->setLocale($locale);
+
+          return $result;
+      }
+  }
+  ```
+
+test "rank1807: a purpose-built facade in the values map keeps the service out of the expression"
+  lang php
+  file SymfonyExpressionTokenProviderPatched.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace Sulu\Bundle\RouteBundle\Generator;
+
+  use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
+  use Symfony\Component\Translation\TranslatorInterface;
+
+  class TranslatorWrapper implements TranslatorInterface
+  {
+      private $translator;
+
+      public function __construct(TranslatorInterface $translator)
+      {
+          $this->translator = $translator;
+      }
+
+      public function trans($id, array $parameters = [], $domain = null, $locale = null)
+      {
+          return $this->translator->trans($id, $parameters, $domain, $locale);
+      }
+
+      public function transChoice($id, $number, array $parameters = [], $domain = null, $locale = null)
+      {
+          return $this->translator->transChoice($id, $number, $parameters, $domain, $locale);
+      }
+
+      public function setLocale($locale)
+      {
+          throw new \Exception('Not supported.');
+      }
+
+      public function getLocale()
+      {
+          return $this->translator->getLocale();
+      }
+  }
+
+  class SymfonyExpressionTokenProviderPatched implements TokenProviderInterface
+  {
+      private $translator;
+
+      private $expressionLanguage;
+
+      public function __construct(TranslatorInterface $translator)
+      {
+          $this->translator = $translator;
+          $this->expressionLanguage = new ExpressionLanguage();
+      }
+
+      public function provide($entity, $name)
+      {
+          $result = $this->expressionLanguage->evaluate($name, [
+              'object' => $entity,
+              'translator' => new TranslatorWrapper($this->translator),
+          ]);
+
+          return $result;
+      }
+  }
+  ```
+
+test "rank1807: a values map of computed entries exposes no enclosing service property"
+  lang php
+  file ValueListProvider.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace Sulu\Bundle\RouteBundle\Generator;
+
+  use Symfony\Component\ExpressionLanguage\ExpressionLanguage;
+
+  class ValueListProvider
+  {
+      private $expressionLanguage;
+
+      public function __construct()
+      {
+          $this->expressionLanguage = new ExpressionLanguage();
+      }
+
+      public function provide($entity, $name)
+      {
+          $locale = \method_exists($entity, 'getLocale') ? $entity->getLocale() : 'en';
+          $segment = $entity->getSegment();
+
+          return $this->expressionLanguage->evaluate($name, ['object' => $entity, 'locale' => $locale, 'segment' => $segment]);
+      }
+  }
+  ```

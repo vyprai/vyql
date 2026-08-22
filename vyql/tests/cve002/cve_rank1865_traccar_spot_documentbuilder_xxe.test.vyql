@@ -1,0 +1,79 @@
+# Traccar's Spot protocol decoder builds its DocumentBuilder from a raw
+# DocumentBuilderFactory in the constructor and parses the body of an
+# unauthenticated HTTP request with it in decode(), so a crafted message
+# list resolves external entities (XXE, CWE-611). The fixed revision configures the
+# factory before calling newDocumentBuilder: disallow-doctype-decl,
+# external-general-entities and external-parameter-entities off,
+# load-external-dtd off, XInclude and entity expansion off.
+test "traccar spot decoder builds its document builder from a raw factory"
+  lang java
+  expect VYQL-DESER-004
+  code
+  ```
+  package org.traccar.protocol;
+
+  import io.netty.channel.Channel;
+  import io.netty.handler.codec.http.FullHttpRequest;
+  import java.net.SocketAddress;
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import javax.xml.parsers.ParserConfigurationException;
+
+  public class SpotProtocolDecoder {
+
+      private DocumentBuilder documentBuilder;
+
+      public SpotProtocolDecoder() {
+          try {
+              documentBuilder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
+          } catch (ParserConfigurationException e) {
+              throw new RuntimeException(e);
+          }
+      }
+
+      protected Object decode(Channel channel, SocketAddress remoteAddress, Object msg) throws Exception {
+          FullHttpRequest request = (FullHttpRequest) msg;
+          return documentBuilder.parse(request.content().nioBuffer());
+      }
+  }
+  ```
+
+test "traccar spot decoder hardens the factory before building the parser"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  package org.traccar.protocol;
+
+  import io.netty.channel.Channel;
+  import io.netty.handler.codec.http.FullHttpRequest;
+  import java.net.SocketAddress;
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import javax.xml.parsers.ParserConfigurationException;
+
+  public class SpotProtocolDecoder {
+
+      private DocumentBuilder documentBuilder;
+
+      public SpotProtocolDecoder() {
+          try {
+              DocumentBuilderFactory builderFactory = DocumentBuilderFactory.newInstance();
+              builderFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+              builderFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+              builderFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+              builderFactory.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+              builderFactory.setXIncludeAware(false);
+              builderFactory.setExpandEntityReferences(false);
+              documentBuilder = builderFactory.newDocumentBuilder();
+          } catch (ParserConfigurationException e) {
+              throw new RuntimeException(e);
+          }
+      }
+
+      protected Object decode(Channel channel, SocketAddress remoteAddress, Object msg) throws Exception {
+          FullHttpRequest request = (FullHttpRequest) msg;
+          return documentBuilder.parse(request.content().nioBuffer());
+      }
+  }
+  ```

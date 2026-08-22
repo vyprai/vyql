@@ -1,0 +1,198 @@
+# Ultimate Member's registration handler accepts the whole request body as
+# user metadata (includes/core/um-actions-register.php at the parent of the
+# 2.1.12 security fix): um_submit_form_register merges $_POST-derived
+# $args['submitted'] and dispatches do_action('um_user_register', $user_id,
+# $args); um_after_insert_user -- registered for that hook at line 117 --
+# hands $args['submitted'] to UM()->user()->set_registration_details, which
+# calls update_profile; update_profile's loop writes every key it is given
+#
+#   foreach ( $changes as $key => $value ) {
+#     if ( ! in_array( $key, $this->update_user_keys ) ) {
+#       update_user_meta( $this->id, $key, $value );
+#     }
+#   }
+#
+# so registering with wp_capabilities[administrator]=1 writes the role meta
+# and escalates an unauthenticated registration to administrator (CWE-269,
+# the mass-assignment mechanism of CWE-915). The fixed revision strips the banned key
+# list at intake and in the loop:
+#
+#   $args['submitted'] = array_diff_key( $args['submitted'],
+#                                       array_flip( UM()->user()->banned_keys ) );
+#   ...
+#   if ( in_array( $key, $this->banned_keys ) ) { continue; }
+#
+# What fires on the real code: nothing on the vector, on either revision.
+# Bounded scans of the whole checkout (timeout 180, --max-ram 6GB, --cache
+# off) report 393 findings on the vulnerable parent and 393 on the fixed revision, and
+# the only MassAssign-shaped possibility is measured with a probe binding
+# labelling update_user_meta's meta-key argument code.MassAssign: it yields
+# exactly one finding on each revision -- class-user.php:1616 on the parent,
+# :1618 at the fixed revision -- on update_usermeta_info(), a helper whose $key
+# parameter is entry-tainted while every real call site passes a literal,
+# i.e. a both-revisions false positive, not this vector. The actual
+# registration loop reports zero at both revisions. The binding is
+# therefore not shipped: a finding that fires identically before and after
+# the fixed revision, with no true positive on either side, and no unless clause that
+# could ever clear it.
+#
+# Four blockers, each measured:
+#
+#   1. WordPress hook dispatch creates no call edge. do_action('um_user_
+#      register', ...) in um-actions-register.php:447 and the add_action(
+#      'um_user_register', 'um_after_insert_user', 1, 2) registration at
+#      :117 never link, so taint dies at the dispatch. The minimal pair
+#      below (pair-direct / pair-hooked) isolates exactly this construct:
+#      the same source, handler and sink report 1 finding when the handler
+#      is called directly and 0 when it is dispatched through the hook.
+#      This is a string-constant-keyed callback registry -- 566 add_action,
+#      173 do_action and 363 apply_filters call sites in this checkout
+#      alone, so the idiom is WordPress-wide, not one plugin's quirk.
+#
+#   2. The singleton receiver never resolves. UM()->user()-
+#      ->set_registration_details( ... ) at um-actions-register.php:64 is
+#      listed UNRESOLVED by vyql resolve even though UM(), UM::user() and
+#      set_registration_details all have bodies in the scan: UM() returns
+#      UM::instance() (includes/class-init.php:1514), and a member call on
+#      the result of a factory call has no receiver type to route through.
+#      The PHP instance of the dependency-injection receiver family.
+#
+#   3. update_user_meta has no binding in any language. With a probe
+#      binding emitting code.MassAssign at the meta-key argument, the
+#      distilled chain below reports end to end -- $_POST through the
+#      registration parameters, the array_merge, the handler parameter,
+#      set_registration_details, $this->update_profile, and the foreach
+#      key extraction all carry taint -- so every intraprocedural piece
+#      works; only the two hops above are missing.
+#
+#   4. The remediation is a key filter, invisible to a taint path. With the
+#      chain connected, the fixed revision's array_diff_key strip still reports 1
+#      finding (patched-strip block below), because array_diff_key is an
+#      ordinary call whose result keeps its argument's taint and no check
+#      concept anywhere neutralizes injection.MassAssignment (internal/
+#      definitions/testdata/threats_without_controls.txt), so no unless
+#      clause can express the strip. No API-documented security call
+#      remains on the registration path (the promote_users capability
+#      check landed on the separate admin role-select vector, not this
+#      one) -- the filter-without-halt family, where the honest outcome is
+#      no rule rather than an unsuppressible one.
+#
+# verify_current_expected: attention-engine-gap. The first block pins the
+# real chain's miss. Blocks 2 and 3 are the dispatch minimal pair and hold.
+# Block 4 pins the non-discrimination: it must flip to reject when a
+# neutralizing control for injection.MassAssignment exists, and block 1
+# flips to expect only when hook dispatch resolves, the UM() singleton
+# receiver links, and update_user_meta carries a sink binding -- all three
+# sit on the one path.
+
+test "rank1886: registration submits the whole request body as user metadata through the um_user_register hook"
+  lang php
+  file register-meta.php
+  reject VYQL-INJ-012
+  code
+  ```
+  <?php
+  class User {
+	public $id = 1;
+	public $update_user_keys = array( 'user_email', 'user_url' );
+
+	function set_registration_details( $submitted, $args ) {
+		if ( isset( $submitted['user_pass'] ) ) {
+			unset( $submitted['user_pass'] );
+		}
+		update_user_meta( $this->id, 'submitted', $submitted );
+		$this->update_profile( $submitted );
+	}
+
+	function update_profile( $changes ) {
+		$args['ID'] = $this->id;
+		foreach ( $changes as $key => $value ) {
+			if ( ! in_array( $key, $this->update_user_keys ) ) {
+				update_user_meta( $this->id, $key, $value );
+			}
+		}
+		wp_update_user( $args );
+	}
+  }
+
+  function um_after_insert_user( $user_id, $args ) {
+	if ( empty( $user_id ) ) {
+		return;
+	}
+	if ( ! empty( $args['submitted'] ) ) {
+		UM()->user()->set_registration_details( $args['submitted'], $args );
+	}
+  }
+  add_action( 'um_user_register', 'um_after_insert_user', 1, 2 );
+
+  function um_submit_form_register( $args ) {
+	$credentials = array( 'user_login' => $args['user_login'] );
+	$args['submitted'] = array_merge( $args['submitted'], $credentials );
+	$user_id = wp_insert_user( array( 'user_login' => $args['user_login'] ) );
+	do_action( 'um_user_register', $user_id, $args );
+	return $user_id;
+  }
+
+  um_submit_form_register( $_POST );
+  ```
+
+test "rank1886: minimal pair, direct handler call -- the request data reaches the handler"
+  lang php
+  file pair-direct.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+  function um_after_insert_user( $user_id, $args ) {
+	echo $args['submitted'];
+  }
+
+  function um_submit_form_register( $args ) {
+	$user_id = 1;
+	um_after_insert_user( $user_id, $args );
+  }
+
+  um_submit_form_register( $_POST );
+  ```
+
+test "rank1886: minimal pair, hook dispatch -- the same handler behind do_action never links"
+  lang php
+  file pair-hooked.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  function um_after_insert_user( $user_id, $args ) {
+	echo $args['submitted'];
+  }
+
+  function um_submit_form_register( $args ) {
+	$user_id = 1;
+	do_action( 'um_user_register', $user_id, $args );
+  }
+  add_action( 'um_user_register', 'um_after_insert_user', 1, 2 );
+
+  um_submit_form_register( $_POST );
+  ```
+
+test "rank1886: the fixed revision's banned-key strip does not clear the request data on a connected chain"
+  lang php
+  file patched-strip.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+  function um_after_insert_user( $user_id, $args ) {
+	echo $args['submitted'];
+  }
+
+  function um_submit_form_register( $args ) {
+	$banned_keys = array( 'wp_capabilities', 'wp_user_level' );
+	if ( ! empty( $args['submitted'] ) ) {
+		$args['submitted'] = array_diff_key( $args['submitted'], array_flip( $banned_keys ) );
+	}
+	um_after_insert_user( 1, $args );
+  }
+
+  um_submit_form_register( $_POST );
+  ```

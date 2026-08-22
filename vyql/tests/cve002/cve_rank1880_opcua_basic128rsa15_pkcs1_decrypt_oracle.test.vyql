@@ -1,0 +1,330 @@
+# Rank 1880 / CVE-2024-42512 (GHSA-h958-fxgg-g7w3, CWE-208 + CWE-639):
+# OPCFoundation/UA-.NETStandard decrypts both the UA TCP secure-channel
+# handshake and the user-identity token with RSA PKCS#1 v1.5 padding whenever
+# the deprecated Basic128Rsa15 security policy is enabled. The policy is
+# disabled by default. Two legs meet at the same BCL call:
+#
+#   handshake:    UaSCUaBinaryChannel.Decrypt (Asymmetric.cs:1208) dispatches
+#                 the Basic128Rsa15 case to Rsa_Decrypt(..., RsaUtils.Padding.Pkcs1),
+#                 which decrypts each block with rsa.Decrypt(input, rsaPadding)
+#                 (Rsa.cs:174) after RsaUtils.GetRSAEncryptionPadding maps the
+#                 enum to RSAEncryptionPadding.Pkcs1 (RsaUtils.cs:37).
+#   application
+#   authentication: UserNameIdentityToken.Decrypt (UserIdentityToken.cs:122)
+#                 calls SecurityPolicies.Decrypt, whose Basic128Rsa15 case is
+#                 the only literal-argument spelling in the tree
+#                 (SecurityPolicies.cs:256,
+#                 RsaUtils.Decrypt(..., RsaUtils.Padding.Pkcs1)) and again ends
+#                 at rsa.Decrypt(input, rsaPadding) (RsaUtils.cs:313).
+#
+# .NET's RSA.Decrypt with RSAEncryptionPadding.Pkcs1 throws a distinguishable
+# CryptographicException on malformed padding and takes a measurably different
+# path than a well-formed block, and the stack surfaces the failure as a
+# BadSecurityChecksFailed fault on a fresh channel -- an unauthenticated remote
+# attacker can submit repeated crafted ciphertexts and read the oracle
+# (CWE-208), recover the handshake or password secrets, and bypass application
+# authentication (CWE-639). That is exactly the class the shipped concept
+# code.RsaPkcs1v15DecryptErrorOracle (VYQL-CRY-032, CWE-203/385 -- CWE-203 is
+# this advisory's CWE-208's parent) exists for.
+#
+# 3543d0292556691f681e39145e2de4526b90487d ("Added a minimal rogue client
+# detection mechanism at the transport level") does not touch the crypto, the
+# policy dispatch, or the failure handling: the mitigation is purely additive.
+# TcpListenerChannel.ProcessClose marks the remote address when a channel faults
+# with BadSecurityChecksFailed or BadTcpMessageTypeInvalid under Basic128Rsa15;
+# TcpTransportListener instantiates an ActiveClientTracker only when the server
+# offers the policy, blocks an address after three failed validations in ten
+# seconds for thirty seconds, and OnAccept refuses blocked addresses before
+# creating a channel. The vendor's stated remediation is to stop using
+# Basic128Rsa15; the change is a rate limit around an unchanged oracle.
+#
+# What fires today. Three `--cache off` runs per revision over
+# Stack/Opc.Ua.Core/Stack/Tcp (timeout 180, --max-ram 6GB): 24 findings at the
+# parent, 25 at the fixed revision, identical rule histograms (VYQL-NUM-005,
+# VYQL-INJ-009, VYQL-CFG-014 only) and zero findings on the RSA path or the
+# channel-close path. The +1 on the patched revision is the fixed revision's own new
+# method (code.ExternalEntryInput @ TcpTransportListener.cs:133 feeding
+# code.LogOutput @ :163), so the patched tree scores higher. `vyql match` on a
+# minimal repro of the decrypt dispatch labels nothing: no source, no sink, no
+# control. VYQL-CRY-032 has no C# emitter at all -- its only binding is the
+# Python frontend's OpenSSL heuristic (rsaPkcs1v15DecryptErrorOracle664 over
+# python_review: tokens from pyRsaPkcs1v15DecryptErrorOracle).
+#
+# Minimal pair, measured with an in-worktree probe binding (reverted before
+# this commit; the ENGINE-GAPS entry beside the ledger holds it): a
+# function-scoped presenceNode binding on callPath rsa.Decrypt plus selector
+# RSAEncryptionPadding.Pkcs1 fires VYQL-CRY-032 on the same-function literal
+# form and reports nothing on the identical decrypt whose padding arrives
+# through GetRSAEncryptionPadding -- the enum member's value crossing the
+# helper boundary produces no fact, and csExprShape collapses a member access
+# to the same "ID" shape as a bare variable (csharp.go:610), so no token
+# carries the distinction at the BCL call site. The same probe measured zero
+# VYQL-CRY-032 over the whole Stack/Opc.Ua.Core tree: the reachable set is one
+# file (RsaUtils.cs, the helper side), no corpus call site passes the enum
+# literally to a BCL decrypt, and shipping the binding would be a detection
+# change with no measurable effect anywhere -- recorded as a gap instead.
+#
+# Closing that gap still would not separate the revisions: the crypto is
+# byte-identical across the fixed revisioned revision, so the binding fires on both. The only new
+# signal the fixed revision introduces is the tracker, whose names
+# (ActiveClientTracker, MarkAsPotentialProblematic, IsBlocked) are the fixing
+# commit's own vocabulary -- the measured family where the change lives in named
+# helpers and framework hooks so both revisions score identically (rank 1331,
+# with 1514/1535/1540/1556/1557/1593 for the configuration-wiring form), and
+# the 1380 counterweight does not apply because the fixed revision leaves no documented API
+# call inside the guarded function. The nearest absent-control rule,
+# VYQL-AUTH-105, is keyed on password-verification vocabulary its clause set
+# does not match, and its check would sit in OnAccept -- a different function
+# from the operation being limited, the endpointGuarded attribution-gap family
+# (1377/1389/1399/1437). Both directions are therefore rejected deliberately.
+
+test "rank1880: (a) the Basic128Rsa15 policy dispatch decrypts the handshake and the identity token with RSA PKCS#1 v1.5 padding, whose failure the stack surfaces as a channel fault"
+  lang csharp
+  file Stack/Opc.Ua.Core/Stack/Tcp/UaSCBinaryChannel.Asymmetric.cs
+  reject VYQL-CRY-032
+  reject VYQL-AUTH-105
+  code
+  ```
+  // Composed from UaSCBinaryChannel.Asymmetric.cs (Decrypt dispatch),
+  // UaSCBinaryChannel.Rsa.cs (Rsa_Decrypt) and
+  // Security/Certificates/RsaUtils.cs (GetRSAEncryptionPadding) at the
+  // vulnerable revision.
+  using System;
+  using System.Security.Cryptography;
+  using System.Security.Cryptography.X509Certificates;
+
+  namespace Opc.Ua.Bindings
+  {
+      public static class SecurityPolicies
+      {
+          public const string Basic128Rsa15 = "http://opcfoundation.org/UA/SecurityPolicy#Basic128Rsa15";
+      }
+
+      public static class RsaUtils
+      {
+          public enum Padding { Pkcs1, OaepSHA1, OaepSHA256 }
+
+          internal static RSAEncryptionPadding GetRSAEncryptionPadding(Padding padding)
+          {
+              switch (padding)
+              {
+                  case Padding.Pkcs1: return RSAEncryptionPadding.Pkcs1;
+                  case Padding.OaepSHA1: return RSAEncryptionPadding.OaepSHA1;
+                  default: return RSAEncryptionPadding.OaepSHA256;
+              }
+          }
+      }
+
+      public class UaSCUaBinaryChannel
+      {
+          private string SecurityPolicyUri;
+
+          private ArraySegment<byte> Rsa_Decrypt(
+              ArraySegment<byte> dataToDecrypt,
+              ArraySegment<byte> headerToCopy,
+              X509Certificate2 encryptingCertificate,
+              RsaUtils.Padding padding)
+          {
+              using (RSA rsa = encryptingCertificate.GetRSAPrivateKey())
+              {
+                  RSAEncryptionPadding rsaPadding = RsaUtils.GetRSAEncryptionPadding(padding);
+                  byte[] decryptedBuffer = new byte[8192];
+                  Array.Copy(headerToCopy.Array, headerToCopy.Offset, decryptedBuffer, 0, headerToCopy.Count);
+
+                  byte[] input = new byte[256];
+                  for (int ii = dataToDecrypt.Offset; ii < dataToDecrypt.Offset + dataToDecrypt.Count; ii += 256)
+                  {
+                      Array.Copy(dataToDecrypt.Array, ii, input, 0, input.Length);
+                      byte[] plainText = rsa.Decrypt(input, rsaPadding);
+                      Array.Copy(plainText, 0, decryptedBuffer, headerToCopy.Count, plainText.Length);
+                  }
+
+                  return new ArraySegment<byte>(decryptedBuffer, 0, headerToCopy.Count + 256);
+              }
+          }
+
+          protected ArraySegment<byte> Decrypt(
+              ArraySegment<byte> dataToDecrypt,
+              ArraySegment<byte> headerToCopy,
+              X509Certificate2 receiverCertificate)
+          {
+              switch (SecurityPolicyUri)
+              {
+                  case SecurityPolicies.Basic128Rsa15:
+                  {
+                      return Rsa_Decrypt(dataToDecrypt, headerToCopy, receiverCertificate, RsaUtils.Padding.Pkcs1);
+                  }
+
+                  default:
+                  {
+                      return dataToDecrypt;
+                  }
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1880: (b) the change rate-limits repeat security-validation failures at the transport layer and refuses blocked addresses at accept time"
+  lang csharp
+  file Stack/Opc.Ua.Core/Stack/Tcp/TcpTransportListener.cs
+  reject VYQL-CRY-032
+  reject VYQL-AUTH-105
+  code
+  ```
+  // The fix's additions: ProcessClose (TcpListenerChannel.cs) marks the
+  // remote address when the faulted channel used Basic128Rsa15, and OnAccept
+  // (TcpTransportListener.cs) refuses addresses the tracker has blocked.
+  using System;
+  using System.Net;
+  using System.Net.Sockets;
+
+  namespace Opc.Ua.Bindings
+  {
+      public class ActiveClientTracker
+      {
+          public bool IsBlocked(IPAddress ipAddress)
+          {
+              return false;
+          }
+
+          public void AddClientAction(IPAddress ipAddress)
+          {
+          }
+      }
+
+      public class TcpListenerChannel
+      {
+          private TcpTransportListener m_listener;
+          private string SecurityPolicyUri;
+          private object Socket;
+
+          public void ProcessClose(uint statusCode, bool close)
+          {
+              if (close)
+              {
+                  // mark the RemoteAddress as potential problematic if Basic128Rsa15
+                  if ((SecurityPolicyUri == SecurityPolicies.Basic128Rsa15) &&
+                      (statusCode == 2147549189 || statusCode == 2147484186))
+                  {
+                      var tcpTransportListener = m_listener as TcpTransportListener;
+                      if (tcpTransportListener != null)
+                      {
+                          tcpTransportListener.MarkAsPotentialProblematic(
+                              ((IPEndPoint)((SocketWrapper)Socket).RemoteEndpoint).Address);
+                      }
+                  }
+
+                  // close channel immediately.
+                  ChannelFaulted();
+              }
+          }
+
+          private void ChannelFaulted()
+          {
+          }
+      }
+
+      internal class SocketWrapper
+      {
+          public EndPoint RemoteEndpoint;
+      }
+
+      public class TcpTransportListener
+      {
+          private ActiveClientTracker m_activeClientTracker;
+          private object m_channels;
+          private object m_lock = new object();
+
+          internal void MarkAsPotentialProblematic(IPAddress remoteEndpoint)
+          {
+              m_activeClientTracker?.AddClientAction(remoteEndpoint);
+          }
+
+          private void OnAccept(object sender, SocketAsyncEventArgs e)
+          {
+              TcpListenerChannel channel = null;
+              bool repeatAccept = false;
+              do
+              {
+                  bool isBlocked = false;
+
+                  // Filter out the Remote IP addresses which are detected with potential problematic behavior
+                  if (m_activeClientTracker != null)
+                  {
+                      IPAddress ipAddress = ((IPEndPoint)e?.AcceptSocket?.RemoteEndPoint)?.Address;
+                      if (ipAddress != null && m_activeClientTracker.IsBlocked(ipAddress))
+                      {
+                          isBlocked = true;
+                      }
+                  }
+
+                  repeatAccept = false;
+                  lock (m_lock)
+                  {
+                      var channels = m_channels;
+                      if (channels != null && !isBlocked)
+                      {
+                          channel = new TcpListenerChannel();
+                      }
+                  }
+              } while (repeatAccept);
+          }
+      }
+  }
+  ```
+
+test "rank1880: (c) the frontend pair -- a decrypt whose PKCS#1 v1.5 padding is the call's own argument, beside the identical decrypt whose padding arrives through the padding helper"
+  lang csharp
+  file Stack/Opc.Ua.Core/Security/Certificates/Pair.cs
+  reject VYQL-CRY-032
+  code
+  ```
+  // The literal form (first class) is what a C# binding for
+  // code.RsaPkcs1v15DecryptErrorOracle can see today and fired under the
+  // probe; the helper form (second class) is the real tree's only spelling
+  // and reported nothing -- the enum member's value crosses a function
+  // boundary that emits no fact. No shipped binding covers either.
+  using System.Security.Cryptography;
+  using System.Security.Cryptography.X509Certificates;
+
+  namespace Opc.Ua.Security.Certificates
+  {
+      public class LiteralPaddingDecrypt
+      {
+          public byte[] DecryptHandshake(byte[] input, X509Certificate2 cert)
+          {
+              using (RSA rsa = cert.GetRSAPrivateKey())
+              {
+                  return rsa.Decrypt(input, RSAEncryptionPadding.Pkcs1);
+              }
+          }
+      }
+
+      public static class RsaUtils
+      {
+          public enum Padding { Pkcs1, OaepSHA1, OaepSHA256 }
+
+          internal static RSAEncryptionPadding GetRSAEncryptionPadding(Padding padding)
+          {
+              switch (padding)
+              {
+                  case Padding.Pkcs1: return RSAEncryptionPadding.Pkcs1;
+                  default: return RSAEncryptionPadding.OaepSHA256;
+              }
+          }
+      }
+
+      public class HelperPaddingDecrypt
+      {
+          public byte[] DecryptHandshake(byte[] input, X509Certificate2 cert)
+          {
+              using (RSA rsa = cert.GetRSAPrivateKey())
+              {
+                  RSAEncryptionPadding rsaPadding = RsaUtils.GetRSAEncryptionPadding(RsaUtils.Padding.Pkcs1);
+                  return rsa.Decrypt(input, rsaPadding);
+              }
+          }
+      }
+  }
+  ```

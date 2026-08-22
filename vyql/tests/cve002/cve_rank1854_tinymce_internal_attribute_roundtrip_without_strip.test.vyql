@@ -1,0 +1,203 @@
+# TinyMCE's editor round-trips URL-bearing attributes through internal
+# copies. On the way in, createParser registers a filter that copies the
+# validated src/href/style value into data-mce-src/data-mce-href/
+# data-mce-style -- but only when the internal copy is not present
+# (modules/tinymce/src/core/main/ts/init/InitContentBody.ts:146-175 at the
+# parent of 0029dada):
+#
+#   parser.addAttributeFilter('src,href,style,tabindex', (nodes, name) => {
+#     const internalName = 'data-mce-' + name;
+#     ...
+#     if (value && !node.attr(internalName)) {
+#       ...
+#       node.attr(internalName, editor.convertURL(value, name, node.name));
+#     }
+#
+# So a data-mce-src arriving in the input HTML is kept verbatim and never
+# passes convertURL or any scheme validation. On the way out, the serializer
+# filter restores the internal value over the real attribute
+# (modules/tinymce/src/core/main/ts/dom/DomSerializerFilters.ts:24-40):
+#
+#   let value = node.attr(internalName);
+#   if (value !== undefined) {
+#     node.attr(name, value.length > 0 ? value : null);
+#
+# which turns `<img data-mce-src="javascript:alert(1)" src="about:blank">`
+# into `<img src="javascript:alert(1)">` in the content applications store
+# and render (CWE-79, stored XSS). The fixed revision 0029dada registers one more
+# parse-time filter that nulls incoming data-mce-src,data-mce-href and
+# data-mce-style before the conversion filter runs; the serializer is not
+# touched.
+#
+# Nothing reports this, and the miss is not a label short by one binding.
+#
+#   1. No source exists. The unsanitized value is an attribute of an AstNode
+#      handed to a closure registered by attribute name; no binding labels a
+#      parser callback's node attributes as input. `vyql match` on the two
+#      real files labels only unrelated constructs (`.exec()` calls as
+#      SqlExecution, other lines as HtmlRender/FormatString) -- findings in
+#      the file are not coverage.
+#   2. No sink exists. The dangerous write is `node.attr(name, value)` on an
+#      in-memory AST node; the HTML string only materialises at
+#      Serializer.serialize(). Labelling an AST attribute write as HtmlRender
+#      would fire on every attribute write in every codebase.
+#   3. The two legs are connected only by the framework's runtime callback
+#      dispatch, which carries no dataflow relation -- the same boundary the
+#      caller-side pair below isolates with generic labels: the DOM attribute
+#      read is a resolved code.DomInput source and the innerHTML assignment a
+#      resolved code.HtmlRender sink, and VYQL-INJ-004 fires only when the
+#      value does not cross the editor round-trip. Taint stops at the
+#      unresolved editor calls; inside the library it stops earlier, where
+#      the value stops being a string and becomes node attributes.
+#
+# No binding can separate the revisions. The patched createParser is a strict
+# superset of the vulnerable one: every token of the vulnerable shape is
+# still present at the fixed revisioned revision, so any positive binding fires on both, and the
+# only textual difference is the fixed revision's own added registration -- negating it
+# keys on the fixing commit's layout, which fires on any other way of
+# stripping the attributes and misses a fix written one statement lower. The
+# fix removes nothing, so it leaves no documented API call behind as a
+# positive discriminator either. The remaining generic route -- reading the
+# editor's content back as a stored-data source -- describes the product's
+# function rather than the defect and would fire on every editor integration
+# at both revisions. The discriminating vocabulary would have to embed
+# TinyMCE's internal attribute protocol and this incident's judgement, so the
+# miss is pinned here rather than worked around in data.
+#
+# Union over three `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# runs per side on modules/tinymce/src/core/main/ts (364 files): 369
+# findings at the vulnerable parent and 369 at the fixed revision, every run, with the
+# finding sets on InitContentBody.ts and DomSerializerFilters.ts identical
+# after normalising the six shifted line numbers.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1854: an internal attribute round-trip that keeps a pre-existing internal copy unsanitized"
+  lang javascript
+  file init-content-body.js
+  reject VYQL-INJ-004
+  code
+  ```
+  const createParser = (editor) => {
+    const parser = editor.createParser();
+
+    // Convert src and href into data-mce-src, data-mce-href and data-mce-style
+    parser.addAttributeFilter('src,href,style,tabindex', (nodes, name) => {
+      const internalName = 'data-mce-' + name;
+
+      let i = nodes.length;
+      while (i--) {
+        const node = nodes[i];
+        const value = node.attr(name);
+
+        // Add internal attribute if we need to we don't on a refresh of the document
+        if (value && !node.attr(internalName)) {
+          node.attr(internalName, editor.convertURL(value, name, node.name));
+        }
+      }
+    });
+
+    return parser;
+  };
+
+  const registerSerializerFilters = (serializer, settings, dom) => {
+    // Convert move data-mce-src, data-mce-href and data-mce-style into nodes or process them if needed
+    serializer.addAttributeFilter('src,href,style', (nodes, name) => {
+      const internalName = 'data-mce-' + name;
+
+      let i = nodes.length;
+      while (i--) {
+        const node = nodes[i];
+
+        const value = node.attr(internalName);
+        if (value !== undefined) {
+          // Set external name to internal value and remove internal
+          node.attr(name, value.length > 0 ? value : null);
+          node.attr(internalName, null);
+        }
+      }
+    });
+  };
+  ```
+
+test "rank1854: incoming internal attributes stripped at parse time reports nothing"
+  lang javascript
+  file init-content-body-fixed.js
+  reject VYQL-INJ-004
+  code
+  ```
+  const createParser = (editor) => {
+    const parser = editor.createParser();
+
+    parser.addAttributeFilter('data-mce-src,data-mce-href,data-mce-style', (nodes, name) => {
+      for (let i = 0; i < nodes.length; i++) {
+        nodes[i].attr(name, null);
+      }
+    });
+
+    // Convert src and href into data-mce-src, data-mce-href and data-mce-style
+    parser.addAttributeFilter('src,href,style,tabindex', (nodes, name) => {
+      const internalName = 'data-mce-' + name;
+
+      let i = nodes.length;
+      while (i--) {
+        const node = nodes[i];
+        const value = node.attr(name);
+
+        if (value && !node.attr(internalName)) {
+          node.attr(internalName, editor.convertURL(value, name, node.name));
+        }
+      }
+    });
+
+    return parser;
+  };
+
+  const registerSerializerFilters = (serializer, settings, dom) => {
+    serializer.addAttributeFilter('src,href,style', (nodes, name) => {
+      const internalName = 'data-mce-' + name;
+
+      let i = nodes.length;
+      while (i--) {
+        const node = nodes[i];
+
+        const value = node.attr(internalName);
+        if (value !== undefined) {
+          node.attr(name, value.length > 0 ? value : null);
+          node.attr(internalName, null);
+        }
+      }
+    });
+  };
+  ```
+
+test "rank1854: a DOM-sourced string assigned straight to innerHTML"
+  lang javascript
+  file render-direct.js
+  expect VYQL-INJ-004
+  code
+  ```
+  const renderDirect = () => {
+    const userInput = document.getElementById('payload').getAttribute('data-content');
+    const target = document.createElement('div');
+    target.innerHTML = userInput;
+    return target;
+  };
+  ```
+
+test "rank1854: the same string passed through the editor round-trip before the innerHTML assignment"
+  lang javascript
+  file render-roundtrip.js
+  reject VYQL-INJ-004
+  code
+  ```
+  const renderRoundtrip = () => {
+    const userInput = document.getElementById('payload').getAttribute('data-content');
+    const editor = tinymce.init({ selector: '#editor' });
+    editor.setContent(userInput);
+    const out = editor.getContent();
+    const target = document.createElement('div');
+    target.innerHTML = out;
+    return target;
+  };
+  ```

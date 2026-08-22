@@ -1,0 +1,432 @@
+# Rank 1851 / CVE-2017-5581: TigerVNC's VNC viewer heap-overflows its
+# framebuffer through an RRE framebuffer-update subrectangle that a hostile
+# server sends outside the framebuffer bounds. The decoder
+# (common/rfb/rreDecode.h, instantiated as rreDecode8/16/32 by
+# common/rfb/RREDecoder.cxx) reads each subrectangle's position and size
+# straight off the RFB stream:
+#
+#   int x = is->readU16();
+#   int y = is->readU16();
+#   int w = is->readU16();
+#   int h = is->readU16();
+#   pb->fillRect(pf, Rect(r.tl.x+x, r.tl.y+y, r.tl.x+x+w, r.tl.y+y+h), &pix);
+#
+# and ModifiablePixelBuffer::fillRect (common/rfb/PixelBuffer.cxx:99 at the
+# parent) turns that Rect into a write extent with no clamp:
+#
+#   w = r.width();
+#   h = r.height();
+#   buf = getBufferRW(r, &stride);
+#   ... memset(buf, *(const U8*)pix, w); ... memcpy(buf, start, w * b);
+#
+# so subrectangle coordinates past the framebuffer write past the allocation
+# (CWE-787, heap). The fixing commit 18c020124f1b2441f714da2017f63dba50720ba
+# changes only the callee: drect = r; if (!drect.enclosed_by(getRect()))
+# drect = drect.intersect(getRect()); if (drect.is_empty()) return; -- the
+# same clamp the sibling maskRect had, applied before getBufferRW.
+# The pool row is correct: repository, language, CVE and commit all check,
+# the vulnerable construct is present at 18c0201^ and the remediation at
+# 18c0201. No corpus correction.
+#
+# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# over the whole tree reports 1083 findings; over three runs per revision the
+# unique-fingerprint set is 1098 on the parent and 1098 at the fixed revision, and the
+# only rows that differ are eleven displaced-by-eleven-lines presence rows in
+# PixelBuffer.cxx itself (six VYQL-MEM-016 on the memcpy calls, which exist
+# in both revisions, and five VYQL-MEM-006 NullableDeref rows, likewise on
+# both sides). Nothing on rreDecode.h or RREDecoder.cxx differs at all: the
+# pair is indistinguishable to the scanner, and the rows inside fillRect are
+# "a memcpy exists", not the defect.
+#
+# Vocabulary is checked for reuse before anything is written. No binding
+# anywhere labels rdr::InStream's readU16/readU32/readOpaque* (grep over all
+# of vyql/bindings/), so the RFB stream is not a source. A probe binding
+# (callee.method in [readU16, readU32, readOpaque16, readOpaque32] emitting
+# code.HttpInput at call.result) is built and measured on the real tree
+# anyway: it labels all five reader calls, and the full-tree fingerprint sets
+# stay identical modulo the same eleven displaced rows -- zero findings
+# change, because the taint path dies two hops downstream (below), so the
+# binding is discarded. The sink half of the rule that would judge this
+# shape, VYQL-MEM-003 (core.UserControlledData -> code.RawMemoryCopySizeSink),
+# exists for memcpy/memmove/strncpy/strncat at args[2] but not memset, so the
+# bpp==8 branch's write is unlabelled even where taint exists. And no C/C++
+# binding emits core.MemoryBoundsCheck (only one exists, in Go), so even with
+# the source labelled and every hop working, the clamp in the fixed form has
+# no control that could clear the finding: intersect/enclosed_by results
+# still derive from the attacker-supplied rect and the rule would fire on
+# both revisions.
+#
+# Where the taint path actually stops, measured with minimal pairs.
+#
+#  1. A C++ member function defined out of line (`void C::m(...) { ... }` as
+#     a top-level definition, the ordinary .h-declares/.cxx-defines layout
+#     PixelBuffer.cxx itself uses) extracts nameless: declName
+#     (internal/extract/frontend/treesitter/c.go:878) walks
+#     pointer/array/parenthesized/init/function_declarator but has no
+#     qualified_identifier case, and its default branch finds no `declarator`
+#     field on one, so the name comes back "". The body is walked (its memcpy
+#     keeps its syntactic sink label) but registers as an anonymous function
+#     with no C.m#param nodes, so no call can link into it: `vyql trace` on
+#     the reduced shape dead-ends at "Call ... call=pb.fillRect -- no
+#     outgoing flow (callee not traced -- external or cross-package)".
+#     Minimal pair below (member_inline vs member_outofline): identical
+#     class, call and sink, definition moved in-class vs out of line -- the
+#     inline form reports VYQL-MEM-003, the out-of-line form reports nothing,
+#     stable over six runs. This is adjacent to but distinct from the
+#     recorded constructor/operator-overload resolution gap: those are call
+#     forms that do not resolve; here the callee body is never registered
+#     under any name. Member-call linking itself is by bare method name
+#     across classes (a g.copyN call links into a same-named other class's
+#     inline method), which is what makes the inline half of the pair work
+#     and also why two same-named methods in one file subsume each other.
+#  2. Taint that enters a callee inside an aggregate passed by const
+#     reference does not come back out through field reads or accessor
+#     calls: the Rect constructor's arguments are tainted at the call site
+#     (VYQL-NUM-003/017 fire on the adds), the aggregate reaches the
+#     callee's parameter, and yet memcpy(..., r.width()),
+#     memcpy(..., r.x2 - r.x) and w = r.width(); memcpy(..., w) all stay
+#     clean -- only the identical function taking the extent as a plain int
+#     parameter reports. Minimal pair below (extent_by_int vs
+#     extent_by_rect). This is a field-sensitivity relation the engine does
+#     not have for C/C++ aggregates, i.e. new dataflow, not a missing case.
+#
+# Cross-file free-function calls do resolve (an inline header function
+# called from another file carries taint to its memcpy), so the
+# RREDecoder.cxx -> rreDecode.h hop is not a blocker; the blockers are the
+# member-definition extraction and the aggregate hop, and behind them the
+# missing source binding and the missing clamp control. Four stacked gaps,
+# one of them a new dataflow relation: not mechanical, so this rank is
+# recorded ATTENTION rather than worked around.
+#
+# A callee-side presence binding ("getBufferRW user with no intersect") is
+# considered and rejected on the library's own documentation: PixelBuffer.h
+# documents these operations as "Basic rendering operations / These
+# operations DO NOT clip to the pixelbuffer area, or trap overruns", and at
+# the fixed revision's imageRect still calls getBufferRW(r, ...) with no clamp --
+# a binding keying on the missing clamp would fire on the still-documented
+# no-clip sibling at the fixed revision, and the caller that actually fails
+# to validate (rreDecode.h) is byte-identical in both revisions, so a
+# caller-side label cannot discriminate a fix that lands entirely inside the
+# callee.
+#
+# verify_current_expected: attention-engine-gap. A future fix must flip
+# rre_vuln, rre_vuln_bound_source, member_outofline and extent_by_rect to
+# expect (the last two need only their named engine fix; the first two need
+# the source binding and the clamp control as well), and must keep
+# fillRect_fixed, member_inline and extent_by_int in their current states
+# (member_inline and extent_by_int expect today and must keep reporting).
+
+test "rank1851: RRE subrectangle geometry reaches fillRect with no framebuffer clamp"
+  lang cpp
+  file rre_vuln.cxx
+  reject VYQL-MEM-003
+  code
+  ```
+  #include <string.h>
+
+  namespace rdr { class InStream { public: unsigned readU16(); unsigned readU32(); }; }
+
+  class Rect {
+  public:
+    int x, y, x2, y2;
+    int width() const { return x2 - x; }
+    int height() const { return y2 - y; }
+  };
+
+  class ModifiablePixelBuffer {
+  public:
+    void fillRect(const Rect& r, const void* pix);
+    unsigned char* getBufferRW(const Rect& r, int* stride);
+    void commitBufferRW(const Rect& r);
+  };
+
+  // PixelBuffer.cxx:99 at the parent: the write extent comes straight from
+  // the caller's Rect with no enclosed_by/intersect clamp.
+  void ModifiablePixelBuffer::fillRect(const Rect& r, const void* pix)
+  {
+    int stride;
+    unsigned char *buf;
+    int w, h, b;
+
+    w = r.width();
+    h = r.height();
+    b = 4;
+
+    if (h == 0)
+      return;
+
+    buf = getBufferRW(r, &stride);
+
+    if (b == 1) {
+      while (h--) {
+        memset(buf, *(const unsigned char*)pix, w);
+        buf += stride * b;
+      }
+    } else {
+      unsigned char *start;
+      int w1;
+
+      start = buf;
+
+      w1 = w;
+      while (w1--) {
+        memcpy(buf, pix, b);
+        buf += b;
+      }
+      buf += (stride - w) * b;
+      h--;
+
+      while (h--) {
+        memcpy(buf, start, w * b);
+        buf += stride * b;
+      }
+    }
+
+    commitBufferRW(r);
+  }
+
+  // rreDecode.h: subrectangle position and size read off the RFB stream.
+  void rreDecode(const Rect& r, rdr::InStream* is, ModifiablePixelBuffer* pb)
+  {
+    int nSubrects = is->readU32();
+    for (int i = 0; i < nSubrects; i++) {
+      int x = is->readU16();
+      int y = is->readU16();
+      int w = is->readU16();
+      int h = is->readU16();
+      pb->fillRect(Rect(r.x+x, r.y+y, r.x+x+w, r.y+y+h), 0);
+    }
+  }
+  ```
+
+test "rank1851: same shape with a labelled source isolates the engine hops"
+  lang cpp
+  file rre_vuln_bound_source.cxx
+  reject VYQL-MEM-003
+  code
+  ```
+  #include <string.h>
+  #include <sys/socket.h>
+
+  class Rect {
+  public:
+    int x, y, x2, y2;
+    int width() const { return x2 - x; }
+    int height() const { return y2 - y; }
+  };
+
+  class ModifiablePixelBuffer {
+  public:
+    void fillRect(const Rect& r, const void* pix);
+    unsigned char* getBufferRW(const Rect& r, int* stride);
+    void commitBufferRW(const Rect& r);
+  };
+
+  void ModifiablePixelBuffer::fillRect(const Rect& r, const void* pix)
+  {
+    int stride;
+    unsigned char *buf;
+    int w, h, b;
+
+    w = r.width();
+    h = r.height();
+    b = 4;
+
+    buf = getBufferRW(r, &stride);
+
+    while (h--) {
+      memcpy(buf, buf, w * b);
+      buf += stride * b;
+    }
+
+    commitBufferRW(r);
+  }
+
+  // The coordinates come from a bound source, so only the member-call hop
+  // and the aggregate hop can block the path here.
+  void rreDecodeBound(const Rect& r, int sock, ModifiablePixelBuffer* pb)
+  {
+    unsigned char wire[8];
+    recv(sock, wire, 8, 0);
+    Rect sub(r.x + wire[0], r.y + wire[1],
+             r.x + wire[0] + wire[2], r.y + wire[1] + wire[3]);
+    pb->fillRect(sub, 0);
+  }
+  ```
+
+test "rank1851: the fixed fillRect clamps the rect before taking the buffer"
+  lang cpp
+  file fillRect_fixed.cxx
+  reject VYQL-MEM-003
+  code
+  ```
+  #include <string.h>
+
+  namespace rdr { class InStream { public: unsigned readU16(); unsigned readU32(); }; }
+
+  class Rect {
+  public:
+    int x, y, x2, y2;
+    Rect() : x(0), y(0), x2(0), y2(0) {}
+    Rect(int x_, int y_, int x2_, int y2_) : x(x_), y(y_), x2(x2_), y2(y2_) {}
+    int width() const { return x2 - x; }
+    int height() const { return y2 - y; }
+    bool is_empty() const { return (x >= x2) || (y >= y2); }
+    bool enclosed_by(const Rect& r) const { return x >= r.x && y >= r.y && x2 <= r.x2 && y2 <= r.y2; }
+    Rect intersect(const Rect& r) const;
+  };
+
+  class ModifiablePixelBuffer {
+  public:
+    void fillRect(const Rect& r, const void* pix);
+    unsigned char* getBufferRW(const Rect& r, int* stride);
+    void commitBufferRW(const Rect& r);
+    Rect getRect() const;
+  };
+
+  // PixelBuffer.cxx at the fix: the destination is intersected with the
+  // framebuffer and an empty result returns before any write.
+  void ModifiablePixelBuffer::fillRect(const Rect& r, const void* pix)
+  {
+    int stride;
+    unsigned char *buf;
+    int w, h, b;
+    Rect drect;
+
+    drect = r;
+    if (!drect.enclosed_by(getRect())) {
+      drect = drect.intersect(getRect());
+    }
+
+    if (drect.is_empty())
+      return;
+
+    w = drect.width();
+    h = drect.height();
+    b = 4;
+
+    buf = getBufferRW(drect, &stride);
+
+    while (h--) {
+      memcpy(buf, buf, w * b);
+      buf += stride * b;
+    }
+
+    commitBufferRW(drect);
+  }
+
+  void rreDecode(const Rect& r, rdr::InStream* is, ModifiablePixelBuffer* pb)
+  {
+    int nSubrects = is->readU32();
+    for (int i = 0; i < nSubrects; i++) {
+      int x = is->readU16();
+      int y = is->readU16();
+      int w = is->readU16();
+      int h = is->readU16();
+      pb->fillRect(Rect(r.x+x, r.y+y, r.x+x+w, r.y+y+h), 0);
+    }
+  }
+  ```
+
+test "rank1851: minimal pair, member method defined in class -- the path works"
+  lang cpp
+  file member_inline.cxx
+  expect VYQL-MEM-003
+  code
+  ```
+  #include <string.h>
+  #include <sys/socket.h>
+
+  // The only difference from member_outofline.cxx is that copyN's body sits
+  // inside the class declaration.
+  class FbWriter {
+  public:
+    void copyN(int n, unsigned char* b) { memcpy(b, b, n); }
+  };
+
+  void drive(int sock)
+  {
+    unsigned char tmp[64];
+    int n = recv(sock, tmp, 64, 0);
+    FbWriter w;
+    w.copyN(n, tmp);
+  }
+  ```
+
+test "rank1851: minimal pair, same method defined out of line -- body never links"
+  lang cpp
+  file member_outofline.cxx
+  reject VYQL-MEM-003
+  code
+  ```
+  #include <string.h>
+  #include <sys/socket.h>
+
+  class FbWriter {
+  public:
+    void copyN(int n, unsigned char* b);
+  };
+
+  void FbWriter::copyN(int n, unsigned char* b) { memcpy(b, b, n); }
+
+  void drive(int sock)
+  {
+    unsigned char tmp[64];
+    int n = recv(sock, tmp, 64, 0);
+    FbWriter w;
+    w.copyN(n, tmp);
+  }
+  ```
+
+test "rank1851: minimal pair, extent crossing the call as a plain int -- reports"
+  lang cpp
+  file extent_by_int.cxx
+  expect VYQL-MEM-003
+  code
+  ```
+  #include <string.h>
+  #include <sys/socket.h>
+
+  void copyExtent(int n, unsigned char* b)
+  {
+    memcpy(b, b, n);
+  }
+
+  void drive(int sock)
+  {
+    unsigned char tmp[64];
+    int n = recv(sock, tmp, 64, 0);
+    copyExtent(n, tmp);
+  }
+  ```
+
+test "rank1851: minimal pair, same extent inside a passed-by-ref aggregate -- silent"
+  lang cpp
+  file extent_by_rect.cxx
+  reject VYQL-MEM-003
+  code
+  ```
+  #include <string.h>
+  #include <sys/socket.h>
+
+  struct Extent {
+    int x, x2;
+    int width() const { return x2 - x; }
+  };
+
+  // The tainted value enters inside the aggregate; field reads and accessor
+  // calls on the parameter never carry it back out.
+  void copyExtent(const Extent& e, unsigned char* b)
+  {
+    int w = e.width();
+    memcpy(b, b, w);
+    memcpy(b, b, e.x2 - e.x);
+  }
+
+  void drive(int sock, int ox)
+  {
+    unsigned char tmp[64];
+    int n = recv(sock, tmp, 64, 0);
+    copyExtent(Extent(ox, ox + n), tmp);
+  }
+  ```

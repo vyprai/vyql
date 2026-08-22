@@ -1,0 +1,224 @@
+# Rank 1810 / CVE-2024-53947 (recorded CWE-89; the axis is CWE-184, an
+# incomplete list of disallowed values): apache/superset executes SQL Lab and
+# chart SQL behind a function-name denylist. BaseEngineSpec.execute
+# (superset/db_engine_specs/base.py:1811) reads
+# current_app.config["DISALLOWED_SQL_FUNCTIONS"], asks
+# sql_parse.check_sql_functions_exist(query, disallowed, engine) whether the
+# statement calls any named function, raises DisallowedSQLFunction when it
+# does, and otherwise runs cursor.execute(query). The denylist
+# (superset/config.py:1278) named four postgresql functions -- version,
+# query_to_xml, inet_server_addr, inet_client_addr -- and omitted the rest of
+# PostgreSQL's documented XML-producing family: query_to_xml_and_xmlschema,
+# table_to_xml, table_to_xml_and_xmlschema, database_to_xml and their
+# siblings all take a query/table/database (or serialize one opened)
+# and return it as XML, so query_to_xml_and_xmlschema('select ...') executes
+# the attacker's nested query text through a spelling the screen never
+# consults. The fixed revision 0e002826 adds six strings to the set literal; it touches
+# no code path. This is the second pass over the same list (CVE-2024-39887
+# added the first four), which is the shape's own character: the project
+# enumerates the family one advisory at a time.
+#
+# Measured, both revisions, three --cache off runs each over
+# superset/config.py + superset/db_engine_specs + superset/sql_parse.py:
+# 110 findings on the vulnerable parent and 110 on the fixed revision, identical sets;
+# config.py's only findings are unrelated HardcodedSecret rows at lines
+# 1177/1501/1668/1674/1683. The consumer's cursor.execute(query) is labelled
+# code.SqlExecution (base.py:1831) and VYQL-INJ-001 does fire on a direct
+# request -> execute repro, but on the real tree the request payload ->
+# Query model -> execute_sql_statements -> spec.execute chain severs taint
+# at the ORM persistence boundary (no SqlExecution finding on the sql_lab
+# flow), and that path is identical in both revisions either way -- running
+# user SQL is SQL Lab's purpose, and the guard call is present in both. The
+# denylist has exactly one non-test consumer (grep over the tree), and the
+# 1380 counterweight test fails: the fixed revision touches no guarded function, only
+# the config set's contents.
+#
+# Reuse is checked before minting. The ontology's denylist-gap vocabulary
+# (code.IncompleteDangerousUploadExtensionBlocklist,
+# code.PickleUnsafeImportBlocklistGap,
+# code.SandboxHostObjectMemberDenylistGap, code.IncompleteIpDenylist,
+# code.JdbcSensitiveParamSinglePassFilterBypass) is the right class of
+# judgement but each concept's vulnerableTo threat and reviewCondition name
+# a different surface (upload extensions, pickle imports, sandbox members,
+# IP ranges, JDBC connection parameters), so reuse would mis-file this
+# finding. Minting a SQL-function-denylist sibling does not discriminate:
+# a binding anchored on PostgreSQL's documentation (the whole XML-producing
+# family) still fires on the patched revision, because the fixed revision itself adds
+# only five of the family's documented spellings -- cursor_to_xml,
+# cursor_to_xml_and_xmlschema, database_to_xml_and_xmlschema and the plain
+# *_to_xmlschema variants are absent from the patched set too -- so the
+# documentation-derived form flags both revisions and the only list that
+# separates them is the fixing commit's own subset. That is the 1394 trap
+# in data form. The corpus sweep is also empty: across the 430 clones under
+# /tmp/cve-work/rank*/ no other file names any XML-family member or
+# declares any SQL-function denylist (cross-checked pg_read_file/pg_sleep/
+# dblink/lo_import; only a PHP builtins lexer table and jinja test
+# fixtures), so the binding would fire on one product's one config file.
+# ATTENTION, the configuration-content family (1514, 1535, 1540, 1556,
+# 1557, 1593; missing-entry vocabulary like 1609/1614), not an engine gap:
+# no construct is mishandled -- the distinguishing information is six
+# strings in a set literal.
+#
+# All cases assert reject VYQL-INJ-001 (the taint rule consuming
+# code.SqlExecution): nothing fires today because the query arrives as a
+# parameter behind the ORM boundary and the denylist's contents carry no
+# label. When SQL-function-denylist vocabulary lands, the first case must
+# flip to expect while the patched, documentation-complete and
+# no-consult-override cases stay reject.
+
+test "rank1810: pg function denylist consult runs user SQL through a screen that names one family member"
+  lang python
+  reject VYQL-INJ-001
+  file superset/config.py
+  code
+  ```
+  DISALLOWED_SQL_FUNCTIONS: dict[str, set[str]] = {
+      "postgresql": {"version", "query_to_xml", "inet_server_addr", "inet_client_addr"},
+      "clickhouse": {"url"},
+      "mysql": {"version"},
+  }
+  ```
+  file superset/db_engine_specs/base.py
+  code
+  ```
+  from flask import current_app
+
+  from superset import sql_parse
+
+
+  class DisallowedSQLFunction(Exception):
+      def __init__(self, functions):
+          super().__init__(f"disallowed SQL functions: {functions}")
+
+
+  class BaseEngineSpec:
+      engine = "postgresql"
+
+      @classmethod
+      def execute(cls, cursor, query, database, **kwargs):
+          disallowed_functions = current_app.config["DISALLOWED_SQL_FUNCTIONS"].get(
+              cls.engine, set()
+          )
+          if sql_parse.check_sql_functions_exist(query, disallowed_functions, cls.engine):
+              raise DisallowedSQLFunction(disallowed_functions)
+
+          cursor.execute(query)
+  ```
+
+test "rank1810: the patched denylist adds the rest of the family the advisory names"
+  lang python
+  reject VYQL-INJ-001
+  file superset/config.py
+  code
+  ```
+  DISALLOWED_SQL_FUNCTIONS: dict[str, set[str]] = {
+      "postgresql": {
+          "database_to_xml",
+          "inet_client_addr",
+          "inet_server_addr",
+          "query_to_xml",
+          "query_to_xml_and_xmlschema",
+          "table_to_xml",
+          "table_to_xml_and_xmlschema",
+          "version",
+      },
+      "clickhouse": {"url"},
+      "mysql": {"version"},
+  }
+  ```
+  file superset/db_engine_specs/base.py
+  code
+  ```
+  from flask import current_app
+
+  from superset import sql_parse
+
+
+  class DisallowedSQLFunction(Exception):
+      def __init__(self, functions):
+          super().__init__(f"disallowed SQL functions: {functions}")
+
+
+  class BaseEngineSpec:
+      engine = "postgresql"
+
+      @classmethod
+      def execute(cls, cursor, query, database, **kwargs):
+          disallowed_functions = current_app.config["DISALLOWED_SQL_FUNCTIONS"].get(
+              cls.engine, set()
+          )
+          if sql_parse.check_sql_functions_exist(query, disallowed_functions, cls.engine):
+              raise DisallowedSQLFunction(disallowed_functions)
+
+          cursor.execute(query)
+  ```
+
+test "rank1810: the documentation-complete denylist names the whole XML-producing family"
+  lang python
+  reject VYQL-INJ-001
+  file superset/config.py
+  code
+  ```
+  DISALLOWED_SQL_FUNCTIONS: dict[str, set[str]] = {
+      "postgresql": {
+          "cursor_to_xml",
+          "cursor_to_xml_and_xmlschema",
+          "cursor_to_xmlschema",
+          "database_to_xml",
+          "database_to_xml_and_xmlschema",
+          "database_to_xmlschema",
+          "inet_client_addr",
+          "inet_server_addr",
+          "query_to_xml",
+          "query_to_xml_and_xmlschema",
+          "query_to_xmlschema",
+          "table_to_xml",
+          "table_to_xml_and_xmlschema",
+          "table_to_xmlschema",
+          "version",
+      },
+      "clickhouse": {"url"},
+      "mysql": {"version"},
+  }
+  ```
+  file superset/db_engine_specs/base.py
+  code
+  ```
+  from flask import current_app
+
+  from superset import sql_parse
+
+
+  class DisallowedSQLFunction(Exception):
+      def __init__(self, functions):
+          super().__init__(f"disallowed SQL functions: {functions}")
+
+
+  class BaseEngineSpec:
+      engine = "postgresql"
+
+      @classmethod
+      def execute(cls, cursor, query, database, **kwargs):
+          disallowed_functions = current_app.config["DISALLOWED_SQL_FUNCTIONS"].get(
+              cls.engine, set()
+          )
+          if sql_parse.check_sql_functions_exist(query, disallowed_functions, cls.engine):
+              raise DisallowedSQLFunction(disallowed_functions)
+
+          cursor.execute(query)
+  ```
+
+test "rank1810: an engine override that skips the consult runs its SQL unscreened"
+  lang python
+  reject VYQL-INJ-001
+  file superset/db_engine_specs/hive.py
+  code
+  ```
+  class HiveEngineSpec(BaseEngineSpec):
+      engine = "hive"
+
+      @staticmethod
+      def execute(cursor, query, database, async_=False):
+          kwargs = {"async": async_}
+          cursor.execute(query, **kwargs)
+  ```

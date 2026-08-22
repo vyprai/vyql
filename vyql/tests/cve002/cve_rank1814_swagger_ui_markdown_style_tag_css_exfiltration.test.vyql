@@ -1,0 +1,229 @@
+# swagger-api/swagger-ui, CVE-2019-17495 (recorded CWE-79). Not the
+# `url`/`dom_id` query-parameter XSS of the advisory's neighbours: the change diff
+# settles it. A document loaded through `?url=` supplies Markdown `description`
+# fields, and `src/core/components/providers/markdown.jsx` renders them through
+# Remarkable with `html: true` -- raw markup passthrough -- then
+# `DomPurify.sanitize(str, { ADD_ATTR: ["target"] })`, then
+# `dangerouslySetInnerHTML={{ __html: sanitized }}`. DOMPurify 1.0.11, the
+# version the tree pins, carries `style` in its default `html` tag list
+# (`src/tags.js:102`), and its README states the same in prose -- "DOMPurify per
+# default allows CSS" -- and gives the opt-out as a worked example,
+# `{FORBID_TAGS: ['style']}`. So a `<style>@import url(...)</style>` in a
+# description survives sanitization into the document, and a chained stylesheet
+# reads whatever the page renders into an HTML attribute. That is the Relative
+# Path Overwrite / sequential-import-chaining exfiltration the advisory
+# describes, and the OAuth panel is the reachable target: `<input
+# value={this.state.clientSecret}>` puts the credential in the CSS-readable
+# `value` attribute.
+#
+# The fixing change is 5f6ec8ce1d0e06ad20a243e1b79a6e68373ce8f5 and it is two
+# moves. `FORBID_TAGS: ["style"]` is added to the sanitizer's config, and the
+# two OAuth inputs stop being controlled React inputs: a new `InitializedInput`
+# component takes `initialValue`, filters `value`/`defaultValue` out of the
+# props it spreads, and sets `this.inputRef.value` in `componentDidMount` -- the
+# DOM property, which CSS attribute selectors cannot read, where React's
+# controlled-input `value` prop is serialised into the HTML attribute. The
+# second move is defence in depth against a technique the first move
+# removes; the entry point is the `<style>` element reaching the document.
+#
+# Pool row: 77f4651cbf5b3767f0d79c91fd337de82b6ddee6 is `release: v3.23.11`, a
+# bundle-regeneration commit. Its only source-bearing content is the rebuilt
+# `dist/` bundles (which do carry `FORBID_TAGS`); the `src/` fix is its parent.
+# So `<fix>^` is remediated and no revision pair exists around the row's
+# SHA. The scannable pair is c8ad3963 (v3.23.10, vulnerable) against 5f6ec8c.
+
+#
+# What fires today, union over three `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` runs per revision over `src/`: 39 findings at c8ad3963 and 39
+# at 5f6ec8c, identical sets. `vyql match` on markdown.jsx at c8ad3963 labels
+# exactly two nodes -- `DomPurify.sanitize` as `core.HtmlEscape` (the
+# `htmlEscape505` control, which clears the path) and the `__html` argument as
+# `code.HtmlRender` -- and nothing distinguishes the two revisions, because the
+# only textual difference between them is one key in the sanitizer's config
+# object. The cases below pin that boundary from both sides: the pipeline
+# without the sanitizer reports VYQL-INJ-004, and with it reports nothing at
+# either revision.
+#
+# ATTENTION, precision cost. The discriminator exists and is documentable --
+# DOMPurify's default tag policy permits `style`, and `FORBID_TAGS`/`ALLOWED_TAGS`
+# are the documented ways to stop that -- but it is the absence of a restriction
+# the application never wrote, which is the library's default, and it does not
+# separate this code from ordinary usage. Enumerated across every `.js`/`.jsx`/
+# `.ts`/`.tsx` file in the ~436 rank clones (node_modules, `dist/` and `.min.`
+# excluded): 138 files call `*Purify.sanitize`, 100 of those also write raw HTML
+# (`dangerouslySetInnerHTML` or `.innerHTML =`), and 67 of those name no
+# `FORBID_TAGS` or `ALLOWED_TAGS`. Those 67 span two dozen real projects -- Loris
+# `welcome.js` doing `el.innerHTML = DOMPurify.sanitize(json.Description)`,
+# NocoBase's `useDialog`/`useDrawer`/`usePopover`, NocoDB's MarkdownParser,
+# OneUptime, Open WebUI -- and each is the documented call. Only 40 of the 138
+# name a tag policy at all, so the negation is real but unselective.
+#
+# The one narrowing that separates them is built and measured rather than
+# assumed, and rejected. Adding a raw-HTML-mode conjunct (`html: true` in the
+# module, which in swagger-ui is Remarkable's passthrough option and is
+# causally necessary -- without it the Markdown renderer escapes the `<style>`
+# element before DOMPurify ever sees it) takes 67 files to 4 and gives a clean
+# 40 -> 39 on the real `src/` tree, the delta being exactly markdown.jsx:1. The
+# conjunct is not honest, for two reasons. It is ambiguous: `html: true` also
+# spells DOMPurify's own `USE_PROFILES: { html: true }`, and the one collateral
+# file it selected, streamlit's `Html.tsx`, matched through that reading -- a
+# DOMPurify output-profile restriction, not a renderer passthrough -- so its
+# selectivity is a coincidence rather than a reason. And it does not carry the
+# class: the Loris call site above has the identical `<style>` exposure, no
+# renderer anywhere in the module, and is missed. That is the genericity test
+# failing -- someone reading DOMPurify's README and deciding that permitting CSS
+# into a raw-HTML sink is worth a flag would not restrict the flag to modules
+# that also happen to construct a Markdown renderer; the restriction is what
+# knowing this CVE adds. Suppression is confirmed specific rather than
+# incidental: adding an unrelated config key (`SANITIZE_DOM: true`) leaves the
+# flag firing, only `FORBID_TAGS`/`ALLOWED_TAGS` clear it.
+#
+# This is rank 1083's judgement on the same library, transposed from the
+# version axis to the configuration axis: there the library's nesting-depth
+# limit is missing, here its default tag list permits CSS, and in both the
+# application's code is the documented call. `core.HtmlEscape` from
+# `DomPurify.sanitize` is the control doing its job with no idea the tag policy
+# leaves a channel open, and no concept in the ontology asks a sanitizer
+# whether the `style` element survives it. Minting one, and a rule pairing it
+# with a raw-HTML sink, is the 67-file rule above.
+#
+# The fixed revision's second half is measured too and is further from shippable: 245
+# distinct files across the clones render something credential-named into a
+# React `value={ ... }` attribute, which is the normal controlled-input
+# spelling and is only readable by a stylesheet that is injected.
+#
+# verify_current_expected: attention-precision-cost, both revisions reject; the
+# unsanitized boundary case is the reporting half and stays expected.
+
+test "rank1814: the Markdown pipeline with the sanitizer that permits the style element"
+  lang javascript
+  file src/core/components/providers/markdown.jsx
+  reject VYQL-INJ-004
+  code
+  ```
+  import React from "react"
+  import Remarkable from "remarkable"
+  import DomPurify from "dompurify"
+
+  export function sanitizer(str) {
+    return DomPurify.sanitize(str, {
+      ADD_ATTR: ["target"]
+    })
+  }
+
+  export default function Markdown({ source, className = "" }) {
+    const md = new Remarkable({
+      html: true,
+      typographer: true,
+      breaks: true,
+      linkify: true,
+      linkTarget: "_blank"
+    })
+
+    const html = md.render(source)
+    const sanitized = sanitizer(html)
+
+    return (
+      <div className={cx(className, "markdown")} dangerouslySetInnerHTML={{ __html: sanitized }}></div>
+    )
+  }
+  ```
+
+test "rank1814: the same pipeline at the fixed revision forbids the style element"
+  lang javascript
+  file src/core/components/providers/markdownPatched.jsx
+  reject VYQL-INJ-004
+  code
+  ```
+  import React from "react"
+  import Remarkable from "remarkable"
+  import DomPurify from "dompurify"
+
+  export function sanitizer(str) {
+    return DomPurify.sanitize(str, {
+      ADD_ATTR: ["target"],
+      FORBID_TAGS: ["style"]
+    })
+  }
+
+  export default function Markdown({ source, className = "" }) {
+    const md = new Remarkable({
+      html: true,
+      typographer: true,
+      breaks: true,
+      linkify: true,
+      linkTarget: "_blank"
+    })
+
+    const html = md.render(source)
+    const sanitized = sanitizer(html)
+
+    return (
+      <div className={cx(className, "markdown")} dangerouslySetInnerHTML={{ __html: sanitized }}></div>
+    )
+  }
+  ```
+
+test "rank1814: the pipeline without the sanitizer, the boundary's reporting half"
+  lang javascript
+  file src/core/components/providers/markdownRaw.jsx
+  expect VYQL-INJ-004
+  code
+  ```
+  import React from "react"
+  import Remarkable from "remarkable"
+
+  const md = new Remarkable({
+    html: true,
+    typographer: true,
+    breaks: true,
+    linkify: true,
+    linkTarget: "_blank"
+  })
+
+  export async function renderInfo() {
+    const url = window.location.search
+    const res = await fetch(url)
+    const spec = await res.json()
+
+    return (
+      <div className="description"
+           dangerouslySetInnerHTML={{ __html: md.render(spec.info.description) }}></div>
+    )
+  }
+  ```
+
+test "rank1814: the OAuth credential in the CSS-readable value attribute"
+  lang javascript
+  file src/core/components/auth/oauth2.jsx
+  reject VYQL-INJ-004
+  code
+  ```
+  export default class Oauth2 extends React.Component {
+    constructor(props, context) {
+      super(props, context)
+      this.state = { clientId: "", clientSecret: "" }
+    }
+
+    render() {
+      const { isAuthorized, flow } = this.props
+
+      return (
+        <div>
+          { flow !== APPLICATION && flow !== AUTHORIZATION_CODE
+            ? <p>OAuth2 is required for this operation.</p> : null }
+          <input id="client_id"
+                 type="text"
+                 value={ this.state.clientId }
+                 data-name="clientId"
+                 onChange={ this.onInputChange }/>
+          <input id="client_secret"
+                 type="text"
+                 value={ this.state.clientSecret }
+                 data-name="clientSecret"
+                 onChange={ this.onInputChange }/>
+        </div>
+      )
+    }
+  }
+  ```

@@ -1,0 +1,205 @@
+# swift-nio-http2 before 1.20 (GHSA-q36x-r5x4-h4q6, CVE-2022-0618, no CWE
+# recorded; the shape is CWE-125/129; the vulnerable checkout sits four
+# commits past the 1.19.2 tag) decodes HTTP/2 frames in
+# HTTP2FrameDecoder, and for a HEADERS or PUSH_PROMISE frame that does not
+# carry END_HEADERS the payload takes the CONTINUATION-accumulation branch of
+# the accumulatingPayload state. That branch strips the leading padding byte
+# itself instead of going through validatePadding:
+#
+#     var payloadBytes = state.accumulatedBytes.readSlice(length: state.header.length)!
+#     if state.header.flags.contains(.padded) {
+#         let padding: UInt8 = payloadBytes.readInteger()!
+#         payloadBytes.moveWriterIndex(to: payloadBytes.writerIndex - Int(padding))
+#         state.header.flags.subtract(.padded)
+#         state.header.length -= Int(padding)
+#     }
+#
+# The padding byte is attacker-controlled and never compared against the
+# payload length: moveWriterIndex(to:) is documented in swift-nio to trap
+# unless the index is within the buffer, and writerIndex - padding underflows
+# for a frame whose only payload is the padding byte itself (oss-fuzz
+# minimized case clusterfuzz-testcase-minimized-ServerFuzzer-release-
+# 6530582404792320, shipped at the fixed revision). Every peer can send such a frame,
+# so the trap is a remote denial of service.
+#
+# ac2a5afce3dbb6795b4f78ec3f19726dc28f5617 rewrites the decoder: the padding
+# byte now goes through a dedicated awaitingPaddingLengthByte state that
+# validates it against the remaining payload length before any index
+# arithmetic (unpaddedHeader.length < Int(expectedPadding) -> PROTOCOL_ERROR)
+# and only then hands an expectedPadding field to the state that eventually
+# moves the writer index -- the read and the index move do not share a
+# function.
+#
+# What fires at the vulnerable revision: nothing. `scan --cache off` over the vulnerable
+# checkout reports 89 findings, none of them in HTTP2FrameParser.swift -- the
+# tree's swift findings are WebViewJsInterface rows on test files and ruby
+# ResourceHandle rows in scripts.
+#
+# Vocabulary checked for reuse before minting: none minted. The sink is
+# code.IndexAccessSink -- "attacker-controlled index reaches an access; the
+# index is not range-checked against the accessed object" -- bound in
+# C, C++, Rust and ObjC and consumed by VYQL-MEM-005 TaintedIndexAccess. The
+# source is code.HttpInput on readInteger's result: reading an integer off a
+# ByteBuffer is a wire field read in any swift-nio decoder (the same label
+# the C bindings give protocol payload getters), and it refines
+# core.UserControlledData, which VYQL-MEM-005 names. core.UserControlledData
+# itself is not usable: it sits outside every profile entrypoint list that
+# can apply here. The label goes on the call, not call.result -- for these
+# swift calls the call.result target labels nothing (measured: the identical
+# binding at call labels both probe files, at call.result neither).
+# moveWriterIndex(to:) is the absolute-index form whose argument is
+# the position (its forwardBy: form consumes a count and stays out of
+# scope), and swift folds argument labels into the callee path, so the
+# binding matches callee.path ~= "moveWriterIndex.to".
+#
+# Measured with both bindings, `--cache off`, union over three runs:
+# vulnerable checkout 41 -> 42 findings with exactly one VYQL-MEM-005
+# (source readInteger at HTTP2FrameParser.swift:440, sink moveWriterIndex.to
+# at :442); fixed checkout 41 -> 41 with zero VYQL-MEM-005. Collateral zero:
+# swift-nio 150 -> 150 and swift-nio-extras 2 -> 2, no new rows from the
+# HttpInput source. The two memory.OobRead/OobWrite swift lines join the
+# orphaned-sink work list beside c/cpp/rust/objc/go, which carry the same
+# debt for the same sink.
+#
+# ATTENTION, for one measured reason -- the swift instance of the profile
+# scope family recorded for C at 1437 and Java at 1218. Every finding above
+# requires forcing the profile (`-profile generic`; web/api also work): the
+# auto-detected profile for any tree containing .swift files is mobile_ios
+# (priority 90, detect file("Package.swift") / project.has("ext:.swift")),
+# and its entrypoints are [code.PasteboardInput, code.URLSchemeInput,
+# code.ExternalApiResponse, code.DatabaseRead, code.StoredDataRead,
+# code.SecretValue, code.ComputedSizeValue, code.ArchiveEntryName] -- no
+# inbound-wire source concept at all, so swift-nio-http2's own checkout
+# reports 0 VYQL-MEM-005 under -profile auto against 1 under -profile
+# generic (three runs each), and `vyql match` on the file shows the
+# readInteger call unlabelled under auto. This silences the pre-existing
+# swift .query/.parameters/.queryParameters/.headers HttpInput bindings the
+# same way -- on swift-nio's HTTPTypes.swift those label 4 sites under
+# -profile generic and 0 under auto. mobile_ios is the only profile whose
+# detect list mentions Swift, so server-side Swift has no auto profile with
+# an inbound trust boundary; widening a profile's entrypoint list is a
+# corpus-wide precision lever and is not decided here.
+#
+# The third case pins the route's residual: a length comparison written
+# inline in the sink's own function does not clear the taint (no swift check
+# concept neutralizes memory.OobRead/OobWrite, and swift emits no
+# per-function context facts a guard negation could read), so that safe form
+# still reports. The second case -- the fixing change -- is quiet because the
+# rewrite moved the read and the validation out of the function that moves
+# the index, and the tainted field does not flow back into it.
+#
+# verify_current_expected: attention-profile-scope, case 1 and case 3 fire,
+# case 2 and case 4 quiet under profile generic; case 1 unlabelled under the
+# auto-detected mobile_ios profile
+
+test "swift-nio-http2: padded HEADERS payload moves the writer index by the wire-read padding byte with no length comparison"
+  lang swift
+  file Parser.swift
+  profile generic
+  expect VYQL-MEM-005
+  code
+  ```
+  struct AccumulatingPayloadParserState {
+      var accumulatedBytes: ByteBuffer
+      var header: FrameHeader
+  }
+
+  struct HTTP2FrameDecoder {
+      private var state: AccumulatingPayloadParserState
+
+      private mutating func accumulatePayload() throws {
+          guard state.accumulatedBytes.readableBytes >= state.header.length else {
+              return
+          }
+
+          if (state.header.type == 1 || state.header.type == 5) && !state.header.flags.contains(.endHeaders) {
+              var payloadBytes = state.accumulatedBytes.readSlice(length: state.header.length)!
+
+              if state.header.flags.contains(.padded) {
+                  let padding: UInt8 = payloadBytes.readInteger()!
+                  payloadBytes.moveWriterIndex(to: payloadBytes.writerIndex - Int(padding))
+                  state.header.flags.subtract(.padded)
+                  state.header.length -= Int(padding)
+              }
+          }
+      }
+  }
+  ```
+
+test "swift-nio-http2: rewritten decoder validates the padding byte against the payload length before use"
+  lang swift
+  file Parser.swift
+  profile generic
+  reject VYQL-MEM-005
+  code
+  ```
+  struct AwaitingPaddingLengthByteParserState {
+      var frameHeader: FrameHeader
+      var accumulatedBytes: ByteBuffer
+
+      mutating func process() throws -> ParserState {
+          guard let expectedPadding = self.accumulatedBytes.readInteger(as: UInt8.self) else {
+              return .needMoreData
+          }
+          var unpaddedHeader = self.frameHeader
+          unpaddedHeader.length -= 1
+          if unpaddedHeader.length < Int(expectedPadding) {
+              // Padding that exceeds the remaining payload size MUST be treated as a PROTOCOL_ERROR.
+              throw InternalError.codecError(code: .protocolError)
+          }
+          return .accumulatingFrame(AccumulatingFrameParserState(header: unpaddedHeader,
+                                                                  accumulatedBytes: self.accumulatedBytes,
+                                                                  expectedPadding: expectedPadding))
+      }
+  }
+
+  struct AccumulatingFrameParserState {
+      var frameHeader: FrameHeader
+      var expectedPadding: Int?
+
+      mutating func accumulateFrame() throws {
+          var payloadBytes = self.accumulatedBytes.readSlice(length: self.frameHeader.length)!
+          if let padding = self.expectedPadding {
+              payloadBytes.moveWriterIndex(to: payloadBytes.writerIndex &- padding)
+          }
+      }
+  }
+  ```
+
+test "swift-nio-http2: padding validated against the payload length in the sink's own function still reports"
+  lang swift
+  file Parser.swift
+  profile generic
+  expect VYQL-MEM-005
+  code
+  ```
+  struct HTTP2FrameDecoder {
+      private var payloadBytes: ByteBuffer
+
+      private mutating func stripPadding(length: Int) throws {
+          let padding: UInt8 = self.payloadBytes.readInteger()!
+          let unpaddedLength = length - 1
+          if unpaddedLength < Int(padding) {
+              throw InternalError.codecError(code: .protocolError)
+          }
+          self.payloadBytes.moveWriterIndex(to: self.payloadBytes.writerIndex - Int(padding))
+      }
+  }
+  ```
+
+test "swift-nio-http2: constant writer index reset carries no wire-read value"
+  lang swift
+  file Parser.swift
+  profile generic
+  reject VYQL-MEM-005
+  code
+  ```
+  struct HTTP2FrameEncoder {
+      private var buf: ByteBuffer
+
+      mutating func reset() {
+          self.buf.moveWriterIndex(to: 0)
+          self.buf.moveWriterIndex(forwardBy: 3)
+      }
+  }
+  ```

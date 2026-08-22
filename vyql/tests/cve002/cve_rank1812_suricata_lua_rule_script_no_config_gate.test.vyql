@@ -1,0 +1,315 @@
+# Rank 1812 / CVE-2023-35853 (CWE-1188, CWE-94): Suricata's `lua:` rule
+# keyword names a script file in the rule itself. DetectLuaSetup is the
+# keyword handler registered as sigmatch_table[DETECT_LUA].Setup, so its
+# `str` argument is option text taken verbatim from the rule file; rule
+# files arrive from feeds and shared community collections rather than
+# from the operator's own hand. DetectLuaParse resolves that text against
+# `default-rule-path` into lua->filename, and DetectLuaSetupPrime then
+# runs luaL_newstate + luaL_openlibs + luaL_loadfile(luastate,
+# ld->filename) + lua_pcall on it. luaL_openlibs opens the whole Lua
+# standard library, `os` and `io` included, so the chunk a rule names has
+# the sensor process's own authority: a rule feed is a code-execution
+# supply chain into an inline sensor. Nothing gated it -- the keyword
+# loaded whatever the rule named, unconditionally.
+#
+# b95bbcc6 ("lua: disable lua rules by default") adds a configuration
+# read at the top of the *caller* and a commented-out default in
+# suricata.yaml.in:
+#
+#     int enabled = 0;
+#     (void)ConfGetBool("security.lua.allow-rules", &enabled);
+#     if (!enabled) {
+#         SCLogError(SC_ERR_NO_LUA_SUPPORT,
+#                 "Lua rules disabled by security configuration: security.lua.allow-rules");
+#         goto error;
+#     }
+#
+# with `#allow-rules: false` under a new `security: lua:` block in the
+# shipped yaml. The whole diff is those two files, 18 insertions. Neither
+# sink function is touched: DetectLuaSetupPrime and DetectLuaThreadInit
+# are byte-identical before and after.
+#
+# What fires without this change. The whole tree is far too large for the 180 s
+# bound, so the measurement is the src/ subtree (1160 C files) plus an
+# exhaustive grep enumeration of the shape's reachable set, both stated.
+# Three `--cache off` runs at the parent: 6882 findings, 2004 at or above
+# high, every run. Three runs at the fixed revision: 6882 / 2004, every run. The JSON
+# finding set on the two Lua-bearing files (src/detect-lua.c,
+# src/output-lua.c) is byte-identical across the pair: six low
+# VYQL-MEM-006 NullableDeref rows, all in output-lua.c, none in the file
+# the fixed revision touches. `vyql match` on src/detect-lua.c labels no source on
+# `str` and no sink on luaL_openlibs, luaL_loadfile or lua_pcall; with
+# `-flags only` the file carries 47 review flags, five of them inside the
+# load path's line range, and all five are `__binop.sub` /
+# `str.__subscript` numeric flags on the flowvar/flowint counters and the
+# `str[0] == '!'` negation check. Findings in the function are not
+# coverage.
+#
+# No binding is shippable, and the reason is structural. The Lua API is
+# the only generic key, and it has no discriminator: the remediation
+# changes no Lua call at all, so a `luaL_loadfile` + `lua_pcall` sink
+# binding (code.CodeEval under VYQL-INJ-003) fires identically on both
+# revisions of every file it touches. Its collateral is not hypothetical:
+# exhaustively enumerated (not sampled) across every clone this campaign
+# has taken, `luaL_loadfile|luaL_loadbuffer|luaL_dostring|luaL_dofile`
+# appears in 59 C files, and discounting the Lua and LuaJIT
+# interpreters' own implementation of that API (the `require`/`dofile`/
+# `loadstring` builtins under rank1345) the shape occurs in eight
+# distinct applications -- suricata (detect-lua.c, output-lua.c),
+# memcached (proxy_config.c:225, `settings.proxy_startfile`), Apache
+# httpd mod_lua (modules/lua/lua_vmprep.c:372/540, `spec->file`, three
+# copies), neomutt (mutt_lua.c:452 and lua/commands.c:134), ntopng
+# (src/Lua.cpp:5486, `luaL_dofile(L, script_path)`, five copies), redis
+# (src/scripting.c:1182, src/eval.c:458, src/function_lua.c:102 -- the
+# deliberately client-exposed EVAL), and RIOT OS (pkg/lua/contrib/
+# lua_loadlib.c:59). Roughly forty non-vendored files, and in none of
+# them is "embeds Lua" the weakness. The discriminating property is that
+# the feature needs an explicit configuration opt-in, and no Lua call
+# expresses that.
+#
+# The only vocabulary that does express it is Suricata's own: `ConfGetBool`
+# and the `security.lua.allow-rules` key, both introduced by this very
+# commit. That fails the genericity test outright, and widening it to a
+# file-scope negation is a coincidence machine rather than a control --
+# src/output-lua.c:856 reads `ConfGetBool("engine.init-failure-
+# fatal", ...)` for an unrelated purpose, so a file-scope `unless
+# ConfGetBool` suppresses the ungated output-script path too, and 25 files
+# under src/ read ConfGetBool for reasons that have nothing to do with
+# Lua. Binding ConfGetBool as a check concept would additionally clear
+# unrelated findings, the false-negative direction rejected once.
+#
+# The 1380 counterweight fails: the fixed revision leaves no API-documented call
+# inside the function that carries the sink. The added ConfGetBool sits
+# in DetectLuaSetup, the caller; DetectLuaSetupPrime and
+# DetectLuaThreadInit are untouched. That is the attribution-gap family,
+# C instance on file at 1437 -- `endpointGuarded`
+# (internal/engine/engine.go:1160) suppresses only when the control is in
+# the sink's own function. Name the family rather than filing it anew.
+# Two further blockers sit in front of even that: `str` reaches
+# DetectLuaSetup only through function-pointer dispatch
+# (sigmatch_table[DETECT_LUA].Setup), the C dispatch gap on file, so no
+# source label can reach it; and in a single-file scan
+# DetectLoadCompleteSigPath at detect-lua.c:712 is UNRESOLVED, so taint
+# from `str` terminates before the filename it produces.
+#
+# This is the measured "a flag defaulting open" family (1514, 1535, 1540,
+# 1556, 1557, 1593): the remediation is a configuration default, invisible
+# to any taint path.
+#
+# No ENGINE-GAPS.md entry: nothing here is a construct the engine
+# mishandles that is not on file. The unexpressible piece is an
+# opt-in requirement for a code-execution extension point, a vocabulary
+# gap with no generic key, settled by the enumeration above. Spec
+# cve_rank1812 records both the ungated keyword handler and the gated
+# form, each asserting reject VYQL-INJ-003: when code-execution-opt-in
+# vocabulary lands, the ungated form must flip to expect.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1812: the lua rule keyword loads and runs the script the rule names with the full interpreter library and no enabling configuration"
+  lang c
+  file src/detect-lua.c
+  reject VYQL-INJ-003
+  code
+  ```
+  #include <lua.h>
+  #include <lauxlib.h>
+  #include <lualib.h>
+
+  typedef struct DetectLuaData_ {
+      char *filename;
+  } DetectLuaData;
+
+  static DetectLuaData *DetectLuaParse(DetectEngineCtx *de_ctx, const char *str)
+  {
+      DetectLuaData *lua = SCMalloc(sizeof(DetectLuaData));
+      if (unlikely(lua == NULL))
+          goto error;
+      memset(lua, 0x00, sizeof(DetectLuaData));
+
+      if (strlen(str) && str[0] == '!') {
+          str++;
+      }
+
+      /* get full filename */
+      lua->filename = DetectLoadCompleteSigPath(de_ctx, str);
+      if (lua->filename == NULL) {
+          goto error;
+      }
+
+      return lua;
+  error:
+      if (lua != NULL)
+          DetectLuaFree(de_ctx, lua);
+      return NULL;
+  }
+
+  static int DetectLuaSetupPrime(DetectEngineCtx *de_ctx, DetectLuaData *ld)
+  {
+      int status;
+
+      lua_State *luastate = luaL_newstate();
+      if (luastate == NULL)
+          return -1;
+      luaL_openlibs(luastate);
+
+      status = luaL_loadfile(luastate, ld->filename);
+      if (status) {
+          SCLogError(SC_ERR_LUA_ERROR, "couldn't load file: %s", lua_tostring(luastate, -1));
+          goto error;
+      }
+
+      /* prime the script (or something) */
+      if (lua_pcall(luastate, 0, 0, 0) != 0) {
+          SCLogError(SC_ERR_LUA_ERROR, "couldn't prime file: %s", lua_tostring(luastate, -1));
+          goto error;
+      }
+
+      lua_getglobal(luastate, "init");
+      if (lua_type(luastate, -1) != LUA_TFUNCTION) {
+          SCLogError(SC_ERR_LUA_ERROR, "no init function in script");
+          goto error;
+      }
+
+      return 0;
+  error:
+      lua_close(luastate);
+      return -1;
+  }
+
+  /* the lua keyword handler: str is option text from the rule file */
+  static int DetectLuaSetup(DetectEngineCtx *de_ctx, Signature *s, const char *str)
+  {
+      DetectLuaData *lua = NULL;
+      SigMatch *sm = NULL;
+
+      lua = DetectLuaParse(de_ctx, str);
+      if (lua == NULL)
+          goto error;
+
+      if (DetectLuaSetupPrime(de_ctx, lua) == -1) {
+          goto error;
+      }
+
+      sm = SigMatchAlloc();
+      if (sm == NULL)
+          goto error;
+
+      sm->type = DETECT_LUA;
+      sm->ctx = (SigMatchCtx *)lua;
+      return 0;
+  error:
+      if (lua != NULL)
+          DetectLuaFree(de_ctx, lua);
+      return -1;
+  }
+  ```
+
+test "rank1812: the keyword handler refuses the script unless security.lua.allow-rules is set in the configuration"
+  lang c
+  file src/detect-lua.c
+  reject VYQL-INJ-003
+  code
+  ```
+  #include <lua.h>
+  #include <lauxlib.h>
+  #include <lualib.h>
+
+  typedef struct DetectLuaData_ {
+      char *filename;
+  } DetectLuaData;
+
+  static DetectLuaData *DetectLuaParse(DetectEngineCtx *de_ctx, const char *str)
+  {
+      DetectLuaData *lua = SCMalloc(sizeof(DetectLuaData));
+      if (unlikely(lua == NULL))
+          goto error;
+      memset(lua, 0x00, sizeof(DetectLuaData));
+
+      if (strlen(str) && str[0] == '!') {
+          str++;
+      }
+
+      /* get full filename */
+      lua->filename = DetectLoadCompleteSigPath(de_ctx, str);
+      if (lua->filename == NULL) {
+          goto error;
+      }
+
+      return lua;
+  error:
+      if (lua != NULL)
+          DetectLuaFree(de_ctx, lua);
+      return NULL;
+  }
+
+  static int DetectLuaSetupPrime(DetectEngineCtx *de_ctx, DetectLuaData *ld)
+  {
+      int status;
+
+      lua_State *luastate = luaL_newstate();
+      if (luastate == NULL)
+          return -1;
+      luaL_openlibs(luastate);
+
+      status = luaL_loadfile(luastate, ld->filename);
+      if (status) {
+          SCLogError(SC_ERR_LUA_ERROR, "couldn't load file: %s", lua_tostring(luastate, -1));
+          goto error;
+      }
+
+      /* prime the script (or something) */
+      if (lua_pcall(luastate, 0, 0, 0) != 0) {
+          SCLogError(SC_ERR_LUA_ERROR, "couldn't prime file: %s", lua_tostring(luastate, -1));
+          goto error;
+      }
+
+      lua_getglobal(luastate, "init");
+      if (lua_type(luastate, -1) != LUA_TFUNCTION) {
+          SCLogError(SC_ERR_LUA_ERROR, "no init function in script");
+          goto error;
+      }
+
+      return 0;
+  error:
+      lua_close(luastate);
+      return -1;
+  }
+
+  /* the lua keyword handler: str is option text from the rule file */
+  static int DetectLuaSetup(DetectEngineCtx *de_ctx, Signature *s, const char *str)
+  {
+      DetectLuaData *lua = NULL;
+      SigMatch *sm = NULL;
+
+      /* First check if Lua rules are enabled, by default Lua in rules
+       * is disabled. */
+      int enabled = 0;
+      (void)ConfGetBool("security.lua.allow-rules", &enabled);
+      if (!enabled) {
+          SCLogError(SC_ERR_NO_LUA_SUPPORT,
+                  "Lua rules disabled by security configuration: security.lua.allow-rules");
+          goto error;
+      }
+
+      lua = DetectLuaParse(de_ctx, str);
+      if (lua == NULL)
+          goto error;
+
+      if (DetectLuaSetupPrime(de_ctx, lua) == -1) {
+          goto error;
+      }
+
+      sm = SigMatchAlloc();
+      if (sm == NULL)
+          goto error;
+
+      sm->type = DETECT_LUA;
+      sm->ctx = (SigMatchCtx *)lua;
+      return 0;
+  error:
+      if (lua != NULL)
+          DetectLuaFree(de_ctx, lua);
+      return -1;
+  }
+  ```

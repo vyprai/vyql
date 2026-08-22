@@ -1,0 +1,239 @@
+# AmauriC/tarteaucitron.js builds its consent placeholders by reading
+# attributes off the page's own DOM elements and splicing them into markup:
+# getElemWidth returns `elem.getAttribute('width') || elem.clientWidth`
+# raw, and the map services hand a function literal to
+# tarteaucitron.fallback, which assigns its return value straight to
+# `elems[i].innerHTML`:
+#
+#   "getElemWidth": function(elem) {
+#       return elem.getAttribute('width') || elem.clientWidth;
+#   },
+#   ...
+#   tarteaucitron.fallback(['googlemapsembed'], function (x) {
+#       var width = tarteaucitron.getElemWidth(x), ...
+#       return '<iframe title="' + frame_title + '" src="' + url
+#           + '" width="' + width + '" height="' + height + '" ...></iframe>';
+#   });
+#
+# (tarteaucitron.js:2250 and tarteaucitron.services.js:3210 at the vulnerable
+# parent of 1249057.) Whoever can place or influence a placeholder element's
+# width/height attribute -- reflected page markup, a CMS field, another
+# script's document.write -- controls the text spliced inside the width=" "
+# hole, so `100" onload="...` becomes an event handler the moment consent is
+# given and the iframe string lands in innerHTML (CWE-79). Fix 1249057 routes
+# both helpers through getElemAttr, whose fixSelfXSS encodes & < > " '
+# before the value returns.
+#
+# The attribute read itself had no source label at all -- every other DOM
+# read route (location.*, document.cookie, document.referrer, storage) is
+# bound, but Element.getAttribute, the canonical DOM-XSS attribute source,
+# is not. The domInput2650 binding below closes that, and the same tree
+# then reports four sibling instances of exactly this weakness that the fixed revision
+# never touched (xandrsegment/xandrconversion/affiliate tracking attributes
+# spliced into `innerHTML = '<img src=\'' + uri + '\''`, and the group-list
+# element id into the services list markup): 29 -> 33 findings on the
+# vulnerable parent, 33 stable over three runs and unchanged on the fixed
+# revision, since the changeed revision only rewires the two helpers. Collateral over five
+# other JavaScript trees: vite 761 -> 761, element-web 1093 -> 1093, reach
+# 227 -> 227, matrix-react-sdk 741 -> 743 (one attribute -> innerHTML shape
+# in src/editor/serialize.ts, one medium on a test file), nunjucks 280 -> 282
+# (two highs on a vendored bootstrap docs customizer).
+#
+# ATTENTION, engine gap, the closure-literal half of the callee-provenance
+# family on record for the local-alias (ENGINE-GAPS.md, rank 1088) and
+# parameter (rank 1808) forms: taint reaches the callback's `return`
+# statement and stops there. Everything else in the path is measured working
+# -- the getAttribute result is labelled, it survives the helper's return,
+# the string concatenation and the callback body, and
+# `elems[i].innerHTML =` is a resolved HtmlRender sink two lines below the
+# invocation. What never happens is the flow out of a function literal
+# passed as an argument into the parameter-position call that invokes it:
+# `content(elems[i])` has no traced callee, so its result carries nothing.
+# The minimal pair below isolates exactly that: the identical renderer
+# passed by name instead of inline reports VYQL-INJ-004 with the source at
+# the getAttribute call and the sink at the innerHTML assignment, while the
+# inline literal reports nothing. Wiring literal arguments into the same
+# parameter-callee connection named functions get is a new dataflow
+# relation in the frontend, not a localised correction, so the miss is
+# pinned here rather than worked around in data.
+#
+# verify_current_expected: attention-engine-gap; the first snippet is
+# rejected only because the callback's return value cannot flow out of the
+# parameter-position invocation, and the second is the same renderer passed
+# by name.
+
+test "rank1833: a placeholder width attribute spliced into iframe markup through a fallback callback"
+  lang javascript
+  file tac-width-attr.js
+  reject VYQL-INJ-004
+  code
+  ```
+  var tarteaucitron = {
+      "getElemWidth": function (elem) {
+          return elem.getAttribute('width') || elem.clientWidth;
+      },
+      "getElemHeight": function (elem) {
+          return elem.getAttribute('height') || elem.clientHeight;
+      },
+      "fallback": function (matchClass, content, noInner) {
+          "use strict";
+          var elems = document.getElementsByTagName('*'),
+              i,
+              index = 0;
+          for (i in elems) {
+              if (elems[i] !== undefined) {
+                  for (index = 0; index < matchClass.length; index += 1) {
+                      if ((' ' + elems[i].className + ' ').indexOf(' ' + matchClass[index] + ' ') > -1) {
+                          if (typeof content === 'function') {
+                              if (noInner === true) {
+                                  content(elems[i]);
+                              } else {
+                                  elems[i].innerHTML = content(elems[i]);
+                              }
+                          } else {
+                              elems[i].innerHTML = content;
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  };
+
+  tarteaucitron.services = {
+      "googlemapsembed": {
+          "js": function () {
+              "use strict";
+              tarteaucitron.fallback(['googlemapsembed'], function (x) {
+                  var width = tarteaucitron.getElemWidth(x),
+                      height = tarteaucitron.getElemHeight(x),
+                      url = 'https://maps.example/embed';
+
+                  return '<iframe src="' + url + '" width="' + width + '" height="' + height + '" scrolling="no" allowfullscreen></iframe>';
+              });
+          }
+      }
+  };
+  ```
+
+test "rank1833: the same renderer passed by name instead of inline reports"
+  lang javascript
+  file tac-width-attr.js
+  expect VYQL-INJ-004
+  code
+  ```
+  var tarteaucitron = {
+      "getElemWidth": function (elem) {
+          return elem.getAttribute('width') || elem.clientWidth;
+      },
+      "getElemHeight": function (elem) {
+          return elem.getAttribute('height') || elem.clientHeight;
+      },
+      "fallback": function (matchClass, content, noInner) {
+          "use strict";
+          var elems = document.getElementsByTagName('*'),
+              i,
+              index = 0;
+          for (i in elems) {
+              if (elems[i] !== undefined) {
+                  for (index = 0; index < matchClass.length; index += 1) {
+                      if ((' ' + elems[i].className + ' ').indexOf(' ' + matchClass[index] + ' ') > -1) {
+                          if (typeof content === 'function') {
+                              if (noInner === true) {
+                                  content(elems[i]);
+                              } else {
+                                  elems[i].innerHTML = content(elems[i]);
+                              }
+                          } else {
+                              elems[i].innerHTML = content;
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  };
+
+  function renderPlaceholder(x) {
+      var width = tarteaucitron.getElemWidth(x),
+          height = tarteaucitron.getElemHeight(x),
+          url = 'https://maps.example/embed';
+
+      return '<iframe src="' + url + '" width="' + width + '" height="' + height + '" scrolling="no" allowfullscreen></iframe>';
+  }
+
+  tarteaucitron.services = {
+      "googlemapsembed": {
+          "js": function () {
+              "use strict";
+              tarteaucitron.fallback(['googlemapsembed'], renderPlaceholder);
+          }
+      }
+  };
+  ```
+
+test "rank1833: the width attribute escaped before the markup reports nothing"
+  lang javascript
+  file tac-width-attr.js
+  reject VYQL-INJ-004
+  code
+  ```
+  var tarteaucitron = {
+      "fixSelfXSS": function (html) {
+          return html.toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+      },
+      "getElemAttr": function (elem, attr) {
+          var attribute = elem.getAttribute('data-' + attr) || elem.getAttribute(attr);
+
+          if (typeof attribute === 'string') {
+              return tarteaucitron.fixSelfXSS(attribute);
+          }
+
+          return "";
+      },
+      "getElemWidth": function (elem) {
+          return tarteaucitron.getElemAttr(elem, 'width') || elem.clientWidth;
+      },
+      "getElemHeight": function (elem) {
+          return tarteaucitron.getElemAttr(elem, 'height') || elem.clientHeight;
+      },
+      "fallback": function (matchClass, content, noInner) {
+          "use strict";
+          var elems = document.getElementsByTagName('*'),
+              i,
+              index = 0;
+          for (i in elems) {
+              if (elems[i] !== undefined) {
+                  for (index = 0; index < matchClass.length; index += 1) {
+                      if ((' ' + elems[i].className + ' ').indexOf(' ' + matchClass[index] + ' ') > -1) {
+                          if (typeof content === 'function') {
+                              if (noInner === true) {
+                                  content(elems[i]);
+                              } else {
+                                  elems[i].innerHTML = content(elems[i]);
+                              }
+                          } else {
+                              elems[i].innerHTML = content;
+                          }
+                      }
+                  }
+              }
+          }
+      }
+  };
+
+  tarteaucitron.services = {
+      "googlemapsembed": {
+          "js": function () {
+              "use strict";
+              tarteaucitron.fallback(['googlemapsembed'], function (x) {
+                  var width = tarteaucitron.getElemWidth(x),
+                      height = tarteaucitron.getElemHeight(x),
+                      url = 'https://maps.example/embed';
+
+                  return '<iframe src="' + url + '" width="' + width + '" height="' + height + '" scrolling="no" allowfullscreen></iframe>';
+              });
+          }
+      }
+  };
+  ```

@@ -1,0 +1,143 @@
+# Tomcat's HTTP/2 HPACK decoder accepted any bytes a client sent in a header
+# field name or value. HpackDecoder.readHpackString decoded the length-prefixed
+# string literal straight off the connection's ByteBuffer and
+# HPackHuffman.decode walked the Huffman tree appending each decoded
+# character, and neither path asked whether the character is legal in an HTTP
+# field: names are not checked against the token grammar or rejected for
+# upper case, values are not checked against field-vchar/field-content, so
+# control characters and forbidden bytes reached the header store that every
+# downstream consumer (logging, proxying, the servlet API) trusts. The HTTP/1.1
+# parser had enforced exactly this via HttpParser for years; the HTTP/2 path
+# never validated at all, so over HTTP/2 the container accepted headers it
+# would have rejected over HTTP/1.1 (CWE-20, CWE-113 adjacent).
+#
+# The fixed revision threads an isFieldName flag through both decode paths and validates
+# every character before it is appended:
+#
+#     char c = (char) (buffer.get() & 0xFF);
+#     if (isFieldName) {
+#         if (HttpParser.isToken(c) && !Character.isUpperCase(c)) {
+#             stringBuilder.append(c);
+#         } else {
+#             throw new IllegalArgumentException(...);
+#         }
+#     } else {
+#         if ((i == 0 || i == length - 1) && HttpParser.isFieldVChar(c) ||
+#                 i > 0 && i < length - 1 && HttpParser.isFieldContent(c)) {
+#             stringBuilder.append(c);
+#         } else {
+#             throw new IllegalArgumentException(...);
+#         }
+#     }
+#
+# Pinned as a miss: nothing reports either revision. Both snippets below are
+# the real decode pair (vulnerable first, patched second) and the scanner
+# holds no finding on them -- measured over three --cache off runs of the
+# whole java/org/apache/coyote/http2 subtree per revision: 3 findings each
+# time, identical fingerprints, all VYQL-INJ-009 log findings in
+# Http2UpgradeHandler, nothing on HpackDecoder or HPackHuffman. `vyql match`
+# on the vulnerable HpackDecoder labels nothing at all -- source, sink and
+# control all empty -- and on HPackHuffman only an integer-shift fact.
+#
+# No binding is shippable for the shape, for reasons the corpus measures:
+#
+# - The defect is a property of the whole decode-and-store path, and neither
+#   end carries a label. A source binding for the decode would have to name
+#   readHpackString / HPackHuffman.decode -- package-private Tomcat internals
+#   with no library documentation, so the genericity test fails -- or label
+#   raw ByteBuffer reads, which are ordinary NIO on every Java program.
+# - The parser-property route (the AmbiguousMessageBodyFraming style:
+#   identify the method by what it does, negate the remedies) has no precise
+#   positive trigger. The only generic one -- a loop appending chars read
+#   from a buffer into a builder -- occurs at 194 sites in 68 Java files
+#   across the sibling corpus clones alone (thrift's TJSONProtocol, JSch's
+#   KnownHosts and ProxyHTTP, Tika's RTF and PSD parsers, Tomcat's own
+#   URLEncoder, StandardSessionIdGenerator and AbstractAccessLogValve) and at
+#   46 sites inside Tomcat, including the *safe* validating HTTP/1.1 form,
+#   HttpParser.readToken's `while (c != -1 && isToken(c)) result.append((char)
+#   c);` -- the same textual append, guarded only by its position in the loop
+#   condition, a fact no frontend emits. Validation also legitimately lives
+#   in the caller or the header store in other designs, where a
+#   function-scoped negation cannot see it (the measured attribution-gap
+#   family).
+#
+# VYQL-INJ-247 (netty's documented validateHeaders switch turned off) is the
+# adjacent shipped rule and is rejected on both snippets deliberately: this
+# code disables no flag, and widening that concept to "a decoder with no
+# validation anywhere" is the unshippable shape above, not coverage.
+
+test "hpack header field decoded from request bytes without character validation"
+  lang java
+  reject VYQL-INJ-247
+  code
+  ```
+  import java.nio.ByteBuffer;
+
+  class HpackDecoder {
+      // Decodes a HPACK string literal -- an HTTP/2 header field name or
+      // value -- from the request bytes.
+      private String readHpackString(ByteBuffer buffer) {
+          byte data = buffer.get(buffer.position());
+          int length = Hpack.decodeInteger(buffer, 7);
+          boolean huffman = (data & 0b10000000) != 0;
+          if (huffman) {
+              return readHuffmanString(length, buffer);
+          }
+          StringBuilder stringBuilder = new StringBuilder(length);
+          for (int i = 0; i < length; ++i) {
+              stringBuilder.append((char) buffer.get());
+          }
+          return stringBuilder.toString();
+      }
+
+      private String readHuffmanString(int length, ByteBuffer buffer) {
+          StringBuilder stringBuilder = new StringBuilder(length);
+          HPackHuffman.decode(buffer, length, stringBuilder);
+          return stringBuilder.toString();
+      }
+  }
+  ```
+
+test "hpack header field decode validating every character"
+  lang java
+  reject VYQL-INJ-247
+  code
+  ```
+  import java.nio.ByteBuffer;
+
+  class HpackDecoder {
+      private String readHpackString(ByteBuffer buffer, boolean isFieldName) {
+          byte data = buffer.get(buffer.position());
+          int length = Hpack.decodeInteger(buffer, 7);
+          boolean huffman = (data & 0b10000000) != 0;
+          if (huffman) {
+              return readHuffmanString(length, buffer, isFieldName);
+          }
+          StringBuilder stringBuilder = new StringBuilder(length);
+          for (int i = 0; i < length; ++i) {
+              char c = (char) (buffer.get() & 0xFF);
+              if (isFieldName) {
+                  if (HttpParser.isToken(c) && !Character.isUpperCase(c)) {
+                      stringBuilder.append(c);
+                  } else {
+                      throw new IllegalArgumentException("illegal character in name");
+                  }
+              } else {
+                  if ((i == 0 || i == length - 1) && HttpParser.isFieldVChar(c) ||
+                          i > 0 && i < length - 1 && HttpParser.isFieldContent(c)) {
+                      stringBuilder.append(c);
+                  } else {
+                      throw new IllegalArgumentException("illegal character in value");
+                  }
+              }
+          }
+          return stringBuilder.toString();
+      }
+
+      private String readHuffmanString(int length, ByteBuffer buffer, boolean isFieldName) {
+          StringBuilder stringBuilder = new StringBuilder(length);
+          HPackHuffman.decode(buffer, length, stringBuilder, isFieldName);
+          return stringBuilder.toString();
+      }
+  }
+  ```

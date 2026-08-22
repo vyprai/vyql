@@ -1,0 +1,147 @@
+# Nextcloud user_oidc (CVE-2026-45156, CWE-347) completed an id4me login
+# from a token whose payload is decoded by hand and never signature-checked.
+# Id4meController::code (lib/Controller/Id4meController.php:250 at the parent
+# of 5797f577) exchanges the authorization code at the token endpoint, splits
+# the returned id_token on '.', base64/json-decodes the payload, and leaves a
+# literal "TODO: VALIATE SIGNATURE!" where the check belongs:
+#
+#   [$header, $payload, $signature] = explode('.', $data['id_token']);
+#   $plainHeaders = json_decode(base64_decode($header), true);
+#   $plainPayload = json_decode(base64_decode($payload), true);
+#
+#   /** TODO: VALIATE SIGNATURE! */
+#
+#   if ($plainPayload['exp'] < $this->timeFactory->getTime()) { ... }
+#   ... audience/azp/nonce checks on $plainPayload ...
+#   $backendUser = $this->userMapper->getOrCreate($id4Me->getId(), $plainPayload['sub'], true);
+#   $this->userSession->completeLogin($user, ...);
+#
+# The exp/aud/azp/nonce claims are all attacker-chosen once the signature is
+# not verified, so the sub claim alone decides which account is logged in.
+# The fixed revision decodes the same token through Firebase JWT::decode with the
+# authority's JWKs and rejects on failure, before any claim is read.
+#
+# The shape is the PHP spelling of "a JWT is decoded with signature
+# verification disabled": a dot-separated three-part token is exploded, a
+# segment is base64+json decoded, and no signature-verification API appears
+# in the function. The patched blocks pin that the neutraliser is the
+# verification itself, not the fixed revision's own library: openssl_verify clears it
+# just as JWT::decode does.
+
+test "id4me controller logs in on hand-decoded token claims"
+  lang php
+  file id4me_controller.php
+  expect VYQL-AUTH-108
+  code
+  ```
+  <?php
+
+  class Id4meController {
+  	public function code(string $code = '', string $state = '') {
+  		$client = $this->clientService->newClient();
+  		$result = $client->post($openIdConfig->getTokenEndpoint(), ['body' => ['code' => $code]]);
+  		$data = json_decode($result->getBody(), true);
+
+  		[$header, $payload, $signature] = explode('.', $data['id_token']);
+  		$plainHeaders = json_decode(base64_decode($header), true);
+  		$plainPayload = json_decode(base64_decode($payload), true);
+
+  		if ($plainPayload['exp'] < $this->timeFactory->getTime()) {
+  			return $this->build403TemplateResponse('expired', 403);
+  		}
+  		if (!($plainPayload['aud'] === $id4Me->getClientId())) {
+  			return $this->build403TemplateResponse('wrong audience', 403);
+  		}
+
+  		$backendUser = $this->userMapper->getOrCreate($id4Me->getId(), $plainPayload['sub'], true);
+  		$user = $this->userManager->get($backendUser->getUserId());
+  		$this->userSession->completeLogin($user, ['loginName' => $user->getUID(), 'password' => '']);
+  		return new RedirectResponse('index');
+  	}
+  }
+  ```
+
+test "stateless callback verifies claims from a list-decoded token"
+  lang php
+  file callback.php
+  expect VYQL-AUTH-108
+  code
+  ```
+  <?php
+
+  function finish_oidc_login($auth_header) {
+  	$token = substr($auth_header, 7);
+  	list($header, $payload, $signature) = explode(".", $token);
+  	$claims = json_decode(base64_decode($payload), true);
+
+  	if (!isset($claims['sub'])) {
+  		return null;
+  	}
+  	return login_as_user($claims['sub']);
+  }
+  ```
+
+test "same decode with the signature checked through JWT::decode"
+  lang php
+  file id4me_controller_patched.php
+  reject VYQL-AUTH-108
+  code
+  ```
+  <?php
+
+  class Id4meController {
+  	public function code(string $code = '', string $state = '') {
+  		$client = $this->clientService->newClient();
+  		$result = $client->post($openIdConfig->getTokenEndpoint(), ['body' => ['code' => $code]]);
+  		$data = json_decode($result->getBody(), true);
+
+  		[$header, $payload, $signature] = explode('.', $data['id_token']);
+  		$plainHeaders = json_decode(base64_decode($header), true);
+  		$plainPayload = json_decode(base64_decode($payload), true);
+
+  		$idTokenRaw = $data['id_token'];
+  		$jwkUri = $openIdConfig->getJwksUri();
+  		JWT::$leeway = 60;
+  		try {
+  			$jwks = $this->id4MeService->obtainJWK($jwkUri, $idTokenRaw, true);
+  			$idTokenPayload = JWT::decode($idTokenRaw, $jwks);
+  		} catch (\Exception|\Throwable $e) {
+  			return $this->build403TemplateResponse('token signature check failed', 403);
+  		}
+
+  		if ($plainPayload['exp'] < $this->timeFactory->getTime()) {
+  			return $this->build403TemplateResponse('expired', 403);
+  		}
+
+  		$backendUser = $this->userMapper->getOrCreate($id4Me->getId(), $plainPayload['sub'], true);
+  		$user = $this->userManager->get($backendUser->getUserId());
+  		$this->userSession->completeLogin($user, ['loginName' => $user->getUID(), 'password' => '']);
+  		return new RedirectResponse('index');
+  	}
+  }
+  ```
+
+test "same decode with the signature checked through openssl_verify"
+  lang php
+  file callback_verified.php
+  reject VYQL-AUTH-108
+  code
+  ```
+  <?php
+
+  function finish_oidc_login($auth_header) {
+  	$token = substr($auth_header, 7);
+  	list($header, $payload, $signature) = explode(".", $token);
+  	$claims = json_decode(base64_decode($payload), true);
+
+  	$publicKey = openssl_pkey_get_details(openssl_pkey_get_public(file_get_contents('jwks.pem')))['key'];
+  	if (openssl_verify("$header.$payload", base64_decode($signature), $publicKey, OPENSSL_ALGO_SHA256) !== 1) {
+  		return null;
+  	}
+
+  	if (!isset($claims['sub'])) {
+  		return null;
+  	}
+  	return login_as_user($claims['sub']);
+  }
+  ```

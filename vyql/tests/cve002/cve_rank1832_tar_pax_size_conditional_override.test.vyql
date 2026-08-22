@@ -1,0 +1,190 @@
+# tar-rs at the fixed revision de1a5870 (CVE-2026-33055, CWE-436/CWE-20) parses
+# a pax extended header's size record only when the ustar header's own size
+# field is zero. POSIX gives the size record plain precedence -- the extended
+# header exists to carry values the fixed octal field cannot, and its size
+# value is the size of the following entry's data. Go's archive/tar and the
+# astral-tokio-tar parser apply the record unconditionally, so tar-rs framing
+# an entry by the octal field alone reads the same archive differently from
+# both: the regression test the fixing commit ships builds an archive whose regular
+# entry declares header size 8 and pax size 2048 with a symlink to /etc/shadow
+# hidden in the inflated region, and the lenient reader walks straight into
+# the smuggled entry. The concrete exposure is a crates.io-shaped split, one
+# parser validating server side and this one extracting client side.
+#
+# src/archive.rs next_entry_raw at the vulnerable revision 6071cbe is the whole shape:
+#
+#     let mut pax_size: Option<u64> = None;
+#     if let Some(pax_extensions_ref) = &pax_extensions {
+#         pax_size = pax_extensions_value(pax_extensions_ref, PAX_SIZE);
+#         ... uid and gid records applied unconditionally ...
+#     }
+#
+#     let mut size = header.entry_size()?;
+#     if size == 0 {
+#         if let Some(pax_size) = pax_size {
+#             size = pax_size;
+#         }
+#     }
+#
+# The uid and gid records two lines up show the correct form -- their values
+# land in header.set_uid and header.set_gid with no guard -- which pins that
+# the zero-comparison is the conditional half and nothing else is. The fixed revision
+# deletes the outer if and keeps everything else byte for byte.
+#
+# What fires at the vulnerable revision: nothing on the defect. `scan --cache off` over
+# the vulnerable checkout reported 28 findings -- 26 NullableDeref rows, a
+# PATH finding on a test shell script, and the builder.rs symlink-containment
+# row for the crate's other advisory -- none in archive.rs. With this rule the
+# parent reports 29 and the fixed revision reports 29, and the diff between the two
+# revisions is exactly two rows: this one at archive.rs:283 on the parent only,
+# and a DOS-042 row on tests/all.rs:1971 that the 151 lines of regression test
+# the fixing commit itself adds produce on the fixed side only. Three runs per
+# side, identical each time.
+#
+# Vocabulary checked for reuse before minting. code.AmbiguousMessageBodyFraming
+# is the same interpretation conflict (CWE-444) but its condition names the
+# HTTP/1 Transfer-Encoding and Content-Length pair, and widening it to archive
+# records would stretch its name and evidence past the format they document;
+# code.AmbiguousArchiveManifestSelection is CWE-436 but about which entry a
+# manifest lookup selects, not how many bytes an entry consumes; the
+# ArchiveSymlinkFilterBypass and ArchiveEntryRawPrefixContainment families key
+# on entry names and paths, which is not where this bug lives. None covers "an
+# extended-header override is consulted but applied only under a condition on
+# the base field", so code.ConditionalExtendedHeaderOverride is minted for
+# that class.
+#
+# It is bound in Rust, where the tar crate publishes both halves: Header::
+# entry_size reads the base header's size field and pax_extensions_value with
+# the PAX_SIZE key returns the extended header's record. The zero-comparison
+# is matched on its operands rather than its whole text, so the guard is still
+# recognised when the local carrying the size is renamed to anything
+# containing size, when the call is inlined into the comparison, and in either
+# operand order.
+#
+# Deliberately uncovered, and why: a conditional override written as anything
+# other than an equality against zero -- a max of the two values, an
+# is_positive test, a guard on some third field. The tar crate's own uid and
+# gid handling shows the unconditional idiom this library uses, and the
+# zero-equality is the sentinel form the format's fallback semantics make
+# natural, but a differently-shaped conditional would need its own atoms and
+# there is no second measured instance to pin them on.
+
+test "tar-rs: entry size from the header is zero-compared before the pax size record may override it"
+  lang rust
+  file src/archive.rs
+  expect VYQL-VAL-033
+  expect_review code.ConditionalExtendedHeaderOverride
+  code
+  ```
+  use std::io;
+
+  struct Header;
+
+  impl Header {
+      fn new_old() -> Header {
+          Header
+      }
+
+      fn set_uid(&mut self, _uid: u64) {}
+
+      fn set_gid(&mut self, _gid: u64) {}
+
+      fn entry_size(&self) -> io::Result<u64> {
+          Ok(0)
+      }
+  }
+
+  fn pax_extensions_value(a: &[u8], key: &str) -> Option<u64> {
+      let _ = a;
+      let _ = key;
+      None
+  }
+
+  const PAX_SIZE: &str = "size";
+  const PAX_UID: &str = "uid";
+  const PAX_GID: &str = "gid";
+
+  fn next_entry_raw(pax_extensions: Option<&[u8]>) -> io::Result<u64> {
+      let mut header = Header::new_old();
+      let mut pax_size: Option<u64> = None;
+      if let Some(pax_extensions_ref) = &pax_extensions {
+          pax_size = pax_extensions_value(pax_extensions_ref, PAX_SIZE);
+
+          if let Some(pax_uid) = pax_extensions_value(pax_extensions_ref, PAX_UID) {
+              header.set_uid(pax_uid);
+          }
+
+          if let Some(pax_gid) = pax_extensions_value(pax_extensions_ref, PAX_GID) {
+              header.set_gid(pax_gid);
+          }
+      }
+
+      let mut size = header.entry_size()?;
+      if size == 0 {
+          if let Some(pax_size) = pax_size {
+              size = pax_size;
+          }
+      }
+      Ok(size)
+  }
+  ```
+
+test "tar-rs: patched entry size applies the pax size record unconditionally"
+  lang rust
+  file src/archive.rs
+  reject VYQL-VAL-033
+  code
+  ```
+  use std::io;
+
+  struct Header;
+
+  impl Header {
+      fn new_old() -> Header {
+          Header
+      }
+
+      fn set_uid(&mut self, _uid: u64) {}
+
+      fn set_gid(&mut self, _gid: u64) {}
+
+      fn entry_size(&self) -> io::Result<u64> {
+          Ok(0)
+      }
+  }
+
+  fn pax_extensions_value(a: &[u8], key: &str) -> Option<u64> {
+      let _ = a;
+      let _ = key;
+      None
+  }
+
+  const PAX_SIZE: &str = "size";
+  const PAX_UID: &str = "uid";
+  const PAX_GID: &str = "gid";
+
+  fn next_entry_raw(pax_extensions: Option<&[u8]>) -> io::Result<u64> {
+      let mut header = Header::new_old();
+      let mut pax_size: Option<u64> = None;
+      if let Some(pax_extensions_ref) = &pax_extensions {
+          pax_size = pax_extensions_value(pax_extensions_ref, PAX_SIZE);
+
+          if let Some(pax_uid) = pax_extensions_value(pax_extensions_ref, PAX_UID) {
+              header.set_uid(pax_uid);
+          }
+
+          if let Some(pax_gid) = pax_extensions_value(pax_extensions_ref, PAX_GID) {
+              header.set_gid(pax_gid);
+          }
+      }
+
+      let mut size = header.entry_size()?;
+      // If this exists, it must override the header size. Disagreement among
+      // parsers allows construction of malicious archives that appear
+      // different when parsed.
+      if let Some(pax_size) = pax_size {
+          size = pax_size;
+      }
+      Ok(size)
+  }
+  ```

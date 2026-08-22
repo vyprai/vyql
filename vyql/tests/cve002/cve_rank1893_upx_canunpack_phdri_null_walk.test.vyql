@@ -1,0 +1,413 @@
+# Rank 1893 / CVE-2021-30500: upx's PackLinuxElf64::canUnpack() walks
+# program headers through a pointer that stays null. The constructor reads
+# the input file raw into ehdri and constructs phdri = nullptr
+# (src/p_lx_elf.cpp:733 at the parent); canUnpack() treats the file as a
+# shared object whenever the unvalidated ehdri.e_type equals ET_DYN, calls
+# PackLinuxElf64help1(fi) -- which sets the member e_phnum from the same
+# unvalidated header but returns early, phdri untouched, whenever
+# e_ident[EI_CLASS]/e_phentsize/endianness disagree -- and then walks
+#
+#   Elf64_Phdr const *phdr = phdri, *last_LOAD = nullptr;
+#   for (unsigned j = 0; j < e_phnum; ++phdr, ++j)
+#       if (Elf64_Phdr::PT_LOAD==get_te32(&phdr->p_type)) {   // p_lx_elf.cpp:2406
+#
+# so a crafted ET_DYN file with a non-matching class byte and a nonzero
+# e_phnum dereferences null (CWE-476; the SEGV in github.com/upx/upx
+# issues/485, get_te32 -> get_ne32 on address 0x0). The fixing commit
+# 90279abdfcd235172eab99651043051188938dcc adds the pre-existing
+# checkEhdr(&ehdri) validator at the top of both PackLinuxElf32::canUnpack
+# and PackLinuxElf64::canUnpack, so an invalid header never reaches the
+# walk. The pool row is correct: repository, language, CVE and commit all
+# check, the vulnerable construct is present at 90279abd^ and the
+# remediation (both checkEhdr calls) is present at 90279abd. No corpus
+# correction.
+#
+# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# over the whole tree at the parent reports 957 findings (python:6 c:145
+# cpp:91 bash:7 config:1 textpattern:97), stable at 957 over three runs;
+# the unique-fingerprint set is 1002 on the parent and 1002 at the fixed revision, and
+# the only rows that differ are line-number displacements inside
+# p_lx_elf.cpp itself (RawMemoryCopySize and NullableDeref presence rows
+# shifted by the ten added lines). Nothing at all sits inside
+# PackLinuxElf64::canUnpack or PackLinuxElf64help1 on either revision --
+# the findings elsewhere in the file are "a memcpy exists" marks. The pair
+# is indistinguishable to the scanner.
+#
+# The diagnosis, each hop measured on the reduced shape.
+#
+#  1. No source. The file bytes enter through upx's own
+#     InputFile::readx(&ehdri, sizeof(ehdri)); no binding anywhere labels
+#     it (grep over vyql/bindings/), and upx is an application, not a
+#     library -- readx has no documentation a binding author without this
+#     incident could key on. Even a probe source binding would taint only
+#     call.result, not the filled struct: read-style out-parameter taint
+#     is the hardcoded cReaders eight-name table
+#     (internal/extract/frontend/treesitter/c.go:74; ranks 1206/1407).
+#  2. The callee never links. `vyql resolve` on the reduced shape lists
+#     PackLinuxElf64help1 as UNRESOLVED with its definition in the same
+#     file: the constructor, help1 and canUnpack are all out-of-line
+#     `C::m` definitions, which extract nameless (rank 1851a), so no call
+#     links into any of them. A minimal pair below (help1_outofline vs
+#     help1_inline) adds the measured nuance that a call to a *member*
+#     callee does not resolve even when the callee is defined inside the
+#     class: `this->help2(fi)` resolves as `?.help2` (no receiver-type
+#     fact, rank 1631), and the bare sibling call `help2(fi)` resolves
+#     under no name either -- so for this shape 1851a and 1631 stack.
+#  3. The count is a struct field. e_phnum comes from ehdri.e_phnum read
+#     inside the callee; field flow through aggregates is missing (1851b),
+#     and a loop's trip-count condition is never tainted anyway
+#     (1297/1300).
+#  4. The nullability has no fact. The discriminating property is "phdri
+#     may still be its constructor nullptr on the path through help1's
+#     early return" -- a callee post-condition the caller cannot consult;
+#     the mechanism does not exist for C/C++ (the nullable-field-factory
+#     entry at rank 1329 records exactly this missing relation, in its
+#     field-clear form; this is the null-init-plus-early-return form).
+#  5. The deref has no vocabulary. phdr->p_type lowers to an Attr, and the
+#     C/C++ NullableDeref binding is presence on `__deref`, which the
+#     frontend emits only for explicit `*p` (c.go:1580) -- so no CWE-476
+#     rule can so much as express "member access through a possibly-null
+#     pointer". Widening that binding to member access is unshippable
+#     precision-wise: upx src alone holds 4489 `x->field` sites with zero
+#     null checks on phdr, and the label would fire on every one in every
+#     C++ tree, vulnerable or not.
+#
+# Reuse is checked before concluding. code.NullableDeref and
+# code.UncheckedNullableResultDeref exist and are consumed (VYQL-MEM-006 /
+# VYQL-MEM-018); the former binds only explicit dereferences and the
+# latter's producer requires the `x->field = call(...)` text shape
+# (ccUncheckedNullableResultDerefObservations), which this walk is not.
+# The only call the fixed revision leaves inside canUnpack is checkEhdr(&ehdri), an
+# undocumented internal helper -- a control keyed on its absence is the
+# fix's own vocabulary (rename checkEhdr and the binding goes blind), so
+# the delegated-check counterweight does not apply. Every hop of every
+# expressible route is a filed gap, so this rank is recorded
+# ATTENTION and no new entry is filed: the shape is the native-parser
+# lifetime family.
+#
+# verify_current_expected: attention-engine-gap. A future fix must flip
+# canunpack_vuln and flat_null_walk to expect while keeping canunpack_fixed,
+# help1_inline and help1_outofline in their current states -- help1_inline
+# flips only when member-call linking (1851a/1631) lands, and even then it
+# stays rejected until the nullability fact (1329's mechanism) and a
+# nullability-keyed deref judgement exist; the fixed form must never fire,
+# which is what the validator-as-control half requires.
+
+test "rank1893: ET_DYN header walk dereferences the null phdri member"
+  lang cpp
+  file canunpack_vuln.cxx
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <string.h>
+
+  struct Elf64_Ehdr {
+    unsigned char e_ident[16];
+    unsigned short e_type, e_machine, e_phnum, e_shnum;
+    unsigned e_version, e_phoff;
+  };
+  struct Elf64_Phdr { unsigned p_type, p_flags; unsigned long p_offset; };
+
+  class InputFile {
+  public:
+    void seek(long off, int whence);
+    void readx(void *buf, unsigned len);
+  };
+
+  class PackLinuxElf {
+  public:
+    int canUnpack();
+  };
+
+  class PackLinuxElf64 : public PackLinuxElf {
+    Elf64_Ehdr ehdri;          // from input file
+    Elf64_Phdr const *phdri;   // nullptr unless help1 parsed the headers
+    unsigned e_phnum;
+    InputFile *fi;
+    unsigned get_te16(void const *p);
+    unsigned get_te32(void const *p);
+
+  public:
+    PackLinuxElf64(InputFile *f);
+    void PackLinuxElf64help1(InputFile *f);
+    int canUnpack();
+  };
+
+  PackLinuxElf64::PackLinuxElf64(InputFile *f)
+    : phdri(nullptr), e_phnum(0), fi(f)
+  {
+    memset(&ehdri, 0, sizeof(ehdri));
+    if (f) {
+      f->seek(0, 0 /*SEEK_SET*/);
+      f->readx(&ehdri, sizeof(ehdri));
+    }
+  }
+
+  void PackLinuxElf64::PackLinuxElf64help1(InputFile *f)
+  {
+    e_phnum = get_te16(&ehdri.e_phnum);
+    if (ehdri.e_ident[4] != 2 /*ELFCLASS64*/) {
+      return;      // phdri stays nullptr, e_phnum stays file-controlled
+    }
+    fi->seek(0, 0 /*SEEK_SET*/);
+    phdri = (Elf64_Phdr const *) &ehdri;
+  }
+
+  // src/p_lx_elf.cpp:2397 at the parent: no header validation before the walk.
+  int PackLinuxElf64::canUnpack()
+  {
+    if (PackLinuxElf::canUnpack()) {
+      return 1;
+    }
+    if (3 /*ET_DYN*/ == get_te16(&ehdri.e_type)) {
+      PackLinuxElf64help1(fi);
+      Elf64_Phdr const *phdr = phdri, *last_LOAD = 0;
+      for (unsigned j = 0; j < e_phnum; ++phdr, ++j)
+        if (1 /*PT_LOAD*/ == get_te32(&phdr->p_type)) {   // null deref
+          last_LOAD = phdr;
+        }
+      if (!last_LOAD)
+        return 0;
+    }
+    return 0;
+  }
+  ```
+
+test "rank1893: checkEhdr before the walk rejects the invalid header"
+  lang cpp
+  file canunpack_fixed.cxx
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <string.h>
+
+  struct Elf64_Ehdr {
+    unsigned char e_ident[16];
+    unsigned short e_type, e_machine, e_phnum, e_shnum;
+    unsigned e_version, e_phoff;
+  };
+  struct Elf64_Phdr { unsigned p_type, p_flags; unsigned long p_offset; };
+
+  class InputFile {
+  public:
+    void seek(long off, int whence);
+    void readx(void *buf, unsigned len);
+  };
+
+  class PackLinuxElf {
+  public:
+    int canUnpack();
+  };
+
+  class PackLinuxElf64 : public PackLinuxElf {
+    Elf64_Ehdr ehdri;
+    Elf64_Phdr const *phdri;
+    unsigned e_phnum;
+    InputFile *fi;
+    unsigned get_te16(void const *p);
+    unsigned get_te32(void const *p);
+    int checkEhdr(Elf64_Ehdr const *ehdr) const;
+
+  public:
+    PackLinuxElf64(InputFile *f);
+    void PackLinuxElf64help1(InputFile *f);
+    int canUnpack();
+  };
+
+  PackLinuxElf64::PackLinuxElf64(InputFile *f)
+    : phdri(nullptr), e_phnum(0), fi(f)
+  {
+    memset(&ehdri, 0, sizeof(ehdri));
+    if (f) {
+      f->seek(0, 0 /*SEEK_SET*/);
+      f->readx(&ehdri, sizeof(ehdri));
+    }
+  }
+
+  void PackLinuxElf64::PackLinuxElf64help1(InputFile *f)
+  {
+    e_phnum = get_te16(&ehdri.e_phnum);
+    if (ehdri.e_ident[4] != 2 /*ELFCLASS64*/) {
+      return;
+    }
+    fi->seek(0, 0 /*SEEK_SET*/);
+    phdri = (Elf64_Phdr const *) &ehdri;
+  }
+
+  int PackLinuxElf64::checkEhdr(Elf64_Ehdr const *ehdr) const
+  {
+    if (0 != memcmp(ehdr->e_ident, "\x7f\x45\x4c\x46", 4)
+    ||  ehdr->e_ident[4] != 2 /*ELFCLASS64*/) {
+      return -1;
+    }
+    if (get_te16(&ehdr->e_phnum) < 1) {
+      return 5;
+    }
+    return 0;
+  }
+
+  // src/p_lx_elf.cpp at 90279abd: the header is validated first, so the
+  // early-return path that leaves phdri null cannot reach the walk.
+  int PackLinuxElf64::canUnpack()
+  {
+    if (checkEhdr(&ehdri)) {
+      return 0;
+    }
+    if (3 /*ET_DYN*/ == get_te16(&ehdri.e_type)) {
+      PackLinuxElf64help1(fi);
+      Elf64_Phdr const *phdr = phdri, *last_LOAD = 0;
+      for (unsigned j = 0; j < e_phnum; ++phdr, ++j)
+        if (1 /*PT_LOAD*/ == get_te32(&phdr->p_type)) {
+          last_LOAD = phdr;
+        }
+      if (!last_LOAD)
+        return 0;
+    }
+    if (PackLinuxElf::canUnpack()) {
+      return 1;
+    }
+    return 0;
+  }
+  ```
+
+test "rank1893: minimal pair, the helper defined out of line -- never links"
+  lang cpp
+  file help1_outofline.cxx
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <string.h>
+
+  struct Elf64_Ehdr { unsigned char e_ident[16]; unsigned short e_type, e_phnum; };
+  struct Elf64_Phdr { unsigned p_type; };
+  class InputFile { public: void readx(void *buf, unsigned len); };
+
+  class PackLinuxElf64 {
+    Elf64_Ehdr ehdri;
+    Elf64_Phdr const *phdri;
+    unsigned e_phnum;
+    InputFile *fi;
+
+  public:
+    PackLinuxElf64(InputFile *f);
+    void help2(InputFile *f);
+    int canUnpack();
+  };
+
+  void PackLinuxElf64::help2(InputFile *f)
+  {
+    e_phnum = ehdri.e_phnum;
+    if (ehdri.e_ident[4] != 2)
+      return;
+    fi->seek(0, 0);
+    phdri = (Elf64_Phdr const *) &ehdri;
+  }
+
+  int PackLinuxElf64::canUnpack()
+  {
+    if (ehdri.e_type == 3) {
+      help2(fi);
+      Elf64_Phdr const *phdr = phdri;
+      for (unsigned j = 0; j < e_phnum; ++phdr, ++j)
+        if (1 == phdr->p_type) { }
+    }
+    return 0;
+  }
+  ```
+
+test "rank1893: minimal pair, the same helper inline in the class -- still no link"
+  lang cpp
+  file help1_inline.cxx
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <string.h>
+
+  struct Elf64_Ehdr { unsigned char e_ident[16]; unsigned short e_type, e_phnum; };
+  struct Elf64_Phdr { unsigned p_type; };
+  class InputFile { public: void readx(void *buf, unsigned len); };
+
+  class PackLinuxElf64 {
+    Elf64_Ehdr ehdri;
+    Elf64_Phdr const *phdri;
+    unsigned e_phnum;
+    InputFile *fi;
+
+  public:
+    PackLinuxElf64(InputFile *f);
+    // The only difference from help1_outofline.cxx: the body sits inside
+    // the class declaration. `vyql resolve` still reports ?.help2 for the
+    // receiver form and no name at all for the bare sibling call.
+    void help2(InputFile *f)
+    {
+      e_phnum = ehdri.e_phnum;
+      if (ehdri.e_ident[4] != 2)
+        return;
+      fi->seek(0, 0);
+      phdri = (Elf64_Phdr const *) &ehdri;
+    }
+    int canUnpack();
+  };
+
+  int PackLinuxElf64::canUnpack()
+  {
+    if (ehdri.e_type == 3) {
+      this->help2(fi);
+      Elf64_Phdr const *phdr = phdri;
+      for (unsigned j = 0; j < e_phnum; ++phdr, ++j)
+        if (1 == phdr->p_type) { }
+    }
+    return 0;
+  }
+  ```
+
+test "rank1893: the same walk flattened to free functions -- still silent"
+  lang cpp
+  file flat_null_walk.cxx
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <string.h>
+
+  struct Elf64_Ehdr { unsigned char e_ident[16]; unsigned short e_type, e_phnum; };
+  struct Elf64_Phdr { unsigned p_type; };
+  class InputFile { public: void readx(void *buf, unsigned len); };
+
+  // No member calls, no out-of-line definitions: the constructor's
+  // nullptr and the helper's early return are the only things that make
+  // phdri null, and neither is visible to the walk even here.
+  struct State {
+    Elf64_Ehdr ehdri;
+    Elf64_Phdr const *phdri;
+    unsigned e_phnum;
+    InputFile *fi;
+  };
+
+  void init(State *s, InputFile *f)
+  {
+    memset(&s->ehdri, 0, sizeof(s->ehdri));
+    s->phdri = 0;
+    s->fi = f;
+    if (f)
+      f->readx(&s->ehdri, sizeof(s->ehdri));
+  }
+
+  void help(State *s)
+  {
+    s->e_phnum = s->ehdri.e_phnum;
+    if (s->ehdri.e_ident[4] != 2)
+      return;
+    s->phdri = (Elf64_Phdr const *) &s->ehdri;
+  }
+
+  int canUnpack(State *s)
+  {
+    if (s->ehdri.e_type == 3) {
+      help(s);
+      Elf64_Phdr const *phdr = s->phdri;
+      for (unsigned j = 0; j < s->e_phnum; ++phdr, ++j)
+        if (1 == phdr->p_type) { }
+    }
+    return 0;
+  }
+  ```

@@ -1,0 +1,250 @@
+# Tolgee at the fixed revision 6ddba66 (CVE-2024-52297, tolgee/tolgee-platform,
+# kotlin). The public configuration endpoint is
+# ConfigurationController.getPublicConfiguration, a @RestController mapped at
+# /api/public/ with @CrossOrigin(origins = ["*"]) and no authentication, whose
+# @GetMapping("configuration") handler returns a PublicConfigurationDTO. That
+# DTO's primary constructor declared the application's whole configuration
+# object as a serialized member:
+#
+#     class PublicConfigurationDTO(
+#       @Schema(hidden = true)
+#       val properties: TolgeeProperties,
+#       ...
+#
+# TolgeeProperties is the @ConfigurationProperties root for the deployment and
+# carries smtp.password, the S3/Azure content-storage credentials,
+# machineTranslation.{google,aws,deepl,azure,baidu} API keys, slack.token and
+# slack.signingSecret, recaptcha.secretKey, sendInBlue/mailjet keys and
+# postHog.apiKey. In Kotlin a `val` constructor parameter is a property, so
+# Jackson serialises it into the response body; @Schema(hidden = true) hides
+# it from the OpenAPI document only, not from the payload. The fixed revision drops the
+# `val`, leaving `properties` a plain constructor parameter the body still
+# reads to derive the deliberately-public scalars (appName, maxUploadFileSize,
+# recaptcha.siteKey, ...) that belong there, and deletes the
+# now-unused private isContentDeliveryEnabled helper. The remediation is
+# present at the fixed revision and the construct is present at its parent.
+#
+# Nothing in the dataflow changes across the fixed revision -- the controller passes
+# `properties = configuration` to the same constructor on both revisions, and
+# only whether that member is serialised differs -- so the discriminator is a
+# declaration property of the constructor parameter and nothing else.
+#
+# Measured, bounded subtree `backend/api/src/main/kotlin` (256 files, the
+# module carrying the change) plus an exhaustive grep enumeration of the shape's
+# reachable set over all 4348 .kt files in the tree, three `--cache off` runs
+# per revision: 4 findings on the parent and 4 on the fixed revision, byte-stable inside
+# each revision and `vyql diff` reports them identical (4 unchanged, 0 added,
+# 0 removed). All four are on other controllers -- two VYQL-AUTH-002 rows on
+# V2InvitationController.kt, a VYQL-INJ-004 and a VYQL-AUTH-001 on the batch
+# and MT-suggestion controllers, a VYQL-AUTH-079 -- none on
+# PublicConfigurationDTO.kt or ConfigurationController.kt. `vyql match` on the
+# vulnerable file labels no source, sink or control at all.
+#
+# The enumeration: 8 classes in the tree declare a `val`/`var` constructor
+# parameter typed as a @ConfigurationProperties class. One is this DTO. The
+# other seven are constructor-injected service components -- three job and
+# command-line runners, two internal development controllers, an application
+# stopper -- which is the ordinary Spring idiom for consuming configuration.
+# So even once the declaration fact below exists, a binding needs the
+# response-DTO context and not the parameter shape alone, or it fires eight
+# times for one true positive.
+#
+# The blocker is a Kotlin frontend gap. `class_declaration` is lowered by
+# taking only the class body (kotlin.go:77, `c.decls(c.classBody(n))`), and
+# the `primary_constructor` -> `class_parameters` -> `class_parameter` subtree
+# is never visited: the `val`/`var` keyword that makes a parameter a
+# serialised property, the parameter's `user_type`, and its
+# `modifiers`/`annotation` (where @Schema(hidden = true) lives) all reach
+# nothing. c.params and c.paramTypes (kotlin.go:359, :378) match only a direct
+# `function_value_parameters` child, which a class declaration does not have,
+# and ktParamEntries (kotlin.go:482) is called only for function declarations
+# -- which is why a @GetMapping handler's parameter does carry annotation
+# tokens (verified: the shipped kotlin.input binding fires on a handler
+# parameter) while a constructor parameter carries none. Verified directly:
+# `vyql graph` on the vulnerable and the patched DTO produces structurally
+# identical node sets, no node exists at any primary-constructor parameter
+# line in either revision, and probe bindings on `node.context.classAnnotation
+# contains "Schema"` and `node.context.annotation contains "Schema"` label
+# zero nodes while a positive control on the same class-context nodes fires
+# eight.
+#
+# Not mechanical. Lowering the primary constructor adds a new fact class
+# (constructor-parameter property-ness, declared type, parameter annotations)
+# and, for a `val` parameter, a new dataflow relation from the constructor
+# argument into the class-body property reads -- today those reads resolve
+# against a free-floating Name with no definition. It changes the frontend for
+# every idiomatic Kotlin class, not one function or a small region, so it is
+# a design change rather than a localized correction of a construct the engine
+# handles.
+#
+# Reuse is checked before concluding. code.ConfigExposureReview
+# (VYQL-SEC-041, CWE-200/312/522/532, "configuration or diagnostic
+# serialization may expose inline secrets without an observed redaction path")
+# is exactly the judgement class for this shape and is the rule these cases
+# pin; it has bindings only in Python and Go today, none in Kotlin, and the
+# one it needs cannot be written for a construct that is never lowered.
+# code.SensitiveDataInResponse keys on credential material reaching a
+# response, which is the field-level form; here the whole configuration
+# object is the member and no field is named. code.DataExposureSmell is a
+# route returning an unpicked database record. code.InternalContentExposureReview
+# is persisted internal documents. None fits better, and all of them are
+# blocked by the same missing fact.
+#
+# All cases assert reject VYQL-SEC-041: nothing fires today because no
+# Kotlin binding can see a primary constructor. When Kotlin primary-
+# constructor facts land, the first case must flip to expect while the
+# patched form, the non-DTO component and the direct-return control stay
+# reject.
+
+test "rank1857: public configuration DTO declares the whole properties object as a serialized constructor property"
+  lang kotlin
+  file PublicConfigurationDTO.kt
+  reject VYQL-SEC-041
+  code
+  ```
+  import io.swagger.v3.oas.annotations.media.Schema
+  import io.tolgee.configuration.tolgee.TolgeeProperties
+  import org.springframework.web.bind.annotation.CrossOrigin
+  import org.springframework.web.bind.annotation.GetMapping
+  import org.springframework.web.bind.annotation.RequestMapping
+  import org.springframework.web.bind.annotation.RestController
+
+  @RestController
+  @CrossOrigin(origins = ["*"])
+  @RequestMapping("/api/public/")
+  class ConfigurationController(
+    private val configuration: TolgeeProperties,
+  ) {
+    @GetMapping(value = ["configuration"])
+    fun getPublicConfiguration(): PublicConfigurationDTO {
+      return PublicConfigurationDTO(properties = configuration)
+    }
+  }
+
+  class PublicConfigurationDTO(
+    @Schema(hidden = true)
+    val properties: TolgeeProperties,
+  ) {
+    val appName: String = properties.appName
+    val maxUploadFileSize: Int = properties.maxUploadFileSize
+    val recaptchaSiteKey: String = properties.recaptcha.siteKey
+    val smtpHost: String = properties.smtp.host
+  }
+  ```
+
+test "rank1857: patched form keeps the constructor argument but stops declaring it a property"
+  lang kotlin
+  file PublicConfigurationDTO.kt
+  reject VYQL-SEC-041
+  code
+  ```
+  import io.swagger.v3.oas.annotations.media.Schema
+  import io.tolgee.configuration.tolgee.TolgeeProperties
+  import org.springframework.web.bind.annotation.CrossOrigin
+  import org.springframework.web.bind.annotation.GetMapping
+  import org.springframework.web.bind.annotation.RequestMapping
+  import org.springframework.web.bind.annotation.RestController
+
+  @RestController
+  @CrossOrigin(origins = ["*"])
+  @RequestMapping("/api/public/")
+  class ConfigurationController(
+    private val configuration: TolgeeProperties,
+  ) {
+    @GetMapping(value = ["configuration"])
+    fun getPublicConfiguration(): PublicConfigurationDTO {
+      return PublicConfigurationDTO(properties = configuration)
+    }
+  }
+
+  class PublicConfigurationDTO(
+    @Schema(hidden = true)
+    properties: TolgeeProperties,
+  ) {
+    val appName: String = properties.appName
+    val maxUploadFileSize: Int = properties.maxUploadFileSize
+    val recaptchaSiteKey: String = properties.recaptcha.siteKey
+    val smtpHost: String = properties.smtp.host
+  }
+  ```
+
+test "rank1857: the same member declared in the class body is the spelling the frontend does lower"
+  lang kotlin
+  file PublicConfigurationDTO.kt
+  reject VYQL-SEC-041
+  code
+  ```
+  import io.tolgee.configuration.tolgee.TolgeeProperties
+  import org.springframework.web.bind.annotation.CrossOrigin
+  import org.springframework.web.bind.annotation.GetMapping
+  import org.springframework.web.bind.annotation.RequestMapping
+  import org.springframework.web.bind.annotation.RestController
+
+  @RestController
+  @CrossOrigin(origins = ["*"])
+  @RequestMapping("/api/public/")
+  class ConfigurationController(
+    private val configuration: TolgeeProperties,
+  ) {
+    @GetMapping(value = ["configuration"])
+    fun getPublicConfiguration(): PublicConfigurationDTO {
+      return PublicConfigurationDTO(properties = configuration)
+    }
+  }
+
+  class PublicConfigurationDTO(
+    properties: TolgeeProperties,
+  ) {
+    val properties: TolgeeProperties = properties
+
+    val appName: String = properties.appName
+    val maxUploadFileSize: Int = properties.maxUploadFileSize
+  }
+  ```
+
+test "rank1857: a constructor-injected configuration object in a non-response component is the ordinary idiom"
+  lang kotlin
+  file StartupImportCommandLineRunner.kt
+  reject VYQL-SEC-041
+  code
+  ```
+  import io.tolgee.configuration.tolgee.TolgeeProperties
+
+  class StartupImportCommandLineRunner(
+    val tolgeeProperties: TolgeeProperties,
+  ) {
+    fun run(args: Array<String>) {
+      if (!tolgeeProperties.import.enabled) {
+        return
+      }
+      importData(tolgeeProperties.import.path)
+    }
+
+    fun importData(path: String) {}
+  }
+  ```
+
+test "rank1857: returning the configuration object itself is the same leak in a form no Kotlin binding covers either"
+  lang kotlin
+  file ConfigurationController.kt
+  reject VYQL-SEC-041
+  code
+  ```
+  import io.tolgee.configuration.tolgee.TolgeeProperties
+  import org.springframework.web.bind.annotation.CrossOrigin
+  import org.springframework.web.bind.annotation.GetMapping
+  import org.springframework.web.bind.annotation.RequestMapping
+  import org.springframework.web.bind.annotation.RestController
+
+  @RestController
+  @CrossOrigin(origins = ["*"])
+  @RequestMapping("/api/public/")
+  class ConfigurationController(
+    private val configuration: TolgeeProperties,
+  ) {
+    @GetMapping(value = ["configuration"])
+    fun getPublicConfiguration(): TolgeeProperties {
+      return configuration
+    }
+  }
+  ```

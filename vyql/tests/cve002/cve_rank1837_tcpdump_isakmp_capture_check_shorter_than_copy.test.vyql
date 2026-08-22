@@ -1,0 +1,330 @@
+# Rank 1837 / CVE-2017-13690 (the-tcpdump-group/tcpdump, recorded language c;
+# the axis is CWE-125, a buffer over-read, not the advisory title's generic
+# "bounds checks"). The IKEv2 payload dissectors receive the payload as a
+# `const struct isakmp_gen *ext` -- the 4-byte generic payload header -- and
+# validate capture bounds with `ND_TCHECK(*ext)`, which per netdissect.h
+# bails unless `sizeof(*ext)` bytes are captured, i.e. 4. The next statement
+# copies the full typed payload out: `UNALIGNED_MEMCPY(&ke, ext, sizeof(ke))`
+# reads `sizeof(struct ikev2_ke)` = 8 bytes, `ikev2_ID_print` reads
+# `sizeof(struct ikev2_id)` = 8 and `ikev2_auth_print`
+# `sizeof(struct ikev2_auth)` = 8. A packet truncated between 4 and 8 bytes
+# into the payload passes the check and the copy walks past the captured
+# buffer. The fixed revision 8dca25d2 makes the checked byte count equal the copied byte
+# count, in two spellings: deref a pointer of the copied type
+# (`const struct ikev2_ke *k = (const struct ikev2_ke *)ext; ND_TCHECK(*k)`)
+# or give the two-argument form the copy's own length
+# (`ND_TCHECK2(*ext, sizeof(a))`).
+#
+# Measured, whole tree, three `--cache off` runs per revision: 2395 findings
+# on the parent and 2395 on the fixed revision, byte-stable inside each revision; the
+# diff is 39 removed / 39 added, all VYQL-MEM-006 null-deref rows on the
+# `*ext` derefs themselves, moved by the added comment lines. Nothing reports
+# the check-versus-copy relation: `vyql match` on print-isakmp.c labels no
+# `UNALIGNED_MEMCPY` call at all (the macro name never matches the
+# `callee.path ~= "memcpy"` family, so rawMemoryCopySize66 does not apply),
+# and `ND_TCHECK` contributes only the generic `__deref` labels. Findings in
+# the function are not coverage: the three vulnerable copies sit beside 50
+# VYQL-MEM-006 rows that fire identically on the sixteen safe siblings.
+#
+# The discriminator is a byte count, and no layer has it. The C frontend
+# emits `param_type:` for parameters and bare `identifier:` tokens for
+# declaration tags, but no fact pairs a local with its declared type, and
+# nothing evaluates a C struct's size -- `ccSizeofText`
+# (internal/extract/frontend/treesitter/c.go:2317) extracts operand text and
+# `ccSignedLengthUnderflowCopyObservations` (c.go:2243) correlates identifier
+# strings, never lengths. The name-identity proxy is measured on the real
+# file and fails: `ND_TCHECK(*<src>)` followed by
+# `UNALIGNED_MEMCPY(&<d>, <src>, sizeof(<d>))` with `<d> != <src>` selects 19
+# sites at the parent, of which exactly 3 are the vulnerability -- the other
+# 16 copy `sizeof(e)` where `e` is the same 4-byte `struct isakmp_gen` as
+# `*ext`'s pointee. A tag-comparison proxy is both inexpressible (the local's
+# type never reaches the tokens as a pair with the local's name) and wrong in
+# principle: checking a larger type before copying a smaller first member is
+# safe with unequal tags, and the fixed revision's own second spelling,
+# `ND_TCHECK2(*ext, sizeof(a))`, keeps a tag different from the parameter's
+# while being correct only because its length equals the copy's size
+# numerically. Reuse is checked before concluding: code.RawMemoryCopySize /
+# VYQL-MEM-016 ("raw memory copy size expression needs bounds review") is
+# the nearest judgement class and the rule these cases pin, but its condition
+# is about the copy's size being computed or externally influenced -- here
+# the size is a constant `sizeof` and the check is short;
+# code.MissingPostCopyBoundsCheck and code.CompressedBlockSizeCapacityMismatch
+# are per-incident shapes on the destination-offset and compressed-block
+# axes; code.SignedMessageLengthUnderflowCopy is the signed-underflow axis.
+# ATTENTION, engine gap, the check-side sibling of the capacity family
+# (1370: an output buffer's capacity parameter never correlated with a write
+# length; the declared-array capacity entry): a bounds check's implicit
+# `sizeof` length is never compared with the guarded copy's size. Not
+# mechanical: it needs declaration-typing or struct-layout facts plus a new
+# cross-statement relation, not a localized correction of a known construct.
+#
+# All cases assert reject VYQL-MEM-016: nothing fires today because no
+# binding or rule can see the byte counts. When check-length versus
+# copy-length vocabulary lands, the first three cases must flip to expect
+# while the two patched spellings and the equal-size sibling stay reject.
+
+test "rank1837: capture check covers the generic header, the copy reads the larger KE payload"
+  lang c
+  file print-isakmp.c
+  reject VYQL-MEM-016
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  struct isakmp_gen {
+      uint8_t  np;       /* Next Payload */
+      uint8_t  critical; /* bit 7 - critical, rest is RESERVED */
+      uint16_t len;      /* Payload Length */
+  };
+
+  struct ikev2_ke {
+      struct isakmp_gen h;
+      uint16_t  ke_group;
+      uint16_t  ke_res1;
+      /* KE data */
+  };
+
+  #define ND_TTEST2(var, l) \
+    (((uintptr_t)&(var) <= (uintptr_t)snapend - (l)))
+  #define ND_TCHECK2(var, l) if (!ND_TTEST2(var, l)) goto trunc
+  #define ND_TCHECK(var) ND_TCHECK2(var, sizeof(var))
+  #define UNALIGNED_MEMCPY(p, q, l)	memcpy((p), (q), (l))
+
+  const unsigned char *snapend;
+
+  static const unsigned char *
+  ikev2_ke_print(const struct isakmp_gen *ext)
+  {
+      struct ikev2_ke ke;
+
+      ND_TCHECK(*ext);
+      UNALIGNED_MEMCPY(&ke, ext, sizeof(ke));
+
+      return (const unsigned char *)ext + ntohs(ke.h.len);
+  trunc:
+      return NULL;
+  }
+  ```
+
+test "rank1837: identification payload copied under the generic header's check"
+  lang c
+  file print-isakmp.c
+  reject VYQL-MEM-016
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  struct isakmp_gen {
+      uint8_t  np;
+      uint8_t  critical;
+      uint16_t len;
+  };
+
+  struct ikev2_id {
+      struct isakmp_gen h;
+      uint8_t  type;        /* ID type */
+      uint8_t  res1;
+      uint16_t res2;
+  };
+
+  #define ND_TTEST2(var, l) \
+    (((uintptr_t)&(var) <= (uintptr_t)snapend - (l)))
+  #define ND_TCHECK2(var, l) if (!ND_TTEST2(var, l)) goto trunc
+  #define ND_TCHECK(var) ND_TCHECK2(var, sizeof(var))
+  #define UNALIGNED_MEMCPY(p, q, l)	memcpy((p), (q), (l))
+
+  const unsigned char *snapend;
+
+  static const unsigned char *
+  ikev2_ID_print(const struct isakmp_gen *ext)
+  {
+      struct ikev2_id id;
+      int id_len;
+
+      ND_TCHECK(*ext);
+      UNALIGNED_MEMCPY(&id, ext, sizeof(id));
+
+      id_len = ntohs(id.h.len);
+      return (const unsigned char *)ext + id_len;
+  trunc:
+      return NULL;
+  }
+  ```
+
+test "rank1837: authentication payload copied under the generic header's check"
+  lang c
+  file print-isakmp.c
+  reject VYQL-MEM-016
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  struct isakmp_gen {
+      uint8_t  np;
+      uint8_t  critical;
+      uint16_t len;
+  };
+
+  struct ikev2_auth {
+      struct isakmp_gen h;
+      uint8_t  auth_method;  /* Protocol-ID */
+      uint8_t  reserved[3];
+      /* authentication data */
+  };
+
+  #define ND_TTEST2(var, l) \
+    (((uintptr_t)&(var) <= (uintptr_t)snapend - (l)))
+  #define ND_TCHECK2(var, l) if (!ND_TTEST2(var, l)) goto trunc
+  #define ND_TCHECK(var) ND_TCHECK2(var, sizeof(var))
+  #define UNALIGNED_MEMCPY(p, q, l)	memcpy((p), (q), (l))
+
+  const unsigned char *snapend;
+
+  static const unsigned char *
+  ikev2_auth_print(const struct isakmp_gen *ext)
+  {
+      struct ikev2_auth a;
+      unsigned int len;
+
+      ND_TCHECK(*ext);
+      UNALIGNED_MEMCPY(&a, ext, sizeof(a));
+
+      len = ntohs(a.h.len);
+      return (const unsigned char *)ext + len;
+  trunc:
+      return NULL;
+  }
+  ```
+
+test "rank1837: fix derefs a pointer of the copied type, so the check covers the copy"
+  lang c
+  file print-isakmp.c
+  reject VYQL-MEM-016
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  struct isakmp_gen {
+      uint8_t  np;
+      uint8_t  critical;
+      uint16_t len;
+  };
+
+  struct ikev2_ke {
+      struct isakmp_gen h;
+      uint16_t  ke_group;
+      uint16_t  ke_res1;
+  };
+
+  #define ND_TTEST2(var, l) \
+    (((uintptr_t)&(var) <= (uintptr_t)snapend - (l)))
+  #define ND_TCHECK2(var, l) if (!ND_TTEST2(var, l)) goto trunc
+  #define ND_TCHECK(var) ND_TCHECK2(var, sizeof(var))
+  #define UNALIGNED_MEMCPY(p, q, l)	memcpy((p), (q), (l))
+
+  const unsigned char *snapend;
+
+  static const unsigned char *
+  ikev2_ke_print(const struct isakmp_gen *ext)
+  {
+      struct ikev2_ke ke;
+      const struct ikev2_ke *k;
+
+      k = (const struct ikev2_ke *)ext;
+      ND_TCHECK(*k);
+      UNALIGNED_MEMCPY(&ke, ext, sizeof(ke));
+
+      return (const unsigned char *)ext + ntohs(ke.h.len);
+  trunc:
+      return NULL;
+  }
+  ```
+
+test "rank1837: fix gives the two-argument check the copy's own length"
+  lang c
+  file print-isakmp.c
+  reject VYQL-MEM-016
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  struct isakmp_gen {
+      uint8_t  np;
+      uint8_t  critical;
+      uint16_t len;
+  };
+
+  struct ikev2_auth {
+      struct isakmp_gen h;
+      uint8_t  auth_method;
+      uint8_t  reserved[3];
+  };
+
+  #define ND_TTEST2(var, l) \
+    (((uintptr_t)&(var) <= (uintptr_t)snapend - (l)))
+  #define ND_TCHECK2(var, l) if (!ND_TTEST2(var, l)) goto trunc
+  #define ND_TCHECK(var) ND_TCHECK2(var, sizeof(var))
+  #define UNALIGNED_MEMCPY(p, q, l)	memcpy((p), (q), (l))
+
+  const unsigned char *snapend;
+
+  static const unsigned char *
+  ikev2_auth_print(const struct isakmp_gen *ext)
+  {
+      struct ikev2_auth a;
+      unsigned int len;
+
+      ND_TCHECK2(*ext, sizeof(a));
+      UNALIGNED_MEMCPY(&a, ext, sizeof(a));
+
+      len = ntohs(a.h.len);
+      return (const unsigned char *)ext + len;
+  trunc:
+      return NULL;
+  }
+  ```
+
+test "rank1837: equal sizes -- checking the generic header before copying it is correct"
+  lang c
+  file print-isakmp.c
+  reject VYQL-MEM-016
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  struct isakmp_gen {
+      uint8_t  np;
+      uint8_t  critical;
+      uint16_t len;
+  };
+
+  #define ND_TTEST2(var, l) \
+    (((uintptr_t)&(var) <= (uintptr_t)snapend - (l)))
+  #define ND_TCHECK2(var, l) if (!ND_TTEST2(var, l)) goto trunc
+  #define ND_TCHECK(var) ND_TCHECK2(var, sizeof(var))
+  #define UNALIGNED_MEMCPY(p, q, l)	memcpy((p), (q), (l))
+
+  const unsigned char *snapend;
+
+  static const unsigned char *
+  ikev2_sub_print(const struct isakmp_gen *ext)
+  {
+      struct isakmp_gen e;
+
+      while (ext) {
+          ND_TCHECK(*ext);
+          UNALIGNED_MEMCPY(&e, ext, sizeof(e));
+          ND_TCHECK2(*ext, ntohs(e.len));
+          ext = (const struct isakmp_gen *)((const char *)ext + ntohs(e.len));
+      }
+      return (const unsigned char *)ext;
+  trunc:
+      return NULL;
+  }
+  ```

@@ -1,0 +1,80 @@
+# A desktop webview framework serves its custom protocols from
+# `https://<protocol-name>.localhost/` on Windows and Android, and gates
+# every IPC request on the requesting page being a local origin
+# (`Webview::is_local_url`, crates/tauri/src/webview/mod.rs). The gate
+# recovered the protocol name from the request URL's domain by splitting at
+# the first dot and taking the leading label: on `https://app.evil.com/` the
+# label is `app`, so any registered protocol name made the remote site a
+# local origin and custom commands ran with the application's privileges
+# (CWE-346 origin validation, CVE-2026-42184, fixed by ba025588 which
+# anchors the lookup on the `.localhost` suffix instead:
+# `strip_suffix(".localhost")` before the registry lookup). The trusted set
+# is consulted with a fragment of the attacker-chosen domain as the key, so
+# every sibling host that merely shares the leading label passes the gate.
+#
+# The binding recognises the shape, not the framework: a URL host accessor
+# (`domain`, `host`, `host_str`), a first-label split (`split_once`, `split`,
+# `rsplit_once`, `splitn`), and a registry lookup (`contains_key`,
+# `get`, `contains`) in one function, with no suffix anchoring
+# (`strip_suffix`, `ends_with`) anywhere in it. The patched form drops the
+# split for the suffix strip, so the conjunction does not hold.
+
+test "rank1834: origin trust looks up the first label of the request URL's domain"
+  lang rust
+  file crates/tauri/src/webview/mod.rs
+  expect VYQL-AUTH-160
+  expect_review code.UrlDomainFirstLabelAllowlistLookup
+  code
+  ```
+  use std::collections::HashMap;
+  use url::Url;
+
+  pub struct Manager {
+    pub uri_scheme_protocols: HashMap<String, fn()>,
+  }
+
+  impl Manager {
+    // Custom protocols are served from `https://<name>.localhost/`, so the
+    // registered protocol name is recovered from the request's domain.
+    pub fn is_local_url(&self, current_url: &Url) -> bool {
+      let scheme = current_url.scheme();
+      let maybe_protocol = current_url
+        .domain()
+        .and_then(|d| d.split_once('.'))
+        .unwrap_or_default()
+        .0;
+
+      self.uri_scheme_protocols.contains_key(maybe_protocol) && scheme == "https"
+    }
+  }
+  ```
+
+test "rank1834: origin trust anchors the registry lookup on the .localhost suffix"
+  lang rust
+  file crates/tauri/src/webview/mod.rs
+  reject VYQL-AUTH-160
+  reject_review code.UrlDomainFirstLabelAllowlistLookup
+  code
+  ```
+  use std::collections::HashMap;
+  use url::Url;
+
+  pub struct Manager {
+    pub uri_scheme_protocols: HashMap<String, fn()>,
+  }
+
+  impl Manager {
+    // Custom protocols are served from `https://<name>.localhost/`, so only
+    // a domain ending in .localhost can name one.
+    pub fn is_local_url(&self, current_url: &Url) -> bool {
+      let scheme = current_url.scheme() == "https";
+      let protocol = current_url
+        .domain()
+        .and_then(|d| d.strip_suffix(".localhost"))
+        .map(|protocol| self.uri_scheme_protocols.contains_key(protocol))
+        .unwrap_or_default();
+
+      scheme && protocol
+    }
+  }
+  ```

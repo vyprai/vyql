@@ -1,0 +1,209 @@
+# Rank 1806 / CVE-2026-29103 (CWE-94, CWE-358): the Module Loader
+# screens every PHP file inside an uploaded package before it can be
+# installed, and the screen is a hand-rolled linear walk over
+# token_get_all() output. A name token found in the blacklist arms a
+# state flag ($checkFunction) and the violation is recorded only when
+# the very next single-character token is '(' or ']'; every other
+# single-character token -- ')' '.' '=' ';' -- and every array token
+# that falls to the default arm of the inner switch (T_COMMENT,
+# T_DOC_COMMENT) resets the flag. So a call the screen exists to stop
+# is invisible the moment anything legal sits between the name and the
+# parenthesis: (system)('id'), system /* c */ ('id'), or a name
+# assembled by concatenation all pass, the package installs, and the
+# file executes on the next request. This is a bypass of the earlier
+# partial fix (GHSA-5jjq-9qch-9rg7 names CVE-2024-49774); the token
+# walk survived that patch and CVE-2026-29103 is what it let through.
+#
+# 7f2b384d ("SuiteCRM 7.15.1 Release") deletes the walk wholesale:
+# scanFile() keeps only the extension/config checks and delegates to a
+# new private scanFileAST() that parses with nikic/php-parser
+# (ParserFactory::createForHostVersion) and walks the AST through a
+# new ModuleScannerVisitor whose FuncCall arm flags blacklisted names
+# and every dynamic name form -- $f(), ($f)(), $_GET['cmd']() -- with
+# a parse failure itself flagged as an issue rather than skipped.
+# token_get_all is gone from the file at the fixed revision.
+#
+# What fires without this change. The whole checkout does not finish inside
+# the 180 s bound, so the measurement is the ModuleInstall/ subtree
+# (11 PHP files) plus an exhaustive grep enumeration of the shape's
+# reachable set, both stated. Three --cache off runs at the parent:
+# 31 findings, 25 at or above high, every run -- 14 VYQL-INJ-004
+# (translate() strings echoed in PackageManager), 6 VYQL-RF-043,
+# 6 VYQL-PATH-001, 3 VYQL-CFG-014, 3 VYQL-CRY-001 (md5 in
+# sugarFileExists). Three runs at the fixed revision: identical, 25 at or above
+# high. vyql match on ModuleScanner.php at the parent reports no
+# source label at all and only generic sinks -- HtmlRender on the
+# echo lines, FileInclude on the require lines, FilePathAccess on
+# file_get_contents, RegexCompileSink on two preg patterns -- with
+# nothing on token_get_all, the token loop, or the flag. Findings in
+# the file are not coverage.
+#
+# No binding is shippable, and the reason is structural. The only
+# corpus-reachable key on the vulnerable side is token_get_all plus a
+# walk over its result, and that API is a general-purpose tokenizer:
+# exhaustively enumerated (not sampled) across every clone this
+# campaign has taken, token_get_all appears in 29 PHP files, 26 of
+# which foreach over the tokens, and apart from this scanner every
+# one is development tooling -- asset and class collectors (Assetic
+# BasePhpFormulaLoader, mediawiki ClassCollector, ClassInfo /
+# ClassContentRemover / i18nTextCollector), installers and
+# requirement checkers (roundcube rcmail_install, mautic CheckStep,
+# InstallRequirements, mantisbt test_langs), a syntax highlighter
+# (navigate-cms ref.php), comment-strippers feeding checksum
+# comparison (moodle lib/classes/update/validator.php
+# get_stripped_file_contents), translation extractors (symfony
+# PhpExtractor) and PEAR packaging validators. A binding on the API
+# fires on ~25 unrelated files for this one true positive; narrowing
+# it by the screen's intent needs SuiteCRM's own property names
+# ($this->blackList), the vendor-vocabulary route carried by
+# ConcreteCmsIncompleteUploadExtensionBlacklist and
+# DotcmsSqlUtilBlacklistBypass and flagged for renaming; and the
+# vulnerable -> patched discriminator (token_get_all walk versus
+# PhpParser\ParserFactory) is the fixing commit's own layout, which
+# no shipped binding may encode.
+#
+# No taint path exists at either revision: the control is present and
+# halts correctly -- what is incomplete is its matching machinery,
+# which dataflow cannot see from outside, and the baseline is
+# identical on both sides. The 1380 counterweight fails: the fixed revision
+# leaves no API-documented call inside the guarded method, only the
+# delegation to a private helper. The existing
+# code.PackageInstallExecution family (VYQL-INJ-019, bound today only
+# for install-subprocess spawns in JavaScript) labels an installer
+# that executes code, not a screen that under-matches, so reusing it
+# here would misstate what the code does.
+#
+# No ENGINE-GAPS.md entry: nothing here is a construct the engine
+# mishandles -- no taint stops anywhere. The unexpressible piece is
+# the validator's internal matching semantics, a vocabulary gap with
+# no generic key, settled by the enumeration above. Spec
+# cve_rank1806 records both the token-walk screen and the AST
+# delegation, each asserting reject VYQL-INJ-019: when screening-gap
+# vocabulary lands, the token-walk form must flip to expect.
+#
+# verify_current_expected: attention-no-genericity, both revisions rejected.
+
+test "rank1806: the uploaded-code screen walks the token stream and its call-shape flag resets between the name and the parenthesis"
+  lang php
+  file ModuleInstall/ModuleScanner.php
+  reject VYQL-INJ-019
+  code
+  ```
+  <?php
+
+  class ModuleScanner
+  {
+      public $blackList = array('exec', 'system', 'passthru', 'shell_exec', 'popen', 'proc_open');
+
+      public function scanFile($file)
+      {
+          $issues = array();
+          $contents = file_get_contents($file);
+          $tokens = @token_get_all($contents);
+          $checkFunction = false;
+          $possibleIssue = '';
+          $lastToken = false;
+          foreach ($tokens as $index => $token) {
+              if (is_string($token[0])) {
+                  switch ($token[0]) {
+                      case '`':
+                          $issues['backtick'] = 'invalid function ` backtick`';
+                          // no break
+                      case '(':
+                          if ($checkFunction) {
+                              $issues[] = $possibleIssue;
+                          }
+                          break;
+                      case ']':
+                          if ($checkFunction) {
+                              $issues[] = $possibleIssue;
+                          }
+                  }
+                  $checkFunction = false;
+                  $possibleIssue = '';
+              } else {
+                  switch ($token[0]) {
+                      case T_WHITESPACE:
+                          break;
+                      case T_EVAL:
+                          $issues[] = 'invalid function eval()';
+                          break;
+                      case T_STRING:
+                      case T_CONSTANT_ENCAPSED_STRING:
+                          $token[1] = trim(strtolower($token[1]), '\'"');
+                          if (!in_array($token[1], $this->blackList)) {
+                              break;
+                          }
+                          // no break
+                      case T_VARIABLE:
+                          $checkFunction = true;
+                          $possibleIssue = 'invalid function ' . $token[1] . '()';
+                          break;
+
+                      default:
+                          $checkFunction = false;
+                          $possibleIssue = '';
+                  }
+                  if ($token[0] != T_WHITESPACE) {
+                      $lastToken = $token;
+                  }
+              }
+          }
+          return $issues;
+      }
+  }
+  ```
+
+test "rank1806: the screen parses the file into an AST and flags every dynamic call form from the visitor"
+  lang php
+  file ModuleInstall/ModuleScanner.php
+  reject VYQL-INJ-019
+  code
+  ```
+  <?php
+
+  use PhpParser\NodeTraverser;
+
+  class ModuleScanner
+  {
+      public $blackList = array('exec', 'system', 'passthru', 'shell_exec', 'popen', 'proc_open');
+
+      public function scanFile($file)
+      {
+          $issues = array();
+          $contents = file_get_contents($file);
+          $issues = $this->scanFileAST($contents);
+          return $issues;
+      }
+
+      private function scanFileAST(string $contents): array
+      {
+          $issues = array();
+          $parser = (new \PhpParser\ParserFactory())->createForHostVersion();
+          $traverser = new NodeTraverser();
+
+          require_once __DIR__ . '/ModuleScannerVisitor.php';
+
+          $visitor = new ModuleScannerVisitor(
+              $this->blackList,
+              array(),
+              array(),
+              array(),
+              array()
+          );
+          $traverser->addVisitor($visitor);
+
+          try {
+              $stmts = $parser->parse($contents);
+              if ($stmts !== null) {
+                  $traverser->traverse($stmts);
+              }
+              $issues = $visitor->getIssues();
+          } catch (\PhpParser\Error $e) {
+              $issues[] = 'invalid php file (parse error: ' . $e->getMessage() . ')';
+          }
+
+          return $issues;
+      }
+  }
+  ```

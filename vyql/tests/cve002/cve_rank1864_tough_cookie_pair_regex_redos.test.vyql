@@ -1,0 +1,220 @@
+# Rank 1865 / CVE-2017-15010: tough-cookie's cookie pair regex let a space
+# run be redistributed between two quantifiers that both match whitespace, so
+# a cookie header built from a name, 65535 spaces and no `=` cost quadratic
+# backtracking in Cookie.parse (CWE-1333 inefficient regular expression
+# complexity, CWE-400).
+#
+# COOKIE_PAIR and LOOSE_COOKIE_PAIR (lib/cookie.js:61 and :65 at the fixed revision
+# parent) are /^(([^=;]+))\s*=\s*([^\n\r\0]*)/ and
+# /^((?:=)?([^=;]*)\s*=\s*)?([^\n\r\0]*)/. The group's trailing atom [^=;]+
+# admits every whitespace character, and the \s* that follows it matches
+# whitespace too, so on a failing subject the engine can hand each space to
+# either quantifier and walks the O(n^2) set of splits; the advisory's own
+# regression test measures the broken form at 2000-4000x the bounded one.
+# parse (lib/cookie.js:320) applies the literal through a ternary-selected
+# module constant: `var pairRe = options.loose ? LOOSE_COOKIE_PAIR :
+# COOKIE_PAIR; var result = pairRe.exec(firstSemi === -1 ? str :
+# str.substr(0,firstSemi));`. The fixed revision f1ed420a bounds the second quantifier
+# to \s{0,256} in both literals and changes nothing else, so the whole
+# discriminator is the quantifier bound and it lives in the pattern text, at
+# module scope, never at the call site.
+#
+# The pool row carries no flag and reads correctly: f1ed420a is the targeted
+# fix touching lib/cookie.js plus its regression test, the vulnerable
+# literals are present at the parent, and the remediation is present at the
+# commit. .
+#
+# ATTENTION, engine gap, and four stacked absences block it.
+#
+# First, the shared cost model answers false, and correctly for what it
+# models: regexambig.Ambiguous answers false for this pattern because it has
+# no *nested* overlapping quantified branch (no (a+)+ shape), and polynomial
+# backtracking is a class the engine does not model -- the same boundary rank
+# 1343 recorded for loofah's quadratic url() substitution, where any
+# shippable form "needs an operand-boundedness notion alongside a polynomial
+# cost model".
+#
+# Second, the JavaScript frontend has its own adjacent-quantifier analysis
+# for exactly this class -- hasAmbiguousAdjacentRegexQuantifiers feeds
+# jsRegexMayBacktrack (internal/extract/frontend/treesitter/javascript.go:1108)
+# -- but its overlap test regexAtomsOverlap (javascript.go:1371) is bare
+# string equality: `a == b || a == "any" || b == "any"`. [^=;] and \s whose
+# character classes intersect on whitespace are never recognised as
+# overlapping, so even the ungrouped spelling /^x[^=;]+\s*=/ leaves the
+# literal a plain Const and synthesises no __regex.match node.
+#
+# Third, jsRegexAtoms (javascript.go:1165) lowers a group to an opaque atom
+# keyed "group" carrying only the quantifier *after* the closing paren, so
+# overlap across a group boundary is invisible even for identically-spelled
+# atoms: /^\s+\s*=/ synthesises a __regex.match node and /^(\s+)\s*=/, one
+# paren pair later, does not. This CVE's first quantifier sits two groups
+# deep.
+#
+# Fourth, even where the analysis does fire the synthesised __regex.match
+# node (javascript.go:2769) has no JavaScript binding: Ruby's regexMatch205
+# labels its node code.RegexMatch and code.RegexMatchSink, and the
+# JavaScript bindings carry no __regex consumer -- the served routes are the
+# call-site literal-argument needles (regexMatch540, regexMatch970) and five
+# per-CVE literal fragments (catastrophicRegex541..546). /\033\[(\d+)*m/.exec
+# (s), a nested-ambiguity literal applied exactly as tough-cookie applies
+# its pair regex, scans to zero findings for the same reason. So fixing the
+# cost model alone would still report nothing through the receiver-applied
+# route this code uses.
+#
+# A binding cannot bridge it instead, measured three ways. The pattern text
+# the fixed revision changes is \s*=, and that is the universal key-value delimiter
+# idiom: across the sibling checkouts it appears in regex literals in ten
+# files -- growi's bootstrap migration alone carries dozens of distinct
+# class\s*=\s*['"] attribute scanners, geoxml3's KML parsers, highlight.pack,
+# bokeh -- with one real among them, reproducing rank 1343's one-in-seven-to-
+# eleven measurement of exactly this route. A sink on the application is
+# worse: .exec( and .test( occur at 1198 call sites across 390 sibling files
+# (and .exec collides with child_process.exec), and the call site is
+# character-for-character identical at both revisions of this repository, so
+# no call-site label can discriminate. Linking the receiver to its module
+# literal has no route either -- JavaScript emits no call-argument tokens and
+# no assign: token from a variable_declarator, and the module-scope literal
+# is the comment-silenceable text route the ten-file census prices above.
+# Concepts considered and unreachable: code.CatastrophicRegex (the ungated
+# presence route the census kills), code.CatastrophicRegexSink,
+# code.RegexMatchSink (needs a call-site label), code.RegexMatch (the Ruby
+# synthesis label). Nothing minted.
+#
+# Measured on the real checkout, both revisions, timeout 180 --max-ram 6GB
+# --cache off: 13 findings at the vulnerable revision and 13 at the fixed revision, identical
+# fingerprint multisets, zero discrimination in both directions. Nothing is
+# DOS-related; the only label anywhere on the parse is code.CommandExecution
+# on pairRe.exec (lib/cookie.js:330), the known regex .exec mislabel, plus
+# library param-source taint findings unrelated to the pair regex. vyql
+# match on the real parse shape reports no source and no sink for
+# VYQL-DOS-002's pair; vyql trace from code.ExternalEntryInput to
+# code.RegexMatchSink over the repro reports 0 sources, 0 dead-ends.
+#
+# This is not a mechanical fix: making regexAtomsOverlap compare character
+# classes, teaching jsRegexAtoms to see a group's trailing atom, or adding a
+# polynomial case to the shared regexambig cost model are each a new
+# classification with scan-wide effect on what gets labelled, and 1343's
+# measurement of the candidate shapes says the obvious forms are not
+# reportable without the operand-boundedness notion. The pair below pins the
+# boundary with no tough-cookie API: the same exported function applying a
+# pattern to its parameter reports VYQL-DOS-002 when the literal carries a
+# nested ambiguous quantifier and reports nothing when it carries this CVE's
+# adjacent-overlap literal instead -- the two differ only in the quantifier
+# structure of the pattern.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+# When a polynomial backtracking classification lands, the first test flips
+# to expect VYQL-DOS-003 and the second stays reject.
+
+test "rank1864: the cookie pair regex splits a space run between overlapping quantifiers"
+  lang javascript
+  file lib/cookie.js
+  profile library
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  var COOKIE_PAIR = /^(([^=;]+))\s*=\s*([^\n\r\0]*)/;
+
+  var LOOSE_COOKIE_PAIR = /^((?:=)?([^=;]*)\s*=\s*)?([^\n\r\0]*)/;
+
+  function Cookie() {}
+
+  function parse(str, options) {
+    if (!options || typeof options !== 'object') {
+      options = {};
+    }
+    str = str.trim();
+
+    var firstSemi = str.indexOf(';');
+    var pairRe = options.loose ? LOOSE_COOKIE_PAIR : COOKIE_PAIR;
+    var result = pairRe.exec(firstSemi === -1 ? str : str.substr(0,firstSemi));
+
+    if (!result) {
+      return;
+    }
+
+    var c = new Cookie();
+    c.key = result[2].trim();
+    c.value = result[3].trim();
+    return c;
+  }
+
+  module.exports = {
+    Cookie: Cookie,
+    parse: parse
+  };
+  ```
+
+test "rank1864: bounding the space run before the separator keeps the parse linear"
+  lang javascript
+  file lib/cookie.js
+  profile library
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  var COOKIE_PAIR = /^(([^=;]+))\s{0,256}=\s*([^\n\r\0]*)/;
+
+  var LOOSE_COOKIE_PAIR = /^((?:=)?([^=;]*)\s{0,256}=\s*)?([^\n\r\0]*)/;
+
+  function Cookie() {}
+
+  function parse(str, options) {
+    if (!options || typeof options !== 'object') {
+      options = {};
+    }
+    str = str.trim();
+
+    var firstSemi = str.indexOf(';');
+    var pairRe = options.loose ? LOOSE_COOKIE_PAIR : COOKIE_PAIR;
+    var result = pairRe.exec(firstSemi === -1 ? str : str.substr(0,firstSemi));
+
+    if (!result) {
+      return;
+    }
+
+    var c = new Cookie();
+    c.key = result[2].trim();
+    c.value = result[3].trim();
+    return c;
+  }
+
+  module.exports = {
+    Cookie: Cookie,
+    parse: parse
+  };
+  ```
+
+# The isolating pair. Same exported function applying a pattern to its
+# parameter, no tough-cookie API: only the quantifier structure of the
+# literal differs. The nested-overlap class is classified by the shared cost
+# model and served by the call-site literal-argument route; the
+# adjacent-overlap class that is this CVE is invisible to both.
+
+test "rank1864 pair: the nested-overlap quantifier class in the same application is reported"
+  lang javascript
+  file lib/pair.js
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  module.exports = stripAnsi;
+  function stripAnsi(text) {
+    return text.replace(/\033\[(\d+)*m/g, '');
+  }
+  ```
+
+test "rank1864 pair: the adjacent-overlap quantifier class in the same application is not reported"
+  lang javascript
+  file lib/pair.js
+  profile library
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  module.exports = parsePair;
+  function parsePair(str) {
+    return str.replace(/^(([^=;]+))\s*=\s*([^\n\r\0]*)/g, '');
+  }
+  ```

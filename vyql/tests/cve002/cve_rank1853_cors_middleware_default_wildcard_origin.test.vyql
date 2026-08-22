@@ -1,0 +1,83 @@
+test "rank1853: cors middleware mounted with no origin restriction"
+  lang javascript
+  file server.ts
+  expect VYQL-CFG-003
+  code
+  ```
+  import http from 'node:http';
+  import express from 'express';
+  import cors from 'cors';
+
+  export const gqlServer = async (database) => {
+    const app = express();
+    const server = http.createServer(app);
+    app.use(cors());
+    app.use(bodyParser.json());
+    return server;
+  };
+
+  export const devServerEndPointsPlugin = () => {
+    const plug = {
+      name: 'graphql-endpoints',
+      configureServer(server) {
+        server.middlewares.use(cors());
+        server.middlewares.use(bodyParser.json({ limit: '5mb' }));
+        return plug;
+      },
+    };
+    return plug;
+  };
+  ```
+
+test "rank1853: cors middleware configured with an origin check"
+  lang javascript
+  file server.ts
+  reject VYQL-CFG-003
+  code
+  ```
+  import http from 'node:http';
+  import express from 'express';
+  import cors from 'cors';
+
+  export const gqlServer = async (database) => {
+    const app = express();
+    const server = http.createServer(app);
+    app.use(
+      cors({
+        origin: buildCorsOriginCheck(),
+      })
+    );
+    app.use(bodyParser.json());
+    return server;
+  };
+  ```
+
+test "rank1853: cors middleware restricted to configured origins and methods"
+  lang javascript
+  file server.ts
+  reject VYQL-CFG-003
+  code
+  ```
+  import cors from 'cors';
+
+  export const devServerEndPointsPlugin = () => {
+    const corsOriginCheck = buildCorsOriginCheck(
+      configManager.config?.server?.allowedOrigins
+    );
+
+    const plug = {
+      name: 'graphql-endpoints',
+      configureServer(server) {
+        server.middlewares.use(
+          cors({
+            origin: corsOriginCheck,
+            methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+          })
+        );
+        server.middlewares.use(bodyParser.json({ limit: '5mb' }));
+        return plug;
+      },
+    };
+    return plug;
+  };
+  ```

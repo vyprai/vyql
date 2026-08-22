@@ -1,0 +1,214 @@
+# swhkd through 1.2.0 (CVE-2022-27818) runs the daemon as root and the
+# companion server as the invoking user, and the two halves talk over a Unix
+# domain socket whose path both sides spell as a compile-time constant in the
+# shared, world-writable /tmp directory.
+#
+# The daemon half, src/daemon.rs sock_send at the vulnerable revision:
+#
+#     fn sock_send(command: &str) -> std::io::Result<()> {
+#         let mut stream = UnixStream::connect("/tmp/swhkd.sock")?;
+#         stream.write_all(command.as_bytes())?;
+#         Ok(())
+#     }
+#
+# The root-privileged daemon connects to whatever listener owns that
+# path, and /tmp is writable by every local account, so the peer at the other
+# end of the socket is not the program's own server but whoever created the
+# name first. The server half, src/server.rs, holds the mirror image and also
+# names the path in a local before binding it:
+#
+#     let sock_file_path = String::from("/tmp/swhkd.sock");
+#     ...
+#     if Path::new(&sock_file_path).exists() { fs::remove_file(&sock_file_path) ... }
+#     let listener = UnixListener::bind(sock_file_path)?;
+#
+# f70b99dd575fab79d8a942111a6980431f006818 moves both ends out of the shared
+# directory and into the per-user runtime directory, which the invoking user
+# owns and no other account can write:
+#
+#     String::from(format!("/run/user/{}/swhkd.sock", env::var("PKEXEC_UID").unwrap()))
+#     String::from(format!("/run/user/{}/swhkd.sock", unistd::Uid::current()))
+#
+# The commit's other two hunks are cosmetic (an error-message wording change in
+# seteuid and the removal of a redundant config-exists check that config::load
+# performs), so the socket relocation is the whole fix.
+#
+# What fires at the vulnerable revision: nothing. `scan --cache off` over the vulnerable
+# checkout reports 6 findings, all NullableDeref, none on either socket path.
+# At the fixed revision the same tree reports 6 findings and no VYQL-PATH-003.
+#
+# Vocabulary reused, none minted. code.InsecureTempFile (CWE_377, CWE_59, rule
+# VYQL-PATH-003) is exactly this weakness -- a well-known name inside a
+# directory every local user can write -- and its Rust binding covered only
+# File.create, so a socket endpoint lacks a label. The binding now
+# also covers the three standard-library calls whose documented argument is the
+# filesystem path of a socket endpoint: UnixListener::bind creates the socket
+# at that path, UnixStream::connect reaches whatever owns it, and
+# UnixDatagram::bind creates a datagram endpoint there. tokio's
+# tokio::net::UnixListener::bind and tokio::net::UnixStream::connect carry the
+# same trailing segments and are covered by the same clause. The needle list
+# ("/tmp/", "/var/tmp/", "/dev/shm/") is the one the C and C++ macro form of
+# this family ships.
+#
+# Deliberately uncovered, and why: the server half. Rust names a socket path in
+# a local and passes the local to bind, so the path literal is an argument of
+# String::from rather than of the socket call, and args.any.literal on the
+# socket call sees only the identifier. The rust frontend emits assign: tokens
+# for assignment_expression and nothing for a let declaration, so no token links
+# the local to its literal and the two cannot be correlated at the token level.
+# Widening to function scope -- "binds a socket and somewhere in the function
+# mentions a /tmp literal" -- is measured and rejected: the patched server
+# keeps its pid file at /tmp/swhks.pid in the same main, so that form fires one
+# finding on the safe revision too and buys no discrimination. An inline
+# format!("/tmp/{}.sock", name) argument is in the same unreachable set: a macro
+# produces no call node, so the literal is not an argument of the socket call
+# either. A literal wrapped in a plain constructor call
+# (UnixStream::connect(String::from("/tmp/b.sock"))) does stay reachable,
+# because the constructor's argument is still a literal of the call.
+
+test "swhkd: the root daemon connects to its command socket at a compile-time path inside the shared temporary directory"
+  lang rust
+  file src/daemon.rs
+  expect VYQL-PATH-003
+  code
+  ```
+  use std::io::prelude::*;
+  use std::os::unix::net::UnixStream;
+
+  fn sock_send(command: &str) -> std::io::Result<()> {
+      let mut stream = UnixStream::connect("/tmp/swhkd.sock")?;
+      stream.write_all(command.as_bytes())?;
+      Ok(())
+  }
+
+  fn send_command(hotkey_command: String) {
+      if let Err(e) = sock_send(&hotkey_command) {
+          log::error!("Failed to send command to swhks through IPC.");
+          log::error!("Please make sure that swhks is running.");
+          log::error!("Err: {:#?}", e)
+      }
+  }
+  ```
+
+test "swhkd: the same socket endpoint spelled as a creation, at a path every local account can write"
+  lang rust
+  file src/server.rs
+  expect VYQL-PATH-003
+  code
+  ```
+  use std::os::unix::net::UnixListener;
+
+  fn bind_socket() -> std::io::Result<()> {
+      let listener = UnixListener::bind("/tmp/swhkd.sock")?;
+      for stream in listener.incoming() {
+          match stream {
+              Ok(stream) => { }
+              Err(err) => break,
+          }
+      }
+      Ok(())
+  }
+  ```
+
+test "swhkd: a datagram endpoint bound at a path in the shared temporary directory"
+  lang rust
+  file src/daemon.rs
+  expect VYQL-PATH-003
+  code
+  ```
+  use std::os::unix::net::UnixDatagram;
+
+  fn bind_status_socket() -> std::io::Result<UnixDatagram> {
+      let sock = UnixDatagram::bind("/tmp/swhkd-status.sock")?;
+      Ok(sock)
+  }
+  ```
+
+test "swhkd: patched daemon reaches the socket through the per-user runtime directory"
+  lang rust
+  file src/daemon.rs
+  reject VYQL-PATH-003
+  code
+  ```
+  use std::io::prelude::*;
+  use std::os::unix::net::UnixStream;
+
+  fn sock_send(command: &str) -> std::io::Result<()> {
+      let sock_file_path =
+          String::from(format!("/run/user/{}/swhkd.sock", env::var("PKEXEC_UID").unwrap()));
+      let mut stream = UnixStream::connect(sock_file_path)?;
+      stream.write_all(command.as_bytes())?;
+      Ok(())
+  }
+  ```
+
+test "swhkd: patched server binds the socket in the invoking user's runtime directory"
+  lang rust
+  file src/server.rs
+  reject VYQL-PATH-003
+  code
+  ```
+  use nix::unistd;
+  use std::os::unix::net::UnixListener;
+
+  fn bind_socket() -> std::io::Result<()> {
+      let sock_file_path = String::from(format!("/run/user/{}/swhkd.sock", unistd::Uid::current()));
+      let listener = UnixListener::bind(sock_file_path)?;
+      Ok(())
+  }
+  ```
+
+# The vulnerable server's own spelling. The path literal is an argument of
+# String::from and only the identifier reaches the bind, and the rust frontend
+# emits no assign: token for a let declaration, so the two cannot be correlated.
+
+test "swhkd: the vulnerable server names the socket path in a local before binding it"
+  lang rust
+  file src/server.rs
+  reject VYQL-PATH-003
+  code
+  ```
+  use std::os::unix::net::UnixListener;
+  use std::{env, fs, path::Path, process::id};
+
+  fn main() -> std::io::Result<()> {
+      let pid_file_path = String::from("/tmp/swhks.pid");
+      let sock_file_path = String::from("/tmp/swhkd.sock");
+
+      if Path::new(&sock_file_path).exists() {
+          match fs::remove_file(&sock_file_path) {
+              Ok(_) => {}
+              Err(e) => {
+                  log::error!("Error removing the socket file!: {}", e);
+                  std::process::exit(1);
+              }
+          };
+      }
+
+      match fs::write(&pid_file_path, id().to_string()) {
+          Ok(_) => {}
+          Err(e) => {
+              log::error!("Unable to write to {}: {}", pid_file_path, e);
+              std::process::exit(1);
+          }
+      }
+
+      let listener = UnixListener::bind(sock_file_path)?;
+      Ok(())
+  }
+  ```
+
+test "a socket path under a directory the program owns is not a shared name"
+  lang rust
+  file src/daemon.rs
+  reject VYQL-PATH-003
+  code
+  ```
+  use std::os::unix::net::{UnixDatagram, UnixStream};
+
+  fn daemon_paths() -> std::io::Result<()> {
+      let stream = UnixStream::connect("/var/lib/swhkd/swhkd.sock")?;
+      let status = UnixDatagram::bind("/var/lib/swhkd/status.sock")?;
+      Ok(())
+  }
+  ```

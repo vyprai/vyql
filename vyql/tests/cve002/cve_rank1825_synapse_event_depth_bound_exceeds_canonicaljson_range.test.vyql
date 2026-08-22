@@ -1,0 +1,252 @@
+# Rank 1825 / CVE-2025-30355 / GHSA-v56r-hwv5-mxg6 (recorded language python;
+# the axis is a validation-bound mismatch, CWE-20/CWE-400, not a taint path).
+# element-hq/synapse accepts federation PDUs whose "depth" integer is bounded
+# by MAX_DEPTH = 2**63 - 1 (synapse/api/constants.py:33 at the parent), while
+# every event must later round-trip canonical JSON encoding, whose integer
+# range is [-(2**53 - 1), 2**53 - 1]. A remote server sends depth between
+# 2**53 and 2**63 - 1: it passes event_from_pdu_json's unconditional bound
+# (federation_base.py:295), the whole-object validate_canonicaljson call there
+# is gated on room_version.strict_canonicaljson and so never runs for older
+# room versions, and the event is persisted. Re-encoding then fails wherever
+# the event is hashed, signed or served -- a federation denial of service
+# exploited in the wild. Locally created events inherit the same ceiling:
+# EventValidator.validate checks canonical JSON only over event.content
+# ("we trust the portions of the event we created"), and those portions
+# include a depth derived from persisted federation events via
+# min(depth, MAX_DEPTH) in events/builder.py:221.
+#
+# The fixed revision 2277df2a narrows MAX_DEPTH to 2**53 - 1 by aliasing the
+# canonical-JSON constants, filters inbound PDUs by that range before event
+# construction (filter_pdus_for_valid_depth / parse_events_from_pdu_json),
+# filters stored events at serialization time
+# (serialize_and_filter_pdus), guards the inbound handler's per-PDU parse
+# with try/except SynapseError, and validates the whole PDU
+# (event.get_pdu_json()) rather than event.content.
+#
+# Measured, both revisions, three --cache off runs each over
+# synapse/federation + synapse/events + synapse/api: 40 findings / 24 at or
+# above high on the vulnerable parent and 40 / 24 on the fixed revision, identical
+# rule+file sets (only line numbers shift with the edit); no finding touches
+# constants.py, the depth bound in federation_base.py, or the validator's
+# canonical-JSON call. vyql match on federation_base.py labels only generic
+# Param/LogOutput facts -- nothing about the depth bound or the canonical
+# range. The guarded function event_from_pdu_json is byte-identical across
+# the revision pair (the diff only adds parse_events_from_pdu_json and
+# imports), so no function-scoped binding on it can discriminate at all.
+#
+# Reuse is checked before minting. code.UnderboundedProtocolCountLimit
+# ("review protocol parser count limits against consensus or wire-format
+# maximums", VYQL-DOS-011) is the right judgement class -- a protocol field
+# limit not matched to the wire format's maximum -- and is the rule these
+# cases pin. DeflateDecompressionMaxSafeIntegerLimit (deflate output cap),
+# CompassCsfleEjsonParserMissingStrictMode (EJSON strict-mode parsing),
+# IntegerSizeArithmetic (arithmetic overflow) and
+# UnvalidatedDeserializedCollection (payload shape) each name a different
+# axis. No Python binding can emit the concept here without keying on the
+# incident: the discriminating artifacts are the numeric value of a named
+# constant in another file, the fixed revision's new helper names, and the validator's
+# argument expression. Keying the int64-max literal flags 72 corpus files
+# of benign sentinels and test fixtures with no in-file link to JSON
+# encoding (canonicaljson appears in no other corpus clone, and dependency()
+# is inert on pyproject-only projects); keying
+# validate_canonicaljson(event.content) fires on one product's one call site
+# and is the fixed revision's own delta in reverse. The 1380 counterweight test fails:
+# the fixed revision leaves no documented-API call inside a guarded function whose
+# presence discriminates. ATTENTION, the constant-value/configuration-content
+# family (1514, 1535, 1540, 1556, 1557, 1593; list-content sibling 1810),
+# not an engine gap: labels emit and calls resolve on these files, no
+# construct is mishandled -- the missing information is that one constant's
+# value exceeds the wire format's documented maximum, which no local code
+# structure carries.
+#
+# All cases assert reject VYQL-DOS-011: nothing fires today because no
+# binding labels a bound constant against the canonical-JSON range. When
+# wire-format-limit vocabulary lands, the first two cases must flip to
+# expect while the patched and benign-sentinel cases stay reject.
+
+test "rank1825: inbound federation depth bound is the int64 maximum, wider than canonical JSON"
+  lang python
+  reject VYQL-DOS-011
+  file synapse/api/constants.py
+  code
+  ```
+  # the max size of a (canonical-json-encoded) event
+  MAX_PDU_SIZE = 65536
+
+  # the "depth" field on events is limited to 2**63 - 1
+  MAX_DEPTH = 2**63 - 1
+
+  # the maximum length for a room alias is 255 characters
+  MAX_ALIAS_LENGTH = 255
+  ```
+  file synapse/federation/federation_base.py
+  code
+  ```
+  from synapse.api.constants import MAX_DEPTH
+  from synapse.api.errors import Codes, SynapseError
+  from synapse.events import EventBase, make_event_from_dict
+  from synapse.events.utils import validate_canonicaljson
+  from synapse.http.servlet import assert_params_in_dict
+
+
+  def event_from_pdu_json(pdu_json: JsonDict, room_version: RoomVersion) -> EventBase:
+      """Construct an EventBase from an event json received over federation"""
+      assert_params_in_dict(pdu_json, ("type", "depth"))
+
+      if "unsigned" in pdu_json:
+          _strip_unsigned_values(pdu_json)
+
+      depth = pdu_json["depth"]
+      if type(depth) is not int:  # noqa: E721
+          raise SynapseError(400, "Depth %r not an intger" % (depth,), Codes.BAD_JSON)
+
+      if depth < 0:
+          raise SynapseError(400, "Depth too small", Codes.BAD_JSON)
+      elif depth > MAX_DEPTH:
+          raise SynapseError(400, "Depth too large", Codes.BAD_JSON)
+
+      # Validate that the JSON conforms to the specification.
+      if room_version.strict_canonicaljson:
+          validate_canonicaljson(pdu_json)
+
+      event = make_event_from_dict(pdu_json, room_version)
+      return event
+  ```
+  file synapse/federation/federation_client.py
+  code
+  ```
+  from synapse.federation.federation_base import event_from_pdu_json
+
+
+  class FederationClient(FederationBase):
+      async def get_pdu_list(self, destination, room_id):
+          transaction_data = await self.get_json(...)
+          transaction_data_pdus = transaction_data["pdus"]
+
+          pdus = [event_from_pdu_json(p, room_version) for p in transaction_data_pdus]
+
+          pdus[:] = await self._check_sigs_and_hash_for_pulled_events_and_fetch(
+              destination, pdus, room_version=room_version
+          )
+          return pdus
+  ```
+
+test "rank1825: locally built events validate canonical JSON over the content fragment only"
+  lang python
+  reject VYQL-DOS-011
+  file synapse/events/validator.py
+  code
+  ```
+  class EventValidator:
+      def validate_new(self, event, config):
+          self.validate(event)
+
+      def validate(self, event):
+          for s in ["origin"]:
+              if not isinstance(getattr(event, s), str):
+                  raise SynapseError(400, "'%s' not a string type" % (s,))
+
+          # Depending on the room version, ensure the data is spec compliant JSON.
+          if event.room_version.strict_canonicaljson:
+              # Note that only the client controlled portion of the event is
+              # checked, since we trust the portions of the event we created.
+              validate_canonicaljson(event.content)
+
+          if event.type == EventTypes.Aliases:
+              if "aliases" in event.content:
+                  for alias in event.content["aliases"]:
+                      if not isinstance(alias, str):
+                          raise SynapseError(400, "Alias not a string")
+  ```
+  file synapse/events/builder.py
+  code
+  ```
+  from synapse.api.constants import MAX_DEPTH
+
+
+  class EventBuilder:
+      async def build(self, event_dict):
+          if depth is None:
+              (
+                  _,
+                  most_recent_prev_event_depth,
+              ) = await self._store.get_max_depth_of(prev_event_ids)
+
+              depth = most_recent_prev_event_depth + 1
+
+          # we cap depth of generated events, to ensure that they are not
+          # rejected by other servers (and so that they can be persisted in
+          # the db)
+          depth = min(depth, MAX_DEPTH)
+
+          event_dict["depth"] = depth
+  ```
+
+test "rank1825: the patched bound aliases the canonical-JSON maximum and validates the whole PDU"
+  lang python
+  reject VYQL-DOS-011
+  file synapse/api/constants.py
+  code
+  ```
+  # the max size of a (canonical-json-encoded) event
+  MAX_PDU_SIZE = 65536
+
+  # Max/min size of ints in canonical JSON
+  CANONICALJSON_MAX_INT = (2**53) - 1
+  CANONICALJSON_MIN_INT = -CANONICALJSON_MAX_INT
+
+  # the "depth" field on events is limited to the same as what
+  # canonicaljson accepts
+  MAX_DEPTH = CANONICALJSON_MAX_INT
+  ```
+  file synapse/federation/federation_base.py
+  code
+  ```
+  from synapse.federation.units import filter_pdus_for_valid_depth
+
+
+  def parse_events_from_pdu_json(
+      pdus_json: Sequence[JsonDict], room_version: RoomVersion
+  ) -> List[EventBase]:
+      return [
+          event_from_pdu_json(pdu_json, room_version)
+          for pdu_json in filter_pdus_for_valid_depth(pdus_json)
+      ]
+  ```
+  file synapse/events/validator.py
+  code
+  ```
+  class EventValidator:
+      def validate(self, event):
+          for s in ["origin"]:
+              if not isinstance(getattr(event, s), str):
+                  raise SynapseError(400, "'%s' not a string type" % (s,))
+
+          # Depending on the room version, ensure the data is spec compliant JSON.
+          if event.room_version.strict_canonicaljson:
+              validate_canonicaljson(event.get_pdu_json())
+  ```
+
+test "rank1825: the depth ceiling doubles as a no-limit sentinel in backfill queries"
+  lang python
+  reject VYQL-DOS-011
+  file synapse/storage/databases/main/event_federation.py
+  code
+  ```
+  from synapse.api.constants import MAX_DEPTH
+
+
+  def _get_backward_extremeties(self, room_id):
+      rows = self.db_pool.simple_select_list(...)
+
+      if not rows:
+          return None, 0
+      else:
+          min_depth_event_id = ""
+          current_min_depth = MAX_DEPTH
+          for event_id, depth in rows:
+              if depth < current_min_depth:
+                  min_depth_event_id = event_id
+                  current_min_depth = depth
+          return min_depth_event_id, current_min_depth
+  ```

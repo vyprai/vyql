@@ -1,0 +1,179 @@
+# Rank 1823 / CVE-2026-31824 (GHSA-7mp4-25j8-hp5q): Sylius enforces promotion,
+# coupon and per-customer coupon usage limits with a check-then-act pattern over
+# Doctrine entities. The check side reads the entity's in-memory counter,
+#
+#   return $promotion->getUsed() < $usageLimit;
+#
+# in PromotionUsageLimitEligibilityChecker::isEligible
+# (src/Sylius/Component/Promotion/Checker/Eligibility/), with the coupon twin
+# beside it, while the act side, OrderPromotionsUsageModifier::increment
+# (src/Sylius/Component/Core/Promotion/Modifier/), mutates the same counter in
+# application memory through $promotion->incrementUsed() and
+# $promotionCoupon->incrementUsed(), whose bodies are ++$this->used. Doctrine
+# later flushes the field as an absolute value (SET used = 1), the entities
+# carry no optimistic-lock version column, and nothing takes a row lock, so two
+# concurrent order completions both read used = 0, both pass the eligibility
+# check and both write back the same absolute value: a single-use promotion
+# redeems twice (CWE-362/CWE-367, unauthenticated per the advisory).
+#
+# The pool row's commit af579b0b is the v2.0.16 release-version bump
+# (composer.json plus a version string); its parent carries the change.
+# The fixed revision itself is 457e0205f, the single commit of PR #152 (merged as
+# b7046bb33): a new AtomicOrderPromotionsUsageModifier decorating the
+# sylius.modifier.promotion.order_usage service with a conditional atomic
+# UPDATE ... SET used = used + 1 WHERE used < usage_limit, SELECT ... FOR
+# UPDATE on the coupon row and its per-customer orders, and a
+# PromotionUsageLimitReachedException extending OptimisticLockException.
+#
+# ATTENTION, and two separate things block a rule, either of which is enough.
+#
+#  - The change is service wiring, not source. The diff is purely additive (three
+#    new files, 223 insertions, no deletions): OrderPromotionsUsageModifier.php,
+#    both eligibility checkers and both model classes are byte-identical at
+#    457e0205f^ and 457e0205f, and the discriminator is <service decorates=> in
+#    Resources/config/services/promotion.xml. A binding anchored anywhere in
+#    the PHP therefore reports the patched tree identically -- the shape
+#    measured for fixes centralised in wiring (ledger 1514, 1535,
+#    1540, 1556, 1557, 1593), in its concurrency form. The counterweight that
+#    occasionally rescues those ranks does not apply: the fixed revision leaves no
+#    API-documented call inside the method it guards, because it does not touch
+#    the method at all.
+#  - The raciness is not in the PHP. ++$this->used on a PHP object is ordinary
+#    per-request state; the shared state is the database row, and the facts
+#    that make the mutation racy -- the field is persisted, flushed as an
+#    absolute value, and has no version column -- live in the Doctrine mapping
+#    and the ORM's unit of work, neither of which appears at the call site. No
+#    vocabulary joins "a limit check reads a counter" with "the same counter is
+#    incremented in memory elsewhere": a relation across functions keyed on the
+#    entity type, plus persistence and lock facts, is a new capability, not a
+#    binding. Naming incrementUsed() would repeat the one-project
+#    SolveChallenge binding the engine-gap file criticises, and the
+#    counter family is measured: 85 (attempt-limit counter, ATTENTION), 1042
+#    and 1079 (limit keying, vocabulary gap).
+#
+# Scanned at 457e0205f^ and 457e0205f, --cache off, three runs each:
+# src/Sylius/Component/Promotion 0 findings at both revisions,
+# src/Sylius/Component/Core/Promotion 0 at both (the directory is unchanged by
+# the fixed revision), src/Sylius/Bundle/CoreBundle/Doctrine 0 at the fixed revision,
+# which includes the new atomic modifier. vyql match on the vulnerable modifier
+# labels only code.Param/code.ExternalEntryInput on the two entry methods, and
+# on AtomicOrderPromotionsUsageModifier labels nothing at all -- no control
+# concept recognises a lock, an atomic update or a version check in PHP. Whole
+# src/ at the fixed revision scans to 534 findings at or above high, none in
+# the usage-limit code. Exhaustive grep over src/: incrementUsed/decrementUsed
+# have exactly one production caller, OrderPromotionsUsageModifier.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1823: usage limits are checked against an in-memory counter that a sibling service increments in memory"
+  lang php
+  file src/Sylius/Component/Core/Promotion/Modifier/OrderPromotionsUsageModifier.php
+  reject VYQL-RACE-002
+  code
+  ```
+  interface PromotionInterface
+  {
+      public function getUsed(): int;
+
+      public function getUsageLimit(): ?int;
+
+      public function incrementUsed(): void;
+  }
+
+  final class PromotionUsageLimitEligibilityChecker implements PromotionEligibilityCheckerInterface
+  {
+      public function isEligible(PromotionSubjectInterface $promotionSubject, PromotionInterface $promotion): bool
+      {
+          if (null === $usageLimit = $promotion->getUsageLimit()) {
+              return true;
+          }
+
+          return $promotion->getUsed() < $usageLimit;
+      }
+  }
+
+  final class OrderPromotionsUsageModifier implements OrderPromotionsUsageModifierInterface
+  {
+      public function increment(OrderInterface $order): void
+      {
+          foreach ($order->getPromotions() as $promotion) {
+              $promotion->incrementUsed();
+          }
+
+          $promotionCoupon = $order->getPromotionCoupon();
+          if (null !== $promotionCoupon) {
+              $promotionCoupon->incrementUsed();
+          }
+      }
+  }
+  ```
+
+test "rank1823: the decorated modifier increments the same counters atomically in SQL"
+  lang php
+  file src/Sylius/Bundle/CoreBundle/Doctrine/ORM/Promotion/Modifier/AtomicOrderPromotionsUsageModifier.php
+  reject VYQL-RACE-002
+  code
+  ```
+  final class AtomicOrderPromotionsUsageModifier implements OrderPromotionsUsageModifierInterface
+  {
+      public function __construct(private readonly Connection $connection)
+      {
+      }
+
+      public function increment(OrderInterface $order): void
+      {
+          foreach ($order->getPromotions() as $promotion) {
+              $this->incrementPromotionUsage($promotion);
+          }
+
+          $coupon = $order->getPromotionCoupon();
+          if (null === $coupon) {
+              return;
+          }
+
+          $this->incrementCouponUsage($coupon, $order);
+      }
+
+      private function incrementPromotionUsage(PromotionInterface $promotion): void
+      {
+          $affected = $this->connection->executeStatement(
+              'UPDATE sylius_promotion
+               SET used = used + 1
+               WHERE id = :id AND (usage_limit IS NULL OR used < usage_limit)',
+              ['id' => $promotion->getId()],
+          );
+
+          if (0 === $affected) {
+              throw PromotionUsageLimitReachedException::withPromotionCode((string) $promotion->getCode());
+          }
+
+          $newUsed = (int) $this->connection->fetchOne(
+              'SELECT used FROM sylius_promotion WHERE id = :id',
+              ['id' => $promotion->getId()],
+          );
+
+          $promotion->setUsed($newUsed);
+      }
+
+      private function incrementCouponUsage(PromotionCouponInterface $coupon, OrderInterface $order): void
+      {
+          $row = $this->connection->fetchAssociative(
+              'SELECT used, usage_limit, per_customer_usage_limit FROM sylius_promotion_coupon WHERE id = :id FOR UPDATE',
+              ['id' => $coupon->getId()],
+          );
+
+          if (false === $row) {
+              throw PromotionUsageLimitReachedException::withCouponCode((string) $coupon->getCode());
+          }
+
+          if (null !== $row['usage_limit'] && (int) $row['used'] >= (int) $row['usage_limit']) {
+              throw PromotionUsageLimitReachedException::withCouponCode((string) $coupon->getCode());
+          }
+
+          $this->connection->executeStatement(
+              'UPDATE sylius_promotion_coupon SET used = used + 1 WHERE id = :id',
+              ['id' => $coupon->getId()],
+          );
+      }
+  }
+  ```

@@ -1,0 +1,133 @@
+# eclipse-theia/theia preview package, the markdown preview handler at the
+# vulnerable parent of 309b2189. renderContent takes the markdown file's text
+# (preview-widget reads it from the workspace text document or
+# resource.readContents), hands it to a markdown-it engine constructed with
+# `html: true` -- raw markup passthrough, markdown-it's own documented option
+# -- and assigns the returned HTML string straight to
+# `contentElement.innerHTML`. Whoever controls the opened markdown file
+# controls script running in the preview (CWE-79). The fixed revision 309b2189 routes
+# the rendered string through DOMPurify.sanitize before the assignment.
+#
+# The innerHTML assignment is a resolved code.HtmlRender sink and
+# DOMPurify.sanitize a resolved core.HtmlEscape control, but nothing
+# labelled the render result: markdown-it's render() had no JavaScript
+# binding at all, so no taint path existed from the rendered markup to the
+# sink and the assignment reported nothing. markdown-it documents
+# MarkdownIt#render(src[, env]) as "render markdown string into HTML" and its
+# `html` option as "enable HTML tags in source": the returned string is
+# browser markup whose trust equals the source text's trust, which no call
+# site can show. The RenderedMarkup source concept records that class, the
+# markdown-it binding labels the render result with it, and the concept is
+# added to the entrypoint lists of the frontend, web and library profiles --
+# the three that list code.DomInput -- because a profile's
+# entrypoints narrow source labelling by exact concept, so an unnamed source
+# is inert no matter what it refines. The existing VYQL-INJ-004 taint path
+# then reports the unsanitized assignment and the existing HtmlEscape
+# control clears the sanitized one, so the fixed revision's own shape is the reject
+# case rather than a negation keyed on it.
+#
+# Union over three `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# runs per state: packages/preview at the vulnerable parent 0 -> 1 finding
+# (VYQL-INJ-004, source RenderedMarkup at markdown-preview-handler.ts:53,
+# sink HtmlRender at :56, stable in all three runs); the fixed revision 0 ->
+# 0. The full packages/ tree of the vulnerable parent (1188 TypeScript
+# files), three runs per side with the binding moved aside for the "before":
+# 677 -> 678, the delta being exactly the handler finding, so no other
+# .render() result in the monorepo reaches an HTML sink. Enumerating every
+# markdown-it import across the other ~100 scanned clones (94 files), the
+# only unsanitized render-to-HTML-sink sites are a chat sidepanel that
+# assigns msgEl.innerHTML = this.markdown.render(...) (three call sites,
+# +2 findings there, 94 -> 96 on that tree) and one DOMPurify-sanitized
+# parser that correctly reports nothing; rsshub/lib (4778 files, 1925 ->
+# 1925) and eleventy/src (75 -> 75) are unchanged.
+#
+# verify_current_expected: fixed
+
+test "rank1846: markdown-it render output assigned to innerHTML without a sanitizer"
+  lang javascript
+  file markdown-preview-handler.js
+  expect VYQL-INJ-004
+  code
+  ```
+  import * as markdownit from 'markdown-it';
+
+  export class MarkdownPreviewHandler {
+      protected engine;
+
+      renderContent(params) {
+          const content = params.content;
+          const renderedContent = this.getEngine().render(content, params);
+          const contentElement = document.createElement('div');
+          contentElement.classList.add('markdown-preview');
+          contentElement.innerHTML = renderedContent;
+          return contentElement;
+      }
+
+      protected getEngine() {
+          if (!this.engine) {
+              this.engine = markdownit({ html: true, linkify: true });
+          }
+          return this.engine;
+      }
+  }
+  ```
+
+test "rank1846: the rendered string sanitized before the innerHTML assignment reports nothing"
+  lang javascript
+  file markdown-preview-handler.js
+  reject VYQL-INJ-004
+  code
+  ```
+  import * as markdownit from 'markdown-it';
+  import * as DOMPurify from 'dompurify';
+
+  export class MarkdownPreviewHandler {
+      protected engine;
+
+      renderContent(params) {
+          const content = params.content;
+          const renderedContent = this.getEngine().render(content, params);
+          const sanitizedContent = DOMPurify.sanitize(renderedContent);
+          const contentElement = document.createElement('div');
+          contentElement.classList.add('markdown-preview');
+          contentElement.innerHTML = sanitizedContent;
+          return contentElement;
+      }
+
+      protected getEngine() {
+          if (!this.engine) {
+              this.engine = markdownit({ html: true, linkify: true });
+          }
+          return this.engine;
+      }
+  }
+  ```
+
+test "rank1846: the rendered string assigned as text reports nothing"
+  lang javascript
+  file markdown-preview-handler.js
+  reject VYQL-INJ-004
+  code
+  ```
+  import * as markdownit from 'markdown-it';
+
+  export class MarkdownPreviewHandler {
+      protected engine;
+
+      renderContent(params) {
+          const content = params.content;
+          const renderedContent = this.getEngine().render(content, params);
+          const contentElement = document.createElement('div');
+          contentElement.classList.add('markdown-preview');
+          contentElement.textContent = renderedContent;
+          return contentElement;
+      }
+
+      protected getEngine() {
+          if (!this.engine) {
+              this.engine = markdownit({ html: true, linkify: true });
+          }
+          return this.engine;
+      }
+  }
+  ```

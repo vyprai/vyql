@@ -1,0 +1,201 @@
+# Rank 1897 / CVE-2018-3774: url-parse splits a URL into its authority
+# components straight off the raw string. The rules table drives the split --
+# ['#','hash'], ['?','query'], ['/','pathname'], ['@','auth',1],
+# [NaN,'host',...], [/:(\d+)$/,'port',...], [NaN,'hostname',...] -- and the
+# Url constructor walks it with address.indexOf(parse) and address.slice(...).
+# Nothing in that pipeline treats a backslash as a slash, but browsers resolve
+# URLs under WHATWG semantics where a backslash is a path separator: for
+# http://google.com:80\@yahoo.com/ the parser keeps google.com:80\ as userinfo
+# and reports yahoo.com as the host, while every browser connects to
+# google.com with @yahoo.com/ in the path. Any consumer comparing the parsed
+# hostname against an allowlist is bypassable (CWE-20 with SSRF/open-redirect
+# consequences). The fixed revision 53b1794 inserts a sanitize step,
+# address.replace('\\', '/'), ahead of the split.
+#
+# Detection keys on the split itself -- the URL component names carried as
+# literals beside the '@' userinfo delimiter and a string-dividing call --
+# with the backslash-to-slash replacement as the neutraliser.
+
+test "rank1897: url-parse splits authority off the raw string with no backslash normalization"
+  lang javascript
+  file index.js
+  expect VYQL-RF-053
+  expect_review code.UrlAuthoritySplitWithoutBackslashNormalization
+  code
+  ```
+  var rules = [
+    ['#', 'hash'],                        // Extract from the back.
+    ['?', 'query'],                       // Extract from the back.
+    ['/', 'pathname'],                    // Extract from the back.
+    ['@', 'auth', 1],                     // Extract from the front.
+    [NaN, 'host', undefined, 1, 1],       // Set left over value.
+    [/:(\d+)$/, 'port', undefined, 1],    // RegExp the back.
+    [NaN, 'hostname', undefined, 1, 1]    // Set left over.
+  ];
+
+  function Url(address) {
+    var parse, instruction, index, key
+      , instructions = rules.slice()
+      , url = this
+      , i = 0;
+
+    for (; i < instructions.length; i++) {
+      instruction = instructions[i];
+      parse = instruction[0];
+      key = instruction[1];
+
+      if (parse !== parse) {
+        url[key] = address;
+      } else if ('string' === typeof parse) {
+        if (~(index = address.indexOf(parse))) {
+          if ('number' === typeof instruction[2]) {
+            url[key] = address.slice(0, index);
+            address = address.slice(index + instruction[2]);
+          } else {
+            url[key] = address.slice(index);
+            address = address.slice(0, index);
+          }
+        }
+      } else if ((index = parse.exec(address))) {
+        url[key] = index[1];
+        address = address.slice(0, index.index);
+      }
+
+      if (instruction[4]) url[key] = url[key].toLowerCase();
+    }
+
+    return url;
+  }
+
+  module.exports = Url;
+  ```
+
+test "rank1897: sanitize replaces backslash with slash before the split"
+  lang javascript
+  file index.js
+  reject VYQL-RF-053
+  reject_review code.UrlAuthoritySplitWithoutBackslashNormalization
+  code
+  ```
+  var rules = [
+    ['#', 'hash'],                        // Extract from the back.
+    ['?', 'query'],                       // Extract from the back.
+    function sanitize(address) {          // Sanitize what is left of the address
+      return address.replace('\\', '/');
+    },
+    ['/', 'pathname'],                    // Extract from the back.
+    ['@', 'auth', 1],                     // Extract from the front.
+    [NaN, 'host', undefined, 1, 1],       // Set left over value.
+    [/:(\d+)$/, 'port', undefined, 1],    // RegExp the back.
+    [NaN, 'hostname', undefined, 1, 1]    // Set left over.
+  ];
+
+  function Url(address) {
+    var parse, instruction, index, key
+      , instructions = rules.slice()
+      , url = this
+      , i = 0;
+
+    for (; i < instructions.length; i++) {
+      instruction = instructions[i];
+
+      if (typeof instruction === 'function') {
+        address = instruction(address);
+        continue;
+      }
+
+      parse = instruction[0];
+      key = instruction[1];
+
+      if (parse !== parse) {
+        url[key] = address;
+      } else if ('string' === typeof parse) {
+        if (~(index = address.indexOf(parse))) {
+          if ('number' === typeof instruction[2]) {
+            url[key] = address.slice(0, index);
+            address = address.slice(index + instruction[2]);
+          } else {
+            url[key] = address.slice(index);
+            address = address.slice(0, index);
+          }
+        }
+      } else if ((index = parse.exec(address))) {
+        url[key] = index[1];
+        address = address.slice(0, index.index);
+      }
+
+      if (instruction[4]) url[key] = url[key].toLowerCase();
+    }
+
+    return url;
+  }
+
+  module.exports = Url;
+  ```
+
+test "rank1897: an inline backslash-to-slash replacement ahead of the same split is not flagged"
+  lang javascript
+  file parser.js
+  reject VYQL-RF-053
+  reject_review code.UrlAuthoritySplitWithoutBackslashNormalization
+  code
+  ```
+  var rules = [
+    ['/', 'pathname'],
+    ['@', 'auth', 1],
+    [NaN, 'host', undefined, 1, 1],
+    [/:(\d+)$/, 'port', undefined, 1],
+    [NaN, 'hostname', undefined, 1, 1]
+  ];
+
+  function Url(address) {
+    var parse, instruction, index, key
+      , instructions = rules.slice()
+      , url = this
+      , i = 0;
+
+    address = address.replace('\\', '/');
+
+    for (; i < instructions.length; i++) {
+      instruction = instructions[i];
+      parse = instruction[0];
+      key = instruction[1];
+
+      if (parse !== parse) {
+        url[key] = address;
+      } else if ('string' === typeof parse) {
+        if (~(index = address.indexOf(parse))) {
+          url[key] = address.slice(index);
+          address = address.slice(0, index);
+        }
+      } else if ((index = parse.exec(address))) {
+        url[key] = index[1];
+        address = address.slice(0, index.index);
+      }
+    }
+
+    return url;
+  }
+
+  module.exports = Url;
+  ```
+
+test "rank1897: listing URL component names without dividing a string is not flagged"
+  lang javascript
+  file parts.js
+  reject VYQL-RF-053
+  reject_review code.UrlAuthoritySplitWithoutBackslashNormalization
+  code
+  ```
+  var KEYS = ['host', 'hostname', 'port', 'auth', 'pathname'];
+
+  function render(parts) {
+    var out = [];
+    for (var i = 0; i < KEYS.length; i++) {
+      out.push(KEYS[i] + '=' + parts[KEYS[i]]);
+    }
+    return out.join('&');
+  }
+
+  module.exports = render;
+  ```

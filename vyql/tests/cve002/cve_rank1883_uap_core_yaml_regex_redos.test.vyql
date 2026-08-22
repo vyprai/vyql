@@ -1,0 +1,185 @@
+# Rank 1883 / CVE-2020-5243: uap-core's device-parser definitions carried
+# four regexes whose separator runs could be redistributed between an
+# unbounded separator quantifier and the following negated-class quantifier
+# that also admits the separator character, so a User-Agent built from a few
+# tokens and 3500 spaces cost quadratic backtracking in every ua-parser
+# implementation that loads the file (CWE-1333 inefficient regular
+# expression complexity, CWE-400).
+#
+# The vulnerable lines at the vulnerable revision are regexes.yaml:1575
+# ('\bSmartWatch *\( *([^;]+) *; *([^;]+) *;'), :2587
+# ('; *([^;/]+) Build[/ ]Huawei(MT1-U06|[A-Z]+\d+[^\);]+)[^\);]*\)'),
+# :5129 ('(HbbTV)/[0-9]+\.[0-9]+\.[0-9]+ \([^;]*; *(LG)E *; *([^;]*) *;
+# [^;]*;[^;]*;\)') and :5144 (the CUS twin of the same HbbTV shape). In each,
+# ` *` between fixed separators overlaps the `[^;]+`/`[^;]*` that follows on
+# whitespace and semicolon-free runs, and the fixed revision 0afd61e bounds exactly
+# those separator quantifiers -- {0,2}, {0,30}, {0,1} -- while leaving the
+# negated classes themselves unbounded, so the discriminator is the
+# operand-boundedness of the overlapping separator, not the presence of any
+# class. The commit's own regression harness times all six adversarial
+# User-Agents at under 300ms and asserts safe-regex over every definition.
+#
+# The pool row carries no flag and reads correctly: 0afd61e is the GHSA
+# merge of the advisory fix, the four vulnerable regexes are present at the
+# parent cad8bd4, and the remediation is present at the commit. No pool
+# correction.
+#
+# ATTENTION, and the blocker sits before any the JavaScript instance of this
+# family records: the repository is data-only. `git ls-files` at the parent
+# is regexes.yaml (187KB, 1074 `- regex:` definitions), docs/, tests/,
+# package.json and README -- there is no parser implementation in this tree.
+# The code that compiles these definitions and applies them to
+# request-carried User-Agent strings lives in the sibling implementation
+# repositories, so no source-to-sink path can exist here at all: the only
+# JavaScript is three mocha test files, and the bounded scan of the parent
+# checkout (timeout 180 --max-ram 6GB --cache off) reports two unrelated
+# findings in test files and nothing DOS-related.
+#
+# What layer can see the regexes: none. The only frontend claiming .yaml is
+# the config frontend (internal/extract/frontend/registry.go:69), whose
+# scanYaml (internal/extract/frontend/config/config.go:884) is a line
+# scanner that emits NIR calls only for lines matching data-declared
+# substring, exact or prefix needles (config_line_contains_events and
+# siblings in vyql/bindings/config/m2b6375a9.vyql); every shipped yaml|
+# needle is an exact configuration literal such as `privileged: true`.
+# Measured: vyql match on the parent checkout labels zero nodes in
+# regexes.yaml, and the scan analyses config:11 files with no event from any
+# of them -- a non-matching data file deliberately yields no nodes, so no
+# binding can label the definitions and no rule can judge them.
+#
+# The needle route cannot express the discriminator either, measured on the
+# motivating file itself. The one text feature separating the vulnerable
+# from the patched lines is the unbounded separator quantifier, and all four
+# vulnerable lines carry ` *(` -- but so do 389 of the other 1070
+# definitions: a ` *(` needle fires 393 times at the parent and still 390
+# times at the fixed revision, 390 false positives on the remediated revision of the
+# file that motivated it, and the `]*`/`)+` adjacency shape counts 19 lines
+# at both revisions. A needle that does discriminate must name the vendor
+# text (`SmartWatch *\(`), which is the fixing commit's own vocabulary.
+# Concepts considered and unreachable: code.CatastrophicRegex (the ungated
+# VYQL-DOS-003 presence route, which the 393/390 census kills even if a
+# node existed), code.RegexMatchSink and core.UserControlledData (the
+# VYQL-DOS-002 taint pair -- no source can be labelled in a tree with no
+# code), code.RegexMatch and code.CatastrophicRegexSink (call-site labels;
+# there is no call site). Nothing minted.
+#
+# This is the data-file instance of the regex cost-model family on
+# file -- the Ruby instance is rank 1343 (loofah) and the JavaScript
+# instance rank 1864 (tough-cookie), whose entry records that a polynomial
+# cost model plus an operand-boundedness notion is the design work. Here the
+# family needs one more thing first: the config frontend would have to gain
+# a semantic YAML parse and a regex tokenizer over arbitrary string values,
+# then the polynomial classification, then a report route that is not
+# taint-gated. Each step is a new extraction capability with scan-wide
+# effect on what gets labelled, which is not a mechanical fix by any reading
+# of the rule.
+#
+# The pair below isolates the boundary with no uap-core vocabulary: the
+# nested-overlap pattern that the shared cost model classifies reports
+# VYQL-DOS-002 when it is a regex literal in JavaScript source applied to an
+# exported function's parameter, and reports nothing when the same pattern
+# is a `- regex:` definition value in regexes.yaml -- the two differ only in
+# file kind.
+#
+# verify_current_expected: attention-engine-gap, the YAML tests rejected as
+# written. When a data-file regex classification lands, the first and fourth
+# tests flip to expect VYQL-DOS-003 and the second stays reject.
+
+test "rank1883: the SmartWatch and HbbTV separator runs split a space run between overlapping quantifiers"
+  lang config
+  file regexes.yaml
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  device_parsers:
+    #########
+    # WebBrowser for SmartWatch
+    # @ref: https://play.google.com/store/apps/details?id=se.vaggan.webbrowser&hl=en
+    #########
+    - regex: '\bSmartWatch *\( *([^;]+) *; *([^;]+) *;'
+      device_replacement: '$1 $2'
+      brand_replacement: '$1'
+      model_replacement: '$2'
+    - regex: '; *([^;/]+) Build[/ ]Huawei(MT1-U06|[A-Z]+\d+[^\);]+)[^\);]*\)'
+      device_replacement: '$1'
+      brand_replacement: 'Huawei'
+      model_replacement: '$2'
+    ##########
+    # HbbTV (European and Australian standard)
+    # written before the LG regexes, as LG is making HbbTV too
+    ##########
+    - regex: '(HbbTV)/[0-9]+\.[0-9]+\.[0-9]+ \([^;]*; *(LG)E *; *([^;]*) *;[^;]*;[^;]*;\)'
+      device_replacement: '$1'
+      brand_replacement: '$2'
+      model_replacement: '$3'
+    - regex: '(HbbTV)/[0-9]+\.[0-9]+\.[0-9]+ \([^;]*; *(?:CUS:([^;]*)|([^;]+)) *; *([^;]*) *;.*;'
+      device_replacement: '$1'
+      brand_replacement: '$2$3'
+      model_replacement: '$4'
+  ```
+
+test "rank1883: bounding the separator runs keeps the parse linear"
+  lang config
+  file regexes.yaml
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  device_parsers:
+    #########
+    # WebBrowser for SmartWatch
+    # @ref: https://play.google.com/store/apps/details?id=se.vaggan.webbrowser&hl=en
+    #########
+    - regex: '\bSmartWatch {0,2}\( {0,2}([^;]+) {0,2}; {0,2}([^;]+) {0,2};'
+      device_replacement: '$1 $2'
+      brand_replacement: '$1'
+      model_replacement: '$2'
+    - regex: '; *([^;/]+) Build[/ ]Huawei(MT1-U06|[A-Z]+\d+[^\);]+)\)'
+      device_replacement: '$1'
+      brand_replacement: 'Huawei'
+      model_replacement: '$2'
+    ##########
+    # HbbTV (European and Australian standard)
+    # written before the LG regexes, as LG is making HbbTV too
+    ##########
+    - regex: '(HbbTV)/[0-9]+\.[0-9]+\.[0-9]+ \( {0,1};(LG)E {0,1};([^;]{0,30})'
+      device_replacement: '$1'
+      brand_replacement: '$2'
+      model_replacement: '$3'
+    - regex: '(HbbTV)/[0-9]+\.[0-9]+\.[0-9]+ \([^;]{0,30}; {0,1}(?:CUS:([^;]*)|([^;]+)) {0,1}; {0,1}([^;]{0,30})'
+      device_replacement: '$1'
+      brand_replacement: '$2$3'
+      model_replacement: '$4'
+  ```
+
+# The isolating pair. Same nested-overlap pattern, no uap-core API: only the
+# file kind differs. The source-code instance is classified by the shared
+# cost model and served by the call-site literal-argument route; the
+# definition-value instance is invisible because no frontend extracts
+# regex-valued strings out of data files.
+
+test "rank1883 pair: the nested-overlap quantifier class in source code is reported"
+  lang javascript
+  file lib/pair.js
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  module.exports = stripAnsi;
+  function stripAnsi(text) {
+    return text.replace(/\033\[(\d+)*m/g, '');
+  }
+  ```
+
+test "rank1883 pair: the same pattern as a parser definition value is not reported"
+  lang config
+  file regexes.yaml
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  device_parsers:
+    - regex: '\033\[(\d+)*m'
+      device_replacement: '$1'
+  ```

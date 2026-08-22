@@ -1,0 +1,187 @@
+# Rank 1878 / CVE-2025-66414: the MCP TypeScript SDK's server examples mounted
+# their HTTP transports on a bare Express app with no Host-header validation.
+# The transports document DNS rebinding protection as opt-in — `enableDnsRebindingProtection`
+# defaults to false, `allowedHosts`/`allowedOrigins` unspecified means "validation
+# is disabled" — and the examples never named any of it, so a localhost MCP
+# server built the documented way served its whole tool set to any page whose
+# DNS the attacker rebound onto the listener's address (CWE-346, CWE-290).
+# The fixed revision adds the `hostHeaderValidation`/`localhostHostValidation` middleware
+# and the `createMcpExpressApp` factory that installs localhost validation by
+# default, rewrites every example onto the factory, and deprecates the
+# transport-level options.
+#
+# FIXED by a concept, a rule and one binding. `code.HttpEndpointMissingHostValidation`
+# states the class: a web-server module mounts a protocol endpoint whose framework
+# documents Host-header validation, and the module carries neither the validating
+# middleware nor the transport-level enablement. The JavaScript binding keys on
+# the two transport constructors plus the `express()` app in the same module —
+# the unit the SDK's own examples mount in — and negates on the three documented
+# protections (the factory, either middleware, the transport option). Measured
+# on the real checkout: 11 files at the fixed revision's parent, all under examples/server/
+# plus scripts/cli.ts, every one an unprotected MCP endpoint; 1 at the fixed revision, the
+# scripts/cli.ts instance the fixed revision does not convert, which is a true residual of
+# the same weakness rather than collateral.
+
+test "rank1878: streamable http transport mounted on a bare express app"
+  lang javascript
+  file server.ts
+  expect VYQL-AUTH-164
+  expect_review code.HttpEndpointMissingHostValidation
+  code
+  ```
+  import express, { Request, Response } from 'express';
+  import { randomUUID } from 'node:crypto';
+  import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+  import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+
+  const app = express();
+  app.use(express.json());
+
+  const getServer = () => {
+      const server = new McpServer({ name: 'demo', version: '1.0.0' });
+      return server;
+  };
+
+  const transports: { [sessionId: string]: StreamableHTTPServerTransport } = {};
+
+  app.post('/mcp', async (req: Request, res: Response) => {
+      const sessionId = req.headers['mcp-session-id'] as string | undefined;
+      let transport: StreamableHTTPServerTransport;
+      if (sessionId && transports[sessionId]) {
+          transport = transports[sessionId];
+      } else {
+          transport = new StreamableHTTPServerTransport({
+              sessionIdGenerator: () => randomUUID(),
+              enableJsonResponse: false,
+          });
+          transports[sessionId] = transport;
+          await getServer().connect(transport);
+      }
+      await transport.handleRequest(req, res, req.body);
+  });
+
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  app.listen(PORT);
+  ```
+
+test "rank1878: sse transport mounted on a bare express app"
+  lang javascript
+  file sseServer.ts
+  expect VYQL-AUTH-164
+  expect_review code.HttpEndpointMissingHostValidation
+  code
+  ```
+  import express, { Request, Response } from 'express';
+  import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+  import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+
+  const app = express();
+  app.use(express.json());
+
+  const server = new McpServer({ name: 'demo', version: '1.0.0' });
+
+  app.get('/sse', async (req: Request, res: Response) => {
+      const transport = new SSEServerTransport('/messages', res);
+      await server.connect(transport);
+  });
+
+  app.post('/messages', async (req: Request, res: Response) => {
+      const sessionId = req.query.sessionId as string;
+      const transport = new SSEServerTransport('/messages', res);
+      await transport.handlePostMessage(req, res, req.body);
+  });
+
+  app.listen(3000);
+  ```
+
+test "rank1878: the same server built with the factory that validates localhost"
+  lang javascript
+  file sseServer.ts
+  reject VYQL-AUTH-164
+  reject_review code.HttpEndpointMissingHostValidation
+  code
+  ```
+  import { Request, Response } from 'express';
+  import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+  import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+  import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/index.js';
+
+  const app = createMcpExpressApp();
+
+  const server = new McpServer({ name: 'demo', version: '1.0.0' });
+
+  app.get('/sse', async (req: Request, res: Response) => {
+      const transport = new SSEServerTransport('/messages', res);
+      await server.connect(transport);
+  });
+
+  app.post('/messages', async (req: Request, res: Response) => {
+      const sessionId = req.query.sessionId as string;
+      const transport = new SSEServerTransport('/messages', res);
+      await transport.handlePostMessage(req, res, req.body);
+  });
+
+  app.listen(3000);
+  ```
+
+test "rank1878: the transport's documented dns rebinding option enabled"
+  lang javascript
+  file server.ts
+  reject VYQL-AUTH-164
+  reject_review code.HttpEndpointMissingHostValidation
+  code
+  ```
+  import express, { Request, Response } from 'express';
+  import { randomUUID } from 'node:crypto';
+  import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+  import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+
+  const app = express();
+  app.use(express.json());
+
+  const server = new McpServer({ name: 'demo', version: '1.0.0' });
+
+  app.post('/mcp', async (req: Request, res: Response) => {
+      const transport = new StreamableHTTPServerTransport({
+          sessionIdGenerator: () => randomUUID(),
+          enableDnsRebindingProtection: true,
+          allowedHosts: ['localhost', '127.0.0.1'],
+      });
+      await server.connect(transport);
+      await transport.handleRequest(req, res, req.body);
+  });
+
+  app.listen(3000);
+  ```
+
+test "rank1878: the host header validation middleware mounted on the app"
+  lang javascript
+  file sseServer.ts
+  reject VYQL-AUTH-164
+  reject_review code.HttpEndpointMissingHostValidation
+  code
+  ```
+  import express, { Request, Response } from 'express';
+  import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+  import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+  import { hostHeaderValidation } from '@modelcontextprotocol/sdk/server/middleware/hostHeaderValidation.js';
+
+  const app = express();
+  app.use(express.json());
+  app.use(hostHeaderValidation(['localhost', '127.0.0.1', '[::1]']));
+
+  const server = new McpServer({ name: 'demo', version: '1.0.0' });
+
+  app.get('/sse', async (req: Request, res: Response) => {
+      const transport = new SSEServerTransport('/messages', res);
+      await server.connect(transport);
+  });
+
+  app.post('/messages', async (req: Request, res: Response) => {
+      const sessionId = req.query.sessionId as string;
+      const transport = new SSEServerTransport('/messages', res);
+      await transport.handlePostMessage(req, res, req.body);
+  });
+
+  app.listen(3000);
+  ```

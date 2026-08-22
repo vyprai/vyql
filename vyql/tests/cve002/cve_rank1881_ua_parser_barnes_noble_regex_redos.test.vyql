@@ -1,0 +1,289 @@
+# Rank 1881 / CVE-2021-27292: ua-parser-js's Barnes & Noble tablet regex
+# let a greedy dot-star and the whitespace run after it share every space, so
+# a user agent such as "android; BNVT " followed by tens of thousands of
+# spaces and no "build" costs quadratic backtracking inside the device mapper
+# (CWE-1333 inefficient regular expression complexity, CWE-400).
+#
+# The vulnerable literal at src/ua-parser.js:623 (fix parent) is
+# /android.+[;\/]\s+(Barnes[&\s]+Noble\s+|BN[RT])(V?.*)\s+build/i. The third
+# group's .* admits every whitespace character and the \s+ that follows the
+# group matches whitespace too, so on a failing subject the engine can hand
+# each space to either quantifier and walks the O(n^2) set of splits. The fixed revision
+# 809439e2 rewrites the group to (\S(?:.*\S)?) -- the group now starts and
+# ends on a non-space, no split of the space run is ambiguous -- and changes
+# nothing else (the second hunk drops a trailing comma after /(phone)/i, a
+# syntax cleanup). The whole discriminator is the quantifier structure of the
+# pattern text. The pool row reads correctly: the change is targeted, the
+# vulnerable literal is at the parent, the remediation is at the commit. No
+
+#
+# The regexes are applied by mapper.rgx (src/ua-parser.js:98):
+# `matches = regex[j++].exec(ua);` -- each literal sits in a module-scope
+# array of [regexes, props] pairs and is applied receiver-side through an
+# element subscript, with ua the user-agent string UAParser is constructed
+# with. No argument-position application of these literals exists anywhere in
+# the module.
+#
+# ATTENTION, engine gap, and the whole path is blocked by the family rank
+# 1864 recorded in ENGINE-GAPS (the JavaScript instance of the 1343
+# polynomial cost-model boundary), restated for this shape:
+#
+# First, regexambig.Ambiguous answers false -- correctly for what it models:
+# the pattern has no nested overlapping quantified branch, and the ambiguity
+# here is adjacent (a quantifier pair whose classes intersect), the class the
+# 1343 entry records as needing a polynomial cost model plus an
+# operand-boundedness notion before any of its candidate shapes is
+# reportable.
+#
+# Second, the frontend's own adjacent-quantifier analysis never sees the
+# pair. jsRegexAtoms (internal/extract/frontend/treesitter/javascript.go:1165)
+# lowers (V?.*) to a single opaque "group" atom with no quantifier, so the
+# \s+ after the closing paren has nothing to overlap; and its default case
+# (javascript.go:1223) skips . and * outright without emitting an atom, so
+# regexAtomKey's "." -> "any" mapping and regexAtomsOverlap's a == "any" ||
+# b == "any" disjunct are dead code -- no atom ever carries key "any". A
+# probe confirms the consequence beyond the group case: even the ungrouped
+# /^.*\s+(\S+\s+\S+$)/, the plainest adjacent-overlap spelling with no group
+# boundary to hide behind, synthesises no __regex.match node. vyql graph on
+# the real shape reports the literal as a plain code.Const.
+#
+# Third, even where the analysis does fire, ua-parser's application route
+# reports nothing. The nested-ambiguity control below ((\d+)*m substituted
+# into the same group) does synthesise a __regex.match node at module scope
+# -- the synthesis machinery works for the nested class -- but no JavaScript
+# binding consumes __regex.match (Ruby's regexMatch205 has no JS twin), and
+# the receiver-applied .exec route carries no RegexMatchSink in any case:
+# vyql match on the control reports only the known code.CommandExecution
+# mislabel on the .exec argument. The same measurement at rank 1864: the
+# identical nested literal applied through .exec scans to zero while the
+# same literal as a .replace argument reports.
+#
+# A binding cannot bridge it instead. The only discriminating datum is the
+# pattern text, and the class shape -- a dot quantifier immediately followed
+# by a whitespace quantifier, \.[*+] then \s[*+] modulo a group close --
+# enumerates to 5 occurrences in 5 files across the 1631 sibling JavaScript
+# files of the 75 concurrent checkouts (OpenLayers' typeStr
+# /^\s*(\w+)\s*\(\s*(.*)\s*\)\s*$/, traefik's bundled /\(\s*(.*)\s*\)/g,
+# typebot's /^(.*?)\s*\(\d+\)$/, easyWebSocket's /^.*\s+(\S+\s+\S+$)/), none
+# of them a known weakness -- 1 real in 6, on top of the 1343 census's 1
+# real in 7-11 for exactly this route and 1864's ten-files-for-one census of
+# the sibling shape. The taint-gated rule cannot rescue it either: VYQL-DOS-002
+# needs the sink where the operand is applied, the literal is applied through
+# regex[j++] and no route links a module-scope array element to the receiver
+# of a distant .exec, so no source-to-sink path exists -- vyql trace from
+# code.ExternalEntryInput to code.RegexMatchSink over the real shape reports
+# 0 sources, 0 dead-ends. Concepts considered and unreachable or unshippable:
+# code.CatastrophicRegex (the ungated route the census kills),
+# code.RegexMatchSink and code.RegexMatch (need a call-site label this
+# application never produces). Nothing minted.
+#
+# Measured on the real checkout, both revisions, timeout 180 --max-ram 6GB
+# --cache off: 1 finding at the vulnerable revision and 1 at the fixed revision, three runs each
+# at the parent, identical fingerprint (VYQL-INJ-013 ProtoPollute on
+# this[q] = match in mapper.rgx, src/ua-parser.js:932, fp c65dc029b8c09077),
+# zero discrimination in both directions and nothing DOS-related at either
+# revision.
+#
+# Not mechanical for the reasons the 1864 entry records: a class-intersection
+# overlap test, a live dot atom, or a polynomial cost case are each a new
+# classification with scan-wide effect on what gets labelled, and the 1343
+# measurement says the obvious forms are not reportable without the
+# operand-boundedness notion. The pair below pins the boundary with no
+# ua-parser API: the same exported constructor applying its regex array
+# reports nothing whether the third group carries this CVE's adjacent
+# overlap or a nested ambiguity that the cost model does classify, while the
+# same module's argument-position replace idiom with a classified pattern
+# reports VYQL-DOS-002 -- the two legs differ only in the quantifier
+# structure of the pattern and in whether the literal reaches its
+# application as a call argument.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+# When a polynomial backtracking classification lands together with a
+# JavaScript __regex.match consumer (or a receiver-route label), the first
+# test flips to expect VYQL-DOS-002 and the second stays reject.
+
+test "rank1881: the Barnes & Noble device regex splits a space run between a greedy dot-star and the following space quantifier"
+  lang javascript
+  file src/ua-parser.js
+  profile library
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  var regexes = [
+      [
+      /android.+[;\/]\s*(Q[T|M][\d\w]+)\s+build/i                         // Verizon Tablet
+      ], ['model', ['vendor', 'Verizon'], ['type', 'tablet']], [
+
+      /android.+[;\/]\s+(Barnes[&\s]+Noble\s+|BN[RT])(V?.*)\s+build/i     // Barnes & Noble Tablet
+      ], [['vendor', 'Barnes & Noble'], 'model', ['type', 'tablet']], [
+
+      /(phone)/i
+      ], [['type', 'mobile']]
+  ];
+
+  var mapper = {
+
+      rgx : function (ua, arrays) {
+
+          var i = 0, j, matches;
+
+          while (i < arrays.length && !matches) {
+
+              var regex = arrays[i];
+              j = 0;
+
+              while (j < regex.length && !matches) {
+
+                  matches = regex[j++].exec(ua);
+
+                  if (!!matches) {
+                      this['model'] = matches[1];
+                  }
+              }
+              i += 2;
+          }
+      }
+  };
+
+  function UAParser(uastring) {
+
+      var ua = uastring || '';
+
+      mapper.rgx.call(this, ua, regexes);
+
+      return this;
+  }
+
+  module.exports = UAParser;
+  ```
+
+test "rank1881: anchoring the model group at non-space ends keeps the match linear"
+  lang javascript
+  file src/ua-parser.js
+  profile library
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  var regexes = [
+      [
+      /android.+[;\/]\s*(Q[T|M][\d\w]+)\s+build/i                         // Verizon Tablet
+      ], ['model', ['vendor', 'Verizon'], ['type', 'tablet']], [
+
+      /android.+[;\/]\s+(Barnes[&\s]+Noble\s+|BN[RT])(\S(?:.*\S)?)\s+build/i     // Barnes & Noble Tablet
+      ], [['vendor', 'Barnes & Noble'], 'model', ['type', 'tablet']], [
+
+      /(phone)/i
+      ], [['type', 'mobile']]
+  ];
+
+  var mapper = {
+
+      rgx : function (ua, arrays) {
+
+          var i = 0, j, matches;
+
+          while (i < arrays.length && !matches) {
+
+              var regex = arrays[i];
+              j = 0;
+
+              while (j < regex.length && !matches) {
+
+                  matches = regex[j++].exec(ua);
+
+                  if (!!matches) {
+                      this['model'] = matches[1];
+                  }
+              }
+              i += 2;
+          }
+      }
+  };
+
+  function UAParser(uastring) {
+
+      var ua = uastring || '';
+
+      mapper.rgx.call(this, ua, regexes);
+
+      return this;
+  }
+
+  module.exports = UAParser;
+  ```
+
+# The isolating pair. Same exported constructor, same module-scope regex
+# array, same receiver-applied exec: only the quantifier structure of the
+# third group differs. The nested-overlap class is classified by the shared
+# cost model and synthesises a node; the adjacent-overlap class that is this
+# CVE does not -- and through this application route neither reports,
+# because no JavaScript binding consumes __regex.match and the .exec
+# receiver carries no sink. The fourth test applies a classified pattern as
+# a call argument in the same module shape (util.trim's argument-position
+# replace idiom) and is reported, isolating that the miss is the quantifier
+# class and the application route, not the source gate.
+
+test "rank1881 pair: the nested-overlap quantifier class through the same array-applied exec is not reported"
+  lang javascript
+  file src/ua-parser.js
+  profile library
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  var regexes = [
+      [
+      /android.+[;\/]\s+(Barnes[&\s]+Noble\s+|BN[RT])((\d+)*m)\s+build/i     // nested-ambiguity control
+      ], [['vendor', 'Barnes & Noble'], 'model', ['type', 'tablet']]
+  ];
+
+  var mapper = {
+
+      rgx : function (ua, arrays) {
+
+          var i = 0, j, matches;
+
+          while (i < arrays.length && !matches) {
+
+              var regex = arrays[i];
+              j = 0;
+
+              while (j < regex.length && !matches) {
+
+                  matches = regex[j++].exec(ua);
+
+                  if (!!matches) {
+                      this['model'] = matches[1];
+                  }
+              }
+              i += 2;
+          }
+      }
+  };
+
+  function UAParser(uastring) {
+
+      var ua = uastring || '';
+
+      mapper.rgx.call(this, ua, regexes);
+
+      return this;
+  }
+
+  module.exports = UAParser;
+  ```
+
+test "rank1881 pair: the argument-position regex application in the same module is reported"
+  lang javascript
+  file src/ua-parser.js
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  module.exports = stripTags;
+  function stripTags(str) {
+    return str.replace(/<[^>]*>/g, '');
+  }
+  ```
