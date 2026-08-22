@@ -1,0 +1,95 @@
+# Rank 1629 / CVE-2026-24486: python-multipart's File kept the uploaded
+# filename when UPLOAD_KEEP_FILENAME is set, and built the on-disk path
+# as os.path.join(file_dir, base + ext) where base came straight from
+# os.path.splitext(file_name) on the Content-Disposition filename -- no
+# basename reduction -- so a filename like ../../evil wrote outside the
+# upload directory (path traversal to arbitrary file write, CWE-22).
+# The fixed revision (9433f4bbc965, "Merge commit from fork") reduces the name to
+# os.path.basename(file_name) before the split. The multipart parser
+# itself is the entry: on_headers_finished takes file_name from
+# parse_options_header of the Content-Disposition header and constructs
+# File with it.
+#
+# ATTENTION, engine gap -- the receiver-field store hop. Every piece of
+# shipped vocabulary this weakness needs is present and working: the
+# constructor parameter is labelled code.ExternalEntryInput
+# (library.param-source, profile library), open(path) is the
+# code.FilePathAccess sink, and os.path.basename is bound as
+# core.PathCanonicalization (pathCanonicalization536) -- scanning the
+# patched revision reports the basename as a near-miss control
+# at the same sink. What is missing is the taint hop through the field:
+# File.__init__#param#file_name dead-ends at the store
+# self._file_base = base, and the read of self._file_base in
+# _get_disk_file is only ever reached through its own receiver being
+# tainted. Minimal pair (file vK in the review): the same three
+# statements `self._x = p; path = os.path.join("/tmp", self._x);
+# open(path)` connect from the __init__ receiver parameter and dead-end
+# from the value parameter -- a store into self.X propagates nothing to
+# a later read of self.X, even within one method. This is the Python
+# instance of the cross-method receiver-field gap recorded for rank
+# 1198 (PHP); the same lowering handles the field write. A second face
+# of the same gap: when a caller constructs the object with a tainted
+# argument, the receiver summary connects the caller to every method's
+# self directly, bypassing the constructor body entirely -- so the
+# patched revision reports identically to the vulnerable one through
+# that route and no binding can discriminate. Both snippets therefore
+# assert reject today; when the field store-to-load hop lands, the
+# verbatim form must flip to expect VYQL-PATH-001 (the basename control
+# then sits on the path and holds the patched form at reject). The
+# public write-path methods (write/on_data/flush_to_disk) are omitted
+# from the snippet because their labelled self parameters produce that
+# non-discriminating receiver finding on both revisions.
+#
+# No definition change shippedn.
+
+test "rank1629: the uploaded filename reaches the disk file uncanonicalised"
+  lang python
+  profile library
+  file python_multipart/multipart.py
+  reject VYQL-PATH-001
+  code
+  ```
+  import os
+
+
+  class File:
+      def __init__(self, file_name, config):
+          self._config = config
+          base, ext = os.path.splitext(file_name)
+          self._file_base = base
+          self._ext = ext
+
+      def _get_disk_file(self):
+          file_dir = self._config.get("UPLOAD_DIR")
+          keep_extensions = self._config.get("UPLOAD_KEEP_EXTENSIONS", False)
+          fname = self._file_base + self._ext if keep_extensions else self._file_base
+          path = os.path.join(file_dir, fname)
+          return open(path, "w+b")
+  ```
+
+test "rank1629: the fixed revision reduces the uploaded filename to its basename first"
+  lang python
+  profile library
+  file python_multipart/multipart.py
+  reject VYQL-PATH-001
+  code
+  ```
+  import os
+
+
+  class File:
+      def __init__(self, file_name, config):
+          self._config = config
+          # Extract just the basename to avoid directory traversal
+          basename = os.path.basename(file_name)
+          base, ext = os.path.splitext(basename)
+          self._file_base = base
+          self._ext = ext
+
+      def _get_disk_file(self):
+          file_dir = self._config.get("UPLOAD_DIR")
+          keep_extensions = self._config.get("UPLOAD_KEEP_EXTENSIONS", False)
+          fname = self._file_base + self._ext if keep_extensions else self._file_base
+          path = os.path.join(file_dir, fname)
+          return open(path, "w+b")
+  ```

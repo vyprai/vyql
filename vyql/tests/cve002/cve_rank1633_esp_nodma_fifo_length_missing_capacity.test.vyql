@@ -1,0 +1,284 @@
+# QEMU's ESP SCSI emulator keeps its in-flight transfer state as a pair of
+# fields on ESPState (include/hw/scsi/esp.h:47-48): `uint8_t *async_buf`, the
+# remaining slice of the SCSI buffer to service, and `uint32_t async_len`, how
+# many bytes that slice can still take. The pairing is convention, not type:
+# nothing but the emulator's own discipline keeps the two in step. The non-DMA
+# TI (Transfer Info) path, esp_do_nodma() in hw/scsi/esp.c, moves FIFO data
+# into that slice when the guest is the initiator:
+#
+#   len = MIN(fifo8_num_used(&s->fifo), ESP_FIFO_SZ);
+#   esp_fifo_pop_buf(&s->fifo, s->async_buf, len);
+#   s->async_buf += len;
+#   s->async_len -= len;
+#
+# The bound is taken entirely from the source side -- how much data the FIFO
+# holds, capped by the FIFO constant -- and never consults `s->async_len`.
+# When a SCSI transfer is terminated early, the guest can leave more bytes in
+# the FIFO than the terminated transfer still expects, so `len` exceeds the
+# destination slice's remaining capacity: esp_fifo_pop_buf (hw/scsi/esp.c:121)
+# memcpy's `len` bytes into `s->async_buf` past the end of the SCSI buffer,
+# and the `s->async_len -= len` decrement, in uint32_t arithmetic, wraps to a
+# huge value (gitlab issue 1810; write out of bounds reached through an
+# unsigned underflow). The same pattern of writing to the buffer while
+# separately decrementing the counter, in the `else` branch, is index-shaped
+# and safe only because it moves one byte at a time.
+#
+# Fix commit 77668e4b9bca03a856c27ba899a2513ddf52bb52 ("esp: restrict non-DMA
+# transfer length to that of available data") adds the missing operand to the
+# bound, so the capacity enters the MIN chain ahead of the source side:
+#
+#   len = MIN(s->async_len, ESP_FIFO_SZ);
+#   len = MIN(len, fifo8_num_used(&s->fifo));
+#
+# The vulnerable form is present at the parent (b86dc5cb0, checked out and
+# read) and the remediation is present at the fixed revision itself.
+#
+# ATTENTION, engine gap -- the third instance of the output-capacity family,
+# one step further from the engine than the first two. `timeout 180 ./bin/vyql
+# scan --cache off --max-ram 6GB` over hw/scsi reports 118 findings at the
+# vulnerable parent and 118 at the fixed revision; esp.c contributes exactly one row at
+# each, VYQL-MEM-016 (code.RawMemoryCopySize) at :132 -- the memcpy inside
+# esp_fifo_pop_buf, a line the fixed revision does not touch, firing identically at both
+# revisions. Nothing fires on the bound at :760, the copy at :763 or the
+# decrement at :764: the engine reports the safe helper and not the defect,
+# the same inversion measured at 1370. `vyql match` over the isolated function
+# shows one sink (code.RawMemoryCopySizeSink on the helper's memcpy) and no
+# label at all on the MIN assignment, the call, or `s->async_len -= len`.
+#
+# Rank 1370 pinned the parameter form of this gap -- mbedtls's
+# `uint8_t *data, size_t data_size` pair, where a write length computed from
+# key metadata is never compared against the capacity *parameter* -- and its
+# ENGINE-GAPS entry records a second instance in the same library. Here the
+# capacity is not a parameter anywhere on the path: it is a struct field
+# paired with the destination pointer by convention (`async_len` beside
+# `async_buf`), the copy sits behind a project-local static helper rather
+# than a direct memcpy, and the length *is* bounded by a MIN chain -- just
+# not by the capacity. Detecting it needs the fact that entry prescribes (a
+# write length correlated against the destination's remaining capacity) plus
+# the field pairing, which is strictly more correlation, not less. The
+# binding layer cannot fake it: `analysis.function.context` predicates are
+# contains-tests over independent token strings with no way to correlate the
+# token that names the bound with the token that names the capacity, and a
+# binding keyed on "the MIN chain's first operand is a call" would encode
+# judgement on a shape that is ordinary, usually-correct bounded code, and
+# would key on the fixing commit's own arrangement -- MIN(source, cap) and
+# MIN(MIN(cap, ...), source) both bound correctly. The unsigned-decrement
+# half is likewise unlabelled: ccSignedLengthUnderflowCopyObservations
+# (internal/extract/frontend/treesitter/c.go:2234) matches only
+# `len = input - sizeof(...)` assignments feeding a direct same-function
+# memcpy, not a compound `-=` against a field behind a helper call. Macro
+# expansion is not the blocker, tested rather than assumed: rewriting the
+# MIN bound as a plain `if` clamp over the same call leaves the scan at zero
+# findings.
+#
+# The first two tests hold the full real shape of the to_device branch, helper
+# included, at both revisions with identical reject lists -- no rule separates
+# them. The second two isolate the construct as a minimal pair: the helper as
+# a declaration, so the only difference between them is whether `s->async_len`
+# enters the bound, and neither reports anything.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1633: the non-DMA transfer length is bounded by the FIFO side only, never by the destination slice's remaining capacity"
+  lang c
+  file hw/scsi/esp.c
+  reject VYQL-MEM-010
+  reject VYQL-MEM-023
+  reject VYQL-NUM-003
+  reject_review code.CompressedBlockSizeCapacityMismatch
+  reject_review code.SignedMessageLengthUnderflowCopy
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  #define ESP_FIFO_SZ 16
+  #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+  typedef struct Fifo8 Fifo8;
+  uint32_t fifo8_num_used(const Fifo8 *fifo);
+  const uint8_t *fifo8_pop_buf(Fifo8 *fifo, uint32_t max, uint32_t *n);
+
+  struct ESPState {
+      uint32_t async_len;
+      uint8_t *async_buf;
+      uint32_t ti_size;
+      Fifo8 fifo;
+  };
+
+  static uint32_t esp_fifo_pop_buf(Fifo8 *fifo, uint8_t *dest, int maxlen)
+  {
+      const uint8_t *buf;
+      uint32_t n;
+
+      if (maxlen == 0) {
+          return 0;
+      }
+
+      buf = fifo8_pop_buf(fifo, maxlen, &n);
+      if (dest) {
+          memcpy(dest, buf, n);
+      }
+
+      return n;
+  }
+
+  static void esp_do_nodma(struct ESPState *s)
+  {
+      int len;
+
+      if (s->async_len == 0) {
+          return;
+      }
+
+      len = MIN(fifo8_num_used(&s->fifo), ESP_FIFO_SZ);
+      esp_fifo_pop_buf(&s->fifo, s->async_buf, len);
+      s->async_buf += len;
+      s->async_len -= len;
+      s->ti_size += len;
+  }
+  ```
+
+test "rank1633: the destination capacity enters the MIN chain ahead of the FIFO side"
+  lang c
+  file hw/scsi/esp.c
+  reject VYQL-MEM-010
+  reject VYQL-MEM-023
+  reject VYQL-NUM-003
+  reject_review code.CompressedBlockSizeCapacityMismatch
+  reject_review code.SignedMessageLengthUnderflowCopy
+  code
+  ```
+  #include <stdint.h>
+  #include <string.h>
+
+  #define ESP_FIFO_SZ 16
+  #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+  typedef struct Fifo8 Fifo8;
+  uint32_t fifo8_num_used(const Fifo8 *fifo);
+  const uint8_t *fifo8_pop_buf(Fifo8 *fifo, uint32_t max, uint32_t *n);
+
+  struct ESPState {
+      uint32_t async_len;
+      uint8_t *async_buf;
+      uint32_t ti_size;
+      Fifo8 fifo;
+  };
+
+  static uint32_t esp_fifo_pop_buf(Fifo8 *fifo, uint8_t *dest, int maxlen)
+  {
+      const uint8_t *buf;
+      uint32_t n;
+
+      if (maxlen == 0) {
+          return 0;
+      }
+
+      buf = fifo8_pop_buf(fifo, maxlen, &n);
+      if (dest) {
+          memcpy(dest, buf, n);
+      }
+
+      return n;
+  }
+
+  static void esp_do_nodma(struct ESPState *s)
+  {
+      int len;
+
+      if (s->async_len == 0) {
+          return;
+      }
+
+      len = MIN(s->async_len, ESP_FIFO_SZ);
+      len = MIN(len, fifo8_num_used(&s->fifo));
+      esp_fifo_pop_buf(&s->fifo, s->async_buf, len);
+      s->async_buf += len;
+      s->async_len -= len;
+      s->ti_size += len;
+  }
+  ```
+
+test "rank1633: minimal pair -- the copy helper as a declaration, bound taken from the source side only"
+  lang c
+  file hw/scsi/esp.c
+  reject VYQL-MEM-016
+  reject VYQL-MEM-010
+  reject VYQL-MEM-023
+  reject VYQL-NUM-003
+  reject_review code.CompressedBlockSizeCapacityMismatch
+  reject_review code.SignedMessageLengthUnderflowCopy
+  code
+  ```
+  #include <stdint.h>
+
+  #define ESP_FIFO_SZ 16
+  #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+  typedef struct Fifo8 Fifo8;
+  uint32_t fifo8_num_used(const Fifo8 *fifo);
+  static uint32_t esp_fifo_pop_buf(Fifo8 *fifo, uint8_t *dest, int maxlen);
+
+  struct ESPState {
+      uint32_t async_len;
+      uint8_t *async_buf;
+      Fifo8 fifo;
+  };
+
+  static void esp_do_nodma(struct ESPState *s)
+  {
+      int len;
+
+      if (s->async_len == 0) {
+          return;
+      }
+
+      len = MIN(fifo8_num_used(&s->fifo), ESP_FIFO_SZ);
+      esp_fifo_pop_buf(&s->fifo, s->async_buf, len);
+      s->async_buf += len;
+      s->async_len -= len;
+  }
+  ```
+
+test "rank1633: minimal pair -- the same declaration, the capacity first in the MIN chain"
+  lang c
+  file hw/scsi/esp.c
+  reject VYQL-MEM-016
+  reject VYQL-MEM-010
+  reject VYQL-MEM-023
+  reject VYQL-NUM-003
+  reject_review code.CompressedBlockSizeCapacityMismatch
+  reject_review code.SignedMessageLengthUnderflowCopy
+  code
+  ```
+  #include <stdint.h>
+
+  #define ESP_FIFO_SZ 16
+  #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+  typedef struct Fifo8 Fifo8;
+  uint32_t fifo8_num_used(const Fifo8 *fifo);
+  static uint32_t esp_fifo_pop_buf(Fifo8 *fifo, uint8_t *dest, int maxlen);
+
+  struct ESPState {
+      uint32_t async_len;
+      uint8_t *async_buf;
+      Fifo8 fifo;
+  };
+
+  static void esp_do_nodma(struct ESPState *s)
+  {
+      int len;
+
+      if (s->async_len == 0) {
+          return;
+      }
+
+      len = MIN(s->async_len, ESP_FIFO_SZ);
+      len = MIN(len, fifo8_num_used(&s->fifo));
+      esp_fifo_pop_buf(&s->fifo, s->async_buf, len);
+      s->async_buf += len;
+      s->async_len -= len;
+  }
+  ```

@@ -1,0 +1,144 @@
+# Rank 1636 / CVE-2023-24607: the Qt ODBC driver plugin converted QStrings
+# into the driver's SQLTCHAR encoding with toSQLTCHAR() and then handed the
+# converted buffer to the ODBC C API together with a length taken from the
+# *source* string -- the commit's own description of the anti-pattern is
+# "use toSQLTCHAR(s).data(), s.size()". SQLTCHAR is 16-bit on some platforms
+# but 8- or 32-bit on others, and a UTF-8 or UTF-32 encoding of the same
+# string has a different element count than the QString's UTF-16 length, so
+# with sizeof(SQLTCHAR) == 4 a crafted string with astral characters makes
+# the length argument overstate the buffer and the driver reads past it
+# (NVD files this as CWE-476; the diff is a structural-size mismatch between
+# two arguments of one call, CWE-130). The fixing commit
+# aaf1381eab6292aa0444a5eadcc24165b6e1c02d fixes thirteen call sites across
+# qsql_odbc.cpp by naming the conversion's result and passing *its* size.
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+# src/plugins/sqldrivers/odbc at the vulnerable revision and at the fixed revision reports an
+# identical 32 findings on both revisions (31 VYQL-MEM-006 NullableDeref at
+# low confidence plus one VYQL-MEM-016 RawMemoryCopySize): the MEM-016 sits
+# on the memcpy at the old line 1746 whose size is consistently derived from
+# bytes.size()/sizeof(SQLTCHAR), i.e. the correctly-sized copy, and nothing
+# at all is labelled on any of the thirteen mismatched calls --
+# `vyql match` shows zero labels on any SQL* callee or on toSQLTCHAR.
+#
+# The discriminative fact is in the graph and nowhere else. In the fixed
+# form the conversion's result node FLOWS to both the buffer accessor and
+# the size accessor of the consumer call (graph: Call toSQLTCHAR -->
+# Call encoded.data and Call encoded.size); in the vulnerable form it FLOWS
+# only to the buffer accessor while the size argument is fed from the input
+# name. No layer can state "the conversion that produced argument i must
+# also produce argument j of the same call":
+#   - a callExpr binding's predicate surface is callee.method, callee.path
+#     and the positionless args.any.literal bag; args[N] addressing is not
+#     implemented, and the buffer argument's atom collapses
+#     toSQLTCHAR(query).data() to "toSQLTCHAR.data", erasing the shared
+#     identifier, so no text clause can correlate the two arguments;
+#   - keying the bag on the helper name or on .length() vs .size() is the
+#     fixing commit's own vocabulary (QString spells both identically) and
+#     dies on a rename of either;
+#   - a rule's unless clause only accepts coveredBy a control concept, and
+#     the query form chains positive joins, so there is no negated
+#     reachability between two aliased nodes; sameReceiver is a positive
+#     scan-wide name join and cannot express "not the same receiver".
+# This is the consumer-call form of the capacity-correlation gapy
+# recorded for the write-length form. Adjacent concepts considered and
+# rejected: taint.ComputedSize / code.SizeComputation (this is not taint --
+# no attacker value flows into the size; the size has the wrong
+# provenance), code.RawMemoryCopySize (no memcpy at these sites), and the
+# per-CVE capacity-mismatch issues (CompressedBlockSizeCapacityMismatch et
+# al judge expansion arithmetic, not argument-pair provenance).
+#
+# The first two snippets are the minimal pair: identical call, identical
+# conversion, differing only in whether the size argument derives from the
+# conversion's result or from its input. The third snippet is the boundary
+# of the gap: the positive reaches join between two labelled nodes in one
+# function (the capability behind VYQL-MEM-007) fires, so reachability
+# itself is available -- what does not exist is its negated, argument-scoped
+# form. Adding that is a new dataflow relation, not a bounded correction.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1636: the converted buffer is passed with the source string's length"
+  lang cpp
+  file qsql_odbc.cpp
+  reject VYQL-MEM-016
+  reject VYQL-MEM-020
+  code
+  ```
+  typedef short SQLTCHAR;
+  typedef int SQLINTEGER;
+  typedef void *SQLHSTMT;
+
+  struct VarLengthArray {
+      const SQLTCHAR *data() const { return buf; }
+      int size() const { return n; }
+      SQLTCHAR buf[64];
+      int n;
+  };
+  struct QString {
+      int length() const { return len; }
+      int len;
+  };
+  VarLengthArray toSQLTCHAR(const QString &s);
+
+  int SQLExecDirect(SQLHSTMT h, const SQLTCHAR *sql, SQLINTEGER len);
+
+  // QODBCResult::reset, qsql_odbc.cpp:1006 at the fix's parent: the buffer
+  // is the converted string, the length is the source string's.
+  int exec_direct(SQLHSTMT h, const QString &query) {
+      int r = SQLExecDirect(h,
+                            toSQLTCHAR(query).data(),
+                            (SQLINTEGER) query.length());
+      return r;
+  }
+  ```
+
+test "rank1636: the fixed revision names the conversion's result and passes its size"
+  lang cpp
+  file qsql_odbc.cpp
+  reject VYQL-MEM-016
+  reject VYQL-MEM-020
+  code
+  ```
+  typedef short SQLTCHAR;
+  typedef int SQLINTEGER;
+  typedef void *SQLHSTMT;
+
+  struct VarLengthArray {
+      const SQLTCHAR *data() const { return buf; }
+      int size() const { return n; }
+      SQLTCHAR buf[64];
+      int n;
+  };
+  struct QString {
+      int length() const { return len; }
+      int len;
+  };
+  VarLengthArray toSQLTCHAR(const QString &s);
+
+  int SQLExecDirect(SQLHSTMT h, const SQLTCHAR *sql, SQLINTEGER len);
+
+  // Patched form: the conversion's result reaches both the buffer argument
+  // and the size argument of the same call.
+  int exec_direct(SQLHSTMT h, const QString &query) {
+      auto encoded = toSQLTCHAR(query);
+      int r = SQLExecDirect(h,
+                            encoded.data(),
+                            SQLINTEGER(encoded.size()));
+      return r;
+  }
+  ```
+
+test "rank1636: the positive reaches join between two labelled nodes in one function still fires"
+  lang cpp
+  file uaf.cpp
+  expect VYQL-MEM-007
+  code
+  ```
+  void free(void *p);
+
+  void release_then_touch(char *p) {
+      free(p);
+      *p = 1;
+  }
+  ```

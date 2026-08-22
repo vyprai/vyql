@@ -1,0 +1,210 @@
+# Rank 1630 / CVE-2025-32434: torch.load promised that
+# weights_only=True unpickles through a restricted unpickler, but the
+# legacy .tar branch of _legacy_load never honored the promise
+# (CWE-502, deserialization of untrusted data; GHSA-53q9-r3pm-6pq6).
+# torch.load dispatches non-zip files with weights_only=True to
+# _legacy_load(..., _weights_only_unpickler, ...), and the tar branch
+# then installs the unrestricted tuple-returning persistent_load
+# callback onto the restricted unpickler and deserializes the
+# archive-extracted "storages"/"tensors"/"pickle" members with it, so
+# a crafted checkpoint executes code despite the safety flag. Pool
+# commit 8d4b8a92 (the advisory's own reference) raises RuntimeError
+# inside legacy_load when pickle_module is _weights_only_unpickler;
+# its parent 9c34a2076 is the vulnerable state (it reverts an earlier,
+# over-broad fix attempt). The remediation is present at the fixed revision and
+# absent at the parent.
+
+#
+# ATTENTION, mode-guard vocabulary. The remediation is a mode check,
+# not a dataflow change: every deserialization call in legacy_load --
+# pickle_module.load on each extracted member and the
+# UnpicklerWrapper.load over the "pickle" member -- is byte-identical
+# at the fixed revision, so no taint rule separates the pair. Measured: a
+# probe binding labelling every pickle_module.load site
+# code.Deserialization reports the identical sink set at both
+# revisions and zero VYQL-DESER-001 findings either way (no source ->
+# sink path exists in library code); the bounded scan of
+# torch/serialization.py plus torch/_weights_only_unpickler.py
+# reports an identical 3 findings at both revisions (the file scanned
+# alone shows 5 -> 3, but a control applying only the fixed revision's cosmetic
+# UNSAFE_MESSAGE relocation drops the same two findings, so that
+# delta is layout noise, not the guard). The only construct that
+# differs is the sentinel comparison `pickle_module is
+# _weights_only_unpickler` -- the fixing commit's own vocabulary,
+# which the genericity test rejects -- and the generic widening (any
+# .load() on a module-alias receiver is a CWE-502 sink) has 2400
+# reachable call sites across the corpus clones. The
+# API-documented-call counterweight fails because the guarded
+# function's call set is unchanged. No ENGINE-GAPS entry: the sink
+# labels and the paths that exist resolve; the blocker is that the
+# weakness has no dataflow spelling. Spec cve_rank1630 records the
+# unguarded legacy branch and the guarded form, both asserting reject
+# VYQL-DESER-001: when safe-mode-enforcement vocabulary lands, the
+# unguarded form must flip to expect.
+
+test "rank1630: the legacy tar branch deserializes without honoring the restricted unpickler"
+  lang python
+  file torch/serialization.py
+  reject VYQL-DESER-001
+  code
+  ```
+  import os
+  import pickle
+  import struct
+  import tarfile
+  from contextlib import closing
+  from tempfile import mkdtemp
+
+  import torch._weights_only_unpickler as _weights_only_unpickler
+
+
+  def _legacy_load(f, map_location, pickle_module, **pickle_load_args):
+      deserialized_objects = {}
+
+      class UnpicklerWrapper(pickle_module.Unpickler):
+          def find_class(self, mod_name, name):
+              if type(name) is str and "Storage" in name:
+                  try:
+                      return StorageType(name)
+                  except KeyError:
+                      pass
+              return super().find_class(mod_name, name)
+
+      def legacy_load(f):
+          deserialized_objects = {}
+
+          def persistent_load(saved_id):
+              if isinstance(saved_id, tuple):
+                  # Ignore containers that don't have any sources saved
+                  if all(saved_id[1:]):
+                      _check_container_source(*saved_id)
+                  return saved_id[0]
+              return deserialized_objects[int(saved_id)]
+
+          with closing(
+              tarfile.open(fileobj=f, mode="r:", format=tarfile.PAX_FORMAT)
+          ) as tar, mkdtemp() as tmpdir:
+              tar.extract("storages", path=tmpdir)
+              with open(os.path.join(tmpdir, "storages"), "rb", 0) as f:
+                  num_storages = pickle_module.load(f, **pickle_load_args)
+                  for _ in range(num_storages):
+                      args = pickle_module.load(f, **pickle_load_args)
+                      key, location, storage_type = args
+                      dtype = storage_type._dtype
+                      obj = torch.UntypedStorage._new_with_file(
+                          f, torch._utils._element_size(dtype)
+                      )
+                      obj = restore_location(obj, location)
+                      deserialized_objects[key] = torch.storage.TypedStorage(
+                          wrap_storage=obj, dtype=dtype, _internal=True
+                      )
+              tar.extract("tensors", path=tmpdir)
+              with open(os.path.join(tmpdir, "tensors"), "rb", 0) as f:
+                  num_tensors = pickle_module.load(f, **pickle_load_args)
+                  for _ in range(num_tensors):
+                      args = pickle_module.load(f, **pickle_load_args)
+                      key, storage_id, _original_tensor_type = args
+                      storage = deserialized_objects[storage_id]
+                      (ndim,) = struct.unpack("<i", f.read(4))
+                      numel = struct.unpack(f"<{ndim}q", f.read(8 * ndim))
+                      stride = struct.unpack(f"<{ndim}q", f.read(8 * ndim))
+                      (storage_offset,) = struct.unpack("<q", f.read(8))
+                      tensor = torch.empty((0,), dtype=storage.dtype).set_(
+                          storage._untyped_storage, storage_offset, numel, stride
+                      )
+                      deserialized_objects[key] = tensor
+
+              pickle_file = tar.extractfile("pickle")
+              unpickler = UnpicklerWrapper(pickle_file, **pickle_load_args)
+              unpickler.persistent_load = persistent_load
+              result = unpickler.load()
+              return result
+
+      return legacy_load(f)
+  ```
+
+test "rank1630: the fixed revision refuses the legacy tar format under the restricted unpickler"
+  lang python
+  file torch/serialization.py
+  reject VYQL-DESER-001
+  code
+  ```
+  import os
+  import pickle
+  import struct
+  import tarfile
+  from contextlib import closing
+  from tempfile import mkdtemp
+
+  import torch._weights_only_unpickler as _weights_only_unpickler
+
+
+  def _legacy_load(f, map_location, pickle_module, **pickle_load_args):
+      deserialized_objects = {}
+
+      class UnpicklerWrapper(pickle_module.Unpickler):
+          def find_class(self, mod_name, name):
+              if type(name) is str and "Storage" in name:
+                  try:
+                      return StorageType(name)
+                  except KeyError:
+                      pass
+              return super().find_class(mod_name, name)
+
+      def legacy_load(f):
+          deserialized_objects = {}
+
+          def persistent_load(saved_id):
+              if isinstance(saved_id, tuple):
+                  # Ignore containers that don't have any sources saved
+                  if all(saved_id[1:]):
+                      _check_container_source(*saved_id)
+                  return saved_id[0]
+              return deserialized_objects[int(saved_id)]
+
+          with closing(
+              tarfile.open(fileobj=f, mode="r:", format=tarfile.PAX_FORMAT)
+          ) as tar, mkdtemp() as tmpdir:
+              if pickle_module is _weights_only_unpickler:
+                  raise RuntimeError(
+                      "Cannot use ``weights_only=True`` with files saved in the "
+                      "legacy .tar format. " + UNSAFE_MESSAGE
+                  )
+              tar.extract("storages", path=tmpdir)
+              with open(os.path.join(tmpdir, "storages"), "rb", 0) as f:
+                  num_storages = pickle_module.load(f, **pickle_load_args)
+                  for _ in range(num_storages):
+                      args = pickle_module.load(f, **pickle_load_args)
+                      key, location, storage_type = args
+                      dtype = storage_type._dtype
+                      obj = torch.UntypedStorage._new_with_file(
+                          f, torch._utils._element_size(dtype)
+                      )
+                      obj = restore_location(obj, location)
+                      deserialized_objects[key] = torch.storage.TypedStorage(
+                          wrap_storage=obj, dtype=dtype, _internal=True
+                      )
+              tar.extract("tensors", path=tmpdir)
+              with open(os.path.join(tmpdir, "tensors"), "rb", 0) as f:
+                  num_tensors = pickle_module.load(f, **pickle_load_args)
+                  for _ in range(num_tensors):
+                      args = pickle_module.load(f, **pickle_load_args)
+                      key, storage_id, _original_tensor_type = args
+                      storage = deserialized_objects[storage_id]
+                      (ndim,) = struct.unpack("<i", f.read(4))
+                      numel = struct.unpack(f"<{ndim}q", f.read(8 * ndim))
+                      stride = struct.unpack(f"<{ndim}q", f.read(8 * ndim))
+                      (storage_offset,) = struct.unpack("<q", f.read(8))
+                      tensor = torch.empty((0,), dtype=storage.dtype).set_(
+                          storage._untyped_storage, storage_offset, numel, stride
+                      )
+                      deserialized_objects[key] = tensor
+
+              pickle_file = tar.extractfile("pickle")
+              unpickler = UnpicklerWrapper(pickle_file, **pickle_load_args)
+              unpickler.persistent_load = persistent_load
+              result = unpickler.load()
+              return result
+
+      return legacy_load(f)
+  ```

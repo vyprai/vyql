@@ -1,0 +1,119 @@
+# Rank 1627 / CVE-2026-33699: pypdf's DictionaryObject.read_from_stream
+# parsed dictionary key/value pairs in an unbounded while-True loop over
+# the PDF byte stream, and its recovery policy converted every parsing
+# error into warn-and-continue in non-strict mode. The recursion and
+# self-reference guards existed -- PdfReader.get_object raises on a
+# self-referencing indirect object, and deep nesting raises
+# RecursionError -- but the parser swallows the errors in the same broad
+# `except Exception` handler as ordinary malformed input, so the
+# lenient parse re-read the same bytes forever: an infinite loop on a
+# crafted PDF (CWE-835/CWE-400, denial of service; GHSA-87mj-5ggw-8qc3,
+# fixed in 6.9.2). The fixed revision reclassifies RecursionError and
+# LimitReachedError as hard errors that always propagate, in both the
+# reader (the self-reference raise becomes LimitReachedError instead of
+# PdfReadError) and the dictionary parser. The fixing commit da867f49 is the
+# 6.9.2 release bump; the security fix it ships is 02b1345 (PR #3693),
+# named in that release commit's own changelog -- no row correction correction
+# reported, never applied.
+#
+# ATTENTION, lenient-recovery family (the unbounded-parse group with
+# 1517, 1554, 1572, 1586 and 1612). The cycle guard fires and the limit
+# errors are raised; what is missing is a judgement about which error
+# classes a recovery handler must not absorb. No concept expresses it:
+# NumericParserMissingProgressCheck (VYQL-DOS-029) is bound only in C
+# for numeric parsers with a tmp == pos cursor guard,
+# RecursiveObjectParentResolveWithoutCycleGuard covers a missing guard
+# rather than a swallowed one, and the Python frontend emits no
+# except-clause fact at all -- `vyql match` on a minimal repro of the
+# function reports no source, no sink and no control. The only textual
+# discriminator between the two revisions is the added
+# `except (RecursionError, LimitReachedError)` clause, the fixing
+# commit's own layout. A binding keyed on pypdf's logger_warning would
+# detect this library rather than the weakness. Measured on the real
+# checkout at 02b1345^ and 02b1345: 204 findings at both revisions,
+# zero on pypdf/generic/_data_structures.py (the four on pypdf/_reader.py
+# are ReDoS false positives on re.compile), identical rule tallies --
+# no discrimination exists. No ENGINE-GAPS.md entry: no taint path is
+# involved and no single construct is mishandled. No definition change
+# shipped. Spec cve_rank1627 records the swallowed-limit form and the
+# hard-error form, both asserting reject VYQL-DOS-029: when
+# lenient-recovery vocabulary lands, the swallowed form must flip to
+# expect.
+
+test "rank1627: the lenient dictionary parser absorbs the limit errors"
+  lang python
+  file pypdf/generic/_data_structures.py
+  reject VYQL-DOS-029
+  code
+  ```
+  class DictionaryObject(dict):
+      @staticmethod
+      def read_from_stream(stream, pdf, forced_encoding=None):
+          data = {}
+          while True:
+              tok = read_non_whitespace(stream)
+              if tok == b">":
+                  stream.read(1)
+                  break
+              stream.seek(-1, 1)
+              try:
+                  try:
+                      key = read_object(stream, pdf)
+                      if isinstance(key, NullObject):
+                          break
+                  except PdfReadError as exc:
+                      if pdf is not None and pdf.strict:
+                          raise
+                      logger_warning(exc.__repr__(), __name__)
+                      continue
+                  value = read_object(stream, pdf, forced_encoding)
+              except Exception as exc:
+                  if pdf is not None and pdf.strict:
+                      raise PdfReadError(exc.__repr__())
+                  logger_warning(exc.__repr__(), __name__)
+                  retval = DictionaryObject()
+                  retval.update(data)
+                  return retval  # return partial data
+              data[key] = value
+          return DictionaryObject(data)
+  ```
+
+test "rank1627: recursion and limit errors are hard errors"
+  lang python
+  file pypdf/generic/_data_structures.py
+  reject VYQL-DOS-029
+  code
+  ```
+  class DictionaryObject(dict):
+      @staticmethod
+      def read_from_stream(stream, pdf, forced_encoding=None):
+          data = {}
+          while True:
+              tok = read_non_whitespace(stream)
+              if tok == b">":
+                  stream.read(1)
+                  break
+              stream.seek(-1, 1)
+              try:
+                  try:
+                      key = read_object(stream, pdf)
+                      if isinstance(key, NullObject):
+                          break
+                  except PdfReadError as exc:
+                      if pdf is not None and pdf.strict:
+                          raise
+                      logger_warning(exc.__repr__(), __name__)
+                      continue
+                  value = read_object(stream, pdf, forced_encoding)
+              except (RecursionError, LimitReachedError) as exc:
+                  raise PdfReadError(exc.__repr__())
+              except Exception as exc:
+                  if pdf is not None and pdf.strict:
+                      raise PdfReadError(exc.__repr__())
+                  logger_warning(exc.__repr__(), __name__)
+                  retval = DictionaryObject()
+                  retval.update(data)
+                  return retval  # return partial data
+              data[key] = value
+          return DictionaryObject(data)
+  ```
