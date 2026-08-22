@@ -2798,3 +2798,21 @@ binding jenkinsScmCheckoutAllowsLocalSource469 {
   query pattern presenceNode where node.scope == "function" and node.context.functionName contains "checkout" and node.context.paramType contains "SCMRevisionState" and node.context.paramType contains "FilePath" and node.context.paramType contains "Launcher" and not (node.context.scopeCall contains "isRemote")
   emit issue code.JenkinsScmCheckoutAllowsLocalSource at node
 }
+
+// The JAX-RS MessageBodyReader contract passes the request entity body to the
+// provider as the InputStream parameter of readFrom (jakarta.ws.rs.ext
+// .MessageBodyReader): the runtime calls readFrom to unmarshal an incoming
+// entity, so that parameter is request data the same way a servlet parameter
+// is. @Provider marks exactly the classes the runtime discovers, and the fixed
+// interface signature readFrom(Class, Type, Annotation[], MediaType,
+// MultivaluedMap, InputStream) puts the entity stream at parameter index 5, so
+// the conjunction stays on the provider's entity stream and leaves both
+// ordinary stream-reading helpers named readFrom and the other readFrom
+// parameters (the reflection-fed Class type in particular) unlabelled. The
+// index clause matters: every parameter of the method carries a
+// has_param_type:InputStream token, so the type clause alone would taint all
+// six parameters.
+binding httpInput810 {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.classAnnotation contains "Provider" and args.any.context.functionName contains "readFrom" and args.any.context.paramIndex contains "5" and args.any.context.paramType contains "InputStream"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,212 @@
+# Rank 1638 / CVE-2021-34825: quassel's core starts in plaintext when
+# --require-ssl is set and certificate loading fails (CWE-319, recorded after
+# re-mapping from CWE-311 in 2022). SslServer's constructor resolves the
+# certificate paths, calls loadCerts(), and on failure logs a warning and
+# returns; the core then listens and accepts connections with no TLS at all.
+# The operator's --require-ssl mandate is consulted only in
+# CoreAuthHandler::handle(RegisterClient) (src/core/coreauthhandler.cpp:197),
+# never on this startup path, so the core the operator told to refuse
+# plaintext comes up serving it.
+#
+# The pool row's commit 0674fae039bbc79bfe3f7e42b12ec9015b9b879b ("Add link to
+# certificate FAQ in --require-ssl error") is the direct child of the change: it
+# only extends the error message the fixed revision introduced with a FAQ URL. The fixed revision
+# itself is its parent, f20d380a36e11a7591dacbf0a62d7c11d997f9db ("core:
+# Require TLS cert to be loaded if --require-ssl is used", PR #581), which
+# adds the fail-closed branch to the constructor:
+#
+#   if (!loadCerts()) {
+#       if (Quassel::isOptionSet("require-ssl")) {
+#           throw ExitException{EXIT_FAILURE, tr("--require-ssl is set, but no SSL certificate is available. Exiting.")};
+#       }
+#       ... warning ...
+#   }
+#
+# the scan target is the fixed revision's parent either way.
+#
+# ATTENTION, vocabulary gap, configuration-decides-posture family (same family
+# as the ledger rows for 1514, 1535, 1540, 1556, 1557, 1593). No taint path
+# exists: nothing attacker-controlled flows anywhere, the defect is an error
+# path ignoring a configuration mandate. Measured at the vulnerable revision:
+# `scan --cache off` over src/core reports 20 findings in each of three runs,
+# none in sslserver.cpp; the whole tree reports 846 findings, none mentioning
+# sslserver.cpp. `vyql match` on both revisions of the constructor emits
+# identical labels -- only the incidental code.IntegerSizeArithmetic(Sink) on
+# configDirPath() + "quasselCert.pem".
+#
+# Nothing shippable keys the change. The discriminating tokens the fixed revision adds are
+# project-internal (the Quassel::isOptionSet static and the ExitException
+# class); no documented library call remains inside the guarded function, so
+# the 1380 counterweight does not apply. The vulnerable site's callee,
+# loadCerts(), is quassel's own wrapper and is called identically by
+# SslServer::reloadCerts(), whose log-and-continue failure handling is correct
+# (it reverts to the last loaded valid key) and unchanged at both revisions --
+# a callee-keyed binding reports both, and the patched revision still reports
+# the reload. The generic fallback, a cert/ssl/tls-named call in a failure
+# branch handled by logging alone, is the standard optional-TLS idiom across
+# the corpus (qtbase's TLS plugins, mongo's ssl_manager_*.cpp, node's
+# node_crypto.cc carry it by design), so it trades one true positive for a
+# false positive on every optional-TLS server. The nearest concepts by theme
+# do not name this shape either: code.CertValidationDisabled (VYQL-CFG-004,
+# CWE-295) is its mirror -- client-side verification switched off -- and
+# code.CleartextConfig (VYQL-MOB-004, CWE-319) fires only from Android
+# manifest and plist configuration analysis, never from source.
+#
+# verify_current_expected: attention-vocabulary-gap, all three blocks rejected.
+
+test "rank1638: startup continues in plaintext when certificate loading fails"
+  lang cpp
+  file sslserver.cpp
+  reject VYQL-CFG-004
+  reject VYQL-MOB-004
+  reject_review code.CertValidationDisabled
+  reject_review code.CleartextConfig
+  code
+  ```
+  class QString {};
+  class QObject {};
+  class QTcpServer { public: QTcpServer(QObject*) {} };
+  #define EXIT_FAILURE 1
+  #define tr(x) x
+
+  class Quassel {
+  public:
+      static bool isOptionSet(const char*) { return false; }
+      static QString optionValue(const char*) { return QString(); }
+      static QString configDirPath() { return QString(); }
+  };
+
+  class SslServer : public QTcpServer {
+      QString _sslCertPath, _sslKeyPath;
+      bool loadCerts();
+  public:
+      SslServer(QObject* parent)
+          : QTcpServer(parent)
+      {
+          // Keep track if the SSL warning has been mentioned at least once before
+          static bool sslWarningShown = false;
+
+          if (Quassel::isOptionSet("ssl-cert")) {
+              _sslCertPath = Quassel::optionValue("ssl-cert");
+          }
+          else {
+              _sslCertPath = Quassel::configDirPath() + "quasselCert.pem";
+          }
+
+          if (Quassel::isOptionSet("ssl-key")) {
+              _sslKeyPath = Quassel::optionValue("ssl-key");
+          }
+          else {
+              _sslKeyPath = _sslCertPath;
+          }
+
+          // Initialize the certificates for first-time usage
+          if (!loadCerts()) {
+              if (!sslWarningShown) {
+                  qWarning() << "SslServer: Unable to set certificate file\n"
+                             << "          Quassel Core will still work, but cannot provide SSL for client connections.";
+                  sslWarningShown = true;
+              }
+          }
+      }
+  };
+
+  bool SslServer::loadCerts() { return setCertificate(_sslCertPath, _sslKeyPath); }
+  ```
+
+test "rank1638: fix exits when --require-ssl is set and no certificate loads"
+  lang cpp
+  file sslserver.cpp
+  reject VYQL-CFG-004
+  reject VYQL-MOB-004
+  reject_review code.CertValidationDisabled
+  reject_review code.CleartextConfig
+  code
+  ```
+  class QString {};
+  class QObject {};
+  class QTcpServer { public: QTcpServer(QObject*) {} };
+  class ExitException { public: ExitException(int, QString) {} };
+  #define EXIT_FAILURE 1
+  #define tr(x) x
+
+  class Quassel {
+  public:
+      static bool isOptionSet(const char*) { return false; }
+      static QString optionValue(const char*) { return QString(); }
+      static QString configDirPath() { return QString(); }
+  };
+
+  class SslServer : public QTcpServer {
+      QString _sslCertPath, _sslKeyPath;
+      bool loadCerts();
+  public:
+      SslServer(QObject* parent)
+          : QTcpServer(parent)
+      {
+          // Keep track if the SSL warning has been mentioned at least once before
+          static bool sslWarningShown = false;
+
+          if (Quassel::isOptionSet("ssl-cert")) {
+              _sslCertPath = Quassel::optionValue("ssl-cert");
+          }
+          else {
+              _sslCertPath = Quassel::configDirPath() + "quasselCert.pem";
+          }
+
+          if (Quassel::isOptionSet("ssl-key")) {
+              _sslKeyPath = Quassel::optionValue("ssl-key");
+          }
+          else {
+              _sslKeyPath = _sslCertPath;
+          }
+
+          // Initialize the certificates for first-time usage
+          if (!loadCerts()) {
+              // If the core is unable to load a certificate, and "--require-ssl" is specified,
+              // do not proceed, throw an exception and quit. This prevents the core from falling
+              // back to a plaintext-only core when they should be expecting SSL/TLS only.
+              if (Quassel::isOptionSet("require-ssl")) {
+                  throw ExitException{EXIT_FAILURE, tr("--require-ssl is set, but no SSL certificate is available. Exiting.")};
+              }
+              if (!sslWarningShown) {
+                  qWarning() << "SslServer: Unable to set certificate file\n"
+                             << "          Quassel Core will still work, but cannot provide SSL for client connections.";
+                  sslWarningShown = true;
+              }
+          }
+      }
+  };
+
+  bool SslServer::loadCerts() { return setCertificate(_sslCertPath, _sslKeyPath); }
+  ```
+
+test "rank1638: runtime cert reload falls back to the previous key by design"
+  lang cpp
+  file sslserver.cpp
+  reject VYQL-CFG-004
+  reject VYQL-MOB-004
+  reject_review code.CertValidationDisabled
+  reject_review code.CleartextConfig
+  code
+  ```
+  bool SslServer::reloadCerts()
+  {
+      if (loadCerts()) {
+          return true;
+      }
+      else {
+          // Reloading certificates currently only occur in response to a request.  Always print an
+          // error if something goes wrong, in order to simplify checking if it's working.
+          if (isCertValid()) {
+              qWarning() << "SslServer: Unable to reload certificate file, reverting\n"
+                         << "          Quassel Core will use the previous key to provide SSL for client connections.";
+          }
+          else {
+              qWarning() << "SslServer: Unable to reload certificate file\n"
+                         << "          Quassel Core will still work, but cannot provide SSL for client connections.";
+          }
+          return false;
+      }
+  }
+  ```

@@ -1,0 +1,45 @@
+module bindings.python.archive_member_write_member_filter;
+
+// zipfile and tarfile both hand the extracting code the member names the
+// archive itself declares: infolist/namelist on a ZipFile, getmembers/getnames
+// on a TarFile. zipfile's own extract and extractall sanitise a member name
+// before joining it to the destination (drive letters and absolute paths are
+// dropped, `..` and `.` components removed), which is why
+// pythonTarfileExtractWithoutMemberConstraint anchors on tarfile and leaves
+// zipfile's convenience extraction alone -- and why a loop that only routes
+// each entry through ZipFile.extract reports nothing here either. The manual
+// loop is the other discipline: it takes the raw member name, joins it to a
+// destination and opens a file at the joined path for writing. os.path.join
+// adopts an absolute second argument unchanged and follows `..` components out
+// of the destination, so the archive decides where the entry lands with the
+// writing process's privileges (CWE-22, and CWE-59 where a link-shaped entry
+// is also written through). A function that walks the member list and opens a
+// destination file per entry, while naming none of the documented constraints
+// on where an entry may land, is an extraction that cannot keep its own
+// destination root.
+//
+// The write clause is the per-entry assembly rather than any directory
+// creation: makedirs and mkdir also prepare the destination or build test
+// fixtures beside a member walk that never extracts, an open/write pair alone
+// matches a read-only walk that logs to stderr or dumps a stream into a
+// scratch file, and an inline os.path.join matches a test that writes fixtures
+// and only reads the member list back to assert on it. What the binding
+// requires is the assembled destination -- an assignment whose right side is
+// an os.path.join, the idiom a per-entry write loop uses to build the path it
+// opens -- plus the open() and the write or copyfileobj on it. A loop that
+// joins inline inside the open() call reports nothing; that is the residual
+// recall cost of keeping member reads and fixture writes out. Every
+// constraint read here is the API's own
+// surface, in the register the tarfile binding established: a `..` component
+// test, the containment normalisers (Path.resolve, relative_to,
+// is_relative_to, os.path.abspath, os.path.realpath, os.path.isabs) and
+// os.path.basename's single-component strip, tarfile's `filter=` keyword and
+// data_filter/tar_filter, and an entry-type inspection (issym, islnk,
+// linkname on a tar member; external_attr and flag_bits on a ZipInfo, the
+// documented attributes carrying the unix mode word and the encrypted bit).
+// The common read-only member walk -- namelist plus ZipFile.open(name) into
+// memory -- names no write and reports nothing.
+binding pythonArchiveMemberWriteWithoutMemberConstraint {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.call, ["infolist", "namelist", "getmembers", "getnames"]) and node.context.assign contains "=os.path.join(" and containsAny(node.context.call, ["write", "copyfileobj"]) and containsAny(node.context.call, ["open"]) and not (containsAny(node.context.call, ["resolve", "relative_to", "is_relative_to", "abspath", "realpath", "isabs", "basename"])) and not (node.context.expr contains "..") and not (node.context.identifier == "filter") and not (containsAny(node.context.selector, ["tarfile.data_filter", "tarfile.tar_filter"])) and not (containsAny(node.context.identifier, ["issym", "islnk", "linkname", "external_attr", "flag_bits"]))
+  emit issue code.ArchiveSymlinkFilterBypass at node
+}

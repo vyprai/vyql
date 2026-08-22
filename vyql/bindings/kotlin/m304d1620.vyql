@@ -843,3 +843,79 @@ binding objectLookupByUserInput381 {
   query pattern callExpr where callee.method == "getObjectByUrl"
   emit sink code.ObjectLookupByUserInput at args[0]
 }
+
+// Javalin's io.javalin.http.Context exposes the request's path parameters
+// through pathParamMap() / pathParam(name) and its query parameters through
+// queryParam(name); the framework documents each as returning values the
+// client sent, so they are request-parameter reads the same way
+// HttpServletRequest.getParameter is above.
+binding httpInput400 {
+  query pattern callExpr where callee.method == "pathParamMap"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput401 {
+  query pattern callExpr where callee.method == "pathParam"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput402 {
+  query pattern callExpr where callee.method == "queryParam"
+  emit source code.HttpInput at call.result
+}
+
+// java.nio.file.Files' accessors take the file to act on as their first
+// argument, the same contract the Java bindings already label: opening a
+// stream or reader, reading a file's bytes or lines, writing, deleting or
+// copying one. Paths.get is deliberately not mirrored -- it constructs a
+// path without touching the filesystem, so the access operations are where
+// the file is named for the purpose of a path finding.
+binding filePathAccess403 {
+  query pattern callExpr where callee.path ~= "Files.readAllBytes"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess404 {
+  query pattern callExpr where callee.path ~= "Files.readAllLines"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess405 {
+  query pattern callExpr where callee.path ~= "Files.newInputStream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess406 {
+  query pattern callExpr where callee.path ~= "Files.newOutputStream"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess407 {
+  query pattern callExpr where callee.path ~= "Files.newBufferedReader"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess408 {
+  query pattern callExpr where callee.path ~= "Files.newBufferedWriter"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess409 {
+  query pattern callExpr where callee.path ~= "Files.write"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess410 {
+  query pattern callExpr where callee.path ~= "Files.lines"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess411 {
+  query pattern callExpr where callee.path ~= "Files.delete"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess412 {
+  query pattern callExpr where callee.path ~= "Files.copy"
+  emit sink code.FilePathAccess at args[0]
+}

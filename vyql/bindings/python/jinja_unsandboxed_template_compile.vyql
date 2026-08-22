@@ -1,0 +1,28 @@
+module bindings.python.jinja_unsandboxed_template_compile;
+
+// jinja2's documented hardening boundary for a template whose source the
+// program did not write is jinja2.sandbox.SandboxedEnvironment: the
+// module-level Template(source) compiles the source in the default,
+// unsandboxed environment, where a source carrying template markup can
+// walk object attributes into the interpreter. The compile that matters is
+// the one whose argument is not a string the program wrote -- an
+// identifier, a call result, or a read -- because a literal argument is
+// the documented quickstart form and is not data. The assign token keeps
+// the right-hand side's text with its quotes, so a literal argument reads
+// as =Template(" while a dynamic one does not.
+//
+// Three forms stay out of reach and are not covered: an Environment-based
+// compile (env.from_string(source)) leaves the receiver unresolved, so it
+// is indistinguishable from SandboxedEnvironment().from_string(source);
+// a concatenation that begins with a literal ("Hello " + name) reads as
+// the literal form and does not report; and a compile at module scope
+// (script-style code) sits outside the function scope this binds to.
+//
+// The scopeCall clause matches the resolved call path, so a from-import of
+// jinja2's Template is recognised however the file spells the import, and
+// the sandboxed spellings do not contain the needle.
+
+binding unsandboxedJinjaTemplateCompile {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.scopeCall, ["jinja2.Template"]) and not (containsAny(node.context.assign, ["=Template(\"", "=Template('", "=jinja2.Template(\"", "=jinja2.Template('"]))
+  emit issue code.IncompleteTemplateValidation at node
+}

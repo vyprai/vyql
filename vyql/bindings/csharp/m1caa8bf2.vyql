@@ -1202,3 +1202,28 @@ binding certValidationDisabledDelegate {
   query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and node.context.callPath contains "ServerCertificateCustomValidationCallback" and node.context.literal contains "true" and not (node.context.functionName contains "Validate")
   emit issue code.CertValidationDisabled at node
 }
+
+// A C# function that verifies a caller-supplied password against a stored
+// password hash -- the `user.PasswordHash` read handed to an `IsMatch`/
+// `Verify`/`VerifyHashedPassword` comparison, the shape every credential
+// check in the ecosystem reduces to, from ASP.NET Identity's
+// IPasswordHasher.VerifyHashedPassword to a project's own utility -- is an
+// authentication decision an HTTP caller can drive at machine speed unless
+// something in the same function limits how often it may be retried. The
+// attempt-limiting vocabulary is the standard C# one: the rate-limiting
+// middleware and its attribute (`AddRateLimiter`, `EnableRateLimiting`,
+// `RateLimiter`), ASP.NET Identity's lockout (`LockoutEnd`, `IsLockedOut`,
+// `AccessFailedAsync`, `MaxFailedAccessAttempts`) and its opt-in flag spelled
+// safe (`lockoutOnFailure:true`; the false spelling is the unsafe one), the
+// generic failed-attempt counter names, and the 429 phrase. `lockoutOnFailure:
+// false` does not suppress, because disabling the lockout is not a control.
+//
+// Residual: the negation reads the function's own body text, which keeps
+// comments, so a comment naming one of these controls silences the report --
+// the false-negative direction only. And a project that hand-rolls its
+// attempt counter under wholly private names reports either way; the
+// discriminator is the standard vocabulary, not any one project's.
+binding passwordVerificationRateLimitRequired301 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "csharp" and containsAny(node.context.selector, ["PasswordHash", "HashedPassword", "passwordHash"]) and containsAny(node.context.call, ["IsMatch", "Verify", "VerifyHashedPassword", "CheckPassword", "Compare", "Equals"]) and not (containsAny(node.token, ["Lockout", "LockedOut", "lockoutOnFailure:true", "RateLimit", "rateLimit", "RateLimiter", "Throttle", "throttle", "TooManyRequests", "AccessFailed", "FailedAccess", "FailedAttempt", "failedAttempt", "LoginAttempt", "loginAttempt", "AttemptCount", "attemptCount"]))
+  emit issue code.RateLimitRequiredOp at node
+}

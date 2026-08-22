@@ -2825,3 +2825,8 @@ binding redirectAllowlist481 {
     }
   }
 }
+
+binding storedDataRead620 {
+  query pattern callExpr where callee.path ~= "$_SESSION"
+  emit source code.StoredDataRead at call.result
+}

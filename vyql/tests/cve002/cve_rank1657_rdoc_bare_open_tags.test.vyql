@@ -1,0 +1,63 @@
+# CVE-2021-31799: RDoc's remove_unparseable opened each candidate TAGS file
+# through Ruby's receiverless `open`. `Kernel#open` is a private instance
+# method mixed into Object, so `open path, mode` is `Kernel.open path, mode`,
+# and Ruby documents that method as running the path as a subprocess command
+# line whenever its first character is `|`. The file list is gathered with
+# Dir.glob over the tree being documented, so a repository containing a file
+# named `| touch evil.txt && echo tags` ran that command when rdoc walked it
+# (CWE-78). The fixed revision spells the call File.open, the form with no pipe
+# behaviour.
+#
+# The path is filesystem-derived rather than from a labelled source, so this is
+# the review direction: the flag names the call for a caller audit, and the
+# taint rule stays silent until a source reaches it. The callee.path match is
+# exact because `~=` is segment-aware in both directions and would pull in the
+# patched `File.open` itself.
+
+test "rank1657: a TAGS candidate opened through bare open can run a piped path"
+  lang ruby
+  profile library
+  expect_review code.RubyPipeOpenCommandExecution
+  file lib/rdoc/rdoc.rb
+  code
+  ```
+  class RDoc::RDoc
+    ##
+    # Removes file extensions known to be unparseable from +files+ and TAGS
+    # files for emacs and vim.
+
+    def remove_unparseable files
+      files.reject do |file, *|
+        file =~ /\.(?:class|eps|erb|scpt\.txt|svg|ttf|yml)$/i or
+          (file =~ /tags$/i and
+           open(file, 'rb') { |io|
+             io.read(100) =~ /\A(\f\n[^,]+,\d+$|!_TAG_)/
+           })
+      end
+    end
+  end
+  ```
+
+test "rank1657: the TAGS check opens the same path through File.open"
+  lang ruby
+  profile library
+  reject_review code.RubyPipeOpenCommandExecution
+  file lib/rdoc/rdoc.rb
+  code
+  ```
+  class RDoc::RDoc
+    ##
+    # Removes file extensions known to be unparseable from +files+ and TAGS
+    # files for emacs and vim.
+
+    def remove_unparseable files
+      files.reject do |file, *|
+        file =~ /\.(?:class|eps|erb|scpt\.txt|svg|ttf|yml)$/i or
+          (file =~ /tags$/i and
+           File.open(file, 'rb') { |io|
+             io.read(100) =~ /\A(\f\n[^,]+,\d+$|!_TAG_)/
+           })
+      end
+    end
+  end
+  ```

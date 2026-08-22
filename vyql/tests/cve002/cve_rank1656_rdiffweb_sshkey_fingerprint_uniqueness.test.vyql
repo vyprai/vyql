@@ -1,0 +1,143 @@
+# Rank 1656 / CVE-2022-4724: rdiffweb stored each user's SSH public keys in a
+# `sshkeys` table keyed by the key's text, which it declared `unique=True`, but
+# the `fingerprint` column -- the MD5 of the key material, and the value SSH
+# tooling and rdiffweb's own key removal resolve a key by -- carried no
+# constraint at all. `UserObject.add_authorizedkey` inserts
+# `SshKey(userid=self.userid, fingerprint=key.fingerprint, key=key.getvalue())`
+# and catches `IntegrityError` to reject a duplicate key "or one
+# associated to another user", so the code claims the boundary while the schema
+# only enforces it on the key text: the same fingerprint lands on two accounts,
+# and one credential then reaches another user's repositories. The fixed revision declares
+# `Index('sshkey_fingerprint_index', SshKey.fingerprint, unique=True)` on the
+# model and a startup migration that refuses to upgrade a database still
+# holding duplicates; the insert code itself only splits one statement into two.
+#
+# Concepts considered for reuse: `code.CaseInsensitiveLocalIdentityAuthorizationBypass`
+# is the case-folding sibling and does not fit a schema-constraint weakness;
+# `code.UnverifiedEmailClaimIdentity` is an OIDC claim-attestation weakness;
+# `code.UserIdentityMappingReview` fits unchanged -- "external identity data
+# determines local user or group identifiers without an observed uniqueness
+# boundary", with the fingerprint as the external identity and `userid` as the
+# local identifier -- and this widens it to a third binding and to Python.
+#
+# The binding reads the model module's assignment tokens: a declarative model
+# (`__tablename__`) declaring `fingerprint = Column(...)` beside an owner
+# column, with no declaration tying a uniqueness constraint to the
+# fingerprint. Assignment tokens are AST-derived, so the commented-out
+# constraint test pins that prose cannot silence it.
+#
+# Measured: the real tree reports one VYQL-AUTH-083 on
+# rdiffweb/core/model/_sshkey.py at the vulnerable revision and none at the fixed revision,
+# stable over three `--cache off` runs. The shape's reachable set across the
+# corpus clones is one other project, an OpenStack keypair table storing a
+# fingerprint per user with uniqueness only on (user_id, name): its
+# api_models module is reported, while the same table in its thousand-line
+# legacy models module falls past the module context's 512-token cap and is
+# not -- the recall boundary of reading the declaration at module scope. The
+# benchmark corpora contain no `fingerprint` column declaration at all.
+
+test "rank1656: an ssh key model maps fingerprints to accounts with no uniqueness boundary"
+  lang python
+  file _sshkey.py
+  expect VYQL-AUTH-083
+  expect_review code.UserIdentityMappingReview
+  code
+  ```
+  from sqlalchemy import Column, Integer, Text
+  from sqlalchemy.orm import declarative_base
+
+  Base = declarative_base()
+
+
+  class SshKey(Base):
+      __tablename__ = 'sshkeys'
+      __table_args__ = {'sqlite_autoincrement': True}
+      fingerprint = Column('Fingerprint', Text)
+      key = Column('Key', Text, unique=True, primary_key=True)
+      userid = Column('UserID', Integer, nullable=False)
+  ```
+
+test "rank1656: the fixed revision declares a unique index over the fingerprint"
+  lang python
+  file _sshkey.py
+  reject VYQL-AUTH-083
+  code
+  ```
+  from sqlalchemy import Column, Index, Integer, Text
+  from sqlalchemy.orm import declarative_base
+
+  Base = declarative_base()
+
+
+  class SshKey(Base):
+      __tablename__ = 'sshkeys'
+      __table_args__ = {'sqlite_autoincrement': True}
+      fingerprint = Column('Fingerprint', Text)
+      key = Column('Key', Text, unique=True, primary_key=True)
+      userid = Column('UserID', Integer, nullable=False)
+
+
+  # Make finger print unique
+  sshkey_fingerprint_index = Index('sshkey_fingerprint_index', SshKey.fingerprint, unique=True)
+  ```
+
+test "rank1656: the uniqueness flag inline on the column also declares the boundary"
+  lang python
+  file _sshkey.py
+  reject VYQL-AUTH-083
+  code
+  ```
+  from sqlalchemy import Column, Integer, Text
+  from sqlalchemy.orm import declarative_base
+
+  Base = declarative_base()
+
+
+  class SshKey(Base):
+      __tablename__ = 'sshkeys'
+      __table_args__ = {'sqlite_autoincrement': True}
+      fingerprint = Column('Fingerprint', Text, unique=True)
+      key = Column('Key', Text, unique=True, primary_key=True)
+      userid = Column('UserID', Integer, nullable=False)
+  ```
+
+test "rank1656: a commented-out index does not declare the boundary"
+  lang python
+  file _sshkey.py
+  expect VYQL-AUTH-083
+  code
+  ```
+  from sqlalchemy import Column, Integer, Text
+  from sqlalchemy.orm import declarative_base
+
+  Base = declarative_base()
+
+
+  class SshKey(Base):
+      __tablename__ = 'sshkeys'
+      __table_args__ = {'sqlite_autoincrement': True}
+      fingerprint = Column('Fingerprint', Text)
+      key = Column('Key', Text, unique=True, primary_key=True)
+      userid = Column('UserID', Integer, nullable=False)
+
+
+  # sshkey_fingerprint_index = Index('sshkey_fingerprint_index', SshKey.fingerprint, unique=True)
+  ```
+
+test "rank1656: a fingerprint cache with no owner column is not a principal mapping"
+  lang python
+  file _template_cache.py
+  reject VYQL-AUTH-083
+  code
+  ```
+  from sqlalchemy import Column, Integer, Text
+  from sqlalchemy.orm import declarative_base
+
+  Base = declarative_base()
+
+
+  class TemplateFingerprint(Base):
+      __tablename__ = 'template_fingerprints'
+      fingerprint = Column('Fingerprint', Text)
+      template = Column('Template', Text)
+  ```

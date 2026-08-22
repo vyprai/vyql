@@ -1,0 +1,111 @@
+# Rank 1652 / CVE-2023-48022 (GHSA-6wgj-66m2-xxp2): Ray's dashboard
+# exposes the Jobs API with no authentication, so a remote attacker
+# who reaches the head node's port can submit an entrypoint command
+# and have it executed (CWE-306/862; the advisory records CWE-829
+# and CWE-918, but the exploit path is the unauthenticated POST
+# /api/jobs/ -> JobSubmitRequest.entrypoint -> JobSupervisor ->
+# subprocess.Popen(entrypoint, shell=True)). The advisory is
+# disputed by the vendor and lists no patched version; its single
+# commit reference 97894708, is verification tooling
+# rather than remediation: it adds `ray check-open-ports`
+# (python/ray/util/check_open_ports.py), a CLI that asks a port-check
+# service whether the cluster's listening ports are reachable from
+# the internet, and does not touch the Jobs API.ction
+# -- the row points at exactly the commit the advisory references.
+#
+# ATTENTION, unauthenticated-admin-surface posture. Measured on the
+# real code: scanning python/ray/dashboard/modules/job reports 58
+# findings (22 at or above high) with the finding sets byte-identical
+# at 97894708^ and 97894708 -- no revision pair exists to
+# discriminate against. The mechanism is flagged:
+# VYQL-INJ-119 (critical) fires on _exec_entrypoint's
+# subprocess.Popen(self._entrypoint, shell=True) at job_manager.py:208
+# (4 of its 5 firings on this subtree are on the module's own tests),
+# and code.HttpInput at job_agent.py:34 reaches FilePathAccess and
+# LogOutput sinks -- but no taint path connects the HTTP request to
+# the command sink (the entrypoint crosses a ray.remote actor
+# boundary the engine does not resolve), and no AUTH rule fires: the
+# subtree's single VYQL-AUTH-105 row is MissingRateLimit on an
+# unrelated route. What the CVE actually alleges -- an admin surface
+# deployed without authentication -- is the wiring/configuration
+# family of ranks 1514/1535/1540/1556/1557/1593 and the measured-
+# unshippable "handler with no authorization signal in its body"
+# shape (1331): it flags every job-submission system's documented
+# core API, the remediation is a deployment posture with no in-code
+# control to suppress it, and here the vendor documents the
+# endpoint as intended behavior. No ENGINE-GAPS.md entry. No
+# definition change shipped. Spec cve_rank1652 records the
+# submit-and-execute shape and the port-check tooling, both
+# asserting reject VYQL-AUTH-079: when unauthenticated-endpoint
+# vocabulary lands in Python (code.SensitiveOperation has bindings
+# in C#, PHP, Java and Go but none in Python), the first form must
+# flip to expect.
+
+test "rank1652: the jobs api executes a submitted entrypoint with no authentication"
+  lang python
+  file python/ray/dashboard/modules/job/job_head.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import subprocess
+  from dataclasses import dataclass
+
+  import aiohttp.web
+  from aiohttp.web import Request, Response
+
+
+  @dataclass
+  class JobSubmitRequest:
+      entrypoint: str
+
+
+  class JobManager:
+      def _exec_entrypoint(self) -> subprocess.Popen:
+          child = subprocess.Popen(
+              self._entrypoint,
+              shell=True,
+          )
+          return child
+
+
+  class JobHead:
+      @routes.post("/api/jobs/")
+      async def submit_job(self, req: Request) -> Response:
+          submit_request = await parse_and_validate_request(req, JobSubmitRequest)
+          await self._agent.submit(submit_request)
+          return Response(status=aiohttp.web.HTTPOk.status_code)
+  ```
+
+test "rank1652: the fixing commit adds port-exposure verification tooling"
+  lang python
+  file python/ray/util/check_open_ports.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import json
+  import urllib.request
+
+
+  def _check_for_open_ports_from_internet(service_url, ports):
+      request = urllib.request.Request(
+          method="POST",
+          url=service_url,
+          headers={
+              "Content-Type": "application/json",
+              "X-Ray-Open-Port-Check": "1",
+          },
+          data=json.dumps({"ports": ports}).encode("utf-8"),
+      )
+
+      response = urllib.request.urlopen(request)
+      if response.status != 200:
+          raise RuntimeError(
+              f"Failed to check with Ray Open Port Service: {response.status}"
+          )
+      response_body = json.load(response)
+
+      publicly_open_ports = response_body.get("open_ports", [])
+      checked_ports = response_body.get("checked_ports", [])
+
+      return publicly_open_ports, checked_ports
+  ```

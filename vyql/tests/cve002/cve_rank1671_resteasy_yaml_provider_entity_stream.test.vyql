@@ -1,0 +1,70 @@
+test "rank1671: JAX-RS provider readFrom feeds the request entity stream to SnakeYAML's default constructor"
+  lang java
+  expect VYQL-DESER-001
+  file YamlProvider.java
+  code
+  ```
+  import org.yaml.snakeyaml.Yaml;
+  import javax.ws.rs.Consumes;
+  import javax.ws.rs.ext.Provider;
+  import javax.ws.rs.core.MediaType;
+  import javax.ws.rs.core.MultivaluedMap;
+  import java.io.InputStream;
+  import java.lang.annotation.Annotation;
+  import java.lang.reflect.Type;
+
+  @Provider
+  @Consumes({"text/yaml", "text/x-yaml", "application/x-yaml"})
+  public class YamlProvider {
+      public Object readFrom(Class<Object> type, Type genericType, Annotation[] annotations,
+                             MediaType mediaType, MultivaluedMap<String, String> httpHeaders,
+                             InputStream entityStream) {
+          return new Yaml().load(entityStream);
+      }
+  }
+  ```
+
+test "rank1671: JAX-RS provider readFrom loads the entity stream through a constructor argument"
+  lang java
+  reject VYQL-DESER-001
+  file YamlProvider.java
+  code
+  ```
+  import org.yaml.snakeyaml.Yaml;
+  import org.yaml.snakeyaml.constructor.CustomClassLoaderConstructor;
+  import javax.ws.rs.Consumes;
+  import javax.ws.rs.ext.Provider;
+  import javax.ws.rs.core.MediaType;
+  import javax.ws.rs.core.MultivaluedMap;
+  import java.io.InputStream;
+  import java.lang.annotation.Annotation;
+  import java.lang.reflect.Type;
+
+  @Provider
+  @Consumes({"text/yaml", "text/x-yaml", "application/x-yaml"})
+  public class YamlProvider {
+      public Object readFrom(Class<Object> type, Type genericType, Annotation[] annotations,
+                             MediaType mediaType, MultivaluedMap<String, String> httpHeaders,
+                             InputStream entityStream) {
+          CustomClassLoaderConstructor constructor =
+              new CustomClassLoaderConstructor(type.getClassLoader());
+          return new Yaml(constructor).loadAs(entityStream, type);
+      }
+  }
+  ```
+
+test "rank1671: readFrom(InputStream) outside a JAX-RS provider is not a request entity source"
+  lang java
+  reject VYQL-DESER-001
+  file YamlConfigReader.java
+  code
+  ```
+  import org.yaml.snakeyaml.Yaml;
+  import java.io.InputStream;
+
+  public class YamlConfigReader {
+      public Object readFrom(InputStream entityStream) {
+          return new Yaml().load(entityStream);
+      }
+  }
+  ```

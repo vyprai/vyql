@@ -1,0 +1,390 @@
+# Rank 1654 / CVE-2026-49980 (GHSA-qw24-gh76-8rvv): rclone's remote-control
+# interface accepted connection strings carrying global.* options, and
+# fs.NewFs -> addConfigToContext (fs/newfs.go) applied every global.<name>
+# key from a request-derived connection string to the process-wide config
+# via configstruct.Set(globalConfig, GetConfig(context.Background())). Any
+# rc caller therefore rewrote rclone's process-wide configuration --
+# global.http_proxy is the advisory's example -- for every other user and
+# connection of the same process. The advisory records CWE-306
+# (unauthenticated command execution via inline remote instantiation);
+# this commit is its second fix: the parent 48da177 closed unauthenticated
+# inline-remote instantiation on the --rc-serve path (checkServeRemote
+# rejects global.* keys there), and 9222ed2 closes the
+# process-wide mutation on every rc path by marking the context at the rc
+# boundaries (fs.WithRCRequest at rcserver.serveRemote's cache.Get and at
+# jobs.NewJob) and guarding the write with !IsRCRequest(ctx), with the
+# marker reapplied in fs.CopyConfig.
+#
+# The pool row's `nocommit` flag is wrong: the commit resolves in a
+# default clone and `git show` reads the change in full (it is the v1.75.0
+# backport of mainline 53f972830c). The remediation is present at <fix>
+# and absent at <fix>^, where serveRemote passes s.ctx unmarked, NewJob
+# does not mark, and the global write is unconditional. No pool
+# correction.
+#
+# ATTENTION, wiring-not-dataflow family (the 1514/1535/1540/1556/1557/
+# 1593 shape, the context-marker-and-guard-in-the-callee variant). The
+# fix changes no dataflow, and that is measured, not assumed: a
+# full-tree scan (1108 Go files) at the parent reports 669 findings in
+# each of three --cache off runs, and the patched revision reports 669 in
+# each of three more, with the same VYQL-CFG-014 rows shifted by the
+# patch's added lines (fs/newfs.go:113/:121 -> :129/:137). The exact
+# vulnerable write is labelled -- `code.TrustBoundary by
+# go.sinks@syntactic` lands on both configstruct.Set calls in
+# addConfigToContext -- and VYQL-CFG-014 does fire with the global write
+# as its sink, but from an unrelated source (an imagekit API response
+# parsed into a time string, backend/imagekit/imagekit.go:529) and
+# identically on the patched tree: findings in the function are not
+# coverage. On the minimal pair below both revisions label identically
+# (sources at the two *http.Request params, sinks at both Set calls) and
+# report zero findings; `vyql trace -from code.HttpInput -to
+# code.TrustBoundary` shows both sources dead-end, because nothing labels
+# the rc params read (in.GetString("fs")) and no path connects the
+# request to the write.
+#
+# Nothing shippable keys the change. The only discriminating token is the
+# fix's own marker pair (fs.WithRCRequest / IsRCRequest), minted by the
+# fix itself. The 1380 counterweight does not apply: the guarded function
+# (addConfigToContext) gains no API-documented call, only the fixed revision's own
+# predicate. A sink-side binding cannot discriminate either, because the
+# guarded call site survives at the fixed revision and global.* process-wide
+# application is a documented feature for command-line remotes -- the fixed revision
+# deliberately keeps it, so the write is not a vulnerability without a
+# marker no rule can read (the third block pins that by-design form). A
+# source-side binding for rclone's rc Params reads would add labels with
+# no discriminating sink and fire identically at both revisions (the
+# measured 669 = 669). Concepts considered before concluding:
+# code.TrustBoundary (VYQL-CFG-014 -- fires, non-discriminating),
+# code.ConfigExposureReview (exposure of config contents, not mutation),
+# code.StateWrite / code.StateChangingOp (state-change-on-web-action
+# shape), code.UncheckedPrototypeConfigKey (prototype pollution through
+# config keys). None names a request-sourced write to process-global
+# configuration, and one minted now would fire on the documented
+# command-line feature below.
+#
+# verify_current_expected: attention-wiring-not-dataflow, all three
+# blocks rejected. When rc-request vocabulary ever lands, the first block
+# must flip to expect and the second must stay rejected.
+
+test "rank1654: rc connection string global.* options reach the process-wide config"
+  lang go
+  file rcconfig.go
+  reject VYQL-CFG-014
+  code
+  ```
+  package rc
+
+  import (
+  	"context"
+  	"net/http"
+  	"strings"
+  )
+
+  type Params map[string]string
+
+  func (p Params) GetString(key string) string { return p[key] }
+
+  func readParams(r *http.Request) Params { return Params{} }
+
+  type Fs interface{ Name() string }
+
+  type Cache struct{}
+
+  func (c *Cache) Get(ctx context.Context, fsString string) (Fs, error) {
+  	return NewFs(ctx, fsString)
+  }
+
+  type Server struct {
+  	ctx   context.Context
+  	cache *Cache
+  }
+
+  // The rc boundary hands the request context to the Fs cache unmarked.
+  func (s *Server) handlePost(w http.ResponseWriter, r *http.Request, path string) {
+  	ctx := r.Context()
+  	in := readParams(r)
+  	fsString := in.GetString("fs")
+  	f, err := s.cache.Get(ctx, fsString)
+  	if err != nil {
+  		return
+  	}
+  	_ = f
+  }
+
+  // remote,global.http_proxy=socks5://attacker:1080
+  func NewFs(ctx context.Context, path string) (Fs, error) {
+  	_, config := ConfigFs(path)
+  	newCtx, err := addConfigToContext(ctx, config)
+  	_ = newCtx
+  	return nil, err
+  }
+
+  func ConfigFs(path string) (string, map[string]string) {
+  	config := map[string]string{}
+  	for _, kv := range strings.Split(path, ",") {
+  		if i := strings.Index(kv, "="); i > 0 {
+  			config[kv[:i]] = kv[i+1:]
+  		}
+  	}
+  	return path, config
+  }
+
+  type ConfigInfo struct{ HTTPProxy string }
+
+  func AddConfig(ctx context.Context) (context.Context, *ConfigInfo) { return ctx, &ConfigInfo{} }
+
+  func GetConfig(ctx context.Context) *ConfigInfo { return &ConfigInfo{} }
+
+  type configstructPkg struct{}
+
+  var configstruct = configstructPkg{}
+
+  func (configstructPkg) Set(m map[string]string, ci *ConfigInfo) error {
+  	if v, ok := m["http_proxy"]; ok {
+  		ci.HTTPProxy = v
+  	}
+  	return nil
+  }
+
+  func addConfigToContext(ctx context.Context, config map[string]string) (context.Context, error) {
+  	overrideConfig := map[string]string{}
+  	globalConfig := map[string]string{}
+  	for k, v := range config {
+  		switch {
+  		case strings.HasPrefix(k, "global."):
+  			overrideConfig[strings.TrimPrefix(k, "global.")] = v
+  			globalConfig[strings.TrimPrefix(k, "global.")] = v
+  		case strings.HasPrefix(k, "override."):
+  			overrideConfig[strings.TrimPrefix(k, "override.")] = v
+  		}
+  	}
+  	if len(overrideConfig) == 0 && len(globalConfig) == 0 {
+  		return ctx, nil
+  	}
+  	newCtx, ci := AddConfig(ctx)
+  	if err := configstruct.Set(overrideConfig, ci); err != nil {
+  		return ctx, err
+  	}
+  	// Set the global context only
+  	if len(globalConfig) != 0 {
+  		globalCI := GetConfig(context.Background())
+  		if err := configstruct.Set(globalConfig, globalCI); err != nil {
+  			return ctx, err
+  		}
+  	}
+  	return newCtx, nil
+  }
+  ```
+
+test "rank1654: fix marks the rc request so global.* skips the process-wide config"
+  lang go
+  file rcconfig.go
+  reject VYQL-CFG-014
+  code
+  ```
+  package rc
+
+  import (
+  	"context"
+  	"net/http"
+  	"strings"
+  )
+
+  type Params map[string]string
+
+  func (p Params) GetString(key string) string { return p[key] }
+
+  func readParams(r *http.Request) Params { return Params{} }
+
+  type Fs interface{ Name() string }
+
+  type Cache struct{}
+
+  func (c *Cache) Get(ctx context.Context, fsString string) (Fs, error) {
+  	return NewFs(ctx, fsString)
+  }
+
+  type Server struct {
+  	ctx   context.Context
+  	cache *Cache
+  }
+
+  func (s *Server) handlePost(w http.ResponseWriter, r *http.Request, path string) {
+  	ctx := r.Context()
+  	in := readParams(r)
+  	fsString := in.GetString("fs")
+  	// Mark as an rc request e.g. so NewFs can reject global.* config
+  	f, err := s.cache.Get(WithRCRequest(ctx), fsString)
+  	if err != nil {
+  		return
+  	}
+  	_ = f
+  }
+
+  // remote,global.http_proxy=socks5://attacker:1080
+  func NewFs(ctx context.Context, path string) (Fs, error) {
+  	_, config := ConfigFs(path)
+  	newCtx, err := addConfigToContext(ctx, config)
+  	_ = newCtx
+  	return nil, err
+  }
+
+  func ConfigFs(path string) (string, map[string]string) {
+  	config := map[string]string{}
+  	for _, kv := range strings.Split(path, ",") {
+  		if i := strings.Index(kv, "="); i > 0 {
+  			config[kv[:i]] = kv[i+1:]
+  		}
+  	}
+  	return path, config
+  }
+
+  type ConfigInfo struct{ HTTPProxy string }
+
+  func AddConfig(ctx context.Context) (context.Context, *ConfigInfo) { return ctx, &ConfigInfo{} }
+
+  func GetConfig(ctx context.Context) *ConfigInfo { return &ConfigInfo{} }
+
+  // rcRequestKey marks a context as created by a remote control (rc) request.
+  type rcRequestKeyType struct{}
+
+  var rcRequestKey = rcRequestKeyType{}
+
+  func WithRCRequest(ctx context.Context) context.Context {
+  	return context.WithValue(ctx, rcRequestKey, true)
+  }
+
+  func IsRCRequest(ctx context.Context) bool {
+  	v, _ := ctx.Value(rcRequestKey).(bool)
+  	return v
+  }
+
+  type configstructPkg struct{}
+
+  var configstruct = configstructPkg{}
+
+  func (configstructPkg) Set(m map[string]string, ci *ConfigInfo) error {
+  	if v, ok := m["http_proxy"]; ok {
+  		ci.HTTPProxy = v
+  	}
+  	return nil
+  }
+
+  func addConfigToContext(ctx context.Context, config map[string]string) (context.Context, error) {
+  	overrideConfig := map[string]string{}
+  	globalConfig := map[string]string{}
+  	for k, v := range config {
+  		switch {
+  		case strings.HasPrefix(k, "global."):
+  			overrideConfig[strings.TrimPrefix(k, "global.")] = v
+  			globalConfig[strings.TrimPrefix(k, "global.")] = v
+  		case strings.HasPrefix(k, "override."):
+  			overrideConfig[strings.TrimPrefix(k, "override.")] = v
+  		}
+  	}
+  	if len(overrideConfig) == 0 && len(globalConfig) == 0 {
+  		return ctx, nil
+  	}
+  	newCtx, ci := AddConfig(ctx)
+  	if err := configstruct.Set(overrideConfig, ci); err != nil {
+  		return ctx, err
+  	}
+  	// Set the global context unless this Fs is being created for an rc request
+  	if len(globalConfig) != 0 && !IsRCRequest(ctx) {
+  		globalCI := GetConfig(context.Background())
+  		if err := configstruct.Set(globalConfig, globalCI); err != nil {
+  			return ctx, err
+  		}
+  	}
+  	return newCtx, nil
+  }
+  ```
+
+test "rank1654: command-line remotes keep process-wide global.* application by design"
+  lang go
+  file cmdline.go
+  reject VYQL-CFG-014
+  code
+  ```
+  package main
+
+  import (
+  	"context"
+  	"strings"
+  )
+
+  type Fs interface{ Name() string }
+
+  func NewFs(ctx context.Context, path string) (Fs, error) {
+  	_, config := ConfigFs(path)
+  	newCtx, err := addConfigToContext(ctx, config)
+  	_ = newCtx
+  	return nil, err
+  }
+
+  func ConfigFs(path string) (string, map[string]string) {
+  	config := map[string]string{}
+  	for _, kv := range strings.Split(path, ",") {
+  		if i := strings.Index(kv, "="); i > 0 {
+  			config[kv[:i]] = kv[i+1:]
+  		}
+  	}
+  	return path, config
+  }
+
+  type ConfigInfo struct{ HTTPProxy string }
+
+  func AddConfig(ctx context.Context) (context.Context, *ConfigInfo) { return ctx, &ConfigInfo{} }
+
+  func GetConfig(ctx context.Context) *ConfigInfo { return &ConfigInfo{} }
+
+  type configstructPkg struct{}
+
+  var configstruct = configstructPkg{}
+
+  func (configstructPkg) Set(m map[string]string, ci *ConfigInfo) error {
+  	if v, ok := m["http_proxy"]; ok {
+  		ci.HTTPProxy = v
+  	}
+  	return nil
+  }
+
+  func addConfigToContext(ctx context.Context, config map[string]string) (context.Context, error) {
+  	overrideConfig := map[string]string{}
+  	globalConfig := map[string]string{}
+  	for k, v := range config {
+  		switch {
+  		case strings.HasPrefix(k, "global."):
+  			overrideConfig[strings.TrimPrefix(k, "global.")] = v
+  			globalConfig[strings.TrimPrefix(k, "global.")] = v
+  		case strings.HasPrefix(k, "override."):
+  			overrideConfig[strings.TrimPrefix(k, "override.")] = v
+  		}
+  	}
+  	if len(overrideConfig) == 0 && len(globalConfig) == 0 {
+  		return ctx, nil
+  	}
+  	newCtx, ci := AddConfig(ctx)
+  	if err := configstruct.Set(overrideConfig, ci); err != nil {
+  		return ctx, err
+  	}
+  	// Set the global context only
+  	if len(globalConfig) != 0 {
+  		globalCI := GetConfig(context.Background())
+  		if err := configstruct.Set(globalConfig, globalCI); err != nil {
+  			return ctx, err
+  		}
+  	}
+  	return newCtx, nil
+  }
+
+  func main() {
+  	// rclone remote,global.http_proxy=socks5://proxy:1080:dir
+  	remote := "remote,global.http_proxy=socks5://proxy:1080"
+  	f, err := NewFs(context.Background(), remote)
+  	if err != nil {
+  		return
+  	}
+  	_ = f
+  }
+  ```

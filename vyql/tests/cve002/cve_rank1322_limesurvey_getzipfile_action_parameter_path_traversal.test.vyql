@@ -155,7 +155,20 @@ test "rank1322: the same body is reported when the path arrives through a labell
   }
   ```
 
-test "rank1322: the patched action takes no parameter and reads the server-generated path from the session"
+# The patched action handed the generated path to getZipFile() through
+# $_SESSION['__path']. That carrier is now itself a labelled source: a PHP
+# $_SESSION read emits code.StoredDataRead, the concept Perl's Session,
+# Apache-Session and Spring Session already use for session reads, and the
+# same second-order model PHP's own code.DatabaseRead bindings implement. So
+# the session-carrying form reports a second-order path flow, and it can no
+# longer serve as this rank's safe case -- which is correct, because a store
+# written from request data and read back as trusted is exactly CWE-501, and
+# the scanner cannot see from the read that this particular write was
+# canonicalised. What the fix actually guarantees, and what the reject below
+# still asserts, is that no request-derived value reaches the file helpers:
+# the routed $path parameter is gone and the path is built on the server.
+
+test "rank1322: the patched action takes no parameter and its path is server-generated"
   lang php
   file LimeSurveyFileManager.php
   reject VYQL-PATH-001
@@ -165,6 +178,8 @@ test "rank1322: the patched action takes no parameter and reads the server-gener
 
   class LimeSurveyFileManager extends Survey_Common_Action
   {
+      public $zipPath;
+
       public function downloadFiles() {
           App()->loadLibrary('admin.pclzip');
 
@@ -174,7 +189,7 @@ test "rank1322: the patched action takes no parameter and reads the server-gener
           $randomizedFileName = $folder.'_'.substr(md5(time()),3,13).'.zip';
           $zipfile = $tempdir.DIRECTORY_SEPARATOR.$randomizedFileName;
 
-          $_SESSION['__path'] = $zipfile;
+          $this->zipPath = $zipfile;
       }
 
       /**
@@ -182,8 +197,7 @@ test "rank1322: the patched action takes no parameter and reads the server-gener
        */
       public function getZipFile()
       {
-          $path = $_SESSION['__path'];
-          unset($_SESSION['__path']);
+          $path = $this->zipPath;
           $filename = basename($path);
 
           if (is_file($path)) {

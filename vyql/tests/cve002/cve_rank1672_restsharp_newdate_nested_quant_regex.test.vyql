@@ -1,0 +1,273 @@
+# Rank 1672 / CVE-2021-27293: RestSharp's JSON date parser held a static regex
+# with exponential worst-case complexity (GHSA-9pq7-rcxv-47vq, CWE-1333 with
+# CWE-400; fixed in 106.11.8-alpha.0.13).
+#
+# `StringExtensions.ParseJsonDate` (src/RestSharp/Extensions/StringExtensions.cs
+# at the vulnerable revision) hands an attacker-supplied JSON string to a set of static
+# regexes. One of them is
+#
+#   static readonly Regex NewDateRegex = new Regex(@"newDate\((-?\d+)*\)");
+#
+# The `*` applies to a group whose body repeats (`\d+`), so a run of
+# digits can be split between iterations at every point and every split is
+# retried when the closing `)` never comes -- the textbook catastrophic
+# backtracking shape. The matched text is the JSON value a caller asked RestSharp
+# to deserialize (the fixed revision's own regression test feeds it `newdatetimes.json`),
+# so the bound is the attacker's. The fixed revision deletes the outer quantifier:
+# `@"newDate\((-?\d+)\)"`.
+#
+# The pool row carries no flag, and be39346784b68048b230790d15333574341143bc is
+# read before being trusted: it is the real, targeted fix ("Fix NewDateRegex in
+# StringExtensions #1556"), it touches the vulnerable file plus its regression
+# test, the nested quantifier is present at the parent and the remediation is
+# present at the commit itself.
+#
+# The miss is not a vocabulary gap: `code.CatastrophicRegex` and VYQL-DOS-003
+# judge exactly this weakness, and the shared ambiguity classifier
+# (`internal/extract/regexambig`) discriminates this pair -- it answers
+# true for `newDate\((-?\d+)*\)` and false for the fixed form, and it
+# wired for the Python (`re.<op>` / `re.compile`, lowering.go's
+# `analysis.dos.catastrophic_regex` synthetic), Ruby and JavaScript regex
+# literals. What is missing is the C# leg: the .NET idiom passes the pattern as
+# a string-literal argument to the `Regex` constructor (`new Regex(@"...")`) or
+# to a static helper of the same class (`Regex.IsMatch(input, pattern)`), and
+# nothing classifies a string argument that way. A binding cannot do it either
+# -- the binding language has no regex matcher over a literal argument
+# (`matches` is rejected at compile time), so the classification lives in the
+# engine with the other three languages. The isolating pair below pins the
+# construct: same class, same field, same match call, one quantifier apart.
+#
+# .NET's own guidance for this weakness is the matchTimeout parameter every Regex
+# constructor and static helper accepts: a construction that passes an inline
+# TimeSpan bounds the backtracking itself and is not reported, while
+# Timeout.InfiniteTimeSpan -- which lifts the limit rather than setting one --
+# keeps its finding. A timeout held in a field and passed by name is not
+# resolvable from the call site (a C# field declaration carries no declared type
+# through the NIR), so that form stays with the reviewer; NuGetGallery's
+# PackageListTests holds exactly that shape and keeps its medium finding.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected. The
+# C# leg of the shared regex classification does not exist yet: the ambiguity
+# classifier is wired for Python `re.` calls and Ruby/JavaScript regex literals,
+# and nothing recognises a .NET construction that passes the pattern as a string
+# argument, so every direction below is a reject and the miss is pinned. The
+# engine change that lands on top flips the reported directions to expect.
+
+test "rank1672: the newDate regex splits digit runs across a repeated group"
+  lang csharp
+  file RestSharp/Extensions/StringExtensions.cs
+  profile library
+  reject VYQL-DOS-003
+  reject VYQL-DOS-001
+  reject VYQL-DOS-002
+  code
+  ```
+  using System;
+  using System.Globalization;
+  using System.Text.RegularExpressions;
+
+  namespace RestSharp.Extensions
+  {
+      public static class StringExtensions
+      {
+          static readonly Regex DateRegex    = new Regex(@"\\?/Date\((-?\d+)(-|\+)?([0-9]{4})?\)\\?/");
+          static readonly Regex NewDateRegex = new Regex(@"newDate\((-?\d+)*\)");
+
+          public static DateTime ParseJsonDate(this string input, CultureInfo culture)
+          {
+              input = input.Replace(" ", "");
+              if (input.Contains("new Date("))
+                  return ExtractDate(input, NewDateRegex, culture);
+              return ParseFormattedDate(input, culture);
+          }
+
+          static DateTime ExtractDate(string input, Regex regex, CultureInfo culture)
+          {
+              if (!regex.IsMatch(input)) return DateTime.MinValue;
+              return DateTime.MinValue;
+          }
+
+          static DateTime ParseFormattedDate(string input, CultureInfo culture)
+          {
+              return DateTime.MinValue;
+          }
+      }
+  }
+  ```
+
+test "rank1672: the fixed newDate regex repeats once and is clean"
+  lang csharp
+  file RestSharp/Extensions/StringExtensions.cs
+  profile library
+  reject VYQL-DOS-001
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  using System;
+  using System.Globalization;
+  using System.Text.RegularExpressions;
+
+  namespace RestSharp.Extensions
+  {
+      public static class StringExtensions
+      {
+          static readonly Regex DateRegex    = new Regex(@"\\?/Date\((-?\d+)(-|\+)?([0-9]{4})?\)\\?/");
+          static readonly Regex NewDateRegex = new Regex(@"newDate\((-?\d+)\)");
+
+          public static DateTime ParseJsonDate(this string input, CultureInfo culture)
+          {
+              input = input.Replace(" ", "");
+              if (input.Contains("new Date("))
+                  return ExtractDate(input, NewDateRegex, culture);
+              return ParseFormattedDate(input, culture);
+          }
+
+          static DateTime ExtractDate(string input, Regex regex, CultureInfo culture)
+          {
+              if (!regex.IsMatch(input)) return DateTime.MinValue;
+              return DateTime.MinValue;
+          }
+
+          static DateTime ParseFormattedDate(string input, CultureInfo culture)
+          {
+              return DateTime.MinValue;
+          }
+      }
+  }
+  ```
+
+# The isolating pair. No RestSharp vocabulary: a field of any name, a pattern of
+# any body, one quantifier apart. The reported cases put a `+` inside a group
+# the `*` repeats; the unreported cases drop the outer repeat (second block) and
+# every inner repeat (third block) in turn, leaving everything else -- class,
+# field, constructor, match call, literal form -- untouched. The fourth case is
+# the static helper form, which carries the pattern as the argument after the
+# input instead of into the constructor, so both .NET spellings are held by the
+# pair.
+
+test "rank1672 pair: a repeat inside a repeated group is not reported"
+  lang csharp
+  profile library
+  reject VYQL-DOS-003
+  code
+  ```
+  using System;
+  using System.Text.RegularExpressions;
+
+  public static class TokenParser
+  {
+      static readonly Regex Words = new Regex(@"\w+(\s*\w+)*");
+
+      public static bool LooksLikeWords(string input) => Words.IsMatch(input);
+  }
+  ```
+
+test "rank1672 pair: the same pattern without the outer repeat is not reported"
+  lang csharp
+  profile library
+  reject VYQL-DOS-003
+  code
+  ```
+  using System;
+  using System.Text.RegularExpressions;
+
+  public static class TokenParser
+  {
+      static readonly Regex Words = new Regex(@"\w+\s*\w+");
+
+      public static bool LooksLikeWords(string input) => Words.IsMatch(input);
+  }
+  ```
+
+test "rank1672 pair: the same outer repeat over a group with no inner repeat is not reported"
+  lang csharp
+  profile library
+  reject VYQL-DOS-003
+  code
+  ```
+  using System;
+  using System.Text.RegularExpressions;
+
+  public static class TokenParser
+  {
+      static readonly Regex Words = new Regex(@"\w+(\s\w)*");
+
+      public static bool LooksLikeWords(string input) => Words.IsMatch(input);
+  }
+  ```
+
+test "rank1672 pair: a nested-quantifier pattern passed to the static helper is not reported"
+  lang csharp
+  profile library
+  reject VYQL-DOS-003
+  code
+  ```
+  using System;
+  using System.Text.RegularExpressions;
+
+  public static class TokenParser
+  {
+      public static bool LooksLikeWords(string input)
+          => Regex.IsMatch(input, @"\w+(\s*\w+)*");
+  }
+  ```
+
+# The class's documented defence: every Regex constructor and static helper takes a
+# matchTimeout that bounds the backtracking, and .NET's own guidance for ReDoS is to
+# pass one. The two rejected constructions below carry the same catastrophic pattern
+# as the reported cases and differ only in the inline TimeSpan; the third lifts the
+# limit with Timeout.InfiniteTimeSpan and keeps its finding.
+
+test "rank1672 mitigation: the same pattern with an inline match timeout is not reported"
+  lang csharp
+  profile library
+  reject VYQL-DOS-003
+  code
+  ```
+  using System;
+  using System.Text.RegularExpressions;
+
+  public static class TokenParser
+  {
+      static readonly Regex Words =
+          new Regex(@"\w+(\s*\w+)*", RegexOptions.None, TimeSpan.FromSeconds(1));
+
+      public static bool LooksLikeWords(string input) => Words.IsMatch(input);
+  }
+  ```
+
+test "rank1672 mitigation: the two-argument timeout overload is not reported"
+  lang csharp
+  profile library
+  reject VYQL-DOS-003
+  code
+  ```
+  using System;
+  using System.Text.RegularExpressions;
+
+  public static class TokenParser
+  {
+      static readonly Regex Words = new Regex(@"\w+(\s*\w+)*", TimeSpan.FromMilliseconds(250));
+
+      public static bool LooksLikeWords(string input) => Words.IsMatch(input);
+  }
+  ```
+
+test "rank1672 mitigation: InfiniteTimeSpan lifts the limit and is not reported"
+  lang csharp
+  profile library
+  reject VYQL-DOS-003
+  code
+  ```
+  using System;
+  using System.Text.RegularExpressions;
+
+  public static class TokenParser
+  {
+      static readonly Regex Words =
+          new Regex(@"\w+(\s*\w+)*", RegexOptions.None, Timeout.InfiniteTimeSpan);
+
+      public static bool LooksLikeWords(string input) => Words.IsMatch(input);
+  }
+  ```
