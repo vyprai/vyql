@@ -1,0 +1,44 @@
+module bindings.python.oauth_email_claim_username;
+
+// JupyterHub's OAuthenticator resolves a login to a local account by reading one
+// claim out of the provider's userinfo response: `username_claim` names it, and a
+// subclass declares its default with traitlets' documented dynamic-default hook,
+// `@default("username_claim") def _username_claim_default(self)`. Whatever that
+// method returns is the account the login lands on.
+//
+// OpenID Connect Core 5.7 is explicit that the `email` claim is not usable that
+// way on its own: the address is mutable, reassignable, and set by whoever
+// controls the upstream account, so a provider ships `email_verified` beside it to
+// say whether it ever confirmed the address. Google's userinfo spells the same
+// attestation `verified_email`, GitLab's a `confirmed_at` timestamp, Bitbucket's
+// an `is_confirmed` flag per address. A relying party that names `email` as its
+// account identity and never reads any of them lets anyone who can type a victim's
+// address into an unconfirmed provider account sign in as that victim
+// (CWE-287/CWE-290).
+//
+// The claim selection is the fact: an authenticator deriving from OAuthenticator
+// or from its generic OIDC subclass whose `username_claim` default is the email
+// address. The default has to be unconditional -- the method body ends at
+// `return "email"` -- because a default that branches on configuration
+// (`if self.username_from_email: return "email"; return "preferred_username"`)
+// names some other claim for an unconfigured deployment, and the address is then
+// the identity only where an operator asked for it.
+//
+// The neutraliser is any read of an attestation the provider actually supplies,
+// anywhere on the authenticator class, because the check belongs in `check_allowed`
+// or `check_blocked_users` rather than beside the claim selection. It is spelled
+// with the quotes or the leading dot the lookup itself carries, so that the class
+// body's prose -- which Python hands to every method's context verbatim, comments
+// and docstrings included -- cannot decide the result. Being generous here costs
+// recall, not precision: an authenticator that reads the attestation and then falls
+// back past it is not reported, and that is the right trade for keeping every
+// correctly-checking provider quiet.
+binding oauthEmailClaimUsernameUnverified {
+  query pattern presenceNode where node.scope == "function"
+    and node.token contains "lang=python"
+    and node.context.functionName == "_username_claim_default"
+    and containsAny(node.context.classBase, ["OAuthenticator", "GenericOAuthenticator", "LocalGenericOAuthenticator"])
+    and node.token endsWith "return\"email\""
+    and not containsAny(node.token, ["\"email_verified\"", "'email_verified'", "\"verified_email\"", "'verified_email'", "\"email_confirmed\"", "'email_confirmed'", "\"confirmed_at\"", "'confirmed_at'", "\"is_confirmed\"", "'is_confirmed'", ".email_verified", ".verified_email", ".email_confirmed"])
+  emit issue code.UnverifiedEmailClaimIdentity at node
+}

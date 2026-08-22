@@ -1,0 +1,221 @@
+# Rank 1495 / CVE-2022-25888 (locka99/opcua, CWE-400): an OPC UA server accepted
+# an unlimited number of unlimited-sized message chunks, because every limit that
+# transport that bounds the transport is configured to the wire protocol's
+# "no limit" sentinel.
+#
+# OPC UA Part 6 negotiates MaxMessageSize and MaxChunkCount in the
+# Hello/Acknowledge handshake, and both carry an explicit 0 = unlimited value.
+# At 9fad97a7^ the crate's DecodingOptions had no max_message_size field at all
+# and built max_chunk_count as 0 in all three of its constructors:
+#
+#   impl Default for DecodingOptions {
+#       fn default() -> Self {
+#           DecodingOptions {
+#               client_offset: Duration::zero(),
+#               max_chunk_count: 0,
+#               max_string_length: constants::MAX_STRING_LENGTH,
+#               max_byte_string_length: constants::MAX_BYTE_STRING_LENGTH,
+#               max_array_length: constants::MAX_ARRAY_LENGTH,
+#           }
+#       }
+#   }
+#
+# So the per-value ceilings are real while the framing is unbounded, and the
+# one sanity check the chunk decoder performs is dead code:
+#
+#   let message_size = chunk_header.message_size as usize;
+#   if decoding_options.max_chunk_count > 0 && message_size > decoding_options.max_chunk_count {
+#       Err(StatusCode::BadTcpMessageTooLarge)
+#   } else {
+#       let data = vec![0u8; message_size];   // peer-declared size, unbounded
+#
+# with the receiver's pending-chunk buffer likewise growing per chunk until a
+# Final chunk that a hostile peer never sends
+# (lib/src/server/comms/tcp_transport.rs). Claroty's report is exactly that:
+# an unlimited number of 2GB chunks with no Final.
+#
+# The fixed revision (9fad97a7b5298b2ececc4d2c710bba9363c665a5) adds MAX_CHUNK_COUNT = 5
+# and MAX_MESSAGE_SIZE = 65535 * MAX_CHUNK_COUNT as defaults, adds the
+# max_message_size field, points the chunk decoder's size check at it, plumbs
+# both through the server and client configuration and the Acknowledge reply,
+# and rejects a write whose chunk count exceeds the limit.
+#
+# FIXED by a new Rust binding,
+# vyql/bindings/rust/opcua_decoding_limits_disabled.vyql, emitting
+# code.UnboundedResourceOperation (VYQL-DOS-042, high). It reads a function's
+# own context tokens: a decoding-limits literal that sets the chunk count or the
+# total message size to the disabling sentinel while giving the per-value limits
+# real ceilings, and that does not fall back to the type's defaults through
+# Rust's struct update syntax.
+#
+# Measured, three `--cache off --max-ram 6GB` runs per revision over copies of
+# lib/ at both revisions (identical counts on all three runs):
+#   9fad97a7^ (vulnerable): 6 code.UnboundedResourceOperation flags, 4 of them
+#     new -- types/encoding.rs:36 (Default::default), types/encoding.rs:50
+#     (DecodingOptions::minimal), server/config.rs:708
+#     (ServerConfig::decoding_options) and core/tests/chunk.rs:95.
+#   9fad97a7  (patched):    2 flags, none of them new.
+# The 2 flags common to both revisions are the pre-existing unbounded_next_await
+# fact on client/comms/tcp_transport.rs and are unrelated to this defect; before
+# the binding both revisions reported the same 237 findings and the same 61 at
+# or above high, so nothing covers this.
+#
+# The `..Default::default()` clause is Rust struct-update semantics rather than
+# the fixed revision's own vocabulary: it is what makes the patched
+# `DecodingOptions::minimal()` and the patched core/tests/chunk.rs literal safe,
+# since both still leave fields unnamed and receive the crate's new non-zero
+# ceilings for them.
+#
+# Collateral: across the ~100 other clones under /tmp/cve-work/rank*/ no .rs
+# file contains a `max_*: 0,` decoding-limit initialiser at all, and an A/B over
+# three unrelated Rust trees is flat -- mongo-rust-driver/src 23 -> 23,
+# matrix-rust-sdk 12 -> 12, mio 0 -> 0 code.UnboundedResourceOperation flags.
+
+test "rank1495: (a) the decoding options give the string, byte string and array limits real ceilings but leave the chunk count at the protocol's no-limit sentinel"
+  lang rust
+  file lib/src/types/encoding.rs
+  expect VYQL-DOS-042
+  code
+  ```
+  use crate::types::{constants, status_codes::StatusCode};
+
+  #[derive(Clone, Copy, Debug)]
+  pub struct DecodingOptions {
+      pub client_offset: Duration,
+      /// Maximum size of a message chunk in bytes. 0 means no limit
+      pub max_chunk_count: usize,
+      pub max_string_length: usize,
+      pub max_byte_string_length: usize,
+      pub max_array_length: usize,
+  }
+
+  impl Default for DecodingOptions {
+      fn default() -> Self {
+          DecodingOptions {
+              client_offset: Duration::zero(),
+              max_chunk_count: 0,
+              max_string_length: constants::MAX_STRING_LENGTH,
+              max_byte_string_length: constants::MAX_BYTE_STRING_LENGTH,
+              max_array_length: constants::MAX_ARRAY_LENGTH,
+          }
+      }
+  }
+  ```
+
+test "rank1495: (b) the fixed revision gives the chunk count and the total message size non-zero defaults of their own"
+  lang rust
+  file lib/src/types/encoding.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  use crate::{sync::Mutex, types::{constants, status_codes::StatusCode}};
+
+  #[derive(Clone, Debug)]
+  pub struct DecodingOptions {
+      pub client_offset: Duration,
+      /// Maximum size of a message in bytes. 0 means no limit.
+      pub max_message_size: usize,
+      /// Maximum number of chunks. 0 means no limit.
+      pub max_chunk_count: usize,
+      pub max_string_length: usize,
+      pub max_byte_string_length: usize,
+      pub max_array_length: usize,
+      pub decoding_depth_gauge: Arc<Mutex<DepthGauge>>,
+  }
+
+  impl Default for DecodingOptions {
+      fn default() -> Self {
+          DecodingOptions {
+              client_offset: Duration::zero(),
+              max_message_size: constants::MAX_MESSAGE_SIZE,
+              max_chunk_count: constants::MAX_CHUNK_COUNT,
+              max_string_length: constants::MAX_STRING_LENGTH,
+              max_byte_string_length: constants::MAX_BYTE_STRING_LENGTH,
+              max_array_length: constants::MAX_ARRAY_LENGTH,
+              decoding_depth_gauge: Arc::new(Mutex::new(DepthGauge::default())),
+          }
+      }
+  }
+  ```
+
+test "rank1495: (c) the server's own configuration hands the decoder the same disabled chunk limit"
+  lang rust
+  file lib/src/server/config.rs
+  expect VYQL-DOS-042
+  code
+  ```
+  impl ServerConfig {
+      pub fn decoding_options(&self) -> DecodingOptions {
+          DecodingOptions {
+              client_offset: chrono::Duration::zero(),
+              max_chunk_count: 0,
+              max_string_length: self.limits.max_string_length as usize,
+              max_byte_string_length: self.limits.max_byte_string_length as usize,
+              max_array_length: self.limits.max_array_length as usize,
+          }
+      }
+  }
+  ```
+
+test "rank1495: (d) the fixed revision reads both transport limits out of the server's configured limits"
+  lang rust
+  file lib/src/server/config.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  impl ServerConfig {
+      pub fn decoding_options(&self) -> DecodingOptions {
+          DecodingOptions {
+              client_offset: chrono::Duration::zero(),
+              max_message_size: self.limits.max_message_size,
+              max_chunk_count: self.limits.max_chunk_count,
+              max_string_length: self.limits.max_string_length,
+              max_byte_string_length: self.limits.max_byte_string_length,
+              max_array_length: self.limits.max_array_length,
+              ..Default::default()
+          }
+      }
+  }
+  ```
+
+test "rank1495: (e) a literal that names only some limits and falls back to the crate's defaults for the rest still receives the ceilings those defaults carry"
+  lang rust
+  file lib/src/core/tests/chunk.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  #[test]
+  fn chunk_multi_encode_decode() {
+      let mut secure_channel = SecureChannel::new_no_certificate_store();
+      secure_channel.set_decoding_options(DecodingOptions {
+          client_offset: chrono::Duration::zero(),
+          max_chunk_count: 0,
+          max_string_length: 65535,
+          max_byte_string_length: 65535,
+          max_array_length: 20000,
+          ..Default::default()
+      });
+  }
+  ```
+
+test "rank1495: (f) a Hello frame echoing the peer's advertised zero for both transport limits is protocol data, not a decoder configuration"
+  lang rust
+  file lib/src/core/tests/hello.rs
+  reject VYQL-DOS-042
+  code
+  ```
+  fn hello_message() -> HelloMessage {
+      HelloMessage {
+          message_header: MessageHeader {
+              message_type: MessageType::Invalid,
+              message_size: 0,
+          },
+          protocol_version: 0,
+          receive_buffer_size: 0,
+          send_buffer_size: 0,
+          max_message_size: 0,
+          max_chunk_count: 0,
+          endpoint_url: UAString::null(),
+      }
+  }
+  ```

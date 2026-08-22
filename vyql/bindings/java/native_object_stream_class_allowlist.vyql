@@ -1,0 +1,60 @@
+module bindings.java.native_object_stream_class_allowlist;
+
+// java.io.ObjectInputStream reconstructs whatever classes the byte stream names,
+// running their readObject/readResolve/finalize code as it goes; its own javadoc
+// says a stream from an untrusted source must be read with a filter that limits
+// the classes it may name (ObjectInputStream.setObjectInputFilter, or a
+// resolveClass override rejecting everything outside a list). The shape labelled
+// here is the one where that obligation is unavoidable and unowned: a method
+// that takes the serialized bytes as a byte[] parameter, wraps them in a
+// ByteArrayInputStream and reads the graph back with readObject/readUnshared. A
+// helper of that shape decides nothing about where the bytes came from, so it
+// carries the whole burden of bounding the class set for every caller, and its
+// callers -- request parameters, cookies, cache entries, message payloads --
+// routinely hand it bytes an attacker chose.
+//
+// The clauses together are what make this a blob decoder rather than
+// ordinary Java serialization plumbing: a non-public helper has a closed caller
+// set inside its own class, a stream opened over a file or a socket
+// is reachable by taint from a labelled source and is VYQL-DESER-001's business,
+// and a class's own private readObject(ObjectInputStream) hook takes the stream,
+// not a byte[]. Whether the class set is bounded is the rule's question, not
+// this binding's: the filter APIs below emit the control the rule consumes.
+
+binding unrestrictedClassDeserialization900 {
+  query pattern presenceNode where node.scope == "function" and node.context.functionModifier in ["public"] and node.context.paramType in ["byte"] and containsAny(node.context.callPath, ["ByteArrayInputStream"]) and containsAny(node.context.call, ["readObject", "readUnshared"])
+  emit issue code.UnrestrictedClassDeserialization at node
+}
+
+// JEP 290's filter hooks and commons-io's ValidatingObjectInputStream are the
+// documented ways to bound the class set an object stream may name: each rejects
+// a class the reader did not accept before it is resolved. The filter is set on
+// the stream rather than passed to the read, so it covers the lexical scope it
+// runs in rather than one call's arguments.
+
+binding safeDeserialization901 {
+  query pattern callExpr where callee.path ~= "setObjectInputFilter"
+  emit check core.SafeDeserialization at call {
+    covers sameScope {
+      anchor: call
+    }
+  }
+}
+
+binding safeDeserialization902 {
+  query pattern callExpr where callee.path ~= "ObjectInputFilter.Config.createFilter"
+  emit check core.SafeDeserialization at call {
+    covers sameScope {
+      anchor: call
+    }
+  }
+}
+
+binding safeDeserialization903 {
+  query pattern callExpr where callee.path ~= "ValidatingObjectInputStream.accept"
+  emit check core.SafeDeserialization at call {
+    covers sameScope {
+      anchor: call
+    }
+  }
+}

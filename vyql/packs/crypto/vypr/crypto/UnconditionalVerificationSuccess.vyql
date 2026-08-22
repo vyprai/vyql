@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule UnconditionalVerificationSuccess {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_347, CWE_494]
+    id: "VYQL-CRY-055"
+    severity: high
+  }
+  issue code.UnconditionalVerificationSuccess as verifier
+}

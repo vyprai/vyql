@@ -1,0 +1,178 @@
+# The WebUI serves its whole subscriber database over HTTP through
+# express-restify-mongoose. One `serve(router, Model)` call per model
+# publishes the collection and every document under it for GET, POST,
+# PUT/PATCH and DELETE, plus a `query` parameter that takes arbitrary Mongo
+# selectors -- so the served router is the database. The library documents
+# that it applies no access control of its own: the options that add it are
+# `access`, `contextFilter`, `preMiddleware`, `preCreate`, `preRead`,
+# `preUpdate` and `preDelete`, and its authentication guidance is to mount the
+# served router behind ordinary Express middleware.
+#
+# The routes index mounted it behind nothing. `router.use('/db', db)` sits one
+# line below the login routes, so anyone who could reach the port could read
+# every subscriber record, including the IMSI and the authentication keys, and
+# write new ones. The session cookie the login form set is never consulted on
+# that path.
+#
+# The scope is the module because that is the unit Express mounting happens
+# in: `express.Router()` and the `use` calls that populate it sit together in
+# a routes index, one file above the module that calls `serve`. Both are read
+# as whole `call:` tokens rather than by receiver name, so `router.use`,
+# `api.use` and `apiRouter.use` read alike.
+#
+# The last two cases say what the two halves of the binding are each doing.
+# The third mounts the same database router behind a middleware passed by
+# reference rather than invoked, which produces no call token at all -- the
+# identifier naming the gate is what declines it, so the discrimination does
+# not depend on the fixed revision's choice of passport. The fourth is the
+# unguarded mount again in a project that does not depend on
+# express-restify-mongoose: an Express router that mounts sub-routers is
+# ordinary code, and without a library that turns a model into a public CRUD
+# surface there is nothing here to report.
+
+test "rank1498 open5gs: the webui routes index mounts the express-restify-mongoose database router with no authentication middleware"
+  lang javascript
+  file webui/package.json
+  code
+  ```
+  {
+    "name": "open5gs-webui",
+    "dependencies": {
+      "express": "^4.16.3",
+      "express-restify-mongoose": "^4.3.0",
+      "express-session": "^1.15.2",
+      "mongoose": "^4.13.14",
+      "passport": "^0.4.0",
+      "passport-local": "^1.0.0"
+    }
+  }
+  ```
+  file webui/server/routes/index.js
+  expect VYQL-AUTH-001
+  code
+  ```
+  const express = require('express');
+  const auth = require('./auth');
+  const db = require('./db')
+
+  const router = express.Router();
+
+  router.use('/auth', auth);
+  router.use('/db', db);
+
+  module.exports = router;
+  ```
+
+test "rank1498 open5gs: the routes index mounts the database router behind a passport jwt strategy"
+  lang javascript
+  file webui/package.json
+  code
+  ```
+  {
+    "name": "open5gs-webui",
+    "dependencies": {
+      "express": "^4.16.3",
+      "express-restify-mongoose": "^4.3.0",
+      "jsonwebtoken": "^8.5.1",
+      "mongoose": "^4.13.14",
+      "passport": "^0.4.0",
+      "passport-jwt": "^4.0.0"
+    }
+  }
+  ```
+  file webui/server/routes/index.js
+  reject VYQL-AUTH-001
+  code
+  ```
+  const express = require('express');
+  const auth = require('./auth');
+  const db = require('./db')
+
+  const router = express.Router();
+
+  const secret = process.env.JWT_SECRET_KEY || 'change-me';
+  const passport = require('passport');
+  const JWTstrategy = require('passport-jwt').Strategy;
+  const ExtractJWT = require('passport-jwt').ExtractJwt;
+
+  passport.use(
+    new JWTstrategy(
+      {
+        secretOrKey: secret,
+        jwtFromRequest: ExtractJWT.fromAuthHeaderWithScheme('bearer')
+      },
+      async (token, done) => {
+        try {
+          return done(null, token.user);
+        } catch (error) {
+          done(error);
+        }
+      }
+    )
+  );
+
+  router.use('/auth', auth);
+  router.use('/db', passport.authenticate('jwt', { session: false }), db);
+
+  module.exports = router;
+  ```
+
+test "rank1498 open5gs: the database router is mounted behind a middleware passed by reference"
+  lang javascript
+  file webui/package.json
+  code
+  ```
+  {
+    "name": "open5gs-webui",
+    "dependencies": {
+      "express": "^4.16.3",
+      "express-restify-mongoose": "^4.3.0",
+      "mongoose": "^4.13.14"
+    }
+  }
+  ```
+  file webui/server/routes/index.js
+  reject VYQL-AUTH-001
+  code
+  ```
+  const express = require('express');
+  const auth = require('./auth');
+  const db = require('./db')
+  const requireAuth = require('../middleware/require-auth');
+
+  const router = express.Router();
+
+  router.use('/auth', auth);
+  router.use('/db', requireAuth, db);
+
+  module.exports = router;
+  ```
+
+test "rank1498 open5gs: an express routes index that mounts no auto-generated model crud router is not reported"
+  lang javascript
+  file webui/package.json
+  code
+  ```
+  {
+    "name": "open5gs-webui",
+    "dependencies": {
+      "express": "^4.16.3",
+      "express-session": "^1.15.2"
+    }
+  }
+  ```
+  file webui/server/routes/index.js
+  reject VYQL-AUTH-001
+  code
+  ```
+  const express = require('express');
+  const auth = require('./auth');
+  const pages = require('./pages')
+
+  const router = express.Router();
+
+  router.use('/auth', auth);
+  router.use('/pages', pages);
+
+  module.exports = router;
+  ```

@@ -1,0 +1,351 @@
+# Rank 1494 / CVE-2022-33082 (NVD, "an issue in the AST parser (ast/compile.go)
+# of Open Policy Agent allows attackers to cause a Denial of Service (DoS) via a
+# crafted input", NVD-CWE-noinfo; the real class is CWE-617/CWE-248 reached
+# through CWE-1284). OPA compiles Rego, and a Rego module is untrusted input in
+# every deployment that accepts policy from a tenant, a bundle server or an
+# HTTP `PUT /v1/policies` request.
+#
+# The compiler's local-variable rewriting stage walks a comprehension head after
+# pushing a scope for the comprehension body, so any name the body declares is
+# substituted wherever it appears in the head:
+#
+#   func rewriteDeclaredVarsInTerm(g *localVarGenerator, stack *localDeclaredVars,
+#                                  term *Term, errs Errors, strict bool) (bool, Errors) {
+#       switch v := term.Value.(type) {
+#       case Var:
+#           if gv, ok := stack.Declared(v); ok {
+#               term.Value = gv
+#               stack.Seen(v)
+#           } ...
+#       case Ref:
+#           if RootDocumentRefs.Contains(term) {
+#               x := v[0].Value.(Var)
+#               ...
+#       case *object: ...
+#       case Set: ...
+#       case *ArrayComprehension: ...
+#       case *SetComprehension: ...
+#       case *ObjectComprehension: ...
+#       default:
+#           return false, errs
+#       }
+#
+# (ast/compile.go:4644 at the parent.) There is no `case Call:`. A Call term is a
+# function application whose operand 0 is the callee reference, and the recursive
+# driver `rewriteDeclaredVarsInTermRecursive` (:4691) reaches every operand of a
+# Call through `WalkNodes`, so the callee reference lands in the `Var`/`Ref` cases
+# and is rewritten to the comprehension body's local. `p := [f(y) | y = 1; f = 2]`
+# then compiles to a call whose operator is a local variable -- Rego has no
+# first-class functions, so no later stage can mean anything by that. Two
+# outcomes, both in issue #4762 which the fixing commit closes:
+#
+#   package test
+#   f(x) := x
+#   p := [f(y) | y = 1; f = 2]      -> eval-time "undefined ref: data.test.f"
+#
+#   package test
+#   p := [input() | input := 1]     -> panic: interface conversion:
+#                                      ast.Value is ast.Var, not ast.Ref
+#
+# The panic escapes: `Compiler.compile()` recovers only `errLimitReached` and
+# re-panics everything else (`ast/compile.go:1222-1226`, which is the exact line
+# NVD's single reference points at). A tenant-supplied module therefore kills the
+# process -- the DoS.
+#
+# The fixed revision adds the missing case, which rejects the module at compile time instead
+# of rewriting the callee:
+#
+#   + case Call:
+#   +     ref := v[0]
+#   +     WalkVars(ref, func(v Var) bool {
+#   +         if gv, ok := stack.Declared(v); ok && !gv.Equal(v) {
+#   +             errs = append(errs, NewError(CompileErr, term.Location,
+#   +                 "called function %s shadowed", ref))
+#   +             return true
+#   +         }
+#   +         return false
+#   +     })
+#   +     return false, errs
+#
+# ## The pool row
+#
+# Correct as written, and better than the advisory. `064f6168a8` is the fixing commit;
+# `git show` reads it in full, the missing case is present at `064f6168a8^` and
+# the added case is present at `064f6168a8`. OSV records the fixing commit as
+# `9b5fb9b1d2feca3eb51da6a383ca25175ee58234`, which is `Prepare release v0.42.0
+# (#4834)` -- CHANGELOG + `builtin_metadata.json` + `capabilities/v0.42.0.json` +
+# `version/version.go`, i.e. pool-row failure mode 1, a release bump. No
+# correction is proposed: the row names the real commit.
+#
+# ## Measured: a double miss, and two independent reasons for it
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`, three runs at each
+# revision, byte-identical every time:
+#
+#   whole tree (go:566 javascript:59 c:106 cpp:46 bash:2 config:143
+#   textpattern:739): **1479 findings / 396 at or above high at 064f6168a8^,
+#   1479 / 396 at 064f6168a8**
+#   bounded subtree `ast/` (53 Go files): **2 findings at each revision**, both
+#   VYQL-CRY-003 `code.WeakRandomValue`, at `policy.go:21` and
+#   `term_bench_test.go:169`
+#
+# `ast/compile.go` carries exactly two rows on the whole-tree scan --
+# `code.Deserialization` at :980 (the JSON schema loader) and `code.TrustBoundary`
+# at :3323 (the unsafe-vars set) -- and neither is within 1300 lines of
+# `rewriteDeclaredVarsInTerm`. Findings in the file are not coverage.
+#
+# ### Reason one: nothing in the function is extracted at all
+#
+# The whole vulnerable body is a Go type switch, and the Go frontend drops
+# `*ast.TypeSwitchStmt` bodies. `(*conv).stmt`
+# (`internal/extract/frontend/golang/golang.go:1652-1655`) handles
+# `*ast.SwitchStmt` and carries the comment "NOTE: *ast.TypeSwitchStmt is
+# intentionally left to the nil default (it is a no-op before B1 -- converting
+# it lowering ignored bodies and shifting baselines)", and
+# `(*conv).expr` (:1728) has no `*ast.TypeAssertExpr` case either. A nil stmt is
+# no nodes, so every statement inside every `case` clause of a Go type switch is
+# invisible.
+#
+# The last two cases below are the minimal pair that isolates it: one HTTP
+# handler whose `exec.Command` sits inside `if _, ok := v.(...); ok`, and the
+# same handler with the same three statements inside `switch v.(type) { case ...:
+# }`. Over three `--cache off` runs the first is **1** finding (VYQL-INJ-002,
+# critical) and the second **0**, stable; the `v := x.(type)` assigning form
+# scores 0 as well. `vyql match` shows why: the `if` form reports
+# `code.CommandExecution` twice plus two `code.ResourceReview` flags on
+# `exec.Command`/`exec.Command.Output`, and the type-switch form reports the same
+# three `code.HttpInput` sources and then **no sink and no control at all** -- the
+# call node does not exist. Exhaustive grep over the ~105 Go-bearing clones under
+# `/tmp/cve-work/rank*/`: **6557 type-switch statements**, 539 of them in opa,
+# 149 in `opa/ast`, 33 in `ast/compile.go` alone. Reported as an ENGINE-GAPS
+# entry rather than fixed here: the in-tree comment records the exclusion as
+# deliberate and names shifting every Go baseline as its reason, so restoring the
+# case is a judgement about the whole Go frontend's output, not a confined
+# correction -- "unsure means not mechanical".
+#
+# ### Reason two: no vocabulary can state the weakness even with the body visible
+#
+# The construct that distinguishes vulnerable from patched is *a case label that
+# is not there*: a recursive term rewriter that dispatches on node type, handles
+# the container types, and has no arm for the application/call type, so the
+# walker descends into the callee position and substitutes it like any other
+# name. That is not an API, not a taint path, and not a control -- it is an
+# invariant about one program's own AST. Every discriminator available keys on
+# `case Call:`, which is the fixing commit's own vocabulary and is exactly what
+# the loop forbids. `code.ReachableAssertionReview` / VYQL-DOS-040 (CWE-617) is
+# the concept that names the impact -- "externally reachable input can violate an
+# internal assertion or invariant and terminate the process" -- and both of its
+# shipped bindings (`reachableAssertionReview129` in `bindings/c/mce54b166.vyql`,
+# `reachableAssertionReview77` in `bindings/cpp/m4e783366.vyql`) route through
+# `node.analysis ~= "assertion.<one library's shape>"`, a hand-written frontend
+# observation per case. There is no Go counterpart and no shape to give one.
+#
+# The generic Go weakness in view -- a single-value type assertion `x.(T)` with
+# no `, ok` on parsed input -- is rejected on measurement, not taste: the fixed revision
+# does not remove `v[0].Value.(Var)`, so a binding on that shape scores
+# identically at both revisions, and `ast/` alone carries 149 type switches whose
+# arms assert the same way by construction.
+#
+# The Rego module itself is not a route either: `.rego` matches no frontend
+# (`19 file(s)` in the warning line of the whole-tree scan), so the crafted input
+# cannot be described in the language it is written in.
+#
+# No definition is touched, so the OWASP Java and Python numbers are unaffected
+# by this rank.
+#
+# verify_current_expected: attention, 0 -> 0 (double miss, pinned below).
+
+test "rank1494: the local-variable rewriter substitutes a comprehension body's declaration into a call's callee position"
+  lang go
+  file ast/compile.go
+  reject VYQL-DOS-040
+  code
+  ```
+  package ast
+
+  func rewriteDeclaredVarsInTerm(g *localVarGenerator, stack *localDeclaredVars, term *Term, errs Errors, strict bool) (bool, Errors) {
+  	switch v := term.Value.(type) {
+  	case Var:
+  		if gv, ok := stack.Declared(v); ok {
+  			term.Value = gv
+  			stack.Seen(v)
+  		} else if stack.Occurrence(v) == newVar {
+  			stack.Insert(v, v, seenVar)
+  		}
+  	case Ref:
+  		if RootDocumentRefs.Contains(term) {
+  			x := v[0].Value.(Var)
+  			if occ, ok := stack.GlobalOccurrence(x); ok && occ != seenVar {
+  				gv, _ := stack.Declared(x)
+  				term.Value = gv
+  			}
+
+  			return true, errs
+  		}
+  		return false, errs
+  	case *object:
+  		cpy, _ := v.Map(func(k, v *Term) (*Term, *Term, error) {
+  			kcpy := k.Copy()
+  			errs = rewriteDeclaredVarsInTermRecursive(g, stack, kcpy, errs, strict)
+  			errs = rewriteDeclaredVarsInTermRecursive(g, stack, v, errs, strict)
+  			return kcpy, v, nil
+  		})
+  		term.Value = cpy
+  	case Set:
+  		cpy, _ := v.Map(func(elem *Term) (*Term, error) {
+  			elemcpy := elem.Copy()
+  			errs = rewriteDeclaredVarsInTermRecursive(g, stack, elemcpy, errs, strict)
+  			return elemcpy, nil
+  		})
+  		term.Value = cpy
+  	case *ArrayComprehension:
+  		errs = rewriteDeclaredVarsInArrayComprehension(g, stack, v, errs, strict)
+  	case *SetComprehension:
+  		errs = rewriteDeclaredVarsInSetComprehension(g, stack, v, errs, strict)
+  	case *ObjectComprehension:
+  		errs = rewriteDeclaredVarsInObjectComprehension(g, stack, v, errs, strict)
+  	default:
+  		return false, errs
+  	}
+  	return true, errs
+  }
+
+  func rewriteDeclaredVarsInTermRecursive(g *localVarGenerator, stack *localDeclaredVars, term *Term, errs Errors, strict bool) Errors {
+  	WalkNodes(term, func(n Node) bool {
+  		var stop bool
+  		switch n := n.(type) {
+  		case *With:
+  			_, errs = rewriteDeclaredVarsInTerm(g, stack, n.Value, errs, strict)
+  			stop = true
+  		case *Term:
+  			stop, errs = rewriteDeclaredVarsInTerm(g, stack, n, errs, strict)
+  		}
+  		return stop
+  	})
+  	return errs
+  }
+
+  func rewriteDeclaredVarsInArrayComprehension(g *localVarGenerator, stack *localDeclaredVars, v *ArrayComprehension, errs Errors, strict bool) Errors {
+  	used := NewVarSet()
+  	used.Update(v.Term.Vars())
+
+  	stack.Push()
+  	v.Body, errs = rewriteDeclaredVarsInBody(g, stack, used, v.Body, errs, strict)
+  	errs = rewriteDeclaredVarsInTermRecursive(g, stack, v.Term, errs, strict)
+  	stack.Pop()
+  	return errs
+  }
+  ```
+
+test "rank1494: rejecting a shadowed callee at compile time is the safe form"
+  lang go
+  file ast/compile.go
+  reject VYQL-DOS-040
+  code
+  ```
+  package ast
+
+  func rewriteDeclaredVarsInTerm(g *localVarGenerator, stack *localDeclaredVars, term *Term, errs Errors, strict bool) (bool, Errors) {
+  	switch v := term.Value.(type) {
+  	case Var:
+  		if gv, ok := stack.Declared(v); ok {
+  			term.Value = gv
+  			stack.Seen(v)
+  		} else if stack.Occurrence(v) == newVar {
+  			stack.Insert(v, v, seenVar)
+  		}
+  	case Ref:
+  		if RootDocumentRefs.Contains(term) {
+  			x := v[0].Value.(Var)
+  			if occ, ok := stack.GlobalOccurrence(x); ok && occ != seenVar {
+  				gv, _ := stack.Declared(x)
+  				term.Value = gv
+  			}
+
+  			return true, errs
+  		}
+  		return false, errs
+  	case Call:
+  		ref := v[0]
+  		WalkVars(ref, func(v Var) bool {
+  			if gv, ok := stack.Declared(v); ok && !gv.Equal(v) {
+  				errs = append(errs, NewError(CompileErr, term.Location, "called function %s shadowed", ref))
+  				return true
+  			}
+  			return false
+  		})
+  		return false, errs
+  	case *object:
+  		cpy, _ := v.Map(func(k, v *Term) (*Term, *Term, error) {
+  			kcpy := k.Copy()
+  			errs = rewriteDeclaredVarsInTermRecursive(g, stack, kcpy, errs, strict)
+  			errs = rewriteDeclaredVarsInTermRecursive(g, stack, v, errs, strict)
+  			return kcpy, v, nil
+  		})
+  		term.Value = cpy
+  	case Set:
+  		cpy, _ := v.Map(func(elem *Term) (*Term, error) {
+  			elemcpy := elem.Copy()
+  			errs = rewriteDeclaredVarsInTermRecursive(g, stack, elemcpy, errs, strict)
+  			return elemcpy, nil
+  		})
+  		term.Value = cpy
+  	case *ArrayComprehension:
+  		errs = rewriteDeclaredVarsInArrayComprehension(g, stack, v, errs, strict)
+  	case *SetComprehension:
+  		errs = rewriteDeclaredVarsInSetComprehension(g, stack, v, errs, strict)
+  	case *ObjectComprehension:
+  		errs = rewriteDeclaredVarsInObjectComprehension(g, stack, v, errs, strict)
+  	default:
+  		return false, errs
+  	}
+  	return true, errs
+  }
+  ```
+
+test "rank1494: a request-derived shell command guarded by an if-form type assertion is reported"
+  lang go
+  file handler_if.go
+  expect VYQL-INJ-002
+  code
+  ```
+  package main
+
+  import (
+  	"net/http"
+  	"os/exec"
+  )
+
+  func handleIf(w http.ResponseWriter, r *http.Request) {
+  	s := r.URL.Query().Get("cmd")
+  	var v interface{} = r.Body
+  	if _, ok := v.(interface{ Close() error }); ok {
+  		out, _ := exec.Command("sh", "-c", s).Output()
+  		w.Write(out)
+  	}
+  }
+  ```
+
+test "rank1494: the same command inside a type-switch case body is not reported, because the Go frontend drops type-switch bodies"
+  lang go
+  file handler_typeswitch.go
+  reject VYQL-INJ-002
+  code
+  ```
+  package main
+
+  import (
+  	"net/http"
+  	"os/exec"
+  )
+
+  func handleTypeSwitch(w http.ResponseWriter, r *http.Request) {
+  	s := r.URL.Query().Get("cmd")
+  	var v interface{} = r.Body
+  	switch v.(type) {
+  	case interface{ Close() error }:
+  		out, _ := exec.Command("sh", "-c", s).Output()
+  		w.Write(out)
+  	}
+  }
+  ```

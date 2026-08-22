@@ -1,0 +1,280 @@
+# Rank 1489 / CVE-2025-59824 (GHSA-hqrf-67pm-wgfq, recorded CWE-863): Omni and
+# every Talos machine it manages share a SideroLink WireGuard tunnel. Omni hands
+# each machine a random IPv6 address out of one /64 and keeps `::1` of that block
+# for itself, so from Omni's side the interface is a single device with one peer
+# per machine. WireGuard's own allowed-IPs check constrains the *source* address
+# of an inbound packet to the address that peer is assigned; nothing in the
+# protocol constrains the *destination*. The Talos end is not a trusted
+# environment -- a host-networked Kubernetes workload can write raw packets onto
+# the link -- so a machine could address Omni's own listening services, or, with
+# IP forwarding on, anything routable behind Omni.
+#
+# The device is configured in one place, `startWireguard`:
+#
+#   if err = manager.wgHandler.SetupDevice(wireguard.DeviceConfig{
+#     Bind:         wgbind.NewServerBind(conn.NewDefaultBind(), manager.virtualPrefix, manager.peerTraffic, manager.logger),
+#     PeerHandler:  peerHandler,
+#     Logger:       manager.logger,
+#     ServerPrefix: serverAddr,
+#     PrivateKey:   key,
+#     ListenPort:   uint16(port),
+#   }); err != nil {
+#
+# and the fixed revision bumps siderolink to v0.3.13 and fills in the field that release
+# added:
+#
+#   + InputPacketFilters: []tun.InputPacketFilter{tun.FilterAllExceptIP(serverAddr.Addr())},
+#
+# `wireguard.DeviceConfig.InputPacketFilters` is documented as "enables packet
+# filtering on the wireguard level"; `tun.InputPacketFilter` is "the function for
+# filtering the packets going through the wireguard tunnel" and reads a decoded
+# `PacketHeader` carrying `SourceAddr` and `DestinationAddr`; `tun.FilterAllExceptIP`
+# "drops all packets that have the destination different from the ip specified".
+# Unset is the library default, and the default is to accept everything.
+#
+# ## The pool row
+#
+# Correct, and no correction is proposed. The advisory names this commit
+# verbatim as the fixing change and `< 0.48.0` as the vulnerable range. `git show` reads it
+# in full. The vulnerable literal is present at the parent and the remediation is
+# present at the fixed revision.
+#
+# ## What ships
+#
+# `bindings/go/wireguardDeviceWithoutInputPacketFilter.vyql` emits the existing
+# `code.NetworkFilteringDisabled` (VYQL-CFG-015, CWE-284) for a
+# `wireguard.DeviceConfig` that sets `ServerPrefix` -- the field that marks the
+# server end of the tunnel, and the one that distinguishes a constructed
+# configuration from the bare type in an interface or method signature -- and
+# names no `InputPacketFilters`, in the literal or assigned onto the value
+# afterwards. No concept and no rule is minted: the concept's own name is what
+# the library's field documentation says is missing, and `core.PacketFilterDefaultDeny`
+# is the control the rule's `unless` accepts.
+#
+# ## Measured
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over `internal/`
+# (457 Go files), three runs at each revision, byte-identical each time:
+# **50 findings / 16 at or above high at the parent, 49 / 15 at the fixed revision**. The
+# one row that moves is `VYQL-CFG-015` on `internal/pkg/siderolink/manager.go:365`,
+# `startWireguard` itself.
+#
+# Precision. `wireguard.DeviceConfig` appears at four sites in omni; the binding
+# reports one. The other three -- `internal/pkg/siderolink/wireguard.go:24` and
+# `:79` and the two `fakeWireguardHandler.SetupDevice(wireguard.DeviceConfig) error`
+# test doubles -- are type positions with no field list, and the `ServerPrefix`
+# clause is what declines them. Across the 212 checkouts under `/tmp/cve-work/rank*/`
+# (1315 repository trees) an exhaustive grep finds `wireguard.DeviceConfig` in
+# **zero** files outside this one, so there is no collateral to measure; the
+# nearest unrelated `DeviceConfig` is lxd's own type, and
+# `/tmp/cve-work/rank1347/lxd/lxd/device` (62 Go files, 9 findings) reports no
+# VYQL-CFG-015 because the clause is package-qualified. Neither identifier occurs
+# in either OWASP benchmark corpus.
+#
+# Rank 1394's rename test passes: the negation keys on the library's field name,
+# not the fixed revision's vocabulary. Replacing `tun.FilterAllExceptIP(...)` with a
+# project-local `myOwnDestinationFilter(...)` leaves the patched form unreported,
+# and so does writing the filter on afterwards as `cfg.InputPacketFilters = ...`.
+#
+# The two shapes the dispatch flagged as directly relevant are checked and do
+# not fit: `code.AuthEndpointRawRequestUriExemption` (VYQL-AUTH-120) and
+# `code.McpTransportRouteMissingAuthentication` (VYQL-AUTH-134) are both about a
+# route mounted past its authentication, and there is no route here -- the
+# weakness is at the packet layer, below any handler. `code.AccessPolicyReview`
+# (VYQL-AUTH-080, CWE-863) matches the advisory's recorded CWE but its review
+# text is about role and group policy, and it would have made this an attention
+# flag rather than the finding it is. `code.NetworkFilteringDisabled`lready
+# means what the missing field means.
+#
+# verify_current_expected: fixed, 1 -> 0.
+
+test "rank1489: the SideroLink wireguard device is set up with no filter on inbound packet destinations"
+  lang go
+  file internal/pkg/siderolink/manager.go
+  expect VYQL-CFG-015
+  code
+  ```
+  package siderolink
+
+  import (
+  	"fmt"
+  	"net"
+  	"net/netip"
+  	"strconv"
+
+  	"github.com/siderolabs/siderolink/pkg/wgtunnel/wgbind"
+  	"github.com/siderolabs/siderolink/pkg/wireguard"
+  	"golang.org/x/sync/errgroup"
+  	"golang.zx2c4.com/wireguard/conn"
+  	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+  )
+
+  func (manager *Manager) startWireguard(ctx context.Context, eg *errgroup.Group, serverAddr netip.Prefix) error {
+  	key, err := wgtypes.ParseKey(manager.wgConfig().PrivateKey)
+  	if err != nil {
+  		return fmt.Errorf("invalid private key: %w", err)
+  	}
+
+  	_, strPort, err := net.SplitHostPort(manager.wgConfig().WireguardEndpoint)
+  	if err != nil {
+  		return fmt.Errorf("invalid Wireguard endpoint: %w", err)
+  	}
+
+  	port, err := strconv.Atoi(strPort)
+  	if err != nil {
+  		return fmt.Errorf("invalid Wireguard endpoint port: %w", err)
+  	}
+
+  	peerHandler := &peerHandler{
+  		allowedPeers: manager.allowedPeers,
+  	}
+
+  	if err = manager.wgHandler.SetupDevice(wireguard.DeviceConfig{
+  		Bind:         wgbind.NewServerBind(conn.NewDefaultBind(), manager.virtualPrefix, manager.peerTraffic, manager.logger),
+  		PeerHandler:  peerHandler,
+  		Logger:       manager.logger,
+  		ServerPrefix: serverAddr,
+  		PrivateKey:   key,
+  		ListenPort:   uint16(port),
+  	}); err != nil {
+  		return err
+  	}
+
+  	eg.Go(func() error {
+  		return manager.wgHandler.Run(ctx, manager.logger)
+  	})
+
+  	return nil
+  }
+  ```
+
+test "rank1489: the same device drops every packet not addressed to the server's own address"
+  lang go
+  file internal/pkg/siderolink/manager.go
+  reject VYQL-CFG-015
+  code
+  ```
+  package siderolink
+
+  import (
+  	"fmt"
+  	"net"
+  	"net/netip"
+  	"strconv"
+
+  	"github.com/siderolabs/siderolink/pkg/tun"
+  	"github.com/siderolabs/siderolink/pkg/wgtunnel/wgbind"
+  	"github.com/siderolabs/siderolink/pkg/wireguard"
+  	"golang.org/x/sync/errgroup"
+  	"golang.zx2c4.com/wireguard/conn"
+  	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+  )
+
+  func (manager *Manager) startWireguard(ctx context.Context, eg *errgroup.Group, serverAddr netip.Prefix) error {
+  	key, err := wgtypes.ParseKey(manager.wgConfig().PrivateKey)
+  	if err != nil {
+  		return fmt.Errorf("invalid private key: %w", err)
+  	}
+
+  	_, strPort, err := net.SplitHostPort(manager.wgConfig().WireguardEndpoint)
+  	if err != nil {
+  		return fmt.Errorf("invalid Wireguard endpoint: %w", err)
+  	}
+
+  	port, err := strconv.Atoi(strPort)
+  	if err != nil {
+  		return fmt.Errorf("invalid Wireguard endpoint port: %w", err)
+  	}
+
+  	peerHandler := &peerHandler{
+  		allowedPeers: manager.allowedPeers,
+  	}
+
+  	if err = manager.wgHandler.SetupDevice(wireguard.DeviceConfig{
+  		Bind:               wgbind.NewServerBind(conn.NewDefaultBind(), manager.virtualPrefix, manager.peerTraffic, manager.logger),
+  		PeerHandler:        peerHandler,
+  		Logger:             manager.logger,
+  		ServerPrefix:       serverAddr,
+  		PrivateKey:         key,
+  		ListenPort:         uint16(port),
+  		InputPacketFilters: []tun.InputPacketFilter{tun.FilterAllExceptIP(serverAddr.Addr())},
+  	}); err != nil {
+  		return err
+  	}
+
+  	eg.Go(func() error {
+  		return manager.wgHandler.Run(ctx, manager.logger)
+  	})
+
+  	return nil
+  }
+  ```
+
+test "rank1489: a filter written onto the configuration after the literal is still a filter"
+  lang go
+  file internal/pkg/siderolink/manager.go
+  reject VYQL-CFG-015
+  code
+  ```
+  package siderolink
+
+  import (
+  	"net/netip"
+
+  	"github.com/siderolabs/siderolink/pkg/tun"
+  	"github.com/siderolabs/siderolink/pkg/wireguard"
+  	"golang.zx2c4.com/wireguard/wgctrl/wgtypes"
+  )
+
+  func (manager *Manager) startWireguard(key wgtypes.Key, serverAddr netip.Prefix, port int) error {
+  	cfg := wireguard.DeviceConfig{
+  		Logger:       manager.logger,
+  		ServerPrefix: serverAddr,
+  		PrivateKey:   key,
+  		ListenPort:   uint16(port),
+  	}
+
+  	cfg.InputPacketFilters = []tun.InputPacketFilter{tun.FilterAllExceptIP(serverAddr.Addr())}
+
+  	return manager.wgHandler.SetupDevice(cfg)
+  }
+  ```
+
+test "rank1489: the bare configuration type in an interface and a test double is not a configured device"
+  lang go
+  file internal/pkg/siderolink/wireguard.go
+  reject VYQL-CFG-015
+  code
+  ```
+  package siderolink
+
+  import (
+  	"context"
+
+  	"github.com/siderolabs/siderolink/pkg/wireguard"
+  	"go.uber.org/zap"
+  )
+
+  // WireguardHandler is an interface for the wireguard link handler.
+  type WireguardHandler interface {
+  	SetupDevice(wireguard.DeviceConfig) error
+  	Shutdown() error
+  	Run(context.Context, *zap.Logger) error
+  }
+
+  // SetupDevice implements WireguardHandler.
+  func (handler *PhysicalWireguardHandler) SetupDevice(cfg wireguard.DeviceConfig) error {
+  	var err error
+
+  	handler.wgDevice, err = wireguard.NewDevice(cfg)
+  	if err != nil {
+  		return err
+  	}
+
+  	return nil
+  }
+
+  func (h *fakeWireguardHandler) SetupDevice(wireguard.DeviceConfig) error {
+  	return nil
+  }
+  ```

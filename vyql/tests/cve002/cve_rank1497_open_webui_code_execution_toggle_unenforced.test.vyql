@@ -1,0 +1,141 @@
+# Rank 1497 / CVE-2026-45672: Open WebUI's `/api/v1/utils/code/execute` route
+# forwarded any verified user's Python source to the configured Jupyter server
+# after reading only the engine selection, the Jupyter URL, its credentials and
+# its timeout off `request.app.state.config`. The administrator-facing switch for
+# the feature, `ENABLE_CODE_EXECUTION`, lives in that same settings object and
+# is never read, so an operator who turned code execution off kept serving it
+# and every authenticated caller could still run code inside the Jupyter
+# container (CWE-863). The fixed revision 6d736d3c59 raises 403 from the handler when the
+# switch is off.
+#
+# VYQL-AUTH-080 reports the vulnerable form through a function-scope presence
+# binding: a route handler that reads the runtime settings object and dispatches
+# to the code-execution surface while naming no enable/disable/allow/permit
+# setting of its own. The patched form is declined by the settings read the fixed revision
+# adds, and the control is spelled as the toggle vocabulary rather than as this
+# fix's constant, so a handler gated on a differently named switch is declined
+# too.
+
+test "rank1497: code execution route dispatches without reading the feature's runtime switch"
+  lang python
+  file backend/open_webui/routers/utils.py
+  expect VYQL-AUTH-080
+  code
+  ```
+  from fastapi import APIRouter, Depends, HTTPException, Request
+  from pydantic import BaseModel
+
+  from open_webui.utils.auth import get_verified_user
+  from open_webui.utils.code_interpreter import execute_code_jupyter
+
+  router = APIRouter()
+
+
+  class CodeForm(BaseModel):
+      code: str
+
+
+  @router.post('/code/execute')
+  async def execute_code(request: Request, form_data: CodeForm, user=Depends(get_verified_user)):
+      if request.app.state.config.CODE_EXECUTION_ENGINE == 'jupyter':
+          output = await execute_code_jupyter(
+              request.app.state.config.CODE_EXECUTION_JUPYTER_URL,
+              form_data.code,
+              (
+                  request.app.state.config.CODE_EXECUTION_JUPYTER_AUTH_TOKEN
+                  if request.app.state.config.CODE_EXECUTION_JUPYTER_AUTH == 'token'
+                  else None
+              ),
+              request.app.state.config.CODE_EXECUTION_JUPYTER_TIMEOUT,
+          )
+
+          return output
+      else:
+          raise HTTPException(
+              status_code=400,
+              detail='Code execution engine not supported',
+          )
+  ```
+
+test "rank1497: fix rejects the request when the runtime switch is off"
+  lang python
+  file backend/open_webui/routers/utils.py
+  reject VYQL-AUTH-080
+  code
+  ```
+  from fastapi import APIRouter, Depends, HTTPException, Request
+  from pydantic import BaseModel
+
+  from open_webui.utils.auth import get_verified_user
+  from open_webui.utils.code_interpreter import execute_code_jupyter
+
+  router = APIRouter()
+
+
+  class CodeForm(BaseModel):
+      code: str
+
+
+  @router.post('/code/execute')
+  async def execute_code(request: Request, form_data: CodeForm, user=Depends(get_verified_user)):
+      if not request.app.state.config.ENABLE_CODE_EXECUTION:
+          raise HTTPException(
+              status_code=403,
+              detail='Code execution is disabled',
+          )
+
+      if request.app.state.config.CODE_EXECUTION_ENGINE == 'jupyter':
+          output = await execute_code_jupyter(
+              request.app.state.config.CODE_EXECUTION_JUPYTER_URL,
+              form_data.code,
+              (
+                  request.app.state.config.CODE_EXECUTION_JUPYTER_AUTH_TOKEN
+                  if request.app.state.config.CODE_EXECUTION_JUPYTER_AUTH == 'token'
+                  else None
+              ),
+              request.app.state.config.CODE_EXECUTION_JUPYTER_TIMEOUT,
+          )
+
+          return output
+      else:
+          raise HTTPException(
+              status_code=400,
+              detail='Code execution engine not supported',
+          )
+  ```
+
+test "rank1497: a switch the service spells differently is still a switch"
+  lang python
+  file backend/open_webui/routers/utils.py
+  reject VYQL-AUTH-080
+  code
+  ```
+  from fastapi import APIRouter, Depends, HTTPException, Request
+  from pydantic import BaseModel
+
+  from open_webui.utils.auth import get_verified_user
+  from open_webui.utils.code_interpreter import execute_code_jupyter
+
+  router = APIRouter()
+
+
+  class CodeForm(BaseModel):
+      code: str
+
+
+  @router.post('/code/execute')
+  async def execute_code(request: Request, form_data: CodeForm, user=Depends(get_verified_user)):
+      if not request.app.state.config.CODE_SANDBOX_PERMITTED:
+          raise HTTPException(
+              status_code=403,
+              detail='Code execution is disabled',
+          )
+
+      if request.app.state.config.CODE_EXECUTION_ENGINE == 'jupyter':
+          return await execute_code_jupyter(
+              request.app.state.config.CODE_EXECUTION_JUPYTER_URL,
+              form_data.code,
+              request.app.state.config.CODE_EXECUTION_JUPYTER_TIMEOUT,
+          )
+      raise HTTPException(status_code=400, detail='Code execution engine not supported')
+  ```

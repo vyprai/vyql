@@ -24,7 +24,7 @@
 # The vocabulary for this is complete: `window.location.href` is
 # `code.DomInput`, `import(...)` is `code.DynamicCodeLoad`, taint survives the
 # `parseURL`/`parseQuery` hops, and `VYQL-INJ-023` pairs them. What stopped it
-# being reported was the frontend, in two places; the first is closed here and
+# being reported is the frontend, in two places; the first is closed here and
 # the tests below pin both.
 #
 # 1. tree-sitter makes a comment a named child of an argument list, and the JS
@@ -34,8 +34,8 @@
 #    labelled the comment instead of the value, and the sink vanished. The same
 #    shift deleted `code.CommandExecution` from `exec(/* nosemgrep */ cmd)`.
 #    Inline argument annotations are ordinary in bundler and linter directives
-#    (`@vite-ignore`, `webpackChunkName`, `#__PURE__`), so it was silent. A
-#    comment is no longer an argument: the first and last tests are the
+#    (`@vite-ignore`, `webpackChunkName`, `#__PURE__`), so it stays silent. A
+#    comment is not an argument: the first and last tests are the
 #    positive half, and the second differs from the first only in the specifier
 #    being a constant.
 #

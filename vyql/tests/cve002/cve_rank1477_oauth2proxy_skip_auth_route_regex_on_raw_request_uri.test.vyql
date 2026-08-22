@@ -1,0 +1,265 @@
+# Rank 1477 / CVE-2025-54576 (GHSA-9x44-qcxq-fwc9, CWE-863): oauth2-proxy exempts a
+# configured set of routes from authentication. `--skip-auth-route` compiles each
+# entry into a regular expression, and every request is tested against that list
+# before any session is required:
+#
+#	func isAllowedPath(req *http.Request, route allowedRoute) bool {
+#		matches := route.pathRegex.MatchString(requestutil.GetRequestURI(req))
+#		if route.negate {
+#			return !matches
+#		}
+#		return matches
+#	}
+#
+# requestutil.GetRequestURI is the raw request target -- the X-Forwarded-Uri header
+# when the request is proxied, otherwise req.URL.RequestURI(), whose own comment in
+# that file reads "Use RequestURI to preserve ?query". So the pattern runs over
+# `path?query`, and the query is whatever the client wrote. A skip-auth entry such
+# as `^/public/health$` is written to exempt one path, and
+# `GET /admin/secrets?x=/public/health` is a different path whose target still
+# satisfies any entry that is not anchored at both ends -- and an anchored entry is
+# satisfied too whenever the entry's own `$` can match ahead of the `?`. The route
+# allowlist therefore admits arbitrary protected paths without authentication.
+#
+# The fixed revision (9ffafad4b2d2f9f7668e5504565f356a7c047b77) adds requestutil.GetRequestPath,
+# which parses the target with net/url and returns URL.Path (falling back to a manual
+# `?` split), and matches the route pattern against that instead. It deliberately
+# leaves isAPIPath on GetRequestURI, since that decision picks a response format
+# rather than granting access.
+#
+# Detection reuses code.AuthEndpointRawRequestUriExemption (VYQL-AUTH-120,
+# CWE-187/CWE-863), the concept rank 1399 introduced for moby's `/auth` suffix test
+# on r.RequestURI. That rank's binding requires a strings containment predicate
+# against a conventional authentication endpoint literal, which a configured route
+# regex has none of, so the concept gains a second Go binding rather than a sibling
+# concept: goAuthExemptionRouteRegexRawRequestTarget fires on a Go function that runs
+# one of regexp's documented matching methods (MatchString, FindStringIndex,
+# FindStringSubmatch), names the raw request target rather than a path (`RequestURI`
+# in any spelling, which covers the net/http field, net/url's method and any accessor
+# named for it), and whose own name says it decides access -- allow, skip, exempt,
+# public, whitelist, bypass, anonymous, protected, auth. The neutraliser is net/url's
+# documented url.Parse / url.ParseRequestURI or a URL.Path / URL.RawPath /
+# URL.EscapedPath read in the same function. The concept's reviewCondition and
+# reviewEvidence are widened from "string containment predicate" to "containment
+# predicate or route pattern" to cover both bindings.
+#
+# The access-decision name clause is what keeps the shape off request-target
+# classification that is not a security decision: oauth2-proxy's own isAPIPath runs
+# the same regex over the same raw target on both revisions and is not reported,
+# which is correct -- it selects an error page's content type.
+#
+# Measured with `--cache off`, counts taken as the union of three runs.
+# oauth2-proxy scans whole in under a minute. The vulnerable revision
+# (9ffafad4b^, 470 Go files) reports 84 findings, the patched revision 83; the
+# whole difference is the one VYQL-AUTH-120 row at oauthproxy.go:583,
+# isAllowedPath, which is gone at the fixed revision: that function does not name
+# the raw target. An exhaustive enumeration of the shape's reachable set over
+# both revisions agrees: of the 9 non-test regexp match sites in the tree,
+# exactly one is in a function whose name is an access decision and which names
+# RequestURI, and it is that one.
+#
+# Collateral is enumerated across 104 other repository clones under
+# /tmp/cve-work/rank*/ -- 24 of them Go trees, 20143 Go files, 2871 regexp
+# matching-method call sites between them. Nine Go trees scanned (whole where
+# they fit in the budget, bounded subtrees otherwise) and none reports a
+# VYQL-AUTH-120 row from this binding.
+
+test "rank1477: a skip-auth route pattern is matched against the raw request target"
+  lang go
+  file oauthproxy.go
+  expect VYQL-AUTH-120
+  expect_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package main
+
+  import (
+  	"net/http"
+  	"regexp"
+
+  	requestutil "github.com/oauth2-proxy/oauth2-proxy/v7/pkg/requests/util"
+  )
+
+  type allowedRoute struct {
+  	method    string
+  	pathRegex *regexp.Regexp
+  	negate    bool
+  }
+
+  func isAllowedPath(req *http.Request, route allowedRoute) bool {
+  	matches := route.pathRegex.MatchString(requestutil.GetRequestURI(req))
+
+  	if route.negate {
+  		return !matches
+  	}
+
+  	return matches
+  }
+  ```
+
+test "rank1477: the same route pattern matched against the parsed path is not this shape"
+  lang go
+  file oauthproxy.go
+  reject VYQL-AUTH-120
+  reject_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package main
+
+  import (
+  	"net/http"
+  	"regexp"
+
+  	requestutil "github.com/oauth2-proxy/oauth2-proxy/v7/pkg/requests/util"
+  )
+
+  type allowedRoute struct {
+  	method    string
+  	pathRegex *regexp.Regexp
+  	negate    bool
+  }
+
+  func isAllowedPath(req *http.Request, route allowedRoute) bool {
+  	matches := route.pathRegex.MatchString(requestutil.GetRequestPath(req))
+
+  	if route.negate {
+  		return !matches
+  	}
+
+  	return matches
+  }
+  ```
+
+test "rank1477: a gateway spelled nothing like the proxy skips auth on a pattern over r.RequestURI"
+  lang go
+  file internal/gateway/middleware.go
+  expect VYQL-AUTH-120
+  expect_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package gateway
+
+  import (
+  	"net/http"
+  	"regexp"
+  )
+
+  type Guard struct {
+  	publicRoutes []*regexp.Regexp
+  }
+
+  func (g *Guard) shouldSkipAuth(r *http.Request) bool {
+  	target := r.RequestURI
+  	for _, pattern := range g.publicRoutes {
+  		if pattern.FindStringIndex(target) != nil {
+  			return true
+  		}
+  	}
+  	return false
+  }
+
+  func (g *Guard) Wrap(next http.Handler) http.Handler {
+  	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+  		if g.shouldSkipAuth(r) {
+  			next.ServeHTTP(w, r)
+  			return
+  		}
+  		if _, err := r.Cookie("session"); err != nil {
+  			http.Error(w, "unauthorized", http.StatusUnauthorized)
+  			return
+  		}
+  		next.ServeHTTP(w, r)
+  	})
+  }
+  ```
+
+test "rank1477: the same gateway parsing the target before matching is not this shape"
+  lang go
+  file internal/gateway/middleware.go
+  reject VYQL-AUTH-120
+  reject_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package gateway
+
+  import (
+  	"net/http"
+  	"net/url"
+  	"regexp"
+  )
+
+  type Guard struct {
+  	publicRoutes []*regexp.Regexp
+  }
+
+  func (g *Guard) shouldSkipAuth(r *http.Request) bool {
+  	parsed, err := url.ParseRequestURI(r.RequestURI)
+  	if err != nil {
+  		return false
+  	}
+  	for _, pattern := range g.publicRoutes {
+  		if pattern.FindStringIndex(parsed.Path) != nil {
+  			return true
+  		}
+  	}
+  	return false
+  }
+  ```
+
+test "rank1477: a route pattern over the raw target that picks a response format is not an access decision"
+  lang go
+  file oauthproxy.go
+  reject VYQL-AUTH-120
+  reject_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package main
+
+  import (
+  	"net/http"
+  	"regexp"
+
+  	requestutil "github.com/oauth2-proxy/oauth2-proxy/v7/pkg/requests/util"
+  )
+
+  type apiRoute struct {
+  	pathRegex *regexp.Regexp
+  }
+
+  type OAuthProxy struct {
+  	apiRoutes []apiRoute
+  }
+
+  func (p *OAuthProxy) isAPIPath(req *http.Request) bool {
+  	for _, route := range p.apiRoutes {
+  		if route.pathRegex.MatchString(requestutil.GetRequestURI(req)) {
+  			return true
+  		}
+  	}
+  	return false
+  }
+  ```
+
+test "rank1477: an allowlist decision taken on a path the handlerlready holds is not a raw-target match"
+  lang go
+  file pkg/upstream/proxy.go
+  reject VYQL-AUTH-120
+  reject_review code.AuthEndpointRawRequestUriExemption
+  code
+  ```
+  package upstream
+
+  import (
+  	"net/http"
+  	"regexp"
+  )
+
+  var rewriteRegExp = regexp.MustCompile(`^/public/`)
+
+  func isAllowedRewrite(req *http.Request) bool {
+  	if req.URL.Path == "" {
+  		return false
+  	}
+  	return rewriteRegExp.MatchString(req.URL.Path)
+  }
+  ```

@@ -1,0 +1,37 @@
+module bindings.go.unconditionalVerificationSuccess;
+
+// A routine named for verifying a signature, a checksum, a digest or a
+// downloaded artifact has one documented contract: it returns an error (or
+// false) when the artifact does not verify. Go spells that contract in the
+// signature -- `func verifyDownload() error`, `func checkSignature() error` --
+// and every library that performs the work underneath is called from inside
+// that body: `golang.org/x/sys/windows.WinVerifyTrustEx` for Authenticode,
+// `crypto/x509.Certificate.CheckSignature`, `crypto.Verify`,
+// `hash.Hash.Sum` compared against an expected digest, or an exec of the
+// platform's own verifier. A body that reaches none of them and returns only
+// the success value has no way to reject anything: the contract is inverted,
+// every artifact verifies, and callers that gate installation or execution on
+// the returned error are gated on a constant.
+//
+// This is the one shape where the routine's *name* is the anchor rather than a
+// library call, and necessarily so -- the weakness is that no library call is
+// present. The four negations are what make the statement precise rather than a
+// guess about intent:
+//
+//   no `call_path:` token  -- the body invokes nothing at all, so no verifier,
+//                             no helper and no delegated check is reached;
+//   no `binary:` token     -- it compares nothing, so it is not a call-free
+//                             check such as a length or magic-byte test;
+//   no `assign:` token     -- it computes nothing;
+//   no `err`/`false` return atom -- every return path yields success, so there
+//                             is no branch on which the routine rejects.
+//
+// Together these say the body is exactly `return nil` (or `return true`), which
+// is the platform-stub form: one build-tagged implementation performs real
+// verification while its sibling is left as a placeholder, and the caller cannot
+// tell the difference. The neutralised form needs no special case -- as soon as
+// the routine calls anything, the first negation declines it.
+binding goUnconditionalVerificationSuccess {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and containsAny(node.context.functionName, ["verifySignature", "checkSignature", "validateSignature", "verifyDownload", "verifyUpdate", "verifyUpgrade", "verifyInstaller", "verifyBundle", "verifyArtifact", "verifyPackage", "verifyChecksum", "checkChecksum", "validateChecksum", "verifyIntegrity", "checkIntegrity", "validateIntegrity", "verifyDigest", "checkDigest"]) and containsAny(node.context.return, ["nil", "true"]) and not (node.context.callPath contains "") and not (node.context.binary contains "") and not (node.context.assign contains "") and not containsAny(node.context.return, ["err", "false"])
+  emit issue code.UnconditionalVerificationSuccess at node
+}

@@ -34,11 +34,12 @@
 # advisory's CWE-29 is a narrower spelling than the defect ('\..\filename'
 # specifically); CWE-22/CWE-59 is what the code shows.
 #
-# What fires today. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
-# mlflow/pyfunc reports 47 findings and 24 flags, identical over three runs and
-# identical on the vulnerable and the fixed revision -- same rules, same sites,
-# the two dbconnect_artifact_cache.py lines merely shifted by the inserted call.
-# The whole mlflow/ package holds exactly three `extractall` call sites
+# What fires. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+# mlflow/pyfunc reports 47 findings and 24 flags on the shipped state at the time
+# this was written, identical over three runs and identical on the vulnerable and
+# the fixed revision -- same rules, same sites, the two dbconnect_artifact_cache.py
+# lines merely shifted by the inserted call. The whole mlflow/ package holds
+# exactly three `extractall` call sites
 # (mlflow/pyfunc/dbconnect_artifact_cache.py:143, mlflow/utils/_spark_utils.py:173,
 # mlflow/projects/utils.py:180), none with a `filter=` argument and none walking
 # members first, so that grep is the shape's entire reachable set here; a
@@ -46,30 +47,42 @@
 # the three package subtrees mlflow/pyfunc (47), mlflow/utils (193) and
 # mlflow/projects (28) plus that enumeration.
 #
+<<<<<<< ours
 # One finding does land inside the vulnerable function -- VYQL-PATH-001, tainting
 # `archive_path` from _download_prebuilt_env_if_needed into the
 # `code.FilePathAccess` on tarfile.open -- and it is the other axis: it says the
 # archive's *path* is caller-chosen, which the fixed revision does not change and which it
 # still reports afterwards. Findings in the function are not coverage of the
 # defect.
+=======
+# VYQL-PATH-001 also lands inside the vulnerable function, tainting `archive_path`
+# from _download_prebuilt_env_if_needed into the `code.FilePathAccess` on
+# tarfile.open -- and it is the other axis: it says the archive's *path* is
+# caller-chosen, which the fix does not change and which it still reports
+# afterwards. Findings in the function are not coverage of the defect.
+>>>>>>> theirs
 #
 # Vocabulary is checked for reuse first, and the rule for this weakness
 # exists twice over. VYQL-PATH-004 is `taint core.UserControlledData ->
 # code.ArchiveEntryWrite`, and code.ArchiveEntryWrite is bound for Python at
 # `callee.method == "extractall"`. VYQL-PATH-007 is `issue
-# code.ArchiveSymlinkFilterBypass as sink`, and Python reaches it through the
+# code.ArchiveSymlinkFilterBypass as sink`, and Python reaches it two ways: the
 # `archive_symlink_filter_bypass` fact in
 # internal/extract/frontend/treesitter/python.go:1015 -- an extraction-named
 # function that calls `.getmembers()` and then `.extract(`/`.extractall(` without
-# `.issym()`, `.islnk()`, `.linkname` or `filter=`. Neither reaches this code:
+# `.issym()`, `.islnk()`, `.linkname` or `filter=` -- and the binding in
+# vyql/bindings/python/tarfile_extraction_member_filter.vyql, which asks only that
+# a function calling `tarfile.open` then extract or extractall name one of
+# tarfile's documented constraints. That second route is what reports case (a).
 #
 #  * PATH-004's sink is anchored at `args[0]`, and this call passes the
 #    destination by its documented keyword, `extractall(path=dest_dir)`. Cases
 #    (e) and (f) below are that pair on shipped vocabulary alone -- the
 #    positional spelling reports, the keyword spelling reports nothing -- so the
 #    label is absent before taint is even considered.
-#  * PATH-007's fact requires a `.getmembers()` walk as its evidence that the
+#  * PATH-007's *fact* requires a `.getmembers()` walk as its evidence that the
 #    function is inspecting members at all. mlflow inspects nothing, which is
+<<<<<<< ours
 #    strictly more dangerous than the partial-validation shape the fact is
 #    written for, and is therefore silent. Cases (c) and (d) show the same
 #    function reporting the moment a member walk is added and clearing again on
@@ -99,34 +112,70 @@
 # through the callee, holds. And rank 1380's counterweight does not
 # apply: the fixed revision leaves no API-documented call inside the guarded function to key
 # on, only the helper call itself. What is additional here is where the
+=======
+#    strictly more dangerous than the partial-validation shape the fact was
+#    written for, so the fact alone is silent here. Cases (c) and (d) show the
+#    same function reporting the moment a member walk is added and clearing again
+#    on `filter="data"`.
+#
+# What the binding does not do is discriminate this fix. It reports the patched
+# revision too, at case (b), because the patched function leaves not one of
+# tarfile's constraints in place: no `filter=`, no `members=`, no member walk, no
+# link test. Every in-function difference between the two revisions is the single
+# added call `check_tarfile_security(archive_path)`, whose name is the fixing
+# commit's own helper -- the discriminator rank 1364's four-variant measurement
+# and rank 1372 both rejected, and which rank 1348 additionally showed is
+# silenceable by a comment when it is matched over context text. So (b) expects
+# the flag rather than rejecting it: at medium confidence on an attention-kind
+# review rule that is the honest register for an extraction that is genuinely
+# unconstrained at its own call site, and a reviewer confirms the helper.
+#
+# The residual gap is rank 1377's, one language over and with the sink on the
+# review side rather than the taint side, so it is restated rather than filed
+# anew: a control that lives wholly inside a resolved callee is not attributed to
+# the caller's sink (endpointGuarded, internal/engine/engine.go:1160, suppresses
+# only when the control is in the sink's own function). Two things make this
+# instance narrower than 1377's. The value that identifies the resource does
+# cross the boundary -- `archive_path` is the argument to check_tarfile_security
+# and then to tarfile.open -- so 1377's stated precondition, that the tainted
+# value flow through the callee, already holds. And rank 1380's counterweight
+# does not apply: the fix left no API-documented call inside the guarded function
+# to key on, only the helper call itself. What is additional here is where the
+>>>>>>> theirs
 # neutraliser would have to live. An `issue` rule can carry coverage clauses --
 # internal/engine/match.go:64 runs endpointGuarded over the issue node itself --
 # but VYQL-PATH-007 declares none, and declaring one would not help: that is the
 # same function-confined endpointGuarded, so a control inside
 # check_tarfile_security is outside its reach, and no Python control concept
 # describes archive-member validation for such a clause to name. With no flow
-# there is no flowGuarded alternative either, which is why the shipped Python
-# detector carries its neutralisers as four text negations inside the frontend
-# fact, and why a guard one resolved call away can never clear it.
+# there is no flowGuarded alternative either, which is why the Python detectors
+# carry their neutralisers as negations over the extracting function's own
+# context, and why a guard one resolved call away can never clear them.
 #
-# Behaviour a shippable detector needs, in this order: (1) anchor Python's
+# Behaviour still missing, in this order: (1) anchor Python's
 # code.ArchiveEntryWrite at the extraction call's `path` argument whether it is
 # positional or the documented keyword; (2) let an archive-extraction review
 # concept be neutralised by a control, so an `issue` rule can carry an `unless`
 # the way VYQL-PATH-004 does; (3) attribute a member-validation control found in
 # a resolved callee to the caller's extraction site when the archive's own
+<<<<<<< ours
 # identifier is what is passed to it. Ranks blocked: this one, and any fix of
 # the same shape -- validate the archive in a helper, extract unchanged.
+=======
+# identifier is what was passed to it. Ranks blocked on (3): any fix of the shape
+# "validate the archive in a helper, extract unchanged".
+>>>>>>> theirs
 #
-# verify_current_expected: attention-engine-gap. (c), (d) and (e) are correct
-# today; (a), (b) and (f) record the gap.
+# verify_current_expected: caught-by-binding for (a); (b) pins the
+# non-discrimination that (3) above would resolve; (c), (d), (e) and (f) are
+# unchanged.
 
 test "rank1397: (a) an mlflow prebuilt-environment tar is expanded with no constraint on its member names"
   lang python
   file mlflow/pyfunc/dbconnect_artifact_cache.py
   reject VYQL-PATH-004
-  reject VYQL-PATH-007
-  reject_review code.ArchiveSymlinkFilterBypass
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
   code
   ```
   import os
@@ -144,8 +193,8 @@ test "rank1397: (b) the same extraction with member validation delegated to a he
   lang python
   file mlflow/pyfunc/dbconnect_artifact_cache.py
   reject VYQL-PATH-004
-  reject VYQL-PATH-007
-  reject_review code.ArchiveSymlinkFilterBypass
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
   code
   ```
   import os
