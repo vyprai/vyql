@@ -35,21 +35,33 @@
 # could not report this class of route in Kotlin however directly the
 # value flowed.
 #
-# Two findings of the diagnosis, both measured on minimal pairs below:
+# Three findings of the diagnosis, all measured on minimal pairs below:
 #
-# 1. The Kotlin frontend severs an expression-body function's value from
-#    its return. `ktConv.block` (kotlin.go) lowers `fun f() = expr` to a
-#    bare ExprStmt, which never reaches the `analysis.function.return`
-#    node callers read; and an `indexing_expression` body has no `stmt`
+# 1. The Kotlin frontend severed an expression-body function's value from
+#    its return. `ktConv.block` (kotlin.go) lowered `fun f() = expr` to a
+#    bare ExprStmt, which never reached the `analysis.function.return`
+#    node callers read; and an `indexing_expression` body had no `stmt`
 #    case at all, so `fun parameter(name: String): String? =
 #    ctx.pathParamMap()[name]` -- the exact spelling of Reposilite's
-#    ContextDsl.parameter -- lowers to an empty function. The same body
-#    written with a block and an explicit return reaches the sink. This
-#    is the nearest dead-end on the real path and the pair below isolates
-#    it; the change (route a function-body expression through nir.Return)
-#    follows in a second commit.
+#    ContextDsl.parameter -- lowered to an empty function. The same body
+#    written with a block and an explicit return reached the sink. This
+#    is the nearest dead-end on the real path; the change (route a
+#    function-body expression through nir.Return) ships alongside this
+#    spec and the fourth test holds the minimal pair.
 #
-# 2. Even with every hop visible, the change is not discriminable at the
+# 2. The real route's chain is still severed further along, so the first
+#    two tests stay quiet and pin those gaps: a bare call to a method
+#    inherited from a base class does not resolve (`resolveCallee`'s
+#    curClass branch, lowering.go, looks only in the enclosing class and
+#    never falls back to the base-class walk used for typed receivers),
+#    which is how `requireParameter("resource")` reads inside a route
+#    class extending the DSL; an if-expression body's value is still
+#    dropped (its value form keeps only each branch's last statement, so
+#    routing it through a return is not a safe one-line change); and a
+#    value stored through a data-class constructor is not read back from
+#    the field the way `with (request) { resource }` reads it.
+#
+# 3. Even with every hop visible, the change is not discriminable at the
 #    dataflow layer. The remediation is a private string sanitizer -- a
 #    chained `.replace(Regex("\\.{2,}"), ".")` -- and no layer recognizes
 #    a user-defined replace as a traversal neutralizer (every
@@ -208,10 +220,10 @@ test "rank1669: the parameter read reaches the file open when every function ret
   }
   ```
 
-test "rank1669: engine gap isolated -- the parameter wrapper spelled as an expression body severs the value from the return"
+test "rank1669: the parameter wrapper as an expression body returns its value now that the body lowers through a return"
   lang kotlin
   file reposilite-backend/src/main/kotlin/com/reposilite/javadocs/JavadocFacade.kt
-  reject VYQL-PATH-001
+  expect VYQL-PATH-001
   code
   ```
   import java.nio.file.Files
