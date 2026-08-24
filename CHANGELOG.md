@@ -35,6 +35,54 @@ behaviour change, even if no code moved.
 - **Definition downloads use `dl.vyprsec.ai` only**, with retries and
   `Cache-Control: no-cache` when the CDN has not yet served a new object.
 
+### Fixed
+
+- **`--max-ram` is a hard limit on memory use.** It named a figure and then
+  used a multiple of it: on a repository of 11,000 C files, `-max-ram 8GB`
+  reached 24 GB of resident memory in 30 minutes and had not finished. Three
+  things caused that, and all three are fixed.
+
+  The budget was spent more than once. Half of it funded badger's block cache
+  and a quarter the node-detail buffer, while the heap ceiling was set to half,
+  and badger's block cache is ordinary Go heap, so the caches alone could reach
+  the ceiling before a single node was stored. The collector then ran
+  continuously against memory it was not allowed to release. The budget is now
+  partitioned so that the pools fit inside the ceiling with room left for the
+  graph: the block cache takes a sixteenth and at most half a gigabyte, the
+  detail buffer a quarter, and the heap ceiling is the figure itself, less a
+  reserve for tree-sitter's C parse trees and badger's mapped tables, which the
+  Go runtime does not account for.
+
+  The graph store went to `$TMPDIR`. On a systemd distribution `/tmp` is a
+  tmpfs, so the mode whose whole purpose is to move the graph out of RAM wrote
+  it back into RAM, and then paid the encode and write cost for nothing. The
+  store now lives beside the scan cache, under the user cache directory, and a
+  store that still lands on a memory filesystem is reported rather than
+  silently accepted. A `kill -9` still leaves one behind, so a scan also removes
+  any store there that has not been written to for a day.
+
+  Nothing stopped a scan that outgrew the figure anyway. The graph a scan builds
+  is live memory, so a heap ceiling cannot release it; a large enough tree grows
+  past any ceiling and is killed by the kernel: no diagnostic, no exit status,
+  a truncated report on stdout, and an OOM killer free to choose a different
+  process as its victim. A scan now watches its own resident size and stops at
+  the ceiling with a message naming what to do instead, exiting 1. What it
+  watches is the memory the kernel cannot take back, meaning anonymous and
+  shared pages, because mapped files are dropped under pressure rather than
+  killed for. Without `--max-ram` the same watch guards what the machine or the
+  cgroup allows, less a margin.
+
+  A scan that needs more than the figure now fails instead of finishing over
+  budget. On a large JavaScript monorepo, `-max-ram 2GB` took 9 min 43 s and
+  peaked at 3.1 GB before returning findings; it now stops after 26 seconds and
+  says the ceiling is too small for that tree.
+
+- **The default ceiling reads the cgroup, not just the host.** `GOMEMLIMIT`
+  defaulted to 80% of the host's physical memory. A scan in a container or a
+  systemd unit capped well below that budgeted against memory it could never
+  have. On a 4 GiB container on a 128 GiB host, that budget was 102 GiB. The
+  smaller of the two figures is now used, on both cgroup v1 and v2.
+
 ## [0.3.1] - 2026-08-13
 
 ### Fixed
