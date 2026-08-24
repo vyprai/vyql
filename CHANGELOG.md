@@ -10,18 +10,6 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
-### Fixed
-
-- **A release archive carries its definitions again.** The script that packs the
-  free bundle unpacks from a temporary working directory, so a relative
-  destination was written there and deleted with it. The caller got no data
-  directory, and the check meant to catch that passed, because it was relative
-  to the same wrong place. Both callers that pass a relative path were affected:
-  the release archive, whose binary then reported "could not locate the data
-  directory" on every platform, and `make fetch-definitions`, which silently
-  fetched nothing. The destination is resolved before anything changes
-  directory.
-
 ## [0.4.0] - 2026-08-24
 
 ### Added
@@ -50,6 +38,16 @@ behaviour change, even if no code moved.
   `Cache-Control: no-cache` when the CDN has not yet served a new object.
 
 ### Fixed
+
+- **A release archive carries its definitions again.** The script that packs the
+  free bundle unpacks from a temporary working directory, so a relative
+  destination was written there and deleted with it. The caller got no data
+  directory, and the check meant to catch that passed, because it was relative
+  to the same wrong place. Both callers that pass a relative path were affected:
+  the release archive, whose binary then reported "could not locate the data
+  directory" on every platform, and `make fetch-definitions`, which silently
+  fetched nothing. The destination is resolved before anything changes
+  directory.
 
 - **`--max-ram` is a hard limit on memory use.** It named a figure and then
   used a multiple of it: on a repository of 11,000 C files, `-max-ram 8GB`
