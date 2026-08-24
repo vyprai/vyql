@@ -19,9 +19,16 @@ import (
 //
 // A reading of zero means the platform could not report resident memory. It is
 // never treated as a crossing, and never as proof of headroom either.
+//
+// stop waits for the sampler to finish before it returns, so once it has
+// returned no further reading is taken. Returning early would leave a sample
+// already in flight to land afterwards, and a caller that stops the watch to
+// take the resource down cannot act on "probably no longer running".
 func memWatch(limit int64, every time.Duration, resident func() int64, onExceed func(int64)) (stop func()) {
 	done := make(chan struct{})
+	stopped := make(chan struct{})
 	go func() {
+		defer close(stopped)
 		t := time.NewTicker(every)
 		defer t.Stop()
 		for {
@@ -29,6 +36,13 @@ func memWatch(limit int64, every time.Duration, resident func() int64, onExceed 
 			case <-done:
 				return
 			case <-t.C:
+				// A tick and a stop can both be ready, and select chooses
+				// between them at random, so ask again before sampling.
+				select {
+				case <-done:
+					return
+				default:
+				}
 				if rss := resident(); rss > limit {
 					onExceed(rss)
 					return
@@ -37,7 +51,10 @@ func memWatch(limit int64, every time.Duration, resident func() int64, onExceed 
 		}
 	}()
 	var once sync.Once
-	return func() { once.Do(func() { close(done) }) }
+	return func() {
+		once.Do(func() { close(done) })
+		<-stopped
+	}
 }
 
 // watchResidentMemory arms memWatch on the real process against limit. The scan
