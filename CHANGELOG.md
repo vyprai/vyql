@@ -10,6 +10,8 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-08-24
+
 ### Added
 
 - **`vyql update`.** Checks the free definitions channel on `dl.vyprsec.ai`,
