@@ -22,27 +22,48 @@ func cacheHome(t *testing.T) string {
 	return dir
 }
 
-func TestApplyMaxRAMPartitionsOnceAndRestoresTheLimit(t *testing.T) {
+func TestApplyMaxRAMKeepsEveryPoolInsideTheBudget(t *testing.T) {
 	cacheHome(t)
 	prev := debug.SetMemoryLimit(-1)
 	t.Cleanup(func() { debug.SetMemoryLimit(prev) })
 
 	cleanup := applyMaxRAM("8GB")
+	t.Cleanup(cleanup)
 	n, err := parseBytes("8GB")
 	if err != nil {
 		t.Fatalf("parseBytes: %v", err)
 	}
 
-	if lowering.DiskCacheBytes != n/2 {
-		t.Errorf("DiskCacheBytes = %d, want n/2 = %d", lowering.DiskCacheBytes, n/2)
+	limit := debug.SetMemoryLimit(-1)
+	if limit > n {
+		t.Errorf("heap limit = %d, above the budget %d", limit, n)
 	}
-	if lowering.DiskDetailBuf != n/4 {
-		t.Errorf("DiskDetailBuf = %d, want n/4 = %d", lowering.DiskDetailBuf, n/4)
+	if limit <= n/2 {
+		t.Errorf("heap limit = %d, at or below half the budget %d: the resident graph has no room", limit, n)
 	}
-	if got := debug.SetMemoryLimit(-1); got != n/2 {
-		t.Errorf("heap limit = %d, want n/2 = %d", got, n/2)
+	// Badger's block cache is ordinary Go heap, so both pools are spent from the
+	// same limit as the graph itself. Together they must leave most of it free.
+	pools := lowering.DiskCacheBytes + lowering.DiskDetailBuf
+	if pools >= limit/2 {
+		t.Errorf("caches total %d, at least half the %d heap limit they share with the graph", pools, limit)
+	}
+	if lowering.DiskCacheBytes <= 0 || lowering.DiskDetailBuf <= 0 {
+		t.Errorf("cache = %d, detail buffer = %d: both must be funded", lowering.DiskCacheBytes, lowering.DiskDetailBuf)
+	}
+}
+
+func TestApplyMaxRAMRestoresTheLimitAndClearsTheBudgets(t *testing.T) {
+	cacheHome(t)
+	prev := debug.SetMemoryLimit(-1)
+	t.Cleanup(func() { debug.SetMemoryLimit(prev) })
+
+	cleanup := applyMaxRAM("8GB")
+	dir := lowering.DiskStorePath
+	if dir == "" {
+		t.Fatal("DiskStorePath not set")
 	}
 	cleanup()
+
 	if got := debug.SetMemoryLimit(-1); got != prev {
 		t.Errorf("heap limit after cleanup = %d, want restored %d", got, prev)
 	}
@@ -51,6 +72,9 @@ func TestApplyMaxRAMPartitionsOnceAndRestoresTheLimit(t *testing.T) {
 	}
 	if lowering.DiskCacheBytes != 0 || lowering.DiskDetailBuf != 0 {
 		t.Error("disk budgets not cleared by cleanup")
+	}
+	if _, err := os.Stat(dir); !os.IsNotExist(err) {
+		t.Errorf("graph store %s survived cleanup", dir)
 	}
 }
 
