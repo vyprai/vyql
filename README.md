@@ -636,7 +636,7 @@ fallback when the flag is not given.
 | `-flag-loc` | | filter review flags by location substring |
 | `-cache` | `auto` | `auto`, `off`, or a directory |
 | `-cache-incremental` | off | also cache per-file parses, for an edit loop |
-| `-max-ram` | 80% of RAM | soft ceiling, e.g. `8GB` or `16GiB` |
+| `-max-ram` | 80% of available RAM | hard limit on memory use, e.g. `8GB` or `16GiB` |
 | `-max-file-size` | `2MiB` | skip larger source files; `0` disables |
 
 Combinations that are useful to know:
@@ -795,10 +795,24 @@ directory when one is found, otherwise into `~/.local/share/vyql/vyql`.
 `cache clear` removes the directory instead of emptying it, and reports how much
 space it freed. The next scan creates it again.
 
-`scan -max-ram` puts the graph in a store under the system temporary directory,
+`scan -max-ram` puts the graph in a store under the user cache directory
+(`$XDG_CACHE_HOME/vyql/graph`, or `~/Library/Caches/vyql/graph` on macOS),
 removed when the scan ends, and also when you interrupt it. A `kill -9` cannot be
-caught, so only that case leaves the directory behind. Remove it with
-`rm -rf $TMPDIR/vyql-graph-*`.
+caught, so only that case leaves the directory behind, and the next scan removes
+any store left there for more than a day. It is not the system temporary
+directory on purpose: `/tmp` is a memory filesystem on most systemd
+distributions, and a graph stored there is still in RAM.
+
+The flag is a hard limit, not a hint. A scan that reaches it stops and exits `1`,
+naming the figure it passed, rather than growing until the kernel kills it. What
+is measured is the memory the kernel cannot take back, meaning anonymous and
+shared pages. Mapped files are resident too, but the kernel drops them under
+pressure instead of killing anything, so the total RSS a tool like `time -v`
+reports can sit somewhat above the ceiling while the scan is still inside it.
+The graph a scan builds is live memory that no amount of collection can
+release, so a tree large enough will pass any figure you give it. When that
+happens, exclude unwanted files with `-exclude`, or raise the ceiling. With no
+`-max-ram`, the same watch guards what the machine or the cgroup allows.
 
 ## Languages
 

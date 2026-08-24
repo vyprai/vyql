@@ -228,7 +228,7 @@ func cmdScan(args []string) error {
 	flagCategory := fs.String("flag-category", "all", "review flag category filter")
 	flagKind := addEnum(fs, "flag-kind", "all", "review flag kind filter", []string{"all", "attention", "target", "check"})
 	flagLoc := fs.String("flag-loc", "", "review flag location substring filter")
-	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
+	maxRAM := fs.String("max-ram", "", "hard limit on memory use; the scan stops if it is passed, e.g. 8GB / 16GiB (default: 80% of available RAM)")
 	bindingsPath := fs.String("bindings", "", "optional repo-local binding overlay directory")
 	exclude := addExclude(fs)
 	maxFileSize := fs.String("max-file-size", "", "skip source files larger than this during tree walks, e.g. 4MB (default 2MiB; 0 disables)")
@@ -294,6 +294,7 @@ func cmdScan(args []string) error {
 	}
 	cleanup := onExit(applyMaxRAM(*maxRAM))
 	defer cleanup()
+	defer armMemoryWatch(*maxRAM)()
 	cacheCleanup := onExit(applyScanCache(*cacheDir))
 	defer cacheCleanup()
 	if v := strings.TrimSpace(*maxFileSize); v != "" {
@@ -357,11 +358,10 @@ func applyScanCache(v string) func() {
 	}
 }
 
-// applyMaxRAM honors --max-ram: set the soft heap limit and route the graph
-// through the disk-backed BadgerGraph store (graph on disk, RAM bounded by badger's cache, sized
-// to ~half the budget) so a scan stays under the ceiling even when the graph exceeds it. Returns
-// a cleanup func that removes the temporary graph db. Overrides the auto-80% default; an invalid
-// value is reported and ignored.
+// applyMaxRAM honors --max-ram: it partitions the budget across the pools a scan provisions,
+// applies the heap ceiling, and routes the graph through the disk-backed BadgerGraph store so
+// node detail can leave RAM. Returns a cleanup func that removes the graph db. Overrides the
+// auto-80% default; an invalid value is reported and ignored.
 func applyMaxRAM(v string) func() {
 	noop := func() {}
 	if v == "" {
@@ -372,23 +372,30 @@ func applyMaxRAM(v string) func() {
 		fmt.Fprintf(os.Stderr, "vyql: invalid --max-ram %q (use e.g. 8GB, 16GiB)\n", v)
 		return noop
 	}
-	dir, err := os.MkdirTemp("", "vyql-graph-")
+	dir, err := newGraphStoreDir()
 	if err != nil {
 		debug.SetMemoryLimit(n)
 		lowering.UseIntStore = true // fallback: lower-footprint in-RAM store
 		return noop
 	}
-	// Partition the budget ONCE across the pools that actually hold memory, and apply the
-	// heap ceiling here too. Half to badger's off-heap block cache, a quarter to the on-heap
-	// node-detail buffer, and the heap ceiling set to half — the detail buffer plus the
-	// resident structural core live inside it. A scan whose core fits comfortably never
-	// feels the limit; a tight limit sized to the whole flag would make the GC thrash
-	// whenever the resident core neared it.
-	lowering.DiskCacheBytes = n / 2
-	lowering.DiskDetailBuf = n / 4
+	// The flag names a ceiling on the whole process, so every pool is carved out of the one
+	// figure and the heap ceiling is that figure less a reserve for the memory the Go runtime
+	// does not account for: tree-sitter's C parse trees and badger's mapped tables.
+	//
+	// The detail buffer gets a quarter. A buffer large enough to hold the whole scan's node
+	// detail means nothing ever spills and no blob is ever read back, which is by far the
+	// cheapest outcome.
+	//
+	// Badger's block cache gets a sixteenth and no more than half a gigabyte. It is ordinary Go
+	// heap, because ristretto holds decoded blocks as Go values, so it is spent from the same
+	// ceiling as the graph itself, and it only earns anything after a spill. A cache sized as a large
+	// share of the budget fills the ceiling before a node is stored, leaving the collector to
+	// run against memory it may not release.
+	lowering.DiskCacheBytes = clampBytes(n/16, 64<<20, 512<<20)
+	lowering.DiskDetailBuf = clampBytes(n/4, 64<<20, 4<<30)
 	lowering.DiskStorePath = dir
 	prev := debug.SetMemoryLimit(-1)
-	debug.SetMemoryLimit(n / 2)
+	debug.SetMemoryLimit(n - cgoReserve(n))
 	return func() {
 		debug.SetMemoryLimit(prev)
 		lowering.DiskStorePath = ""
@@ -396,6 +403,26 @@ func applyMaxRAM(v string) func() {
 		_ = os.RemoveAll(dir) // best-effort temp cleanup
 	}
 }
+
+// clampBytes returns want, held between lo and hi. A budget small enough that a
+// share of it would be useless still funds the pool at lo, and a budget large
+// enough that a share of it would be wasteful stops at hi.
+func clampBytes(want, lo, hi int64) int64 {
+	if want < lo {
+		return lo
+	}
+	if want > hi {
+		return hi
+	}
+	return want
+}
+
+// cgoReserve is the part of the budget held back from the Go heap ceiling for
+// memory the Go runtime never sees: tree-sitter's C parse trees, badger's
+// mmapped tables, and the allocator's own fragmentation. An eighth, capped at
+// 1 GiB, because the C-side cost tracks the largest file being parsed rather
+// than the size of the budget.
+func cgoReserve(n int64) int64 { return clampBytes(n/8, 32<<20, 1<<30) }
 
 // parseBytes parses a human size like "8GB", "512MiB", "2G", "1048576". Decimal (KB/MB/GB) and
 // binary (KiB/MiB/GiB) units are accepted; a bare number is bytes.
