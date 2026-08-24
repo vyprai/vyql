@@ -360,7 +360,7 @@ func applyScanCache(v string) func() {
 // applyMaxRAM honors --max-ram: set the soft heap limit and route the graph
 // through the disk-backed BadgerGraph store (graph on disk, RAM bounded by badger's cache, sized
 // to ~half the budget) so a scan stays under the ceiling even when the graph exceeds it. Returns
-// a cleanup func that removes the temporary graph db. Overrides the auto-80% default; an invalid
+// a cleanup func that removes the graph db. Overrides the auto-80% default; an invalid
 // value is reported and ignored.
 func applyMaxRAM(v string) func() {
 	noop := func() {}
@@ -372,7 +372,7 @@ func applyMaxRAM(v string) func() {
 		fmt.Fprintf(os.Stderr, "vyql: invalid --max-ram %q (use e.g. 8GB, 16GiB)\n", v)
 		return noop
 	}
-	dir, err := os.MkdirTemp("", "vyql-graph-")
+	dir, err := newGraphStoreDir()
 	if err != nil {
 		debug.SetMemoryLimit(n)
 		lowering.UseIntStore = true // fallback: lower-footprint in-RAM store
