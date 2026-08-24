@@ -39,6 +39,16 @@ done
 dest="${1:-}"
 [ -n "$dest" ] || die "usage: $0 [--with-tests] DEST"
 
+# Resolved here, before anything changes directory. Unpacking happens from a
+# temporary working directory, so a relative DEST would be written there and
+# deleted with it: the caller gets no data directory, and the post-condition
+# below passes because it is relative to the same wrong place. Callers do pass
+# relative paths -- `make fetch-definitions` and the release archive both do.
+case "$dest" in
+	/*) ;;
+	*) dest="$(pwd)/$dest" ;;
+esac
+
 need() { command -v "$1" >/dev/null 2>&1 || die "$1 is required"; }
 need curl
 need tar
