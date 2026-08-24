@@ -228,7 +228,7 @@ func cmdScan(args []string) error {
 	flagCategory := fs.String("flag-category", "all", "review flag category filter")
 	flagKind := addEnum(fs, "flag-kind", "all", "review flag kind filter", []string{"all", "attention", "target", "check"})
 	flagLoc := fs.String("flag-loc", "", "review flag location substring filter")
-	maxRAM := fs.String("max-ram", "", "soft RAM ceiling, e.g. 8GB / 16GiB (default: 80% of physical RAM)")
+	maxRAM := fs.String("max-ram", "", "hard limit on memory use; the scan stops if it is passed, e.g. 8GB / 16GiB (default: 80% of available RAM)")
 	bindingsPath := fs.String("bindings", "", "optional repo-local binding overlay directory")
 	exclude := addExclude(fs)
 	maxFileSize := fs.String("max-file-size", "", "skip source files larger than this during tree walks, e.g. 4MB (default 2MiB; 0 disables)")
@@ -294,6 +294,7 @@ func cmdScan(args []string) error {
 	}
 	cleanup := onExit(applyMaxRAM(*maxRAM))
 	defer cleanup()
+	defer armMemoryWatch(*maxRAM)()
 	cacheCleanup := onExit(applyScanCache(*cacheDir))
 	defer cacheCleanup()
 	if v := strings.TrimSpace(*maxFileSize); v != "" {
