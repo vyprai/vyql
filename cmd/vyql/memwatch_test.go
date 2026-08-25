@@ -57,22 +57,45 @@ func TestMemWatchIgnoresAnUnknownReading(t *testing.T) {
 	}
 }
 
-func TestMemWatchStops(t *testing.T) {
-	calls := make(chan struct{}, 100)
+// stop is the caller's guarantee that nothing is still reading, so the test
+// holds a reading inside the callback and stops the watch while it is in
+// flight. A stop that returns early leaves that reading to land afterwards.
+func TestMemWatchTakesNoReadingOnceStopReturns(t *testing.T) {
+	entered := make(chan struct{}, 1)
+	readings := make(chan struct{}, 1024)
 	stop := memWatch(1000, time.Millisecond, func() int64 {
 		select {
-		case calls <- struct{}{}:
+		case entered <- struct{}{}:
+		default:
+		}
+		time.Sleep(30 * time.Millisecond)
+		select {
+		case readings <- struct{}{}:
 		default:
 		}
 		return 10
-	}, func(int64) {})
-	time.Sleep(20 * time.Millisecond)
+	}, func(rss int64) {
+		t.Errorf("fired at %d, below the 1000 ceiling", rss)
+	})
+
+	<-entered // a reading is in flight
 	stop()
-	drain(calls)
-	time.Sleep(20 * time.Millisecond)
-	if len(calls) != 0 {
-		t.Errorf("%d polls after stop, want none", len(calls))
+	drain(readings)
+
+	// Whatever was in flight finished before stop returned, so nothing may
+	// arrive now however long we wait.
+	time.Sleep(100 * time.Millisecond)
+	if n := len(readings); n != 0 {
+		t.Errorf("%d readings landed after stop returned, want none", n)
 	}
+}
+
+// Calling it twice must not panic on a closed channel, and the second call must
+// still return rather than block on a sampler that has already gone.
+func TestMemWatchStopIsRepeatable(t *testing.T) {
+	stop := memWatch(1000, time.Millisecond, func() int64 { return 10 }, func(int64) {})
+	stop()
+	stop()
 }
 
 func drain(c chan struct{}) {
