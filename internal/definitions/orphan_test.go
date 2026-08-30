@@ -153,6 +153,9 @@ func readFixtureLines(t *testing.T, path string) []string {
 // are open today and must reach empty. Removing a line without binding the control
 // fails here, and binding one without removing the line fails here too.
 func TestShippedCorpusHasNoOrphanedSinks(t *testing.T) {
+	if !corpusIsVendored() {
+		t.Skip("the definitions are fetched, and the work list is versioned with the corpus it describes")
+	}
 	cat, err := Inspect(InspectOptions{Kind: "all", Max: 1 << 30})
 	if err != nil {
 		t.Fatalf("inspect: %v", err)

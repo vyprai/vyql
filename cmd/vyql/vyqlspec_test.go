@@ -197,6 +197,19 @@ func parseSpecFile(t *testing.T, path string) []vyqlSpec {
 }
 
 func TestVyqlSpecs(t *testing.T) {
+	// A spec asserts what one definition detects, and it is written against the
+	// engine of the moment. When the definitions are fetched, the bundle is cut
+	// at a tag an operator chooses and the two versions move independently, so a
+	// failure here says which side is newer rather than that anything is wrong.
+	// Asserting them anyway would tie this repository's checks to release timing.
+	//
+	// They are run where the specs and the definitions are kept together, against
+	// the engine they were written for. What this repository checks about a
+	// fetched bundle is that it arrived whole and parses, in
+	// TestFetchedCVESpecsArriveWhole.
+	if !corpusIsVendored() {
+		t.Skip("the definitions are fetched; their specs are run where they are kept")
+	}
 	root := datadir.Root()
 	testsDir := filepath.Join(root, "tests")
 	if _, err := os.Stat(testsDir); err != nil {

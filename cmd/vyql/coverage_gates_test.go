@@ -1411,6 +1411,37 @@ func TestFetchedCVESpecsArriveWhole(t *testing.T) {
 			t.Errorf("CVE spec %s does not name a rank, so nothing can attribute it", name)
 		}
 	}
+
+	// And every spec in the bundle parses. A publish that arrived truncated or
+	// corrupt is a failure nothing else here would catch, because the CDN has no
+	// purge and its cache policy lives in object metadata.
+	for _, path := range readAllSpecFiles(t) {
+		if len(parseSpecFile(t, path)) == 0 {
+			t.Errorf("%s parsed to no cases, so the bundle is not whole", path)
+		}
+	}
+}
+
+// readAllSpecFiles is every spec in the definitions, CVE or not. A truncated
+// publish loses whichever files it loses, so the check reads all of them.
+func readAllSpecFiles(t *testing.T) []string {
+	t.Helper()
+	var out []string
+	err := filepath.WalkDir(filepath.Join(datadir.Root(), "tests"),
+		func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if !d.IsDir() && strings.HasSuffix(d.Name(), ".test.vyql") {
+				out = append(out, path)
+			}
+			return nil
+		})
+	if err != nil {
+		t.Fatalf("read tests dir: %v", err)
+	}
+	sort.Strings(out)
+	return out
 }
 
 // cveSpecFloor is what a whole bundle carries at least. A floor rather than an
