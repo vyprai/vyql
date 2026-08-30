@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc542c3f3;
-
-binding sqlExecution0 {
-  requires {
-    dependency("EntityModel")
-  }
-  query pattern callExpr where callee.method == "_run_query"
-  emit sink code.SqlExecution at args[0]
-}

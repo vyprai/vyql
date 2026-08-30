@@ -1,9 +1,0 @@
-module bindings.php.generated.m676fdce5;
-
-binding codeEval0 {
-  requires {
-    dependency("antecedent/patchwork")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.CodeEval at args[0]
-}

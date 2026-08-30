@@ -1,6 +1,0 @@
-module code;
-
-concept UnneutralizedDiagnosticValue : issue {
-  cwe: [CWE_150, CWE_117]
-  vulnerableTo: [injection.LogInjection]
-}

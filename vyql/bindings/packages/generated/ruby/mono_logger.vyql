@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m39d253a0;
-
-binding logOutput0 {
-  requires {
-    dependency("mono_logger")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.LogOutput at args[0]
-}

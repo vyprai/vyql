@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m3d649dd6;
-
-binding cliArgument0 {
-  requires {
-    dependency("covertool")
-  }
-  query pattern callExpr where callee.method == "process_args"
-  emit source code.CliArgument at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m13a9f284;
-
-binding deserialization0 {
-  requires {
-    dependency("version-compare")
-  }
-  query pattern callExpr where callee.method == "Version::from"
-  emit sink code.Deserialization at args[0]
-}

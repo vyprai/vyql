@@ -1,8 +1,0 @@
-module code;
-
-review code.UnencodedUrlQueryParameter {
-  category: injection
-  expected: [core.InputValidation]
-  kind: target
-  text: "URL-encode caller-controlled or stored values before appending them into generated query-string links"
-}

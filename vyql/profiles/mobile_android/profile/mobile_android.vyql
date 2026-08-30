@@ -1,8 +1,0 @@
-module profiles;
-
-profile mobile_android {
-  detect: [any(file("AndroidManifest.xml"), file("app/src/main/AndroidManifest.xml"), dependency("com.android.tools.build"), dependency("androidx"), dependency("com.android.application"))]
-  entrypoints: [code.IntentInput, code.ExternalApiResponse, code.DatabaseRead, code.StoredDataRead, code.SecretValue, code.ComputedSizeValue, code.ArchiveEntryName]
-  priority: 90
-  title: "Mobile app — Android"
-}

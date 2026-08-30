@@ -1,6 +1,0 @@
-module memory;
-
-threat TypeConfusion {
-  cwe: [CWE_843]
-  desc: "Type confusion"
-}

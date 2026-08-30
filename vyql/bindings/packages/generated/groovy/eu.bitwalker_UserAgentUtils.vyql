@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m685eefc7;
-
-binding deserialization0 {
-  requires {
-    dependency("eu.bitwalker:UserAgentUtils")
-  }
-  query pattern callExpr where callee.method == "parseUserAgentString"
-  emit sink code.Deserialization at args[0]
-}

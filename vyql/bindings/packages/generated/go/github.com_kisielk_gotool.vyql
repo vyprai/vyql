@@ -1,9 +1,0 @@
-module bindings.go.generated.m5e230034;
-
-binding cliArgument0 {
-  requires {
-    dependency("github.com/kisielk/gotool")
-  }
-  query pattern callExpr where callee.method == "ImportPaths"
-  emit source code.CliArgument at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.m9ec2bcbb;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/moby/term")
-  }
-  query pattern callExpr where callee.method == "NewEscapeProxy"
-  emit source core.UserControlledData at call.result
-}

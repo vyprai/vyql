@@ -1,6 +1,0 @@
-module smartcontract;
-
-threat TxOriginAuth {
-  cwe: [CWE_477]
-  desc: "Authorization via tx.origin (phishing-vulnerable)"
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.ConcreteCmsIncompleteUploadExtensionBlacklist {
-  category: upload
-  expected: [core.AllowlistValidation]
-  kind: attention
-  text: "review Concrete CMS upload extension blacklist for omitted executable extensions such as phar, php8, pht, shtml, cgi, and htaccess"
-}

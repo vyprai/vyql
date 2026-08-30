@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m63e6bf5d;
-
-binding deserialization0 {
-  requires {
-    dependency("cmark")
-  }
-  query pattern callExpr where callee.method == "cmark_parser_free"
-  emit sink code.Deserialization at args[0]
-}

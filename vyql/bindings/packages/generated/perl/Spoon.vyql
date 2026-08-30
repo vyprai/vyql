@@ -1,9 +1,0 @@
-module bindings.perl.generated.meb3ce2f8;
-
-binding httpInput0 {
-  requires {
-    dependency("Spoon")
-  }
-  query pattern callExpr where callee.method == "cgi"
-  emit source code.HttpInput at call.result
-}

@@ -1,6 +1,0 @@
-module crypto;
-
-threat ImproperSignatureCheck {
-  cwe: [CWE_347]
-  desc: "Improper verification of cryptographic signature (e.g. JWT alg none)"
-}

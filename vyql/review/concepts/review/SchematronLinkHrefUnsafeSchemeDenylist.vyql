@@ -1,8 +1,0 @@
-module code;
-
-review code.SchematronLinkHrefUnsafeSchemeDenylist {
-  category: xss
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review Schematron xlink:href validation for lowercased safe-scheme allowlisting and dangerous character rejection"
-}

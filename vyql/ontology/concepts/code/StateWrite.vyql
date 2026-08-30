@@ -1,6 +1,0 @@
-module code;
-
-concept StateWrite : issue {
-  cwe: [CWE_841]
-  vulnerableTo: [smartcontract.Reentrancy]
-}

@@ -1,6 +1,0 @@
-module dos;
-
-threat UncontrolledResourceConsumption {
-  cwe: [CWE_400]
-  desc: "Uncontrolled resource consumption (DoS)"
-}

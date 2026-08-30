@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m58d35b9c;
-
-binding filePathAccess0 {
-  requires {
-    dependency("serilog.sinks.file")
-  }
-  query pattern callExpr where callee.method == "FileLoggerConfigurationExtensions.File"
-  emit sink code.FilePathAccess at args[0]
-}

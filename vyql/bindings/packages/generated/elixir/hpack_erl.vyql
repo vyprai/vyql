@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mc99b2a38;
-
-binding deserialization0 {
-  requires {
-    dependency("hpack_erl")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m2392b195;
-
-binding deserialization0 {
-  requires {
-    dependency("org.jdom:jdom2")
-  }
-  query pattern callExpr where callee.method == "DTDParser.parse"
-  emit sink code.Deserialization at args[0]
-}

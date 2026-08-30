@@ -1,7 +1,0 @@
-module code;
-
-review code.UnboundedCopySmell {
-  category: memory
-  kind: attention
-  text: "review unbounded string copy usage and surrounding length constraints"
-}

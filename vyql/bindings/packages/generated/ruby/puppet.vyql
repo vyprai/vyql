@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m2273793a;
-
-binding commandExecution0 {
-  requires {
-    dependency("puppet")
-  }
-  query pattern callExpr where callee.method == "safe_posix_fork"
-  emit sink code.CommandExecution at args[0]
-}

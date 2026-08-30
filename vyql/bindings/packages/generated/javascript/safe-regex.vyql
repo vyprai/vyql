@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m343a272e;
-
-binding deserialization0 {
-  requires {
-    dependency("safe-regex")
-  }
-  query pattern callExpr where callee.method == "safeRegex"
-  emit sink code.Deserialization at args[0]
-}

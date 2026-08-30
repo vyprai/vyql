@@ -1,9 +1,0 @@
-module bindings.swift.generated.m953e24ac;
-
-binding cliArgument0 {
-  requires {
-    dependency("github.com/objecthub/swift-commandlinekit")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source code.CliArgument at call.result
-}

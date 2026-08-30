@@ -1,9 +1,0 @@
-module bindings.python.generated.m292154a5;
-
-binding commandExecution0 {
-  requires {
-    dependency("pytest-watch")
-  }
-  query pattern callExpr where callee.method == "run_hook"
-  emit sink code.CommandExecution at args[0]
-}

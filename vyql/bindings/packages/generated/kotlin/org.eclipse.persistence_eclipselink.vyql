@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m7d9d0069;
-
-binding deserialization0 {
-  requires {
-    dependency("org.eclipse.persistence:eclipselink")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

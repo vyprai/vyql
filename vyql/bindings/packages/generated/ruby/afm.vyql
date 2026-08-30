@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m6ef4f912;
-
-binding filePathAccess0 {
-  requires {
-    dependency("afm")
-  }
-  query pattern callExpr where callee.method == "initialize"
-  emit sink code.FilePathAccess at args[0]
-}

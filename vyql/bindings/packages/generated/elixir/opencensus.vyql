@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m6e22a47a;
-
-binding httpInput0 {
-  requires {
-    dependency("opencensus")
-  }
-  query pattern callExpr where callee.method == "from_headers"
-  emit source code.HttpInput at call.result
-}

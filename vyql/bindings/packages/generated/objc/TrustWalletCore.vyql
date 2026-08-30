@@ -1,9 +1,0 @@
-module bindings.objc.generated.m324a2872;
-
-binding deserialization0 {
-  requires {
-    dependency("TrustWalletCore")
-  }
-  query pattern callExpr where callee.method == "TWAsnParserEcdsaSignatureFromDer"
-  emit sink code.Deserialization at args[0]
-}

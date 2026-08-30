@@ -1,9 +1,0 @@
-module bindings.bash.generated.m3f7f45b1;
-
-binding cliArgument0 {
-  requires {
-    dependency("glow")
-  }
-  query pattern callExpr where callee.path ~= "glow.argv"
-  emit source code.CliArgument at call.result
-}

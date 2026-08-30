@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m88f25b22;
-
-binding codeEval0 {
-  requires {
-    dependency("commonjs")
-  }
-  query pattern callExpr where callee.method == "require"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.mf78c783b;
-
-binding filePathAccess0 {
-  requires {
-    dependency("net.java.dev.jna:jna-platform")
-  }
-  query pattern callExpr where callee.method == "moveToTrash"
-  emit sink code.FilePathAccess at args[0]
-}

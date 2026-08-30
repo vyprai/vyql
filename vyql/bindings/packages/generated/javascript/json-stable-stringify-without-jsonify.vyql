@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mea741d2f;
-
-binding codeEval0 {
-  requires {
-    dependency("json-stable-stringify-without-jsonify")
-  }
-  query pattern callExpr where callee.method == "module.exports"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m11119fb0;
-
-binding networkSend0 {
-  requires {
-    dependency("angular-file-upload")
-  }
-  query pattern callExpr where callee.method == "upload"
-  emit sink code.NetworkSend at args[0]
-}

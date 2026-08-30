@@ -1,6 +1,0 @@
-module code;
-
-concept RequestPolicyStripped : issue {
-  cwe: [CWE_200, CWE_441, CWE_524]
-  vulnerableTo: [injection.ProtocolStateConfusion]
-}

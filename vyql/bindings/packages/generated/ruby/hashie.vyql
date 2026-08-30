@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m83aa8eda;
-
-binding deserialization0 {
-  requires {
-    dependency("hashie")
-  }
-  query pattern callExpr where callee.method == "Hashie::Mash.load"
-  emit sink code.Deserialization at args[0]
-}

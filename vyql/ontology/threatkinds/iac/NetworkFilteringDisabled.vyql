@@ -1,6 +1,0 @@
-module iac;
-
-threat NetworkFilteringDisabled {
-  cwe: [CWE_284]
-  desc: "Network filtering or policy enforcement is explicitly disabled"
-}

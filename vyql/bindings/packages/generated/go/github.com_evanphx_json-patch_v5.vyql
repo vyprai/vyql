@@ -1,9 +1,0 @@
-module bindings.go.generated.m61b0c0ab;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/evanphx/json-patch/v5")
-  }
-  query pattern callExpr where callee.method == "parseTag"
-  emit sink code.Deserialization at args[0]
-}

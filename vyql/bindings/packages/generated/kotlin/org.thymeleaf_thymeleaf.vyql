@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mc737875e;
-
-binding templateRender0 {
-  requires {
-    dependency("org.thymeleaf:thymeleaf")
-  }
-  query pattern callExpr where callee.method == "process"
-  emit sink code.TemplateRender at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.mc847b3de;
-
-binding deserialization0 {
-  requires {
-    dependency("aws-sam-translator")
-  }
-  query pattern callExpr where callee.method == "yaml_parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,6 +1,0 @@
-module code;
-
-concept PdfJsEvalSupportedSource : source {
-  cwe: [CWE_79]
-  taint: [taint.UntrustedData]
-}

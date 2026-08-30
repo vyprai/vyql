@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mf8c9634f;
-
-binding codeEval0 {
-  requires {
-    dependency("com.github.xiaoymin:swagger-bootstrap-ui")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.CodeEval at args[0]
-}

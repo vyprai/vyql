@@ -1,7 +1,0 @@
-module code;
-
-review code.UnboundedProtocolStateByIdentifier {
-  category: resource
-  kind: attention
-  text: "review protocol state keyed by remote identifiers for fail-closed size/type checks before storage or queueing"
-}

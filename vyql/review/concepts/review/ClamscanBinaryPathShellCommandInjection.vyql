@@ -1,8 +1,0 @@
-module code;
-
-review code.ClamscanBinaryPathShellCommandInjection {
-  category: command
-  expected: [core.ShellEscape]
-  kind: attention
-  text: "review Clamscan scanner binary verification for execFile-style argument separation instead of shell command strings"
-}

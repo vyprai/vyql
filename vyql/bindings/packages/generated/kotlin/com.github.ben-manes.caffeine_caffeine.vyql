@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m79e1fd06;
-
-binding deserialization0 {
-  requires {
-    dependency("com.github.ben-manes.caffeine:caffeine")
-  }
-  query pattern callExpr where callee.method == "CaffeineSpec.parse"
-  emit sink code.Deserialization at args[0]
-}

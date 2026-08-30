@@ -1,9 +1,0 @@
-module bindings.dart.generated.m844113a5;
-
-binding networkData0 {
-  requires {
-    dependency("mic_stream")
-  }
-  query pattern callExpr where callee.method == "microphone"
-  emit source code.NetworkData at call.result
-}

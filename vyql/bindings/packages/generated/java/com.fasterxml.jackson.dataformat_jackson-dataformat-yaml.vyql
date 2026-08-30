@@ -1,9 +1,0 @@
-module bindings.java.generated.mceda4a0f;
-
-binding deserialization0 {
-  requires {
-    dependency("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
-  }
-  query pattern callExpr where callee.method == "YAMLParser"
-  emit sink code.Deserialization at args[0]
-}

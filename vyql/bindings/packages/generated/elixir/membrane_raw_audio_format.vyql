@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m4ff175ca;
-
-binding deserialization0 {
-  requires {
-    dependency("membrane_raw_audio_format")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

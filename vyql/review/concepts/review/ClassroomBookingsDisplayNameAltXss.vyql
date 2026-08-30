@@ -1,8 +1,0 @@
-module code;
-
-review code.ClassroomBookingsDisplayNameAltXss {
-  category: xss
-  expected: [core.HtmlEscape]
-  kind: attention
-  text: "review classroombookings global menu labels for display-name escaping before image alt attribute rendering"
-}

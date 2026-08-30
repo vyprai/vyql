@@ -1134,3 +1134,80 @@ print "Search results for '$query':\n\n";
 		t.Fatalf("legacy PHP script tag did not expose $_GET and print nodes; sawGet=%v sawPrint=%v", sawPost, sawPrint)
 	}
 }
+
+func TestPHPParamEntriesCarryClassAndVisibilityFacts(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Entries.php")
+	src := []byte(`<?php
+namespace App\Http;
+
+class Nav extends \Livewire\Component implements Arrayable {
+  public function render($theme) { return view($theme); }
+  protected function secret($token) { return $token; }
+}
+class Bare {
+  public function plain($x) { return $x; }
+}
+function helper($input) { return $input; }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractPHP([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sawTheme, sawToken, sawInput := false, false, false
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.parameter.entry" {
+			continue
+		}
+		args := n.Prop("str_args")
+		switch {
+		case strings.Contains(args, "param_name:$theme"):
+			sawTheme = true
+			for _, want := range []string{
+				"class_name:Nav",
+				`class_base:\Livewire\Component`,
+				"class_base:Component",
+				"function_visibility:public",
+			} {
+				if !strings.Contains(args, want) {
+					t.Fatalf("Nav entry missing %q; entry=%q", want, args)
+				}
+			}
+			if strings.Contains(args, "Arrayable") {
+				t.Fatalf("implements list leaked into class_base; entry=%q", args)
+			}
+			if strings.Contains(args, "class_name:Bare") || strings.Contains(args, "function_name:helper") {
+				t.Fatalf("class facts leaked across declarations; entry=%q", args)
+			}
+		case strings.Contains(args, "param_name:$token"):
+			sawToken = true
+			if !strings.Contains(args, "function_visibility:private") {
+				t.Fatalf("protected method should carry private visibility; entry=%q", args)
+			}
+		case strings.Contains(args, "param_name:$input"):
+			sawInput = true
+			for _, unwanted := range []string{"class_name:", "class_base:"} {
+				if strings.Contains(args, unwanted) {
+					t.Fatalf("top-level function entry should carry no class token; entry=%q", args)
+				}
+			}
+			if !strings.Contains(args, "function_visibility:public") {
+				t.Fatalf("top-level function should carry public visibility; entry=%q", args)
+			}
+		}
+	}
+	if !sawTheme || !sawToken || !sawInput {
+		t.Fatalf("parameter entries not all found: theme=%v token=%v input=%v", sawTheme, sawToken, sawInput)
+	}
+}

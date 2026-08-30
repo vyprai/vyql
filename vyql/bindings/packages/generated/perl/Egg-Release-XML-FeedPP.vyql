@@ -1,9 +1,0 @@
-module bindings.perl.generated.m9181bc91;
-
-binding urlFetch0 {
-  requires {
-    dependency("Egg-Release-XML-FeedPP")
-  }
-  query pattern callExpr where callee.method == "feed"
-  emit sink code.UrlFetch at args[0]
-}

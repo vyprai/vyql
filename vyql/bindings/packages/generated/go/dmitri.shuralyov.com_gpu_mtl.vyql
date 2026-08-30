@@ -1,9 +1,0 @@
-module bindings.go.generated.m24204bc8;
-
-binding codeEval0 {
-  requires {
-    dependency("dmitri.shuralyov.com/gpu/mtl")
-  }
-  query pattern callExpr where callee.method == "Device.MakeLibrary"
-  emit sink code.CodeEval at args[0]
-}

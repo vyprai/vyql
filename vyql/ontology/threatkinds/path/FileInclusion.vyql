@@ -1,6 +1,0 @@
-module path;
-
-threat FileInclusion {
-  cwe: [CWE_98]
-  desc: "Untrusted data controlling an include/require path"
-}

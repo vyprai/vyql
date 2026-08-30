@@ -1,9 +1,0 @@
-module bindings.perl.generated.md5aa4c4a;
-
-binding commandExecution0 {
-  requires {
-    dependency("Gedcom")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit sink code.CommandExecution at args[0]
-}

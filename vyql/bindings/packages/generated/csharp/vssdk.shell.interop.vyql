@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m5b67e523;
-
-binding commandExecution0 {
-  requires {
-    dependency("vssdk.shell.interop")
-  }
-  query pattern callExpr where callee.method == "RunningDocumentTable"
-  emit sink code.CommandExecution at args[0]
-}

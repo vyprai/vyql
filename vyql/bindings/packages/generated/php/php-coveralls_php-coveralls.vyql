@@ -1,9 +1,0 @@
-module bindings.php.generated.m88308fe3;
-
-binding commandExecution0 {
-  requires {
-    dependency("php-coveralls/php-coveralls")
-  }
-  query pattern callExpr where callee.method == "SystemCommandExecutor.execute"
-  emit sink code.CommandExecution at args[0]
-}

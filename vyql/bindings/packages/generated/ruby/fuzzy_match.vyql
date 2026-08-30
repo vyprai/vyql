@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mc1d9788e;
-
-binding userControlledData0 {
-  requires {
-    dependency("fuzzy_match")
-  }
-  query pattern callExpr where callee.method == "make"
-  emit source core.UserControlledData at call.result
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.PairwiseConstraintIntersectionDos {
-  category: resource
-  expected: [core.InputValidation]
-  kind: target
-  text: "review constraint-list intersection for sorted merge or bounded processing instead of pairwise nested intersection"
-}

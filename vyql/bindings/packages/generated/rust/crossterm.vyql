@@ -1,9 +1,0 @@
-module bindings.rust.generated.m08f2517c;
-
-binding stdinInput0 {
-  requires {
-    dependency("crossterm")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.StdinInput at call.result
-}

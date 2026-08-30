@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.ma1c5e9bd;
-
-binding httpInput0 {
-  requires {
-    dependency("org.springframework:spring-webmvc")
-  }
-  query pattern callExpr where callee.path ~= "org.springframework.spring.webmvc.cookie"
-  emit source code.HttpInput at call.result
-}

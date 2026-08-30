@@ -1,8 +1,0 @@
-module code;
-
-review code.FlowSpecOperatorLoopBoundOffByOne {
-  category: memory
-  expected: [core.MemoryBoundsCheck]
-  kind: target
-  text: "review FlowSpec chained operator decoders for an inclusive loop bound before writing match-value array entries"
-}

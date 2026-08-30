@@ -1,9 +1,0 @@
-module bindings.perl.generated.m4cf9ada7;
-
-binding userControlledData0 {
-  requires {
-    dependency("opts")
-  }
-  query pattern callExpr where callee.method == "opts"
-  emit source core.UserControlledData at call.result
-}

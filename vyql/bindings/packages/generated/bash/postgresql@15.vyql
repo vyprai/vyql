@@ -1,9 +1,0 @@
-module bindings.bash.generated.m09c60566;
-
-binding sqlExecution0 {
-  requires {
-    dependency("postgresql@15")
-  }
-  query pattern callExpr where callee.path ~= "Makefile"
-  emit sink code.SqlExecution at args.any
-}

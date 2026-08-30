@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mbafa908f;
-
-binding weakHash0 {
-  requires {
-    dependency("google-apis-core")
-  }
-  query pattern presenceNode where node.path ~= "google.apis.core.hash"
-  emit issue code.WeakHash at node
-}

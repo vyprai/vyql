@@ -1,9 +1,0 @@
-module bindings.rust.generated.mde7fcfe4;
-
-binding deserialization0 {
-  requires {
-    dependency("http-range-header")
-  }
-  query pattern callExpr where callee.method == "parse_range_header"
-  emit sink code.Deserialization at args[0]
-}

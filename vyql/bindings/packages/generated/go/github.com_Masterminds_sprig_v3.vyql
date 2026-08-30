@@ -1,9 +1,0 @@
-module bindings.go.generated.m4cec8adc;
-
-binding weakHash0 {
-  requires {
-    dependency("github.com/Masterminds/sprig/v3")
-  }
-  query pattern callExpr where callee.method == "sha1sum"
-  emit issue code.WeakHash at call
-}

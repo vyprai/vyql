@@ -1,6 +1,0 @@
-module code;
-
-concept PrivilegedContainer : issue {
-  cwe: [CWE_250]
-  vulnerableTo: [iac.PrivilegedContainer]
-}

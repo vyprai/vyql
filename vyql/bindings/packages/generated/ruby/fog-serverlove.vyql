@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m6142bb58;
-
-binding networkSend0 {
-  requires {
-    dependency("fog-serverlove")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit sink code.NetworkSend at args[0]
-}

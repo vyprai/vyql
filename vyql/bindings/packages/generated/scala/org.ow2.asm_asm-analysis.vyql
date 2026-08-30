@@ -1,9 +1,0 @@
-module bindings.scala.generated.m33665896;
-
-binding codeEval0 {
-  requires {
-    dependency("org.ow2.asm:asm-analysis")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.CodeEval at args[0]
-}

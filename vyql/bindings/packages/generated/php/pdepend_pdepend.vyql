@@ -1,9 +1,0 @@
-module bindings.php.generated.m9d52006b;
-
-binding commandExecution0 {
-  requires {
-    dependency("pdepend/pdepend")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit sink code.CommandExecution at args[0]
-}

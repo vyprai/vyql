@@ -1,9 +1,0 @@
-module bindings.swift.generated.mcfdea106;
-
-binding htmlRender0 {
-  requires {
-    dependency("github.com/vapor-community/markdown")
-  }
-  query pattern callExpr where callee.method == "markdownToHTML"
-  emit sink code.HtmlRender at args[0]
-}

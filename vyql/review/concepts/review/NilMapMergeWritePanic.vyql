@@ -1,8 +1,0 @@
-module code;
-
-review code.NilMapMergeWritePanic {
-  category: resource
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review optional map merge paths for an empty-map initialization before writing merged values"
-}

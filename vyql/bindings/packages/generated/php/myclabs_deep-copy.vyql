@@ -1,9 +1,0 @@
-module bindings.php.generated.me86468f2;
-
-binding deserialization0 {
-  requires {
-    dependency("myclabs/deep-copy")
-  }
-  query pattern callExpr where callee.method == "copy"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m6d0c1307;
-
-binding deserialization0 {
-  requires {
-    dependency("org.glassfish.jersey.media:jersey-media-moxy")
-  }
-  query pattern callExpr where callee.method == "initializeUnmarshaller"
-  emit sink code.Deserialization at args[0]
-}

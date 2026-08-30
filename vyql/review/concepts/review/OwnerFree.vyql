@@ -1,7 +1,0 @@
-module code;
-
-review code.OwnerFree {
-  category: resource
-  kind: attention
-  text: "review owner release and fields cleared before it"
-}

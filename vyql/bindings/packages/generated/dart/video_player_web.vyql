@@ -1,9 +1,0 @@
-module bindings.dart.generated.mdb0c37a5;
-
-binding urlFetch0 {
-  requires {
-    dependency("video_player_web")
-  }
-  query pattern callExpr where callee.method == "VideoPlayerPlugin.setDataSource"
-  emit sink code.UrlFetch at args[0]
-}

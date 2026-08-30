@@ -1,7 +1,0 @@
-module core;
-
-concept OwnershipCheck : check {
-  applies: endpoint
-  covers: [endpoint, path]
-  neutralizes: [access_control.BrokenAccess, access_control.Idor]
-}

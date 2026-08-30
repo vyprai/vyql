@@ -1,9 +1,0 @@
-module bindings.objc.generated.me83079a4;
-
-binding deserialization0 {
-  requires {
-    dependency("OpenSSL-Universal")
-  }
-  query pattern callExpr where callee.method == "ASN1_item_d2i_fp"
-  emit sink code.Deserialization at args[0]
-}

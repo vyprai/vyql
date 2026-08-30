@@ -1,9 +1,0 @@
-module bindings.php.generated.ma63d37b5;
-
-binding commandExecution0 {
-  requires {
-    dependency("laravel/prompts")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

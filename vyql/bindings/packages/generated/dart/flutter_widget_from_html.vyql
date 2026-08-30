@@ -1,9 +1,0 @@
-module bindings.dart.generated.m33f5f4e5;
-
-binding htmlRender0 {
-  requires {
-    dependency("flutter_widget_from_html")
-  }
-  query pattern callExpr where callee.method == "HtmlWidget"
-  emit sink code.HtmlRender at args[0]
-}

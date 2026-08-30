@@ -1,8 +1,0 @@
-module code;
-
-review code.CinnyServiceWorkerMediaAuthLeak {
-  category: secret
-  expected: [core.AllowlistValidation]
-  kind: attention
-  text: "review service-worker media fetch authorization for homeserver-origin validation before adding bearer tokens"
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m2d951392;
-
-binding commandExecution0 {
-  requires {
-    dependency("rustc_version")
-  }
-  query pattern callExpr where callee.method == "for_command"
-  emit sink code.CommandExecution at args[0]
-}

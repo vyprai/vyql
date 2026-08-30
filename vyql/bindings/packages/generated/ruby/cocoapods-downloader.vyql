@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m905dcae7;
-
-binding commandExecution0 {
-  requires {
-    dependency("cocoapods-downloader")
-  }
-  query pattern callExpr where callee.method == "execute_command"
-  emit sink code.CommandExecution at args[0]
-}

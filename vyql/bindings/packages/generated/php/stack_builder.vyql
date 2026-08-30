@@ -1,9 +1,0 @@
-module bindings.php.generated.m3ac8f426;
-
-binding httpInput0 {
-  requires {
-    dependency("stack/builder")
-  }
-  query pattern callExpr where callee.method == "handle"
-  emit source code.HttpInput at call.result
-}

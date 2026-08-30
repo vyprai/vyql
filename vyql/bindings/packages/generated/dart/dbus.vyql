@@ -1,9 +1,0 @@
-module bindings.dart.generated.mc960d37f;
-
-binding xmlParse0 {
-  requires {
-    dependency("dbus")
-  }
-  query pattern callExpr where callee.method == "parseDBusIntrospectXml"
-  emit sink code.XmlParse at args[0]
-}

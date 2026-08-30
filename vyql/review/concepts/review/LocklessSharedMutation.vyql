@@ -1,8 +1,0 @@
-module code;
-
-review code.LocklessSharedMutation {
-  category: concurrency
-  expected: [core.LockRelease]
-  kind: attention
-  text: "review shared mutable state writes and confirm they are protected by a lock or atomic guard"
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.mdb43220d;
-
-binding commandExecution0 {
-  requires {
-    dependency("org.elasticsearch:elasticsearch")
-  }
-  query pattern callExpr where callee.method == "spawnNativeController"
-  emit sink code.CommandExecution at args[0]
-}

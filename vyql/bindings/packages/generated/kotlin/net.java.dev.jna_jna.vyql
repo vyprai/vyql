@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mc179d338;
-
-binding filePathAccess0 {
-  requires {
-    dependency("net.java.dev.jna:jna")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

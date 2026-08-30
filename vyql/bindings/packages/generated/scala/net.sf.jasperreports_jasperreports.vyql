@@ -1,9 +1,0 @@
-module bindings.scala.generated.m0c4b3eb9;
-
-binding sqlExecution0 {
-  requires {
-    dependency("net.sf.jasperreports:jasperreports")
-  }
-  query pattern callExpr where callee.method == "getQuery"
-  emit sink code.SqlExecution at args[0]
-}

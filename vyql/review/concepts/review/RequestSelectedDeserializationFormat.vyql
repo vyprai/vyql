@@ -1,7 +1,0 @@
-module code;
-
-review code.RequestSelectedDeserializationFormat {
-  category: deserialization
-  kind: attention
-  text: "review request-selected deserialization formats for unsafe codecs such as pickle"
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.ma26500a3;
-
-binding filePathAccess0 {
-  requires {
-    dependency("SwifterSwift")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FilePathAccess at args[0]
-}

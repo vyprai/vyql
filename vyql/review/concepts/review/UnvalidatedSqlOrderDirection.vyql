@@ -1,8 +1,0 @@
-module code;
-
-review code.UnvalidatedSqlOrderDirection {
-  category: sql
-  expected: [core.SqlParameterization, core.InputValidation]
-  kind: target
-  text: "verify ORDER BY direction values are normalized to an ASC/DESC allowlist before SQL concatenation"
-}

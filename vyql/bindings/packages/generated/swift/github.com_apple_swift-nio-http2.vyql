@@ -1,9 +1,0 @@
-module bindings.swift.generated.md5af62dc;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/apple/swift-nio-http2")
-  }
-  query pattern callExpr where callee.method == "decodeHeaders"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m71747260;
-
-binding filePathAccess0 {
-  requires {
-    dependency("cabbage")
-  }
-  query pattern callExpr where callee.method == "extract_named_vars"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.mbb6a5efd;
-
-binding cliArgument0 {
-  requires {
-    dependency("GBCli")
-  }
-  query pattern callExpr where callee.method == "main"
-  emit source code.CliArgument at call.result
-}

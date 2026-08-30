@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mb5ef8e2a;
-
-binding fileUse0 {
-  requires {
-    dependency("fog-vmfusion")
-  }
-  query pattern callExpr where callee.method == "scp"
-  emit sink code.FileUseSink at args[0]
-}

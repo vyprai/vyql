@@ -1,6 +1,0 @@
-module path;
-
-threat UncontrolledSearchPath {
-  cwe: [CWE_427]
-  desc: "Executable or plugin discovery includes a lower-trust search path"
-}

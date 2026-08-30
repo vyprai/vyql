@@ -1,6 +1,0 @@
-module access_control;
-
-threat PermissiveCors {
-  cwe: [CWE_942]
-  desc: "Permissive CORS — Access-Control-Allow-Origin set to '*'"
-}

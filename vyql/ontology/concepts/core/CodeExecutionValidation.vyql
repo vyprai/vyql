@@ -1,8 +1,0 @@
-module core;
-
-concept CodeExecutionValidation : check {
-  applies: path
-  covers: [endpoint, path]
-  cwe: [CWE_94]
-  neutralizes: [injection.CodeInjection]
-}

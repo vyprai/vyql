@@ -1,9 +1,0 @@
-module bindings.java.generated.m3f61c164;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework.hateoas:spring-hateoas")
-  }
-  query pattern callExpr where callee.method == "Links.parse"
-  emit sink code.Deserialization at args[0]
-}

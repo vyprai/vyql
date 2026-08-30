@@ -1,9 +1,0 @@
-module bindings.objc.generated.m882e7b96;
-
-binding urlFetch0 {
-  requires {
-    dependency("FBAudienceNetwork")
-  }
-  query pattern callExpr where callee.method == "setUrlPrefix"
-  emit sink code.UrlFetch at args[0]
-}

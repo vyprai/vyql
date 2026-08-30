@@ -1,9 +1,0 @@
-module bindings.go.generated.mf37e5907;
-
-binding httpInput0 {
-  requires {
-    dependency("github.com/go-chi/chi/v5")
-  }
-  query pattern callExpr where callee.method == "URLParam"
-  emit source code.HttpInput at call.result
-}

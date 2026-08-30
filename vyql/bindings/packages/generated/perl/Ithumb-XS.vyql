@@ -1,9 +1,0 @@
-module bindings.perl.generated.ma4e1ed68;
-
-binding filePathAccess0 {
-  requires {
-    dependency("Ithumb-XS")
-  }
-  query pattern callExpr where callee.method == "create_thumbnail"
-  emit sink code.FilePathAccess at args[0]
-}

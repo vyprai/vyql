@@ -1,9 +1,0 @@
-module bindings.swift.generated.m20041f9f;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/nmdias/FeedKit")
-  }
-  query pattern callExpr where callee.method == "XMLDecoder.decode"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.maf33707b;
-
-binding commandExecution0 {
-  requires {
-    dependency("github.com/mattn/goveralls")
-  }
-  query pattern callExpr where callee.method == "runCommand"
-  emit sink code.CommandExecution at args[0]
-}

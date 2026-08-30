@@ -1,9 +1,0 @@
-module bindings.bash.generated.m64ba0d5f;
-
-binding sqlExecution0 {
-  requires {
-    dependency("shared-mime-info")
-  }
-  query pattern callExpr where callee.path ~= "shared-mime-info"
-  emit sink code.SqlExecution at args.any
-}

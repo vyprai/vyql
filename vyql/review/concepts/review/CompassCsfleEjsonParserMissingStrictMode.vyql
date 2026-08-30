@@ -1,8 +1,0 @@
-module code;
-
-review code.CompassCsfleEjsonParserMissingStrictMode {
-  category: injection
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review Compass CSFLE EJSON parsing for strict-mode parsing rather than shell/query parser evaluation"
-}

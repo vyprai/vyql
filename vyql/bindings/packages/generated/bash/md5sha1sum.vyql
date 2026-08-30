@@ -1,9 +1,0 @@
-module bindings.bash.generated.m929250d2;
-
-binding weakHash0 {
-  requires {
-    dependency("md5sha1sum")
-  }
-  query pattern callExpr where callee.method == "md5sum"
-  emit issue code.WeakHash at call
-}

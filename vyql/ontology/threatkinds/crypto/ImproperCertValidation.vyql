@@ -1,6 +1,0 @@
-module crypto;
-
-threat ImproperCertValidation {
-  cwe: [CWE_295]
-  desc: "Improper certificate validation (verification disabled)"
-}

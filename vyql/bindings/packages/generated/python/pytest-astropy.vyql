@@ -1,9 +1,0 @@
-module bindings.python.generated.m7cad1acc;
-
-binding cliArgument0 {
-  requires {
-    dependency("pytest-astropy")
-  }
-  query pattern callExpr where callee.method == "pytest_addoption"
-  emit source code.CliArgument at call.result
-}

@@ -1,6 +1,0 @@
-module concurrency;
-
-threat Deadlock {
-  cwe: [CWE_667]
-  desc: "Improper locking — acquired lock is not released on every path"
-}

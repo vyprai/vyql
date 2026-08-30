@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m2ecdc9e1;
-
-binding domInput0 {
-  requires {
-    dependency("react-router-dom")
-  }
-  query pattern callExpr where callee.path ~= "HydratedRouter"
-  emit source code.DomInput at call.result
-}

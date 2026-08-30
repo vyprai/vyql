@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mae90240f;
-
-binding urlFetch0 {
-  requires {
-    dependency("lykke.settingsreader")
-  }
-  query pattern callExpr where callee.method == "HttpSettingsLoader.Load"
-  emit sink code.UrlFetch at args[0]
-}

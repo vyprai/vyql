@@ -1,9 +1,0 @@
-module bindings.python.generated.mb6911a04;
-
-binding cliArgument0 {
-  requires {
-    dependency("httpie")
-  }
-  query pattern callExpr where callee.method == "HTTPieArgumentParser.parse_args"
-  emit source code.CliArgument at call.result
-}

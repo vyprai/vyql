@@ -1,9 +1,0 @@
-module bindings.objc.generated.m1fbc47fd;
-
-binding weakHash0 {
-  requires {
-    dependency("XMPPFramework")
-  }
-  query pattern presenceNode where node.path ~= "xmppframework.hash"
-  emit issue code.WeakHash at node
-}

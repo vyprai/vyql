@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8fce20f0;
-
-binding deserialization0 {
-  requires {
-    dependency("uniq")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

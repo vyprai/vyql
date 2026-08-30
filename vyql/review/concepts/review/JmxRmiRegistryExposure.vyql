@@ -1,8 +1,0 @@
-module code;
-
-review code.JmxRmiRegistryExposure {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: attention
-  text: "review JMX/RMI server registration for local-only socket binding and enforced authentication"
-}

@@ -1,9 +1,0 @@
-module bindings.bash.generated.md95ed03b;
-
-binding cliArgument0 {
-  requires {
-    dependency("parallel")
-  }
-  query pattern callExpr where callee.path ~= "parallel.argv"
-  emit source code.CliArgument at call.result
-}

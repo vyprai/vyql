@@ -1,9 +1,0 @@
-module bindings.python.generated.m674b73c2;
-
-binding filePathAccess0 {
-  requires {
-    dependency("wandb")
-  }
-  query pattern callExpr where callee.method == "use_model"
-  emit sink code.FilePathAccess at args[0]
-}

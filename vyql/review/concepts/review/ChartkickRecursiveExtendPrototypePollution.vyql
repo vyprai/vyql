@@ -1,8 +1,0 @@
-module code;
-
-review code.ChartkickRecursiveExtendPrototypePollution {
-  category: prototype_pollution
-  expected: [core.PrototypePollutionGuard]
-  kind: attention
-  text: "review Chartkick recursive object extension for __proto__ filtering before assigning target keys"
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.mfc246855;
-
-binding deserialization0 {
-  requires {
-    dependency("com.nimbusds:nimbus-jose-jwt")
-  }
-  query pattern callExpr where callee.method == "JOSEObject.parse"
-  emit sink code.Deserialization at args[0]
-}

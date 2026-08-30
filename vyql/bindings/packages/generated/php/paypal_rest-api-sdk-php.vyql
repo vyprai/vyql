@@ -1,9 +1,0 @@
-module bindings.php.generated.mf637233b;
-
-binding filePathAccess0 {
-  requires {
-    dependency("paypal/rest-api-sdk-php")
-  }
-  query pattern callExpr where callee.method == "saveToFile"
-  emit sink code.FilePathAccess at args[0]
-}

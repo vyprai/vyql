@@ -1,9 +1,0 @@
-module bindings.perl.generated.mf40ed6c6;
-
-binding filePathAccess0 {
-  requires {
-    dependency("JSON-Immutable-XS")
-  }
-  query pattern callExpr where callee.method == "load_dict"
-  emit sink code.FilePathAccess at args[0]
-}

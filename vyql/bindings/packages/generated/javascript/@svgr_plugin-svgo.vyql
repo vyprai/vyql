@@ -1,9 +1,0 @@
-module bindings.javascript.generated.maa298207;
-
-binding deserialization0 {
-  requires {
-    dependency("@svgr/plugin-svgo")
-  }
-  query pattern callExpr where callee.method == "svgoPlugin"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me90bd4c6;
-
-binding deserialization0 {
-  requires {
-    dependency("ruby_dep")
-  }
-  query pattern callExpr where callee.path ~= "RubyDep::Travis.version_constraint"
-  emit sink code.Deserialization at args[0]
-}

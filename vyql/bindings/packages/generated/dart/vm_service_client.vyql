@@ -1,9 +1,0 @@
-module bindings.dart.generated.m3f99f270;
-
-binding networkConnect0 {
-  requires {
-    dependency("vm_service_client")
-  }
-  query pattern callExpr where callee.method == "VMServiceClient.connect"
-  emit sink code.NetworkConnectSink at args[0]
-}

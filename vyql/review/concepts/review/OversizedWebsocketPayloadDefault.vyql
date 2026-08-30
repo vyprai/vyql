@@ -1,8 +1,0 @@
-module code;
-
-review code.OversizedWebsocketPayloadDefault {
-  category: resource
-  expected: [core.InputValidation]
-  kind: target
-  text: "review WebSocket or long-polling payload defaults for low, denial-of-service-resistant request body limits"
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m1f0917f9;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/AudioKit/AudioKitUI")
-  }
-  query pattern callExpr where callee.method == "loadSequencerFile"
-  emit sink code.FilePathAccess at args[0]
-}

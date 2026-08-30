@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mbe20f0d1;
-
-binding deserialization0 {
-  requires {
-    dependency("doctrine")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

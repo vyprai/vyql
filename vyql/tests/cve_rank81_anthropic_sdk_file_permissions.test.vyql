@@ -1,8 +1,0 @@
-# Rank 81 / CVE-2026-34450: anthropic-sdk-python insecure memory-tool permissions.
-
-test "rank81: insecure file permission is a CVE anchor"
-  expect VYQL-CFG-008
-  graph
-  ```
-  node perm code.InsecurePermission
-  ```

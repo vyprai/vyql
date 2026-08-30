@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mb19bb8cb;
-
-binding deserialization0 {
-  requires {
-    dependency("xom:xom")
-  }
-  query pattern callExpr where callee.method == "build"
-  emit sink code.Deserialization at args[0]
-}

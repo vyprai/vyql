@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m62cff57b;
-
-binding commandExecution0 {
-  requires {
-    dependency("growl")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

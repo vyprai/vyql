@@ -1,8 +1,0 @@
-module core;
-
-concept ProcessArgVector : check {
-  applies: path
-  internalRoles: [process_arg_vector]
-  neutralizes: [injection.CommandInjection]
-  refines: core.ShellEscape
-}

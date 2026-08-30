@@ -1,8 +1,0 @@
-module code;
-
-review code.FeehiUsernameStoredXss {
-  category: xss
-  expected: [core.HtmlEscape]
-  kind: attention
-  text: "review Feehi CMS username model loading for Html::encode before stored usernames are rendered"
-}

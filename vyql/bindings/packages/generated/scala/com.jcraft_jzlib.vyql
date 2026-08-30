@@ -1,9 +1,0 @@
-module bindings.scala.generated.m26c4cf27;
-
-binding userControlledData0 {
-  requires {
-    dependency("com.jcraft:jzlib")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source core.UserControlledData at call.result
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.OAuthReauthenticationUserMismatch {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: target
-  text: "verify OAuth reauthentication callbacks require the OAuth-resolved user to match the current authenticated user before refreshing session freshness"
-}

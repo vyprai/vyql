@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m30069610;
-
-binding deserialization0 {
-  requires {
-    dependency("gpb")
-  }
-  query pattern callExpr where callee.method == "case_expr_to_parse_tree_for_clause"
-  emit sink code.Deserialization at args[0]
-}

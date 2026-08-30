@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m57dab393;
-
-binding weakCipher0 {
-  requires {
-    dependency("salsa20")
-  }
-  query pattern callExpr where callee.method == "crypt"
-  emit issue code.WeakCipher at call
-}

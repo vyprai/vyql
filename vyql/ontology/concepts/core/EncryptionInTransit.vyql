@@ -1,7 +1,0 @@
-module core;
-
-concept EncryptionInTransit : check {
-  applies: scope
-  cwe: [CWE_319]
-  neutralizes: [crypto.CleartextTransmission]
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mffe43f4d;
-
-binding httpInput0 {
-  requires {
-    dependency("org.springframework.integration:spring-integration-http")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.HttpInput at call.result
-}

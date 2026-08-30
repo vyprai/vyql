@@ -1,9 +1,0 @@
-module bindings.c.generated.mdd548168;
-
-binding filePathAccess0 {
-  requires {
-    dependency("qtquicktimeline")
-  }
-  query pattern callExpr where callee.method == "QQuickKeyframeGroupPrivate::loadKeyframes"
-  emit sink code.FilePathAccess at args[0]
-}

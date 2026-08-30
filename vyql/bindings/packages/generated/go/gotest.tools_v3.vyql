@@ -1,9 +1,0 @@
-module bindings.go.generated.me86b2667;
-
-binding commandExecution0 {
-  requires {
-    dependency("gotest.tools/v3")
-  }
-  query pattern callExpr where callee.method == "Command"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.mcf638115;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/dehesa/CodableCSV")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

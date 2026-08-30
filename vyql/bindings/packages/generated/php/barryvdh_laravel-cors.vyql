@@ -1,9 +1,0 @@
-module bindings.php.generated.m84074a50;
-
-binding responseHeaderWrite0 {
-  requires {
-    dependency("barryvdh/laravel-cors")
-  }
-  query pattern callExpr where callee.method == "addHeaders"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

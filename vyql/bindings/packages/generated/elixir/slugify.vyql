@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mac4db144;
-
-binding userControlledData0 {
-  requires {
-    dependency("slugify")
-  }
-  query pattern callExpr where callee.method == "slugify"
-  emit source core.UserControlledData at call.result
-}

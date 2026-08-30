@@ -1,9 +1,0 @@
-module bindings.go.generated.m8699d6ac;
-
-binding deserialization0 {
-  requires {
-    dependency("go4.org")
-  }
-  query pattern callExpr where callee.method == "ReadFile"
-  emit sink code.Deserialization at args[0]
-}

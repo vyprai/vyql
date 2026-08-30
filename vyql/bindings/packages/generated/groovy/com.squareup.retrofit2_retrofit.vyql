@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m46687406;
-
-binding networkData0 {
-  requires {
-    dependency("com.squareup.retrofit2:retrofit")
-  }
-  query pattern callExpr where callee.method == "baseUrl"
-  emit source code.NetworkData at call.result
-}

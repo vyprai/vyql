@@ -1,9 +1,0 @@
-module bindings.swift.generated.m3e4bde54;
-
-binding codeEval0 {
-  requires {
-    dependency("github.com/johnno1962/XprobePlugin")
-  }
-  query pattern callExpr where callee.method == "patch"
-  emit sink code.CodeEval at args[0]
-}

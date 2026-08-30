@@ -1,9 +1,0 @@
-module bindings.scala.generated.md102207d;
-
-binding deserialization0 {
-  requires {
-    dependency("com.fasterxml.jackson.core:jackson-databind")
-  }
-  query pattern callExpr where callee.method == "readValue"
-  emit sink code.Deserialization at args[0]
-}

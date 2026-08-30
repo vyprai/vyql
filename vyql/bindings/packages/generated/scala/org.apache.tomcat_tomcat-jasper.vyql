@@ -1,9 +1,0 @@
-module bindings.scala.generated.m7da44c5b;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.tomcat:tomcat-jasper")
-  }
-  query pattern callExpr where callee.method == "ELParser.parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.mb5e7e7e6;
-
-binding deserialization0 {
-  requires {
-    dependency("com.fasterxml.jackson.jaxrs:jackson-jaxrs-json-provider")
-  }
-  query pattern callExpr where callee.method == "value"
-  emit sink code.Deserialization at args[0]
-}

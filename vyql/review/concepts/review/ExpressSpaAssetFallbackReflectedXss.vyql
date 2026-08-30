@@ -1,8 +1,0 @@
-module code;
-
-review code.ExpressSpaAssetFallbackReflectedXss {
-  category: xss
-  expected: [core.InputValidation]
-  kind: target
-  text: "add explicit 404 handlers for static asset URL prefixes before an Express catch-all index.html fallback"
-}

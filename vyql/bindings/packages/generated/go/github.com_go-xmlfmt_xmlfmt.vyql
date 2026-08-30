@@ -1,9 +1,0 @@
-module bindings.go.generated.mc2411a6f;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/go-xmlfmt/xmlfmt")
-  }
-  query pattern callExpr where callee.method == "FormatXML"
-  emit sink code.Deserialization at args[0]
-}

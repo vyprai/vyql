@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m480d79e2;
-
-binding deserialization0 {
-  requires {
-    dependency("com.google.firebase:firebase-admin")
-  }
-  query pattern callExpr where callee.method == "com.google.firebase.auth.FirebaseTokenVerifierImpl.parse"
-  emit sink code.Deserialization at args[0]
-}

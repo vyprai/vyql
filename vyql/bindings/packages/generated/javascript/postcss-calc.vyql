@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mfed5d684;
-
-binding deserialization0 {
-  requires {
-    dependency("postcss-calc")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

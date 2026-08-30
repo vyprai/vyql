@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m23f3fc55;
-
-binding commandExecution0 {
-  requires {
-    dependency("org.freemarker:freemarker")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

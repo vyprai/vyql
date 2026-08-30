@@ -1,9 +1,0 @@
-module bindings.scala.generated.m66db0ba8;
-
-binding deserialization0 {
-  requires {
-    dependency("com.google.code.gson:gson")
-  }
-  query pattern callExpr where callee.method == "fromJson"
-  emit sink code.Deserialization at args[0]
-}

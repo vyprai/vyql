@@ -1,4 +1,0 @@
-module runtime;
-
-concept Process : fact {
-}

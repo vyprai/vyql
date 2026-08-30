@@ -1,9 +1,0 @@
-module bindings.php.generated.maa9cb8fa;
-
-binding deserialization0 {
-  requires {
-    dependency("ergebnis/composer-normalize")
-  }
-  query pattern callExpr where callee.method == "normalize"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0f04759f;
-
-binding deserialization0 {
-  requires {
-    dependency("oj")
-  }
-  query pattern callExpr where callee.method == "VALUE"
-  emit sink code.Deserialization at args[0]
-}

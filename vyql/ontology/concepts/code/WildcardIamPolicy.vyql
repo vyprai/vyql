@@ -1,6 +1,0 @@
-module code;
-
-concept WildcardIamPolicy : issue {
-  cwe: [CWE_284]
-  vulnerableTo: [iac.WildcardIamPolicy]
-}

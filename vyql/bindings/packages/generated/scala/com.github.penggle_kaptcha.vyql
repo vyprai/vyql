@@ -1,9 +1,0 @@
-module bindings.scala.generated.m627ae14d;
-
-binding httpInput0 {
-  requires {
-    dependency("com.github.penggle:kaptcha")
-  }
-  query pattern callExpr where callee.method == "doGet"
-  emit source code.HttpInput at call.result
-}

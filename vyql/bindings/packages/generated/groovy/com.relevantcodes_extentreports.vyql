@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m2b7ee114;
-
-binding xmlParse0 {
-  requires {
-    dependency("com.relevantcodes:extentreports")
-  }
-  query pattern callExpr where callee.method == "Configuration.parse"
-  emit sink code.XmlParse at args[0]
-}

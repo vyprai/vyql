@@ -1,8 +1,0 @@
-module code;
-
-review code.UnauthenticatedAdminerIncludeRoute {
-  category: auth
-  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
-  kind: target
-  text: "review Adminer UI routes for an authenticated session gate before including the Adminer application"
-}

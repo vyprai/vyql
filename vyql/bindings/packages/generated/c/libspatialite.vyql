@@ -1,9 +1,0 @@
-module bindings.c.generated.m216c127c;
-
-binding sqlExecution0 {
-  requires {
-    dependency("libspatialite")
-  }
-  query pattern callExpr where callee.method == "spatialite_init_ex"
-  emit sink code.SqlExecution at args[0]
-}

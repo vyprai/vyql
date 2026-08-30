@@ -1,9 +1,0 @@
-module bindings.swift.generated.m723c980b;
-
-binding expressionEval0 {
-  requires {
-    dependency("github.com/SwiftScream/URITemplate")
-  }
-  query pattern callExpr where callee.method == "process"
-  emit sink code.ExpressionEval at args[0]
-}

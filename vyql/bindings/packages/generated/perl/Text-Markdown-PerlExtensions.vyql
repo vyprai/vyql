@@ -1,9 +1,0 @@
-module bindings.perl.generated.ma7a4bbaa;
-
-binding htmlRender0 {
-  requires {
-    dependency("Text-Markdown-PerlExtensions")
-  }
-  query pattern callExpr where callee.method == "markdown"
-  emit sink code.HtmlRender at args[0]
-}

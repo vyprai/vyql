@@ -1,6 +1,0 @@
-module supply_chain;
-
-threat Typosquat {
-  cwe: [CWE_1357]
-  desc: "Reliance on a dependency whose name typosquats a popular package"
-}

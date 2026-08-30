@@ -1,6 +1,0 @@
-module code;
-
-concept ProtocolFrameBindingReview : issue {
-  cwe: [CWE_287]
-  vulnerableTo: [authentication.ImproperAuthentication]
-}

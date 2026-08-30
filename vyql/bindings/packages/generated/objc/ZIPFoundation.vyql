@@ -1,9 +1,0 @@
-module bindings.objc.generated.m4ff285e0;
-
-binding archiveEntryWrite0 {
-  requires {
-    dependency("ZIPFoundation")
-  }
-  query pattern callExpr where callee.method == "extract"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

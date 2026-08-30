@@ -1,9 +1,0 @@
-module bindings.swift.generated.m2ae9657b;
-
-binding commandExecution0 {
-  requires {
-    dependency("github.com/apple/swift-llbuild")
-  }
-  query pattern callExpr where callee.method == "spawn"
-  emit sink code.CommandExecution at args[0]
-}

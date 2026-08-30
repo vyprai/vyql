@@ -1,9 +1,0 @@
-module bindings.rust.generated.m104e8bd4;
-
-binding filePathAccess0 {
-  requires {
-    dependency("tokio-fs")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.FilePathAccess at args[0]
-}

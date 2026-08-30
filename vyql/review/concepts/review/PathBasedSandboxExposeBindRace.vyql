@@ -1,8 +1,0 @@
-module code;
-
-review code.PathBasedSandboxExposeBindRace {
-  category: path
-  expected: [core.PathAccessCheck]
-  kind: attention
-  text: "review sandbox-expose handling for fd-based bind mounting instead of path-based filesystem arguments"
-}

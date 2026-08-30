@@ -1,9 +1,0 @@
-module bindings.dart.generated.m36ec1897;
-
-binding logOutput0 {
-  requires {
-    dependency("pretty_dio_logger")
-  }
-  query pattern callExpr where callee.method == "logPrint"
-  emit sink code.LogOutput at args[0]
-}

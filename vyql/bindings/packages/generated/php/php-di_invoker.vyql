@@ -1,9 +1,0 @@
-module bindings.php.generated.mc59630dd;
-
-binding codeEval0 {
-  requires {
-    dependency("php-di/invoker")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m129b93f2;
-
-binding deserialization0 {
-  requires {
-    dependency("ruby_parser")
-  }
-  query pattern callExpr where callee.method == "process"
-  emit sink code.Deserialization at args[0]
-}

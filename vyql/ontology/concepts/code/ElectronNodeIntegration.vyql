@@ -1,6 +1,0 @@
-module code;
-
-concept ElectronNodeIntegration : issue {
-  cwe: [CWE_829]
-  vulnerableTo: [desktop.InsecureElectronConfig]
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.WebViewServerRedirectUrlValidationBypass {
-  category: xss
-  expected: [core.InputValidation]
-  kind: target
-  text: "verify WKWebView server redirects are validated through URL-fixup or allowlist logic before provisional navigation continues"
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.me51e2d78;
-
-binding deserialization0 {
-  requires {
-    dependency("josegonzalez/dotenv")
-  }
-  query pattern callExpr where callee.method == "josegonzalezDotenvLoader::parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,8 +1,0 @@
-module core;
-
-concept PdfScanCheck : check {
-  applies: endpoint
-  covers: [endpoint, path]
-  cwe: [CWE_79]
-  neutralizes: [injection.Xss]
-}

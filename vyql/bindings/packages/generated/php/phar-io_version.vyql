@@ -1,9 +1,0 @@
-module bindings.php.generated.m2f5968a9;
-
-binding deserialization0 {
-  requires {
-    dependency("phar-io/version")
-  }
-  query pattern callExpr where callee.method == "PharIo\\Version\\VersionConstraintParser::parse"
-  emit sink code.Deserialization at args[0]
-}

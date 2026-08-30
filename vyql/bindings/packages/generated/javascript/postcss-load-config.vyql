@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mc36307e2;
-
-binding deserialization0 {
-  requires {
-    dependency("postcss-load-config")
-  }
-  query pattern callExpr where callee.method == "yamlLoader"
-  emit sink code.Deserialization at args[0]
-}

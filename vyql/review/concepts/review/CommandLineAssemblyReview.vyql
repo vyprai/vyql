@@ -1,7 +1,0 @@
-module code;
-
-review code.CommandLineAssemblyReview {
-  category: command
-  kind: attention
-  text: "review command-line assembly that appends contextual values before shell or process launch without observed shell quoting"
-}

@@ -1,7 +1,0 @@
-module code;
-
-review code.LengthMultiplierFormattedExpansionUnderallocation {
-  category: memory
-  kind: attention
-  text: "review strlen-multiplier output allocations before formatted numeric token expansion; digit growth may exceed the reserved per-character budget"
-}

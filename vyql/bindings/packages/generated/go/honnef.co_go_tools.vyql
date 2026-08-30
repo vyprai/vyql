@@ -1,9 +1,0 @@
-module bindings.go.generated.mc92a2b41;
-
-binding filePathAccess0 {
-  requires {
-    dependency("honnef.co/go/tools")
-  }
-  query pattern callExpr where callee.method == "Open"
-  emit sink code.FilePathAccess at args[0]
-}

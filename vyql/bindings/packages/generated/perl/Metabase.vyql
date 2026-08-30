@@ -1,9 +1,0 @@
-module bindings.perl.generated.m889b1b9d;
-
-binding databaseRead0 {
-  requires {
-    dependency("Metabase")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.DatabaseReadSink at args[0]
-}

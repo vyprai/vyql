@@ -1,7 +1,0 @@
-module code;
-
-review code.RepeatedKeyfileSubstitutionTables {
-  category: crypto
-  kind: attention
-  text: "review keyfile-based substitution-table generation for per-table mixing and keyfile-derived table order"
-}

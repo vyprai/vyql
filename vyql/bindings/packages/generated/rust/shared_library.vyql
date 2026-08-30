@@ -1,9 +1,0 @@
-module bindings.rust.generated.m4b57bd71;
-
-binding filePathAccess0 {
-  requires {
-    dependency("shared_library")
-  }
-  query pattern callExpr where callee.method == "DynamicLibrary::open"
-  emit sink code.FilePathAccess at args[0]
-}

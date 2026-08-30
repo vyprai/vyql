@@ -1,8 +1,0 @@
-module code;
-
-review code.CloudBaseOpenUrlSsrf {
-  category: request_forgery
-  expected: [core.AllowlistValidation]
-  kind: attention
-  text: "review CloudBase MCP open-url requests for scheme, hostname, and private-address validation before opening URLs"
-}

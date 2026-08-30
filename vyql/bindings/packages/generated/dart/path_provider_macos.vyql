@@ -1,9 +1,0 @@
-module bindings.dart.generated.m42b6e0d2;
-
-binding filePathAccess0 {
-  requires {
-    dependency("path_provider_macos")
-  }
-  query pattern callExpr where callee.method == "PathProviderApi.getDirectoryPath"
-  emit sink code.FilePathAccess at args[0]
-}

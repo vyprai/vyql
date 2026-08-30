@@ -1,8 +1,0 @@
-module code;
-
-review code.CustomerThreadEditMissingMailboxAuthorization {
-  category: auth
-  expected: [core.AuthorizationCheck]
-  kind: target
-  text: "review customer-thread edit policies for mailbox or conversation access checks before allowing customer-originated thread edits"
-}

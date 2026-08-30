@@ -1,9 +1,0 @@
-module bindings.python.generated.m99f77228;
-
-binding userControlledData0 {
-  requires {
-    dependency("environs")
-  }
-  query pattern callExpr where callee.method == "read_env"
-  emit source core.UserControlledData at call.result
-}

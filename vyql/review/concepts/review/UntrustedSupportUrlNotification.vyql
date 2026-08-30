@@ -1,8 +1,0 @@
-module code;
-
-review code.UntrustedSupportUrlNotification {
-  category: validation
-  expected: [core.InputValidation]
-  kind: target
-  text: "derive support notification site identity from trusted request host data or defang user-supplied URLs before forwarding them to administrators"
-}

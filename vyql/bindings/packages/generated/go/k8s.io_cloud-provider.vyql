@@ -1,9 +1,0 @@
-module bindings.go.generated.m4bcfadc0;
-
-binding deserialization0 {
-  requires {
-    dependency("k8s.io/cloud-provider")
-  }
-  query pattern callExpr where callee.method == "parseRequest"
-  emit sink code.Deserialization at args[0]
-}

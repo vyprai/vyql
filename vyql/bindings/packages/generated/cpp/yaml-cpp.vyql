@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m738f602a;
-
-binding deserialization0 {
-  requires {
-    dependency("yaml-cpp")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,7 +1,0 @@
-module code;
-
-review code.PrototypeKeyCachePoisoning {
-  category: prototype_pollution
-  kind: attention
-  text: "review dynamic cache keys written into plain objects; prefer null-prototype cache buckets"
-}

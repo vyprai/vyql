@@ -1,9 +1,0 @@
-module bindings.objc.generated.m839afeb0;
-
-binding deserialization0 {
-  requires {
-    dependency("Nimbus")
-  }
-  query pattern callExpr where callee.method == "cssConsume"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m0c6793cf;
-
-binding weakHash0 {
-  requires {
-    dependency("github.com/mapbox/turf-swift")
-  }
-  query pattern callExpr where callee.method == "hash"
-  emit issue code.WeakHash at call
-}

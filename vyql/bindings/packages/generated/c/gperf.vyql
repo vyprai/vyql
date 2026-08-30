@@ -1,9 +1,0 @@
-module bindings.c.generated.m5201c687;
-
-binding userControlledData0 {
-  requires {
-    dependency("gperf")
-  }
-  query pattern callExpr where callee.method == "read_input"
-  emit source core.UserControlledData at call.result
-}

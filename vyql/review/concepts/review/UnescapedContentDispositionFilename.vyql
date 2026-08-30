@@ -1,8 +1,0 @@
-module code;
-
-review code.UnescapedContentDispositionFilename {
-  category: injection
-  expected: [core.InputValidation]
-  kind: target
-  text: "verify attachment filenames are URL/header-escaped before being embedded in Content-Disposition response headers"
-}

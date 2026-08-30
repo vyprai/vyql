@@ -1,6 +1,0 @@
-module injection;
-
-threat XpathInjection {
-  cwe: [CWE_643]
-  desc: "Untrusted data in an XPath query"
-}

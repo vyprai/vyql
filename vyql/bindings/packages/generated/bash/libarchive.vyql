@@ -1,9 +1,0 @@
-module bindings.bash.generated.m40e26583;
-
-binding filePathAccess0 {
-  requires {
-    dependency("libarchive")
-  }
-  query pattern callExpr where callee.path ~= "libarchive"
-  emit sink code.FilePathAccess at args.any
-}

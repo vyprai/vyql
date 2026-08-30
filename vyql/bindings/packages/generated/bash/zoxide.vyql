@@ -1,9 +1,0 @@
-module bindings.bash.generated.m014b7c27;
-
-binding filePathAccess0 {
-  requires {
-    dependency("zoxide")
-  }
-  query pattern callExpr where callee.path ~= "zoxide"
-  emit sink code.FilePathAccess at args.any
-}

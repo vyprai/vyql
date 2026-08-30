@@ -1,8 +1,0 @@
-module code;
-
-review code.FixedChunkCapacityGrowthIndex {
-  category: memory
-  expected: [core.MemoryBoundsCheck]
-  kind: target
-  text: "review fixed-chunk capacity growth to ensure the allocation is sized at least to the requested index before indexing"
-}

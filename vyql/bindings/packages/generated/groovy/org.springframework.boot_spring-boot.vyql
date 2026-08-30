@@ -1,9 +1,0 @@
-module bindings.groovy.generated.ma6d3218a;
-
-binding cliArgument0 {
-  requires {
-    dependency("org.springframework.boot:spring-boot")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit source code.CliArgument at call.result
-}

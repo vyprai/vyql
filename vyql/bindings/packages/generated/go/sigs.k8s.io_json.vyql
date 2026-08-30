@@ -1,9 +1,0 @@
-module bindings.go.generated.m4a86c10d;
-
-binding deserialization0 {
-  requires {
-    dependency("sigs.k8s.io/json")
-  }
-  query pattern callExpr where callee.method == "parseTag"
-  emit sink code.Deserialization at args[0]
-}

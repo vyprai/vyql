@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m14846366;
-
-binding deserialization0 {
-  requires {
-    dependency("org.eclipse.jetty:jetty-server")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

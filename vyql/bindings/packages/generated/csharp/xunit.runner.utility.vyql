@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m8376f3b3;
-
-binding deserialization0 {
-  requires {
-    dependency("xunit.runner.utility")
-  }
-  query pattern callExpr where callee.method == "ConfigReader.Load"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.WebhookUrlFetchMissingSsrfGuard {
-  category: request_forgery
-  expected: [core.AllowlistValidation]
-  kind: target
-  text: "review webhook or callback delivery for SSRF-safe dispatchers or URL validation before outbound fetches"
-}

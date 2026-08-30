@@ -1,9 +1,0 @@
-module bindings.bash.generated.mc95d627f;
-
-binding commandExecution0 {
-  requires {
-    dependency("amazon-ecs-cli")
-  }
-  query pattern callExpr where callee.path ~= "ecs-cli"
-  emit sink code.CommandExecution at args[0]
-}

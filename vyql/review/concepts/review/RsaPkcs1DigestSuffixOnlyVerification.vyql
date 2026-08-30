@@ -1,8 +1,0 @@
-module code;
-
-review code.RsaPkcs1DigestSuffixOnlyVerification {
-  category: crypto
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review RSA PKCS#1 signature verification for full padding, separator, DigestInfo, and digest checks"
-}

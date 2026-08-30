@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mfe074165;
-
-binding codeEval0 {
-  requires {
-    dependency("jekyll-coffeescript")
-  }
-  query pattern callExpr where callee.method == "convert"
-  emit sink code.CodeEval at args[0]
-}

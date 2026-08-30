@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m150216f4;
-
-binding deserialization0 {
-  requires {
-    dependency("com.google.gwt:gwt-user")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

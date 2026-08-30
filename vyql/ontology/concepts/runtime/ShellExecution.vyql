@@ -1,6 +1,0 @@
-module runtime;
-
-concept ShellExecution : sink {
-  enabledBy: [taint.UntrustedData]
-  vulnerableTo: [injection.CommandInjection]
-}

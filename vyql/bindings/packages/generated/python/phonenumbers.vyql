@@ -1,9 +1,0 @@
-module bindings.python.generated.md23525d4;
-
-binding deserialization0 {
-  requires {
-    dependency("phonenumbers")
-  }
-  query pattern callExpr where callee.method == "phonenumberutil.parse"
-  emit sink code.Deserialization at args[0]
-}

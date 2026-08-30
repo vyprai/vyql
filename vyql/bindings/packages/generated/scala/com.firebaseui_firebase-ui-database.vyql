@@ -1,9 +1,0 @@
-module bindings.scala.generated.m0aaa3b4d;
-
-binding databaseRead0 {
-  requires {
-    dependency("com.firebaseui:firebase-ui-database")
-  }
-  query pattern callExpr where callee.method == "parseSnapshot"
-  emit sink code.DatabaseReadSink at args[0]
-}

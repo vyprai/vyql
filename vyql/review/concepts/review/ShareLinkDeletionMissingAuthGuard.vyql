@@ -1,8 +1,0 @@
-module code;
-
-review code.ShareLinkDeletionMissingAuthGuard {
-  category: auth
-  expected: [core.AuthenticationCheck, core.AuthorizationCheck, core.CsrfProtection]
-  kind: target
-  text: "verify share-link deletion endpoints require an authenticated authorized caller and CSRF protection before deleting token-selected links"
-}

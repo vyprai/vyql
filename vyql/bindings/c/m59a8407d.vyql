@@ -1,6 +1,0 @@
-module bindings.c.generated.m59a8407d;
-
-binding coreMqttSubackRemainingLengthBoundary201 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.name contains "deserializeSubUnsubAck" and node.context.callPath contains "deserializeSubUnsubAckProperties" and node.context.binary contains "incomingPacket->remainingLength>4U" and not (node.context.binary contains "incomingPacket->remainingLength>=4U")
-  emit issue code.CoreMqttSubackRemainingLengthBoundary at node
-}

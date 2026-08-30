@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m9ccd4b53;
-
-binding userControlledData0 {
-  requires {
-    dependency("akka.bootstrap.docker")
-  }
-  query pattern callExpr where callee.method == "EnvironmentVariableConfigLoader.FromEnvironment"
-  emit source core.UserControlledData at call.result
-}

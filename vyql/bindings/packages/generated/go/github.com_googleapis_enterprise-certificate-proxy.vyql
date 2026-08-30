@@ -1,9 +1,0 @@
-module bindings.go.generated.mab6abde2;
-
-binding secretValue0 {
-  requires {
-    dependency("github.com/googleapis/enterprise-certificate-proxy")
-  }
-  query pattern callExpr where callee.method == "Encrypt"
-  emit source code.SecretValue at call.result
-}

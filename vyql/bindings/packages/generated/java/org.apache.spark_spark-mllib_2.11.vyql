@@ -1,9 +1,0 @@
-module bindings.java.generated.mf0efde93;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.spark:spark-mllib_2.11")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

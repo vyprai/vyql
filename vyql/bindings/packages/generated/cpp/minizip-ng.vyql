@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mc9bca055;
-
-binding archiveEntryWrite0 {
-  requires {
-    dependency("minizip-ng")
-  }
-  query pattern callExpr where callee.method == "mz_os_read_dir"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

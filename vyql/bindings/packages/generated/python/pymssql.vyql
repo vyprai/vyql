@@ -1,9 +1,0 @@
-module bindings.python.generated.m365db6d5;
-
-binding sqlExecution0 {
-  requires {
-    dependency("pymssql")
-  }
-  query pattern callExpr where callee.method == "find_compiler"
-  emit sink code.SqlExecution at args[0]
-}

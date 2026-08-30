@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m276ede68;
-
-binding filePathAccess0 {
-  requires {
-    dependency("directory_watcher")
-  }
-  query pattern callExpr where callee.method == "delete_observer"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m8a1f132f;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/Nef10/SwiftBeanCountTangerineMapper")
-  }
-  query pattern callExpr where callee.method == "createTransactions"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.bash.generated.mf3a67398;
-
-binding commandExecution0 {
-  requires {
-    dependency("ssh-copy-id")
-  }
-  query pattern callExpr where callee.path ~= "ssh-copy-id"
-  emit sink code.CommandExecution at args[0]
-}

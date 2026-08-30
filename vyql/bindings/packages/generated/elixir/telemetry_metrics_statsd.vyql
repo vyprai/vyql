@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mfbcab526;
-
-binding networkSend0 {
-  requires {
-    dependency("telemetry_metrics_statsd")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

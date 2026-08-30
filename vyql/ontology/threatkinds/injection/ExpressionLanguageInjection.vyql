@@ -1,6 +1,0 @@
-module injection;
-
-threat ExpressionLanguageInjection {
-  cwe: [CWE_917]
-  desc: "Untrusted data in an expression-language statement"
-}

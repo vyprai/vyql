@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mb25b01fe;
-
-binding deserialization0 {
-  requires {
-    dependency("com.esotericsoftware:kryo")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

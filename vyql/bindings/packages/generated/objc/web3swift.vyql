@@ -1,9 +1,0 @@
-module bindings.objc.generated.m55e387b8;
-
-binding deserialization0 {
-  requires {
-    dependency("web3swift")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

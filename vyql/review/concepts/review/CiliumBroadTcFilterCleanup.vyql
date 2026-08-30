@@ -1,7 +1,0 @@
-module code;
-
-review code.CiliumBroadTcFilterCleanup {
-  category: lifecycle
-  kind: attention
-  text: "review Cilium TC filter cleanup for broad name matching that can detach endpoint datapath programs during agent restart"
-}

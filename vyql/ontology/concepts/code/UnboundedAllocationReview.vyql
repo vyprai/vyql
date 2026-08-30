@@ -1,6 +1,0 @@
-module code;
-
-concept UnboundedAllocationReview : issue {
-  cwe: [CWE_400, CWE_770]
-  vulnerableTo: [dos.UncontrolledResourceConsumption]
-}

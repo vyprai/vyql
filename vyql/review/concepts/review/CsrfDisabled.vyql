@@ -1,8 +1,0 @@
-module code;
-
-review code.CsrfDisabled {
-  category: request
-  expected: [core.CsrfProtection]
-  kind: target
-  text: "review why CSRF protection is disabled or exempted here"
-}

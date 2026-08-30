@@ -1,9 +1,0 @@
-module bindings.python.generated.m801162fd;
-
-binding sqlExecution0 {
-  requires {
-    dependency("pytzdata")
-  }
-  query pattern callExpr where callee.method == "download"
-  emit sink code.SqlExecution at args[0]
-}

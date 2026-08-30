@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m767f1e57;
-
-binding userControlledData0 {
-  requires {
-    dependency("camelcase")
-  }
-  query pattern callExpr where callee.method == "camelCase"
-  emit source core.UserControlledData at call.result
-}

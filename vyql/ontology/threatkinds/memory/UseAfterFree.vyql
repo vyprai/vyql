@@ -1,6 +1,0 @@
-module memory;
-
-threat UseAfterFree {
-  cwe: [CWE_416]
-  desc: "Use after free"
-}

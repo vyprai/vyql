@@ -1,9 +1,0 @@
-module bindings.perl.generated.m45652e9e;
-
-binding deserialization0 {
-  requires {
-    dependency("MPMinus")
-  }
-  query pattern callExpr where callee.method == "_parse_qs"
-  emit sink code.Deserialization at args[0]
-}

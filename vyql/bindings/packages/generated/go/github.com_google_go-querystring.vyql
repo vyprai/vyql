@@ -1,9 +1,0 @@
-module bindings.go.generated.mbb7730dd;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/google/go-querystring")
-  }
-  query pattern callExpr where callee.method == "Values"
-  emit sink code.Deserialization at args[0]
-}

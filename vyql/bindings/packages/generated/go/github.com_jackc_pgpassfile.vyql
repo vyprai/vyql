@@ -1,9 +1,0 @@
-module bindings.go.generated.m760c3f50;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/jackc/pgpassfile")
-  }
-  query pattern callExpr where callee.method == "ReadPassfile"
-  emit sink code.FilePathAccess at args[0]
-}

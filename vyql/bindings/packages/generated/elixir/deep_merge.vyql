@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mb9e2e2e4;
-
-binding userControlledData0 {
-  requires {
-    dependency("deep_merge")
-  }
-  query pattern callExpr where callee.method == "deep_merge"
-  emit source core.UserControlledData at call.result
-}

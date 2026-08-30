@@ -534,6 +534,38 @@ rule XxeUnhardened {
 	}
 }
 
+func TestMatchSameReceiverHardeningConfinedToItsFile(t *testing.T) {
+	rule := `
+module vypr.deserialization;
+rule XxeUnhardened {
+  meta { id: "TEST-XXE", severity: medium, cwe: [CWE_611] }
+  issue code.XmlParserCreate as p
+  unless p.sameReceiver coveredBy core.XmlHardening
+}
+`
+	g := usg.NewInMemStore()
+	g.AddNode(usg.Node{ID: "hardening", Type: "code.Call", Loc: "CoreParser.java:10", Region: "CoreParser.java/fn1", Props: map[string]string{"callee_path": "dbf.setFeature"}})
+	g.AddLabel("hardening", coverageLabel("core.XmlHardening", "sameReceiver"))
+	g.AddNode(usg.Node{ID: "parser", Type: "code.Call", Loc: "DOMUtils.java:20", Region: "DOMUtils.java/fn1", Props: map[string]string{"callee_path": "dbf.newDocumentBuilder"}})
+	g.AddLabel("parser", usg.Label{Concept: "code.XmlParserCreate"})
+
+	decls, err := parseV2DefinitionsForTest(rule)
+	if err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	compiled, errs := CompileRules(decls, ontology.Seed())
+	if len(errs) != 0 {
+		t.Fatalf("compile: %v", errs)
+	}
+	fs, err := New(ontology.Seed(), g).Evaluate(compiled[0])
+	if err != nil {
+		t.Fatalf("eval: %v", err)
+	}
+	if len(fs) != 1 {
+		t.Fatalf("a receiver hardened in another file must not suppress parser creation, got %d findings", len(fs))
+	}
+}
+
 func TestMatchGuardedBySameReceiverNodeLabel(t *testing.T) {
 	rule := `
 module vypr.deserialization;

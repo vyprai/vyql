@@ -1,8 +1,0 @@
-module code;
-
-review code.TemplateDirectoryHiddenGlobCopy {
-  category: path
-  expected: [core.PathAccessCheck]
-  kind: attention
-  text: "review downloaded template directory copies for hidden dot-glob recursion and disable hidden copy mode for untrusted template subdirectories"
-}

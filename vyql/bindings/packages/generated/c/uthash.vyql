@@ -1,9 +1,0 @@
-module bindings.c.generated.m08cf8d34;
-
-binding formatString0 {
-  requires {
-    dependency("uthash")
-  }
-  query pattern callExpr where callee.method == "utstring_printf"
-  emit sink code.FormatString at args[0]
-}

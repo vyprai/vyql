@@ -1,9 +1,0 @@
-module bindings.java.generated.m489936e9;
-
-binding cliArgument0 {
-  requires {
-    dependency("jline:jline")
-  }
-  query pattern callExpr where callee.method == "org.jline.builtins.Options.parse"
-  emit source code.CliArgument at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc1213bf6;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/mchoe/SwiftSVG")
-  }
-  query pattern callExpr where callee.method == "NSXMLSVGParser.init(svgURL:supportedElements:completion:)"
-  emit sink code.Deserialization at args[0]
-}

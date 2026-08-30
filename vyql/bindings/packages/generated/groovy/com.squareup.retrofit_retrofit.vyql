@@ -1,9 +1,0 @@
-module bindings.groovy.generated.me865b404;
-
-binding deserialization0 {
-  requires {
-    dependency("com.squareup.retrofit:retrofit")
-  }
-  query pattern callExpr where callee.method == "RequestFactoryParser.parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m03c2fbd3;
-
-binding filePathAccess0 {
-  requires {
-    dependency("exrm")
-  }
-  query pattern callExpr where callee.method == "chmod"
-  emit sink code.FilePathAccess at args[0]
-}

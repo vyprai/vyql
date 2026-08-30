@@ -1,9 +1,0 @@
-module bindings.python.generated.m2da3a02a;
-
-binding commandExecution0 {
-  requires {
-    dependency("molecule")
-  }
-  query pattern callExpr where callee.method == "run_command"
-  emit sink code.CommandExecution at args[0]
-}

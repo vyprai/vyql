@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m84e4052c;
-
-binding cliArgument0 {
-  requires {
-    dependency("annotate")
-  }
-  query pattern callExpr where callee.method == "Annotate::Parser.parse"
-  emit source code.CliArgument at call.result
-}

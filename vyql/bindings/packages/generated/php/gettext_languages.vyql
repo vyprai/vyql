@@ -1,9 +1,0 @@
-module bindings.php.generated.m072a9c43;
-
-binding fileUse0 {
-  requires {
-    dependency("gettext/languages")
-  }
-  query pattern callExpr where callee.method == "Exporter::toFile"
-  emit sink code.FileUseSink at args[0]
-}

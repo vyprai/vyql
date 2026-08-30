@@ -1,9 +1,0 @@
-module bindings.rust.generated.m1c74bd18;
-
-binding filePathAccess0 {
-  requires {
-    dependency("cpal")
-  }
-  query pattern callExpr where callee.method == "open_pcm"
-  emit sink code.FilePathAccess at args[0]
-}

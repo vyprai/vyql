@@ -1,9 +1,0 @@
-module bindings.python.generated.mc03bc546;
-
-binding userControlledData0 {
-  requires {
-    dependency("pathspec")
-  }
-  query pattern callExpr where callee.method == "PathSpec.from_lines"
-  emit source core.UserControlledData at call.result
-}

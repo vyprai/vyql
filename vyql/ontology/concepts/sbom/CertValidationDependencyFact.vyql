@@ -1,4 +1,0 @@
-module sbom;
-
-concept CertValidationDependencyFact : fact {
-}

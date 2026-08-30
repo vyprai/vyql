@@ -1,8 +1,0 @@
-module code;
-
-review code.UnvalidatedChoiceControlField {
-  category: input_validation
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review truthy early returns on caller-controlled choice fields before canonical allowed-value normalization"
-}

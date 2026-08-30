@@ -1,9 +1,0 @@
-module bindings.perl.generated.m2f1aa10b;
-
-binding filePathAccess0 {
-  requires {
-    dependency("Bryar")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.FilePathAccess at args[0]
-}

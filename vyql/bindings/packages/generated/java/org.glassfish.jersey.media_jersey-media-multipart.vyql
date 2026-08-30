@@ -1,9 +1,0 @@
-module bindings.java.generated.m9f6a6751;
-
-binding filePathAccess0 {
-  requires {
-    dependency("org.glassfish.jersey.media:jersey-media-multipart")
-  }
-  query pattern callExpr where callee.method == "moveTo"
-  emit sink code.FilePathAccess at args[0]
-}

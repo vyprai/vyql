@@ -1,8 +1,0 @@
-module code;
-
-review code.DnsInterfaceNewlineValidationMissing {
-  category: input_validation
-  expected: [core.InputValidation]
-  kind: target
-  text: "review DNS interface config validators for newline rejection before writing resolver configuration syntax"
-}

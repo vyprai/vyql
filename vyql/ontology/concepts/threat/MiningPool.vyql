@@ -1,4 +1,0 @@
-module threat;
-
-concept MiningPool : fact {
-}

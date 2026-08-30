@@ -1,9 +1,0 @@
-module bindings.swift.generated.m584bc383;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/nerdsupremacist/SyntaxTree")
-  }
-  query pattern callExpr where callee.method == "encode"
-  emit sink code.Deserialization at args[0]
-}

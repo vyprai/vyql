@@ -1,9 +1,0 @@
-module bindings.dart.generated.m612e5302;
-
-binding filePathAccess0 {
-  requires {
-    dependency("device_info_plus_linux")
-  }
-  query pattern callExpr where callee.method == "linuxInfo"
-  emit sink code.FilePathAccess at args[0]
-}

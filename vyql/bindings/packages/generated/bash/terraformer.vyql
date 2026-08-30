@@ -1,9 +1,0 @@
-module bindings.bash.generated.m61b598b3;
-
-binding cliArgument0 {
-  requires {
-    dependency("terraformer")
-  }
-  query pattern callExpr where callee.path ~= "terraformer.argv"
-  emit source code.CliArgument at call.result
-}

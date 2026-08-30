@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m8c3ba7cd;
-
-binding publicNetworkExposure0 {
-  requires {
-    dependency("aws-sdk-ec2")
-  }
-  query pattern callExpr where callee.method == "create_security_group"
-  emit issue code.PublicNetworkExposure at call
-}

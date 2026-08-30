@@ -1,8 +1,0 @@
-module code;
-
-review code.ConfigUrlStoredBeforeSchemeValidation {
-  category: request_forgery
-  expected: [core.AllowlistValidation, core.InputValidation]
-  kind: target
-  text: "review connector URL configuration for URL syntax and scheme validation before storing or testing server-side connections"
-}

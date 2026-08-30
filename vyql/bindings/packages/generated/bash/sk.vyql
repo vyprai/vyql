@@ -1,9 +1,0 @@
-module bindings.bash.generated.m4782c578;
-
-binding commandExecution0 {
-  requires {
-    dependency("sk")
-  }
-  query pattern callExpr where callee.path ~= "sk-tmux"
-  emit sink code.CommandExecution at args[0]
-}

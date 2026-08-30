@@ -1,9 +1,0 @@
-module bindings.groovy.generated.ma3714a1a;
-
-binding deserialization0 {
-  requires {
-    dependency("org.skyscreamer:jsonassert")
-  }
-  query pattern callExpr where callee.method == "parseJSON"
-  emit sink code.Deserialization at args[0]
-}

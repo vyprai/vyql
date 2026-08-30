@@ -1,6 +1,0 @@
-module request_forgery;
-
-threat Csrf {
-  cwe: [CWE_352]
-  desc: "Cross-site request forgery"
-}

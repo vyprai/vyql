@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m2f94ef31;
-
-binding cliArgument0 {
-  requires {
-    dependency("libgpg-error")
-  }
-  query pattern callExpr where callee.method == "arg_parse"
-  emit source code.CliArgument at call.result
-}

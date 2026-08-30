@@ -1,8 +1,0 @@
-# Rank 124 / CVE-2021-45688: ash read_spv uninitialized buffer exposure.
-
-test "rank124: uninitialized buffer exposure is a CVE anchor"
-  expect VYQL-MEM-015
-  graph
-  ```
-  node buf code.UninitializedBufferExposure
-  ```

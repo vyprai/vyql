@@ -1,7 +1,0 @@
-module code;
-
-review code.StackAllocationSmell {
-  category: memory
-  kind: attention
-  text: "review stack allocation size and whether it is bounded"
-}

@@ -1,9 +1,0 @@
-module bindings.c.generated.mb92f3f34;
-
-binding deserialization0 {
-  requires {
-    dependency("kf5bookmarks")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

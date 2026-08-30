@@ -1,9 +1,0 @@
-module bindings.rust.generated.mb1ee4775;
-
-binding weakHash0 {
-  requires {
-    dependency("polyval")
-  }
-  query pattern callExpr where callee.method == "finalize"
-  emit issue code.WeakHash at call
-}

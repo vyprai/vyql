@@ -1,6 +1,0 @@
-module core;
-
-review core.LockRelease {
-  category: concurrency
-  kind: check
-}

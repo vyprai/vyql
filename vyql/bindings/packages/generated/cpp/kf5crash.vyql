@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m7086a832;
-
-binding commandExecution0 {
-  requires {
-    dependency("kf5crash")
-  }
-  query pattern callExpr where callee.method == "startProcess"
-  emit sink code.CommandExecution at args[0]
-}

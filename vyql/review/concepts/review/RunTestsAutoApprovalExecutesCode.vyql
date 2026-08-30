@@ -1,8 +1,0 @@
-module code;
-
-review code.RunTestsAutoApprovalExecutesCode {
-  category: auth
-  expected: [core.AuthorizationCheck]
-  kind: target
-  text: "verify test-runner tools that execute workspace code require or suggest user approval before running cargo test"
-}

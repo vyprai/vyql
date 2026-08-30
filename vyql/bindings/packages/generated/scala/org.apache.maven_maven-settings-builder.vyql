@@ -1,9 +1,0 @@
-module bindings.scala.generated.m3eb3d2f3;
-
-binding userControlledData0 {
-  requires {
-    dependency("org.apache.maven:maven-settings-builder")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source core.UserControlledData at call.result
-}

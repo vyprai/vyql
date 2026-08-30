@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m4d19897d;
-
-binding urlFetch0 {
-  requires {
-    dependency("plugin.share")
-  }
-  query pattern callExpr where callee.method == "OpenBrowser"
-  emit sink code.UrlFetch at args[0]
-}

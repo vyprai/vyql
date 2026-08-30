@@ -1,6 +1,0 @@
-module injection;
-
-threat XmlInjection {
-  cwe: [CWE_91]
-  desc: "Untrusted data in an XML document"
-}

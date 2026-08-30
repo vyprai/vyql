@@ -1,9 +1,0 @@
-module bindings.c.generated.m998ea3dd;
-
-binding archiveEntryWrite0 {
-  requires {
-    dependency("libzip")
-  }
-  query pattern callExpr where callee.method == "diff_output_start_file"
-  emit sink code.ArchiveEntryWrite at args[0]
-}

@@ -1,9 +1,0 @@
-module vypr.identity;
-
-rule ExternalToAdmin {
-  meta {
-    id: "VYQL-IDN-001"
-    severity: critical
-  }
-  grant identity.ExternalPrincipal -> identity.AdminPrivilege
-}

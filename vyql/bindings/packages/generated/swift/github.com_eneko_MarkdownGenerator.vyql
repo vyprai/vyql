@@ -1,9 +1,0 @@
-module bindings.swift.generated.m8a86eef7;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/eneko/MarkdownGenerator")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FilePathAccess at args[0]
-}

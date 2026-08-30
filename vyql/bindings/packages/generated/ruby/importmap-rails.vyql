@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m17f2523b;
-
-binding networkConnect0 {
-  requires {
-    dependency("importmap-rails")
-  }
-  query pattern callExpr where callee.method == "post_json"
-  emit sink code.NetworkConnectSink at args[0]
-}

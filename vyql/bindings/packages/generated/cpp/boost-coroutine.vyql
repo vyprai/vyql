@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m174de3b5;
-
-binding commandExecution0 {
-  requires {
-    dependency("boost-coroutine")
-  }
-  query pattern callExpr where callee.method == "bind_to_processor"
-  emit sink code.CommandExecution at args[0]
-}

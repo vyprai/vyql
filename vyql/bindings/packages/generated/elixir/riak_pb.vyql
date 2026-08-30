@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m22d06a11;
-
-binding deserialization0 {
-  requires {
-    dependency("riak_pb")
-  }
-  query pattern callExpr where callee.method == "decode_counter_op"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.IgnoredAuthorizationResult {
-  category: auth
-  expected: [core.AuthorizationCheck]
-  kind: attention
-  text: "review authorization check result usage; a failed check must stop the operation"
-}

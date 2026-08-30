@@ -1,7 +1,0 @@
-module code;
-
-review code.IncompleteIpDenylist {
-  category: request
-  kind: attention
-  text: "review network address validation for missing special-use IP ranges such as unspecified or broadcast"
-}

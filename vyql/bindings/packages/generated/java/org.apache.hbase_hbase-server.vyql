@@ -1,9 +1,0 @@
-module bindings.java.generated.m9cee5b67;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.hbase:hbase-server")
-  }
-  query pattern callExpr where callee.method == "SplitLogTask.parseFrom"
-  emit sink code.Deserialization at args[0]
-}

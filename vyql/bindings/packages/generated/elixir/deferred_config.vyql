@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mb4062123;
-
-binding secretValue0 {
-  requires {
-    dependency("deferred_config")
-  }
-  query pattern callExpr where callee.method == "get_system_tuple"
-  emit source code.SecretValue at call.result
-}

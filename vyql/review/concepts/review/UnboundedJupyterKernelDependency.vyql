@@ -1,7 +1,0 @@
-module code;
-
-review code.UnboundedJupyterKernelDependency {
-  category: supply_chain
-  kind: attention
-  text: "review Jupyter kernel runtime dependencies for upper compatibility caps before building gateway or remote-kernel images"
-}

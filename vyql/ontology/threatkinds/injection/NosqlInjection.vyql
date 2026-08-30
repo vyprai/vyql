@@ -1,6 +1,0 @@
-module injection;
-
-threat NosqlInjection {
-  cwe: [CWE_943]
-  desc: "Untrusted data in a data-query/NoSQL command"
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc7697c3a;
-
-binding filePathAccess0 {
-  requires {
-    dependency("rlib")
-  }
-  query pattern callExpr where callee.method == "import"
-  emit sink code.FilePathAccess at args[0]
-}

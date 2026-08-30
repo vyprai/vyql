@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m21c64a36;
-
-binding deserialization0 {
-  requires {
-    dependency("javax.portlet:portlet-api")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

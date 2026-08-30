@@ -1,8 +1,0 @@
-module code;
-
-review code.ExpressParamArrayValuePollution {
-  category: input_validation
-  expected: [core.InputValidation]
-  kind: target
-  text: "review Express parameter lookup helpers for duplicate-parameter array normalization or rejection"
-}

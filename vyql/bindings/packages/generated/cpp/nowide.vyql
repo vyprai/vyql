@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mcb41bedf;
-
-binding commandExecution0 {
-  requires {
-    dependency("nowide")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit sink code.CommandExecution at args[0]
-}

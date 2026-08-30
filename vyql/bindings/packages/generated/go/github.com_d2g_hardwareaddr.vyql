@@ -1,9 +1,0 @@
-module bindings.go.generated.m5030e2b8;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("github.com/d2g/hardwareaddr")
-  }
-  query pattern callExpr where callee.method == "GenerateEUI48"
-  emit issue code.WeakRandomValue at call
-}

@@ -1,7 +1,0 @@
-module code;
-
-review code.UninitializedBufferExposure {
-  category: memory
-  kind: attention
-  text: "review reserved-capacity buffer exposure and whether every byte is initialized before the callee can observe it"
-}

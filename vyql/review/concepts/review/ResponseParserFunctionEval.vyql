@@ -1,8 +1,0 @@
-module code;
-
-review code.ResponseParserFunctionEval {
-  category: code_execution
-  expected: [core.CodeExecutionValidation, core.InputValidation]
-  kind: attention
-  text: "review response parsers that compile response data with Function; prefer JSON.parse or a strict data parser"
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m2ea87e77;
-
-binding networkSend0 {
-  requires {
-    dependency("faraday-retry")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit sink code.NetworkSend at args[0]
-}

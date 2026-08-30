@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mfddaade8;
-
-binding deserialization0 {
-  requires {
-    dependency("libcbor")
-  }
-  query pattern callExpr where callee.method == "cbor_stream_decode"
-  emit sink code.Deserialization at args[0]
-}

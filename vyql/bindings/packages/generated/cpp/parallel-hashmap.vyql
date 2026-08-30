@@ -1,9 +1,0 @@
-module bindings.cpp.generated.made3f8eb;
-
-binding weakHash0 {
-  requires {
-    dependency("parallel-hashmap")
-  }
-  query pattern presenceNode where node.path ~= "parallel.hashmap.hash"
-  emit issue code.WeakHash at node
-}

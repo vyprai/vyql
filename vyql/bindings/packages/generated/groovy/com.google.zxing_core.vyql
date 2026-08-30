@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbe62a9f2;
-
-binding deserialization0 {
-  requires {
-    dependency("com.google.zxing:core")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.m14412f77;
-
-binding expressionEval0 {
-  requires {
-    dependency("github.com/pascaldekloe/goe")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.ExpressionEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m47387d5a;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("sympy")
-  }
-  query pattern presenceNode where node.path ~= "sympy.random"
-  emit issue code.WeakRandomValue at node
-}

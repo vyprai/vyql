@@ -1,9 +1,0 @@
-module bindings.powershell.generated.m7e16e940;
-
-binding htmlRender0 {
-  requires {
-    dependency("twitter.bootstrap.mvc4.htmlhelpers")
-  }
-  query pattern callExpr where callee.method == "ActionLinkWithGlyphIcon"
-  emit sink code.HtmlRender at args[0]
-}

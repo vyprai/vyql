@@ -1,9 +1,0 @@
-module bindings.perl.generated.mb61f0e05;
-
-binding deserialization0 {
-  requires {
-    dependency("TOML")
-  }
-  query pattern callExpr where callee.method == "from_toml"
-  emit sink code.Deserialization at args[0]
-}

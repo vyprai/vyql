@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m75dc409a;
-
-binding stdinInput0 {
-  requires {
-    dependency("jest-watcher")
-  }
-  query pattern callExpr where callee.method == "onKey"
-  emit source code.StdinInput at call.result
-}

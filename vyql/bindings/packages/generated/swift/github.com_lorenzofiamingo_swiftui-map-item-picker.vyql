@@ -1,9 +1,0 @@
-module bindings.swift.generated.m62ae2289;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/lorenzofiamingo/swiftui-map-item-picker")
-  }
-  query pattern callExpr where callee.method == "mapItemPicker"
-  emit source core.UserControlledData at call.result
-}

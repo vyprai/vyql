@@ -1,9 +1,0 @@
-module bindings.php.generated.mde744b86;
-
-binding filePathAccess0 {
-  requires {
-    dependency("jeroennoten/laravel-adminlte")
-  }
-  query pattern callExpr where callee.method == "copyDirectory"
-  emit sink code.FilePathAccess at args[0]
-}

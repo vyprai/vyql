@@ -1,9 +1,0 @@
-module bindings.go.generated.m78926822;
-
-binding fileUse0 {
-  requires {
-    dependency("github.com/shurcooL/vfsgen")
-  }
-  query pattern callExpr where callee.method == "Generate"
-  emit sink code.FileUseSink at args[0]
-}

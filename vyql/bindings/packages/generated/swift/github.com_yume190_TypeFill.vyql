@@ -1,9 +1,0 @@
-module bindings.swift.generated.mdc06f2c6;
-
-binding commandExecution0 {
-  requires {
-    dependency("github.com/yume190/TypeFill")
-  }
-  query pattern callExpr where callee.method == "Exec.run"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m210fc043;
-
-binding userControlledData0 {
-  requires {
-    dependency("ua_inspector")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source core.UserControlledData at call.result
-}

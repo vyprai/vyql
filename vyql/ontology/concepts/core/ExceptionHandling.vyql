@@ -1,6 +1,0 @@
-module core;
-
-concept ExceptionHandling : check {
-  neutralizes: [dos.UncontrolledResourceConsumption, validation.ImproperInputValidation]
-  summary: "Evidence that exceptional, EOF, or parse-failure paths are handled safely."
-}

@@ -1,6 +1,0 @@
-module deserialization;
-
-threat Xxe {
-  cwe: [CWE_611]
-  desc: "Improper restriction of XML external entities"
-}

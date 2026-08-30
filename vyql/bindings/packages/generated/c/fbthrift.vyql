@@ -1,9 +1,0 @@
-module bindings.c.generated.meb7c63d6;
-
-binding deserialization0 {
-  requires {
-    dependency("fbthrift")
-  }
-  query pattern callExpr where callee.method == "apache::thrift::compiler::parse::parse"
-  emit sink code.Deserialization at args[0]
-}

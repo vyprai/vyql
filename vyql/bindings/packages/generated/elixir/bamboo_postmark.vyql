@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mbe1bee53;
-
-binding networkSend0 {
-  requires {
-    dependency("bamboo_postmark")
-  }
-  query pattern callExpr where callee.method == "deliver"
-  emit sink code.NetworkSend at args[0]
-}

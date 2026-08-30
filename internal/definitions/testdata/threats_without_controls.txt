@@ -10,7 +10,6 @@
 
 concurrency.Toctou
 crypto.IncompleteSecurityIdentifier
-deserialization.UnsafeReflection
 iac.PublicNetworkExposure
 injection.ArgumentInjection
 injection.CrlfInjection

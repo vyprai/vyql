@@ -1,6 +1,0 @@
-module code;
-
-concept DebuggableApp : issue {
-  cwe: [CWE_489]
-  vulnerableTo: [mobile.DebuggableBuild]
-}

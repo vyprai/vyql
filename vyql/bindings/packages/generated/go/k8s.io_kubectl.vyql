@@ -1,9 +1,0 @@
-module bindings.go.generated.me9672ecb;
-
-binding commandExecution0 {
-  requires {
-    dependency("k8s.io/kubectl")
-  }
-  query pattern callExpr where callee.method == "command"
-  emit sink code.CommandExecution at args[0]
-}

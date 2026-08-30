@@ -1,9 +1,0 @@
-module bindings.dart.generated.m0989922b;
-
-binding userControlledData0 {
-  requires {
-    dependency("eventify")
-  }
-  query pattern callExpr where callee.method == "emit"
-  emit source core.UserControlledData at call.result
-}

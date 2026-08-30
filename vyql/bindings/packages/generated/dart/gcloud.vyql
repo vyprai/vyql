@@ -1,9 +1,0 @@
-module bindings.dart.generated.mf9b1eba7;
-
-binding storedDataRead0 {
-  requires {
-    dependency("gcloud")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.StoredDataRead at call.result
-}

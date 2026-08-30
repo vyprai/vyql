@@ -1,8 +1,0 @@
-module code;
-
-concept TrustBoundary : sink {
-  cwe: [CWE_501]
-  enabledBy: [taint.UntrustedData]
-  possibility: exclude
-  vulnerableTo: [validation.TrustBoundary]
-}

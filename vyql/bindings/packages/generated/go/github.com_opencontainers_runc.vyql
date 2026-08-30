@@ -1,9 +1,0 @@
-module bindings.go.generated.m50eabebe;
-
-binding commandExecution0 {
-  requires {
-    dependency("github.com/opencontainers/runc")
-  }
-  query pattern callExpr where callee.method == "execProcess"
-  emit sink code.CommandExecution at args[0]
-}

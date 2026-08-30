@@ -1,8 +1,0 @@
-module code;
-
-review code.ExpressionEvaluatorPrototypeNameAccess {
-  category: prototype_pollution
-  expected: [core.PrototypePollutionGuard]
-  kind: attention
-  text: "review expression evaluators for __proto__/constructor/prototype rejection before resolving variable or member tokens"
-}

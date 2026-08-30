@@ -1,9 +1,0 @@
-module bindings.php.generated.m79ddfe49;
-
-binding userControlledData0 {
-  requires {
-    dependency("google/recaptcha")
-  }
-  query pattern callExpr where callee.method == "verify"
-  emit source core.UserControlledData at call.result
-}

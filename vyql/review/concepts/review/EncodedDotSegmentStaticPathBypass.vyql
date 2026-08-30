@@ -1,8 +1,0 @@
-module code;
-
-review code.EncodedDotSegmentStaticPathBypass {
-  category: path
-  expected: [core.InputValidation, core.PathAccessCheck]
-  kind: target
-  text: "review static-file path filters for percent-decoding or explicit %2e dot-segment rejection before serving files"
-}

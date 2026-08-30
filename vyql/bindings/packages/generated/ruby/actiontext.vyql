@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m275876ff;
-
-binding deserialization0 {
-  requires {
-    dependency("actiontext")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

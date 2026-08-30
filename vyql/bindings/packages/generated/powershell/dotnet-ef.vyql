@@ -1,9 +1,0 @@
-module bindings.powershell.generated.m5cd31769;
-
-binding commandExecution0 {
-  requires {
-    dependency("dotnet-ef")
-  }
-  query pattern callExpr where callee.path ~= "dotnet-ef.exe"
-  emit sink code.CommandExecution at args[0]
-}

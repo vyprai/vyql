@@ -1,7 +1,0 @@
-module code;
-
-review code.OwnerFieldClear {
-  category: resource
-  kind: attention
-  text: "review whether clearing the owner field before release leaks nested state"
-}

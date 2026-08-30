@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m312a3258;
-
-binding deserialization0 {
-  requires {
-    dependency("tomlrb")
-  }
-  query pattern callExpr where callee.method == "Tomlrb::Parser"
-  emit sink code.Deserialization at args[0]
-}

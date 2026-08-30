@@ -1,7 +1,0 @@
-module code;
-
-review code.GsonObjectTypeAdapterRecursiveRead {
-  category: resource
-  kind: attention
-  text: "review Gson ObjectTypeAdapter JSON parsing for iterative traversal or an explicit nesting limit before recursive read calls"
-}

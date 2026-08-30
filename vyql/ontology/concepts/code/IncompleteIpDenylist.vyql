@@ -1,6 +1,0 @@
-module code;
-
-concept IncompleteIpDenylist : issue {
-  cwe: [CWE_918]
-  vulnerableTo: [request_forgery.Ssrf]
-}

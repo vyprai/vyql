@@ -1,6 +1,0 @@
-module smartcontract;
-
-threat ExternalCallInjection {
-  cwe: [CWE_829]
-  desc: "Untrusted address/value in a low-level external call (.call/.delegatecall/.send/.transfer)"
-}

@@ -1,7 +1,0 @@
-module code;
-
-review code.AuthenticatedDecryptionTagReview {
-  category: crypto
-  kind: attention
-  text: "review authenticated decryption tag validation for fixed length and fail-closed behavior"
-}

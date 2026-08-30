@@ -1,9 +1,0 @@
-module bindings.dart.generated.m9d205ded;
-
-binding userControlledData0 {
-  requires {
-    dependency("image_picker")
-  }
-  query pattern callExpr where callee.method == "ImagePicker.pickImage"
-  emit source core.UserControlledData at call.result
-}

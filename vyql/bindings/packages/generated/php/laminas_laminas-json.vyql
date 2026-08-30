@@ -1,9 +1,0 @@
-module bindings.php.generated.maf7f4a5e;
-
-binding deserialization0 {
-  requires {
-    dependency("laminas/laminas-json")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

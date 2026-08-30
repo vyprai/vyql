@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mf4c79d6e;
-
-binding commandExecution0 {
-  requires {
-    dependency("boilex")
-  }
-  query pattern callExpr where callee.method == "Mix.Tasks.Boilex.Ci.run"
-  emit sink code.CommandExecution at args[0]
-}

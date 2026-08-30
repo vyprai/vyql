@@ -1,9 +1,0 @@
-module bindings.scala.generated.mba9d9b71;
-
-binding deserialization0 {
-  requires {
-    dependency("io.rest-assured:json-path")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

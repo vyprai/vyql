@@ -1,7 +1,0 @@
-module code;
-
-concept StoredDataWrite : sink {
-  cwe: [CWE_312]
-  enabledBy: [taint.SecretValue]
-  vulnerableTo: [crypto.CleartextStorage]
-}

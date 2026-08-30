@@ -1,9 +1,0 @@
-module bindings.python.generated.m8eae8340;
-
-binding codeEval0 {
-  requires {
-    dependency("apscheduler")
-  }
-  query pattern callExpr where callee.method == "apscheduler.executors.base.run_job"
-  emit sink code.CodeEval at args[0]
-}

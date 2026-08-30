@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8f298494;
-
-binding networkData0 {
-  requires {
-    dependency("broadway_sqs")
-  }
-  query pattern callExpr where callee.method == "receive_messages"
-  emit source code.NetworkData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m684a3e9b;
-
-binding commandExecution0 {
-  requires {
-    dependency("org.apache.zookeeper:zookeeper")
-  }
-  query pattern callExpr where callee.method == "execCommand"
-  emit sink code.CommandExecution at args[0]
-}

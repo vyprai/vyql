@@ -1,6 +1,0 @@
-module crypto;
-
-threat CleartextTransmission {
-  cwe: [CWE_319]
-  desc: "Cleartext transmission of sensitive information"
-}

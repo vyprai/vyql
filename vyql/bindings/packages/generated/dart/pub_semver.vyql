@@ -1,9 +1,0 @@
-module bindings.dart.generated.m45e86d19;
-
-binding deserialization0 {
-  requires {
-    dependency("pub_semver")
-  }
-  query pattern callExpr where callee.method == "Version.parse"
-  emit sink code.Deserialization at args[0]
-}

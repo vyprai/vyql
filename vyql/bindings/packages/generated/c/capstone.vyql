@@ -1,9 +1,0 @@
-module bindings.c.generated.mb99d2cb4;
-
-binding deserialization0 {
-  requires {
-    dependency("capstone")
-  }
-  query pattern callExpr where callee.method == "decodeULEB128"
-  emit sink code.Deserialization at args[0]
-}

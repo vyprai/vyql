@@ -1,9 +1,0 @@
-module bindings.perl.generated.m16cd8f00;
-
-binding networkData0 {
-  requires {
-    dependency("RxPerl")
-  }
-  query pattern callExpr where callee.method == "websocket"
-  emit source code.NetworkData at call.result
-}

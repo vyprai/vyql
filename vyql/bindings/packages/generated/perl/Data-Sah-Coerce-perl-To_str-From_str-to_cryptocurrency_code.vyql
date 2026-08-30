@@ -1,9 +1,0 @@
-module bindings.perl.generated.m893b555e;
-
-binding userControlledData0 {
-  requires {
-    dependency("Data-Sah-Coerce-perl-To_str-From_str-to_cryptocurrency_code")
-  }
-  query pattern callExpr where callee.method == "coerce"
-  emit source core.UserControlledData at call.result
-}

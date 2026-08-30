@@ -1,9 +1,0 @@
-module bindings.java.generated.m4f920ed3;
-
-binding xmlParse0 {
-  requires {
-    dependency("com.sun.xml.bind:jaxb-core")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.XmlParse at args[0]
-}

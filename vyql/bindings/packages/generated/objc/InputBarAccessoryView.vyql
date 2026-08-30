@@ -1,9 +1,0 @@
-module bindings.objc.generated.md3caee6a;
-
-binding userControlledData0 {
-  requires {
-    dependency("InputBarAccessoryView")
-  }
-  query pattern callExpr where callee.method == "inputBar:didPressSendButtonWith:"
-  emit source core.UserControlledData at call.result
-}

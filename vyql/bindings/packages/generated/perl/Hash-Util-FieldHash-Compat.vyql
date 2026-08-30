@@ -1,9 +1,0 @@
-module bindings.perl.generated.m51c5629c;
-
-binding weakHash0 {
-  requires {
-    dependency("Hash-Util-FieldHash-Compat")
-  }
-  query pattern callExpr where callee.method == "fieldhash"
-  emit issue code.WeakHash at call
-}

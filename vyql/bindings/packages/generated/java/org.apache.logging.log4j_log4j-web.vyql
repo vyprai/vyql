@@ -1,9 +1,0 @@
-module bindings.java.generated.m5c323665;
-
-binding userControlledData0 {
-  requires {
-    dependency("org.apache.logging.log4j:log4j-web")
-  }
-  query pattern callExpr where callee.method == "lookup"
-  emit source core.UserControlledData at call.result
-}

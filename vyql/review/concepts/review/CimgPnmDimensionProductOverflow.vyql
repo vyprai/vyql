@@ -1,8 +1,0 @@
-module code;
-
-review code.CimgPnmDimensionProductOverflow {
-  category: numeric
-  expected: [core.IntegerOverflowGuard]
-  kind: attention
-  text: "review CImg get_load_pnm dimension-size checks for a widened width-height-depth multiplication before allocation or loading"
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m9d813707;
-
-binding deserialization0 {
-  requires {
-    dependency("dlib")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

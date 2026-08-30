@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m0c74143c;
-
-binding deserialization0 {
-  requires {
-    dependency("raw-body")
-  }
-  query pattern callExpr where callee.method == "getRawBody"
-  emit sink code.Deserialization at args[0]
-}

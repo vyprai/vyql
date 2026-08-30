@@ -1,9 +1,0 @@
-module bindings.objc.generated.mddd1a0e2;
-
-binding weakHash0 {
-  requires {
-    dependency("AWSPluginsCore")
-  }
-  query pattern callExpr where callee.method == "update"
-  emit issue code.WeakHash at call
-}

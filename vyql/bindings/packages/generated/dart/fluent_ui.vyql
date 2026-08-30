@@ -1,9 +1,0 @@
-module bindings.dart.generated.m01dce390;
-
-binding deserialization0 {
-  requires {
-    dependency("fluent_ui")
-  }
-  query pattern callExpr where callee.method == "defaultParse"
-  emit sink code.Deserialization at args[0]
-}

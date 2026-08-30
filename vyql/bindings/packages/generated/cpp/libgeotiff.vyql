@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m4876bc2a;
-
-binding storedDataRead0 {
-  requires {
-    dependency("libgeotiff")
-  }
-  query pattern callExpr where callee.method == "GTIFKeyGet"
-  emit source code.StoredDataRead at call.result
-}

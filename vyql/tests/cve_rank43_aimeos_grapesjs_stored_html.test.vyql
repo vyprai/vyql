@@ -1,8 +1,0 @@
-# Rank 43 / CVE-2025-66468: Aimeos GrapesJS stored HTML write.
-
-test "rank43: stored HTML write is a CVE anchor"
-  expect VYQL-INJ-028
-  graph
-  ```
-  node sink code.StoredHtmlWrite
-  ```

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m95dc5ed0;
-
-binding networkConnect0 {
-  requires {
-    dependency("github.com/vsanthanam/SafariUI")
-  }
-  query pattern callExpr where callee.method == "prewarmConnections"
-  emit sink code.NetworkConnectSink at args[0]
-}

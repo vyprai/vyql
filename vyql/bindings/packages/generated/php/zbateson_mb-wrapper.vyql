@@ -1,9 +1,0 @@
-module bindings.php.generated.m737d40ee;
-
-binding deserialization0 {
-  requires {
-    dependency("zbateson/mb-wrapper")
-  }
-  query pattern callExpr where callee.method == "convert"
-  emit sink code.Deserialization at args[0]
-}

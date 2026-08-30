@@ -1,9 +1,0 @@
-module bindings.perl.generated.m95e61eba;
-
-binding deserialization0 {
-  requires {
-    dependency("HTML-Selector-XPath")
-  }
-  query pattern callExpr where callee.method == "selector_to_xpath"
-  emit sink code.Deserialization at args[0]
-}

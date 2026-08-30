@@ -1,7 +1,0 @@
-module core;
-
-concept MemoryBoundsCheckIssue : issue {
-  applies: path
-  cwe: [CWE_125, CWE_787]
-  neutralizes: [memory.OobRead, memory.OobWrite]
-}

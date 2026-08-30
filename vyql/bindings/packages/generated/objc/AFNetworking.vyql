@@ -1,9 +1,0 @@
-module bindings.objc.generated.mfa27ee45;
-
-binding certValidationDisabled0 {
-  requires {
-    dependency("AFNetworking")
-  }
-  query pattern callExpr where callee.method == "evaluateServerTrust:forDomain:"
-  emit issue code.CertValidationDisabled at call
-}

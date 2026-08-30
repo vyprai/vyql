@@ -1,8 +1,0 @@
-module code;
-
-review code.TempPathJoinBeforeSeparatorCheck {
-  category: path
-  expected: [core.PathAccessCheck]
-  kind: attention
-  text: "review temp filename joins for path-separator rejection or basename canonicalization before temp path registration"
-}

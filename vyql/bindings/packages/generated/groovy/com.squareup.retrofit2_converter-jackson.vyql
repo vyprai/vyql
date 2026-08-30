@@ -1,9 +1,0 @@
-module bindings.groovy.generated.meef7bba9;
-
-binding deserialization0 {
-  requires {
-    dependency("com.squareup.retrofit2:converter-jackson")
-  }
-  query pattern callExpr where callee.method == "JacksonResponseBodyConverter.convert"
-  emit sink code.Deserialization at args[0]
-}

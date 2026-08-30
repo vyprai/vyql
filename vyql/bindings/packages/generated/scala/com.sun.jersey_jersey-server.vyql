@@ -1,9 +1,0 @@
-module bindings.scala.generated.ma8027f76;
-
-binding httpInput0 {
-  requires {
-    dependency("com.sun.jersey:jersey-server")
-  }
-  query pattern callExpr where callee.method == "cookie"
-  emit source code.HttpInput at call.result
-}

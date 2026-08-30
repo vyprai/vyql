@@ -1,9 +1,0 @@
-module bindings.swift.generated.m7c0a10aa;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/apple/FHIRModels")
-  }
-  query pattern callExpr where callee.method == "init(from:)"
-  emit sink code.Deserialization at args[0]
-}

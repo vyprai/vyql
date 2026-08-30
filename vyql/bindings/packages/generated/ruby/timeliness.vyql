@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mdb16a42f;
-
-binding deserialization0 {
-  requires {
-    dependency("timeliness")
-  }
-  query pattern callExpr where callee.method == "Timeliness::Parser.parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m080df91e;
-
-binding codeEval0 {
-  requires {
-    dependency("workbox-sw")
-  }
-  query pattern callExpr where callee.method == "importScripts"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.mcf96b502;
-
-binding commandExecution0 {
-  requires {
-    dependency("debugpy")
-  }
-  query pattern callExpr where callee.method == "spawn"
-  emit sink code.CommandExecution at args[0]
-}

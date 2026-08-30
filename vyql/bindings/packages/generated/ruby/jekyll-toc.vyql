@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mf8228642;
-
-binding deserialization0 {
-  requires {
-    dependency("jekyll-toc")
-  }
-  query pattern callExpr where callee.method == "Parser"
-  emit sink code.Deserialization at args[0]
-}

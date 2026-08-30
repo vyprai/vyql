@@ -1,9 +1,0 @@
-module bindings.php.generated.m20ec4d4c;
-
-binding userControlledData0 {
-  requires {
-    dependency("willdurand/negotiation")
-  }
-  query pattern callExpr where callee.method == "NegotiationAbstractNegotiator::getBest"
-  emit source core.UserControlledData at call.result
-}

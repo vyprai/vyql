@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mffd63f21;
-
-binding domInput0 {
-  requires {
-    dependency("rxjs-lite")
-  }
-  query pattern callExpr where callee.method == "createEventListener"
-  emit source code.DomInput at call.result
-}

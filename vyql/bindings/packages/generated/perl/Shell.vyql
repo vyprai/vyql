@@ -1,9 +1,0 @@
-module bindings.perl.generated.m87ea4231;
-
-binding commandExecution0 {
-  requires {
-    dependency("Shell")
-  }
-  query pattern callExpr where callee.method == "_make_cmd"
-  emit sink code.CommandExecution at args[0]
-}

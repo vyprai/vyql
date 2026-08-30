@@ -1,8 +1,0 @@
-module code;
-
-review code.SamlAssertionWrappingBypass {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: attention
-  text: "review SAML assertion validation for a single direct Assertion element in the expected namespace before accepting a signed assertion"
-}

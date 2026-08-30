@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mef11d337;
-
-binding filePathAccess0 {
-  requires {
-    dependency("gperf")
-  }
-  query pattern callExpr where callee.method == "Input<KT>::read_input"
-  emit sink code.FilePathAccess at args[0]
-}

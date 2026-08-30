@@ -1,6 +1,0 @@
-module injection;
-
-threat HttpResponseSplitting {
-  cwe: [CWE_113]
-  desc: "Untrusted data in HTTP headers"
-}

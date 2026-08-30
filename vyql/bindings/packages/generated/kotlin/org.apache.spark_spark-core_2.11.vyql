@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m6961dd39;
-
-binding commandExecution0 {
-  requires {
-    dependency("org.apache.spark:spark-core_2.11")
-  }
-  query pattern callExpr where callee.method == "testCommandAvailable"
-  emit sink code.CommandExecution at args[0]
-}

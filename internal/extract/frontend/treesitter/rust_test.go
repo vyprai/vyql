@@ -103,6 +103,77 @@ unsafe impl<T: Send> Sync for VecBox<T> {}
 	}
 }
 
+func TestRustUnsafeImplBoundsAttachToParameters(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lib.rs")
+	src := []byte(`
+pub struct RawRwLock;
+pub trait GuardMarker {}
+
+pub struct MappedRwLockReadGuard<'a, R: RawRwLock, T: ?Sized> {
+    raw: &'a R,
+    data: *const T,
+}
+
+pub struct MappedRwLockWriteGuard<'a, R: RawRwLock, T: ?Sized> {
+    raw: &'a R,
+    data: *mut T,
+}
+
+pub struct Marker(*mut ());
+
+// A bound on an associated type constrains a projection, not the parameter:
+// neither guard's parameter carries a Send or Sync bound of its own.
+unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized + 'a> Send
+    for MappedRwLockReadGuard<'a, R, T>
+where
+    R::GuardMarker: Send,
+{
+}
+
+unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized + 'a> Send
+    for MappedRwLockWriteGuard<'a, R, T>
+where
+    R::GuardMarker: Send,
+{
+}
+
+// Either bound on the parameter makes the impl conditional.
+unsafe impl<'a, R: RawRwLock + 'a, T: ?Sized + Sync + 'a> Send
+    for MappedRwLockReadGuard<'a, R, T>
+where
+    R::GuardMarker: Send,
+{
+}
+
+unsafe impl<T> Send for BoundedInWhere<T> where T: Send {}
+
+// A concrete impl asserts thread safety for a fully known type.
+unsafe impl Sync for Marker {}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractRust([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if countRustAnalysisNodes(nodes, "analysis.rust.unsafe_send_impl_missing_bound") != 2 {
+		t.Fatalf("want missing-bound on the two unparameterised guard impls only; nodes=%#v", nodes)
+	}
+	if hasRustAnalysisNode(nodes, "analysis.rust.unsafe_sync_impl_missing_bound") {
+		t.Fatalf("concrete Sync impl should not emit missing-bound observation; nodes=%#v", nodes)
+	}
+}
+
 func TestRustFfiEnumLayoutSpecificObservation(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "lib.rs")
@@ -443,4 +514,58 @@ func countRustAnalysisNodes(nodes []usg.Node, path string) int {
 		}
 	}
 	return count
+}
+
+func TestRustFunctionContextRecordsExternAbi(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "lib.rs")
+	src := []byte(`
+extern "C"
+fn c_proxy(userdata: *mut u8) {
+    let callback = get(userdata);
+    callback(1);
+}
+
+extern
+fn default_abi(x: i32) {
+    work(x);
+}
+
+extern "C-unwind"
+fn unwinding(x: i32) {
+    work(x);
+}
+
+fn plain(x: i32) {
+    work(x);
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractRust([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{
+		"c_proxy":     "abi=C",
+		"default_abi": "abi=C",
+		"unwinding":   "abi=C-unwind",
+	} {
+		got := rustFunctionContextArgs(nodes, name)
+		if !strings.Contains(got, want) {
+			t.Fatalf("extern function %s context missing %q; context=%q", name, want, got)
+		}
+	}
+	if got := rustFunctionContextArgs(nodes, "plain"); strings.Contains(got, "abi=") {
+		t.Fatalf("plain function context carries an abi token; context=%q", got)
+	}
 }

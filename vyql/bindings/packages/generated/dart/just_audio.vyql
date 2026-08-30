@@ -1,9 +1,0 @@
-module bindings.dart.generated.m18ce8c3c;
-
-binding httpInput0 {
-  requires {
-    dependency("just_audio")
-  }
-  query pattern callExpr where callee.method == "_HttpRangeRequest.parse"
-  emit source code.HttpInput at call.result
-}

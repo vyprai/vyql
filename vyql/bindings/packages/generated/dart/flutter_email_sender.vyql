@@ -1,9 +1,0 @@
-module bindings.dart.generated.m337a4a40;
-
-binding networkSend0 {
-  requires {
-    dependency("flutter_email_sender")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

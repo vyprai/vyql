@@ -1,9 +1,0 @@
-module bindings.perl.generated.m9f1f7004;
-
-binding xmlParse0 {
-  requires {
-    dependency("Template-Semantic")
-  }
-  query pattern callExpr where callee.method == "process"
-  emit sink code.XmlParse at args[0]
-}

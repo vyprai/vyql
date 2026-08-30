@@ -1,9 +1,0 @@
-module bindings.java.generated.m24a1f5c7;
-
-binding sqlExecution0 {
-  requires {
-    dependency("org.dbunit:dbunit")
-  }
-  query pattern callExpr where callee.method == "setSql"
-  emit sink code.SqlExecution at args[0]
-}

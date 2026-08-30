@@ -1,9 +1,0 @@
-module bindings.swift.generated.md7cfc018;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/raspu/Highlightr")
-  }
-  query pattern callExpr where callee.method == "highlight"
-  emit sink code.Deserialization at args[0]
-}

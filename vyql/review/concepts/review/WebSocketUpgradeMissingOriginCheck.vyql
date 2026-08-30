@@ -1,8 +1,0 @@
-module code;
-
-review code.WebSocketUpgradeMissingOriginCheck {
-  category: request
-  expected: [core.CsrfProtection, core.AuthenticationCheck]
-  kind: target
-  text: "review WebSocket upgrade handlers for trusted Origin validation before handleUpgrade"
-}

@@ -1,9 +1,0 @@
-module bindings.c.generated.mf926f3bc;
-
-binding fileUse0 {
-  requires {
-    dependency("console-bridge")
-  }
-  query pattern callExpr where callee.method == "OutputHandlerFile"
-  emit sink code.FileUseSink at args[0]
-}

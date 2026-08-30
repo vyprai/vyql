@@ -1,9 +1,0 @@
-module bindings.dart.generated.m5549deba;
-
-binding deserialization0 {
-  requires {
-    dependency("youtube_explode_dart")
-  }
-  query pattern callExpr where callee.method == "HlsManifest.parse"
-  emit sink code.Deserialization at args[0]
-}

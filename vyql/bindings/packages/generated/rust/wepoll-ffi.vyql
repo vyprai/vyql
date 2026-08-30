@@ -1,9 +1,0 @@
-module bindings.rust.generated.m105d5b43;
-
-binding fileUse0 {
-  requires {
-    dependency("wepoll-ffi")
-  }
-  query pattern callExpr where callee.method == "epoll_ctl"
-  emit sink code.FileUseSink at args[0]
-}

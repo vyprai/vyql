@@ -1,7 +1,0 @@
-module code;
-
-review code.ChatterBotSqlalchemySessionPoolExhaustion {
-  category: resource
-  kind: attention
-  text: "review SQLAlchemy session factories and generator-backed queries for bounded pools and guaranteed session cleanup"
-}

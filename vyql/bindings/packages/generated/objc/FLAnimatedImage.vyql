@@ -1,9 +1,0 @@
-module bindings.objc.generated.m2dcfa796;
-
-binding deserialization0 {
-  requires {
-    dependency("FLAnimatedImage")
-  }
-  query pattern callExpr where callee.method == "initWithAnimatedGIFData:optimalFrameCacheSize:predrawingEnabled:"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.ma6f79019;
-
-binding deserialization0 {
-  requires {
-    dependency("org.codehaus.jackson:jackson-xc")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

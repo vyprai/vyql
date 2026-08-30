@@ -1,8 +1,0 @@
-module code;
-
-review code.CodeServerPathProxyPortConfusedProxy {
-  category: request_forgery
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review code-server path proxy targets for numeric port validation before proxying requests"
-}

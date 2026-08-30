@@ -1,7 +1,0 @@
-module core;
-
-concept ReferrerPolicy : check {
-  applies: endpoint
-  cwe: [CWE_200, CWE_598]
-  neutralizes: [secrets.SecretLeak]
-}

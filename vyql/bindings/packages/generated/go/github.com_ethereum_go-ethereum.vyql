@@ -1,9 +1,0 @@
-module bindings.go.generated.mf3df0ec7;
-
-binding userControlledData0 {
-  requires {
-    dependency("github.com/ethereum/go-ethereum")
-  }
-  query pattern callExpr where callee.method == "ParseDerivationPath"
-  emit source core.UserControlledData at call.result
-}

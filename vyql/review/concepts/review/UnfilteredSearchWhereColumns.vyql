@@ -1,7 +1,0 @@
-module code;
-
-review code.UnfilteredSearchWhereColumns {
-  category: sql
-  kind: attention
-  text: "review searchable query scopes that allowlist only some request keys before passing the full search array to where()"
-}

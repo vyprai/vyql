@@ -1,9 +1,0 @@
-module bindings.scala.generated.mc3001c65;
-
-binding xmlParse0 {
-  requires {
-    dependency("org.apache.maven:maven-project")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.XmlParse at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.m3ee55bfa;
-
-binding xmlParse0 {
-  requires {
-    dependency("io.springfox:springfox-swagger2")
-  }
-  query pattern callExpr where callee.method == "mapXml"
-  emit sink code.XmlParse at args[0]
-}

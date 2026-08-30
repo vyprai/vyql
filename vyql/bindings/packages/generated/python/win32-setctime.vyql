@@ -1,9 +1,0 @@
-module bindings.python.generated.m6d1fc608;
-
-binding filePathAccess0 {
-  requires {
-    dependency("win32-setctime")
-  }
-  query pattern callExpr where callee.method == "setctime"
-  emit sink code.FilePathAccess at args[0]
-}

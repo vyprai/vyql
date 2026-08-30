@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m9c226908;
-
-binding urlFetch0 {
-  requires {
-    dependency("sobelow")
-  }
-  query pattern callExpr where callee.method == "get_router"
-  emit sink code.UrlFetch at args[0]
-}

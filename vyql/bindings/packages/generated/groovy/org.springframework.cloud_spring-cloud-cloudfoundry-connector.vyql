@@ -1,9 +1,0 @@
-module bindings.groovy.generated.me42f01a3;
-
-binding secretValue0 {
-  requires {
-    dependency("org.springframework.cloud:spring-cloud-cloudfoundry-connector")
-  }
-  query pattern callExpr where callee.method == "CloudFoundryServiceInfoCreator.getCredentials"
-  emit source code.SecretValue at call.result
-}

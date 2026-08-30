@@ -1,9 +1,0 @@
-module bindings.swift.generated.m0012e89e;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/tikhop/TPInAppReceipt")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

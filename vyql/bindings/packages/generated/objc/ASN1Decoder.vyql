@@ -1,9 +1,0 @@
-module bindings.objc.generated.md54a4303;
-
-binding deserialization0 {
-  requires {
-    dependency("ASN1Decoder")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.bash.generated.m744189ae;
-
-binding filePathAccess0 {
-  requires {
-    dependency("terraform-docs")
-  }
-  query pattern callExpr where callee.path ~= "terraform-docs"
-  emit sink code.FilePathAccess at args[0]
-}

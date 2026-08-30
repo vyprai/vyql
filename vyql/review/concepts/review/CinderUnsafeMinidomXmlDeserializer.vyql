@@ -1,8 +1,0 @@
-module code;
-
-review code.CinderUnsafeMinidomXmlDeserializer {
-  category: xml
-  expected: [core.XmlHardening]
-  kind: attention
-  text: "review OpenStack Cinder extension XML deserializers for safe_minidom_parse_string before parsing request XML"
-}

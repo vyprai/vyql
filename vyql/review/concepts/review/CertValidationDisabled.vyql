@@ -1,8 +1,0 @@
-module code;
-
-review code.CertValidationDisabled {
-  category: crypto
-  expected: [core.CertificateValidation]
-  kind: target
-  text: "review TLS client options for disabled or missing certificate and hostname validation"
-}

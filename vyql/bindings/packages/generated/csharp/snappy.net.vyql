@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m13d36331;
-
-binding deserialization0 {
-  requires {
-    dependency("snappy.net")
-  }
-  query pattern callExpr where callee.method == "Uncompress"
-  emit sink code.Deserialization at args[0]
-}

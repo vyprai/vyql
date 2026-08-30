@@ -1,8 +1,0 @@
-module code;
-
-review code.IncompleteDangerousUploadExtensionBlocklist {
-  category: upload
-  expected: [core.AllowlistValidation]
-  kind: attention
-  text: "review dangerous upload extension blocklists for omitted executable extensions such as PHAR"
-}

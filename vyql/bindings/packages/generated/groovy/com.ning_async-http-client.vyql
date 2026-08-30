@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m75f1e56d;
-
-binding urlFetch0 {
-  requires {
-    dependency("com.ning:async-http-client")
-  }
-  query pattern callExpr where callee.method == "get"
-  emit sink code.UrlFetch at args[0]
-}

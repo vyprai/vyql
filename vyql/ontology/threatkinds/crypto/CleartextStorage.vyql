@@ -1,6 +1,0 @@
-module crypto;
-
-threat CleartextStorage {
-  cwe: [CWE_312]
-  desc: "Cleartext storage of sensitive information"
-}

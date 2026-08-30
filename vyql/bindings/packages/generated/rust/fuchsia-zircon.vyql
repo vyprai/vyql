@@ -1,9 +1,0 @@
-module bindings.rust.generated.m0fc7402b;
-
-binding secretValue0 {
-  requires {
-    dependency("fuchsia-zircon")
-  }
-  query pattern callExpr where callee.method == "cprng_draw"
-  emit source code.SecretValue at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m4df7f115;
-
-binding deserialization0 {
-  requires {
-    dependency("pQuery")
-  }
-  query pattern callExpr where callee.method == "pQuery::DOM->fromHTML"
-  emit sink code.Deserialization at args[0]
-}
