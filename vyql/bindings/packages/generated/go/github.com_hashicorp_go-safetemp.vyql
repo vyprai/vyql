@@ -1,9 +1,0 @@
-module bindings.go.generated.m61ecac6d;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/hashicorp/go-safetemp")
-  }
-  query pattern callExpr where callee.method == "Dir"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m745eb6d4;
-
-binding deserialization0 {
-  requires {
-    dependency("timezone")
-  }
-  query pattern callExpr where callee.method == "TZDateTime.parse"
-  emit sink code.Deserialization at args[0]
-}

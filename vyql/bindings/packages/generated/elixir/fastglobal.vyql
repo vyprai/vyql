@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m56ec8c24;
-
-binding codeEval0 {
-  requires {
-    dependency("fastglobal")
-  }
-  query pattern callExpr where callee.method == "put"
-  emit sink code.CodeEval at args[0]
-}

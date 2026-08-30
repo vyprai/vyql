@@ -1,9 +1,0 @@
-module bindings.python.generated.mb2f9c70f;
-
-binding deserialization0 {
-  requires {
-    dependency("entrypoints")
-  }
-  query pattern callExpr where callee.method == "EntryPoint.load"
-  emit sink code.Deserialization at args[0]
-}

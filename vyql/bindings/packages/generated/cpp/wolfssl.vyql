@@ -1,9 +1,0 @@
-module bindings.cpp.generated.md2e8b40f;
-
-binding secretValue0 {
-  requires {
-    dependency("wolfssl")
-  }
-  query pattern callExpr where callee.method == "CRYPT_RSA_PrivateKeyDecode"
-  emit source code.SecretValue at call.result
-}

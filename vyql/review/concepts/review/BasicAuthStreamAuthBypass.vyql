@@ -1,8 +1,0 @@
-module code;
-
-review code.BasicAuthStreamAuthBypass {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: attention
-  text: "review streaming/SSE auth option builders that enable Basic auth but do not set AuthRequired=true"
-}

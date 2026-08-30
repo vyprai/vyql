@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mc301844f;
-
-binding commandExecution0 {
-  requires {
-    dependency("parallel_tests")
-  }
-  query pattern callExpr where callee.method == "execute_command_in_parallel"
-  emit sink code.CommandExecution at args[0]
-}

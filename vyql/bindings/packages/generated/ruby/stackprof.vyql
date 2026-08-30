@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mf3773629;
-
-binding deserialization0 {
-  requires {
-    dependency("stackprof")
-  }
-  query pattern callExpr where callee.method == "StackProf::Report.parse_json"
-  emit sink code.Deserialization at args[0]
-}

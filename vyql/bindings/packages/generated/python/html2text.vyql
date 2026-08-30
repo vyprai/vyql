@@ -1,9 +1,0 @@
-module bindings.python.generated.ma38a6978;
-
-binding deserialization0 {
-  requires {
-    dependency("html2text")
-  }
-  query pattern callExpr where callee.method == "html2text"
-  emit sink code.Deserialization at args[0]
-}

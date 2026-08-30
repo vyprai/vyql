@@ -1,8 +1,0 @@
-# Rank 117 / CVE-2024-47827: Argo Workflows lockless shared mutation.
-
-test "rank117: lockless shared mutation is a CVE anchor"
-  expect VYQL-RACE-002
-  graph
-  ```
-  node mutation code.LocklessSharedMutation
-  ```

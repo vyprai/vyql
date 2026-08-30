@@ -1,9 +1,0 @@
-module bindings.scala.generated.m9d7b3af3;
-
-binding weakHash0 {
-  requires {
-    dependency("c3p0:c3p0")
-  }
-  query pattern callExpr where callee.method == "hash"
-  emit issue code.WeakHash at call
-}

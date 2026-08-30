@@ -1,8 +1,0 @@
-module code;
-
-review code.UnboundedRouteFilenameCacheAccess {
-  category: resource
-  expected: [core.InputValidation]
-  kind: target
-  text: "review route-derived cache filenames for a length bound before filesystem path construction"
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m71959898;
-
-binding deserialization0 {
-  requires {
-    dependency("dflydev/dot-access-configuration")
-  }
-  query pattern callExpr where callee.method == "internalBuild"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m470187f1;
-
-binding filePathAccess0 {
-  requires {
-    dependency("gdk-pixbuf")
-  }
-  query pattern callExpr where callee.method == "init_modules"
-  emit sink code.FilePathAccess at args[0]
-}

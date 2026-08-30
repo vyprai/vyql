@@ -1,9 +1,0 @@
-module bindings.c.generated.m5a072ec5;
-
-binding deserialization0 {
-  requires {
-    dependency("jbig2dec")
-  }
-  query pattern callExpr where callee.method == "jbig2_parse_segment_header"
-  emit sink code.Deserialization at args[0]
-}

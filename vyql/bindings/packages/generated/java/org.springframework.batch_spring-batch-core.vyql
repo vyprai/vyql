@@ -1,9 +1,0 @@
-module bindings.java.generated.m50745772;
-
-binding commandExecution0 {
-  requires {
-    dependency("org.springframework.batch:spring-batch-core")
-  }
-  query pattern callExpr where callee.method == "SystemCommandTasklet.execute"
-  emit sink code.CommandExecution at args[0]
-}

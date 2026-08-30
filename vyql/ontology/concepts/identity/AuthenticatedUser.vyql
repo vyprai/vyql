@@ -1,4 +1,0 @@
-module identity;
-
-concept AuthenticatedUser : principal {
-}

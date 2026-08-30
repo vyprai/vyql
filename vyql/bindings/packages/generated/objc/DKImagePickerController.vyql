@@ -1,9 +1,0 @@
-module bindings.objc.generated.m92b3816a;
-
-binding fileUse0 {
-  requires {
-    dependency("DKImagePickerController")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FileUseSink at args[0]
-}

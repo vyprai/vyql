@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mb4d2e854;
-
-binding deserialization0 {
-  requires {
-    dependency("coin")
-  }
-  query pattern callExpr where callee.method == "coin_parse_versionstring"
-  emit sink code.Deserialization at args[0]
-}

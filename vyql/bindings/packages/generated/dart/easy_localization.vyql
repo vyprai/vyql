@@ -1,9 +1,0 @@
-module bindings.dart.generated.m7869fba5;
-
-binding filePathAccess0 {
-  requires {
-    dependency("easy_localization")
-  }
-  query pattern callExpr where callee.method == "AuditCommand.run"
-  emit sink code.FilePathAccess at args[0]
-}

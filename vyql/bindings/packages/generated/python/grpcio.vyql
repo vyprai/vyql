@@ -1,9 +1,0 @@
-module bindings.python.generated.m14d58d0e;
-
-binding commandExecution0 {
-  requires {
-    dependency("grpcio")
-  }
-  query pattern callExpr where callee.method == "Spawn"
-  emit sink code.CommandExecution at args[0]
-}

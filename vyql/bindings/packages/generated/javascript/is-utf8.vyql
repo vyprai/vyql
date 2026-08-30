@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m6582a4c5;
-
-binding deserialization0 {
-  requires {
-    dependency("is-utf8")
-  }
-  query pattern callExpr where callee.method == "module.exports"
-  emit sink code.Deserialization at args[0]
-}

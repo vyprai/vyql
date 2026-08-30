@@ -1,6 +1,0 @@
-module desktop;
-
-threat InsecureElectronConfig {
-  cwe: [CWE_829]
-  desc: "Electron renderer with nodeIntegration enabled / contextIsolation disabled (untrusted web content can run Node)"
-}

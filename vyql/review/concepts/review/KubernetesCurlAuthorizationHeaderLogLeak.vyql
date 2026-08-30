@@ -1,8 +1,0 @@
-module code;
-
-review code.KubernetesCurlAuthorizationHeaderLogLeak {
-  category: secret
-  expected: [core.SecretRedaction]
-  kind: attention
-  text: "review Kubernetes client-go curl debug logging for authorization-header redaction before formatting header values"
-}

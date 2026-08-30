@@ -1,8 +1,0 @@
-module code;
-
-review code.EmailAttachmentFilenamePathTraversal {
-  category: path
-  expected: [core.PathCanonicalization]
-  kind: attention
-  text: "review email attachment extraction for basename canonicalization before joining attachment filenames into output paths"
-}

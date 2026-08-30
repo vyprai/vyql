@@ -1,9 +1,0 @@
-module bindings.dart.generated.mad313438;
-
-binding filePathAccess0 {
-  requires {
-    dependency("dart_style")
-  }
-  query pattern callExpr where callee.method == "formatPaths"
-  emit sink code.FilePathAccess at args[0]
-}

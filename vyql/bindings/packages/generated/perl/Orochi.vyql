@@ -1,9 +1,0 @@
-module bindings.perl.generated.mcfc55109;
-
-binding codeEval0 {
-  requires {
-    dependency("Orochi")
-  }
-  query pattern callExpr where callee.method == "expand"
-  emit sink code.CodeEval at args[0]
-}

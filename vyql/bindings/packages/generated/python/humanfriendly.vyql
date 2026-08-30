@@ -1,9 +1,0 @@
-module bindings.python.generated.m66402d04;
-
-binding commandExecution0 {
-  requires {
-    dependency("humanfriendly")
-  }
-  query pattern callExpr where callee.method == "run_command"
-  emit sink code.CommandExecution at args[0]
-}

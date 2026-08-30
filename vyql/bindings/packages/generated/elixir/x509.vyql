@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m93e1496f;
-
-binding deserialization0 {
-  requires {
-    dependency("x509")
-  }
-  query pattern callExpr where callee.method == "try_der_decode"
-  emit sink code.Deserialization at args[0]
-}

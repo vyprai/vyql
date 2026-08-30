@@ -1,6 +1,0 @@
-module code;
-
-concept MessageInput : source {
-  coverageReservedSource: true
-  taint: [taint.UntrustedData]
-}

@@ -50,7 +50,12 @@ type lowerer struct {
 	selfName       string
 	resolveImports bool
 	ctorTypes      map[string]string // constructor callee-path -> returned type name
-	g              usg.Store
+	// phiOperands holds, per control-flow merge node, the values that merge joins.
+	// A merge's FLOWS in-edges are not the same set: a later mutator call or an
+	// alias can add an edge into the same node, so the operands are captured where
+	// mergeDeltas builds the merge and nowhere else.
+	phiOperands map[string][]string
+	g           usg.Store
 	// storeErr holds the FIRST graph-write failure. Every node and edge the
 	// lowering produces goes through the two call sites that set it, and neither
 	// can report upward -- they are called from deep inside expression lowering,
@@ -765,6 +770,7 @@ func (l *lowerer) mergeDeltas(sc *scope, before map[string]string, deltas []map[
 		for _, s := range srcIDs {
 			l.flow(s, phi)
 		}
+		l.phiOperands[phi] = srcIDs
 		sc.setNode(v, phi)
 		sc.delCnst(v) // a merged value is no longer a known constant
 	}
@@ -1695,7 +1701,10 @@ func allowedHostsWildcard(target string, value nir.Expr) bool {
 }
 
 // certCheckDisabled reports whether TLS hostname/certificate checking is turned off via an
-// assignment `ctx.check_hostname = False` / `verify_mode = CERT_NONE` (CWE-295).
+// assignment `ctx.check_hostname = False` / `verify_mode = CERT_NONE` (CWE-295), or weakened via
+// `verify_mode = CERT_OPTIONAL`: the ssl.SSLContext peer certificate becomes optional rather than
+// required, which drops mandatory certificate/client-cert enforcement on the same attribute
+// (CWE-295/CWE-306).
 func certCheckDisabled(target string, value nir.Expr) bool {
 	n := strings.ToLower(target)
 	if strings.HasSuffix(n, "check_hostname") {
@@ -1704,11 +1713,17 @@ func certCheckDisabled(target string, value nir.Expr) bool {
 		}
 	}
 	if strings.HasSuffix(n, "verify_mode") {
-		if v, ok := litVal(value); ok && strings.Contains(strings.ToUpper(v), "CERT_NONE") {
-			return true
+		if v, ok := litVal(value); ok {
+			u := strings.ToUpper(v)
+			if strings.Contains(u, "CERT_NONE") || strings.Contains(u, "CERT_OPTIONAL") {
+				return true
+			}
 		}
-		if nm, ok := value.(nir.Name); ok && strings.Contains(strings.ToUpper(nm.ID), "CERT_NONE") {
-			return true
+		if nm, ok := value.(nir.Name); ok {
+			u := strings.ToUpper(nm.ID)
+			if strings.Contains(u, "CERT_NONE") || strings.Contains(u, "CERT_OPTIONAL") {
+				return true
+			}
 		}
 	}
 	return false
@@ -2137,6 +2152,130 @@ func isRegexApply(path, method string) bool {
 	return path == "re."+method || path == "regex."+method || strings.HasSuffix(path, ".re."+method)
 }
 
+// csharpRegexPatternArg reports which argument of a C# call is the regular-expression
+// pattern, or -1 when the call carries none. The Regex constructor takes the pattern
+// first (`new Regex("…")`, possibly namespace-qualified); the static helpers of the
+// same class take it second, after the input being matched
+// (`Regex.Match/IsMatch/Matches/Replace/Split(input, pattern)`). The instance form
+// (`compiled.IsMatch(input)`) has the pattern only in the compiled object and stays out.
+func csharpRegexPatternArg(path, method string) int {
+	if path == "Regex" || strings.HasSuffix(path, ".Regex") {
+		return 0
+	}
+	switch method {
+	case "Match", "IsMatch", "Matches", "Replace", "Split":
+		if path == "Regex."+method || strings.HasSuffix(path, ".Regex."+method) {
+			return 1
+		}
+	}
+	return -1
+}
+
+// javaRegexPatternArg reports which argument of a Java call is the regular-expression
+// pattern, or -1 when the call carries none. java.util.regex takes the pattern as a
+// plain string: `Pattern.compile(pattern)` and the static `Pattern.matches(pattern,
+// input)` name it first, and String's own regex methods take it as their first argument
+// with the input as the receiver (`s.matches(pattern)`, `s.replaceAll(pattern, repl)`,
+// `s.replaceFirst(pattern, repl)`). The forms that keep the pattern only inside an
+// already-compiled object stay out, as they do for C#: `matcher(in).matches()` takes no
+// pattern argument, and `compiled.split(input)` / `matcher.replaceAll(repl)` take the
+// INPUT or the replacement where the String spellings take the pattern, so `split` is
+// left out entirely rather than guessed at by receiver type.
+func javaRegexPatternArg(path, method string) int {
+	if path == "Pattern.compile" || strings.HasSuffix(path, ".Pattern.compile") ||
+		path == "Pattern.matches" || strings.HasSuffix(path, ".Pattern.matches") {
+		return 0
+	}
+	switch method {
+	case "matches", "replaceAll", "replaceFirst":
+		return 0
+	}
+	return -1
+}
+
+// csRegexPassesMatchTimeout reports whether a C# Regex construction passes the
+// matchTimeout argument -- the class's own documented defence against excessive
+// backtracking, in any overload, built inline (`TimeSpan.FromSeconds(…)`,
+// `new TimeSpan(…)`). A timeout held in a field is not resolvable from the call site
+// (a C# field declaration carries no declared type through the NIR) and stays with the
+// reviewer, as does Timeout.InfiniteTimeSpan, which lifts the limit rather than
+// setting one.
+func csRegexPassesMatchTimeout(args []nir.Expr, patIdx int) bool {
+	for i := patIdx + 1; i < len(args); i++ {
+		if c, ok := args[i].(nir.Call); ok {
+			segs := strings.Split(c.Path, ".")
+			last := segs[len(segs)-1]
+			secondLast := ""
+			if len(segs) >= 2 {
+				secondLast = segs[len(segs)-2]
+			}
+			if (c.IsCtor && last == "TimeSpan") || (secondLast == "TimeSpan" && strings.HasPrefix(last, "From")) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// csUnquoteVerbatim strips the C# verbatim-string wrapper a raw literal keeps after generic
+// unquoting: `@"…"` (and the interpolated `$@"…"`), where `""` escapes a quote. A pattern that
+// reached here already unquoted, or never carried the wrapper, is returned unchanged.
+func csUnquoteVerbatim(s string) string {
+	body := strings.TrimPrefix(s, "$@")
+	if strings.HasPrefix(body, "@\"") && strings.HasSuffix(body, "\"") && len(body) >= 3 {
+		return strings.ReplaceAll(body[2:len(body)-1], "\"\"", "\"")
+	}
+	return s
+}
+
+// javaUnescapeString folds the escape sequences of a Java string literal's text, so the
+// pattern handed to the ambiguity analysis is the one the JVM compiles: source `"\\."` is an
+// escaped dot at runtime, not a literal backslash followed by any character, which is what
+// the raw text says and would both hide a real separator and invent one. Only the sequences
+// that change a regex's shape are folded; an unknown or truncated escape keeps both
+// characters rather than guessing at what it was meant to be.
+func javaUnescapeString(s string) string {
+	if !strings.Contains(s, `\`) {
+		return s
+	}
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); i++ {
+		if s[i] != '\\' || i+1 >= len(s) {
+			b.WriteByte(s[i])
+			continue
+		}
+		i++
+		switch s[i] {
+		case 'n':
+			b.WriteByte('\n')
+		case 'r':
+			b.WriteByte('\r')
+		case 't':
+			b.WriteByte('\t')
+		case 'f':
+			b.WriteByte('\f')
+		case 'b':
+			b.WriteByte('\b')
+		case '0':
+			b.WriteByte(0)
+		case 'u':
+			if i+4 < len(s) {
+				if v, err := strconv.ParseUint(s[i+1:i+5], 16, 32); err == nil {
+					b.WriteRune(rune(v))
+					i += 4
+					continue
+				}
+			}
+			b.WriteByte('\\')
+			b.WriteByte(s[i])
+		default: // \\, \", \', and the regex escapes \d \w \s \. \- … — the char stands for itself
+			b.WriteByte(s[i])
+		}
+	}
+	return b.String()
+}
+
 // catastrophicRegex reports whether a regex has textbook super-linear backtracking structure —
 // a quantifier applied to a group that itself contains a quantifier or an alternation:
 // (a+)+  (a*)*  (.*)*  ((a)+)+  (\d+)*  (a|a)*  (a|ab)*  — the classic ReDoS shapes (CWE-1333/400).
@@ -2150,16 +2289,69 @@ func catastrophicRegex(pat string) bool {
 
 // envDefaultConst returns the hardcoded DEFAULT literal of an os.getenv(name, default) /
 // os.environ.get(name, default) call — the fallback baked into source (CWE-798). "" if none.
+//
+// The stdlib spellings are rarely the ones application code calls: an application wraps them in one
+// accessor of its own so it can cast, log and default in a single place (get_env_var(key, default,
+// cast_type), read_env(key, default)), and the fallback literal is just as baked into the source
+// when read through the wrapper. envGetterCallee names the wrappers it accepts.
 func envDefaultConst(e nir.Expr, l *lowerer) string {
 	c, ok := e.(nir.Call)
 	if !ok || len(c.Args) < 2 {
 		return ""
 	}
-	d := exprDotted(c.Callee)
-	if !(strings.HasSuffix(d, "getenv") || strings.HasSuffix(d, "environ.get") || strings.HasSuffix(d, "config.get")) {
+	if !envGetterCallee(exprDotted(c.Callee)) {
 		return ""
 	}
 	return constStr(c.Args[1])
+}
+
+// ctorDefaultConst returns the hardcoded DEFAULT literal baked into a multi-argument
+// constructor/config call — its FINAL argument, the slot a (name, ..., default) options
+// constructor declares the default in (`new ConfigOption<>(name, desc, checker, "literal")`,
+// `dict.get(key, "fallback")`). "" when the value is not a call, takes fewer than two
+// arguments, or its final argument is not a string literal: a default computed at runtime
+// (a call, an identifier) is generated, not baked into source. The two-argument minimum
+// keeps a single-argument call's operand — a header/algorithm name read by name
+// (`getHeader("X-Auth-Token")`, `Mac.getInstance("HmacSHA256")`) — out of the default slot.
+// As with envDefaultConst, only the slot is read here: whether the literal it holds matters
+// stays the caller's secretNamedTarget plus plausibleSecretLiteral decision.
+func ctorDefaultConst(e nir.Expr) string {
+	c, ok := e.(nir.Call)
+	if !ok || len(c.Args) < 2 {
+		return ""
+	}
+	return constStr(c.Args[len(c.Args)-1])
+}
+
+// envWrapperNames are the names an application gives its own (key, default) wrapper around the
+// stdlib environment accessors. envGetterCallee compares a callee's final segment against these
+// exactly. The list is closed on purpose: a substring or prefix test over "env" reads
+// envelope_decrypt(blob, "alias/production-cmk") and openEnvelope(blob, "AES-256-GCM") as
+// environment reads, and their second argument is a key alias or an algorithm name rather than a
+// default — while envelope crypto is precisely where secret-named targets live, so such a test's
+// false positives correlate with the secret-name guard meant to hold them back. Value-setting forms
+// (setenv, putenv) are absent for the same reason: their second argument is the value being
+// written, not a fallback. Extend this list by adding a name to it, never by loosening the match.
+var envWrapperNames = map[string]bool{
+	"getenv": true, "getEnv": true, "get_env_var": true, "env": true,
+	"read_env": true, "readEnv": true, "env_or": true, "envOr": true,
+}
+
+// envGetterCallee reports whether a callee reads an environment variable as (name, default) — the
+// stdlib accessors matched on their dotted suffix, or one of envWrapperNames matched exactly against
+// the final segment. Only the callee is judged here: what makes reading argument 1 correct is that it
+// is the default in every (key, default) accessor, so the caller reads the same argument whichever
+// spelling it went through. Whether the value it returns matters is the caller's decision — for a
+// hardcoded secret that stays secretNamedTarget plus plausibleSecretLiteral.
+func envGetterCallee(dotted string) bool {
+	if strings.HasSuffix(dotted, "environ.get") || strings.HasSuffix(dotted, "config.get") {
+		return true
+	}
+	base := dotted
+	if i := strings.LastIndexAny(base, ".:"); i >= 0 {
+		base = base[i+1:]
+	}
+	return envWrapperNames[base]
 }
 
 // truthyDefault reports whether e assigns/defaults DEBUG to an on value ("True"/"1"/true) —
@@ -2263,6 +2455,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		selfName:        prog.Self(),
 		resolveImports:  resolveImports,
 		ctorTypes:       ctorTypes,
+		phiOperands:     map[string][]string{},
 		g:               newGraphStore(estimateGraphNodeHint(prog)),
 		modCtr:          map[string]int{},
 		modOrder:        map[string]int{},
@@ -3046,9 +3239,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		for _, t := range st.Targets {
 			// Hardcoded secret (CWE-798): a secret-named target assigned a NON-TRIVIAL string literal,
-			// directly or as an os.getenv(...,"default") fallback baked into source. Skip test/seed files.
+			// directly, as an os.getenv(...,"default") fallback, or as the default argument of a
+			// constructor/config call — all baked into source. Skip test/seed files.
 			if secretNamedTarget(t) && !inTestOrSeedFile(st.Loc) {
-				if plausibleSecretLiteral(cv) || plausibleSecretLiteral(envDefaultConst(st.Value, l)) {
+				if plausibleSecretLiteral(cv) || plausibleSecretLiteral(envDefaultConst(st.Value, l)) ||
+					plausibleSecretLiteral(ctorDefaultConst(st.Value)) {
 					l.syntheticCall("analysis.secret.hardcoded", "hardcoded_secret", val, st.Loc, "secret="+t)
 				}
 			}
@@ -3060,6 +3255,16 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			// that references the name by identifier can resolve the literal for ReDoS detection.
 			if l.region == "" && cv != "" {
 				l.modStr[t] = cv
+				// The Java constant route of the same weakness: hoisting the pattern into a
+				// class-level `static final String` and handing the NAME to a wrapper that
+				// compiles it is idiomatic, and at that call site no regex API and no literal
+				// is visible, so the structure of the value is the only fact left. Reported
+				// where the constant is declared, and gated on the tech for the same reason
+				// the API routes are. The test guard reads the module's file: a Java loc
+				// carries the base name only, so the statement's own loc cannot answer it.
+				if moduleTech(l.curFile) == "java" && catastrophicRegex(javaUnescapeString(cv)) && !inTestOrSeedFile(l.curFile) {
+					l.syntheticCall("analysis.dos.catastrophic_regex", "catastrophic_regex", val, st.Loc, "redos")
+				}
 			}
 			// Track dynamically-built query strings for the deferred `q = f"..."; execute(q)` form.
 			if isDynamicStringExpr(st.Value) {
@@ -3401,6 +3606,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		b := l.nextBranch()
 		exn := l.nodeInline("Exception", st.Loc, nil, "exception", "analysis.exception", "", "")
 		l.tryExceptionTargets = append(l.tryExceptionTargets, exn)
+		jcMark := len(sc.jc)
 		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
 		l.tryExceptionTargets = l.tryExceptionTargets[:len(l.tryExceptionTargets)-1]
 		for i, h := range st.Handlers {
@@ -3411,6 +3617,19 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				}
 			}
 			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
+		}
+		// The body and every handler are control regions — either may be skipped or
+		// left partway, so a variable whose constant was written (or cleared) inside
+		// one of them is no longer a known constant after the statement. Without
+		// this, the last write inside the region const-folds out and opaque-predicate
+		// pruning drops a following `if (x)` as a dead branch — the same join the
+		// if/loop merges perform through mergeDeltas' delCnst.
+		touched := make(map[string]bool, len(sc.jc)-jcMark)
+		for i := jcMark; i < len(sc.jc); i++ {
+			touched[sc.jc[i].key] = true
+		}
+		for v := range touched {
+			sc.delCnst(v)
 		}
 		// A `finally` runs on every path out of the try statement, so it belongs to the
 		// region the statement itself sits in — lowered after the body and the handlers,
@@ -3444,6 +3663,14 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Name:
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
+		}
+		// PHP spells the implicit self receiver `$this`; map it onto the stable self node
+		// (the same node the C#-style `this` gate binds) so `$this->prop` stores and reads
+		// share one receiver per method instead of a fresh node per occurrence.
+		if l.curClass != "" && ex.ID == "$this" {
+			if self := sc.node["this"]; self != "" {
+				return self
+			}
 		}
 		// inheritance-aware implicit-`this`: a bare identifier that is a (declared or inherited)
 		// member of the enclosing class — and is NOT a local/param (checked above) — refers to
@@ -3693,6 +3920,24 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 // A strings.Replacer builds a lookup trie on first use, so constructing one inside the
 // function rebuilds and discards that trie on every call. Hoisted to build it once.
 var binopNameReplacer = strings.NewReplacer(".", "_", "/", "div", "%", "mod", "*", "mul", "+", "add", "-", "sub")
+
+// calleeLambda reports whether a call's callee expression is a function
+// expression, unwrapping the parenthesized-expression chain around it: the
+// immediately-invoked forms `(function () { ... })()` and `(function () {
+// ... }())` differ only in where that chain sits, and both name the same
+// invoked body.
+func calleeLambda(e nir.Expr) (nir.Lambda, bool) {
+	for {
+		switch v := e.(type) {
+		case nir.Thru:
+			e = v.Inner
+		case nir.Lambda:
+			return v, true
+		default:
+			return nir.Lambda{}, false
+		}
+	}
+}
 
 func binopMethod(op string) string {
 	switch op {
@@ -4126,6 +4371,50 @@ func (l *lowerer) recvType(nodeID string) string {
 	return ""
 }
 
+// recvMergeCtorType returns the constructor type a control-flow merge carries when
+// every value the merge joins is a call to the same known constructor. A receiver
+// assigned in both arms of a branch, or in a loop body and used after the loop,
+// reaches its uses through such a merge, and a merge holds no callee path of its
+// own, so recvType leaves it untyped however the arms were built.
+//
+// This is a MAY-type and is deliberately weaker than recvType in three ways.
+// Operands are read from the merge's recorded operand list, never from its FLOWS
+// in-edges, so a mutator or an alias writing into the same node cannot join the
+// vote. Only the constructor table is consulted on an operand -- never a declared
+// or inferred type -- so a merge of locals declared at a supertype stays untyped
+// rather than reporting the supertype. And every operand must be typed and must
+// agree: one arm the table does not name, one arm holding a parameter or a null,
+// or two arms built by different constructors all withhold the type, because the
+// receiver may be any of them at the use.
+//
+// Because of that weakness it is stamped apart from recv_type, and only the
+// receiver-constrained SOURCE path reads it. For a source a known type is what
+// admits the label, so a may-type can only add; for a sink a known type is what
+// withholds one, and a may-type is not the authoritative disproof that withholding
+// requires.
+func (l *lowerer) recvMergeCtorType(nodeID string) string {
+	if nodeID == "" || len(l.ctorTypes) == 0 {
+		return ""
+	}
+	operands := l.phiOperands[nodeID]
+	if len(operands) == 0 {
+		return ""
+	}
+	merged := ""
+	for _, op := range operands {
+		n, ok, _ := l.g.GetNode(op)
+		if !ok {
+			return ""
+		}
+		t := l.ctorTypes[n.Prop("callee_path")]
+		if t == "" || (merged != "" && t != merged) {
+			return ""
+		}
+		merged = t
+	}
+	return merged
+}
+
 func (l *lowerer) typedBindingNode(val, typ string) string {
 	loc := ""
 	if n, ok, _ := l.g.GetNode(val); ok {
@@ -4219,8 +4508,11 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	// resolve the receiver once; if it was assigned from a known constructor,
 	// stamp recv_type so type-constrained sink binding applicators can reason about it.
+	// A receiver reached through a control-flow merge gets recv_may_type instead,
+	// which only the receiver-constrained source path reads (see recvMergeCtorType).
 	var recvNode string
 	var recvType string
+	var recvMayType string
 	if attr, ok := call.Callee.(nir.Attr); ok {
 		if mutatorMethods[call.Method] {
 			if nm, ok := attr.Base.(nir.Name); ok && sc.node[nm.ID] == "" {
@@ -4229,6 +4521,29 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 		recvNode = l.eval(attr.Base, sc)
 		recvType = l.recvType(recvNode)
+		if recvType == "" {
+			recvMayType = l.recvMergeCtorType(recvNode)
+		}
+	}
+	// A call whose callee is itself a call — `f(x)(y)`, the curried and
+	// immediate-invocation form — still contains a real call site for the
+	// inner call: lower it so its arguments get Arg slots like the
+	// assignment-equivalent form. Only the inner node is created; the outer
+	// call's result does not flow from it.
+	if inner, ok := call.Callee.(nir.Call); ok {
+		l.evalCall(inner, sc)
+	}
+	// A call whose callee is a function expression is the immediately-invoked
+	// form `(function () { ... })()` / `(function () { ... }())`, the standard
+	// module wrapper in browser JavaScript. The body is real program text with
+	// its own scope, so lower it as a lambda: the function context and every
+	// call inside it become visible. The invocation's result still does not
+	// flow anywhere — the wrapper's return value is assigned by the enclosing
+	// expression, not by this call node. The function expression reaches the
+	// callee slot either directly or wrapped in the parenthesized-expression
+	// chain, so unwrap that first.
+	if lam, ok := calleeLambda(call.Callee); ok {
+		l.eval(lam, sc)
 	}
 	propCount := len(args)
 	propCount += litCount
@@ -4236,6 +4551,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		propCount++
 	}
 	if recvType != "" {
+		propCount++
+	}
+	if recvMayType != "" {
 		propCount++
 	}
 	// Which package this call is made on, so a binding gated on package P can
@@ -4263,6 +4581,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 		if recvType != "" {
 			props["recv_type"] = recvType
+		}
+		if recvMayType != "" {
+			props["recv_may_type"] = recvMayType
 		}
 		if recvPackage != "" {
 			props["recv_package"] = recvPackage
@@ -4314,6 +4635,30 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	if len(call.Args) >= 1 && isRegexApply(calleePath, call.Method) {
 		if pat, ok := l.resolveRegexPattern(call.Args[0], sc); ok && catastrophicRegex(pat) {
 			l.syntheticCall("analysis.dos.catastrophic_regex", "catastrophic_regex", result, call.Loc, "redos")
+		}
+	}
+	// The C# spelling of the same weakness: .NET passes the pattern as a string-literal argument
+	// to the Regex constructor or one of the class's static helpers, rather than an `re.` call.
+	// Gated on the file's tech so a `Regex` symbol in another language is not read as the BCL
+	// class. A construction that passes the class's documented matchTimeout carries its own
+	// bound on the backtracking and is not reported.
+	if len(call.Args) >= 1 && moduleTech(l.curFile) == "csharp" {
+		if i := csharpRegexPatternArg(calleePath, call.Method); i >= 0 && i < len(call.Args) {
+			if pat, ok := l.resolveRegexPattern(call.Args[i], sc); ok && catastrophicRegex(csUnquoteVerbatim(pat)) &&
+				!csRegexPassesMatchTimeout(call.Args, i) {
+				l.syntheticCall("analysis.dos.catastrophic_regex", "catastrophic_regex", result, call.Loc, "redos")
+			}
+		}
+	}
+	// The Java spelling of the same weakness: java.util.regex is string-driven too, so the
+	// pattern reaches a `Pattern.compile(pattern)` / `Pattern.matches(pattern, input)` or one
+	// of String's own regex methods (`s.matches(pattern)`, `s.replaceAll`, `s.replaceFirst`)
+	// as an argument. Gated on the file's tech for the same reason the C# arm is.
+	if len(call.Args) >= 1 && moduleTech(l.curFile) == "java" {
+		if i := javaRegexPatternArg(calleePath, call.Method); i >= 0 && i < len(call.Args) {
+			if pat, ok := l.resolveRegexPattern(call.Args[i], sc); ok && catastrophicRegex(javaUnescapeString(pat)) {
+				l.syntheticCall("analysis.dos.catastrophic_regex", "catastrophic_regex", result, call.Loc, "redos")
+			}
 		}
 	}
 	// Dynamic SQL — a query built by f-string / concat / .format() passed straight to an execute()
@@ -4519,13 +4864,31 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// honoured — `bar = my_wrapper(p)` where my_wrapper transforms p is clean. Only an
 	// arg NOT mapped to any resolved param keeps the conservative direct `arg → result` edge
 	// (unknown/library callee, or a vararg beyond the param list), preserving recall there.
-	targets := l.resolveTargets(call.Callee, sc)
+	targets, reachOnly := l.resolveTargets(call.Callee, sc)
 	dynamicCallback := len(targets) == 0 && l.dynamicFunctionParamCall(call.Callee, sc)
 	if dynamicCallback {
 		targets = l.dynamicCallbackTargets()
 	}
 	mapped := l.flowTemplateRender(call, argVals, recvNode, result)
 	for _, target := range targets {
+		if reachOnly {
+			// interface/abstract dispatch: the args reach every implementor's body (any
+			// of them is a possible runtime continuation), but nothing flows back — the
+			// implementors' param and return nodes are shared across call sites, so
+			// routing the shared return to this call's result would merge taint from
+			// other sites into this one. The call's own args keep the conservative
+			// arg→result edge below (mapped stays unset), matching an unresolved call.
+			paramOffset := 0
+			if recvNode != "" && target.cls != "" && len(target.paramNames) > 0 && target.paramNames[0] == l.selfName {
+				paramOffset = 1
+			}
+			for i, a := range args {
+				if i+paramOffset < len(target.paramNames) {
+					l.flow(a, target.params[target.paramNames[i+paramOffset]])
+				}
+			}
+			continue
+		}
 		if dynamicCallback {
 			for i, a := range args {
 				l.flowValueToAllParams(a, target)
@@ -4632,7 +4995,8 @@ func (l *lowerer) applyTargetArgsCallback(call nir.Call, argVals []string, sc *s
 	if !ok {
 		return
 	}
-	for _, target := range l.resolveTargets(targetExpr, sc) {
+	targets, _ := l.resolveTargets(targetExpr, sc)
+	for _, target := range targets {
 		l.flowValueToAllParams(argsVal, target)
 	}
 }
@@ -4909,7 +5273,11 @@ func callEffectDestName(e nir.Expr) string {
 
 // --- call resolution (shared; docs/10 §"Call resolution") -------------
 
-func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
+// resolveTargets returns the callee targets for a call, and whether those
+// targets are reach-only: interface/abstract dispatch, where the args reach the
+// implementors' bodies but the call result keeps the unresolved conservative
+// semantics (see the abstract-method branch below).
+func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool) {
 	if !l.resolveImports {
 		var name string
 		switch c := callee.(type) {
@@ -4918,7 +5286,7 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		case nir.Name:
 			name = c.ID
 		}
-		return l.funcShort[name]
+		return l.funcShort[name], false
 	}
 	imports := l.importTables[l.curModule]
 	switch c := callee.(type) {
@@ -4926,24 +5294,24 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		nm := c.ID
 		if imp, ok := imports[nm]; ok && imp.kind == "sym" {
 			if f := l.funcQual[imp.module+"::"+imp.symbol]; f != nil {
-				return []*funcInfo{f}
+				return []*funcInfo{f}, false
 			}
 		}
 		if f := l.funcQual[l.curModule+"::"+nm]; f != nil {
-			return []*funcInfo{f}
+			return []*funcInfo{f}, false
 		}
 		// a bare call inside a class resolves to the enclosing class's own method (e.g. a
 		// `private static String doSomething(...)` called as `doSomething(...)`). Without this
 		// the call is unresolved and the conservative arg→result edge over-taints the result.
 		if l.curClass != "" {
 			if f := l.funcQual[l.curModule+"::"+l.curClass+"."+nm]; f != nil {
-				return []*funcInfo{f}
+				return []*funcInfo{f}, false
 			}
 		}
 		if f, ok := l.uniqueTechFuncInfo(l.funcShort[nm]); ok { // guarded fallback
-			return []*funcInfo{f}
+			return []*funcInfo{f}, false
 		}
-		return nil
+		return nil, false
 	case nir.Attr:
 		// `new T().method()` — receiver is a constructor call; resolve T's method.
 		baseExpr := c.Base
@@ -4953,48 +5321,54 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		if call, ok := baseExpr.(nir.Call); ok {
 			if t, ok := l.resolveCtor(call.Callee); ok {
 				if m := l.funcQual[t[0]+"::"+t[1]+"."+c.Attr]; m != nil {
-					return []*funcInfo{m}
+					return []*funcInfo{m}, false
 				}
 			}
-			return nil
+			return nil, false
 		}
 		base, isName := baseExpr.(nir.Name)
 		if !isName {
-			return nil
+			return nil, false
 		}
 		obj, attr := base.ID, c.Attr
 		if obj == "super" && l.curClass != "" {
-			return l.resolveBaseMethods(l.curModule, l.curClass, attr)
+			return l.resolveBaseMethods(l.curModule, l.curClass, attr), false
 		}
 		if imp, ok := imports[obj]; ok && imp.kind == "mod" { // module.func
 			if f := l.funcQual[imp.module+"::"+attr]; f != nil {
-				return []*funcInfo{f}
+				return []*funcInfo{f}, false
 			}
 		}
 		if cm, ok := l.classModule(obj, imports); ok { // Class.method (static)
 			if m := l.funcQual[cm+"::"+obj+"."+attr]; m != nil {
-				return []*funcInfo{m}
+				return []*funcInfo{m}, false
 			}
 		}
 		if typ, ok := sc.typ[obj]; ok { // instance/self method
 			var out []*funcInfo
 			if m := l.funcQual[typ[0]+"::"+typ[1]+"."+attr]; m != nil {
 				if m.abstract {
-					// interface/abstract method — the concrete runtime target is unknown, so
-					// don't route through this empty body (which would sink the taint). Return
-					// unresolved: the conservative direct arg→result edge then carries taint
-					// through the call (over-approximate, recall-safe), while concrete callees
-					// still route through their real body so in-body sanitizers are honoured.
-					return nil
+					// interface/abstract method — never route through this empty body (which
+					// would sink the taint). A receiver of an interface type holds some
+					// implementing class, so the implementors' bodies are possible runtime
+					// continuations: report them as reach-only targets (args flow in, the
+					// call result keeps the unresolved conservative semantics below) so a
+					// sink inside an implementor body is coverable without merging the
+					// implementors' shared return taint across call sites. With no
+					// implementor in the scan, stay fully unresolved.
+					if derived := l.resolveDerivedMethods(typ[1], attr); len(derived) > 0 {
+						return derived, true
+					}
+					return nil, false
 				}
 				out = append(out, m)
 			}
 			out = append(out, l.resolveDerivedMethods(typ[1], attr)...)
 			if len(out) > 0 {
-				return dedupeFuncInfos(out)
+				return dedupeFuncInfos(out), false
 			}
 			if bases := l.resolveBaseMethods(typ[0], typ[1], attr); len(bases) > 0 {
-				return bases
+				return bases, false
 			}
 		}
 		// Cross-file fallback: the receiver type is unresolved (common with dynamically-typed
@@ -5003,10 +5377,10 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) []*funcInfo {
 		// value connects to the call result — the canonical interprocedural-across-files miss.
 		// The uniqueness guard avoids mis-resolving same-named methods on different types.
 		if f, ok := l.uniqueTechFuncInfo(l.funcShort[c.Attr]); ok {
-			return []*funcInfo{f}
+			return []*funcInfo{f}, false
 		}
 	}
-	return nil
+	return nil, false
 }
 
 func dedupeFuncInfos(in []*funcInfo) []*funcInfo {

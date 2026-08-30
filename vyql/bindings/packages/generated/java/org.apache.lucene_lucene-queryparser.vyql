@@ -1,9 +1,0 @@
-module bindings.java.generated.ma89f1cd1;
-
-binding xmlParse0 {
-  requires {
-    dependency("org.apache.lucene:lucene-queryparser")
-  }
-  query pattern callExpr where callee.method == "CoreParser.parse"
-  emit sink code.XmlParse at args[0]
-}

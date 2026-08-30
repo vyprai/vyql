@@ -1,6 +1,0 @@
-module bindings.cpp.generated.m61415c9f;
-
-binding jpegSubsamplingRatioValidationMissing162 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "jpeg.subsampling_ratio_validation_missing"
-  emit issue code.JpegSubsamplingRatioValidationMissing at node
-}

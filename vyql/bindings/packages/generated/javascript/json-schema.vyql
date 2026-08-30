@@ -1,9 +1,0 @@
-module bindings.javascript.generated.ma24063b7;
-
-binding deserialization0 {
-  requires {
-    dependency("json-schema")
-  }
-  query pattern callExpr where callee.method == "validate"
-  emit sink code.Deserialization at args[0]
-}

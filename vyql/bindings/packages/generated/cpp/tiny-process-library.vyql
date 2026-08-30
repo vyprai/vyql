@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m183b8c4b;
-
-binding commandExecution0 {
-  requires {
-    dependency("tiny-process-library")
-  }
-  query pattern callExpr where callee.method == "Process"
-  emit sink code.CommandExecution at args[0]
-}

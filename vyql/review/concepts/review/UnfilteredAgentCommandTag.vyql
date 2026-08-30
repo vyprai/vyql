@@ -1,8 +1,0 @@
-module code;
-
-review code.UnfilteredAgentCommandTag {
-  category: code_execution
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review AI output custom-tag parsers for command/control tags that must be consumed or hidden instead of rendered as markdown"
-}

@@ -1,8 +1,0 @@
-# Rank 113 / CVE-2018-1000888: Archive_Tar phar filename validation bypass.
-
-test "rank113: incomplete archive filename validation is a CVE anchor"
-  expect VYQL-DESER-005
-  graph
-  ```
-  node sink code.IncompleteArchiveFilenameValidation
-  ```

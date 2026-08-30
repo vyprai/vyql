@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m3ef2d09f;
-
-binding deserialization0 {
-  requires {
-    dependency("bunch")
-  }
-  query pattern callExpr where callee.method == "Bunch.Config.parse"
-  emit sink code.Deserialization at args[0]
-}

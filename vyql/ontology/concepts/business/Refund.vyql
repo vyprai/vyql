@@ -1,4 +1,0 @@
-module business;
-
-concept Refund : fact {
-}

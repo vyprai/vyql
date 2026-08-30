@@ -1,9 +1,0 @@
-module bindings.python.generated.mc5831489;
-
-binding codeEval0 {
-  requires {
-    dependency("astor")
-  }
-  query pattern callExpr where callee.method == "visit_Exec"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m370c225d;
-
-binding secretValue0 {
-  requires {
-    dependency("nanorand")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit source code.SecretValue at call.result
-}

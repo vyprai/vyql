@@ -1,9 +1,0 @@
-module bindings.rust.generated.m5080b765;
-
-binding fileUse0 {
-  requires {
-    dependency("trust-dns-resolver")
-  }
-  query pattern callExpr where callee.method == "read_hosts_conf"
-  emit sink code.FileUseSink at args[0]
-}

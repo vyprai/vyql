@@ -1,9 +1,0 @@
-module bindings.python.generated.mc46ebabd;
-
-binding stdinInput0 {
-  requires {
-    dependency("prompt-toolkit")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source code.StdinInput at call.result
-}

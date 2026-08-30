@@ -1,6 +1,0 @@
-module core;
-
-concept DataCollectionControl : check {
-  applies: scope
-  covers: [path]
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.SwaggerParserExternalRefDereference {
-  category: request_forgery
-  expected: [core.AllowlistValidation, core.InputValidation]
-  kind: target
-  text: "review Swagger/OpenAPI parser validation for disabled external $ref dereferencing"
-}

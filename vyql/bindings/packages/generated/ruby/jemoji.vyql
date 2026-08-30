@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mb9083dd4;
-
-binding htmlRender0 {
-  requires {
-    dependency("jemoji")
-  }
-  query pattern callExpr where callee.method == "emojify"
-  emit sink code.HtmlRender at args[0]
-}

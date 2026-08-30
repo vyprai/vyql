@@ -1,9 +1,0 @@
-module bindings.rust.generated.m39fadb50;
-
-binding cliArgument0 {
-  requires {
-    dependency("clap")
-  }
-  query pattern callExpr where callee.path ~= "Parser.parse"
-  emit source code.CliArgument at call.result
-}

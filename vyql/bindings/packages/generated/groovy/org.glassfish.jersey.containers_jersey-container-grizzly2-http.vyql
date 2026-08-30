@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m960c0640;
-
-binding responseHeaderWrite0 {
-  requires {
-    dependency("org.glassfish.jersey.containers:jersey-container-grizzly2-http")
-  }
-  query pattern callExpr where callee.method == "writeResponseStatusAndHeaders"
-  emit sink code.ResponseHeaderWrite at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mac4bc48d;
-
-binding deserialization0 {
-  requires {
-    dependency("fog-sakuracloud")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

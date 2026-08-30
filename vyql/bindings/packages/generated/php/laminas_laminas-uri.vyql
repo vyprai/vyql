@@ -1,9 +1,0 @@
-module bindings.php.generated.m16ac07d6;
-
-binding urlFetch0 {
-  requires {
-    dependency("laminas/laminas-uri")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.UrlFetch at args[0]
-}

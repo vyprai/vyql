@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m9dfa6b1f;
-
-binding sqlExecution0 {
-  requires {
-    dependency("microsoft.aspnet.signalr.sqlserver")
-  }
-  query pattern callExpr where callee.method == "ObservableDbOperation.ExecuteReaderWithUpdates"
-  emit sink code.SqlExecution at args[0]
-}

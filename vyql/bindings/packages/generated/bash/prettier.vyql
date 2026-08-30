@@ -1,9 +1,0 @@
-module bindings.bash.generated.m27909ea3;
-
-binding cliArgument0 {
-  requires {
-    dependency("prettier")
-  }
-  query pattern callExpr where callee.path ~= "prettier.argv"
-  emit source code.CliArgument at call.result
-}

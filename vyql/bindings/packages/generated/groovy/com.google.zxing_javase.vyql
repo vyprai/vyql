@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m64ebf717;
-
-binding filePathAccess0 {
-  requires {
-    dependency("com.google.zxing:javase")
-  }
-  query pattern callExpr where callee.method == "writeToPath"
-  emit sink code.FilePathAccess at args[0]
-}

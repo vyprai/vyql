@@ -1,8 +1,0 @@
-module code;
-
-review code.UnescapedQueueQueryStringXss {
-  category: xss
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review queue query-string helpers for URL escaping before embedding queue names in generated links"
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0ee1b8e6;
-
-binding deserialization0 {
-  requires {
-    dependency("bson")
-  }
-  query pattern callExpr where callee.method == "rb_bson_byte_buffer_get_hash"
-  emit sink code.Deserialization at args[0]
-}

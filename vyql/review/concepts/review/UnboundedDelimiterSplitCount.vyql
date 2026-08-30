@@ -1,7 +1,0 @@
-module code;
-
-review code.UnboundedDelimiterSplitCount {
-  category: resource
-  kind: attention
-  text: "review delimiter counting that fully splits attacker-sized input before enforcing the count limit"
-}

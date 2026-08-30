@@ -1,8 +1,0 @@
-module code;
-
-review code.GitPackSignatureSearchParsingBypass {
-  category: input_validation
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review Git push pack parsers for packet-line offset parsing and PACK signature validation instead of searching the request body for PACK bytes"
-}

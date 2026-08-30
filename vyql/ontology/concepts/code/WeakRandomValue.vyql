@@ -1,6 +1,0 @@
-module code;
-
-concept WeakRandomValue : issue {
-  cwe: [CWE_330]
-  vulnerableTo: [crypto.InsufficientEntropy]
-}

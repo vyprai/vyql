@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m2a8524cd;
-
-binding cliArgument0 {
-  requires {
-    dependency("buck-yeh-bux")
-  }
-  query pattern callExpr where callee.method == "C_EZArgs.retro_path"
-  emit source code.CliArgument at call.result
-}

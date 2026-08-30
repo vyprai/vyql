@@ -1,8 +1,0 @@
-module code;
-
-review code.ShopwareStoreApiManyToManyCriteriaBypass {
-  category: access_control
-  expected: [core.AuthorizationCheck, core.InputValidation]
-  kind: attention
-  text: "review Shopware Store API Criteria association traversal for ManyToMany ApiAware protection"
-}

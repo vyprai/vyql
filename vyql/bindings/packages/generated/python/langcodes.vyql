@@ -1,9 +1,0 @@
-module bindings.python.generated.me4508c78;
-
-binding deserialization0 {
-  requires {
-    dependency("langcodes")
-  }
-  query pattern callExpr where callee.method == "parse_tag"
-  emit sink code.Deserialization at args[0]
-}

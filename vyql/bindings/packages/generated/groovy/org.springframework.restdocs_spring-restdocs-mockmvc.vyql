@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m908df003;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework.restdocs:spring-restdocs-mockmvc")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

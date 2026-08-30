@@ -1,6 +1,0 @@
-module code;
-
-concept NetworkDisconnect : sink {
-  cwe: [CWE_772]
-  vulnerableTo: [resource.ResourceLeak]
-}

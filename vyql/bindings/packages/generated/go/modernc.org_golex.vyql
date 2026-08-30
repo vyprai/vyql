@@ -1,9 +1,0 @@
-module bindings.go.generated.m688b715e;
-
-binding deserialization0 {
-  requires {
-    dependency("modernc.org/golex")
-  }
-  query pattern callExpr where callee.method == "New"
-  emit sink code.Deserialization at args[0]
-}

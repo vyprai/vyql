@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mece2501b;
-
-binding logOutput0 {
-  requires {
-    dependency("commons-logging:commons-logging")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.LogOutput at args[0]
-}

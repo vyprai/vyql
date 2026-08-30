@@ -1,9 +1,0 @@
-module bindings.python.generated.m495a9104;
-
-binding deserialization0 {
-  requires {
-    dependency("astunparse")
-  }
-  query pattern callExpr where callee.method == "unparse"
-  emit sink code.Deserialization at args[0]
-}

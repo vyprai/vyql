@@ -1,9 +1,0 @@
-module bindings.scala.generated.mec1a1ae0;
-
-binding codeEval0 {
-  requires {
-    dependency("net.sourceforge.htmlunit:htmlunit")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.CodeEval at args[0]
-}

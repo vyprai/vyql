@@ -1,6 +1,0 @@
-module code;
-
-concept NetworkFilteringDisabled : issue {
-  cwe: [CWE_284]
-  vulnerableTo: [iac.NetworkFilteringDisabled]
-}

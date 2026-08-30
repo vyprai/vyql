@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m9c775f37;
-
-binding commandExecution0 {
-  requires {
-    dependency("cimg")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit sink code.CommandExecution at args[0]
-}

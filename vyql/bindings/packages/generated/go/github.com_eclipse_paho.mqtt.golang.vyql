@@ -1,9 +1,0 @@
-module bindings.go.generated.mb59d719d;
-
-binding secretValue0 {
-  requires {
-    dependency("github.com/eclipse/paho.mqtt.golang")
-  }
-  query pattern callExpr where callee.method == "Get"
-  emit source code.SecretValue at call.result
-}

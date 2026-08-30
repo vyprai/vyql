@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me8fa15d3;
-
-binding xmlParse0 {
-  requires {
-    dependency("hpricot")
-  }
-  query pattern callExpr where callee.method == "ELE"
-  emit sink code.XmlParse at args[0]
-}

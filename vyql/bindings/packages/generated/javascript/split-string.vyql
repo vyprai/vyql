@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mf8f1bde9;
-
-binding userControlledData0 {
-  requires {
-    dependency("split-string")
-  }
-  query pattern callExpr where callee.method == "module.exports"
-  emit source core.UserControlledData at call.result
-}

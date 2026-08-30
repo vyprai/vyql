@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mb1e065ef;
-
-binding filePathAccess0 {
-  requires {
-    dependency("xlsxir")
-  }
-  query pattern callExpr where callee.method == "extract"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.mb952de54;
-
-binding cliArgument0 {
-  requires {
-    dependency("progressbar2")
-  }
-  query pattern callExpr where callee.method == "create_argument_parser"
-  emit source code.CliArgument at call.result
-}

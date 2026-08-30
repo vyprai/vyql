@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m32af5963;
-
-binding deserialization0 {
-  requires {
-    dependency("sord")
-  }
-  query pattern callExpr where callee.method == "sord_node_from_serd_node"
-  emit sink code.Deserialization at args[0]
-}

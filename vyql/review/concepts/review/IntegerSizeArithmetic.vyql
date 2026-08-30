@@ -1,7 +1,0 @@
-module code;
-
-review code.IntegerSizeArithmetic {
-  category: numeric
-  kind: attention
-  text: "review integer arithmetic used for address, size, or bounds calculations"
-}

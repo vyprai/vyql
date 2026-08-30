@@ -1,9 +1,0 @@
-module bindings.rust.generated.m28aa991e;
-
-binding filePathAccess0 {
-  requires {
-    dependency("gtk")
-  }
-  query pattern callExpr where callee.method == "file"
-  emit sink code.FilePathAccess at args[0]
-}

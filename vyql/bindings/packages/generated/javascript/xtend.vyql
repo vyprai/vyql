@@ -1,9 +1,0 @@
-module bindings.javascript.generated.me1d32cfe;
-
-binding deserialization0 {
-  requires {
-    dependency("xtend")
-  }
-  query pattern callExpr where callee.method == "extend"
-  emit sink code.Deserialization at args[0]
-}

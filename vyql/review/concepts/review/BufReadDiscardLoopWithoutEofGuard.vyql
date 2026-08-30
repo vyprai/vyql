@@ -1,8 +1,0 @@
-module code;
-
-review code.BufReadDiscardLoopWithoutEofGuard {
-  category: resource
-  expected: [core.InputValidation, core.ExceptionHandling]
-  kind: target
-  text: "review buffered discard loops for an empty-buffer EOF guard before consuming and subtracting progress"
-}

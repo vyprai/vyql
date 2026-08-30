@@ -1,6 +1,0 @@
-module injection;
-
-threat ArgumentInjection {
-  cwe: [CWE_88]
-  desc: "Untrusted data injected as command arguments"
-}

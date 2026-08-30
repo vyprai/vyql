@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mcb16b3c4;
-
-binding urlFetch0 {
-  requires {
-    dependency("public_suffix")
-  }
-  query pattern callExpr where callee.method == "PublicSuffix.RemoteFileFetcher.fetch_remote_file"
-  emit sink code.UrlFetch at args[0]
-}

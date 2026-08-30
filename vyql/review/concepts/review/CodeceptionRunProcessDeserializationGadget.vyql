@@ -1,8 +1,0 @@
-module code;
-
-review code.CodeceptionRunProcessDeserializationGadget {
-  category: deserialization
-  expected: [core.SafeDeserialization]
-  kind: attention
-  text: "review Codeception RunProcess for __sleep/__wakeup rejection before process-control objects can be deserialized"
-}

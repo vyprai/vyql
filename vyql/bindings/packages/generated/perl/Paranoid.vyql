@@ -1,9 +1,0 @@
-module bindings.perl.generated.m336b9845;
-
-binding commandExecution0 {
-  requires {
-    dependency("Paranoid")
-  }
-  query pattern callExpr where callee.method == "popen"
-  emit sink code.CommandExecution at args[0]
-}

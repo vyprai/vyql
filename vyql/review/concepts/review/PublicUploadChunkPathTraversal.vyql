@@ -1,8 +1,0 @@
-module code;
-
-review code.PublicUploadChunkPathTraversal {
-  category: path
-  expected: [core.PathAccessCheck]
-  kind: attention
-  text: "review public chunk-upload temp path construction for checksum sanitization and realpath containment before append writes"
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.AuthenticationRequiredOp {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: target
-  text: "verify an authenticated user is required before this operation"
-}

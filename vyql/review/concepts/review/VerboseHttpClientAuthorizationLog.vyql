@@ -1,8 +1,0 @@
-module code;
-
-review code.VerboseHttpClientAuthorizationLog {
-  category: secret
-  expected: [core.SecretRedaction]
-  kind: attention
-  text: "review verbose HTTP client logging for authorization-header, cookie, token, or request-body redaction before production use"
-}

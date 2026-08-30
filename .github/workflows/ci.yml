@@ -46,10 +46,27 @@ jobs:
           # than one page of files.
           changed="$(gh api --paginate "repos/${GITHUB_REPOSITORY}/pulls/${PR}/files" --jq '.[].filename')"
           echo "changed files:"; echo "$changed" | sed 's/^/  /'
+          # The API stops at 3000 files. A larger pull request therefore arrives
+          # truncated, and the files it did not name could be anything, so the
+          # only safe reading of a full page is that this cannot be decided.
+          if [ "$(printf '%s\n' "$changed" | grep -c .)" -ge 3000 ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"
+            echo "-> more files than the API will list; running everything"
+            exit 0
+          fi
           # Inverted on purpose: anything that is not recognisably documentation
           # counts as code, so a new kind of file runs the full suite. Being
           # wrong that way costs runner minutes; the other way ships untested.
-          if printf '%s\n' "$changed" | grep -qvE '^(docs/.*|.*\.md|LICENSE|NOTICE)$'; then
+          #
+          # Collected into a variable rather than tested through `grep -q`. With
+          # `pipefail` set, `grep -q` exits at its first match and closes the
+          # pipe, `printf` dies of SIGPIPE, and the pipeline reports that failure
+          # rather than grep's success -- so the branch below was taken by
+          # whether the list was long enough for grep to finish early, not by
+          # what was in it. Every large pull request skipped its own tests and
+          # reported a green build.
+          noncode="$(printf '%s\n' "$changed" | grep -vE '^(docs/.*|.*\.md|LICENSE|NOTICE)$' || true)"
+          if [ -n "$noncode" ]; then
             echo "code=true" >> "$GITHUB_OUTPUT"
             echo "-> code changed; running everything"
           else

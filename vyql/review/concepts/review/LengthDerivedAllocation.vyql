@@ -1,7 +1,0 @@
-module code;
-
-review code.LengthDerivedAllocation {
-  category: resource
-  kind: attention
-  text: "review length-derived allocation for a dominating remaining-buffer or maximum-size check"
-}

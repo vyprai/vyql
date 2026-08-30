@@ -37,6 +37,17 @@ func TestAmbiguous(t *testing.T) {
 		{false, "rank266 disjoint comma branches", `^\{((?:,|\{,+\})+)\}`},
 		{true, "rank435 unbounded comment body", `^(\s|\/\*.*?\*\/)*[\[\(\w]`},
 		{false, "rank435 bounded comment body", `^(\s|\/\*([^*]|\*(?!\/))*?\*\/)*[\[\(\w]`},
+
+		// The run-split's second consumer may sit at the head of an unquantified
+		// group's branch, where the class is wider than the run's character.
+		{true, "run split through an alternation branch", `&#0*((?:\d+)|(?:x[a-fA-F0-9]+));`},
+		{false, "one consumer after the prefix is dropped", `&#((?:\d+)|(?:x[a-fA-F0-9]+));`},
+		{true, "run split through a nested group head", `0*((\d+))`},
+		{false, "branch heads on another character", `&#0*((?:x\d+)|(?:x[a-f]+));`},
+		{false, "branch continues with a single char", `&#0*((?:\d)|(?:x[0-9a-f]+));`},
+		{false, "wide first repeat stays ordinary", `\s*((?:\s+)|(?:x\d+));`},
+		{false, "universal consumer is not a run split", `0*((?:.*)|(?:y\d+));`},
+		{false, "repeated group head is not a run-split consumer", ` +(?<path>(?:[^\"]|\\"|\\.)*?)(?: +\S*)?`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

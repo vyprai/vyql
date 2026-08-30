@@ -1,6 +1,0 @@
-module crypto;
-
-threat InsufficientEntropy {
-  cwe: [CWE_331]
-  desc: "Insufficient entropy"
-}

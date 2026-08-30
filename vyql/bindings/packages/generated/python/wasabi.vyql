@@ -1,9 +1,0 @@
-module bindings.python.generated.m7e303ed9;
-
-binding stdinInput0 {
-  requires {
-    dependency("wasabi")
-  }
-  query pattern callExpr where callee.method == "get_raw_input"
-  emit source code.StdinInput at call.result
-}

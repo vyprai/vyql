@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mbf6d4f08;
-
-binding userControlledData0 {
-  requires {
-    dependency("new_relic_absinthe")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit source core.UserControlledData at call.result
-}

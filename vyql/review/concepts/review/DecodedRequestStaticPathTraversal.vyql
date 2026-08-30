@@ -1,8 +1,0 @@
-module code;
-
-review code.DecodedRequestStaticPathTraversal {
-  category: path
-  expected: [core.PathCanonicalization, core.PathAccessCheck]
-  kind: target
-  text: "review decoded request paths appended to static-file roots for canonical containment before serving files"
-}

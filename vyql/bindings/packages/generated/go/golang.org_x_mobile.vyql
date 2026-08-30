@@ -1,9 +1,0 @@
-module bindings.go.generated.mc59f9d62;
-
-binding deserialization0 {
-  requires {
-    dependency("golang.org/x/mobile")
-  }
-  query pattern callExpr where callee.method == "go_seq_from_java_bytearray"
-  emit sink code.Deserialization at args[0]
-}

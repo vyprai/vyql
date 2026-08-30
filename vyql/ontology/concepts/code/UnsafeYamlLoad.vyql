@@ -1,6 +1,0 @@
-module code;
-
-concept UnsafeYamlLoad : issue {
-  cwe: [CWE_502]
-  vulnerableTo: [deserialization.DeserializationAbuse]
-}

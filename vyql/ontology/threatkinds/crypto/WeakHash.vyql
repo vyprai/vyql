@@ -1,6 +1,0 @@
-module crypto;
-
-threat WeakHash {
-  cwe: [CWE_327]
-  desc: "Use of a broken/weak cryptographic primitive (MD5/SHA1/DES/RC4/ECB)"
-}

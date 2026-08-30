@@ -1,8 +1,0 @@
-module code;
-
-review code.MethodGatedRedirectValidationBypass {
-  category: request_forgery
-  expected: [core.RedirectAllowlist]
-  kind: attention
-  text: "review HTTP method gates that skip redirect or callback URL origin validation"
-}

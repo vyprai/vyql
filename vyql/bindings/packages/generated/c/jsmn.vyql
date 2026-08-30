@@ -1,9 +1,0 @@
-module bindings.c.generated.m0c14864b;
-
-binding deserialization0 {
-  requires {
-    dependency("jsmn")
-  }
-  query pattern callExpr where callee.method == "jsmn_parse"
-  emit sink code.Deserialization at args[0]
-}

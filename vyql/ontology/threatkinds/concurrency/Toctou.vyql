@@ -1,6 +1,0 @@
-module concurrency;
-
-threat Toctou {
-  cwe: [CWE_367]
-  desc: "Time-of-check time-of-use race"
-}

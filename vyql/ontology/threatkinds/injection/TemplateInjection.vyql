@@ -1,6 +1,0 @@
-module injection;
-
-threat TemplateInjection {
-  cwe: [CWE_1336]
-  desc: "Server-side template injection"
-}

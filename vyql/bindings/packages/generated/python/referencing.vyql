@@ -1,9 +1,0 @@
-module bindings.python.generated.md6814658;
-
-binding urlFetch0 {
-  requires {
-    dependency("referencing")
-  }
-  query pattern callExpr where callee.method == "get_or_retrieve"
-  emit sink code.UrlFetch at args[0]
-}

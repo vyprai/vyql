@@ -1,9 +1,0 @@
-module bindings.c.generated.m604f0483;
-
-binding secretValue0 {
-  requires {
-    dependency("openssl")
-  }
-  query pattern callExpr where callee.method == "s390x_HMAC_CTX_copy"
-  emit source code.SecretValue at call.result
-}

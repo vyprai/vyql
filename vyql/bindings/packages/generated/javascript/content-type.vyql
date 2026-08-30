@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m66d83ffb;
-
-binding deserialization0 {
-  requires {
-    dependency("content-type")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

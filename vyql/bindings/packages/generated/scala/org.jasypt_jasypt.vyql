@@ -1,9 +1,0 @@
-module bindings.scala.generated.m64f44a79;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("org.jasypt:jasypt")
-  }
-  query pattern callExpr where callee.method == "nextRandomInt"
-  emit issue code.WeakRandomValue at call
-}

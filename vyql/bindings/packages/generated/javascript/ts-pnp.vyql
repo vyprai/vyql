@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m5ef2bcbd;
-
-binding filePathAccess0 {
-  requires {
-    dependency("ts-pnp")
-  }
-  query pattern callExpr where callee.method == "resolveModuleName"
-  emit sink code.FilePathAccess at args[0]
-}

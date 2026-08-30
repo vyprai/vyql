@@ -1,9 +1,0 @@
-module bindings.scala.generated.m35a64d78;
-
-binding deserialization0 {
-  requires {
-    dependency("com.jayway.jsonpath:json-path")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

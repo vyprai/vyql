@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mafc885b3;
-
-binding deserialization0 {
-  requires {
-    dependency("cbor")
-  }
-  query pattern callExpr where callee.method == "CBOR.decode"
-  emit sink code.Deserialization at args[0]
-}

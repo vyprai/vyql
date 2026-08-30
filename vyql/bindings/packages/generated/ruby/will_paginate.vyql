@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m20160aa4;
-
-binding sqlExecution0 {
-  requires {
-    dependency("will_paginate")
-  }
-  query pattern callExpr where callee.method == "paginate_by_sql"
-  emit sink code.SqlExecution at args[0]
-}

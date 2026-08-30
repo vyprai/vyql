@@ -1,6 +1,0 @@
-module injection;
-
-threat CodeInjection {
-  cwe: [CWE_94]
-  desc: "Untrusted data evaluated as code"
-}

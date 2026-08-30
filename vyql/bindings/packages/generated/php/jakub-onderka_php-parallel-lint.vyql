@@ -1,9 +1,0 @@
-module bindings.php.generated.mb4e0aaa5;
-
-binding cliArgument0 {
-  requires {
-    dependency("jakub-onderka/php-parallel-lint")
-  }
-  query pattern callExpr where callee.method == "parseArguments"
-  emit source code.CliArgument at call.result
-}

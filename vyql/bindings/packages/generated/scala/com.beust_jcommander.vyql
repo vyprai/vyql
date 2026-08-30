@@ -1,9 +1,0 @@
-module bindings.scala.generated.mf5ba188f;
-
-binding userControlledData0 {
-  requires {
-    dependency("com.beust:jcommander")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source core.UserControlledData at call.result
-}

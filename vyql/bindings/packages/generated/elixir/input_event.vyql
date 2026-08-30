@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma12b08d4;
-
-binding networkData0 {
-  requires {
-    dependency("input_event")
-  }
-  query pattern callExpr where callee.path ~= "process_events"
-  emit source code.NetworkData at call.result
-}

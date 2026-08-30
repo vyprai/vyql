@@ -1,9 +1,0 @@
-module bindings.php.generated.mc27112d8;
-
-binding deserialization0 {
-  requires {
-    dependency("khanamiryan/qrcode-detector-decoder")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.ExternalLinkReferrerLeak {
-  category: secret
-  expected: [core.ReferrerPolicy]
-  kind: attention
-  text: "review external HTML links for rel=noreferrer or an equivalent referrer policy before rendering on token-bearing pages"
-}

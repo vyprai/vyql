@@ -1,8 +1,0 @@
-module code;
-
-review code.XmlParserCreate {
-  category: xml
-  expected: [core.XmlHardening]
-  kind: target
-  text: "verify parser factory hardening disables dangerous XML features"
-}

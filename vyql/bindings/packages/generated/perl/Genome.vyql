@@ -1,9 +1,0 @@
-module bindings.perl.generated.m6b67669a;
-
-binding commandExecution0 {
-  requires {
-    dependency("Genome")
-  }
-  query pattern callExpr where callee.method == "shellcmd"
-  emit sink code.CommandExecution at args[0]
-}

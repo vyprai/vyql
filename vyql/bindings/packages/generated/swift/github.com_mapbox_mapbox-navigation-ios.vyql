@@ -1,9 +1,0 @@
-module bindings.swift.generated.m3b967ea4;
-
-binding networkConnect0 {
-  requires {
-    dependency("github.com/mapbox/mapbox-navigation-ios")
-  }
-  query pattern callExpr where callee.method == "urlRequest"
-  emit sink code.NetworkConnectSink at args[0]
-}

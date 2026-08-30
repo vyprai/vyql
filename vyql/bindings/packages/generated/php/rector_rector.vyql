@@ -1,9 +1,0 @@
-module bindings.php.generated.mceb676f3;
-
-binding commandExecution0 {
-  requires {
-    dependency("rector/rector")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

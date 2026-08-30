@@ -1,8 +1,0 @@
-module code;
-
-review code.ChecksumErrorLogoutRedirect {
-  category: request_forgery
-  expected: [core.RedirectAllowlist]
-  kind: attention
-  text: "review checksum-error redirect handling that can fall back to request-supplied logout URLs"
-}

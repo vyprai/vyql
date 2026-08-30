@@ -1,8 +1,0 @@
-module code;
-
-review code.CharmRouteFileStorePathAccess {
-  category: path
-  expected: [core.PathCanonicalization]
-  kind: attention
-  text: "review route wildcard paths before file-store get, put, or delete operations"
-}

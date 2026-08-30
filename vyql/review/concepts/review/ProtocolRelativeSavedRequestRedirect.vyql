@@ -1,8 +1,0 @@
-module code;
-
-review code.ProtocolRelativeSavedRequestRedirect {
-  category: request_forgery
-  expected: [core.RedirectAllowlist, core.InputValidation]
-  kind: attention
-  text: "review saved-request redirect reconstruction for protocol-relative URLs beginning with double slash"
-}

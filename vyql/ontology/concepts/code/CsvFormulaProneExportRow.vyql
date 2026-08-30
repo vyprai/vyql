@@ -1,6 +1,0 @@
-module code;
-
-concept CsvFormulaProneExportRow : issue {
-  cwe: [CWE_1236]
-  vulnerableTo: [injection.CsvInjection]
-}

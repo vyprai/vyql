@@ -1,9 +1,0 @@
-module bindings.rust.generated.m32e28bbf;
-
-binding xmlParse0 {
-  requires {
-    dependency("quick-xml")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.XmlParse at args[0]
-}

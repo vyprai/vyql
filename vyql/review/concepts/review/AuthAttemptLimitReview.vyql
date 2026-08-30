@@ -1,8 +1,0 @@
-module code;
-
-review code.AuthAttemptLimitReview {
-  category: auth
-  expected: [core.RateLimit]
-  kind: attention
-  text: "review authentication challenge or failed-attempt limit logic for brute-force resistance and concurrent bypasses"
-}

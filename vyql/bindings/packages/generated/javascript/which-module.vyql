@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mc48b606f;
-
-binding userControlledData0 {
-  requires {
-    dependency("which-module")
-  }
-  query pattern callExpr where callee.method == "module.exports"
-  emit source core.UserControlledData at call.result
-}

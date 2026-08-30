@@ -1,6 +1,0 @@
-module request_forgery;
-
-threat Ssrf {
-  cwe: [CWE_918]
-  desc: "Server-side request forgery"
-}

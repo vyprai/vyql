@@ -1,9 +1,0 @@
-module bindings.rust.generated.m76d28b92;
-
-binding sqlExecution0 {
-  requires {
-    dependency("sqlx")
-  }
-  query pattern callExpr where callee.method == "let"
-  emit sink code.SqlExecution at args[0]
-}

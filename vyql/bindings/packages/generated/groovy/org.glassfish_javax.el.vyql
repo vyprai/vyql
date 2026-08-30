@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mbccde3b2;
-
-binding expressionEval0 {
-  requires {
-    dependency("org.glassfish:javax.el")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.ExpressionEval at args[0]
-}

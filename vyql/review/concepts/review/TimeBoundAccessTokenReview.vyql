@@ -1,7 +1,0 @@
-module code;
-
-review code.TimeBoundAccessTokenReview {
-  category: auth
-  kind: attention
-  text: "review generated access tokens or signed URLs for configurable, appropriately bounded expiration"
-}

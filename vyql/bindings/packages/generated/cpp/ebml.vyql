@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m3f6a593d;
-
-binding deserialization0 {
-  requires {
-    dependency("ebml")
-  }
-  query pattern callExpr where callee.method == "ReadData"
-  emit sink code.Deserialization at args[0]
-}

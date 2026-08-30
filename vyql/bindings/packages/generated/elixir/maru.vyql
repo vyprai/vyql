@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m234b11d6;
-
-binding deserialization0 {
-  requires {
-    dependency("maru")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

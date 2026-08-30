@@ -1,7 +1,0 @@
-module code;
-
-review code.UnboundedResourceOperation {
-  category: resource
-  kind: attention
-  text: "review long-lived resource operation for timeouts, message limits, and cancellation"
-}

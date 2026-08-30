@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m4647b75e;
-
-binding deserialization0 {
-  requires {
-    dependency("libbson")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

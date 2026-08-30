@@ -1,9 +1,0 @@
-module bindings.rust.generated.md8014405;
-
-binding deserialization0 {
-  requires {
-    dependency("image")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

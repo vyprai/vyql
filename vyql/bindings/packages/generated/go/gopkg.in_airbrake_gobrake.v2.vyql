@@ -1,9 +1,0 @@
-module bindings.go.generated.m964e9fb3;
-
-binding httpInput0 {
-  requires {
-    dependency("gopkg.in/airbrake/gobrake.v2")
-  }
-  query pattern callExpr where callee.method == "NewNotice"
-  emit source code.HttpInput at call.result
-}

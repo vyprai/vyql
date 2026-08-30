@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma56c0836;
-
-binding weakHash0 {
-  requires {
-    dependency("jumper")
-  }
-  query pattern callExpr where callee.method == "slot"
-  emit issue code.WeakHash at call
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m6e894cbe;
-
-binding codeEval0 {
-  requires {
-    dependency("javax.el:javax.el-api")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.CodeEval at args[0]
-}

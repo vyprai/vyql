@@ -1,9 +1,0 @@
-module bindings.java.generated.ma9acd0ed;
-
-binding xmlParse0 {
-  requires {
-    dependency("org.ehcache:ehcache")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.XmlParse at args[0]
-}

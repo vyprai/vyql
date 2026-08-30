@@ -1,8 +1,0 @@
-module code;
-
-review code.CopypartyCprStaticPathTraversal {
-  category: path
-  expected: [core.PathAccessCheck]
-  kind: attention
-  text: "review copyparty /.cpr static file serving for canonical containment under the embedded web directory"
-}

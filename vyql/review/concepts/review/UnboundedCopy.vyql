@@ -1,7 +1,0 @@
-module code;
-
-review code.UnboundedCopy {
-  category: memory
-  kind: attention
-  text: "review copy bounds and whether attacker-controlled data can reach the copied length or source"
-}

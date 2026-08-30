@@ -1,9 +1,0 @@
-module bindings.dart.generated.m11edd3a5;
-
-binding httpInput0 {
-  requires {
-    dependency("devtools_shared")
-  }
-  query pattern callExpr where callee.method == "handle"
-  emit source code.HttpInput at call.result
-}

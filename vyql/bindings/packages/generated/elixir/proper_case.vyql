@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m0cab831c;
-
-binding userControlledData0 {
-  requires {
-    dependency("proper_case")
-  }
-  query pattern callExpr where callee.method == "ProperCase.Plug.SnakeCaseParams.call"
-  emit source core.UserControlledData at call.result
-}

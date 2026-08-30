@@ -1,9 +1,0 @@
-module bindings.swift.generated.m72f5ed2f;
-
-binding logWrite0 {
-  requires {
-    dependency("github.com/chrisaljoudi/swift-log-oslog")
-  }
-  query pattern callExpr where callee.method == "log"
-  emit sink code.LogWriteSink at args[0]
-}

@@ -1,6 +1,0 @@
-test "rank63: AMF timer stop sequence requires protocol-state review"
-  expect_review code.ProtocolStateReview
-  graph
-  ```
-  node op code.ProtocolStateReview
-  ```

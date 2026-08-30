@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m2de7372a;
-
-binding weakHash0 {
-  requires {
-    dependency("org.clojure:clojure")
-  }
-  query pattern presenceNode where node.path ~= "org.clojure.clojure.hash"
-  emit issue code.WeakHash at node
-}

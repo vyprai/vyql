@@ -1,8 +1,0 @@
-module code;
-
-review code.MissingSessionRotationAfterAuthentication {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: attention
-  text: "review successful authentication flows that reuse the pre-login HTTP session instead of rotating it"
-}

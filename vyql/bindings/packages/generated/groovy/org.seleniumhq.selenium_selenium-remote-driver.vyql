@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mb8a7ba8c;
-
-binding networkSend0 {
-  requires {
-    dependency("org.seleniumhq.selenium:selenium-remote-driver")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.NetworkSend at args[0]
-}

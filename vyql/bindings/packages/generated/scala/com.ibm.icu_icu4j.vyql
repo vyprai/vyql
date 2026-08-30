@@ -1,9 +1,0 @@
-module bindings.scala.generated.m69c562ee;
-
-binding weakHash0 {
-  requires {
-    dependency("com.ibm.icu:icu4j")
-  }
-  query pattern callExpr where callee.method == "hash"
-  emit issue code.WeakHash at call
-}

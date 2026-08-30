@@ -1,9 +1,0 @@
-module bindings.rust.generated.m10f2af9c;
-
-binding filePathAccess0 {
-  requires {
-    dependency("ignore")
-  }
-  query pattern callExpr where callee.method == "threads"
-  emit sink code.FilePathAccess at args[0]
-}

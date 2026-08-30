@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m24deda5a;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework.security:spring-security-core")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

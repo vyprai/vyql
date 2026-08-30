@@ -1,9 +1,0 @@
-module bindings.php.generated.mb60d868c;
-
-binding cliArgument0 {
-  requires {
-    dependency("herrera-io/phar-update")
-  }
-  query pattern callExpr where callee.method == "getRunningFile"
-  emit source code.CliArgument at call.result
-}

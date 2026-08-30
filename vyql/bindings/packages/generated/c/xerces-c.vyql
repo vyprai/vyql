@@ -1,9 +1,0 @@
-module bindings.c.generated.m0da1d3fb;
-
-binding deserialization0 {
-  requires {
-    dependency("xerces-c")
-  }
-  query pattern callExpr where callee.method == "SAXParser.parse"
-  emit sink code.Deserialization at args[0]
-}

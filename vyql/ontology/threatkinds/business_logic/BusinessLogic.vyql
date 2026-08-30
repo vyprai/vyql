@@ -1,6 +1,0 @@
-module business_logic;
-
-threat BusinessLogic {
-  cwe: [CWE_841]
-  desc: "Improper enforcement of behavioral workflow (business logic)"
-}

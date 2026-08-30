@@ -1,9 +1,0 @@
-module bindings.go.generated.m59364333;
-
-binding httpInput0 {
-  requires {
-    dependency("github.com/felixge/httpsnoop")
-  }
-  query pattern callExpr where callee.method == "CaptureMetrics"
-  emit source code.HttpInput at call.result
-}

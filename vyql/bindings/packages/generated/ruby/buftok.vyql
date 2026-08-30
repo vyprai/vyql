@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m97c5620f;
-
-binding deserialization0 {
-  requires {
-    dependency("buftok")
-  }
-  query pattern callExpr where callee.method == "extract"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m8457d36b;
-
-binding sqlExecution0 {
-  requires {
-    dependency("github.com/stephencelis/SQLite.swift")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

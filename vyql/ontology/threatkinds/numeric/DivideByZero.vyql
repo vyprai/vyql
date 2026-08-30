@@ -1,6 +1,0 @@
-module numeric;
-
-threat DivideByZero {
-  cwe: [CWE_369]
-  desc: "Attacker-controlled denominator can reach division or modulo by zero"
-}

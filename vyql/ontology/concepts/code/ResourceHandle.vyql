@@ -1,6 +1,0 @@
-module code;
-
-concept ResourceHandle : issue {
-  cwe: [CWE_772]
-  vulnerableTo: [resource.ResourceLeak]
-}

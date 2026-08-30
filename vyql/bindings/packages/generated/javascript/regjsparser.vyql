@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mf58eaa5b;
-
-binding deserialization0 {
-  requires {
-    dependency("regjsparser")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

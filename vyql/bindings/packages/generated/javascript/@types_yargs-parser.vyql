@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m84c07f6d;
-
-binding userControlledData0 {
-  requires {
-    dependency("@types/yargs-parser")
-  }
-  query pattern callExpr where callee.method == "Arguments._"
-  emit source core.UserControlledData at call.result
-}

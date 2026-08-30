@@ -1,9 +1,0 @@
-module bindings.php.generated.mdf2230b1;
-
-binding networkSend0 {
-  requires {
-    dependency("sendgrid/sendgrid")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

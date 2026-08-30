@@ -1,8 +1,0 @@
-module code;
-
-review code.UnescapedDocsOpenapiUrl {
-  category: xss
-  expected: [core.HtmlEscape]
-  kind: attention
-  text: "review docs HTML helpers whose OpenAPI URL includes raw request query values; URL-encode query components before rendering"
-}

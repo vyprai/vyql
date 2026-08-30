@@ -1,6 +1,0 @@
-module code;
-
-concept CommandOptionInjectionSink : sink {
-  cwe: [CWE_74, CWE_88]
-  vulnerableTo: [injection.ArgumentInjection]
-}

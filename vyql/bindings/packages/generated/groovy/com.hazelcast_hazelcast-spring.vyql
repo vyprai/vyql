@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mcdcd2ce8;
-
-binding deserialization0 {
-  requires {
-    dependency("com.hazelcast:hazelcast-spring")
-  }
-  query pattern callExpr where callee.method == "parseInternal"
-  emit sink code.Deserialization at args[0]
-}

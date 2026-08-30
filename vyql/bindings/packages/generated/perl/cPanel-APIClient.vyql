@@ -1,9 +1,0 @@
-module bindings.perl.generated.mcf12bfd8;
-
-binding commandExecution0 {
-  requires {
-    dependency("cPanel-APIClient")
-  }
-  query pattern callExpr where callee.method == "get_cli_command"
-  emit sink code.CommandExecution at args[0]
-}

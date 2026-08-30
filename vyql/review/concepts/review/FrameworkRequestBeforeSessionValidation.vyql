@@ -1,8 +1,0 @@
-module code;
-
-review code.FrameworkRequestBeforeSessionValidation {
-  category: input_validation
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review request/session validation ordering before framework request or transport state is created"
-}

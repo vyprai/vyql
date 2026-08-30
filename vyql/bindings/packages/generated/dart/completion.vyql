@@ -1,9 +1,0 @@
-module bindings.dart.generated.m224f038b;
-
-binding userControlledData0 {
-  requires {
-    dependency("completion")
-  }
-  query pattern callExpr where callee.method == "getArgsCompletions"
-  emit source core.UserControlledData at call.result
-}

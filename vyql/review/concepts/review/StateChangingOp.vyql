@@ -1,8 +1,0 @@
-module code;
-
-review code.StateChangingOp {
-  category: request
-  expected: [core.CsrfProtection, core.AuthenticationCheck]
-  kind: target
-  text: "verify state-changing request paths have CSRF protection and auth context"
-}

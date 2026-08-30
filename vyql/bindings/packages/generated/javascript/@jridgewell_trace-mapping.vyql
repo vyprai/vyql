@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m8403a031;
-
-binding deserialization0 {
-  requires {
-    dependency("@jridgewell/trace-mapping")
-  }
-  query pattern callExpr where callee.method == "TraceMap"
-  emit sink code.Deserialization at args[0]
-}

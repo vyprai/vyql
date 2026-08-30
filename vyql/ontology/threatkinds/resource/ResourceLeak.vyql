@@ -1,6 +1,0 @@
-module resource;
-
-threat ResourceLeak {
-  cwe: [CWE_772]
-  desc: "Missing release of a resource on some path (file/socket/handle leak)"
-}

@@ -1,6 +1,0 @@
-module crypto;
-
-threat IncompleteSecurityIdentifier {
-  cwe: [CWE_358]
-  desc: "Security-sensitive identity check uses a shortened or ambiguous identifier"
-}

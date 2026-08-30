@@ -1,9 +1,0 @@
-module bindings.objc.generated.m3de66cea;
-
-binding userControlledData0 {
-  requires {
-    dependency("QRCodeReaderViewController")
-  }
-  query pattern callExpr where callee.method == "reader:didScanResult:"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.me21b30ba;
-
-binding deserialization0 {
-  requires {
-    dependency("@types/range-parser")
-  }
-  query pattern callExpr where callee.method == "RangeParser"
-  emit sink code.Deserialization at args[0]
-}

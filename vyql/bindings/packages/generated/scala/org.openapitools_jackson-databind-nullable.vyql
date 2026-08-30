@@ -1,9 +1,0 @@
-module bindings.scala.generated.m4ff74ca9;
-
-binding deserialization0 {
-  requires {
-    dependency("org.openapitools:jackson-databind-nullable")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

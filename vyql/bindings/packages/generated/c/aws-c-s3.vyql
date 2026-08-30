@@ -1,9 +1,0 @@
-module bindings.c.generated.m31bd3365;
-
-binding userControlledData0 {
-  requires {
-    dependency("aws-c-s3")
-  }
-  query pattern callExpr where callee.method == "aws_s3_client_make_meta_request"
-  emit source core.UserControlledData at call.result
-}

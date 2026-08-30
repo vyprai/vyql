@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mb72db0e8;
-
-binding filePathAccess0 {
-  requires {
-    dependency("money")
-  }
-  query pattern callExpr where callee.method == "export_rates"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m78e322de;
-
-binding filePathAccess0 {
-  requires {
-    dependency("EPublisher")
-  }
-  query pattern callExpr where callee.method == "extract_package"
-  emit sink code.FilePathAccess at args[0]
-}

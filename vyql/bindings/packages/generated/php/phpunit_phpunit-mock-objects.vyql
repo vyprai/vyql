@@ -1,9 +1,0 @@
-module bindings.php.generated.m57b9a189;
-
-binding codeEval0 {
-  requires {
-    dependency("phpunit/phpunit-mock-objects")
-  }
-  query pattern callExpr where callee.method == "evalClass"
-  emit sink code.CodeEval at args[0]
-}

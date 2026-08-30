@@ -1,9 +1,0 @@
-module bindings.perl.generated.mb779165f;
-
-binding cliArgument0 {
-  requires {
-    dependency("Perlbal")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source code.CliArgument at call.result
-}

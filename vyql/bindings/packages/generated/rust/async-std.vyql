@@ -1,9 +1,0 @@
-module bindings.rust.generated.mccc94b36;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("async-std")
-  }
-  query pattern presenceNode where node.path ~= "async.std.random"
-  emit issue code.WeakRandomValue at node
-}

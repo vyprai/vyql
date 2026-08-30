@@ -1,8 +1,0 @@
-module runtime;
-
-concept Connection : fact {
-  contextConfirmDstProp: dst
-  contextConfirmFlagProp: external
-  contextConfirmFlagValue: true
-  contextConfirmLabel: "confirmed by runtime traffic (last 24h)"
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m43320387;
-
-binding urlFetch0 {
-  requires {
-    dependency("WWW-Scraper-ISBN-BarnesNoble_Driver")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.UrlFetch at args[0]
-}

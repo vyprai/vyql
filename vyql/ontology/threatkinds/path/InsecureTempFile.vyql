@@ -1,6 +1,0 @@
-module path;
-
-threat InsecureTempFile {
-  cwe: [CWE_377]
-  desc: "Insecure temporary file (predictable name / race)"
-}

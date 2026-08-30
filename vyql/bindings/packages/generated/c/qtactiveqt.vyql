@@ -1,9 +1,0 @@
-module bindings.c.generated.ma3e9db91;
-
-binding commandExecution0 {
-  requires {
-    dependency("qtactiveqt")
-  }
-  query pattern callExpr where callee.path ~= "src/tools/dumpcpp/moc.cpp::runProcess"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.BulkEmailRecipientDisclosure {
-  category: privacy
-  expected: [core.SecretRedaction]
-  kind: target
-  text: "send notification emails per recipient or through blind-copy semantics so recipient addresses are not disclosed to other recipients"
-}

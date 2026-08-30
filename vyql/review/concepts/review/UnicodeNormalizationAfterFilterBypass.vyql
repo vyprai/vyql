@@ -1,8 +1,0 @@
-module code;
-
-review code.UnicodeNormalizationAfterFilterBypass {
-  category: input_validation
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review Unicode normalization order; compatibility normalization should happen before character filtering used by lookups or allowlists"
-}

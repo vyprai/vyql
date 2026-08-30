@@ -1,9 +1,0 @@
-module bindings.perl.generated.mb1a94f00;
-
-binding userControlledData0 {
-  requires {
-    dependency("TheSchwartz")
-  }
-  query pattern callExpr where callee.method == "new"
-  emit source core.UserControlledData at call.result
-}

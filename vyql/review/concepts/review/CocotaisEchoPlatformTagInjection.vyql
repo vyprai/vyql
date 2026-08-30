@@ -1,8 +1,0 @@
-module code;
-
-review code.CocotaisEchoPlatformTagInjection {
-  category: injection
-  expected: [core.InputValidation, core.AuthorizationCheck]
-  kind: attention
-  text: "review Cocotais builtin echo replies for platform-tag filtering or permission checks before bot-privileged output"
-}

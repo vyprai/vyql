@@ -1,9 +1,0 @@
-module bindings.php.generated.m1b1c2adb;
-
-binding httpInput0 {
-  requires {
-    dependency("illuminate/http")
-  }
-  query pattern callExpr where callee.method == "cookie"
-  emit source code.HttpInput at call.result
-}

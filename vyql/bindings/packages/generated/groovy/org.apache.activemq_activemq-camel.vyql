@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mdf1783e0;
-
-binding networkSend0 {
-  requires {
-    dependency("org.apache.activemq:activemq-camel")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

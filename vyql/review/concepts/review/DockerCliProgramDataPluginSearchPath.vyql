@@ -1,7 +1,0 @@
-module code;
-
-review code.DockerCliProgramDataPluginSearchPath {
-  category: path
-  kind: attention
-  text: "review Docker CLI Windows plugin discovery for lower-trust ProgramData search paths before executing plugin binaries"
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mba482342;
-
-binding deserialization0 {
-  requires {
-    dependency("sinatra-contrib")
-  }
-  query pattern callExpr where callee.method == "stream"
-  emit sink code.Deserialization at args[0]
-}

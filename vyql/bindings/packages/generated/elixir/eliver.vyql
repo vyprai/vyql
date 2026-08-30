@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m1c62a22c;
-
-binding commandExecution0 {
-  requires {
-    dependency("eliver")
-  }
-  query pattern callExpr where callee.method == "Eliver.Git.run_git_command"
-  emit sink code.CommandExecution at args[0]
-}

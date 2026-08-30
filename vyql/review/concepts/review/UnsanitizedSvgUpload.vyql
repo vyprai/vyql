@@ -1,8 +1,0 @@
-module code;
-
-review code.UnsanitizedSvgUpload {
-  category: xss
-  expected: [core.HtmlEscape]
-  kind: target
-  text: "review uploaded SVG handling for XML/script sanitization before storing or serving"
-}

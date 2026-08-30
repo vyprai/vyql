@@ -1,8 +1,0 @@
-module code;
-
-review code.WordPressPostsWhereDateSqlInjection {
-  category: sql
-  expected: [core.SqlParameterization, core.InputValidation]
-  kind: attention
-  text: "review WordPress posts_where filters that append date parameters to SQL without strict date or numeric validation"
-}

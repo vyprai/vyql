@@ -1,9 +1,0 @@
-module bindings.go.generated.md9894d16;
-
-binding storedDataRead0 {
-  requires {
-    dependency("github.com/armon/go-radix")
-  }
-  query pattern callExpr where callee.method == "NewFromMap"
-  emit source code.StoredDataRead at call.result
-}

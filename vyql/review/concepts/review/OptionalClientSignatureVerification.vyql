@@ -1,8 +1,0 @@
-module code;
-
-review code.OptionalClientSignatureVerification {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: attention
-  text: "review client-signature authentication paths to ensure a missing signature fails closed before accepting the certificate identity"
-}

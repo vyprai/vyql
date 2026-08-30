@@ -1,9 +1,0 @@
-module bindings.python.generated.m39629104;
-
-binding deserialization0 {
-  requires {
-    dependency("pylibmc")
-  }
-  query pattern callExpr where callee.method == "Client.deserialize"
-  emit sink code.Deserialization at args[0]
-}

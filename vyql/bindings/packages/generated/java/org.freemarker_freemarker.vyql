@@ -1,9 +1,0 @@
-module bindings.java.generated.mfb8c6a57;
-
-binding commandExecution0 {
-  requires {
-    dependency("org.freemarker:freemarker")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

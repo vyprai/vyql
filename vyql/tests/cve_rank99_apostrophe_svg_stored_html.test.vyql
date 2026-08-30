@@ -1,8 +1,0 @@
-# Rank 99 / CVE-2021-25978: Apostrophe stored SVG upload XSS.
-
-test "rank99: stored HTML write is a CVE anchor"
-  expect VYQL-INJ-028
-  graph
-  ```
-  node sink code.StoredHtmlWrite
-  ```

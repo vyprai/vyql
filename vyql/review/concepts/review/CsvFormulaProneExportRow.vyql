@@ -1,8 +1,0 @@
-module code;
-
-review code.CsvFormulaProneExportRow {
-  category: injection
-  expected: [core.CsvEscape]
-  kind: attention
-  text: "review CSV/export row construction from object fields and ensure formula-prone cells are escaped before export"
-}

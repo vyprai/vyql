@@ -1,8 +1,0 @@
-# Rank 49 / CVE-2023-37276: aiohttp vulnerable llhttp git dependency.
-
-test "rank49: vulnerable HTTP parser dependency is a CVE anchor"
-  expect VYQL-SCA-005
-  graph
-  ```
-  node dep sbom.HttpRequestSmugglingDependency
-  ```

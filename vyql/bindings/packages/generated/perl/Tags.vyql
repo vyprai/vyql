@@ -1,9 +1,0 @@
-module bindings.perl.generated.me65fd766;
-
-binding xmlParse0 {
-  requires {
-    dependency("Tags")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.XmlParse at args[0]
-}

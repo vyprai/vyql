@@ -1,6 +1,0 @@
-module bindings.cpp.generated.mce54b166;
-
-binding lengthDerivedAllocation161 {
-  query pattern presenceNode where node.kind == "any" and node.analysis ~= "allocation.length_derived_before_file_bound"
-  emit issue code.LengthDerivedAllocation at node
-}

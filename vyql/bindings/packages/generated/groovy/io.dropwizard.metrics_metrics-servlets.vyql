@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m7d22682c;
-
-binding httpInput0 {
-  requires {
-    dependency("io.dropwizard.metrics:metrics-servlets")
-  }
-  query pattern callExpr where callee.method == "doGet"
-  emit source code.HttpInput at call.result
-}

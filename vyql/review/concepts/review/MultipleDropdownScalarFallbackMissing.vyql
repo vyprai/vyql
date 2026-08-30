@@ -1,8 +1,0 @@
-module code;
-
-review code.MultipleDropdownScalarFallbackMissing {
-  category: input_validation
-  expected: [core.InputValidation]
-  kind: target
-  text: "review multiple-select dropdown value handling for scalar and malformed JSON fallback to an array"
-}

@@ -1,8 +1,0 @@
-module core;
-
-concept AuthenticationCheck : check {
-  applies: endpoint
-  covers: [endpoint, path]
-  cwe: [CWE_306]
-  neutralizes: [authentication.MissingAuthentication]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.m3e5c1bbb;
-
-binding secretValue0 {
-  requires {
-    dependency("github.com/braintree/braintree_ios")
-  }
-  query pattern callExpr where callee.method == "tokenize"
-  emit source code.SecretValue at call.result
-}

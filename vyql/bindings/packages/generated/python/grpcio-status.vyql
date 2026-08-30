@@ -1,9 +1,0 @@
-module bindings.python.generated.m9187bd91;
-
-binding deserialization0 {
-  requires {
-    dependency("grpcio-status")
-  }
-  query pattern callExpr where callee.method == "from_call"
-  emit sink code.Deserialization at args[0]
-}

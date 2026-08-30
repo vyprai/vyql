@@ -4,7 +4,7 @@ What VyQL currently scores on `main`, and on which corpus. Every number here cam
 out of `TestOWASPBenchmark`. Older figures live in git history rather than on this
 page, so you never have to read past a stale number to find the current one.
 
-Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-08-13.
+Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-08-30.
 
 > **Check the corpus column before comparing anything.** Scores from our synthetic
 > ports get mistaken for scores from the public OWASP suites more than any other
@@ -30,12 +30,16 @@ Per-suite on `main`:
 | Suite | Youden macro |
 |---|---|
 | BenchmarkJava | **+1.00** |
-| BenchmarkPython | **+0.90** |
+| BenchmarkPython | **+0.8959** |
 | owasp-js (port) | **+1.00** |
 
 Python recall is exactly 1.0 (452/452, zero false negatives); every point below
-+1.00 there is a false positive, broken down per category in §3.1.1. owasp-go is
-short the other way, entirely on recall (§3.1.2).
++1.00 there is a false positive, broken down per category in §3.1.1.
+
+**BenchmarkPython is +0.8959, not +0.90.** The two-decimal figure is what the
+protected gate compares, so both read as `+0.90`, and a floor set from the
+rounded number refuses a tree that has not moved. Four decimals are recorded
+here for anything that gates on the value.
 
 ## 2. Corpora
 
@@ -70,16 +74,18 @@ VYQL_BENCH=1 BENCH_DIR=/tmp/bench/ports/owasp-js   go test -count=1 -v ./cmd/vyq
 
 ### 3.1 Full corpora
 
-Every fetched corpus, measured 2026-08-13 on `fe529827d` in one sweep:
+Every fetched corpus, measured in one sweep:
 
 | Corpus | Youden macro |
 |---|---|
 | BenchmarkJava (2,740) | **+1.00** |
-| BenchmarkPython (1,230) | **+0.90** |
-| owasp-go (2,740) | **+0.78** |
-| owasp-bash, -c, -cpp, -csharp, -dart, -elixir, -groovy, -js, -kotlin, -lua, -objc, -perl, -php, -powershell, -python, -ruby, -rust, -scala, -solidity, -swift, -typescript | **+1.00** each |
+| BenchmarkPython (1,230) | **+0.8959** |
+| owasp-go (2,740) | **+1.00** |
+| owasp-bash, -c, -cpp, -csharp, -dart, -elixir, -groovy, -js, -lua, -objc, -perl, -php, -powershell, -python, -ruby, -rust, -scala, -solidity, -swift, -typescript | **+1.00** each |
+| owasp-kotlin (2,740) | **+0.909** |
 
-owasp-go is the only port below +1.00.
+`owasp-kotlin` is the only port below +1.00, at **+0.909**: 20 false positives,
+all in `xpathi` and none elsewhere.
 
 #### 3.1.1 Python: every point below +1.00 is a false positive
 
@@ -103,24 +109,26 @@ precision, with **FP=99** against **TN=679**.
 `pathtraver` and `xpathi` carry 83 of the 99 false positives between them, so
 they are where the next Python precision work belongs.
 
-#### 3.1.2 owasp-go: every point below +1.00 is a false negative
+#### 3.1.2 owasp-go: TP=1,415, FN=0, FP=0
 
-**FP=0 in all eleven categories**; the gap to +1.00 is entirely recall,
-**FN=302** against **TP=1,113**.
+Every one of the 302 false negatives this port used to carry was the same source
+construct, a map composite literal read back by key:
 
-| category | Youden | TP | FN |
-|---|---|---|---|
-| crypto, hash, securecookie, weakrand | **+1.00** | 513 | 0 |
-| pathtraver | **+0.69** | 92 | 41 |
-| cmdi | **+0.67** | 84 | 42 |
-| sqli | **+0.67** | 181 | 91 |
-| trustbound | **+0.67** | 56 | 27 |
-| xpathi | **+0.67** | 10 | 5 |
-| xss | **+0.66** | 163 | 83 |
-| ldapi | **+0.52** | 14 | 13 |
+```go
+payload := map[string]string{"v": payload0}["v"]
+```
 
-Every category that needs taint to reach a sink is short; the four saturated ones
-are constant/API-shape.
+The two sibling shapes in the same corpus, `[]string{P}[0]` and
+`struct{ V string }{P}.V`, both carried taint, so the gap showed up only in the
+seven categories that need taint to reach a sink — 91 in `sqli`, 83 in `xss`, 42
+in `cmdi`, 41 in `pathtraver`, 27 in `trustbound`, 13 in `ldapi`, 5 in `xpathi` —
+and not in the four constant/API-shape ones. A frontend that keeps the literal
+key of a map element closes all seven at once, and costs no precision: FP stays
+0 here, and the other 23 corpora are unmoved.
+
+**A uniform ratio across unrelated categories is worth one investigation before
+seven.** Splitting this by category would have produced seven rule tickets for a
+single lowering fact.
 
 #### 3.1.3 `defer` lowering and Swift lock bindings: no movement
 

@@ -1,8 +1,0 @@
-module code;
-
-review code.JenkinsBuildScheduleMissingPermission {
-  category: auth
-  expected: [core.AuthorizationCheck]
-  kind: attention
-  text: "review Jenkins Stapler build endpoints for Item/Build permission checks before queueing projects"
-}

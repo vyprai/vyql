@@ -1,9 +1,0 @@
-module bindings.objc.generated.m320c7cd1;
-
-binding fileUse0 {
-  requires {
-    dependency("AFDownloadRequestOperation")
-  }
-  query pattern callExpr where callee.method == "deleteTempFileWithError:"
-  emit sink code.FileUseSink at args[0]
-}

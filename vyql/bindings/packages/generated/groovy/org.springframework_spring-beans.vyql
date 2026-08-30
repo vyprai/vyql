@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m2f3ef54b;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework:spring-beans")
-  }
-  query pattern callExpr where callee.method == "copyProperties"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc74d2dce;
-
-binding fileUse0 {
-  requires {
-    dependency("github.com/VishwaiOSDev/FontKit")
-  }
-  query pattern callExpr where callee.method == "register"
-  emit sink code.FileUseSink at args[0]
-}

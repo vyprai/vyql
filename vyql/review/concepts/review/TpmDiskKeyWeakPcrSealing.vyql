@@ -1,8 +1,0 @@
-module code;
-
-review code.TpmDiskKeyWeakPcrSealing {
-  category: crypto
-  expected: [core.StrongCrypto, core.InputValidation]
-  kind: attention
-  text: "review TPM disk-key sealing PCR selections for SHA256 PCR banks and inclusion of the secure-boot measurement PCR"
-}

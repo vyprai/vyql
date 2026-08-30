@@ -1,9 +1,0 @@
-module bindings.perl.generated.mee6f942a;
-
-binding codeEval0 {
-  requires {
-    dependency("Data-Thunk")
-  }
-  query pattern callExpr where callee.method == "AUTOLOAD"
-  emit sink code.CodeEval at args[0]
-}

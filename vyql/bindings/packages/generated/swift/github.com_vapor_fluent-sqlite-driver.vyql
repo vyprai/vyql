@@ -1,9 +1,0 @@
-module bindings.swift.generated.m94ceadb7;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/vapor/fluent-sqlite-driver")
-  }
-  query pattern callExpr where callee.method == "file"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -799,3 +799,311 @@ func hasEnhancedForBinding(mods []nir.Module, target, source string) bool {
 	}
 	return false
 }
+
+func TestJavaExtractsAnonymousClassBody(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ExecuteKatalonStudioHelper.java")
+	src := []byte(`package com.katalon.jenkins.plugin.helper;
+
+import hudson.remoting.Callable;
+import org.jenkinsci.remoting.RoleChecker;
+
+public class ExecuteKatalonStudioHelper {
+    public static boolean executeKatalon(Launcher launcher) {
+        return launcher.getChannel().call(new Callable<Boolean, Exception>() {
+            @Override
+            public Boolean call() throws Exception {
+                return KatalonUtils.executeKatalon();
+            }
+            @Override
+            public void checkRoles(RoleChecker roleChecker) throws SecurityException {
+            }
+        });
+    }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var methods []string
+	var anonClass *nir.ClassDef
+	var walk func([]nir.Stmt)
+	walk = func(stmts []nir.Stmt) {
+		for _, st := range stmts {
+			switch x := st.(type) {
+			case nir.ClassDef:
+				if x.Name == "" && anonClass == nil {
+					cp := x
+					anonClass = &cp
+				}
+				walk(x.Body)
+			case nir.FuncDef:
+				methods = append(methods, x.Name)
+				walk(x.Body)
+			}
+		}
+	}
+	for _, mod := range prog.Modules {
+		walk(mod.Body)
+	}
+	if anonClass == nil {
+		t.Fatalf("no anonymous ClassDef extracted; methods = %v", methods)
+	}
+	if len(anonClass.Bases) != 1 || anonClass.Bases[0] != "Callable" {
+		t.Fatalf("anonymous class bases = %v, want [Callable]", anonClass.Bases)
+	}
+	want := map[string]bool{"call": false, "checkRoles": false}
+	for _, m := range methods {
+		if _, ok := want[m]; ok {
+			want[m] = true
+		}
+	}
+	for m, seen := range want {
+		if !seen {
+			t.Fatalf("anonymous class member %q not extracted; methods = %v", m, methods)
+		}
+	}
+}
+
+func TestJavaExtractsEnumConstantBody(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ConfigSetsHandler.java")
+	src := []byte(`package org.apache.solr.handler.admin;
+
+import java.util.Map;
+
+public class ConfigSetsHandler {
+    enum ConfigSetOperation {
+        CREATE_OP("create") {
+            @Override
+            Map<String, Object> call(SolrQueryRequest req) throws Exception {
+                String base = req.getParams().get("baseConfigSet");
+                return copy(base);
+            }
+        },
+        PLAIN_OP("plain");
+
+        String action;
+        ConfigSetOperation(String action) { this.action = action; }
+        abstract Map<String, Object> call(SolrQueryRequest req) throws Exception;
+    }
+
+    static Map<String, Object> copy(String s) { return null; }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var constantClass *nir.ClassDef
+	var callDef *nir.FuncDef
+	var walk func([]nir.Stmt)
+	walk = func(stmts []nir.Stmt) {
+		for _, st := range stmts {
+			switch x := st.(type) {
+			case nir.ClassDef:
+				if x.Name == "CREATE_OP" && constantClass == nil {
+					cp := x
+					constantClass = &cp
+				}
+				walk(x.Body)
+			case nir.FuncDef:
+				if x.Name == "call" && callDef == nil {
+					cp := x
+					callDef = &cp
+				}
+				walk(x.Body)
+			}
+		}
+	}
+	for _, mod := range prog.Modules {
+		walk(mod.Body)
+	}
+	if constantClass == nil {
+		t.Fatal("no ClassDef extracted for the constant-specific body")
+	}
+	if len(constantClass.Bases) != 1 || constantClass.Bases[0] != "ConfigSetOperation" {
+		t.Fatalf("constant class bases = %v, want [ConfigSetOperation]", constantClass.Bases)
+	}
+	if callDef == nil {
+		t.Fatal("the constant body's call method was not extracted")
+	}
+	found := false
+	for _, tok := range callDef.ContextTokens {
+		if tok == "class_name:CREATE_OP" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("constant body method carries no class_name:CREATE_OP context; tokens = %v", callDef.ContextTokens)
+	}
+}
+
+func TestJavaFieldInitTokensCarryStaticNess(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Pools.java")
+	src := []byte(`package io.example;
+
+import io.netty.util.concurrent.FastThreadLocal;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.HashMap;
+
+public class Pools {
+  private final FastThreadLocal<InProgressTail> current = new FastThreadLocal<>();
+  private static final FastThreadLocal<Cached> shared = new FastThreadLocal<>();
+  private final AtomicInteger count = new AtomicInteger();
+  private final HashMap<String, String> map = new HashMap<>();
+  private final HashMap<String, String> again = new HashMap<>();
+  private final FastThreadLocal<Other> named = otherFactory.build();
+
+  protected static final class Nested {
+    private final FastThreadLocal<NestedTail> own = new FastThreadLocal<>();
+    public void run() {}
+  }
+
+  interface Holder {
+    FastThreadLocal<Holder> GLOBAL = new FastThreadLocal<>();
+  }
+
+  public void submit() {}
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	methods := map[string][]string{}
+	var walk func([]nir.Stmt)
+	walk = func(stmts []nir.Stmt) {
+		for _, st := range stmts {
+			switch x := st.(type) {
+			case nir.ClassDef:
+				walk(x.Body)
+			case nir.FuncDef:
+				if _, ok := methods[x.Name]; !ok {
+					methods[x.Name] = x.ContextTokens
+				}
+				walk(x.Body)
+			}
+		}
+	}
+	for _, mod := range prog.Modules {
+		walk(mod.Body)
+	}
+	submit, ok := methods["submit"]
+	if !ok {
+		t.Fatal("submit method not extracted")
+	}
+	has := func(tok string) bool {
+		for _, t := range submit {
+			if t == tok {
+				return true
+			}
+		}
+		return false
+	}
+	for _, tok := range []string{
+		"instance_field_init:FastThreadLocal",
+		"static_field_init:FastThreadLocal",
+		"instance_field_init:AtomicInteger",
+		"instance_field_init:HashMap",
+	} {
+		if !has(tok) {
+			t.Fatalf("submit context lacks %s; tokens = %v", tok, submit)
+		}
+	}
+	if count := strings.Count(strings.Join(submit, "\n"), "instance_field_init:HashMap"); count != 1 {
+		t.Fatalf("instance_field_init:HashMap appears %d times, want the deduped 1", count)
+	}
+	if strings.Contains(strings.Join(submit, "\n"), "instance_field_init:Other") {
+		t.Fatal("a field initialized by a call, not a construction, carries an init token")
+	}
+	run, ok := methods["run"]
+	if !ok {
+		t.Fatal("nested class run method not extracted")
+	}
+	joined := strings.Join(run, "\n")
+	if !strings.Contains(joined, "instance_field_init:FastThreadLocal") {
+		t.Fatalf("nested class method lacks its own field token; tokens = %v", run)
+	}
+	if strings.Contains(joined, "instance_field_init:HashMap") {
+		t.Fatal("the enclosing class's field tokens smear onto the nested class")
+	}
+}
+
+func TestJavaFieldInitTokensInterfaceAndAnonymousClass(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Registries.java")
+	src := []byte(`package io.example;
+
+import io.netty.util.concurrent.FastThreadLocal;
+
+public class Registries {
+  interface Holder {
+    FastThreadLocal<Holder> GLOBAL = new FastThreadLocal<>();
+    void use();
+  }
+
+  Object watcher = new Object() {
+    final FastThreadLocal<Watcher> perBody = new FastThreadLocal<>();
+    void keep() {}
+  };
+
+  enum Op {
+    CREATE() {
+      final FastThreadLocal<Op> perConstant = new FastThreadLocal<>();
+      void act() {}
+    };
+
+    abstract void act();
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tokens := map[string]string{}
+	var walk func([]nir.Stmt)
+	walk = func(stmts []nir.Stmt) {
+		for _, st := range stmts {
+			switch x := st.(type) {
+			case nir.ClassDef:
+				walk(x.Body)
+			case nir.FuncDef:
+				if _, ok := tokens[x.Name]; !ok {
+					tokens[x.Name] = strings.Join(x.ContextTokens, "\n")
+				}
+				walk(x.Body)
+			}
+		}
+	}
+	for _, mod := range prog.Modules {
+		walk(mod.Body)
+	}
+	for name, want := range map[string]string{
+		"use":  "static_field_init:FastThreadLocal",
+		"keep": "instance_field_init:FastThreadLocal",
+		"act":  "instance_field_init:FastThreadLocal",
+	} {
+		got, ok := tokens[name]
+		if !ok {
+			t.Fatalf("%s method not extracted", name)
+		}
+		if !strings.Contains(got, want) {
+			t.Fatalf("%s context lacks %s; tokens = %q", name, want, got)
+		}
+		if strings.Contains(got, "instance_field_init:FastThreadLocal") && want == "static_field_init:FastThreadLocal" {
+			t.Fatalf("interface field reads as per-instance; tokens = %q", got)
+		}
+	}
+}

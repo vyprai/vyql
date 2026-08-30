@@ -1,9 +1,0 @@
-module bindings.objc.generated.m306bd428;
-
-binding httpInput0 {
-  requires {
-    dependency("STTwitter")
-  }
-  query pattern callExpr where callee.path ~= "postTokenRequest"
-  emit source code.HttpInput at call.result
-}

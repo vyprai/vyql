@@ -1,9 +1,0 @@
-module bindings.java.generated.mb96d0d02;
-
-binding deserialization0 {
-  requires {
-    dependency("org.glassfish.jersey.core:jersey-client")
-  }
-  query pattern callExpr where callee.method == "org.glassfish.jersey.client.ChunkedInput.read"
-  emit sink code.Deserialization at args[0]
-}

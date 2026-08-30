@@ -1,9 +1,0 @@
-module bindings.go.generated.m6eba64a7;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/xi2/xz")
-  }
-  query pattern callExpr where callee.method == "NewReader"
-  emit sink code.Deserialization at args[0]
-}

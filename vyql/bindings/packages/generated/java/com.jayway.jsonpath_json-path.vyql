@@ -1,9 +1,0 @@
-module bindings.java.generated.ma507cb98;
-
-binding deserialization0 {
-  requires {
-    dependency("com.jayway.jsonpath:json-path")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

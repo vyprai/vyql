@@ -1,9 +1,0 @@
-module bindings.scala.generated.m95775399;
-
-binding userControlledData0 {
-  requires {
-    dependency("org.modelmapper:modelmapper")
-  }
-  query pattern callExpr where callee.method == "map"
-  emit source core.UserControlledData at call.result
-}

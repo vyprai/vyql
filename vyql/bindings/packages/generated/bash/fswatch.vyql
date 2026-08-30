@@ -1,9 +1,0 @@
-module bindings.bash.generated.m57abc744;
-
-binding cliArgument0 {
-  requires {
-    dependency("fswatch")
-  }
-  query pattern callExpr where callee.path ~= "fswatch.argv"
-  emit source code.CliArgument at call.result
-}

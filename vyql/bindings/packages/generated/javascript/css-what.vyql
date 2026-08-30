@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m6098e3db;
-
-binding deserialization0 {
-  requires {
-    dependency("css-what")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

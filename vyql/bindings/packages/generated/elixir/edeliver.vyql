@@ -1,9 +1,0 @@
-module bindings.elixir.generated.me50f698f;
-
-binding commandExecution0 {
-  requires {
-    dependency("edeliver")
-  }
-  query pattern callExpr where callee.method == "shell_command"
-  emit sink code.CommandExecution at args[0]
-}

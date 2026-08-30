@@ -1,9 +1,0 @@
-module bindings.java.generated.m10814ed2;
-
-binding codeEval0 {
-  requires {
-    dependency("org.apache.activemq:activemq-camel")
-  }
-  query pattern callExpr where callee.method == "process"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.ControlledMergeInheritedKeyPrototypePollution {
-  category: prototype_pollution
-  expected: [core.PrototypePollutionGuard]
-  kind: attention
-  text: "review controlled-merge for own-property filtering before copying for-in keys into result objects"
-}

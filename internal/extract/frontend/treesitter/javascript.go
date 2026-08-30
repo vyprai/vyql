@@ -383,6 +383,14 @@ func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 						out[c.text(rhs)] = true
 					}
 				}
+			} else if left != nil && left.Kind() == "identifier" && c.isModuleExports(rhs) {
+				out[c.text(left)] = true
+			}
+		case "variable_declarator":
+			// `const alias = module.exports;` names the export root, so
+			// `alias.method = fn` further down is an export of `method`.
+			if name := field(n, "name"); name != nil && name.Kind() == "identifier" && c.isModuleExports(field(n, "value")) {
+				out[c.text(name)] = true
 			}
 		}
 		for _, ch := range c.namedChildren(n) {
@@ -476,6 +484,12 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 		seen[tok] = true
 		out = append(out, tok)
 	}
+	if restart, hiddenCall := c.jsLoopRestartFacts(root); restart {
+		add("loop_restart_without_progress=true")
+		if hiddenCall {
+			add("loop_progress_hidden_in_call=true")
+		}
+	}
 	if jsZeroStepSequenceRisk(c.text(root)) {
 		add("zero_step_sequence_risk=true")
 	}
@@ -505,10 +519,11 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 			if left != nil && left.Kind() == "subscript_expression" {
 				add("dynamic_property_write=true")
 				rightText := jsContextCompact(c.text(right))
-				if right != nil && right.Kind() == "object" {
+				objectLiteral, arrayLiteral := c.jsAllocatedContainerKinds(right)
+				if objectLiteral {
 					add("dynamic_property_write_object_literal=true")
 				}
-				if right != nil && right.Kind() == "array" {
+				if arrayLiteral {
 					add("dynamic_property_write_array_literal=true")
 				}
 				if strings.Contains(rightText, "[") {
@@ -569,6 +584,9 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 			}
 			if c.jsOwnPropertyKeyGuard(n) {
 				add("own_property_key_guard=true")
+			}
+			if c.jsFailOpenPolicyDeclarationGuard(n) {
+				add("fail_open_policy_declaration_guard=true")
 			}
 		case "for_in_statement":
 			add("for_in=true")
@@ -633,6 +651,475 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 	}
 	walk(root)
 	return out
+}
+
+// jsLoopRestartFacts reports a scanning loop that can restart without
+// consuming from the buffer it scans — the CWE-835 weakness class — and
+// whether the restart's path carries a call whose effect on the buffer the
+// fact cannot interpret. A restart is uncovered when some `continue` bound
+// to the loop is reachable from the loop head without passing any progress
+// evidence for the variables the loop's exit reads: re-testing an unchanged
+// exit takes the same branch again, so the cycle cannot reach the exit.
+// while, do-while and update-less for loops carry the fact — `for(;;)`,
+// whose `continue` runs no clause at all, and `for (;cond;)`, which re-tests
+// its condition; a for-loop with an increment clause does not, because
+// `continue` still runs it, and neither do for-in/for-of loops, whose
+// iterator advances mechanically.
+// Loops are attributed to the innermost function that owns them: the walk
+// never crosses a function boundary in either direction, so a closure's
+// loop reports on the closure and not on every enclosing function.
+func (c *jsConv) jsLoopRestartFacts(root *tree_sitter.Node) (restart, hiddenCall bool) {
+	var loops []*tree_sitter.Node
+	var findLoops func(*tree_sitter.Node)
+	findLoops = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "while_statement", "do_statement":
+			loops = append(loops, n)
+		case "for_statement":
+			if jsForClause(n, "increment") == nil {
+				loops = append(loops, n)
+			}
+		case "function_declaration", "function_expression", "arrow_function", "method_definition":
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			findLoops(ch)
+		}
+	}
+	findLoops(root)
+	if len(loops) == 0 {
+		return false, false
+	}
+	nested := c.jsNestedFunctionBodies(root)
+	for _, loop := range loops {
+		r, h := c.jsLoopRestart(loop, nested)
+		if r {
+			restart = true
+			if h {
+				hiddenCall = true
+			}
+		}
+	}
+	return restart, hiddenCall
+}
+
+// jsForClause returns a for-loop's optional clause, treating the empty
+// statement the grammar inserts for an omitted clause (`for (;;)`) as
+// absent.
+func jsForClause(n *tree_sitter.Node, name string) *tree_sitter.Node {
+	cl := field(n, name)
+	if cl == nil || cl.Kind() == "empty_statement" {
+		return nil
+	}
+	return cl
+}
+
+// jsNestedFunctionBodies indexes, by name, every function defined anywhere
+// inside the analyzed function: the closures its loops can call, whose
+// bodies may carry the loop's progress (`function getArg() { argv.shift()
+// }` advancing the very vector the loop's condition reads).
+func (c *jsConv) jsNestedFunctionBodies(root *tree_sitter.Node) map[string]*tree_sitter.Node {
+	out := map[string]*tree_sitter.Node{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "function_declaration", "method_definition":
+			if name := c.text(field(n, "name")); name != "" {
+				if body := field(n, "body"); body != nil {
+					out[name] = body
+				}
+			}
+		case "variable_declarator":
+			val := field(n, "value")
+			if val != nil && (val.Kind() == "arrow_function" || val.Kind() == "function_expression") {
+				if name := c.text(field(n, "name")); name != "" {
+					if body := field(val, "body"); body != nil {
+						out[name] = body
+					}
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+// jsLoopRestart holds for a loop with an uncovered restart, and reports
+// whether an uninterpretable call sits on that restart's dominating path.
+// Exit variables are the condition's reads for while, do-while and
+// condition-bearing update-less for loops, and the break guards' reads for
+// `for(;;)`, whose only exits are breaks — a switch's break leaves the
+// switch, so only if-arms guard a loop exit.
+// Progress evidence is an assignment, augmented assignment or update
+// writing an exit variable, a method call receiving one as its receiver —
+// the mutating idiom (`it.next()`, `queue.shift()`) — or a call to a
+// function defined inside the analyzed function whose body carries such
+// evidence. Evidence covers a restart only where it dominates it, on the
+// path every iteration to that `continue` takes: a sibling branch's
+// progress step never executes on the restart it is supposed to cover. The
+// body must carry evidence somewhere, so a loop whose exit is flipped
+// elsewhere (`while (running)`) or reached only by break stays out. A
+// condition that assigns (`while ((line = read()) != null)`) advances every
+// iteration and never qualifies, nor does one that reads no variable
+// (`while (true)`).
+func (c *jsConv) jsLoopRestart(loop *tree_sitter.Node, nested map[string]*tree_sitter.Node) (restart, hiddenCall bool) {
+	var body *tree_sitter.Node
+	condVars := map[string]bool{}
+	condAssign := false
+	switch loop.Kind() {
+	case "while_statement", "do_statement":
+		cond, b := field(loop, "condition"), field(loop, "body")
+		if cond == nil || b == nil {
+			return false, false
+		}
+		body = b
+		c.jsReadExitIdentifiers(cond, condVars, &condAssign)
+	case "for_statement":
+		body = field(loop, "body")
+		if body == nil {
+			return false, false
+		}
+		if cond := jsForClause(loop, "condition"); cond != nil {
+			c.jsReadExitIdentifiers(cond, condVars, &condAssign)
+		} else {
+			c.jsBreakGuardReads(body, condVars)
+		}
+	}
+	if condAssign || len(condVars) == 0 || body == nil {
+		return false, false
+	}
+	if _, anywhere := c.jsProgressEvidence(body, condVars, nested, 0); !anywhere {
+		return false, false
+	}
+	var continues []*tree_sitter.Node
+	var collectContinues func(*tree_sitter.Node)
+	collectContinues = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "continue_statement":
+			if field(n, "label") == nil {
+				continues = append(continues, n)
+			}
+		case "while_statement", "do_statement", "for_statement", "for_in_statement", "for_of_statement",
+			"function_declaration", "function_expression", "arrow_function", "method_definition":
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			collectContinues(ch)
+		}
+	}
+	collectContinues(body)
+	for _, cont := range continues {
+		covered, hidden := c.jsRestartCovered(body, cont, condVars, nested)
+		if !covered {
+			restart = true
+			if hidden {
+				hiddenCall = true
+			}
+		}
+	}
+	return restart, hiddenCall
+}
+
+// jsReadExitIdentifiers collects the identifiers a loop condition reads; an
+// assignment inside the condition advances the loop every iteration.
+func (c *jsConv) jsReadExitIdentifiers(n *tree_sitter.Node, out map[string]bool, assigned *bool) {
+	if n == nil {
+		return
+	}
+	switch n.Kind() {
+	case "assignment_expression":
+		*assigned = true
+	case "identifier":
+		out[c.text(n)] = true
+	}
+	for _, ch := range c.namedChildren(n) {
+		c.jsReadExitIdentifiers(ch, out, assigned)
+	}
+}
+
+// jsBreakGuardReads collects the identifiers read by the conditions of
+// if-arms that break out of this loop: `for(;;) { if (i >= limit) break; ...
+// }` exits on those reads.
+func (c *jsConv) jsBreakGuardReads(body *tree_sitter.Node, out map[string]bool) {
+	var armBreaks func(n *tree_sitter.Node) bool
+	armBreaks = func(n *tree_sitter.Node) bool {
+		if n == nil {
+			return false
+		}
+		switch n.Kind() {
+		case "break_statement":
+			return field(n, "label") == nil
+		case "while_statement", "do_statement", "for_statement", "for_in_statement", "for_of_statement",
+			"function_declaration", "function_expression", "arrow_function", "method_definition", "switch_statement":
+			return false
+		}
+		for _, ch := range c.namedChildren(n) {
+			if armBreaks(ch) {
+				return true
+			}
+		}
+		return false
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "while_statement", "do_statement", "for_statement", "for_in_statement", "for_of_statement",
+			"function_declaration", "function_expression", "arrow_function", "method_definition", "switch_statement":
+			return
+		case "if_statement":
+			for _, arm := range []*tree_sitter.Node{field(n, "consequence"), field(n, "alternative")} {
+				if arm != nil && armBreaks(arm) {
+					c.jsReadExitIdentifiers(field(n, "condition"), out, new(bool))
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+}
+
+// jsIsProgressEvidence holds for a node that advances a loop exit variable:
+// an assignment, augmented assignment or update writing one, a method call
+// receiving one as its receiver, or a call to a nested function whose body
+// carries such evidence (getArg() shifting the argument vector the loop's
+// condition reads). Resolution is one hop deep inside the analyzed function;
+// a function the file defines outside it is as opaque as an import.
+func (c *jsConv) jsIsProgressEvidence(n *tree_sitter.Node, condVars map[string]bool, nested map[string]*tree_sitter.Node, depth int) bool {
+	switch n.Kind() {
+	case "assignment_expression", "augmented_assignment_expression":
+		return condVars[c.jsRootIdentifier(field(n, "left"))]
+	case "update_expression":
+		return condVars[c.jsRootIdentifier(field(n, "argument"))]
+	case "call_expression":
+		fn := c.unwrapJsTransparentExpr(field(n, "function"))
+		if fn == nil {
+			return false
+		}
+		if fn.Kind() == "member_expression" {
+			return condVars[c.jsRootIdentifier(field(fn, "object"))]
+		}
+		if fn.Kind() == "identifier" && depth < 2 {
+			if callee, ok := nested[c.text(fn)]; ok {
+				_, any := c.jsProgressEvidence(callee, condVars, nested, depth+1)
+				return any
+			}
+		}
+	}
+	return false
+}
+
+// jsProgressEvidence walks a subtree for progress evidence, crossing no
+// function boundary: a closure contributes only through a call that
+// resolves to it.
+func (c *jsConv) jsProgressEvidence(n *tree_sitter.Node, condVars map[string]bool, nested map[string]*tree_sitter.Node, depth int) ([]uint, bool) {
+	var pos []uint
+	any := false
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "function_declaration", "function_expression", "arrow_function", "method_definition":
+			return
+		}
+		if c.jsIsProgressEvidence(n, condVars, nested, depth) {
+			pos = append(pos, n.StartByte())
+			any = true
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return pos, any
+}
+
+// jsIsHiddenProgressCall holds for a construct whose effect on a loop exit
+// variable the fact cannot interpret: a call to a bare name the analyzed
+// function does not define (an import, a parameter, a global); a call
+// carrying a callback whose body advances an exit variable — the progress
+// is real, but whether the callee invokes the callback, and on which path,
+// is the callee's contract, not something the syntax shows; and a
+// per-iteration declaration re-binding an exit variable from a call
+// (`var L = e.exec(a)`), whose advance depends on the callee's state.
+// Such a construct may advance the loop through effects the fact cannot
+// see, which is a judgement for the rules, not the frontend.
+func (c *jsConv) jsIsHiddenProgressCall(n *tree_sitter.Node, condVars map[string]bool, nested map[string]*tree_sitter.Node, depth int) bool {
+	if n == nil {
+		return false
+	}
+	if n.Kind() == "variable_declarator" {
+		return depth < 2 && condVars[c.text(field(n, "name"))] &&
+			jsSubtreeContainsCall(field(n, "value"))
+	}
+	if n.Kind() != "call_expression" {
+		return false
+	}
+	fn := c.unwrapJsTransparentExpr(field(n, "function"))
+	if fn == nil {
+		return false
+	}
+	if fn.Kind() == "identifier" {
+		_, resolved := nested[c.text(fn)]
+		return !resolved
+	}
+	if depth < 2 {
+		if args := field(n, "arguments"); args != nil {
+			for _, arg := range c.namedChildren(args) {
+				if arg == nil || (arg.Kind() != "arrow_function" && arg.Kind() != "function_expression") {
+					continue
+				}
+				if body := field(arg, "body"); body != nil {
+					if _, any := c.jsProgressEvidence(body, condVars, nested, depth+1); any {
+						return true
+					}
+				}
+			}
+		}
+	}
+	return false
+}
+
+// jsRestartCovered reports whether progress evidence dominates a continue —
+// executes on every path from the loop body's start to it — and whether
+// that dominating path carries an unresolved call. Only unconditional
+// positions dominate: earlier statements of the same block, the condition
+// of a branch whose arm contains the continue, the left operand of a
+// short-circuit, the discriminant of a switch whose case contains it. A
+// statement's own conditional arms, a short-circuit's right operand, and
+// nested loop and function bodies never dominate what follows them, so a
+// sibling branch's progress step does not cover a restart that branch never
+// executes.
+func (c *jsConv) jsRestartCovered(body, cont *tree_sitter.Node, condVars map[string]bool, nested map[string]*tree_sitter.Node) (covered, hidden bool) {
+	target := cont.Id()
+	var straight func(*tree_sitter.Node)
+	straight = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch n.Kind() {
+		case "while_statement", "do_statement", "for_statement", "for_in_statement", "for_of_statement",
+			"function_declaration", "function_expression", "arrow_function", "method_definition",
+			"switch_statement", "try_statement":
+			return
+		case "if_statement", "conditional_expression":
+			straight(field(n, "condition"))
+			return
+		case "binary_expression":
+			if op := c.text(field(n, "operator")); op == "&&" || op == "||" {
+				straight(field(n, "left"))
+				return
+			}
+		}
+		if c.jsIsProgressEvidence(n, condVars, nested, 0) {
+			covered = true
+		}
+		if c.jsIsHiddenProgressCall(n, condVars, nested, 0) {
+			hidden = true
+		}
+		for _, ch := range c.namedChildren(n) {
+			straight(ch)
+		}
+	}
+	contains := func(n *tree_sitter.Node) bool {
+		return n != nil && cont.StartByte() >= n.StartByte() && cont.EndByte() <= n.EndByte()
+	}
+	var descend func(*tree_sitter.Node) bool
+	descend = func(n *tree_sitter.Node) bool {
+		if n == nil {
+			return false
+		}
+		if n.Id() == target {
+			return true
+		}
+		kids := c.namedChildren(n)
+		for i, ch := range kids {
+			if !contains(ch) {
+				continue
+			}
+			switch n.Kind() {
+			case "if_statement", "conditional_expression":
+				// The condition precedes both arms; one arm never precedes
+				// the other.
+				straight(field(n, "condition"))
+			case "binary_expression":
+				if op := c.text(field(n, "operator")); op == "&&" || op == "||" {
+					if i > 0 {
+						straight(kids[0])
+					}
+				} else {
+					for _, earlier := range kids[:i] {
+						straight(earlier)
+					}
+				}
+			case "switch_body":
+				// Case tests evaluate in order until one matches; case
+				// bodies do not run.
+				for _, earlier := range kids[:i] {
+					straight(field(earlier, "value"))
+				}
+			default:
+				for _, earlier := range kids[:i] {
+					straight(earlier)
+				}
+			}
+			return descend(ch)
+		}
+		return false
+	}
+	descend(body)
+	return covered, hidden
+}
+
+// jsSubtreeContainsCall reports whether an expression calls anything at
+// any depth.
+func jsSubtreeContainsCall(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	if n.Kind() == "call_expression" || n.Kind() == "new_expression" {
+		return true
+	}
+	for i := uint(0); i < n.NamedChildCount(); i++ {
+		if jsSubtreeContainsCall(n.NamedChild(i)) {
+			return true
+		}
+	}
+	return false
+}
+
+// jsRootIdentifier returns the base identifier of a member or subscript
+// chain: `a` for `a.b.c` and `a[i].d`.
+func (c *jsConv) jsRootIdentifier(n *tree_sitter.Node) string {
+	for n != nil {
+		switch n.Kind() {
+		case "identifier":
+			return c.text(n)
+		case "member_expression", "subscript_expression":
+			n = field(n, "object")
+		default:
+			return ""
+		}
+	}
+	return ""
 }
 
 func jsZeroStepSequenceRisk(text string) bool {
@@ -943,6 +1430,32 @@ func (c *jsConv) jsPrototypeKeyGuard(n *tree_sitter.Node) bool {
 	return jsPrototypeKeyComparison(txt)
 }
 
+// jsAllocatedContainerKinds reports whether the value a computed-key write
+// stores is a freshly allocated container literal, and which kinds it can be.
+// The value of a ternary is one of its branches, so
+// `root[path] = deep ? [] : {}` allocates a container on every path exactly as
+// `root[path] = {}` does and reports both kinds, while a ternary with a
+// non-container branch can store a computed value and reports neither.
+func (c *jsConv) jsAllocatedContainerKinds(n *tree_sitter.Node) (object, array bool) {
+	if n == nil {
+		return false, false
+	}
+	switch n.Kind() {
+	case "object":
+		return true, false
+	case "array":
+		return false, true
+	case "ternary_expression":
+		objThen, arrThen := c.jsAllocatedContainerKinds(field(n, "consequence"))
+		objElse, arrElse := c.jsAllocatedContainerKinds(field(n, "alternative"))
+		if !(objThen || arrThen) || !(objElse || arrElse) {
+			return false, false
+		}
+		return objThen || objElse, arrThen || arrElse
+	}
+	return false, false
+}
+
 func jsPrototypeKeyComparison(expr string) bool {
 	if !strings.Contains(expr, "==") && !strings.Contains(expr, "!=") {
 		return false
@@ -970,6 +1483,246 @@ func (c *jsConv) jsOwnPropertyKeyGuard(n *tree_sitter.Node) bool {
 		strings.Contains(txt, "hasOwn(") ||
 		strings.Contains(txt, "Object.getOwnPropertyNames") ||
 		strings.Contains(txt, ".includes(") && strings.Contains(txt, "continue")
+}
+
+// jsFailOpenPolicyDeclarationGuard reports an `&&` chain that consults a
+// declared requirement only as a conjunct of the guard that enforces it: one
+// conjunct is the bare read X of a declared field, another conjunct of the same
+// chain is a negated membership call over some collection whose element is
+// compared against X — `if (token && ep.meta.kind && !token.permission.some(p
+// => p === ep.meta.kind))` — and no operand of the enclosing condition tests
+// X's absence. The chain is then true, and the check it guards skipped,
+// wherever X was never set, which is the shape of an authorization that fails
+// open on an undeclared requirement instead of denying. The fact is keyed on
+// the relation between the sibling conjuncts rather than on X's spelling, so a
+// binding can pair it with a documented collection API without knowing what
+// any application calls its requirement field.
+func (c *jsConv) jsFailOpenPolicyDeclarationGuard(n *tree_sitter.Node) bool {
+	if n == nil || n.Kind() != "if_statement" {
+		return false
+	}
+	ops := c.jsBooleanOperands(field(n, "condition"), nil)
+	if len(ops) < 2 {
+		return false
+	}
+	declared := map[string]bool{}
+	for _, op := range ops {
+		if txt := c.jsDeclaredFieldRead(op); strings.Contains(txt, ".") {
+			declared[txt] = true
+		}
+	}
+	if len(declared) == 0 {
+		return false
+	}
+	for _, op := range ops {
+		for _, x := range c.jsNegatedMembershipOperands(op) {
+			if declared[x] && !c.jsDeniesAbsentDeclaration(ops, x) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// jsBooleanOperands flattens one condition's `&&`/`||` tree into its operands,
+// so a denial spelled in a sibling branch (`... || (!X && deny)`) stays visible
+// to the caller instead of hiding inside a nested expression.
+func (c *jsConv) jsBooleanOperands(n *tree_sitter.Node, acc []*tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return acc
+	}
+	n = c.unwrapJsTransparentExpr(n)
+	if n.Kind() == "binary_expression" {
+		if op := c.text(field(n, "operator")); op == "&&" || op == "||" {
+			acc = c.jsBooleanOperands(field(n, "left"), acc)
+			return c.jsBooleanOperands(field(n, "right"), acc)
+		}
+	}
+	return append(acc, n)
+}
+
+// jsDeclaredFieldRead returns the dotted text of a bare member read — a field
+// of some object, with no call, subscript, comparison or negation around it —
+// or "" for anything else.
+func (c *jsConv) jsDeclaredFieldRead(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	n = c.unwrapJsTransparentExpr(n)
+	switch n.Kind() {
+	case "identifier", "property_identifier":
+		return c.text(n)
+	case "this":
+		return "this"
+	case "member_expression":
+		prop := field(n, "property")
+		if prop == nil || prop.Kind() != "property_identifier" {
+			return ""
+		}
+		base := c.jsDeclaredFieldRead(field(n, "object"))
+		if base == "" {
+			return ""
+		}
+		return base + "." + c.text(prop)
+	}
+	return ""
+}
+
+// jsMembershipPredicates are the call names that answer "is this element in
+// that collection" with a boolean.
+var jsMembershipPredicates = map[string]bool{
+	"some": true, "includes": true, "has": true, "contains": true,
+}
+
+// jsNegatedMembershipOperands returns the declared-field texts a negated
+// membership call compares its element against: the argument itself for
+// `!coll.includes(X)`, and the declared-field side of each comparison inside
+// the predicate for `!coll.some(p => p === X)`.
+func (c *jsConv) jsNegatedMembershipOperands(op *tree_sitter.Node) []string {
+	if op == nil || op.Kind() != "unary_expression" || c.text(field(op, "operator")) != "!" {
+		return nil
+	}
+	call := c.unwrapJsTransparentExpr(field(op, "argument"))
+	if call == nil || call.Kind() != "call_expression" {
+		return nil
+	}
+	fn := c.unwrapJsTransparentExpr(field(call, "function"))
+	if fn == nil || fn.Kind() != "member_expression" || field(fn, "property") == nil {
+		return nil
+	}
+	if !jsMembershipPredicates[c.text(field(fn, "property"))] {
+		return nil
+	}
+	args := field(call, "arguments")
+	if args == nil || len(c.namedChildren(args)) == 0 {
+		return nil
+	}
+	arg := c.unwrapJsTransparentExpr(c.namedChildren(args)[0])
+	if arg == nil {
+		return nil
+	}
+	switch arg.Kind() {
+	case "arrow_function", "function_expression", "function_declaration":
+		var out []string
+		c.jsCollectMembershipComparisons(field(arg, "body"), &out)
+		return out
+	}
+	if txt := c.jsDeclaredFieldRead(arg); strings.Contains(txt, ".") {
+		return []string{txt}
+	}
+	return nil
+}
+
+// jsCollectMembershipComparisons walks a membership predicate's body for
+// `p === X` style comparisons and records the declared-field side of each. A
+// non-null assertion wrapper is not descended into: the grammar binds
+// `p === X!.f` as `(p === X)!.f`, so the comparison inside it names a shorter
+// operand than the source reads.
+func (c *jsConv) jsCollectMembershipComparisons(n *tree_sitter.Node, out *[]string) {
+	if n == nil || n.Kind() == "non_null_expression" {
+		return
+	}
+	n = c.unwrapJsTransparentExpr(n)
+	if n.Kind() == "binary_expression" {
+		if op := c.text(field(n, "operator")); op == "==" || op == "===" || op == "!=" || op == "!==" {
+			for _, side := range []*tree_sitter.Node{field(n, "left"), field(n, "right")} {
+				if txt := c.jsDeclaredFieldRead(side); strings.Contains(txt, ".") {
+					*out = append(*out, txt)
+				}
+			}
+		}
+	}
+	for _, ch := range c.namedChildren(n) {
+		c.jsCollectMembershipComparisons(ch, out)
+	}
+}
+
+// jsDeniesAbsentDeclaration reports whether any operand of the same condition
+// is a test that holds exactly when X is absent — `!X`, `X == null`,
+// `X === undefined`, `typeof X === 'undefined'` — which is the remediation
+// shape: the guard then names the undeclared case instead of skipping it. A
+// presence test (`X != null`, `typeof X !== 'undefined'`) is deliberately not
+// one of these, because conjoining it with the membership test leaves the
+// chain failing open in exactly the same way.
+func (c *jsConv) jsDeniesAbsentDeclaration(ops []*tree_sitter.Node, x string) bool {
+	for _, op := range ops {
+		op = c.unwrapJsTransparentExpr(op)
+		if op == nil {
+			continue
+		}
+		if op.Kind() == "unary_expression" && c.text(field(op, "operator")) == "!" {
+			if c.jsDeclaredFieldRead(field(op, "argument")) == x {
+				return true
+			}
+			continue
+		}
+		if op.Kind() != "binary_expression" {
+			continue
+		}
+		l, r := field(op, "left"), field(op, "right")
+		cmp := c.text(field(op, "operator"))
+		if cmp != "==" && cmp != "===" {
+			continue
+		}
+		if c.jsTypeofFieldRead(l) == x && c.jsUndefinedLiteral(r) {
+			return true
+		}
+		if c.jsTypeofFieldRead(r) == x && c.jsUndefinedLiteral(l) {
+			return true
+		}
+		if c.jsNullishText(r) && c.jsDeclaredFieldRead(l) == x {
+			return true
+		}
+		if c.jsNullishText(l) && c.jsDeclaredFieldRead(r) == x {
+			return true
+		}
+	}
+	return false
+}
+
+// jsTypeofFieldRead returns the declared-field text a `typeof X` operand reads,
+// or "" for anything else.
+func (c *jsConv) jsTypeofFieldRead(n *tree_sitter.Node) string {
+	if n == nil || n.Kind() != "unary_expression" || c.text(field(n, "operator")) != "typeof" {
+		return ""
+	}
+	return c.jsDeclaredFieldRead(field(n, "argument"))
+}
+
+// jsUndefinedLiteral reports whether a comparison operand is the undefined
+// literal rather than a value the program computed. Bare `undefined` is its own
+// node kind in both grammars, not an identifier.
+func (c *jsConv) jsUndefinedLiteral(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	n = c.unwrapJsTransparentExpr(n)
+	switch n.Kind() {
+	case "undefined":
+		return true
+	case "identifier":
+		return jsContextCompact(c.text(n)) == "undefined"
+	case "string":
+		return jsContextCompact(c.text(n)) == "'undefined'" || jsContextCompact(c.text(n)) == "\"undefined\""
+	}
+	return false
+}
+
+// jsNullishText reports whether a comparison operand is the null or undefined
+// literal rather than a value the program computed. Bare `undefined` is its own
+// node kind in both grammars, not an identifier.
+func (c *jsConv) jsNullishText(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	n = c.unwrapJsTransparentExpr(n)
+	switch n.Kind() {
+	case "null", "undefined":
+		return true
+	case "identifier":
+		return jsContextCompact(c.text(n)) == "undefined"
+	}
+	return false
 }
 
 func (c *jsConv) jsSecretConfigObjectVars(root *tree_sitter.Node) map[string]bool {
@@ -1488,7 +2241,13 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		paramTypes := c.funcParamTypes(n)
 		body := c.funcBody(n)
 		decorators := c.jsDecoratorTokens(n)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: exported}}
+		out := []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.jsFunctionContext(name, n), Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: exported}}
+		// A factory function returns its API as an object literal of shorthand
+		// methods, e.g. `function Email(opts){ return { async send(p){…} } }`.
+		// c.expr's object case lowers only pairs, so those method bodies are dead
+		// code unless the same walk the object-valued declaration paths already use
+		// runs here too.
+		return append(out, c.returnedObjectMethodFuncDefs(n, exported)...)
 	case "class_declaration", "abstract_class_declaration":
 		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.body(field(n, "body")), Loc: L}}
 	case "field_definition", "public_field_definition":
@@ -1548,6 +2307,9 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v, Decl: true})
 					if val != nil && val.Kind() == "object" {
 						out = append(out, c.objectMethodFuncDefs(val, false)...)
+					}
+					if val != nil && val.Kind() == "call_expression" {
+						out = append(out, c.callArgObjectMethodFuncDefs(val)...)
 					}
 					if val != nil {
 						out = append(out, c.classExpressionFuncDefs(val)...)
@@ -2054,6 +2816,28 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 }
 
+// jsCallArgNodes lists a call's argument expressions. tree-sitter treats a comment
+// as a named child of the argument list, so `import(/* @vite-ignore */ path)` and
+// `exec(/* nosemgrep */ cmd)` would otherwise shift every argument one place to the
+// right and a binding emitting at args[0] would label the comment instead of the
+// value. Inline argument annotations are ordinary in bundler and linter directives,
+// so the shift silently deletes the sink.
+func (c *jsConv) jsCallArgNodes(call *tree_sitter.Node) []*tree_sitter.Node {
+	args := field(call, "arguments")
+	if args == nil {
+		return nil
+	}
+	kids := c.namedChildren(args)
+	out := make([]*tree_sitter.Node, 0, len(kids))
+	for _, a := range kids {
+		if a == nil || a.Kind() == "comment" {
+			continue
+		}
+		out = append(out, a)
+	}
+	return out
+}
+
 func (c *jsConv) iife(call *tree_sitter.Node, L string) []nir.Stmt {
 	fn := field(call, "function")
 	if fn != nil && fn.Kind() == "parenthesized_expression" {
@@ -2212,10 +2996,10 @@ func (c *jsConv) body(n *tree_sitter.Node) []nir.Stmt {
 	return []nir.Stmt{nir.Return{Value: c.expr(n)}}
 }
 
-func (c *jsConv) funcParams(n *tree_sitter.Node) []string {
-	if n == nil {
-		return nil
-	}
+// paramsFieldOf returns a function-like node's parameter list node, or nil when
+// the node carries none (an expression-bodied arrow binds its single parameter
+// in place, which jsConv.params reads off the node itself).
+func paramsFieldOf(n *tree_sitter.Node) *tree_sitter.Node {
 	params := field(n, "parameters")
 	if params == nil {
 		params = field(n, "parameter")
@@ -2231,7 +3015,14 @@ func (c *jsConv) funcParams(n *tree_sitter.Node) []string {
 			}
 		}
 	}
-	if out := c.params(params); len(out) > 0 {
+	return params
+}
+
+func (c *jsConv) funcParams(n *tree_sitter.Node) []string {
+	if n == nil {
+		return nil
+	}
+	if out := c.params(paramsFieldOf(n)); len(out) > 0 {
 		return out
 	}
 	return c.paramsFromFunctionText(n)
@@ -2241,21 +3032,7 @@ func (c *jsConv) funcParamTypes(n *tree_sitter.Node) map[string]string {
 	if n == nil {
 		return nil
 	}
-	params := field(n, "parameters")
-	if params == nil {
-		params = field(n, "parameter")
-	}
-	if params == nil {
-		for _, ch := range children(n) {
-			switch ch.Kind() {
-			case "formal_parameters", "parameters":
-				params = ch
-			}
-			if params != nil {
-				break
-			}
-		}
-	}
+	params := paramsFieldOf(n)
 	out := c.paramTypes(params)
 	if len(out) == 0 {
 		return jsParamTypesFromText(c.text(n))
@@ -2276,7 +3053,36 @@ func (c *jsConv) funcBody(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 	}
-	return c.body(body)
+	out := c.body(body)
+	if pre := c.patternParamBindings(n); len(pre) > 0 {
+		out = append(pre, out...)
+	}
+	return out
+}
+
+// patternParamBindings lowers the names a destructuring parameter introduces
+// beyond its positional slot: each binds to the slot's value, the same reading
+// the `const { a, b } = v` declaration lowering gives, so an argument passed at
+// the pattern's position reaches every name the pattern binds.
+func (c *jsConv) patternParamBindings(fn *tree_sitter.Node) []nir.Stmt {
+	params := paramsFieldOf(fn)
+	if params == nil || params.Kind() == "identifier" {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, ch := range c.namedChildren(params) {
+		pat := paramPattern(ch)
+		if pat == nil || (pat.Kind() != "object_pattern" && pat.Kind() != "array_pattern") {
+			continue
+		}
+		slot, rest := c.patternSlot(pat)
+		if len(rest) == 0 {
+			continue
+		}
+		loc := c.loc(pat)
+		out = append(out, nir.Assign{Targets: rest, Value: nir.Name{ID: slot, Loc: loc}, Decl: true, Loc: loc})
+	}
+	return out
 }
 
 func (c *jsConv) exportedFuncParams(fn *tree_sitter.Node, exported bool, params []string) []string {
@@ -2618,6 +3424,37 @@ func (c *jsConv) jsDecoratorPath(n *tree_sitter.Node) string {
 	return ""
 }
 
+// jsEmptyPatternParam is the positional slot a destructuring parameter occupies
+// when the pattern binds no name at all (`function f(a, {})`), so the parameters
+// after it keep their positions.
+const jsEmptyPatternParam = "__pattern__"
+
+// patternSlot names the positional slot a destructuring parameter occupies and
+// returns the names it introduces beyond that slot. The slot is the first bound
+// name, so the argument passed at the pattern's position flows into it and the
+// remaining names bind to the whole of it — the same whole-value reading the
+// `const { a, b } = v` declaration lowering gives each bound name.
+func (c *jsConv) patternSlot(pat *tree_sitter.Node) (string, []string) {
+	names := c.bindingNames(pat)
+	if len(names) == 0 {
+		return jsEmptyPatternParam, nil
+	}
+	return names[0], names[1:]
+}
+
+// paramPattern returns the binding pattern a parameter node declares, unwrapping
+// the TypeScript and default-value forms that carry it in a field.
+func paramPattern(ch *tree_sitter.Node) *tree_sitter.Node {
+	pat := ch
+	switch ch.Kind() {
+	case "required_parameter", "optional_parameter":
+		pat = field(ch, "pattern")
+	case "assignment_pattern":
+		pat = field(ch, "left")
+	}
+	return pat
+}
+
 func (c *jsConv) params(params *tree_sitter.Node) []string {
 	if params == nil {
 		return nil
@@ -2628,17 +3465,16 @@ func (c *jsConv) params(params *tree_sitter.Node) []string {
 	}
 	var out []string
 	for _, ch := range c.namedChildren(params) {
-		switch ch.Kind() {
+		pat := paramPattern(ch)
+		if pat == nil {
+			continue
+		}
+		switch pat.Kind() {
 		case "identifier":
-			out = append(out, c.text(ch))
-		case "required_parameter", "optional_parameter":
-			if pat := field(ch, "pattern"); pat != nil && pat.Kind() == "identifier" {
-				out = append(out, c.text(pat))
-			}
-		case "assignment_pattern":
-			if l := field(ch, "left"); l != nil && l.Kind() == "identifier" {
-				out = append(out, c.text(l))
-			}
+			out = append(out, c.text(pat))
+		case "object_pattern", "array_pattern":
+			slot, _ := c.patternSlot(pat)
+			out = append(out, slot)
 		}
 	}
 	return out
@@ -2766,10 +3602,8 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 			path = "import"
 		}
 		var arglist []nir.Expr
-		if args := field(n, "arguments"); args != nil {
-			for _, a := range c.namedChildren(args) {
-				arglist = append(arglist, c.expr(a))
-			}
+		for _, a := range c.jsCallArgNodes(n) {
+			arglist = append(arglist, c.expr(a))
 		}
 		for i, a := range arglist {
 			if lam, ok := a.(nir.Lambda); ok {
@@ -2796,10 +3630,8 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		ctor := field(n, "constructor")
 		path := c.dotted(ctor)
 		var arglist []nir.Expr
-		if args := field(n, "arguments"); args != nil {
-			for _, a := range c.namedChildren(args) {
-				arglist = append(arglist, c.expr(a))
-			}
+		for _, a := range c.jsCallArgNodes(n) {
+			arglist = append(arglist, c.expr(a))
 		}
 		method := path
 		if i := strings.LastIndex(path, "."); i >= 0 {
@@ -2810,6 +3642,15 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		name := c.jsxAttributeName(n)
 		if name == "dangerouslySetInnerHTML" {
 			arg := c.jsxDangerouslySetInnerHTMLArg(c.jsxAttributeValue(n))
+			return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: []nir.Expr{arg}, Path: name, Method: name, Loc: L}
+		}
+		if jsJsxRawMarkupAttribute[name] {
+			// innerHTML/outerHTML parse the value as markup rather than
+			// setting text, so the attribute is the same DOM property write
+			// the imperative `el.innerHTML = v` form is; React's
+			// dangerouslySetInnerHTML above is the same write in its own
+			// spelling.
+			arg := c.jsxExpressionArg(c.jsxAttributeValue(n))
 			return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: []nir.Expr{arg}, Path: name, Method: name, Loc: L}
 		}
 		if val := c.jsxAttributeValue(n); val != nil {
@@ -2943,6 +3784,23 @@ func (c *jsConv) jsxDangerouslySetInnerHTMLArg(n *tree_sitter.Node) nir.Expr {
 		}
 	}
 	return c.expr(n)
+}
+
+// jsxExpressionArg lowers a JSX attribute value to the expression it carries,
+// unwrapping the `{ ... }` container so the value's own nodes survive.
+func (c *jsConv) jsxExpressionArg(n *tree_sitter.Node) nir.Expr {
+	n = c.unwrapJSXExpression(n)
+	if n == nil {
+		return nir.Const{Loc: "?:0"}
+	}
+	return c.expr(n)
+}
+
+// jsJsxRawMarkupAttribute lists the DOM properties a JSX attribute can set
+// whose value is parsed as markup rather than treated as text.
+var jsJsxRawMarkupAttribute = map[string]bool{
+	"innerHTML": true,
+	"outerHTML": true,
 }
 
 func (c *jsConv) unwrapJSXExpression(n *tree_sitter.Node) *tree_sitter.Node {

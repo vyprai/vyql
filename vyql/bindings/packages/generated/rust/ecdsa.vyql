@@ -1,9 +1,0 @@
-module bindings.rust.generated.m7062719e;
-
-binding secretValue0 {
-  requires {
-    dependency("ecdsa")
-  }
-  query pattern callExpr where callee.method == "to_pkcs8_der"
-  emit source code.SecretValue at call.result
-}

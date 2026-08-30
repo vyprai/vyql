@@ -1,8 +1,0 @@
-module code;
-
-review code.ConduitHyperUnboundedBodyToBytes {
-  category: resource
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review conduit-hyper request body collection for a dominating Content-Length or size-hint limit before hyper::body::to_bytes"
-}

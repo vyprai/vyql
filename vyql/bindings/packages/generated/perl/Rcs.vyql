@@ -1,9 +1,0 @@
-module bindings.perl.generated.m7856c0b7;
-
-binding commandExecution0 {
-  requires {
-    dependency("Rcs")
-  }
-  query pattern callExpr where callee.method == "system"
-  emit sink code.CommandExecution at args[0]
-}

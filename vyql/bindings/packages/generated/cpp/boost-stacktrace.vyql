@@ -1,9 +1,0 @@
-module bindings.cpp.generated.md8c44c02;
-
-binding deserialization0 {
-  requires {
-    dependency("boost-stacktrace")
-  }
-  query pattern callExpr where callee.method == "from_dump"
-  emit sink code.Deserialization at args[0]
-}

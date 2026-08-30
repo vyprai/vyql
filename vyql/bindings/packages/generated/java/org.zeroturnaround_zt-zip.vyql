@@ -1,9 +1,0 @@
-module bindings.java.generated.m5ddd3e6b;
-
-binding filePathAccess0 {
-  requires {
-    dependency("org.zeroturnaround:zt-zip")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FilePathAccess at args[0]
-}

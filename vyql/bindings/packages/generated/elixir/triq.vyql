@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mc0dbbe67;
-
-binding commandExecution0 {
-  requires {
-    dependency("triq")
-  }
-  query pattern callExpr where callee.method == "do_run_command"
-  emit sink code.CommandExecution at args[0]
-}

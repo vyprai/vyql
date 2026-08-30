@@ -1,9 +1,0 @@
-module bindings.swift.generated.m29a52e26;
-
-binding networkData0 {
-  requires {
-    dependency("github.com/OperatorFoundation/PacketStream")
-  }
-  query pattern callExpr where callee.method == "payload"
-  emit source code.NetworkData at call.result
-}

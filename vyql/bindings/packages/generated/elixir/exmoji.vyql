@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma65141ab;
-
-binding deserialization0 {
-  requires {
-    dependency("exmoji")
-  }
-  query pattern callExpr where callee.method == "Exmoji.Scanner.scan"
-  emit sink code.Deserialization at args[0]
-}

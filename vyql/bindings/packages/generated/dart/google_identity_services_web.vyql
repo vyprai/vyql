@@ -1,9 +1,0 @@
-module bindings.dart.generated.me6948e0b;
-
-binding userControlledData0 {
-  requires {
-    dependency("google_identity_services_web")
-  }
-  query pattern callExpr where callee.method == "prompt"
-  emit source core.UserControlledData at call.result
-}

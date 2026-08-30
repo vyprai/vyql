@@ -1,6 +1,0 @@
-test "rank91: Kubernetes CRD dispatch requires request-scope policy review"
-  expect_review code.RequestScopePolicyReview
-  graph
-  ```
-  node op code.RequestScopePolicyReview
-  ```

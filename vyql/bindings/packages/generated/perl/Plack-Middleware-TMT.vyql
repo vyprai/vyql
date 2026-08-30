@@ -1,9 +1,0 @@
-module bindings.perl.generated.m4aeefcb1;
-
-binding templateRender0 {
-  requires {
-    dependency("Plack-Middleware-TMT")
-  }
-  query pattern callExpr where callee.method == "process_template"
-  emit sink code.TemplateRender at args[0]
-}

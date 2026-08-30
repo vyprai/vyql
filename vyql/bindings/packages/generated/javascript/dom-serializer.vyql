@@ -1,9 +1,0 @@
-module bindings.javascript.generated.me1a09cd2;
-
-binding htmlRender0 {
-  requires {
-    dependency("dom-serializer")
-  }
-  query pattern callExpr where callee.method == "render"
-  emit sink code.HtmlRender at args[0]
-}

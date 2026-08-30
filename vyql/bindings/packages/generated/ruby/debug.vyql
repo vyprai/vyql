@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m400f9191;
-
-binding cliArgument0 {
-  requires {
-    dependency("debug")
-  }
-  query pattern callExpr where callee.method == "parse_argv"
-  emit source code.CliArgument at call.result
-}

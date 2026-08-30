@@ -1,9 +1,0 @@
-module bindings.perl.generated.m85493eb8;
-
-binding filePathAccess0 {
-  requires {
-    dependency("Enbugger")
-  }
-  query pattern callExpr where callee.method == "load_file"
-  emit sink code.FilePathAccess at args[0]
-}

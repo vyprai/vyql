@@ -1,9 +1,0 @@
-module bindings.java.generated.md0023ded;
-
-binding httpInput0 {
-  requires {
-    dependency("org.apache.tiles:tiles-servlet")
-  }
-  query pattern callExpr where callee.method == "getDefinitionName"
-  emit source code.HttpInput at call.result
-}

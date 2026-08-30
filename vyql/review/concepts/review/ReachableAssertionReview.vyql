@@ -1,7 +1,0 @@
-module code;
-
-review code.ReachableAssertionReview {
-  category: resource
-  kind: attention
-  text: "review externally reachable validation paths that can violate internal assertions or invariants"
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.m4bb7b5ea;
-
-binding sqlExecution0 {
-  requires {
-    dependency("github.com/denisenkom/go-mssqldb")
-  }
-  query pattern callExpr where callee.method == "sendSqlBatch72"
-  emit sink code.SqlExecution at args[0]
-}

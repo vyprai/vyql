@@ -1,9 +1,0 @@
-module bindings.perl.generated.mf0f06d5d;
-
-binding sqlExecution0 {
-  requires {
-    dependency("GitDDL")
-  }
-  query pattern callExpr where callee.method == "_do_sql"
-  emit sink code.SqlExecution at args[0]
-}

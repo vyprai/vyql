@@ -1,9 +1,0 @@
-module bindings.dart.generated.m60609d5f;
-
-binding weakHash0 {
-  requires {
-    dependency("build")
-  }
-  query pattern presenceNode where node.path ~= "build.hash"
-  emit issue code.WeakHash at node
-}

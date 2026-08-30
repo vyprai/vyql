@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mac1f9c2f;
-
-binding deserialization0 {
-  requires {
-    dependency("graphql")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

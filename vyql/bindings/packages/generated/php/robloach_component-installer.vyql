@@ -1,9 +1,0 @@
-module bindings.php.generated.m3f31e28f;
-
-binding filePathAccess0 {
-  requires {
-    dependency("robloach/component-installer")
-  }
-  query pattern callExpr where callee.method == "recursiveGlobFiles"
-  emit sink code.FilePathAccess at args[0]
-}

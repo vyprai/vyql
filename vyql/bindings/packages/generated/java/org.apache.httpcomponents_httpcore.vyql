@@ -1,9 +1,0 @@
-module bindings.java.generated.mf3a89e52;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.httpcomponents:httpcore")
-  }
-  query pattern callExpr where callee.method == "ContentType.parse"
-  emit sink code.Deserialization at args[0]
-}

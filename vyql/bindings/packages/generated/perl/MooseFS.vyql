@@ -1,9 +1,0 @@
-module bindings.perl.generated.maff4fe59;
-
-binding networkData0 {
-  requires {
-    dependency("MooseFS")
-  }
-  query pattern callExpr where callee.method == "myrecv"
-  emit source code.NetworkData at call.result
-}

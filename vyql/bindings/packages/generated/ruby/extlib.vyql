@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m5d51ef22;
-
-binding xmlParse0 {
-  requires {
-    dependency("extlib")
-  }
-  query pattern callExpr where callee.method == "from_xml"
-  emit sink code.XmlParse at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.rust.generated.m61ffa04a;
-
-binding commandExecution0 {
-  requires {
-    dependency("cargo_metadata")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

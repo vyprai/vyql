@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.me92e2dbe;
-
-binding deserialization0 {
-  requires {
-    dependency("ch.qos.logback:logback-core")
-  }
-  query pattern callExpr where callee.method == "tokenize"
-  emit sink code.Deserialization at args[0]
-}

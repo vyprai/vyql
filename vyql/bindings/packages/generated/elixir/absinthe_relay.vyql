@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m18cb5697;
-
-binding deserialization0 {
-  requires {
-    dependency("absinthe_relay")
-  }
-  query pattern callExpr where callee.method == "AbsintheRelay.Node.ParseIds.parse"
-  emit sink code.Deserialization at args[0]
-}

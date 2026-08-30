@@ -1,9 +1,0 @@
-module bindings.python.generated.m2c02d947;
-
-binding commandExecution0 {
-  requires {
-    dependency("pytest-forked")
-  }
-  query pattern callExpr where callee.method == "forked_run_report"
-  emit sink code.CommandExecution at args[0]
-}

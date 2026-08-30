@@ -1,8 +1,0 @@
-module code;
-
-review code.LogoutReturnUrlRedirectWithoutAllowlist {
-  category: request_forgery
-  expected: [core.RedirectAllowlist]
-  kind: target
-  text: "verify logout return-url redirects use same-origin or configured-domain allowlist validation before constructing RedirectResponse"
-}

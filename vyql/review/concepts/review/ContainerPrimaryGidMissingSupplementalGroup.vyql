@@ -1,7 +1,0 @@
-module code;
-
-review code.ContainerPrimaryGidMissingSupplementalGroup {
-  category: auth
-  kind: attention
-  text: "add the configured container primary GID to supplemental groups after resolving RunAsGroup"
-}

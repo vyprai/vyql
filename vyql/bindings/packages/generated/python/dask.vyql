@@ -1,9 +1,0 @@
-module bindings.python.generated.m40eae2bd;
-
-binding cliArgument0 {
-  requires {
-    dependency("dask")
-  }
-  query pattern callExpr where callee.method == "run_cli"
-  emit source code.CliArgument at call.result
-}

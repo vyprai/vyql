@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mc4dfac6d;
-
-binding commandExecution0 {
-  requires {
-    dependency("railties")
-  }
-  query pattern callExpr where callee.method == "exec_bundle_command"
-  emit sink code.CommandExecution at args[0]
-}

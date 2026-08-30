@@ -1,6 +1,0 @@
-module mobile;
-
-threat DebuggableBuild {
-  cwe: [CWE_489]
-  desc: "Application shipped with debugging enabled (android:debuggable=\"true\")"
-}

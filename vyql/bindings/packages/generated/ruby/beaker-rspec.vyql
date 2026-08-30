@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m56d1a7fa;
-
-binding commandExecution0 {
-  requires {
-    dependency("beaker-rspec")
-  }
-  query pattern callExpr where callee.method == "run_command"
-  emit sink code.CommandExecution at args[0]
-}

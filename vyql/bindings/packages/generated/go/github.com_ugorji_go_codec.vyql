@@ -1,9 +1,0 @@
-module bindings.go.generated.mf8d09001;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/ugorji/go/codec")
-  }
-  query pattern callExpr where callee.method == "newTypeInfoLoad"
-  emit sink code.Deserialization at args[0]
-}

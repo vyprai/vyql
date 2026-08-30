@@ -1,9 +1,0 @@
-module bindings.python.generated.med01abe3;
-
-binding commandExecution0 {
-  requires {
-    dependency("pip-tools")
-  }
-  query pattern callExpr where callee.method == "run_python_snippet"
-  emit sink code.CommandExecution at args[0]
-}

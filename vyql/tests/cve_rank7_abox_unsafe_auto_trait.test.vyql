@@ -1,8 +1,0 @@
-# Rank 7 / CVE-2020-36441: abox unsafe auto-trait implementation.
-
-test "rank7: unsafe auto trait implementation is a CVE anchor"
-  expect VYQL-RACE-003
-  graph
-  ```
-  node impl code.UnsafeAutoTraitImpl
-  ```

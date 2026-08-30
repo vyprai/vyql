@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m55b85200;
-
-binding codeEval0 {
-  requires {
-    dependency("org.drools:drools-compiler")
-  }
-  query pattern callExpr where callee.method == "analyzeBlock"
-  emit sink code.CodeEval at args[0]
-}

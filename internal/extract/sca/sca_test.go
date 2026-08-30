@@ -148,6 +148,67 @@ func TestParseNpmrcIgnoresNonElectronRuntime(t *testing.T) {
 	}
 }
 
+func TestParsePomXMLResolvesPropertyVersions(t *testing.T) {
+	got := ParsePomXML(`<project xmlns="http://maven.apache.org/POM/4.0.0">
+  <groupId>org.example</groupId>
+  <artifactId>parent</artifactId>
+  <version>3.5.3</version>
+  <properties>
+    <report.version>1.6.1</report.version>
+  </properties>
+  <dependencies>
+    <dependency>
+      <groupId>org.example.report</groupId>
+      <artifactId>report-starter</artifactId>
+      <version>${report.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.example</groupId>
+      <artifactId>sibling</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.example</groupId>
+      <artifactId>inherited</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>org.example</groupId>
+      <artifactId>unknown-property</artifactId>
+      <version>${not.declared.here}</version>
+    </dependency>
+  </dependencies>
+</project>`)
+	want := []Dep{
+		{"org.example.report:report-starter", "1.6.1"},
+		{"org.example:sibling", "3.5.3"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("parsed %d deps, want %d: %+v", len(got), len(want), got)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Errorf("dep %d = %+v, want %+v", i, got[i], want[i])
+		}
+	}
+}
+
+func TestParsePomXMLReadsDependencyManagement(t *testing.T) {
+	got := ParsePomXML(`<project>
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.example</groupId>
+        <artifactId>managed</artifactId>
+        <version>2.0.0</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+</project>`)
+	if len(got) != 1 || got[0] != (Dep{"org.example:managed", "2.0.0"}) {
+		t.Fatalf("dependencyManagement pins should be reported, got %+v", got)
+	}
+}
+
 func TestParseComposerLockPackages(t *testing.T) {
 	got := ParseComposerLock(`{
   "packages": [

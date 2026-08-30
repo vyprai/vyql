@@ -391,6 +391,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "lang="
 	case "name":
 		return "name="
+	case "abi":
+		return "abi="
 	case "callPath":
 		return "call_path:"
 	case "call":
@@ -469,6 +471,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "slice:"
 	case "field":
 		return "field:"
+	case "fieldTag":
+		return "field_tag:"
 	case "macroName":
 		return "macro_name:"
 	case "macroBody":
@@ -509,6 +513,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "path_segment_type_guard="
 	case "ownPropertyKeyGuard":
 		return "own_property_key_guard="
+	case "failOpenPolicyDeclarationGuard":
+		return "fail_open_policy_declaration_guard="
 	case "forIn":
 		return "for_in="
 	case "objectKeysForEach":
@@ -527,6 +533,10 @@ func v2PresenceValuePrefix(field string) string {
 		return "dynamic_property_plain_object_fallback="
 	case "zeroStepSequenceRisk":
 		return "zero_step_sequence_risk="
+	case "loopRestartWithoutProgress":
+		return "loop_restart_without_progress="
+	case "loopProgressHiddenInCall":
+		return "loop_progress_hidden_in_call="
 	case "convertSvgMultiSvgSanitizerBypass":
 		return "convert_svg_multi_svg_sanitizer_bypass="
 	case "incompleteGeneratedJsIdentifierReservedWords":
@@ -541,6 +551,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "return_call_path:"
 	case "returnIdentifier":
 		return "return_identifier:"
+	case "returnType":
+		return "return_type:"
 	case "metadataExportAfterSensitiveKey":
 		return "metadata_export_after_sensitive_key:"
 	case "metadataExportAfterSensitiveSource":
@@ -599,6 +611,10 @@ func v2PresenceValuePrefix(field string) string {
 		return "decorator_path:"
 	case "fieldType":
 		return "field_type:"
+	case "instanceFieldInit":
+		return "instance_field_init:"
+	case "staticFieldInit":
+		return "static_field_init:"
 	case "functionModifier":
 		return "function_modifier:"
 	case "method":

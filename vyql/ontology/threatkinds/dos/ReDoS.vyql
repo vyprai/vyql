@@ -1,6 +1,0 @@
-module dos;
-
-threat ReDoS {
-  cwe: [CWE_1333]
-  desc: "Untrusted data compiled as a regular expression (catastrophic backtracking)"
-}

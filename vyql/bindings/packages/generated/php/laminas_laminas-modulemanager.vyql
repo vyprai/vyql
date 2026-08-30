@@ -1,9 +1,0 @@
-module bindings.php.generated.m23484449;
-
-binding filePathAccess0 {
-  requires {
-    dependency("laminas/laminas-modulemanager")
-  }
-  query pattern callExpr where callee.method == "addConfigByPath"
-  emit sink code.FilePathAccess at args[0]
-}

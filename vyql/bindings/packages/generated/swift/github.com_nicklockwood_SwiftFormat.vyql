@@ -1,9 +1,0 @@
-module bindings.swift.generated.m73df19ae;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/nicklockwood/SwiftFormat")
-  }
-  query pattern callExpr where callee.method == "parseConfigFile"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.TextAccessLogDefaultFormatInjection {
-  category: injection
-  expected: [core.OutputEncoding]
-  kind: target
-  text: "verify proxy access-log defaults use structured JSON formatting or equivalent JSON escaping for request-derived fields"
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.UnsafeJXPathContextEvaluation {
-  category: code_execution
-  expected: [core.InputValidation]
-  kind: target
-  text: "verify JXPath contexts disable Java functions before evaluating externally influenced XPath expressions"
-}

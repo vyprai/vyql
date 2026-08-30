@@ -1,9 +1,0 @@
-module bindings.swift.generated.m71ce1373;
-
-binding databaseRead0 {
-  requires {
-    dependency("github.com/aws-amplify/amplify-swift")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.DatabaseReadSink at args[0]
-}

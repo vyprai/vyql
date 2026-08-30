@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m51e7fb79;
-
-binding httpInput0 {
-  requires {
-    dependency("plug_cors")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit source code.HttpInput at call.result
-}

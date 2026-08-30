@@ -176,3 +176,47 @@ func TestNpmPackageNodePreGypRemoteBinarySignature(t *testing.T) {
 	}
 	t.Fatalf("npm node-pre-gyp remote binary signature event not emitted; nodes=%#v", nodes)
 }
+
+func TestAttributeValueSpansJoinValuesThatContinueOverLines(t *testing.T) {
+	src := []byte(`<html>
+  <head>
+    <script type="text/javascript"
+        tal:content="structure string:
+        // this is the field we're working on
+        field = '${request/form/property/value}';">
+    </script>
+    <td tal:content="structure context/username/field">username</td>
+  </head>
+</html>
+`)
+	spans := attributeValueSpans(src)
+	want := []attributeValueSpan{
+		{Name: "type", Value: "text/javascript", Line: 3},
+		{Name: "tal:content", Value: "structure string:\n        // this is the field we're working on\n        field = '${request/form/property/value}';", Line: 4},
+		{Name: "tal:content", Value: "structure context/username/field", Line: 8},
+	}
+	if len(spans) != len(want) {
+		t.Fatalf("span count = %d, want %d; spans=%#v", len(spans), len(want), spans)
+	}
+	for i, w := range want {
+		if spans[i] != w {
+			t.Errorf("span[%d] = %#v, want %#v", i, spans[i], w)
+		}
+	}
+	if !containsAllFold(spans[1].Value, []string{"structure string:", "${"}) {
+		t.Errorf("multi-line value does not carry both needles: %q", spans[1].Value)
+	}
+}
+
+func TestAttributeValueSpansSkipProseAndUnquotedAttributes(t *testing.T) {
+	src := []byte(`<!-- don't treat prose quotes as values -->
+<p class=plain tal:content="string:${request/form/x}">
+`)
+	spans := attributeValueSpans(src)
+	if len(spans) != 1 {
+		t.Fatalf("span count = %d, want 1; spans=%#v", len(spans), spans)
+	}
+	if spans[0].Name != "tal:content" || spans[0].Line != 2 {
+		t.Fatalf("span = %#v, want the tal:content attribute on line 2", spans[0])
+	}
+}

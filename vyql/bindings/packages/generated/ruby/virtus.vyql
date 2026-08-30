@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m80524e51;
-
-binding deserialization0 {
-  requires {
-    dependency("virtus")
-  }
-  query pattern callExpr where callee.method == "coerce"
-  emit sink code.Deserialization at args[0]
-}

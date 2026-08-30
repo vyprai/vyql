@@ -1,9 +1,0 @@
-module bindings.bash.generated.m3c9893c3;
-
-binding cliArgument0 {
-  requires {
-    dependency("gum")
-  }
-  query pattern callExpr where callee.path ~= "gum.argv"
-  emit source code.CliArgument at call.result
-}

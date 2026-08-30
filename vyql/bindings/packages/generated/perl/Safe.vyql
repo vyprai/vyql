@@ -1,9 +1,0 @@
-module bindings.perl.generated.mdfc84d7e;
-
-binding codeEval0 {
-  requires {
-    dependency("Safe")
-  }
-  query pattern callExpr where callee.method == "reval"
-  emit sink code.CodeEval at args[0]
-}

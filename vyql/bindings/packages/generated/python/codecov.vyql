@@ -1,9 +1,0 @@
-module bindings.python.generated.m17a8e41f;
-
-binding commandExecution0 {
-  requires {
-    dependency("codecov")
-  }
-  query pattern callExpr where callee.method == "try_to_run"
-  emit sink code.CommandExecution at args[0]
-}

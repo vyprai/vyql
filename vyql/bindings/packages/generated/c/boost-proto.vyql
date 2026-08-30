@@ -1,9 +1,0 @@
-module bindings.c.generated.m47cf9379;
-
-binding expressionEval0 {
-  requires {
-    dependency("boost-proto")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.ExpressionEval at args[0]
-}

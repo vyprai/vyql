@@ -1,9 +1,0 @@
-module bindings.php.generated.mb2797db8;
-
-binding userControlledData0 {
-  requires {
-    dependency("seld/cli-prompt")
-  }
-  query pattern callExpr where callee.method == "SeldCliPromptCliPrompt::prompt"
-  emit source core.UserControlledData at call.result
-}

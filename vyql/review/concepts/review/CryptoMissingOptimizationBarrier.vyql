@@ -1,7 +1,0 @@
-module code;
-
-review code.CryptoMissingOptimizationBarrier {
-  category: crypto
-  kind: attention
-  text: "review constant-time scalar arithmetic for missing optimization barriers around secret-dependent masks"
-}

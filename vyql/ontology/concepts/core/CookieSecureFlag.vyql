@@ -1,7 +1,0 @@
-module core;
-
-concept CookieSecureFlag : check {
-  applies: endpoint
-  cwe: [CWE_614]
-  neutralizes: [session.InsecureCookie]
-}

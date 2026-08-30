@@ -1,6 +1,0 @@
-module taint;
-
-concept WeakSecurityIdentifier : source {
-  coverageReservedSource: true
-  summary: "Data representing an incomplete, shortened, or otherwise weak security identifier."
-}

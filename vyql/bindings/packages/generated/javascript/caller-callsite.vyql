@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mfdbc951e;
-
-binding filePathAccess0 {
-  requires {
-    dependency("caller-callsite")
-  }
-  query pattern callExpr where callee.method == "callerCallsite"
-  emit sink code.FilePathAccess at args[0]
-}

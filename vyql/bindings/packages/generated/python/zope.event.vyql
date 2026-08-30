@@ -1,9 +1,0 @@
-module bindings.python.generated.mf919491c;
-
-binding userControlledData0 {
-  requires {
-    dependency("zope.event")
-  }
-  query pattern callExpr where callee.method == "notify"
-  emit source core.UserControlledData at call.result
-}

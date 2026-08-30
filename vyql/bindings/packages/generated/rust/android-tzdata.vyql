@@ -1,9 +1,0 @@
-module bindings.rust.generated.m36bd2402;
-
-binding userControlledData0 {
-  requires {
-    dependency("android-tzdata")
-  }
-  query pattern callExpr where callee.method == "find_tz_data"
-  emit source core.UserControlledData at call.result
-}

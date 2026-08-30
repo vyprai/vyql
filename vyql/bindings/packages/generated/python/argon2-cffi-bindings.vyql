@@ -1,9 +1,0 @@
-module bindings.python.generated.m1dbf86b9;
-
-binding weakHash0 {
-  requires {
-    dependency("argon2-cffi-bindings")
-  }
-  query pattern presenceNode where node.path ~= "argon2.cffi.bindings.hash"
-  emit issue code.WeakHash at node
-}

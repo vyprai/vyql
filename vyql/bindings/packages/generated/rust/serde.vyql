@@ -1,9 +1,0 @@
-module bindings.rust.generated.ma93910ad;
-
-binding deserialization0 {
-  requires {
-    dependency("serde")
-  }
-  query pattern callExpr where callee.method == "new"
-  emit sink code.Deserialization at args[0]
-}

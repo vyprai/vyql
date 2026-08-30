@@ -1,9 +1,0 @@
-module bindings.python.generated.mb606bc04;
-
-binding deserialization0 {
-  requires {
-    dependency("hypothesis")
-  }
-  query pattern callExpr where callee.method == "decode_failure"
-  emit sink code.Deserialization at args[0]
-}

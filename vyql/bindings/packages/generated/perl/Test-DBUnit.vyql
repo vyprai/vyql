@@ -1,9 +1,0 @@
-module bindings.perl.generated.mad88d9a2;
-
-binding sqlExecution0 {
-  requires {
-    dependency("Test-DBUnit")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

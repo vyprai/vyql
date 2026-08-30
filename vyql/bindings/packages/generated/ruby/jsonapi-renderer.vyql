@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mffd1efb6;
-
-binding deserialization0 {
-  requires {
-    dependency("jsonapi-renderer")
-  }
-  query pattern callExpr where callee.method == "parse_include_args"
-  emit sink code.Deserialization at args[0]
-}

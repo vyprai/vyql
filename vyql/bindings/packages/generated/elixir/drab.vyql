@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma746c578;
-
-binding httpInput0 {
-  requires {
-    dependency("drab")
-  }
-  query pattern callExpr where callee.method == "cookie"
-  emit source code.HttpInput at call.result
-}

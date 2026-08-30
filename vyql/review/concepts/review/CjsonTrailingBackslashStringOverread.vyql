@@ -1,8 +1,0 @@
-module code;
-
-review code.CjsonTrailingBackslashStringOverread {
-  category: memory
-  expected: [core.MemoryBoundsCheck]
-  kind: attention
-  text: "review cJSON parse_string for a trailing-backslash guard before advancing past escaped bytes"
-}

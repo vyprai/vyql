@@ -1,8 +1,0 @@
-module code;
-
-review code.JenkinsRemoteValidationMissingPostPermission {
-  category: request_forgery
-  expected: [core.CsrfProtection, core.AuthorizationCheck]
-  kind: attention
-  text: "review Jenkins descriptor remote-validation endpoints for @POST and administrator permission checks before testing supplied URLs"
-}

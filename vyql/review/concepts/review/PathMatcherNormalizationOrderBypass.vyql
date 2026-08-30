@@ -1,8 +1,0 @@
-module code;
-
-review code.PathMatcherNormalizationOrderBypass {
-  category: request_forgery
-  expected: [core.PathCanonicalization]
-  kind: attention
-  text: "review path matcher normalization order; canonical cleaning should happen before suffix trimming used for platform quirks"
-}

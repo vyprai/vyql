@@ -1,6 +1,0 @@
-module injection;
-
-threat SqlInjection {
-  cwe: [CWE_89]
-  desc: "Untrusted data in a SQL command"
-}

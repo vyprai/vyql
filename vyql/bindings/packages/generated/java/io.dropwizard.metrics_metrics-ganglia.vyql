@@ -1,9 +1,0 @@
-module bindings.java.generated.m59d20bc5;
-
-binding networkSend0 {
-  requires {
-    dependency("io.dropwizard.metrics:metrics-ganglia")
-  }
-  query pattern callExpr where callee.method == "announce"
-  emit sink code.NetworkSend at args[0]
-}

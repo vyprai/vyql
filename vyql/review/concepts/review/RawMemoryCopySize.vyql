@@ -1,7 +1,0 @@
-module code;
-
-review code.RawMemoryCopySize {
-  category: memory
-  kind: attention
-  text: "review raw memory copy size calculations and bounds checks"
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mcd587d96;
-
-binding cliArgument0 {
-  requires {
-    dependency("claide")
-  }
-  query pattern callExpr where callee.method == "option"
-  emit source code.CliArgument at call.result
-}

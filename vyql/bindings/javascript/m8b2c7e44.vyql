@@ -1,6 +1,0 @@
-module bindings.javascript.generated.m8b2c7e44;
-
-binding emailChangeReauthMissingReview692 {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "supabase.auth.updateUser" and node.context.selector contains "form.email" and not (containsAny(node.context.callPath, ["signInWithPassword", "reauthenticate", "reauthenticateWithCredential", "verifyOtp", "verifyPassword", "getRecentEmailOtpVerification", "ensureRecentEmailVerification"]))
-  emit issue code.EmailChangeReauthMissingReview at node
-}

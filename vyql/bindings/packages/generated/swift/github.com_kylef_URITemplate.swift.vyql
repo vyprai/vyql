@@ -1,9 +1,0 @@
-module bindings.swift.generated.m65fbb043;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/kylef/URITemplate.swift")
-  }
-  query pattern callExpr where callee.method == "extract"
-  emit sink code.Deserialization at args[0]
-}

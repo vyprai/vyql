@@ -1,9 +1,0 @@
-module bindings.rust.generated.mccc93439;
-
-binding filePathAccess0 {
-  requires {
-    dependency("tokio-stream")
-  }
-  query pattern callExpr where callee.method == "ReadDirStream.new"
-  emit sink code.FilePathAccess at args[0]
-}

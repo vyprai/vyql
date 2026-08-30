@@ -1,9 +1,0 @@
-module bindings.php.generated.mce78a0f3;
-
-binding commandExecution0 {
-  requires {
-    dependency("symplify/easy-coding-standard")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

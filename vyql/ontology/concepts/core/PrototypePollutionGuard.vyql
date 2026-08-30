@@ -1,8 +1,0 @@
-module core;
-
-concept PrototypePollutionGuard : check {
-  applies: endpoint
-  covers: [endpoint, path]
-  cwe: [CWE_1321]
-  neutralizes: [injection.PrototypePollution]
-}

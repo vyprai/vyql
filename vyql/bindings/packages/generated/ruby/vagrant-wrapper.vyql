@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mfd4691ad;
-
-binding cliArgument0 {
-  requires {
-    dependency("vagrant-wrapper")
-  }
-  query pattern callExpr where callee.path ~= "vagrant.argv"
-  emit source code.CliArgument at call.result
-}

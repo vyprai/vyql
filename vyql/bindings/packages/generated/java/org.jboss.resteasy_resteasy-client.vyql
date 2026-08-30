@@ -1,9 +1,0 @@
-module bindings.java.generated.mb44fb858;
-
-binding httpInput0 {
-  requires {
-    dependency("org.jboss.resteasy:resteasy-client")
-  }
-  query pattern callExpr where callee.method == "request"
-  emit source code.HttpInput at call.result
-}

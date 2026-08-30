@@ -1,9 +1,0 @@
-module bindings.php.generated.me57e5a18;
-
-binding cookie0 {
-  requires {
-    dependency("tymon/jwt-auth")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source code.Cookie at call.result
-}

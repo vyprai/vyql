@@ -1,8 +1,0 @@
-module code;
-
-review code.RequestViewVariableHtmlEscapeMissing {
-  category: xss
-  expected: [core.HtmlEscape]
-  kind: attention
-  text: "review request-derived view variables for htmlentities/htmlspecialchars before passing them into HTML view rendering"
-}

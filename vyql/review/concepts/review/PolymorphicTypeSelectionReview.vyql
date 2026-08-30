@@ -1,8 +1,0 @@
-module code;
-
-review code.PolymorphicTypeSelectionReview {
-  category: input_validation
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review polymorphic type or class selection against a configured allowlist before assigning model state"
-}

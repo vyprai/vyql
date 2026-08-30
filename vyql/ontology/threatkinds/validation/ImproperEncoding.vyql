@@ -1,6 +1,0 @@
-module validation;
-
-threat ImproperEncoding {
-  cwe: [CWE_116]
-  desc: "Improper encoding/escaping of output"
-}

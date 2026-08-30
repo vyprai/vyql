@@ -1,6 +1,0 @@
-module code;
-
-concept MarkdownNegotiationBypass : issue {
-  cwe: [CWE_79]
-  vulnerableTo: [injection.Xss]
-}

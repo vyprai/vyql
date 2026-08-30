@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m9281e918;
-
-binding weakHash0 {
-  requires {
-    dependency("etag")
-  }
-  query pattern callExpr where callee.method == "etag"
-  emit issue code.WeakHash at call
-}

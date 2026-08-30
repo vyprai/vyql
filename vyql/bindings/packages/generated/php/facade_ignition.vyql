@@ -1,9 +1,0 @@
-module bindings.php.generated.mcbcf73ce;
-
-binding weakHash0 {
-  requires {
-    dependency("facade/ignition")
-  }
-  query pattern presenceNode where node.path ~= "facade.ignition.hash"
-  emit issue code.WeakHash at node
-}

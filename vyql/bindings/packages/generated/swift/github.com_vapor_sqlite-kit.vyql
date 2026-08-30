@@ -1,9 +1,0 @@
-module bindings.swift.generated.me7c5f1f6;
-
-binding sqlExecution0 {
-  requires {
-    dependency("github.com/vapor/sqlite-kit")
-  }
-  query pattern callExpr where callee.method == "sql"
-  emit sink code.SqlExecution at args[0]
-}

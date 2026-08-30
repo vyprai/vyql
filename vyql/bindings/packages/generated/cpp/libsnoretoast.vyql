@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m141ba576;
-
-binding commandExecution0 {
-  requires {
-    dependency("libsnoretoast")
-  }
-  query pattern callExpr where callee.method == "startProcess"
-  emit sink code.CommandExecution at args[0]
-}

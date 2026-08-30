@@ -1,8 +1,0 @@
-module code;
-
-review code.LockFileCreateMissingNoFollow {
-  category: path
-  expected: [core.PathAccessCheck]
-  kind: attention
-  text: "review lock-file creation for no-follow or equivalent symlink-safe open behavior"
-}

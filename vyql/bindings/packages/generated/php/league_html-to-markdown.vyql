@@ -1,9 +1,0 @@
-module bindings.php.generated.m562b7e0f;
-
-binding deserialization0 {
-  requires {
-    dependency("league/html-to-markdown")
-  }
-  query pattern callExpr where callee.method == "convert"
-  emit sink code.Deserialization at args[0]
-}

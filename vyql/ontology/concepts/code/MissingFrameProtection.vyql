@@ -1,6 +1,0 @@
-module code;
-
-concept MissingFrameProtection : issue {
-  cwe: [CWE_1021]
-  vulnerableTo: [access_control.Clickjacking]
-}

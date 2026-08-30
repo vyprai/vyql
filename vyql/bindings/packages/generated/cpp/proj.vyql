@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mb9f51062;
-
-binding networkConnect0 {
-  requires {
-    dependency("proj")
-  }
-  query pattern callExpr where callee.method == "pj_network_file_open"
-  emit sink code.NetworkConnectSink at args[0]
-}

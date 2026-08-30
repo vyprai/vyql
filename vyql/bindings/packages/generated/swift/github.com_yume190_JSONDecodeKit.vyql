@@ -1,9 +1,0 @@
-module bindings.swift.generated.mcfb4bf13;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/yume190/JSONDecodeKit")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

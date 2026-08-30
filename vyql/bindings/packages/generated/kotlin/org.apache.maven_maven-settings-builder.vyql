@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m838816c4;
-
-binding secretValue0 {
-  requires {
-    dependency("org.apache.maven:maven-settings-builder")
-  }
-  query pattern callExpr where callee.method == "decrypt"
-  emit source code.SecretValue at call.result
-}

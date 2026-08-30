@@ -1,9 +1,0 @@
-module bindings.php.generated.me225f067;
-
-binding deserialization0 {
-  requires {
-    dependency("overtrue/laravel-lang")
-  }
-  query pattern callExpr where callee.method == "addJsonPath"
-  emit sink code.Deserialization at args[0]
-}

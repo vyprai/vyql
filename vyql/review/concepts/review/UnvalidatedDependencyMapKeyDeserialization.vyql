@@ -1,8 +1,0 @@
-module code;
-
-review code.UnvalidatedDependencyMapKeyDeserialization {
-  category: supply_chain
-  expected: [core.InputValidation]
-  kind: target
-  text: "validate dependency or package map keys during deserialization before they are accepted as manifest identifiers"
-}

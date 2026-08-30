@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m88f307df;
-
-binding userControlledData0 {
-  requires {
-    dependency("org.apache.lucene:lucene-core")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m710dc89b;
-
-binding userControlledData0 {
-  requires {
-    dependency("mime-types")
-  }
-  query pattern callExpr where callee.method == "lookup"
-  emit source core.UserControlledData at call.result
-}

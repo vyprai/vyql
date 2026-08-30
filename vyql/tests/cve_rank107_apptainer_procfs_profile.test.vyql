@@ -1,6 +1,0 @@
-test "rank107: Apptainer procfs profile load requires special-file access review"
-  expect_review code.SpecialFileAccessReview
-  graph
-  ```
-  node op code.SpecialFileAccessReview
-  ```

@@ -1,9 +1,0 @@
-module bindings.php.generated.m8b2693db;
-
-binding secretValue0 {
-  requires {
-    dependency("zendframework/zend-paginator")
-  }
-  query pattern callExpr where callee.method == "key"
-  emit source code.SecretValue at call.result
-}

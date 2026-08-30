@@ -1,8 +1,0 @@
-module code;
-
-review code.CodeCheckerGuidelineRulesMissingViewCheck {
-  category: auth
-  expected: [core.AuthorizationCheck]
-  kind: attention
-  text: "review CodeChecker report-server guideline APIs for __require_view before rule and checker-label lookup"
-}

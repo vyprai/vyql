@@ -1,6 +1,0 @@
-module code;
-
-concept PackageInstallExecution : issue {
-  cwe: [CWE_94]
-  vulnerableTo: [injection.CodeInjection]
-}

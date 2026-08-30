@@ -1,8 +1,0 @@
-module code;
-
-review code.ClientLightboxOptionXss {
-  category: xss
-  expected: [core.HtmlEscape, core.InputValidation]
-  kind: attention
-  text: "review client lightbox option rendering for HTML sanitization, event-attribute filtering, and URL protocol allowlisting"
-}

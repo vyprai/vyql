@@ -1,9 +1,0 @@
-module bindings.python.generated.me34ab13f;
-
-binding cliArgument0 {
-  requires {
-    dependency("flake8")
-  }
-  query pattern callExpr where callee.method == "parse_args"
-  emit source code.CliArgument at call.result
-}

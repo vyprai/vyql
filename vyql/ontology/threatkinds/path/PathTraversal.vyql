@@ -1,6 +1,0 @@
-module path;
-
-threat PathTraversal {
-  cwe: [CWE_22]
-  desc: "Untrusted data in a filesystem path"
-}

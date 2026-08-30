@@ -1,8 +1,0 @@
-module code;
-
-review code.UploadFilePathTraversalWrite {
-  category: path
-  expected: [core.PathAccessCheck]
-  kind: attention
-  text: "review upload helpers that accept full file paths or object keys for traversal checks before storage writes"
-}

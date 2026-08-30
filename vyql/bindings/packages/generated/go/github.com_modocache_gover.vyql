@@ -1,9 +1,0 @@
-module bindings.go.generated.m261b7bf4;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/modocache/gover")
-  }
-  query pattern callExpr where callee.method == "Gover"
-  emit sink code.FilePathAccess at args[0]
-}

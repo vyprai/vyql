@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mf9d0ef92;
-
-binding codeEval0 {
-  requires {
-    dependency("web-console")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.CodeEval at args[0]
-}

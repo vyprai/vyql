@@ -1,8 +1,0 @@
-module code;
-
-review code.EmmettUnhandledCookieParseException {
-  category: resource
-  expected: [core.ExceptionHandling]
-  kind: attention
-  text: "review Emmett request cookie parsing for exception handling around malformed Cookie headers"
-}

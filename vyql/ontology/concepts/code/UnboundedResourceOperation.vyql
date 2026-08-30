@@ -1,6 +1,0 @@
-module code;
-
-concept UnboundedResourceOperation : issue {
-  cwe: [CWE_400, CWE_772]
-  vulnerableTo: [dos.UncontrolledResourceConsumption]
-}

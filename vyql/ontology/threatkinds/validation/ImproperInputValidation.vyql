@@ -1,6 +1,0 @@
-module validation;
-
-threat ImproperInputValidation {
-  cwe: [CWE_20]
-  desc: "Improper input validation"
-}

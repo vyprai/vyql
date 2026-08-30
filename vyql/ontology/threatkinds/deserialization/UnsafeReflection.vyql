@@ -1,6 +1,0 @@
-module deserialization;
-
-threat UnsafeReflection {
-  cwe: [CWE_470]
-  desc: "Untrusted data selecting classes/code via reflection"
-}

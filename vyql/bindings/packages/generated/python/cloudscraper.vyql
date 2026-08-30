@@ -1,9 +1,0 @@
-module bindings.python.generated.mcd686a39;
-
-binding codeEval0 {
-  requires {
-    dependency("cloudscraper")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.CodeEval at args[0]
-}

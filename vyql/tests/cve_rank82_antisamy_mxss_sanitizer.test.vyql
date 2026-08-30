@@ -1,6 +1,0 @@
-test "rank82: AntiSamy raw-text handling requires sanitizer logic review"
-  expect_review code.HtmlSanitizerLogicReview
-  graph
-  ```
-  node op code.HtmlSanitizerLogicReview
-  ```

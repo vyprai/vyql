@@ -1,6 +1,0 @@
-module mobile;
-
-threat WebViewInjection {
-  cwe: [CWE_749]
-  desc: "Untrusted data loaded/evaluated in a WebView, or a native bridge exposed to it"
-}

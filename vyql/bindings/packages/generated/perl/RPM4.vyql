@@ -1,9 +1,0 @@
-module bindings.perl.generated.m345c23d8;
-
-binding deserialization0 {
-  requires {
-    dependency("RPM4")
-  }
-  query pattern callExpr where callee.method == "parserpms"
-  emit sink code.Deserialization at args[0]
-}

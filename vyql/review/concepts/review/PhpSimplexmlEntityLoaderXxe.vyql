@@ -1,8 +1,0 @@
-module code;
-
-review code.PhpSimplexmlEntityLoaderXxe {
-  category: xml
-  expected: [core.XmlHardening]
-  kind: attention
-  text: "review PHP SimpleXML parsing for libxml entity-loader hardening before externally influenced XML is parsed"
-}

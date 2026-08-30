@@ -17,7 +17,21 @@ type jvConv struct {
 	key                string
 	classParamTokens   []string
 	classContextTokens []string
-	childCache         map[uintptr][]*tree_sitter.Node
+	// enumBases holds the enclosing enum declaration's name while its body is
+	// lowered, so a constant-specific body can record the enum type as its base.
+	enumBases []string
+	// fieldInitTokens holds the enclosing class body's field-initializer
+	// tokens while that body is lowered. It is saved and restored per class
+	// rather than accumulated, unlike classContextTokens: a nested class does
+	// not hold its enclosing class's instance fields, so the enclosing body's
+	// field facts must not reach the nested class's members.
+	fieldInitTokens []string
+	// hoisted collects statements extracted out of an expression position —
+	// the body of an anonymous class (`new T() { ... }`). They are appended
+	// after the statement containing the expression by stmt, so the class's
+	// members become real declarations in the enclosing statement list.
+	hoisted    []nir.Stmt
+	childCache map[uintptr][]*tree_sitter.Node
 }
 
 func (c *jvConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
@@ -135,7 +149,20 @@ func (c *jvConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
+// stmt converts one statement, appending any statements hoisted out of it —
+// today the bodies of anonymous classes created inside it — right after it, so
+// code declared in an expression position lands in the enclosing statement list
+// instead of being dropped.
 func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
+	out := c.stmtOne(n)
+	if len(c.hoisted) > 0 {
+		out = append(out, c.hoisted...)
+		c.hoisted = nil
+	}
+	return out
+}
+
+func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "class_declaration", "interface_declaration", "enum_declaration", "record_declaration":
@@ -143,12 +170,43 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		bases := c.jvClassBases(n)
 		prevParams := c.classParamTokens
 		prevContext := c.classContextTokens
+		prevEnumBases := c.enumBases
+		if n.Kind() == "enum_declaration" {
+			// a constant-specific body subclasses the enum type itself
+			c.enumBases = []string{name}
+		}
 		c.classParamTokens = append(append([]string{}, prevParams...), c.jvAnnotationTokens(n, "class_annotation:")...)
 		c.classContextTokens = append(append([]string{}, prevContext...), javaClassContextTokens(name, bases)...)
 		c.classContextTokens = append(c.classContextTokens, c.jvModifierTokens(n, "class_modifier:")...)
+		prevFieldInit := c.fieldInitTokens
+		c.fieldInitTokens = c.jvFieldInitTokens(field(n, "body"), n.Kind() == "interface_declaration")
 		cd := nir.ClassDef{Name: name, Body: c.decls(field(n, "body")), Loc: L, Bases: bases}
 		c.classParamTokens = prevParams
 		c.classContextTokens = prevContext
+		c.fieldInitTokens = prevFieldInit
+		c.enumBases = prevEnumBases
+		return []nir.Stmt{cd}
+	case "enum_constant":
+		// `CONST(args) { members }` — a constant-specific class body, an
+		// anonymous subclass body of the enum type. decls feeds every named
+		// child of an enum body to this switch, and without a case the body's
+		// members produce no FuncDef, no call nodes and no context tokens.
+		// Lower it as a class named for the constant, so the members carry the
+		// class context a named nested class gets. Constants without a body
+		// hold no code. The constant's arguments stay unlowered: they are an
+		// initializer expression, not statements of the body.
+		name := c.text(field(n, "name"))
+		body := field(n, "body")
+		if name == "" || body == nil {
+			return nil
+		}
+		prevContext := c.classContextTokens
+		c.classContextTokens = append(append([]string{}, prevContext...), javaClassContextTokens(name, c.enumBases)...)
+		prevFieldInit := c.fieldInitTokens
+		c.fieldInitTokens = c.jvFieldInitTokens(body, false)
+		cd := nir.ClassDef{Name: name, Body: c.decls(body), Loc: L, Bases: c.enumBases}
+		c.classContextTokens = prevContext
+		c.fieldInitTokens = prevFieldInit
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration":
 		name := c.text(field(n, "name"))
@@ -162,6 +220,7 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		tokens := append([]string{}, c.classParamTokens...)
 		tokens = append(tokens, annotationTokens...)
 		contextTokens := append([]string{}, c.classContextTokens...)
+		contextTokens = append(contextTokens, c.fieldInitTokens...)
 		contextTokens = append(contextTokens, annotationTokens...)
 		contextTokens = append(contextTokens, c.jvModifierTokens(n, "function_modifier:")...)
 		contextTokens = append(contextTokens, c.jvSensitiveMetadataExportTokens(n)...)
@@ -579,6 +638,19 @@ func javaBaseTypeName(s string) string {
 	return s
 }
 
+// anonClassBody returns the class_body child of an object_creation_expression
+// (`new T(args) { ... }`) when the constructed class is anonymous: the body
+// holding its members. The grammar exposes it as a plain named child, without
+// a field name.
+func (c *jvConv) anonClassBody(n *tree_sitter.Node) *tree_sitter.Node {
+	for _, ch := range c.namedChildren(n) {
+		if ch.Kind() == "class_body" {
+			return ch
+		}
+	}
+	return nil
+}
+
 func javaClassContextTokens(name string, bases []string) []string {
 	var out []string
 	if name != "" {
@@ -587,6 +659,58 @@ func javaClassContextTokens(name string, bases []string) []string {
 	for _, base := range bases {
 		if base != "" {
 			out = append(out, "class_base:"+base)
+		}
+	}
+	return out
+}
+
+// jvFieldInitTokens reports what each direct field declaration of a class-like
+// body constructs in its initializer, and whether that construction runs per
+// class or per instance: `static_field_init:<T>` for a static field (or any
+// field of an interface, which the language makes implicitly static -- its
+// constants parse as constant_declaration) and `instance_field_init:<T>`
+// otherwise. The declared modifiers reach no node and no context today -- a
+// field lowers to a bare assignment -- so per-class and per-instance spellings
+// of the same initializer are otherwise indistinguishable. The token carries
+// the constructed type rather than the field name, so a body's fields of one
+// type dedup to one entry. Nested classes are skipped: their own declaration
+// walks their fields with their own context.
+func (c *jvConv) jvFieldInitTokens(body *tree_sitter.Node, interfaceBody bool) []string {
+	if body == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(tok string) {
+		if tok == "" || seen[tok] {
+			return
+		}
+		seen[tok] = true
+		out = append(out, tok)
+	}
+	for _, ch := range c.namedChildren(body) {
+		if ch.Kind() != "field_declaration" && ch.Kind() != "constant_declaration" {
+			continue
+		}
+		static := interfaceBody
+		for _, m := range c.namedChildren(ch) {
+			if m.Kind() == "modifiers" && javaContainsWord(c.text(m), "static") {
+				static = true
+			}
+		}
+		for _, d := range c.namedChildren(ch) {
+			if d.Kind() != "variable_declarator" {
+				continue
+			}
+			val := field(d, "value")
+			if val == nil || val.Kind() != "object_creation_expression" {
+				continue
+			}
+			prefix := "instance_field_init:"
+			if static {
+				prefix = "static_field_init:"
+			}
+			add(prefix + javaBaseTypeName(c.text(field(val, "type"))))
 		}
 	}
 	return out
@@ -686,6 +810,13 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 	}
 	if name != "" {
 		add("function_name:" + name)
+	}
+	// The declared return type is the sibling fact of a parameter's declared
+	// type on the same declaration node, and answers the same question from
+	// the other end: what a caller receives. A constructor has no `type`
+	// field and yields nothing.
+	if rt := paramTypeFromField(c, n); rt != "" {
+		add("return_type:" + rt)
 	}
 	text := c.text(n)
 	add(text)
@@ -1238,6 +1369,25 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 			for _, a := range c.namedChildren(args) {
 				arglist = append(arglist, c.expr(a))
 			}
+		}
+		// `new T(args) { ... }` — a trailing class_body is an anonymous class
+		// whose members are real code. Lower it exactly as class_declaration
+		// lowers its own body (the same class_body node type) and hoist the
+		// ClassDef out of expression position, so the methods become FuncDefs
+		// with the class context a named class gets. The class has no name of
+		// its own; the constructed type is its only base.
+		if body := c.anonClassBody(n); body != nil {
+			base := javaBaseTypeName(typ)
+			prevParams := c.classParamTokens
+			prevContext := c.classContextTokens
+			prevFieldInit := c.fieldInitTokens
+			c.classParamTokens = append([]string{}, prevParams...)
+			c.classContextTokens = append(append([]string{}, prevContext...), javaClassContextTokens("", []string{base})...)
+			c.fieldInitTokens = c.jvFieldInitTokens(body, false)
+			c.hoisted = append(c.hoisted, nir.ClassDef{Bases: []string{base}, Body: c.decls(body), Loc: L})
+			c.classParamTokens = prevParams
+			c.classContextTokens = prevContext
+			c.fieldInitTokens = prevFieldInit
 		}
 		// model `new T(args)` as a constructor call with callee path "T", so
 		// binding applicators can match constructor and type information.

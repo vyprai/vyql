@@ -1,9 +1,0 @@
-module bindings.swift.generated.ma6ed7833;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/dn-m/MusicXML")
-  }
-  query pattern callExpr where callee.method == "init(from:)"
-  emit sink code.Deserialization at args[0]
-}

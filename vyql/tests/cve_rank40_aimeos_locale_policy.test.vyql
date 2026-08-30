@@ -1,6 +1,0 @@
-test "rank40: Aimeos locale admin resource requires access-policy review"
-  expect_review code.AccessPolicyReview
-  graph
-  ```
-  node op code.AccessPolicyReview
-  ```

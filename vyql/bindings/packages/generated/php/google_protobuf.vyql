@@ -1,9 +1,0 @@
-module bindings.php.generated.m6f736fc3;
-
-binding deserialization0 {
-  requires {
-    dependency("google/protobuf")
-  }
-  query pattern callExpr where callee.method == "buildFromProto"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,6 +1,0 @@
-module memory;
-
-threat BufferOverflow {
-  cwe: [CWE_120]
-  desc: "Classic buffer copy without size check"
-}

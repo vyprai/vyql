@@ -1,7 +1,0 @@
-module code;
-
-review code.UnboundedStateGrowthReview {
-  category: resource
-  kind: attention
-  text: "review state keyed by attacker-controlled or high-cardinality values for fail-closed limits"
-}

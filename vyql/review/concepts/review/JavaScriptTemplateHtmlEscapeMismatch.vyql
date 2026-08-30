@@ -1,8 +1,0 @@
-module code;
-
-review code.JavaScriptTemplateHtmlEscapeMismatch {
-  category: xss
-  expected: [core.HtmlEscape]
-  kind: attention
-  text: "review template variables placed into JavaScript strings for context-specific escaping such as Encode.forJavaScript"
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m6c202c7f;
-
-binding deserialization0 {
-  requires {
-    dependency("moneyphp/money")
-  }
-  query pattern callExpr where callee.method == "MoneyParser.parse"
-  emit sink code.Deserialization at args[0]
-}

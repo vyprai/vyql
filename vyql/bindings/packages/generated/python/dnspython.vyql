@@ -1,9 +1,0 @@
-module bindings.python.generated.mbd683ac9;
-
-binding userControlledData0 {
-  requires {
-    dependency("dnspython")
-  }
-  query pattern callExpr where callee.method == "e164.query"
-  emit source core.UserControlledData at call.result
-}

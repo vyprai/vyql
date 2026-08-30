@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc2f54a46;
-
-binding networkData0 {
-  requires {
-    dependency("AnyEvent-FreeSWITCH")
-  }
-  query pattern callExpr where callee.method == "recv_events"
-  emit source code.NetworkData at call.result
-}

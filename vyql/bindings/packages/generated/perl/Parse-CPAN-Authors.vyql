@@ -1,9 +1,0 @@
-module bindings.perl.generated.md9c14788;
-
-binding deserialization0 {
-  requires {
-    dependency("Parse-CPAN-Authors")
-  }
-  query pattern callExpr where callee.method == "_parse"
-  emit sink code.Deserialization at args[0]
-}

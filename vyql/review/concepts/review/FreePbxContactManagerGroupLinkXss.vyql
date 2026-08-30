@@ -1,8 +1,0 @@
-module code;
-
-review code.FreePbxContactManagerGroupLinkXss {
-  category: xss
-  expected: [core.HtmlEscape, core.InputValidation]
-  kind: attention
-  text: "review FreePBX Contactmanager generated action links for integer narrowing of the group request parameter"
-}

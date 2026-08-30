@@ -1,8 +1,0 @@
-module core;
-
-concept CsvEscape : check {
-  applies: path
-  covers: [path]
-  cwe: [CWE_1236]
-  neutralizes: [injection.CsvInjection]
-}

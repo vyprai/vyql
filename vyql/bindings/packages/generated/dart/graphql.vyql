@@ -1,9 +1,0 @@
-module bindings.dart.generated.m694d0114;
-
-binding deserialization0 {
-  requires {
-    dependency("graphql")
-  }
-  query pattern callExpr where callee.method == "GraphQLSocketMessage.parse"
-  emit sink code.Deserialization at args[0]
-}

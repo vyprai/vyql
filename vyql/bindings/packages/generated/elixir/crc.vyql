@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m383062a7;
-
-binding userControlledData0 {
-  requires {
-    dependency("crc")
-  }
-  query pattern callExpr where callee.method == "calculate"
-  emit source core.UserControlledData at call.result
-}

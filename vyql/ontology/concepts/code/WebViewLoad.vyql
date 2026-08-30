@@ -1,7 +1,0 @@
-module code;
-
-concept WebViewLoad : sink {
-  cwe: [CWE_749]
-  enabledBy: [taint.UntrustedData]
-  vulnerableTo: [mobile.WebViewInjection]
-}

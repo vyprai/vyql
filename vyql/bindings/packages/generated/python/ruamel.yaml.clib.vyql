@@ -1,9 +1,0 @@
-module bindings.python.generated.m0e9d9afb;
-
-binding deserialization0 {
-  requires {
-    dependency("ruamel.yaml.clib")
-  }
-  query pattern callExpr where callee.method == "yaml_parser_set_input"
-  emit sink code.Deserialization at args[0]
-}

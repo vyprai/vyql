@@ -1,9 +1,0 @@
-module bindings.java.generated.m33e9151c;
-
-binding secretValue0 {
-  requires {
-    dependency("io.netty:netty-handler")
-  }
-  query pattern callExpr where callee.method == "readPrivateKey"
-  emit source code.SecretValue at call.result
-}

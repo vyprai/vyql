@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m1a723a04;
-
-binding sqlExecution0 {
-  requires {
-    dependency("org.hsqldb:hsqldb")
-  }
-  query pattern callExpr where callee.method == "execute"
-  emit sink code.SqlExecution at args[0]
-}

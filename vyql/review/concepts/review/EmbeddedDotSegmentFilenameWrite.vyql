@@ -1,8 +1,0 @@
-module code;
-
-review code.EmbeddedDotSegmentFilenameWrite {
-  category: path
-  expected: [core.PathCanonicalization]
-  kind: target
-  text: "reject embedded parent-directory segments in caller-provided filenames before writing them under a storage directory"
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.md58fa1c8;
-
-binding deserialization0 {
-  requires {
-    dependency("com.sun.jersey:jersey-json")
-  }
-  query pattern callExpr where callee.method == "unmarshal"
-  emit sink code.Deserialization at args[0]
-}

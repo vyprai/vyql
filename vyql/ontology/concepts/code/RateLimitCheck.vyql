@@ -1,8 +1,0 @@
-module code;
-
-concept RateLimitCheck : check {
-  applies: endpoint
-  covers: [endpoint, path]
-  cwe: [CWE_307]
-  neutralizes: [access_control.IncorrectAuthorization]
-}

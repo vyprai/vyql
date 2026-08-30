@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m5f9ab702;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework.security:spring-security-jwt")
-  }
-  query pattern callExpr where callee.method == "decodeAndVerify"
-  emit sink code.Deserialization at args[0]
-}

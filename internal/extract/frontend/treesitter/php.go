@@ -19,7 +19,66 @@ type phConv struct {
 	root       string
 	file       string
 	funcName   string
+	className  string
+	classBases []string
+	// hoisted collects statements extracted out of an expression position —
+	// the body of an anonymous class (`new class extends B { ... }`). They are
+	// appended after the statement containing the expression by stmt, so the
+	// class's methods become FuncDefs in the enclosing statement list.
+	hoisted    []nir.Stmt
 	childCache map[uintptr][]*tree_sitter.Node
+}
+
+// phpBaseClauseTokens returns the base-clause type names of a class-like
+// declaration, one token per name: the text as written plus, for a
+// namespace-qualified name, its last "\" segment, so exact last-segment
+// class_base matching sees both `extends Component` and
+// `extends \Livewire\Component`.
+func (c *phConv) phpBaseClauseTokens(n *tree_sitter.Node) []string {
+	var out []string
+	for _, ch := range c.namedChildren(n) {
+		if ch.Kind() != "base_clause" {
+			continue
+		}
+		for _, nm := range c.namedChildren(ch) {
+			switch nm.Kind() {
+			case "name", "qualified_name", "relative_name":
+				t := strings.TrimSpace(c.text(nm))
+				if t == "" {
+					continue
+				}
+				out = append(out, t)
+				if i := strings.LastIndex(t, `\`); i >= 0 && i+1 < len(t) {
+					out = append(out, t[i+1:])
+				}
+			}
+		}
+	}
+	return out
+}
+
+// phpClassMembers returns the property names declared directly in a class body, so a member
+// reference on the implicit self receiver inside a method resolves to that receiver's field
+// slot instead of a fresh node per occurrence.
+func (c *phConv) phpClassMembers(body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	var out []string
+	for _, m := range c.namedChildren(body) {
+		if m.Kind() != "property_declaration" {
+			continue
+		}
+		for _, el := range c.namedChildren(m) {
+			if el.Kind() != "property_element" {
+				continue
+			}
+			if nm := field(el, "name"); nm != nil {
+				out = append(out, c.text(nm))
+			}
+		}
+	}
+	return out
 }
 
 // ExtractPHP parses PHP files into one NIR Program (all modules keyed "").
@@ -135,7 +194,20 @@ func (c *phConv) block(n *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
+// stmt converts one statement, appending any statements hoisted out of it —
+// today the bodies of anonymous classes created inside it — right after it, so
+// code declared in an expression position lands in the enclosing statement list
+// instead of being dropped.
 func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
+	out := c.stmtOne(n)
+	if len(c.hoisted) > 0 {
+		out = append(out, c.hoisted...)
+		c.hoisted = nil
+	}
+	return out
+}
+
+func (c *phConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
 	switch n.Kind() {
 	case "function_definition", "method_declaration":
@@ -197,16 +269,22 @@ func (c *phConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			Params:        params,
 			ParamTypes:    ptypes,
 			ContextTokens: c.phpFunctionTokens(name),
-			ParamEntries:  c.phpParamEntries(name, params, ptypes, reviewTokens),
+			ParamEntries:  c.phpParamEntries(name, params, ptypes, reviewTokens, exported),
 			Body:          body,
 			Loc:           L,
 			Exported:      exported,
 		}}
 	case "class_declaration", "interface_declaration", "trait_declaration", "enum_declaration":
 		name := c.text(field(n, "name"))
+		prevClass := c.className
+		prevBases := c.classBases
+		c.className = name
+		c.classBases = c.phpBaseClauseTokens(n)
 		body := c.block(field(n, "body"))
 		body = append(body, c.phpClassContext(n, name)...)
-		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Loc: L}}
+		c.className = prevClass
+		c.classBases = prevBases
+		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Members: c.phpClassMembers(field(n, "body")), Loc: L}}
 	case "expression_statement":
 		kids := c.namedChildren(n)
 		if len(kids) == 0 {
@@ -737,6 +815,9 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 			add("raw_cookie_httponly_false")
 		}
 	}
+	if phpResolveFailureSentinelNotRejected(compact) {
+		add("resolve_failure_url_validation_bypass")
+	}
 	if phpTempPathJoinBeforeSeparatorCheck(compact) {
 		add("temp_path_join_before_separator_check")
 	}
@@ -1141,6 +1222,11 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 		!strings.Contains(compact, "setSafeMode(true)") {
 		add("stored_html_write")
 	}
+	if strings.Contains(compact, `$data["attributes"]["description"]`) &&
+		strings.Contains(compact, `$page->description=$data["attributes"]["description"];`) &&
+		!strings.Contains(compact, `$page->description=strip_tags($data["attributes"]["description"]);`) {
+		add("haxcms_page_break_description_stored_html_write")
+	}
 	if strings.Contains(compact, "toggleSubpalette") && strings.Contains(compact, "Input->post('field')") &&
 		strings.Contains(compact, "prepare(\"UPDATE\"") && !strings.Contains(compact, "__selector__") &&
 		!strings.Contains(compact, "hasAccess($dc->table") {
@@ -1269,9 +1355,6 @@ func (c *phConv) phpReviewTokens(n *tree_sitter.Node) []string {
 	if strings.Contains(compact, "sanitizeUrl($url)") && strings.Contains(compact, "absoluteUrlWithProtocol($url)") &&
 		!strings.Contains(compact, "sanitizeUrl(UrlHelper::absoluteUrlWithProtocol($url))") {
 		add("host_expanded_url_sanitized_before_expansion")
-	}
-	if strings.Contains(compact, "generateKey") && strings.Contains(compact, "keyfile") && !strings.Contains(compact, "chmod") {
-		add("secret_file_permission_review")
 	}
 	if strings.Contains(compact, "Tar") && strings.Contains(compact, "extract(") &&
 		strings.Contains(compact, "manifest") && strings.Contains(compact, "unserialize") &&
@@ -1426,6 +1509,63 @@ func phpFatFreeClearEvalCompileWithoutKeyValidation(compact string) bool {
 		}
 	}
 	return true
+}
+
+// phpResolveFailureSentinelNotRejected reports the documented gethostbyname()
+// failure idiom handled by overwriting the resolved variable with a falsy
+// literal instead of rejecting the value. PHP documents gethostbyname() as
+// returning "a string containing the unmodified hostname" on failure, so the
+// caller that compares the answer with its input has detected the failure;
+// assigning a bare false back to the resolved variable records that failure
+// while the function continues, and the address test that follows is skipped
+// by its own truthiness guard, so a host string the resolver refused to
+// interpret is returned as validated. The correlation on the resolved
+// variable's name keeps an unrelated false assignment in the same function --
+// a same-host flag, a status default -- from satisfying the shape, and the
+// call must be the right side of an assignment, so diagnostic code that only
+// prints gethostbyname('example.org') decides nothing here. gethostbynamel(),
+// a different function, does not match the call marker.
+func phpResolveFailureSentinelNotRejected(compact string) bool {
+	search := 0
+	for {
+		callIdx := strings.Index(compact[search:], "gethostbyname(")
+		if callIdx < 0 {
+			return false
+		}
+		callIdx += search
+		search = callIdx + len("gethostbyname(")
+		k := callIdx
+		if k > 0 && compact[k-1] == '@' {
+			k--
+		}
+		// "<$name>=" must sit immediately before the call.
+		if k < 2 || compact[k-1] != '=' || (compact[k-2] != '$' && !phpVarNameByte(compact[k-2])) {
+			continue
+		}
+		vStart := k - 2
+		for vStart > 0 && phpVarNameByte(compact[vStart-1]) {
+			vStart--
+		}
+		if vStart == k-2 {
+			continue
+		}
+		v := "$" + compact[vStart:k-1]
+		cmpNeedle := v + "=="
+		cmpIdx := strings.Index(compact[callIdx:], cmpNeedle)
+		if cmpIdx < 0 {
+			continue
+		}
+		rest := compact[callIdx+cmpIdx+len(cmpNeedle):]
+		for _, lit := range []string{"false", "FALSE", "False"} {
+			if strings.Contains(rest, v+"="+lit) {
+				return true
+			}
+		}
+	}
+}
+
+func phpVarNameByte(b byte) bool {
+	return b == '_' || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
 }
 
 func phpBpDocsSaveMissingAccessPolicy(compact string) bool {
@@ -1787,7 +1927,7 @@ func phpIsWPListTableColumn(name string) bool {
 	return name == "column_default" || strings.HasPrefix(name, "column_")
 }
 
-func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string]string, reviewTokens []string) []nir.ParamEntry {
+func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string]string, reviewTokens []string, exported bool) []nir.ParamEntry {
 	if len(params) == 0 {
 		return nil
 	}
@@ -1799,10 +1939,24 @@ func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string
 			functionTypes = append(functionTypes, "function_param_type:"+t)
 		}
 	}
+	var classTokens []string
+	if c.className != "" {
+		classTokens = append(classTokens, "class_name:"+c.className)
+		for _, b := range c.classBases {
+			if b != "" {
+				classTokens = append(classTokens, "class_base:"+b)
+			}
+		}
+	}
+	visibility := "function_visibility:private"
+	if exported {
+		visibility = "function_visibility:public"
+	}
 	var out []nir.ParamEntry
 	for i, p := range params {
 		tokens := append([]string{}, functionTypes...)
-		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i))
+		tokens = append(tokens, classTokens...)
+		tokens = append(tokens, "function_name:"+name, "param_name:"+p, "param_index:"+itoa(i), visibility)
 		for _, tok := range reviewTokens {
 			tokens = append(tokens, "php_review:"+tok)
 		}
@@ -1897,6 +2051,7 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "object_creation_expression":
 		var typ string
 		var argsNode *tree_sitter.Node
+		var anon *tree_sitter.Node
 		for _, ch := range c.namedChildren(n) {
 			if ch.Kind() == "name" || ch.Kind() == "qualified_name" {
 				typ = c.text(ch)
@@ -1904,9 +2059,30 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 			if ch.Kind() == "arguments" {
 				argsNode = ch
 			}
+			if ch.Kind() == "anonymous_class" {
+				anon = ch
+			}
 		}
 		if argsNode == nil {
 			argsNode = field(n, "arguments")
+		}
+		if anon != nil {
+			// `new class extends B { ... }` — the constructor arguments live on the
+			// anonymous_class child when the class takes any.
+			if a := field(anon, "arguments"); a != nil && argsNode == nil {
+				argsNode = a
+			}
+			// The body is real code: walk it exactly as class_declaration walks its
+			// own body (same declaration_list field type) and hoist the statements
+			// after this expression's statement, so the methods become FuncDefs.
+			// The class has no name of its own, so only its base clause is recorded.
+			prevClass := c.className
+			prevBases := c.classBases
+			c.className = ""
+			c.classBases = c.phpBaseClauseTokens(anon)
+			c.hoisted = append(c.hoisted, c.block(field(anon, "body"))...)
+			c.className = prevClass
+			c.classBases = prevBases
 		}
 		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: c.callArgs(argsNode), Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
@@ -1962,6 +2138,17 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		// `fn ($x) => expr` — single-expression closure; model the body as a return.
 		return nir.Lambda{Params: c.params(field(n, "parameters")), ParamTypes: c.paramTypes(field(n, "parameters")),
 			Body: []nir.Stmt{nir.Return{Value: c.expr(field(n, "body"))}}, Loc: L}
+	case "include_expression", "include_once_expression", "require_expression", "require_once_expression":
+		// include/require used as an expression (`return include $f;`, `$x = include $f;`) —
+		// same file-inclusion sink call as the statement form in exprStmt. Without this case the
+		// generic Seq fallback below dropped the Call entirely and kept only its argument, so the
+		// sink label vanished whenever the include's result was consumed instead of discarded.
+		kids := c.namedChildren(n)
+		var args []nir.Expr
+		if len(kids) > 0 {
+			args = append(args, c.expr(kids[0]))
+		}
+		return nir.Call{Callee: nir.Name{ID: "include", Loc: L}, Args: args, Path: "include", Method: "include", Loc: L}
 	}
 	var parts []nir.Expr
 	for _, ch := range c.namedChildren(n) {
@@ -2020,7 +2207,15 @@ func (c *phConv) dotted(n *tree_sitter.Node) string {
 	case "member_call_expression":
 		return c.dotted(field(n, "object")) + "." + c.text(field(n, "name"))
 	case "scoped_call_expression":
-		return c.text(field(n, "scope")) + "." + c.text(field(n, "name"))
+		// `self::`/`static::` name the enclosing class, same as `$this` already does for
+		// instance calls — substitute it so `self::foo()` resolves to `<Class>.foo` instead of
+		// the unresolvable literal path "self.foo". `parent::` is left as-is: the superclass is
+		// a genuinely different, unresolved target, not a wrong extraction of this one.
+		scope := c.text(field(n, "scope"))
+		if (scope == "self" || scope == "static") && c.className != "" {
+			scope = c.className
+		}
+		return scope + "." + c.text(field(n, "name"))
 	case "function_call_expression":
 		return c.dotted(field(n, "function"))
 	case "subscript_expression":

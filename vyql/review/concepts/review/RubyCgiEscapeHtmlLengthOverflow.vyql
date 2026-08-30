@@ -1,7 +1,0 @@
-module code;
-
-review code.RubyCgiEscapeHtmlLengthOverflow {
-  category: numeric
-  kind: attention
-  text: "review Ruby CGI escape_html allocation for checked multiplication before maximum HTML expansion"
-}

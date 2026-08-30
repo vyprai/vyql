@@ -1,9 +1,0 @@
-module bindings.php.generated.md2affe8d;
-
-binding deserialization0 {
-  requires {
-    dependency("apigen/apigen")
-  }
-  query pattern callExpr where callee.method == "tokenize"
-  emit sink code.Deserialization at args[0]
-}

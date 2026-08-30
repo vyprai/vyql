@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mc41b758a;
-
-binding filePathAccess0 {
-  requires {
-    dependency("istanbul-lib-report")
-  }
-  query pattern callExpr where callee.method == "Context.getSource"
-  emit sink code.FilePathAccess at args[0]
-}

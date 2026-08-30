@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc711f1bb;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/LebJe/TOMLKit")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

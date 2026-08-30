@@ -1,7 +1,0 @@
-module code;
-
-review code.PublicWeakChecksumUtility {
-  category: crypto
-  kind: attention
-  text: "review public checksum/hash utilities for weak algorithms and restrict non-cryptographic helpers to internal or package-private API"
-}

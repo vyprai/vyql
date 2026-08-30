@@ -1,8 +1,0 @@
-module code;
-
-concept Cookie : source {
-  coverageReservedSource: true
-  cwe: [CWE_20]
-  refines: core.UserControlledData
-  taint: [taint.UntrustedData]
-}

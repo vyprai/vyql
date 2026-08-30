@@ -1,9 +1,0 @@
-module bindings.perl.generated.m0b1bdf2a;
-
-binding sqlExecution0 {
-  requires {
-    dependency("Apache-AuthTicket")
-  }
-  query pattern callExpr where callee.method == "_update_ticket_timestamp"
-  emit sink code.SqlExecution at args[0]
-}

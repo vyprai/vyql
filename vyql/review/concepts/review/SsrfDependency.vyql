@@ -1,7 +1,0 @@
-module sbom;
-
-review sbom.SsrfDependency {
-  category: dependency
-  kind: attention
-  text: "review dependency constraints for SSRF-prone URL fetch or service registration behavior"
-}

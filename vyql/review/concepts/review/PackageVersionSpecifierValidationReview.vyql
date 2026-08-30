@@ -1,8 +1,0 @@
-module code;
-
-review code.PackageVersionSpecifierValidationReview {
-  category: supply_chain
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review package version specifier validation before using the specifier in package installation"
-}
