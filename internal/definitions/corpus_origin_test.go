@@ -3,32 +3,33 @@ package definitions
 import (
 	"os"
 	"path/filepath"
+
+	"github.com/vyprai/vyql/internal/datadir"
 )
 
-// corpusIsVendored reports whether the definitions under test are the ones this
-// repository carries, rather than a bundle fetched at build time.
+// definitionsArePublished reports whether the definitions under test came from a
+// publish rather than from a working tree.
 //
-// It decides whether a check that compares the corpus against a checked-in work
-// list can mean anything. Such a list is versioned with the corpus it describes;
-// once the corpus is fetched, the two move independently -- the bundle is
-// published from a tag an operator chooses, with no fixed relationship to this
-// repository -- so a comparison reports which side is newer rather than whether
-// the corpus is sound. Those checks run where the corpus and the list are kept
-// together.
-func corpusIsVendored() bool {
-	dir, err := os.Getwd()
-	if err != nil {
+// A publish stamps VERSION and definitions.meta.json at the root of the bundle; a
+// repository's own vyql/ tree carries neither. That is exactly the distinction
+// these checks need. A bundle is cut at a tag chosen elsewhere, so its specs were
+// written against a different scanner and asserting them reports which side is
+// newer. A working tree is the definitions under change, and its specs are the
+// thing that has to hold.
+//
+// Read from the data directory rather than from the checkout's own layout. The
+// definitions repository runs these checks against a scanner it fetched, so there
+// is no vyql/ beside that scanner -- deciding from its absence would skip the
+// gate in the repository that most needs it, and skip it silently.
+func definitionsArePublished() bool {
+	root, ok := datadir.Lookup()
+	if !ok {
 		return false
 	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			_, err := os.Stat(filepath.Join(dir, "vyql"))
-			return err == nil
+	for _, marker := range []string{"VERSION", "definitions.meta.json"} {
+		if _, err := os.Stat(filepath.Join(root, marker)); err == nil {
+			return true
 		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return false
-		}
-		dir = parent
 	}
+	return false
 }

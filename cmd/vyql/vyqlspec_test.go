@@ -207,7 +207,7 @@ func TestVyqlSpecs(t *testing.T) {
 	// the engine they were written for. What this repository checks about a
 	// fetched bundle is that it arrived whole and parses, in
 	// TestFetchedCVESpecsArriveWhole.
-	if !corpusIsVendored() {
+	if definitionsArePublished() {
 		t.Skip("the definitions are fetched; their specs are run where they are kept")
 	}
 	root := datadir.Root()
