@@ -795,16 +795,34 @@ func putDefaultsOnly(r io.Reader) error {
 		return err
 	}
 	return save(cfg)
+
+// TestGoMapLiteralKeepsItsLiteralKey covers the composite-literal shape that
+// carries taint in the OWASP Go port. A struct literal keys on a field name,
+// which is a path; a map keys on a value, so the key is a literal and the path
+// of it is empty. An element that keeps no key is lowered under its position, so
+// a read by the real key finds an empty slot and reads as clean -- which loses
+// the flow silently rather than falling back to the whole container.
+func TestGoMapLiteralKeepsItsLiteralKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "m.go")
+	src := []byte(`package m
+
+func f(payload string) string {
+	return map[string]string{"v": payload}["v"]
 }
 `)
 	if err := os.WriteFile(path, src, 0o600); err != nil {
 		t.Fatal(err)
 	}
+<<<<<<< HEAD
 
+=======
+>>>>>>> d2d888afc (go: keep the literal key of a map composite literal element)
 	prog, err := gofrontend.Extract([]string{path}, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
+<<<<<<< HEAD
 	g, err := lowering.Lower(prog, true)
 	if err != nil {
 		t.Fatal(err)
@@ -1018,5 +1036,46 @@ func perIterationShort(data [][]byte) {
 	}
 	if closure != 1 {
 		t.Errorf("hoisted-closure facts = %d, want 1 (the closure's own pass); got %q", closure, facts)
+=======
+
+	var pairs []nir.Pair
+	var walk func(nir.Expr)
+	walk = func(e nir.Expr) {
+		switch v := e.(type) {
+		case nir.Seq:
+			for _, p := range v.Parts {
+				walk(p)
+			}
+		case nir.Pair:
+			pairs = append(pairs, v)
+			walk(v.Value)
+		case nir.Index:
+			walk(v.Base)
+			walk(v.Key)
+		case nir.Thru:
+			walk(v.Inner)
+		}
+	}
+	for _, m := range prog.Modules {
+		for _, s := range m.Body {
+			fn, ok := s.(nir.FuncDef)
+			if !ok {
+				continue
+			}
+			for _, b := range fn.Body {
+				if r, ok := b.(nir.Return); ok {
+					walk(r.Value)
+				}
+			}
+		}
+	}
+
+	if len(pairs) != 1 {
+		t.Fatalf("want one nir.Pair for the map element, got %d", len(pairs))
+	}
+	// Unquoted, because that is what a subscript's key resolves to.
+	if pairs[0].Key != "v" {
+		t.Errorf("map element key = %q, want %q", pairs[0].Key, "v")
+>>>>>>> d2d888afc (go: keep the literal key of a map composite literal element)
 	}
 }

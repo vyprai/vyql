@@ -1351,6 +1351,19 @@ func (c *conv) goBoolLiteral(e ast.Expr) string {
 	return ""
 }
 
+// goCompositeKey is the literal key of a map or indexed-array literal element,
+// unquoted so that it matches the key a subscript resolves to. An empty string
+// means the key is not a literal, which leaves the element keyed by position.
+func goCompositeKey(e ast.Expr) string {
+	if s := goStringLiteral(e); s != "" {
+		return s
+	}
+	if lit, ok := e.(*ast.BasicLit); ok && lit.Kind == token.INT {
+		return lit.Value
+	}
+	return ""
+}
+
 func goStringLiteral(e ast.Expr) string {
 	switch x := e.(type) {
 	case *ast.BasicLit:
@@ -2027,6 +2040,15 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 		for _, el := range ex.Elts {
 			if kv, ok := el.(*ast.KeyValueExpr); ok {
 				key := c.path(kv.Key)
+				if key == "" {
+					// A struct literal keys on a field name, which is a path. A map
+					// or an indexed array literal keys on a value, so the key is a
+					// literal and c.path reports nothing for it. Without this the
+					// pair keeps no key and lowering falls back to the element's
+					// position, so a read by the real key finds an empty slot and
+					// reads as clean.
+					key = goCompositeKey(kv.Key)
+				}
 				parts = append(parts, nir.Pair{Key: key, Value: c.exprWithFuncHint(kv.Value, key), Loc: c.loc(kv.Pos())})
 			} else {
 				parts = append(parts, c.expr(el))
