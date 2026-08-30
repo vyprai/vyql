@@ -1418,26 +1418,6 @@ func TestFetchedCVESpecsArriveWhole(t *testing.T) {
 // does not know which batch the published bundle came from.
 const cveSpecFloor = 1000
 
-func nonemptyTSVRows(src string) []string {
-	lines := strings.Split(src, "\n")
-	rows := make([]string, 0, len(lines))
-	for _, line := range lines {
-		if strings.TrimSpace(line) != "" {
-			rows = append(rows, line)
-		}
-	}
-	return rows
-}
-
-func cve1000LedgerRepoMatches(ledgerRepo string, poolFields []string) bool {
-	if len(poolFields) < 2 {
-		return false
-	}
-	project := poolFields[0]
-	owner := poolFields[1]
-	return ledgerRepo == project || ledgerRepo == owner || ledgerRepo == owner+"/"+project
-}
-
 func readCVERankSpecFiles(t *testing.T) []string {
 	t.Helper()
 	testsDir := filepath.Join(datadir.Root(), "tests")
