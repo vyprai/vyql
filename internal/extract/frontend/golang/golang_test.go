@@ -795,34 +795,16 @@ func putDefaultsOnly(r io.Reader) error {
 		return err
 	}
 	return save(cfg)
-
-// TestGoMapLiteralKeepsItsLiteralKey covers the composite-literal shape that
-// carries taint in the OWASP Go port. A struct literal keys on a field name,
-// which is a path; a map keys on a value, so the key is a literal and the path
-// of it is empty. An element that keeps no key is lowered under its position, so
-// a read by the real key finds an empty slot and reads as clean -- which loses
-// the flow silently rather than falling back to the whole container.
-func TestGoMapLiteralKeepsItsLiteralKey(t *testing.T) {
-	dir := t.TempDir()
-	path := filepath.Join(dir, "m.go")
-	src := []byte(`package m
-
-func f(payload string) string {
-	return map[string]string{"v": payload}["v"]
 }
 `)
 	if err := os.WriteFile(path, src, 0o600); err != nil {
 		t.Fatal(err)
 	}
-<<<<<<< HEAD
 
-=======
->>>>>>> d2d888afc (go: keep the literal key of a map composite literal element)
 	prog, err := gofrontend.Extract([]string{path}, dir)
 	if err != nil {
 		t.Fatal(err)
 	}
-<<<<<<< HEAD
 	g, err := lowering.Lower(prog, true)
 	if err != nil {
 		t.Fatal(err)
@@ -1036,7 +1018,26 @@ func perIterationShort(data [][]byte) {
 	}
 	if closure != 1 {
 		t.Errorf("hoisted-closure facts = %d, want 1 (the closure's own pass); got %q", closure, facts)
-=======
+	}
+}
+
+// TestGoMapLiteralKeepsItsLiteralKey covers the composite-literal shape that
+// carries taint in the OWASP Go port. A struct literal keys on a field name,
+// which is a path; a map keys on a value, so the key is a literal and the path
+// of it is empty. An element that keeps no key is lowered under its position, so
+// a read by the real key finds an empty slot and reads as clean -- which loses
+// the flow silently rather than falling back to the whole container.
+func TestGoMapLiteralKeepsItsLiteralKey(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "m.go")
+	src := []byte("package m\n\nfunc f(payload string) string {\n\treturn map[string]string{\"v\": payload}[\"v\"]\n}\n")
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var pairs []nir.Pair
 	var walk func(nir.Expr)
@@ -1076,6 +1077,5 @@ func perIterationShort(data [][]byte) {
 	// Unquoted, because that is what a subscript's key resolves to.
 	if pairs[0].Key != "v" {
 		t.Errorf("map element key = %q, want %q", pairs[0].Key, "v")
->>>>>>> d2d888afc (go: keep the literal key of a map composite literal element)
 	}
 }
