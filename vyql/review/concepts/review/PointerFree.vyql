@@ -1,7 +1,0 @@
-module code;
-
-review code.PointerFree {
-  category: memory
-  kind: attention
-  text: "review pointer lifetime: frees, aliases, and later uses"
-}

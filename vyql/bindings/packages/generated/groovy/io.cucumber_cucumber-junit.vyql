@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mb2d136e8;
-
-binding userControlledData0 {
-  requires {
-    dependency("io.cucumber:cucumber-junit")
-  }
-  query pattern callExpr where callee.method == "JUnitOptionsParser.parse"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.m51b27297;
-
-binding weakHash0 {
-  requires {
-    dependency("net.spy:spymemcached")
-  }
-  query pattern callExpr where callee.method == "hash"
-  emit issue code.WeakHash at call
-}

@@ -131,6 +131,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		paramTypes := c.paramTypes(field(n, "parameters"))
 		body := c.block(field(n, "body"))
 		body = append(body, c.rsFunctionContext(n)...)
+		body = append(body, c.rsTypeErasureMetadata(n)...)
 		exported := false
 		for _, ch := range children(n) {
 			if ch.Kind() == "visibility_modifier" {
@@ -209,9 +210,17 @@ func (c *rsConv) rsUninitializedMetadata(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *rsConv) rsRunTestsAutoApprovalMetadata(n *tree_sitter.Node) []nir.Stmt {
 	compact := rustCompactText(c.text(n))
+	// The cargo-test association appears in three real spellings inside a
+	// run_tests tool impl: a command() string literal "cargo test" (compacts
+	// to "cargotest"), a backticked `cargo test` in the doc description
+	// (compacts to `cargotest`), and Command::new("cargo") beside the
+	// vec!["test"] argument vector.
+	cargoTest := strings.Contains(compact, "\"cargotest\"") ||
+		strings.Contains(compact, "`cargotest`") ||
+		(strings.Contains(compact, "Command::new(\"cargo\")") && strings.Contains(compact, "vec![\"test\""))
 	if !strings.Contains(compact, "\"run_tests\"") ||
 		!strings.Contains(compact, "ToolCapability::ExecutesCode") ||
-		!strings.Contains(compact, "\"cargotest\"") ||
+		!cargoTest ||
 		strings.Contains(compact, "ApprovalRequirement::Required") ||
 		strings.Contains(compact, "ApprovalRequirement::Suggest") {
 		return nil
@@ -430,6 +439,70 @@ func dedupeStrings(values []string) []string {
 	return out
 }
 
+// rsImplParameterBounds returns an impl's type parameter names and which
+// thread-safety auto-trait bounds (Send, Sync) constrain at least one of
+// them. Only bounds attached to a parameter the impl itself declares count:
+// a bound on an associated type (`where R::GuardMarker: Send`) constrains a
+// projection, not the parameter, and a bound on some other type constrains
+// nothing this impl is generic over.
+func (c *rsConv) rsImplParameterBounds(n *tree_sitter.Node) ([]string, map[string]bool) {
+	bounded := map[string]bool{}
+	tp := field(n, "type_parameters")
+	if tp == nil {
+		return nil, bounded
+	}
+	params := []string{}
+	declared := map[string]bool{}
+	for _, ch := range children(tp) {
+		if ch.Kind() != "type_parameter" {
+			continue
+		}
+		name := c.text(orSelf(field(ch, "name"), ch))
+		params = append(params, name)
+		declared[strings.TrimSpace(name)] = true
+		c.rsCollectAutoTraitBounds(field(ch, "bounds"), bounded)
+	}
+	for _, ch := range children(n) {
+		if ch.Kind() != "where_clause" {
+			continue
+		}
+		for _, pred := range children(ch) {
+			if pred.Kind() != "where_predicate" {
+				continue
+			}
+			left := field(pred, "left")
+			if left == nil || left.Kind() != "type_identifier" {
+				continue
+			}
+			if !declared[strings.TrimSpace(c.text(left))] {
+				continue
+			}
+			c.rsCollectAutoTraitBounds(field(pred, "bounds"), bounded)
+		}
+	}
+	return params, bounded
+}
+
+// rsCollectAutoTraitBounds records which of Send and Sync appear among a
+// parameter's trait bounds.
+func (c *rsConv) rsCollectAutoTraitBounds(bounds *tree_sitter.Node, into map[string]bool) {
+	if bounds == nil || bounds.Kind() != "trait_bounds" {
+		return
+	}
+	for _, b := range children(bounds) {
+		if b.Kind() == "lifetime" {
+			continue
+		}
+		name := c.text(b)
+		if i := strings.LastIndex(name, "::"); i >= 0 {
+			name = name[i+2:]
+		}
+		if name == "Send" || name == "Sync" {
+			into[name] = true
+		}
+	}
+}
+
 func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {
 	text := c.text(n)
 	compact := rustCompactText(text)
@@ -448,26 +521,31 @@ func (c *rsConv) rsUnsafeImplMetadata(n *tree_sitter.Node) []nir.Stmt {
 	}
 	loc := c.loc(n)
 	tokens := []string{"lang=rust", "kind:unsafe_impl", "trait:" + trait}
+	params, bounded := c.rsImplParameterBounds(n)
 	for _, bound := range []string{"Send", "Sync"} {
-		if strings.Contains(compact, "+"+bound) || strings.Contains(compact, ":"+bound) {
+		if bounded[bound] {
 			tokens = append(tokens, "bound:"+bound)
 		}
 	}
 	path := "analysis.rust.unsafe_impl"
 	out := []nir.Stmt{c.rsAnalysisCall(path, "unsafe_impl", loc, tokens...)}
-	hasSendBound := rsContainsString(tokens, "bound:Send")
-	hasSyncBound := rsContainsString(tokens, "bound:Sync")
+	// A concrete impl asserts thread safety for a fully known type, which is
+	// the ordinary use of an unsafe auto-trait impl. The unsound shape is a
+	// generic one: a parameter the impl cannot see through, with neither a
+	// Send nor a Sync bound of its own. Either bound makes the impl sound
+	// for some exposure of the parameter (a wrapper holding `&T` is Send
+	// when `T: Sync`, one holding `T` when `T: Send`), and the source alone
+	// does not say which exposure applies.
+	if len(params) == 0 || bounded["Send"] || bounded["Sync"] {
+		return out
+	}
 	switch trait {
 	case "Send":
-		if !hasSendBound {
-			out = append(out, c.rsAnalysisCall("analysis.rust.unsafe_send_impl_missing_bound", "unsafe_send_impl_missing_bound", loc,
-				"lang=rust", "trait:Send", "missing_bound:Send"))
-		}
+		out = append(out, c.rsAnalysisCall("analysis.rust.unsafe_send_impl_missing_bound", "unsafe_send_impl_missing_bound", loc,
+			"lang=rust", "trait:Send", "missing_bound:SendOrSync"))
 	case "Sync":
-		if !hasSyncBound && !hasSendBound {
-			out = append(out, c.rsAnalysisCall("analysis.rust.unsafe_sync_impl_missing_bound", "unsafe_sync_impl_missing_bound", loc,
-				"lang=rust", "trait:Sync", "missing_bound:SyncOrSend"))
-		}
+		out = append(out, c.rsAnalysisCall("analysis.rust.unsafe_sync_impl_missing_bound", "unsafe_sync_impl_missing_bound", loc,
+			"lang=rust", "trait:Sync", "missing_bound:SyncOrSend"))
 	}
 	return out
 }
@@ -517,6 +595,162 @@ func (c *rsConv) rsAnalysisCall(path, method, loc string, tokens ...string) nir.
 	}}
 }
 
+// rsTypeErasureMetadata reports a function that erases one of its own generic
+// type parameters behind an untyped raw pointer -- a cast to `*const ()` or
+// `*mut ()` -- while no type parameter it declares carries a lifetime bound.
+// A raw pointer keeps no trace of the lifetime of what it points at, and the
+// untyped spelling drops the type too, so whatever vtable, struct field or
+// return value receives the pointer can restore the type and call into it
+// after the original value is gone. The signature is the only place left to
+// state that constraint, which is why a lifetime bound ('static or a named
+// lifetime) on the erased parameter is what makes the erasure checkable at
+// all. Only parameters the function declares itself count: a method whose
+// receiver type comes from the surrounding impl carries its obligation there,
+// and a non-generic function erases a concrete type with no lifetime to lose.
+// The check reads the cast from the syntax tree, so prose and comments cannot
+// satisfy or defeat it, and it names no crate's identifiers.
+func (c *rsConv) rsTypeErasureMetadata(n *tree_sitter.Node) []nir.Stmt {
+	tp := field(n, "type_parameters")
+	body := field(n, "body")
+	if tp == nil || body == nil {
+		return nil
+	}
+	var typeParams []string
+	for _, p := range c.namedChildren(tp) {
+		if p.Kind() != "type_parameter" {
+			continue
+		}
+		name := c.text(field(p, "name"))
+		if name == "" {
+			continue
+		}
+		typeParams = append(typeParams, name)
+	}
+	if len(typeParams) == 0 {
+		return nil
+	}
+	// A lifetime bound on any declared parameter -- inline, in the where
+	// clause, or on a declared lifetime -- means the signature already states
+	// the constraint the erasure needs.
+	for _, p := range c.namedChildren(tp) {
+		if rsBoundsCarryLifetime(field(p, "bounds")) {
+			return nil
+		}
+	}
+	for _, ch := range c.namedChildren(n) {
+		if ch.Kind() == "where_clause" {
+			for _, pred := range c.namedChildren(ch) {
+				if rsBoundsCarryLifetime(field(pred, "bounds")) {
+					return nil
+				}
+			}
+		}
+	}
+	if !c.rsErasesUntypedPointer(body, typeParams, c.rsGenericCarrierParams(field(n, "parameters"), typeParams)) {
+		return nil
+	}
+	loc := c.loc(n)
+	return []nir.Stmt{c.rsAnalysisCall("analysis.rust.type_erasure_missing_lifetime_bound", "type_erasure_missing_lifetime_bound", loc,
+		"lang=rust", "kind:type_erasure", "missing_bound:lifetime")}
+}
+
+// rsBoundsCarryLifetime reports whether a trait_bounds node contains a
+// lifetime, i.e. the bound list constrains the bounded parameter's lifetime.
+func rsBoundsCarryLifetime(bounds *tree_sitter.Node) bool {
+	if bounds == nil || bounds.Kind() != "trait_bounds" {
+		return false
+	}
+	for _, ch := range namedChildren(bounds) {
+		if ch.Kind() == "lifetime" {
+			return true
+		}
+	}
+	return false
+}
+
+// rsGenericCarrierParams names the value parameters whose declared type
+// mentions one of the function's type parameters, so a value read from one of
+// them carries that parameter's type -- and its lifetime.
+func (c *rsConv) rsGenericCarrierParams(params *tree_sitter.Node, typeParams []string) map[string]bool {
+	typeParamSet := map[string]bool{}
+	for _, t := range typeParams {
+		typeParamSet[t] = true
+	}
+	carrier := map[string]bool{}
+	if params == nil {
+		return carrier
+	}
+	for _, ch := range c.namedChildren(params) {
+		if ch.Kind() != "parameter" {
+			continue
+		}
+		if c.rsExprMentions(field(ch, "type"), nil, typeParamSet) {
+			if nm := c.patName(field(ch, "pattern")); nm != "" {
+				carrier[nm] = true
+			}
+		}
+	}
+	return carrier
+}
+
+// rsErasesUntypedPointer reports whether the body casts a value that carries
+// one of the function's own type parameters to the untyped raw pointer
+// `*const ()` or `*mut ()`: either the operand names a type parameter
+// directly, or it names a value parameter whose declared type does.
+func (c *rsConv) rsErasesUntypedPointer(body *tree_sitter.Node, typeParams []string, carrier map[string]bool) bool {
+	typeParamSet := map[string]bool{}
+	for _, t := range typeParams {
+		typeParamSet[t] = true
+	}
+	var visit func(n *tree_sitter.Node) bool
+	visit = func(n *tree_sitter.Node) bool {
+		if n == nil {
+			return false
+		}
+		if n.Kind() == "type_cast_expression" {
+			if pt := field(n, "type"); pt != nil && pt.Kind() == "pointer_type" {
+				if el := field(pt, "type"); el != nil && el.Kind() == "unit_type" {
+					if c.rsExprMentions(field(n, "value"), carrier, typeParamSet) {
+						return true
+					}
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			if visit(ch) {
+				return true
+			}
+		}
+		return false
+	}
+	return visit(body)
+}
+
+// rsExprMentions reports whether the expression subtree contains a bare
+// identifier naming one of the given value parameters or a type identifier
+// naming one of the type parameters.
+func (c *rsConv) rsExprMentions(n *tree_sitter.Node, paramSet, typeParamSet map[string]bool) bool {
+	if n == nil {
+		return false
+	}
+	switch n.Kind() {
+	case "identifier":
+		if paramSet[c.text(n)] {
+			return true
+		}
+	case "type_identifier":
+		if typeParamSet[c.text(n)] {
+			return true
+		}
+	}
+	for _, ch := range c.namedChildren(n) {
+		if c.rsExprMentions(ch, paramSet, typeParamSet) {
+			return true
+		}
+	}
+	return false
+}
+
 func rsContainsString(values []string, want string) bool {
 	for _, value := range values {
 		if value == want {
@@ -553,6 +787,9 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rustCompactText(text)},
 	}
+	if abi := c.rsExternAbi(fn); abi != "" {
+		args = append(args, nir.Const{Loc: loc, Value: "abi=" + abi})
+	}
 	for _, tok := range c.rsStructuredContextTokens(body) {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
@@ -566,6 +803,30 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 		Method: "context",
 		Loc:    loc,
 	}}}
+}
+
+// rsExternAbi reports the extern ABI a function item is declared with: the
+// function_modifiers -> extern_modifier grammar path, whose optional string
+// literal names the ABI and defaults to "C" when absent. A function with no
+// extern modifier returns "".
+func (c *rsConv) rsExternAbi(fn *tree_sitter.Node) string {
+	for _, ch := range c.namedChildren(fn) {
+		if ch.Kind() != "function_modifiers" {
+			continue
+		}
+		for _, m := range c.namedChildren(ch) {
+			if m.Kind() != "extern_modifier" {
+				continue
+			}
+			for _, lit := range c.namedChildren(m) {
+				if lit.Kind() == "string_literal" {
+					return strings.Trim(c.text(lit), "\"")
+				}
+			}
+			return "C"
+		}
+	}
+	return ""
 }
 
 func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {

@@ -1,6 +1,0 @@
-test "rank66: Android passcode action exit requires auth-flow bypass review"
-  expect_review code.AuthFlowBypassReview
-  graph
-  ```
-  node op code.AuthFlowBypassReview
-  ```

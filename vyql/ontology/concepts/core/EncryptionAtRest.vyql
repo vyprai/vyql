@@ -1,7 +1,0 @@
-module core;
-
-concept EncryptionAtRest : check {
-  applies: scope
-  cwe: [CWE_312]
-  neutralizes: [crypto.CleartextStorage]
-}

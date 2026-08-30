@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m1febe749;
-
-binding weakHash0 {
-  requires {
-    dependency("siphash")
-  }
-  query pattern presenceNode where node.path ~= "siphash.hash"
-  emit issue code.WeakHash at node
-}

@@ -1,7 +1,0 @@
-module code;
-
-concept HttpHeader : source {
-  coverageReservedSource: true
-  refines: core.UserControlledData
-  taint: [taint.UntrustedData]
-}

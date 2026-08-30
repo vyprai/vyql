@@ -1,9 +1,0 @@
-module bindings.csharp.generated.meeb20c20;
-
-binding deserialization0 {
-  requires {
-    dependency("xunit.abstractions")
-  }
-  query pattern callExpr where callee.method == "Deserialize"
-  emit sink code.Deserialization at args[0]
-}

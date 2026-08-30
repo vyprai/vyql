@@ -1,9 +1,0 @@
-module bindings.java.generated.m86c722b7;
-
-binding weakHash0 {
-  requires {
-    dependency("net.spy:spymemcached")
-  }
-  query pattern presenceNode where node.path ~= "net.spy.spymemcached.hash"
-  emit issue code.WeakHash at node
-}

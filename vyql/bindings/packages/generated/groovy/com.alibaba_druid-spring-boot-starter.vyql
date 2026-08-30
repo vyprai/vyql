@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mc831208f;
-
-binding secretValue0 {
-  requires {
-    dependency("com.alibaba:druid-spring-boot-starter")
-  }
-  query pattern callExpr where callee.method == "getLoginPassword"
-  emit source code.SecretValue at call.result
-}

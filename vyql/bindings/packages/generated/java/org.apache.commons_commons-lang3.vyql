@@ -1,9 +1,0 @@
-module bindings.java.generated.m36edbbf9;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("org.apache.commons:commons-lang3")
-  }
-  query pattern presenceNode where node.path ~= "org.apache.commons.commons.lang3.random"
-  emit issue code.WeakRandomValue at node
-}

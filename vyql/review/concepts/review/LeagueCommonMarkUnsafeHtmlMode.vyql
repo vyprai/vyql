@@ -1,8 +1,0 @@
-module code;
-
-review code.LeagueCommonMarkUnsafeHtmlMode {
-  category: xss
-  expected: [core.HtmlEscape]
-  kind: attention
-  text: "review League CommonMark Markdown conversion for html_input escaping, DisallowedRawHtmlExtension, or an HTML sanitizer"
-}

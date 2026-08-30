@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m8c677235;
-
-binding sqlExecution0 {
-  requires {
-    dependency("dbup-postgresql")
-  }
-  query pattern callExpr where callee.method == "ExecuteCommandsWithinExceptionHandler"
-  emit sink code.SqlExecution at args[0]
-}

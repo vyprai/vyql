@@ -1,8 +1,0 @@
-module code;
-
-review code.CommandStringWrapperExecution {
-  category: command
-  expected: [core.ShellEscape]
-  kind: attention
-  text: "review command wrapper calls for argv-array execution instead of formatted shell command strings"
-}

@@ -1,6 +1,0 @@
-module code;
-
-concept FailurePathOwnedBufferFree : issue {
-  cwe: [CWE_415]
-  vulnerableTo: [memory.DoubleFree]
-}

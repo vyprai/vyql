@@ -1,9 +1,0 @@
-module bindings.dart.generated.m34b797db;
-
-binding networkData0 {
-  requires {
-    dependency("connectivity_for_web")
-  }
-  query pattern callExpr where callee.method == "checkConnectivity"
-  emit source code.NetworkData at call.result
-}

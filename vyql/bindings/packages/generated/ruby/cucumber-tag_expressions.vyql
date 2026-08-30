@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m3d92d19b;
-
-binding expressionEval0 {
-  requires {
-    dependency("cucumber-tag_expressions")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.ExpressionEval at args[0]
-}

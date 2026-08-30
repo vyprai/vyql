@@ -1,8 +1,0 @@
-module code;
-
-review code.ProtocolFrameBindingReview {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: attention
-  text: "review protocol frame/session identifier binding before accepting the frame as belonging to an existing authenticated session"
-}

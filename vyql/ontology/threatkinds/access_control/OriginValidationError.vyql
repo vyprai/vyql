@@ -1,6 +1,0 @@
-module access_control;
-
-threat OriginValidationError {
-  cwe: [CWE_346]
-  desc: "Improper origin validation for cross-origin or cross-protocol trust decisions"
-}

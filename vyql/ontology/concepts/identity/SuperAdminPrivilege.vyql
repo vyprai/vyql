@@ -1,5 +1,0 @@
-module identity;
-
-concept SuperAdminPrivilege : privilege {
-  grantMinLevel: SUPERADMIN
-}

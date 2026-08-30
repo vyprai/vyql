@@ -1,9 +1,0 @@
-module bindings.python.generated.m10acdf57;
-
-binding userControlledData0 {
-  requires {
-    dependency("tox")
-  }
-  query pattern callExpr where callee.method == "parse_known_args"
-  emit source core.UserControlledData at call.result
-}

@@ -1,6 +1,0 @@
-module crypto;
-
-threat WeakCipher {
-  cwe: [CWE_327]
-  desc: "Use of a broken/weak symmetric cipher (DES/RC4/Blowfish/RC2)"
-}

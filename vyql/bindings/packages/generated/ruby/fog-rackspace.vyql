@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me1cb1cfe;
-
-binding networkSend0 {
-  requires {
-    dependency("fog-rackspace")
-  }
-  query pattern callExpr where callee.method == "request_without_retry"
-  emit sink code.NetworkSend at args[0]
-}

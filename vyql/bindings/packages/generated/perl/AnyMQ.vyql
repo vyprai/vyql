@@ -1,9 +1,0 @@
-module bindings.perl.generated.mdcd54dc7;
-
-binding userControlledData0 {
-  requires {
-    dependency("AnyMQ")
-  }
-  query pattern callExpr where callee.method == "publish"
-  emit source core.UserControlledData at call.result
-}

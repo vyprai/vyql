@@ -1,6 +1,0 @@
-module injection;
-
-threat CommandInjection {
-  cwe: [CWE_78]
-  desc: "Untrusted data in an OS command"
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m391bbb8a;
-
-binding deserialization0 {
-  requires {
-    dependency("laminas/laminas-validator")
-  }
-  query pattern callExpr where callee.method == "Laminas\\Validator\\IsJsonString::isValid"
-  emit sink code.Deserialization at args[0]
-}

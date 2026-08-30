@@ -1,6 +1,0 @@
-module crypto;
-
-threat MissingEncryption {
-  cwe: [CWE_311]
-  desc: "Missing encryption of sensitive data"
-}

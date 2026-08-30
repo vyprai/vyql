@@ -1,9 +1,0 @@
-module bindings.swift.generated.m94c2b3f5;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/vapor/queues")
-  }
-  query pattern callExpr where callee.method == "parsePayload"
-  emit sink code.Deserialization at args[0]
-}

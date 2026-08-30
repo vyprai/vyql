@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m3ca5ef68;
-
-binding cliArgument0 {
-  requires {
-    dependency("net.sf.jopt-simple:jopt-simple")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source code.CliArgument at call.result
-}

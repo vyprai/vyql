@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mee9790ef;
-
-binding deserialization0 {
-  requires {
-    dependency("faad2")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.c.generated.m09deec72;
-
-binding deserialization0 {
-  requires {
-    dependency("protobuf")
-  }
-  query pattern callExpr where callee.path ~= "protobuf.parse"
-  emit sink code.Deserialization at args[0]
-}

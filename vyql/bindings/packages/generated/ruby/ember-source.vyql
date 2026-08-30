@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m6788ff15;
-
-binding filePathAccess0 {
-  requires {
-    dependency("ember-source")
-  }
-  query pattern callExpr where callee.method == "Ember::Source.bundled_path_for"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.m232f354e;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/nxadm/tail")
-  }
-  query pattern callExpr where callee.method == "TailFile"
-  emit sink code.FilePathAccess at args[0]
-}

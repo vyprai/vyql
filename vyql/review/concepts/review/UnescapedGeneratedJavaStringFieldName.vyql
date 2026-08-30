@@ -1,8 +1,0 @@
-module code;
-
-review code.UnescapedGeneratedJavaStringFieldName {
-  category: code_execution
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review generated Java source templates for Java string escaping before embedding logical field names"
-}

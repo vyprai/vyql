@@ -1,9 +1,0 @@
-module bindings.perl.generated.m5230ba43;
-
-binding codeEval0 {
-  requires {
-    dependency("experimental")
-  }
-  query pattern callExpr where callee.method == "import"
-  emit sink code.CodeEval at args[0]
-}

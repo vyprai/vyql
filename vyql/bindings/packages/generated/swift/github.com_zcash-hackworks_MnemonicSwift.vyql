@@ -1,9 +1,0 @@
-module bindings.swift.generated.m929ccd9f;
-
-binding weakHash0 {
-  requires {
-    dependency("github.com/zcash-hackworks/MnemonicSwift")
-  }
-  query pattern callExpr where callee.method == "PKCS5.PBKDF2SHA512"
-  emit issue code.WeakHash at call
-}

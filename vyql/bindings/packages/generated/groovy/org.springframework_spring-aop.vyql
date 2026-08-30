@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m5f712f3e;
-
-binding deserialization0 {
-  requires {
-    dependency("org.springframework:spring-aop")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

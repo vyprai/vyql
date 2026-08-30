@@ -1,9 +1,0 @@
-module bindings.c.generated.mefcbe3d0;
-
-binding filePathAccess0 {
-  requires {
-    dependency("mio")
-  }
-  query pattern callExpr where callee.method == "basic_mmap"
-  emit sink code.FilePathAccess at args[0]
-}

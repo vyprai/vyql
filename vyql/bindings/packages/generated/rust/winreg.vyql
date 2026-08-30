@@ -1,9 +1,0 @@
-module bindings.rust.generated.mca77949a;
-
-binding secretValue0 {
-  requires {
-    dependency("winreg")
-  }
-  query pattern callExpr where callee.method == "Key"
-  emit source code.SecretValue at call.result
-}

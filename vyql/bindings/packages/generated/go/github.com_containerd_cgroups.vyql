@@ -1,9 +1,0 @@
-module bindings.go.generated.m22ff4284;
-
-binding weakHash0 {
-  requires {
-    dependency("github.com/containerd/cgroups")
-  }
-  query pattern presenceNode where node.path ~= "containerd.cgroups.hash"
-  emit issue code.WeakHash at node
-}

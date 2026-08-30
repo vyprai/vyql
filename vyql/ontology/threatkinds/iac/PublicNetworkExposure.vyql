@@ -1,6 +1,0 @@
-module iac;
-
-threat PublicNetworkExposure {
-  cwe: [CWE_284]
-  desc: "Security group / firewall rule open to 0.0.0.0/0"
-}

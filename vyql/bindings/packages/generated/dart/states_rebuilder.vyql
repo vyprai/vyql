@@ -1,9 +1,0 @@
-module bindings.dart.generated.ma203c67a;
-
-binding storedDataWrite0 {
-  requires {
-    dependency("states_rebuilder")
-  }
-  query pattern callExpr where callee.method == "storageInitializer"
-  emit sink code.StoredDataWrite at args[0]
-}

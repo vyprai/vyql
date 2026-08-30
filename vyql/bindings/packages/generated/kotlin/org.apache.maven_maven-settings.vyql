@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m37b9faea;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.maven:maven-settings")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

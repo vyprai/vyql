@@ -1,6 +1,0 @@
-module mobile;
-
-threat ExportedComponent {
-  cwe: [CWE_926]
-  desc: "Android component exported to other apps without permission (android:exported=\"true\")"
-}

@@ -759,3 +759,264 @@ func f(mu *sync.Mutex) {
 		t.Errorf("nir.Defer loc = %q, want the defer statement's line 7", found[0].Loc)
 	}
 }
+
+func TestGoSecurityObservationDetectsDecodeOverwritesPresetFields(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "user.go")
+	src := []byte(`package api
+
+import "encoding/json"
+
+type User struct {
+	UserID int
+	Email  string
+}
+
+func putVulnerable(r io.Reader) error {
+	user := User{UserID: 42}
+	if err := json.NewDecoder(r).Decode(&user); err != nil {
+		return err
+	}
+	return save(user)
+}
+
+func putPresetAfterDecode(r io.Reader) error {
+	user := User{}
+	if err := json.NewDecoder(r).Decode(&user); err != nil {
+		return err
+	}
+	user.UserID = 42
+	return save(user)
+}
+
+func putDefaultsOnly(r io.Reader) error {
+	cfg := User{Email: "none@example.com"}
+	if err := json.NewDecoder(r).Decode(&cfg); err != nil {
+		return err
+	}
+	return save(cfg)
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var facts []string
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.go.decode_overwrites_preset_fields" {
+			continue
+		}
+		facts = append(facts, n.Prop("str_args"))
+	}
+	if len(facts) != 2 {
+		t.Fatalf("decode-overwrites-preset observations = %d, want 2 (the preset-before-decode handlers); got %q", len(facts), facts)
+	}
+	if !strings.Contains(facts[0], "field:UserID") {
+		t.Errorf("vulnerable handler fact tokens %q miss field:UserID", facts[0])
+	}
+	if !strings.Contains(facts[1], "field:Email") {
+		t.Errorf("defaults handler fact tokens %q miss field:Email", facts[1])
+	}
+	for _, f := range facts {
+		if strings.Contains(f, "function_name:putPresetAfterDecode") {
+			t.Errorf("preset recorded after the decode: %q", f)
+		}
+	}
+}
+
+func TestGoSecurityObservationDetectsUnboundedAppendAccumulation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "decode.go")
+	src := []byte(`package decode
+
+import "io"
+
+func fireVulnerable(r io.Reader) ([]byte, error) {
+	buf := make([]byte, 128)
+	dst := make([]byte, 0, 1024)
+	for {
+		b, err := io.ReadByte(r)
+		if err != nil {
+			return dst, nil
+		}
+		n := readRun(r, buf, int(b))
+		dst = append(dst, buf[:n]...)
+	}
+}
+
+func guardOrdering(r io.Reader, lim int) ([]byte, error) {
+	dst := make([]byte, 0, 1024)
+	for {
+		dst = append(dst, readByte(r))
+		if len(dst) > lim {
+			return nil, errTooLarge
+		}
+	}
+}
+
+func guardEquality(r io.Reader, n int) ([]byte, error) {
+	dst := make([]byte, 0, 1024)
+	for {
+		dst = append(dst, readByte(r))
+		if len(dst) == n {
+			return dst, nil
+		}
+	}
+}
+
+func guardCapacity(r io.Reader, max int) ([]byte, error) {
+	dst := make([]byte, 0, 1024)
+	for {
+		dst = append(dst, readByte(r))
+		if cap(dst) > max {
+			return nil, errTooLarge
+		}
+	}
+}
+
+func guardAfterLoop(r io.Reader, lim int) ([]byte, error) {
+	dst := make([]byte, 0, 1024)
+	for {
+		dst = append(dst, readByte(r))
+		if done(r) {
+			break
+		}
+	}
+	if len(dst) > lim {
+		return nil, errTooLarge
+	}
+	return dst, nil
+}
+
+func guardLabeledBreak(r io.Reader, lim int) ([]byte, error) {
+	dst := make([]byte, 0, 1024)
+outer:
+	for {
+		dst = append(dst, readByte(r))
+		if len(dst) > lim {
+			break outer
+		}
+	}
+	return dst, nil
+}
+
+func guardConvertedLen(r io.Reader, lim int64) ([]byte, error) {
+	dst := make([]byte, 0, 1024)
+	for {
+		dst = append(dst, readByte(r))
+		if int64(len(dst)) > lim {
+			return nil, errTooLarge
+		}
+	}
+}
+
+func emptinessCheckOnly(r io.Reader) ([]byte, error) {
+	dst := make([]byte, 0, 1024)
+	for {
+		dst = append(dst, readByte(r))
+		if len(dst) > 0 {
+			_ = dst
+		}
+	}
+}
+
+func rangeLoop(data []byte) []byte {
+	dst := make([]byte, 0, 1024)
+	for _, b := range data {
+		dst = append(dst, b)
+	}
+	return dst
+}
+
+func outerWithClosure(r io.Reader) {
+	worker := func() {
+		dst := make([]byte, 0, 1024)
+		for {
+			dst = append(dst, readByte(r))
+		}
+	}
+	go worker()
+}
+
+func perIterationShort(data [][]byte) {
+	for {
+		fresh1 := []byte{}
+		for _, b := range readBatch(data) {
+			fresh1 = append(fresh1, b)
+		}
+		var fresh2 []byte
+		for _, b := range readBatch(data) {
+			fresh2 = append(fresh2, b)
+		}
+		fresh3 := []byte{}
+		for _, b := range readBatch(data) {
+			fresh3 = append(fresh3, b)
+		}
+		fresh3 = nil
+	}
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var facts []string
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.go.unbounded_append_accumulation" {
+			continue
+		}
+		facts = append(facts, n.Prop("str_args"))
+	}
+	var fire, emptiness, closure int
+	for _, f := range facts {
+		switch {
+		case strings.Contains(f, "function_name:fireVulnerable"):
+			fire++
+			if !strings.Contains(f, "var:dst") || !strings.Contains(f, "loop:no_exit_condition") {
+				t.Errorf("fire-shape fact tokens %q miss var:dst or loop:no_exit_condition", f)
+			}
+		case strings.Contains(f, "function_name:emptinessCheckOnly"):
+			emptiness++
+		case strings.Contains(f, "function_name:outerWithClosure"):
+			t.Errorf("closure's loop attributed to the enclosing function: %q", f)
+		default:
+			closure++
+		}
+	}
+	if fire != 1 {
+		t.Errorf("fire-shape facts = %d, want 1; all facts %q", fire, facts)
+	}
+	if emptiness != 1 {
+		t.Errorf("emptiness-check-only facts = %d, want 1 (a len(x) > 0 check is not a bound); all facts %q", emptiness, facts)
+	}
+	if len(facts) != 3 {
+		t.Errorf("total facts = %d, want 3 (fire shape, emptiness-check-only, and the hoisted closure's own); got %q", len(facts), facts)
+	}
+	if closure != 1 {
+		t.Errorf("hoisted-closure facts = %d, want 1 (the closure's own pass); got %q", closure, facts)
+	}
+}

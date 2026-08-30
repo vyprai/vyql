@@ -1,8 +1,0 @@
-module core;
-
-concept CertificateValidation : check {
-  applies: scope
-  covers: [path]
-  cwe: [CWE_295]
-  neutralizes: [crypto.ImproperCertValidation]
-}

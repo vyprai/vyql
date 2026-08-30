@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m3a839f02;
-
-binding deserialization0 {
-  requires {
-    dependency("postcss-normalize-string")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

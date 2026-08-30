@@ -1,9 +1,0 @@
-module bindings.php.generated.m92db8b94;
-
-binding deserialization0 {
-  requires {
-    dependency("barryvdh/reflection-docblock")
-  }
-  query pattern callExpr where callee.method == "parseTags"
-  emit sink code.Deserialization at args[0]
-}

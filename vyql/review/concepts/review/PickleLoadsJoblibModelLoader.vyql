@@ -1,8 +1,0 @@
-module code;
-
-review code.PickleLoadsJoblibModelLoader {
-  category: deserialization
-  expected: [core.SafeDeserialization]
-  kind: target
-  text: "verify model-loading helpers do not pass joblib-loaded artifacts into pickle.loads unless artifacts are strictly trusted or loaded with a restricted unpickler"
-}

@@ -1,6 +1,0 @@
-module code;
-
-concept MountStubCleanupPathEscape : issue {
-  cwe: [CWE_22]
-  vulnerableTo: [path.PathTraversal, path.LinkFollowing]
-}

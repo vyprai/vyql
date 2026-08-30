@@ -1,9 +1,0 @@
-module bindings.php.generated.mc8e7e508;
-
-binding networkSend0 {
-  requires {
-    dependency("psr/http-client")
-  }
-  query pattern callExpr where callee.method == "ClientInterface::sendRequest"
-  emit sink code.NetworkSend at args[0]
-}

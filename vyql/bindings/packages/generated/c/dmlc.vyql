@@ -1,9 +1,0 @@
-module bindings.c.generated.m0526d469;
-
-binding codeEval0 {
-  requires {
-    dependency("dmlc")
-  }
-  query pattern callExpr where callee.method == "Eval"
-  emit sink code.CodeEval at args[0]
-}

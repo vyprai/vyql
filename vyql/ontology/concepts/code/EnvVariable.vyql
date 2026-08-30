@@ -1,6 +1,0 @@
-module code;
-
-concept EnvVariable : source {
-  refines: core.UserControlledData
-  taint: [taint.UntrustedData]
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m37003b4b;
-
-binding secretValue0 {
-  requires {
-    dependency("org.quartz-scheduler:quartz-jobs")
-  }
-  query pattern callExpr where callee.method == "setPassword"
-  emit source code.SecretValue at call.result
-}

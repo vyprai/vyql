@@ -1,8 +1,0 @@
-module code;
-
-review code.UnvalidatedSqlIdentifierInterpolation {
-  category: sql
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review SQL builders that interpolate caller-selected table or column identifiers before an allowlist check"
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.ma4f8136e;
-
-binding deserialization0 {
-  requires {
-    dependency("org.mapdb:mapdb")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

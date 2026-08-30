@@ -1,9 +1,0 @@
-module bindings.perl.generated.m60e45039;
-
-binding userControlledData0 {
-  requires {
-    dependency("App-BPOMUtils-Table-RegCodePrefix")
-  }
-  query pattern callExpr where callee.method == "bpom_list_reg_code_prefixes"
-  emit source core.UserControlledData at call.result
-}

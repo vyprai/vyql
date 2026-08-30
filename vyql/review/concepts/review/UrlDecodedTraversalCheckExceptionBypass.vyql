@@ -1,8 +1,0 @@
-module code;
-
-review code.UrlDecodedTraversalCheckExceptionBypass {
-  category: path
-  expected: [core.PathCanonicalization, core.PathAccessCheck]
-  kind: attention
-  text: "review URL-decoded path traversal checks for malformed percent escapes that bypass later parent-directory validation"
-}

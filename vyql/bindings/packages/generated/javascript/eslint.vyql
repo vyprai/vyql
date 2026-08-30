@@ -1,9 +1,0 @@
-module bindings.javascript.generated.md18c1244;
-
-binding commandExecution0 {
-  requires {
-    dependency("eslint")
-  }
-  query pattern callExpr where callee.method == "spawnExternalCommand"
-  emit sink code.CommandExecution at args[0]
-}

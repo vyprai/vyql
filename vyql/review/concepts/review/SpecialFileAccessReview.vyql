@@ -1,8 +1,0 @@
-module code;
-
-review code.SpecialFileAccessReview {
-  category: path
-  expected: [core.PathAccessCheck]
-  kind: attention
-  text: "verify special filesystem paths are opened through a boundary that prevents link or mount redirection"
-}

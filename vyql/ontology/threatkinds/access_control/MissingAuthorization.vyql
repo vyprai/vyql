@@ -1,6 +1,0 @@
-module access_control;
-
-threat MissingAuthorization {
-  cwe: [CWE_862]
-  desc: "Missing authorization check"
-}

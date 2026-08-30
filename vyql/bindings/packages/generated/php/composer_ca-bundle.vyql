@@ -1,9 +1,0 @@
-module bindings.php.generated.m66538608;
-
-binding filePathAccess0 {
-  requires {
-    dependency("composer/ca-bundle")
-  }
-  query pattern callExpr where callee.method == "validateCaFile"
-  emit sink code.FilePathAccess at args[0]
-}

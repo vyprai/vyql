@@ -1,7 +1,0 @@
-module code;
-
-concept PasteboardInput : source {
-  cwe: [CWE_20]
-  refines: core.UserControlledData
-  taint: [taint.UntrustedData]
-}

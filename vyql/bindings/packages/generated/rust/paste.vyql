@@ -1,9 +1,0 @@
-module bindings.rust.generated.maa143897;
-
-binding secretValue0 {
-  requires {
-    dependency("paste")
-  }
-  query pattern callExpr where callee.method == "pasted_to_tokens"
-  emit source code.SecretValue at call.result
-}

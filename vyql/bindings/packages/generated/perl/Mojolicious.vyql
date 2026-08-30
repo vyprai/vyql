@@ -1,9 +1,0 @@
-module bindings.perl.generated.me1ccf404;
-
-binding deserialization0 {
-  requires {
-    dependency("Mojolicious")
-  }
-  query pattern callExpr where callee.method == "Mojo::DOM.parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.bash.generated.m75a26f22;
-
-binding filePathAccess0 {
-  requires {
-    dependency("jump")
-  }
-  query pattern callExpr where callee.path ~= "jump"
-  emit sink code.FilePathAccess at args.any
-}

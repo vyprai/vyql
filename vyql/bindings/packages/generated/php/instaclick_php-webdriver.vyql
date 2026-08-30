@@ -1,9 +1,0 @@
-module bindings.php.generated.m54078ddf;
-
-binding httpInput0 {
-  requires {
-    dependency("instaclick/php-webdriver")
-  }
-  query pattern callExpr where callee.method == "getAllCookies"
-  emit source code.HttpInput at call.result
-}

@@ -1,7 +1,0 @@
-test "rank121: Artemis federation downstream flow requires protocol-state review"
-  expect VYQL-AUTH-082
-  expect_review code.ProtocolStateReview
-  graph
-  ```
-  node op code.ProtocolStateReview
-  ```

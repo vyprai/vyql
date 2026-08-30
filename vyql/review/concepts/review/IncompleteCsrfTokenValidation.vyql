@@ -1,8 +1,0 @@
-module code;
-
-review code.IncompleteCsrfTokenValidation {
-  category: request
-  expected: [core.CsrfProtection]
-  kind: attention
-  text: "review CSRF token validation for empty-token acceptance or missing freshness checks"
-}

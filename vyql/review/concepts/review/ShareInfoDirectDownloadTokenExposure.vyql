@@ -1,8 +1,0 @@
-module code;
-
-review code.ShareInfoDirectDownloadTokenExposure {
-  category: auth
-  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
-  kind: target
-  text: "verify public share-info responses do not include tokenized direct-download URLs before the share password or access challenge"
-}

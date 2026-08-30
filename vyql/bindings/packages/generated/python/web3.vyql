@@ -1,9 +1,0 @@
-module bindings.python.generated.mefc88b4b;
-
-binding networkSend0 {
-  requires {
-    dependency("web3")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

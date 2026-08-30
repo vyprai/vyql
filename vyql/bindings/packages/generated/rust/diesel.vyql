@@ -1,9 +1,0 @@
-module bindings.rust.generated.mdbe271c8;
-
-binding sqlExecution0 {
-  requires {
-    dependency("diesel")
-  }
-  query pattern callExpr where callee.method == "batch_execute"
-  emit sink code.SqlExecution at args[0]
-}

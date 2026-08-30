@@ -1,6 +1,0 @@
-module code;
-
-concept PeerLimitUnderflow : issue {
-  cwe: [CWE_191]
-  vulnerableTo: [memory.IntegerOverflow]
-}

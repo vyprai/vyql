@@ -1,6 +1,0 @@
-module code;
-
-concept ProtocolCommandInjection : issue {
-  cwe: [CWE_349]
-  vulnerableTo: [injection.ProtocolStateConfusion]
-}

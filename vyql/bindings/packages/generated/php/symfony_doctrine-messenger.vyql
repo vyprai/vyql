@@ -1,9 +1,0 @@
-module bindings.php.generated.mf058fef8;
-
-binding sqlExecution0 {
-  requires {
-    dependency("symfony/doctrine-messenger")
-  }
-  query pattern callExpr where callee.method == "executeQuery"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m337e0aaa;
-
-binding sqlExecution0 {
-  requires {
-    dependency("mysql1")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.SqlExecution at args[0]
-}

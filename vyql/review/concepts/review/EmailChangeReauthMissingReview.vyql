@@ -1,7 +1,0 @@
-module code;
-
-review code.EmailChangeReauthMissingReview {
-  category: auth
-  kind: attention
-  text: "review account email-change flows for password, OTP, MFA, or explicit reauthentication before updating the email"
-}

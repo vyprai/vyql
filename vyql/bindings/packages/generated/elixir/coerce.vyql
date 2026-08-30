@@ -1,9 +1,0 @@
-module bindings.elixir.generated.med1d72d4;
-
-binding deserialization0 {
-  requires {
-    dependency("coerce")
-  }
-  query pattern callExpr where callee.method == "coerce"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.mc36cdb8c;
-
-binding xmlParse0 {
-  requires {
-    dependency("hamcrest/hamcrest-php")
-  }
-  query pattern callExpr where callee.method == "hasXPath"
-  emit sink code.XmlParse at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m706e4255;
-
-binding deserialization0 {
-  requires {
-    dependency("sentencepiece")
-  }
-  query pattern callExpr where callee.method == "DecodePrecompiledCharsMap"
-  emit sink code.Deserialization at args[0]
-}

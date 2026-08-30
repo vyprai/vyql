@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m8aff9f26;
-
-binding weakHash0 {
-  requires {
-    dependency("com.squareup.okio:okio")
-  }
-  query pattern presenceNode where node.path ~= "com.squareup.okio.okio.hash"
-  emit issue code.WeakHash at node
-}

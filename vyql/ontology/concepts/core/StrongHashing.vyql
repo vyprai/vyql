@@ -1,7 +1,0 @@
-module core;
-
-concept StrongHashing : check {
-  applies: scope
-  cwe: [CWE_328]
-  neutralizes: [crypto.WeakHash]
-}

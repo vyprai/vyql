@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mb4b70454;
-
-binding networkConnect0 {
-  requires {
-    dependency("detect-port-alt")
-  }
-  query pattern callExpr where callee.method == "module.exports"
-  emit sink code.NetworkConnectSink at args[0]
-}

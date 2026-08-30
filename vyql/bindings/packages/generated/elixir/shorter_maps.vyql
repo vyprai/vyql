@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m169468fc;
-
-binding codeEval0 {
-  requires {
-    dependency("shorter_maps")
-  }
-  query pattern callExpr where callee.method == "do_sigil_m"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.dart.generated.m1b8d259a;
-
-binding filePathAccess0 {
-  requires {
-    dependency("flutter_cache_manager")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

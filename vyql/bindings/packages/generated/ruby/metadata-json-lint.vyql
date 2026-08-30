@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m03ea9428;
-
-binding deserialization0 {
-  requires {
-    dependency("metadata-json-lint")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

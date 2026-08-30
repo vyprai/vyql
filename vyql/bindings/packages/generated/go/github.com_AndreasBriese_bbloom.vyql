@@ -1,9 +1,0 @@
-module bindings.go.generated.m10d665af;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/AndreasBriese/bbloom")
-  }
-  query pattern callExpr where callee.method == "JSONUnmarshal"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.UnsafeBuildClientCommandAssembly {
-  category: command
-  expected: [core.InputValidation, core.ShellEscape]
-  kind: attention
-  text: "review client build shell commands for filename/address/port validation before formatting into sh -c"
-}

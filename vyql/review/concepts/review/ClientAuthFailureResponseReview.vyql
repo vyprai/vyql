@@ -1,8 +1,0 @@
-module code;
-
-review code.ClientAuthFailureResponseReview {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: attention
-  text: "review client-side unauthorized response handling before invoking privileged success callbacks"
-}

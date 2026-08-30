@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mb5fca82f;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("randombytes")
-  }
-  query pattern callExpr where callee.method == "randomBytes"
-  emit issue code.WeakRandomValue at call
-}

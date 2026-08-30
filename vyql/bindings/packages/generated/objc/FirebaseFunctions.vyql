@@ -1,9 +1,0 @@
-module bindings.objc.generated.m75541bd8;
-
-binding weakHash0 {
-  requires {
-    dependency("FirebaseFunctions")
-  }
-  query pattern callExpr where callee.method == "Hash"
-  emit issue code.WeakHash at call
-}

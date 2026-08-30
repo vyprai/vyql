@@ -1,8 +1,0 @@
-module code;
-
-concept SqlExecution : sink {
-  cwe: [CWE_89]
-  enabledBy: [taint.UntrustedData]
-  excludedChars: "'\"\\;"
-  vulnerableTo: [injection.SqlInjection]
-}

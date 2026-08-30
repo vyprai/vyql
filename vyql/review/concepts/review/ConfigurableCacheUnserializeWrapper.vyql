@@ -1,8 +1,0 @@
-module code;
-
-review code.ConfigurableCacheUnserializeWrapper {
-  category: deserialization
-  expected: [core.SafeDeserialization]
-  kind: attention
-  text: "review configurable cache unserialize wrappers for unsafe unserializers and vulnerable cache-data type handling"
-}

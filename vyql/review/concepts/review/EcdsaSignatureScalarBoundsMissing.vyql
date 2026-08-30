@@ -1,8 +1,0 @@
-module code;
-
-review code.EcdsaSignatureScalarBoundsMissing {
-  category: crypto
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review ECDSA verification for r and s range checks before modular inverse and point arithmetic"
-}

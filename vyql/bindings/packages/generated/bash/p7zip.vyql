@@ -1,9 +1,0 @@
-module bindings.bash.generated.m3b1c766a;
-
-binding filePathAccess0 {
-  requires {
-    dependency("p7zip")
-  }
-  query pattern callExpr where callee.path ~= "p7zip"
-  emit sink code.FilePathAccess at args.any
-}

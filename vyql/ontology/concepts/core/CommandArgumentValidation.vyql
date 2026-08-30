@@ -1,8 +1,0 @@
-module core;
-
-concept CommandArgumentValidation : check {
-  applies: endpoint
-  covers: [endpoint, path]
-  cwe: [CWE_78]
-  neutralizes: [injection.CommandInjection]
-}

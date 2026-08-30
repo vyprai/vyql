@@ -1,9 +1,0 @@
-module bindings.go.generated.meb90f824;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/go-git/gcfg")
-  }
-  query pattern callExpr where callee.method == "ReadWithCallback"
-  emit sink code.Deserialization at args[0]
-}

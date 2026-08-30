@@ -1,9 +1,0 @@
-module bindings.scala.generated.m9519ce63;
-
-binding deserialization0 {
-  requires {
-    dependency("org.infinispan:infinispan-core")
-  }
-  query pattern callExpr where callee.method == "readObject"
-  emit sink code.Deserialization at args[0]
-}

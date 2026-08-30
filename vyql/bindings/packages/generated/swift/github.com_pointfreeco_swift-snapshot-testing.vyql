@@ -1,9 +1,0 @@
-module bindings.swift.generated.m64f1c590;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/pointfreeco/swift-snapshot-testing")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

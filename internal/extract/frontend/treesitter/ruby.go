@@ -56,6 +56,7 @@ func ExtractRuby(files []string, root string) (nir.Program, error) {
 	build := func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 		c := &rbConv{src: src, root: root, file: rel}
 		body := append(c.rubyModuleContext(tree.RootNode()), c.blockChildren(tree.RootNode())...)
+		body = append(body, c.regexBacktrackObservations(tree.RootNode())...)
 		return nir.Module{Key: "", File: rel, Body: body}, true
 	}
 	mods := parseModules(ruby, root,
@@ -366,10 +367,35 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{right},
 				Path: c.dotted(left), Method: "", Loc: L}}}
 		}
+		// multiple assignment (a, b = f()) — every name on the left takes the value,
+		// same as Go's a, b := f() and Python's tuple unpacking. Without this the
+		// value is evaluated and bound to nothing, so taint stops at the assignment.
+		if left != nil && left.Kind() == "left_assignment_list" {
+			var tgts []string
+			for _, ch := range c.namedChildren(left) {
+				switch ch.Kind() {
+				case "identifier", "constant", "instance_variable":
+					tgts = append(tgts, c.text(ch))
+				case "splat_parameter", "rest_assignment":
+					// *rest = the remaining elements; the inner name still takes them.
+					for _, in := range c.namedChildren(ch) {
+						if in.Kind() == "identifier" {
+							tgts = append(tgts, c.text(in))
+						}
+					}
+				}
+			}
+			if len(tgts) > 0 {
+				return []nir.Stmt{nir.Assign{Targets: tgts, Value: right, Loc: L}}
+			}
+		}
 		return []nir.Stmt{nir.Assign{Value: right}}
 	case "operator_assignment":
 		left := field(n, "left")
-		if left != nil && left.Kind() == "identifier" {
+		// Same target kinds the plain assignment case above accepts. `@memo ||= expr` is
+		// Ruby's ordinary memoization idiom; an instance_variable left that falls through
+		// evaluates the right side and binds it to nothing, so taint stops at the op-assign.
+		if left != nil && (left.Kind() == "identifier" || left.Kind() == "constant" || left.Kind() == "instance_variable") {
 			return []nir.Stmt{nir.AugAssign{Target: c.text(left), Value: c.expr(field(n, "right")), Loc: L}}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(field(n, "right"))}}
@@ -418,6 +444,20 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// then the block body inline (see callBlockStmts).
 		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 		return append(out, c.callBlockStmts(n)...)
+	case "binary":
+		// `bag[key] << v` appends into a container slot in place. The expression
+		// form keeps the taint-propagating Format, but in statement position that
+		// value is discarded and the write leaves no node a binding can label.
+		// Lower the slot append as a call on the element reference — its dotted
+		// path ends in `[]`, distinct from the element write's base path — so the
+		// appended value is reachable the way a written one is.
+		if c.text(field(n, "operator")) == "<<" {
+			if left := field(n, "left"); left != nil && left.Kind() == "element_reference" {
+				return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: c.expr(left), Args: []nir.Expr{c.expr(field(n, "right"))},
+					Path: c.dotted(left), Method: "<<", Loc: L}}}
+			}
+		}
+		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
 	}
 	// any other expression used as a statement
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
@@ -767,6 +807,20 @@ func rbSemanticReviewTokens(raw, scope string) []string {
 		!strings.Contains(compact, "shellescape") {
 		add("git_clone_interpolated_branch_option_unescaped")
 	}
+	// A JOSE decoder that chooses its branch from the token's own compact
+	// serialization -- three segments for JWS, five for JWE -- accepts an
+	// encrypted token wherever a signed one is accepted. Encrypting to a
+	// recipient public key proves no identity, so the caller reads claims whose
+	// signature was never verified. The control is a guard on the encrypted
+	// branch: a raise, a return, or a test of what the caller expected, on the
+	// line that follows the branch selector.
+	if scope == "function" &&
+		rbJoseSeparatorCountDispatchRe.MatchString(raw) &&
+		rbJoseSignedDecodeRe.MatchString(raw) &&
+		rbJoseEncryptedDecodeRe.MatchString(raw) &&
+		!rbJoseEncryptedBranchGuardRe.MatchString(raw) {
+		add("jose_compact_decode_accepts_encrypted_serialization")
+	}
 	return out
 }
 
@@ -777,6 +831,10 @@ var (
 	rbBacktickInterpolationRe                  = regexp.MustCompile("`\\s*#\\{[^}]+\\}\\s*`")
 	rbQueryStringJoinInterpolationRe           = regexp.MustCompile(`\?[A-Za-z0-9_%-]+=\s*#\{[^}]+\.join\(`)
 	rbGitCloneInterpolatedBranchOptionRe       = regexp.MustCompile(`--branch#\{[^}]*branch[^}]*\}--single-branch`)
+	rbJoseSeparatorCountDispatchRe             = regexp.MustCompile(`\.count\(\s*['"]\.['"]\s*\)`)
+	rbJoseSignedDecodeRe                       = regexp.MustCompile(`\bJWS[A-Za-z0-9_]*\.decode`)
+	rbJoseEncryptedDecodeRe                    = regexp.MustCompile(`\bJWE[A-Za-z0-9_]*\.decode`)
+	rbJoseEncryptedBranchGuardRe               = regexp.MustCompile(`(?m)^[ \t]*(?:when|if|elsif)\b[^\n]*\bJWE\b[^\n]*\n[ \t]*(?:if|unless|raise|fail|return|next|break)\b`)
 )
 
 func rbPersistentResponseReuse(compact string) bool {
@@ -1107,6 +1165,39 @@ func (c *rbConv) keyName(n *tree_sitter.Node) string {
 		}
 	}
 	return strings.TrimSuffix(strings.TrimPrefix(t, ":"), ":")
+}
+
+// regexBacktrackObservations reports each regex literal the shared ambiguity
+// analysis flags as an analysis fact at the literal's own location, so the
+// definition-site catastrophic-regex arm — the one java.util.regex and re.*
+// patterns already report through — can judge it wherever the literal sits:
+// inline in a method body, or hoisted into a class- or module-level constant
+// the code applies far from the definition. A literal that interpolates
+// (`#{...}`) is skipped: the analysis reads the literal's source text, and an
+// interpolated fragment's quantifiers are not in it.
+func (c *rbConv) regexBacktrackObservations(root *tree_sitter.Node) []nir.Stmt {
+	var out []nir.Stmt
+	var walk func(n *tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if n.Kind() == "regex" && !strings.Contains(c.text(n), "#{") && rubyRegexMayBacktrack(c.text(n)) {
+			loc := c.loc(n)
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "analysis.dos.catastrophic_regex", Loc: loc},
+				Args:   []nir.Expr{nir.Const{Loc: loc, Value: c.text(n)}},
+				Path:   "analysis.dos.catastrophic_regex",
+				Method: "catastrophic_regex",
+				Loc:    loc,
+			}})
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
 }
 
 func rubyRegexMayBacktrack(raw string) bool {

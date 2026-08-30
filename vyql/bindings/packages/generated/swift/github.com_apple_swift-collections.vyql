@@ -1,9 +1,0 @@
-module bindings.swift.generated.m632f4864;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/apple/swift-collections")
-  }
-  query pattern callExpr where callee.method == "init(from:)"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.python.generated.m745705de;
-
-binding userControlledData0 {
-  requires {
-    dependency("dj-database-url")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source core.UserControlledData at call.result
-}

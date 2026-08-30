@@ -684,6 +684,126 @@ function fixed(str) {
 	}
 }
 
+func TestJavaScriptFunctionContextMarksFailOpenPolicyDeclarationGuard(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "dispatcher.ts")
+	src := []byte(`
+function skipWhenUndeclared(ep, token) {
+  if (token && ep.meta.kind && !token.permission.some(p => p === ep.meta.kind)) {
+    throw new Error('denied');
+  }
+}
+
+function denyWhenUndeclared(ep, token) {
+  if (token && ((ep.meta.kind && !token.permission.some(p => p === ep.meta.kind))
+    || (!ep.meta.kind && (ep.meta.requireCredential || ep.meta.requireAdmin)))) {
+    throw new Error('denied');
+  }
+}
+
+function denyThroughNullComparison(ep, token) {
+  if (token && ((ep.meta.kind && !token.permission.includes(ep.meta.kind))
+    || (ep.meta.kind == null && ep.meta.requireCredential))) {
+    throw new Error('denied');
+  }
+}
+
+function denyThroughTypeof(ep, token) {
+  if (token && ((ep.meta.kind && !token.permission.some(p => p === ep.meta.kind))
+    || (typeof ep.meta.kind === 'undefined' && ep.meta.requireCredential))) {
+    throw new Error('denied');
+  }
+}
+
+function denyThroughStrictUndefined(ep, token) {
+  if (token && ((ep.meta.kind && !token.permission.some(p => p === ep.meta.kind))
+    || (ep.meta.kind === undefined && ep.meta.requireCredential))) {
+    throw new Error('denied');
+  }
+}
+
+function denyThroughLooseUndefined(ep, token) {
+  if (token && ((ep.meta.kind && !token.permission.some(p => p === ep.meta.kind))
+    || (ep.meta.kind == undefined && ep.meta.requireCredential))) {
+    throw new Error('denied');
+  }
+}
+
+function presenceTestStillSkips(ep, token) {
+  if (token && ep.meta.kind != null && !token.permission.some(p => p === ep.meta.kind)) {
+    throw new Error('denied');
+  }
+}
+
+function membershipAgainstALiteral(token) {
+  if (app !== null && !app.permission.some(p => p === 'read:account')) {
+    throw new Error('denied');
+  }
+}
+
+function unrelatedRequirement(ep, token) {
+  if (ep.meta.kind && !token.permission.some(p => p === ep.meta.secure)) {
+    throw new Error('denied');
+  }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	marked := map[string]bool{}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		if !strings.Contains(tokens, "fail_open_policy_declaration_guard=true") {
+			continue
+		}
+		for _, fn := range []string{"skipWhenUndeclared"} {
+			if strings.Contains(tokens, "function_name:"+fn) {
+				marked[fn] = true
+			}
+		}
+		for _, fn := range []string{"denyWhenUndeclared", "denyThroughNullComparison", "denyThroughTypeof", "denyThroughStrictUndefined", "denyThroughLooseUndefined", "membershipAgainstALiteral", "unrelatedRequirement", "presenceTestStillSkips"} {
+			if strings.Contains(tokens, "function_name:"+fn) {
+				marked[fn] = true
+			}
+		}
+	}
+	if !marked["skipWhenUndeclared"] {
+		t.Fatalf("guard gated on the requirement it compares against was not marked; nodes=%#v", nodes)
+	}
+	// presenceTestStillSkips spells the requirement only inside a comparison, so
+	// it has no bare conjunct to key the relation on; that spelling is the
+	// stated residual of this observation rather than a denial. The two
+	// undefined comparisons are the idiomatic TypeScript absence tests, where
+	// bare `undefined` is its own node kind rather than an identifier.
+	for _, fn := range []string{"denyWhenUndeclared", "denyThroughNullComparison", "denyThroughTypeof", "denyThroughStrictUndefined", "denyThroughLooseUndefined", "presenceTestStillSkips"} {
+		if marked[fn] {
+			t.Fatalf("%s must not be marked; nodes=%#v", fn, nodes)
+		}
+	}
+	if marked["membershipAgainstALiteral"] {
+		t.Fatalf("membership against a literal requirement was marked; nodes=%#v", nodes)
+	}
+	if marked["unrelatedRequirement"] {
+		t.Fatalf("membership test comparing a different field was marked; nodes=%#v", nodes)
+	}
+}
+
 func TestJavaScriptFunctionContextMarksConvertSvgMultiSvgSanitizerBypass(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "Converter.js")
@@ -1821,4 +1941,340 @@ $.extend($.fn.bootstrapTable.defaults, {
 		}
 	}
 	t.Fatalf("no function lowered for the nested object method; nodes=%#v", nodes)
+}
+
+func TestJavaScriptLoopRestartFactsMatchTheRecordedDesign(t *testing.T) {
+	dir := t.TempDir()
+	files := map[string]string{
+		"restart.ts": `
+export function crawl(links: string[], limit: number) {
+  let i = 0
+  let next: string | null = links[0]
+  while (next && i < limit) {
+    if (next === 'self') continue
+    console.log(next)
+    next = links[i]
+    i++
+  }
+}
+`,
+		"advanced.ts": `
+export function crawl(links: string[], limit: number) {
+  let i = 0
+  let next: string | null = links[0]
+  while (next && i < limit) {
+    i++
+    if (next === 'self') continue
+    console.log(next)
+    next = links[i]
+  }
+}
+`,
+		"opassign.ts": `
+export function crawl(links: string[], limit: number) {
+  let i = 0
+  while (i < limit) {
+    if (links[i] === 'self') continue
+    i += 1
+  }
+}
+`,
+		"plainassign.ts": `
+export function crawl(links: string[], limit: number) {
+  let i = 0
+  while (i < limit) {
+    if (links[i] === 'self') continue
+    i = i + 1
+  }
+}
+`,
+		"update.ts": `
+export function crawl(links: string[], limit: number) {
+  let i = 0
+  while (i < limit) {
+    if (links[i] === 'self') continue
+    i++
+  }
+}
+`,
+		"sibling.ts": `
+export function crawl(links: string[], limit: number) {
+  let i = 0
+  let next: string | null = links[0]
+  while (next && i < limit) {
+    if (next === 'a') { i++; continue }
+    if (next === 'b') continue
+    console.log(next)
+    next = links[i]
+    i++
+  }
+}
+`,
+		"forinfinite.ts": `
+export function crawl(links: string[], limit: number) {
+  let next: string | null = links[0]
+  let i = 0
+  for (;;) {
+    if (i >= limit) break
+    if (next === 'self') continue
+    console.log(next)
+    next = links[i]
+    i++
+  }
+}
+`,
+		"forupdate.ts": `
+export function crawl(links: string[], limit: number) {
+  let next: string | null = links[0]
+  for (let i = 0; i < limit; i++) {
+    if (next === 'self') continue
+    console.log(next)
+    next = links[i]
+  }
+}
+`,
+		"condassign.ts": `
+export function read(reader: any) {
+  let line: string | null
+  let i = 0
+  while ((line = reader.readLine()) != null && i < 100) {
+    if (line === '') continue
+    console.log(line)
+    i++
+  }
+}
+`,
+		"external.ts": `
+export let running = true
+export function loop(dispatch: (e: any) => void) {
+  while (running) {
+    const e = nextEvent()
+    if (e == null) continue
+    dispatch(e)
+  }
+}
+`,
+		"receiver.ts": `
+export function drain(queue: string[]) {
+  while (queue.length > 0) {
+    const item = queue.shift()
+    if (item === 'self') continue
+    console.log(item)
+  }
+}
+`,
+		"branchcover.ts": `
+export function crawl(links: string[], limit: number) {
+  let i = 0
+  let next: string | null = links[0]
+  while (next && i < limit) {
+    if (next === 'self') { i++; next = links[i]; continue }
+    console.log(next)
+    i++
+    next = links[i]
+  }
+}
+`,
+		"nestedfn.ts": `
+export function outer(links: string[], limit: number) {
+  const inner = () => {
+    let i = 0
+    let next: string | null = links[0]
+    while (next && i < limit) {
+      if (next === 'self') continue
+      console.log(next)
+      next = links[i]
+      i++
+    }
+  }
+  return inner
+}
+`,
+		"getarg.ts": `
+export function parseArg(argv: string[]) {
+  const options: Record<string, string> = {}
+
+  function getArg(): string {
+    const arg = argv.shift()
+    if (arg == null) return ''
+    if (arg.indexOf('--') === 0) {
+      const pair = arg.split('=')
+      if (pair.length > 1) options[pair[0]] = pair[1]
+      return pair[0]
+    }
+    return arg
+  }
+
+  while (argv.length) {
+    const arg = getArg()
+    if (arg.indexOf('--') === 0) {
+      if (!(arg in options)) continue
+      console.log(arg)
+    } else {
+      console.log(arg)
+    }
+  }
+}
+`,
+		"fornocond.ts": `
+export function crawl(links: string[], limit: number) {
+  let i = 0
+  while (true) {
+    for (; i < limit;) {
+      if (links[i] === 'self') continue
+      i++
+    }
+    break
+  }
+}
+`,
+		"rebind.ts": `
+export function scan(input: string, e: RegExp) {
+  const out: string[] = []
+  for (e.lastIndex = 0;;) {
+    var L = e.exec(input)
+    if (!L) break
+    if (L[0] === 'x') continue
+    out.push(L[0])
+    L = String(L)
+  }
+  return out
+}
+`,
+		"forincrement.ts": `
+export function spans(h: any, d: boolean) {
+  for (var i = 0; i < h.markedSpans.length; ++i) {
+    var k = h.markedSpans[i]
+    if (d && k.explicitlyCleared) {
+      if (h.markedSpans) { --i; continue }
+      break
+    }
+    if (!k.atomic) continue
+    var l = k.find(1)
+  }
+}
+`,
+		"opaquecall.ts": `
+export function crawl(links: string[], limit: number, advance: (f: () => void) => void) {
+  let i = 0
+  let next: string | null = links[0]
+  while (next && i < limit) {
+    advance(() => { i++ })
+    if (next === 'self') continue
+    next = links[i]
+  }
+}
+`,
+	}
+	var paths []string
+	for name, src := range files {
+		p := filepath.Join(dir, name)
+		if err := os.WriteFile(p, []byte(src), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, p)
+	}
+	prog, err := treesitter.ExtractJavaScript(paths, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// restart[filename] = functions whose context carries the restart fact,
+	// hidden[filename] = same for the unresolved-call control.
+	restart := map[string][]string{}
+	hidden := map[string][]string{}
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		loc := n.Prop("loc")
+		if strings.Contains(tokens, "loop_restart_without_progress=true") {
+			restart[loc] = append(restart[loc], loc)
+		}
+		if strings.Contains(tokens, "loop_progress_hidden_in_call=true") {
+			hidden[loc] = append(hidden[loc], loc)
+		}
+	}
+	if len(restart) != 10 {
+		t.Fatalf("restart fact should attribute to exactly ten innermost functions (restart, opassign, plainassign, update, sibling, forinfinite, fornocond, nestedfn-inner, opaquecall, rebind), got %d: %v", len(restart), restart)
+	}
+	for _, absent := range []string{"advanced.ts", "forupdate.ts", "forincrement.ts", "condassign.ts", "external.ts", "receiver.ts", "branchcover.ts", "getarg.ts"} {
+		for loc := range restart {
+			if strings.Contains(loc, absent) {
+				t.Fatalf("loop restart fact must not attribute to %s: %v", absent, loc)
+			}
+		}
+	}
+	if len(hidden) != 2 {
+		t.Fatalf("unresolved-call control should attribute to opaquecall.ts and rebind.ts only, got %d: %v", len(hidden), hidden)
+	}
+	for loc := range hidden {
+		if !strings.Contains(loc, "opaquecall.ts") && !strings.Contains(loc, "rebind.ts") {
+			t.Fatalf("unresolved-call control attributed to the wrong function: %s", loc)
+		}
+	}
+}
+
+func TestJavaScriptTernaryAllocatedContainerWriteObservation(t *testing.T) {
+	dir := t.TempDir()
+	allocated := filepath.Join(dir, "allocated.js")
+	mixed := filepath.Join(dir, "mixed.js")
+	computed := filepath.Join(dir, "computed.js")
+	if err := os.WriteFile(allocated, []byte("function alloc(root, path, deep) {\n"+
+		"  root[path] = deep ? [] : {};\n"+
+		"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(mixed, []byte("function both(root, path, deep) {\n"+
+		"  root[path] = deep ? {} : {};\n"+
+		"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(computed, []byte("function store(root, path, deep, value) {\n"+
+		"  root[path] = deep ? {} : value;\n"+
+		"}\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{allocated, mixed, computed}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	sawAllocated, sawBoth, sawComputed := false, false, false
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.function.context" {
+			continue
+		}
+		tokens := n.Prop("str_args")
+		switch {
+		case strings.Contains(tokens, "name=alloc"):
+			sawAllocated = strings.Contains(tokens, "dynamic_property_write_object_literal=true") &&
+				strings.Contains(tokens, "dynamic_property_write_array_literal=true")
+		case strings.Contains(tokens, "name=both"):
+			sawBoth = strings.Contains(tokens, "dynamic_property_write_object_literal=true") &&
+				!strings.Contains(tokens, "dynamic_property_write_array_literal=true")
+		case strings.Contains(tokens, "name=store"):
+			sawComputed = !strings.Contains(tokens, "dynamic_property_write_object_literal=true") &&
+				!strings.Contains(tokens, "dynamic_property_write_array_literal=true")
+		}
+	}
+	if !sawAllocated || !sawBoth || !sawComputed {
+		t.Fatalf("ternary-allocated container kinds not observed: allocated=%v both=%v computed=%v", sawAllocated, sawBoth, sawComputed)
+	}
 }

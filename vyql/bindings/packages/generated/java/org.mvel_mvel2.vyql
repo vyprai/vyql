@@ -1,9 +1,0 @@
-module bindings.java.generated.mb4f5005b;
-
-binding weakHash0 {
-  requires {
-    dependency("org.mvel:mvel2")
-  }
-  query pattern presenceNode where node.path ~= "org.mvel.mvel2.hash"
-  emit issue code.WeakHash at node
-}

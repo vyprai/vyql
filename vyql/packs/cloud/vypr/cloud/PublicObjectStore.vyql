@@ -1,9 +1,0 @@
-module vypr.cloud;
-
-rule PublicObjectStore {
-  meta {
-    id: "VYQL-CLD-002"
-    severity: high
-  }
-  reach cloud.Internet -> cloud.ObjectStore
-}

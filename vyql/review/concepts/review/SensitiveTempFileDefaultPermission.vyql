@@ -1,8 +1,0 @@
-module code;
-
-review code.SensitiveTempFileDefaultPermission {
-  category: secret
-  expected: [core.SecretRedaction, core.PathAccessCheck]
-  kind: target
-  text: "create credential or private-key temporary files with owner-only permissions before writing secret material"
-}

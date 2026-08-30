@@ -1,9 +1,0 @@
-module bindings.perl.generated.mfedaba2c;
-
-binding commandExecution0 {
-  requires {
-    dependency("Devel-Mutator")
-  }
-  query pattern callExpr where callee.method == "_run_command"
-  emit sink code.CommandExecution at args[0]
-}

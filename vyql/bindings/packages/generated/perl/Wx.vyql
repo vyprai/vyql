@@ -1,9 +1,0 @@
-module bindings.perl.generated.m3b712974;
-
-binding codeEval0 {
-  requires {
-    dependency("Wx")
-  }
-  query pattern callExpr where callee.method == "AUTOLOAD"
-  emit sink code.CodeEval at args[0]
-}

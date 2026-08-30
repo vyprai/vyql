@@ -1,9 +1,0 @@
-module bindings.objc.generated.me7aaa909;
-
-binding httpInput0 {
-  requires {
-    dependency("GTMSessionFetcher")
-  }
-  query pattern callExpr where callee.method == "staticCookieStorage"
-  emit source code.HttpInput at call.result
-}

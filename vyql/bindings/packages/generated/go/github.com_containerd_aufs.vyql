@@ -1,9 +1,0 @@
-module bindings.go.generated.mbbda8de2;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/containerd/aufs")
-  }
-  query pattern callExpr where callee.method == "New"
-  emit sink code.FilePathAccess at args[0]
-}

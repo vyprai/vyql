@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mbdb69fc5;
-
-binding deserialization0 {
-  requires {
-    dependency("urdfdom-headers")
-  }
-  query pattern callExpr where callee.method == "init"
-  emit sink code.Deserialization at args[0]
-}

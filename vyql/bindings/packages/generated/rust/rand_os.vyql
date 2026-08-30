@@ -1,9 +1,0 @@
-module bindings.rust.generated.m98553bcc;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("rand_os")
-  }
-  query pattern callExpr where callee.method == "new"
-  emit issue code.WeakRandomValue at call
-}

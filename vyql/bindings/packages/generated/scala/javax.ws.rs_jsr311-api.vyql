@@ -1,9 +1,0 @@
-module bindings.scala.generated.m02059663;
-
-binding httpInput0 {
-  requires {
-    dependency("javax.ws.rs:jsr311-api")
-  }
-  query pattern callExpr where callee.method == "Cookie"
-  emit source code.HttpInput at call.result
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.UnescapedChartTooltipDataName {
-  category: xss
-  expected: [core.HtmlEscape]
-  kind: attention
-  text: "review chart tooltip formatters that return raw data item names instead of passing them through structured tooltip markup or escaping"
-}

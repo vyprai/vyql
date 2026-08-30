@@ -1,8 +1,0 @@
-module code;
-
-review code.FeedMeSaveFeedMissingErrorGuard {
-  category: availability
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review Feed Me save actions for a getErrors guard before saving and redirecting a model built from POST"
-}

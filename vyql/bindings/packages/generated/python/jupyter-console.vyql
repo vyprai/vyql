@@ -1,9 +1,0 @@
-module bindings.python.generated.m92841d05;
-
-binding cliArgument0 {
-  requires {
-    dependency("jupyter-console")
-  }
-  query pattern callExpr where callee.method == "parse_command_line"
-  emit source code.CliArgument at call.result
-}

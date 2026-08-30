@@ -1,8 +1,0 @@
-module code;
-
-review code.ConnectCmsCodestudiesPluginCodeExecution {
-  category: code_execution
-  expected: [core.CodeExecutionValidation, core.ShellEscape]
-  kind: attention
-  text: "review Connect-CMS Code Study plugin for removal or strict sandboxing before running submitted code on the server"
-}

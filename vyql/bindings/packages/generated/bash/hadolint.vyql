@@ -1,9 +1,0 @@
-module bindings.bash.generated.md07cdc13;
-
-binding cliArgument0 {
-  requires {
-    dependency("hadolint")
-  }
-  query pattern callExpr where callee.path ~= "hadolint.argv"
-  emit source code.CliArgument at call.result
-}

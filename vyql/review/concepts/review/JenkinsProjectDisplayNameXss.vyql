@@ -1,8 +1,0 @@
-module code;
-
-review code.JenkinsProjectDisplayNameXss {
-  category: xss
-  expected: [core.HtmlEscape]
-  kind: attention
-  text: "review Jenkins project display names for HTML escaping before graph or UI rendering"
-}

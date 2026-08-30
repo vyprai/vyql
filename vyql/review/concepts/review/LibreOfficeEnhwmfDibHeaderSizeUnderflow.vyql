@@ -1,8 +1,0 @@
-module code;
-
-review code.LibreOfficeEnhwmfDibHeaderSizeUnderflow {
-  category: memory
-  expected: [core.MemoryBoundsCheck, core.IntegerOverflowGuard]
-  kind: attention
-  text: "review LibreOffice EMF alpha-blend bitmap header size validation before DIBV5 delta allocation and copy"
-}

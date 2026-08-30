@@ -1,6 +1,0 @@
-module core;
-
-review core.AuthenticationCheck {
-  category: auth
-  kind: check
-}

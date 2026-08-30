@@ -1,7 +1,0 @@
-module core;
-
-concept CsrfProtection : check {
-  applies: endpoint
-  covers: [endpoint, path]
-  neutralizes: [request_forgery.Csrf]
-}

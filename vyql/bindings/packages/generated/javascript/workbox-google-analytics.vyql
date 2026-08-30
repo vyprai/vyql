@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mc54cb256;
-
-binding userControlledData0 {
-  requires {
-    dependency("workbox-google-analytics")
-  }
-  query pattern callExpr where callee.method == "initialize"
-  emit source core.UserControlledData at call.result
-}

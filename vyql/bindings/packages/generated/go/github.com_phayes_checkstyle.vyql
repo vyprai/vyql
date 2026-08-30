@@ -1,9 +1,0 @@
-module bindings.go.generated.m673bc9f9;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/phayes/checkstyle")
-  }
-  query pattern callExpr where callee.method == "ReadFile"
-  emit sink code.Deserialization at args[0]
-}

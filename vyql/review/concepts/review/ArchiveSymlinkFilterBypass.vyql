@@ -1,7 +1,0 @@
-module code;
-
-review code.ArchiveSymlinkFilterBypass {
-  category: path
-  kind: attention
-  text: "review archive extraction for symlink and hard-link target validation before writing entries"
-}

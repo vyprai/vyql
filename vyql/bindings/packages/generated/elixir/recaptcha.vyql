@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m07a2f162;
-
-binding networkSend0 {
-  requires {
-    dependency("recaptcha")
-  }
-  query pattern callExpr where callee.method == "Recaptcha.verify"
-  emit sink code.NetworkSend at args[0]
-}

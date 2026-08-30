@@ -1,9 +1,0 @@
-module bindings.swift.generated.m0715f928;
-
-binding commandExecution0 {
-  requires {
-    dependency("github.com/migueldeicaza/SwiftTerm")
-  }
-  query pattern callExpr where callee.method == "fork"
-  emit sink code.CommandExecution at args[0]
-}

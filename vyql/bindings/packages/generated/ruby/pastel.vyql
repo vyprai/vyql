@@ -1,9 +1,0 @@
-module bindings.ruby.generated.md89c4743;
-
-binding deserialization0 {
-  requires {
-    dependency("pastel")
-  }
-  query pattern callExpr where callee.method == "ColorParser.parse"
-  emit sink code.Deserialization at args[0]
-}

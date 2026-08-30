@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m53d83c7d;
-
-binding deserialization0 {
-  requires {
-    dependency("psych")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

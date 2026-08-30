@@ -1,9 +1,0 @@
-module bindings.php.generated.m28aca1e0;
-
-binding commandExecution0 {
-  requires {
-    dependency("jms/di-extra-bundle")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

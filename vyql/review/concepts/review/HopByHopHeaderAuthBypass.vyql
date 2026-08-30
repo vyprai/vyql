@@ -1,8 +1,0 @@
-module code;
-
-review code.HopByHopHeaderAuthBypass {
-  category: auth
-  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
-  kind: attention
-  text: "review reverse-proxy impersonation handlers for hop-by-hop Connection header stripping before backend auth headers are written"
-}

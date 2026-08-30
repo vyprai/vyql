@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m78c2a881;
-
-binding httpInput0 {
-  requires {
-    dependency("rack-cors")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit source code.HttpInput at call.result
-}

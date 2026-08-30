@@ -1,8 +1,0 @@
-module code;
-
-review code.OsqueryAllowUnsafePlatformArgs {
-  category: misconfig
-  expected: [core.CommandArgumentValidation, core.InputValidation]
-  kind: target
-  text: "verify osqueryd launch configuration does not enable unsafe runtime flags such as allow_unsafe"
-}

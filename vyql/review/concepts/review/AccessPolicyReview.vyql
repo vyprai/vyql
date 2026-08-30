@@ -1,8 +1,0 @@
-module code;
-
-review code.AccessPolicyReview {
-  category: auth
-  expected: [core.AuthorizationCheck]
-  kind: attention
-  text: "review role or group policy configuration for overly broad access"
-}

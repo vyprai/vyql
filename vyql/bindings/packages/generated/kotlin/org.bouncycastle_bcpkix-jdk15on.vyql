@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m5cf8e80a;
-
-binding deserialization0 {
-  requires {
-    dependency("org.bouncycastle:bcpkix-jdk15on")
-  }
-  query pattern callExpr where callee.method == "parseNonEmptyASN1"
-  emit sink code.Deserialization at args[0]
-}

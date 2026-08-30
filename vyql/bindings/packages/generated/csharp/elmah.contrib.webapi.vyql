@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m9e0ef8c1;
-
-binding logOutput0 {
-  requires {
-    dependency("elmah.contrib.webapi")
-  }
-  query pattern callExpr where callee.method == "ElmahHandleErrorApiAttribute"
-  emit sink code.LogOutput at args[0]
-}

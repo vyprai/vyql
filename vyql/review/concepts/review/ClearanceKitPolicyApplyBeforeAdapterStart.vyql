@@ -1,7 +1,0 @@
-module code;
-
-review code.ClearanceKitPolicyApplyBeforeAdapterStart {
-  category: auth
-  kind: attention
-  text: "review ClearanceKit startup ordering so full policy, allowlist, and jail rules are applied after the EndpointSecurity client starts"
-}

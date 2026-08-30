@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m93eaf9f1;
-
-binding codeEval0 {
-  requires {
-    dependency("mhook")
-  }
-  query pattern callExpr where callee.method == "Mhook_SetHook"
-  emit sink code.CodeEval at args[0]
-}

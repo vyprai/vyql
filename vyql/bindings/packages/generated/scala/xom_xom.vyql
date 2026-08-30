@@ -1,9 +1,0 @@
-module bindings.scala.generated.mbeda684d;
-
-binding xpathQuery0 {
-  requires {
-    dependency("xom:xom")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.XpathQuery at args[0]
-}

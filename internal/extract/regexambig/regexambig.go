@@ -339,8 +339,17 @@ func regexAltHasAmbiguousRepeat(alt string, depth int) bool {
 
 // regexBodyHasRepeat is the original trigger: a `*` or `+` anywhere inside the
 // repeated group, so the group iterates over something that already repeats.
+// A quantifier character inside a [...] class is a literal member of that class,
+// not a quantifier, so class spans are skipped: `([a-z+])+` iterates over one
+// character from a fixed set — the class's own `+` does not make it explode.
 func regexBodyHasRepeat(body string) bool {
 	for i := 0; i < len(body); i++ {
+		if body[i] == '[' && !isEscaped(body, i) {
+			if end := regexCharClassEnd(body, i); end > i {
+				i = end // a class holds literals; its members cannot quantify
+			}
+			continue
+		}
 		if isRegexQuantifier(body[i]) && !isEscaped(body, i) && !isPossessiveQuantifier(body, i) {
 			return true
 		}
@@ -611,8 +620,11 @@ func regexSetSize(s regexCharSet) int {
 // regexSplitsOneCharRun reports two repeats over the SAME single character separated
 // only by material that can match nothing. A run of that character can then be split
 // between them at any point, and every split is retried on failure — the shape behind
-// `,+(?:…)*,*`. Restricted to single-character sets: two repeats over a wide class
-// (`\s*…\s*`) are ordinary, and flagging those reports most real-world regexes.
+// `,+(?:…)*,*`. Restricted to single-character sets on the first repeat: two repeats
+// over a wide class (`\s*…\s*`) are ordinary, and flagging those reports most
+// real-world regexes. The second repeat may sit at the head of an unquantified
+// group's branch — `0*((?:\d+)|(?:x[0-9a-fA-F]+))` splits a run of `0` between the
+// prefix and the branch's leading class exactly as `0*0+` does.
 func regexSplitsOneCharRun(atoms []regexAtom) bool {
 	for i, a := range atoms {
 		if a.look != 0 || !isBacktrackingRepeat(a.quant) || regexSetSize(a.set) != 1 {
@@ -626,10 +638,61 @@ func regexSplitsOneCharRun(atoms []regexAtom) bool {
 			if isBacktrackingRepeat(b.quant) && regexSetSize(b.set) == 1 && b.set.intersects(a.set) {
 				return true
 			}
+			if b.group && b.quant == 0 && regexAltStartsWithRepeat(b.body, a.set, 0) {
+				return true
+			}
 			if !b.nullable {
 				break // something mandatory separates them
 			}
 		}
 	}
 	return false
+}
+
+// regexAltStartsWithRepeat reports whether some branch of an alternation continues,
+// through nullable material only, with a backtracking repeat that can also consume
+// c — the second consumer of a character run hiding inside a group.
+func regexAltStartsWithRepeat(alt string, c regexCharSet, depth int) bool {
+	if depth > regexAnalysisMaxDepth {
+		return false
+	}
+	for _, branch := range splitTopLevelRegexBranches(alt) {
+		if regexAtomsStartWithRepeat(regexAtomsOf(branch, depth+1), c, depth) {
+			return true
+		}
+	}
+	return false
+}
+
+func regexAtomsStartWithRepeat(atoms []regexAtom, c regexCharSet, depth int) bool {
+	if depth > regexAnalysisMaxDepth {
+		return false
+	}
+	for _, a := range atoms {
+		if a.look != 0 {
+			continue
+		}
+		// The run's second consumer is an atom — a class or an escaped class —
+		// not a repeated group: a group that repeats over an alternation is the
+		// nesting report's shape, and its own first set says nothing about how
+		// it splits a run of one character.
+		if !a.group && isBacktrackingRepeat(a.quant) && !isUniversalCharSet(a.set) && a.set.intersects(c) {
+			return true
+		}
+		if a.group && a.quant == 0 && regexAltStartsWithRepeat(a.body, c, depth+1) {
+			return true
+		}
+		if !a.nullable {
+			return false
+		}
+	}
+	return false
+}
+
+// isUniversalCharSet reports the set that matches every byte. A consumer that wide
+// makes every prefix of the input a split rather than a run of one character, and
+// ordinary code is full of repeats before a `(.*)`, so it is not a run-split
+// consumer.
+func isUniversalCharSet(s regexCharSet) bool {
+	return s.complement().empty()
 }

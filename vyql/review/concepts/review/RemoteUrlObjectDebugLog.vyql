@@ -1,8 +1,0 @@
-module code;
-
-review code.RemoteUrlObjectDebugLog {
-  category: secret
-  expected: [core.SecretRedaction]
-  kind: target
-  text: "verify remote repository URL objects are not logged before credentials, query strings, and fragments are stripped"
-}

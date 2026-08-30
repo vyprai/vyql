@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md278329b;
-
-binding secretValue0 {
-  requires {
-    dependency("net.dv8tion:JDA")
-  }
-  query pattern callExpr where callee.method == "getToken"
-  emit source code.SecretValue at call.result
-}

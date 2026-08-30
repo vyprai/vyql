@@ -1,9 +1,0 @@
-module bindings.dart.generated.mc9a67a1f;
-
-binding filePathAccess0 {
-  requires {
-    dependency("flutter_tts")
-  }
-  query pattern callExpr where callee.method == "synthesizeToFile"
-  emit sink code.FilePathAccess at args[0]
-}

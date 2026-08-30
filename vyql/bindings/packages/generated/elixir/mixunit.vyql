@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m9cb960f5;
-
-binding cliArgument0 {
-  requires {
-    dependency("mixunit")
-  }
-  query pattern callExpr where callee.method == "Mix.Tasks.Eunit.run"
-  emit source code.CliArgument at call.result
-}

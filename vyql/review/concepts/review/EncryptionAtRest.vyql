@@ -1,6 +1,0 @@
-module core;
-
-review core.EncryptionAtRest {
-  category: crypto
-  kind: check
-}

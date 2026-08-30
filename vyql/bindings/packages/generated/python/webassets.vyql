@@ -1,9 +1,0 @@
-module bindings.python.generated.m20896567;
-
-binding codeEval0 {
-  requires {
-    dependency("webassets")
-  }
-  query pattern callExpr where callee.method == "exec_"
-  emit sink code.CodeEval at args[0]
-}

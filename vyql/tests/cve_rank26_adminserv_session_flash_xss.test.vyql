@@ -1,8 +1,0 @@
-# Rank 26 / CVE-2020-36637: AdminServ unescaped session flash XSS.
-
-test "rank26: unescaped session flash is a CVE anchor"
-  expect VYQL-INJ-025
-  graph
-  ```
-  node flash code.UnescapedSessionFlash
-  ```

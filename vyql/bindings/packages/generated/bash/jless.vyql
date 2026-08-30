@@ -1,9 +1,0 @@
-module bindings.bash.generated.me5e8385b;
-
-binding cliArgument0 {
-  requires {
-    dependency("jless")
-  }
-  query pattern callExpr where callee.path ~= "jless.argv"
-  emit source code.CliArgument at call.result
-}

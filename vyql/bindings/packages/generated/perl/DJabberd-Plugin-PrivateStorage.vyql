@@ -1,9 +1,0 @@
-module bindings.perl.generated.mf2868e96;
-
-binding secretValue0 {
-  requires {
-    dependency("DJabberd-Plugin-PrivateStorage")
-  }
-  query pattern callExpr where callee.method == "set_config_password"
-  emit source code.SecretValue at call.result
-}

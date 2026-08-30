@@ -1,8 +1,0 @@
-module code;
-
-review code.ZeroLengthRadiusAttributeValueParse {
-  category: input_validation
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review RADIUS attribute parsers for zero-length VSA/Tunnel-Password payload checks before value construction"
-}

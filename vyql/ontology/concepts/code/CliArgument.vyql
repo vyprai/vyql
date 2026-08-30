@@ -1,6 +1,0 @@
-module code;
-
-concept CliArgument : source {
-  refines: core.UserControlledData
-  taint: [taint.UntrustedData]
-}

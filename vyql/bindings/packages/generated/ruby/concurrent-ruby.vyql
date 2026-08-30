@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m63f35edc;
-
-binding deserialization0 {
-  requires {
-    dependency("concurrent-ruby")
-  }
-  query pattern callExpr where callee.method == "marshal_load"
-  emit sink code.Deserialization at args[0]
-}

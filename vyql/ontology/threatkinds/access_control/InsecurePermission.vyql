@@ -1,6 +1,0 @@
-module access_control;
-
-threat InsecurePermission {
-  cwe: [CWE_732]
-  desc: "Incorrect permission assignment for a critical resource (world-writable / overly broad mode)"
-}

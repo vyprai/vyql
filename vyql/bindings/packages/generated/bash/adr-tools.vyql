@@ -1,9 +1,0 @@
-module bindings.bash.generated.m19f76d67;
-
-binding cliArgument0 {
-  requires {
-    dependency("adr-tools")
-  }
-  query pattern callExpr where callee.path ~= "adr-tools.argv"
-  emit source code.CliArgument at call.result
-}

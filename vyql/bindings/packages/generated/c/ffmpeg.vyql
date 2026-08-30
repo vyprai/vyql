@@ -1,9 +1,0 @@
-module bindings.c.generated.m1bb5dd88;
-
-binding cliArgument0 {
-  requires {
-    dependency("ffmpeg")
-  }
-  query pattern callExpr where callee.method == "ffmpeg_parse_options"
-  emit source code.CliArgument at call.result
-}

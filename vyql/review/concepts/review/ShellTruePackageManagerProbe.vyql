@@ -1,8 +1,0 @@
-module code;
-
-review code.ShellTruePackageManagerProbe {
-  category: command
-  expected: [core.ShellEscape]
-  kind: attention
-  text: "review package-manager probe commands for argv-array subprocess execution instead of shell=True command strings"
-}

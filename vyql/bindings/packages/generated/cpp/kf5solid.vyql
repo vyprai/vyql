@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mfcd07b2e;
-
-binding commandExecution0 {
-  requires {
-    dependency("kf5solid")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

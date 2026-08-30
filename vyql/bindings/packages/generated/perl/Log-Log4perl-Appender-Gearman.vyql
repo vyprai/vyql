@@ -1,9 +1,0 @@
-module bindings.perl.generated.m2b5eaa41;
-
-binding networkSend0 {
-  requires {
-    dependency("Log-Log4perl-Appender-Gearman")
-  }
-  query pattern callExpr where callee.method == "log"
-  emit sink code.NetworkSend at args[0]
-}

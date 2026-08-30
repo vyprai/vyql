@@ -1,9 +1,0 @@
-module bindings.php.generated.mc4466a6c;
-
-binding codeEval0 {
-  requires {
-    dependency("league/event")
-  }
-  query pattern callExpr where callee.method == "OneTimeListener.call_user_func"
-  emit sink code.CodeEval at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m3f8e7a10;
-
-binding cliArgument0 {
-  requires {
-    dependency("minc")
-  }
-  query pattern callExpr where callee.method == "ParseArgv"
-  emit source code.CliArgument at call.result
-}

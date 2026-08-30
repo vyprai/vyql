@@ -1,7 +1,0 @@
-module code;
-
-review code.UnboundedAllocationReview {
-  category: resource
-  kind: attention
-  text: "review allocation sizes derived from parsed counts for per-item limits, aggregate consistency checks, and overflow"
-}

@@ -1,9 +1,0 @@
-module bindings.php.generated.m95880be3;
-
-binding secretValue0 {
-  requires {
-    dependency("league/oauth2-client")
-  }
-  query pattern callExpr where callee.method == "setRefreshToken"
-  emit source code.SecretValue at call.result
-}

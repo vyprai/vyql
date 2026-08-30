@@ -1,7 +1,0 @@
-module code;
-
-review code.RecursiveJsonMarshalUnderLock {
-  category: concurrency
-  kind: attention
-  text: "review JSON marshaling while holding a receiver lock; avoid re-entering MarshalJSON on the same type"
-}

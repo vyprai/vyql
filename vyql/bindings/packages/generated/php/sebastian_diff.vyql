@@ -1,9 +1,0 @@
-module bindings.php.generated.ma6e6269e;
-
-binding deserialization0 {
-  requires {
-    dependency("sebastian/diff")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

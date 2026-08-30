@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m2783623a;
-
-binding urlFetch0 {
-  requires {
-    dependency("original")
-  }
-  query pattern callExpr where callee.method == "origin"
-  emit sink code.UrlFetch at args[0]
-}

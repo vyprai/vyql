@@ -1,6 +1,0 @@
-module access_control;
-
-threat CsrfDisabled {
-  cwe: [CWE_352]
-  desc: "CSRF protection explicitly disabled / exempted"
-}

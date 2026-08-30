@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m8b96fadc;
-
-binding deserialization0 {
-  requires {
-    dependency("@bcoe/v8-coverage")
-  }
-  query pattern callExpr where callee.method == "parseFunctionRanges"
-  emit sink code.Deserialization at args[0]
-}

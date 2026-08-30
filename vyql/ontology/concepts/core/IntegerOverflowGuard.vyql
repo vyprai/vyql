@@ -1,8 +1,0 @@
-module core;
-
-concept IntegerOverflowGuard : check {
-  applies: endpoint
-  covers: [endpoint, path]
-  cwe: [CWE_190]
-  neutralizes: [memory.IntegerOverflow]
-}

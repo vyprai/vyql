@@ -1,9 +1,0 @@
-module bindings.dart.generated.mc7775f4f;
-
-binding fileUse0 {
-  requires {
-    dependency("camera_web")
-  }
-  query pattern callExpr where callee.method == "Camera.takePicture"
-  emit sink code.FileUseSink at args[0]
-}

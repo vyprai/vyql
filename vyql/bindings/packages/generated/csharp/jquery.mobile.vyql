@@ -1,9 +1,0 @@
-module bindings.csharp.generated.mc3721697;
-
-binding networkData0 {
-  requires {
-    dependency("jquery.mobile")
-  }
-  query pattern callExpr where callee.method == "parseUrl"
-  emit source code.NetworkData at call.result
-}

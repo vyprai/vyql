@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mdffc4e53;
-
-binding weakCipher0 {
-  requires {
-    dependency("openssl")
-  }
-  query pattern callExpr where callee.method == "sslv3_method"
-  emit issue code.WeakCipher at call
-}

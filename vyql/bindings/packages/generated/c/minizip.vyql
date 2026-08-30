@@ -1,9 +1,0 @@
-module bindings.c.generated.m05a38b13;
-
-binding deserialization0 {
-  requires {
-    dependency("minizip")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

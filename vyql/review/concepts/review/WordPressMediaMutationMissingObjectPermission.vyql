@@ -1,8 +1,0 @@
-module code;
-
-review code.WordPressMediaMutationMissingObjectPermission {
-  category: access_control
-  expected: [core.AuthorizationCheck]
-  kind: target
-  text: "review WordPress media mutation handlers for object-specific attachment permission checks before previewing or replacing media"
-}

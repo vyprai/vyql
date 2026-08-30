@@ -1,9 +1,0 @@
-module bindings.java.generated.m13a01316;
-
-binding httpInput0 {
-  requires {
-    dependency("com.sun.jersey:jersey-server")
-  }
-  query pattern callExpr where callee.path ~= "com.sun.jersey.jersey.server.cookie"
-  emit source code.HttpInput at call.result
-}

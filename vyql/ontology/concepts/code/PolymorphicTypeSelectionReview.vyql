@@ -1,6 +1,0 @@
-module code;
-
-concept PolymorphicTypeSelectionReview : issue {
-  cwe: [CWE_20, CWE_470]
-  vulnerableTo: [validation.ImproperInputValidation, deserialization.UnsafeReflection]
-}

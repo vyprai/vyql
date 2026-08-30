@@ -1,8 +1,0 @@
-# Rank 53 / CVE-2020-15366: Ajv schema code-generation validation bypass.
-
-test "rank53: schema codegen validation bypass is a CVE anchor"
-  expect VYQL-INJ-029
-  graph
-  ```
-  node sink code.SchemaCodegenValidationBypass
-  ```

@@ -1,9 +1,0 @@
-module bindings.go.generated.m08073781;
-
-binding htmlRender0 {
-  requires {
-    dependency("github.com/aryann/difflib")
-  }
-  query pattern callExpr where callee.method == "HTMLDiff"
-  emit sink code.HtmlRender at args[0]
-}

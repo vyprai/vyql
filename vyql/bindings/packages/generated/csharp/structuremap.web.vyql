@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m819e6a4c;
-
-binding httpInput0 {
-  requires {
-    dependency("structuremap.web")
-  }
-  query pattern callExpr where callee.method == "HttpContextScoped"
-  emit source code.HttpInput at call.result
-}

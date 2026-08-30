@@ -1,9 +1,0 @@
-module bindings.php.generated.m1ff4dad6;
-
-binding commandExecution0 {
-  requires {
-    dependency("brianium/paratest")
-  }
-  query pattern callExpr where callee.method == "ParaTest\\WrapperRunner\\WrapperWorker::start"
-  emit sink code.CommandExecution at args[0]
-}

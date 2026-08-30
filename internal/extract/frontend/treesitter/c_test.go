@@ -1270,3 +1270,194 @@ func hasCExprCall(expr nir.Expr, method string) bool {
 	}
 	return false
 }
+
+func TestCNarrowDeclaredBoundsCheckObservation(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "bounds.c")
+	src := []byte(`
+#include <stdint.h>
+typedef unsigned long u64;
+typedef struct { unsigned int width; } Image;
+static unsigned int cap = 100;
+
+int vulnerable_plain(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  if (x + y > cap) return 1;
+  return 0;
+}
+
+int fixed_wide_declaration(unsigned int a, unsigned int b) {
+  uint64_t x = a, y = b;
+  if (x + y > cap) return 1;
+  return 0;
+}
+
+int fixed_uint64_cast(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  if ((uint64_t)x + y > cap) return 1;
+  return 0;
+}
+
+int fixed_u64_cast(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  if ((u64)x + y > cap) return 1;
+  return 0;
+}
+
+int fixed_long_int_cast(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  if ((long int)x + y > cap) return 1;
+  return 0;
+}
+
+int fixed_unsigned_long_int_cast(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  if ((unsigned long int)x + y > cap) return 1;
+  return 0;
+}
+
+int vulnerable_narrow_cast(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  if ((unsigned int)x + y > cap) return 1;
+  return 0;
+}
+
+int vulnerable_parenthesized_sum(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  if ((x + y) > cap) return 1;
+  return 0;
+}
+
+int vulnerable_return_comparison(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  return x + y > cap;
+}
+
+int vulnerable_mirrored_parenthesized(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  if (cap < (x + y)) return 1;
+  return 0;
+}
+
+int quiet_zero_literal_operand(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  if (x + 0 > cap) return 1;
+  return 0;
+}
+
+int quiet_wide_cast_zero_literal(unsigned int a, unsigned int b) {
+  unsigned int x = a, y = b;
+  if ((uint64_t)0 + y > cap) return 1;
+  return 0;
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "analysis.narrow_width.bounds_check"
+	for _, fire := range []string{
+		"vulnerable_plain",
+		"vulnerable_narrow_cast",
+		"vulnerable_parenthesized_sum",
+		"vulnerable_return_comparison",
+		"vulnerable_mirrored_parenthesized",
+	} {
+		if !cFuncHasAnalysisToken(prog.Modules[0].Body, fire, path, "widening=absent") {
+			t.Fatalf("%s missing narrow-width bounds check observation: %#v", fire, prog.Modules[0].Body)
+		}
+	}
+	if !cFuncHasAnalysisToken(prog.Modules[0].Body, "vulnerable_plain", path, "left=x") ||
+		!cFuncHasAnalysisToken(prog.Modules[0].Body, "vulnerable_plain", path, "right=y") {
+		t.Fatalf("narrow-width bounds check observation does not name its operands: %#v", prog.Modules[0].Body)
+	}
+	for _, quiet := range []string{
+		"fixed_wide_declaration",
+		"fixed_uint64_cast",
+		"fixed_u64_cast",
+		"fixed_long_int_cast",
+		"fixed_unsigned_long_int_cast",
+		"quiet_zero_literal_operand",
+		"quiet_wide_cast_zero_literal",
+	} {
+		if cFuncHasAnalysisToken(prog.Modules[0].Body, quiet, path, "widening=absent") {
+			t.Fatalf("%s should not emit narrow-width bounds check observation: %#v", quiet, prog.Modules[0].Body)
+		}
+	}
+}
+
+func TestCPublicEntryMarkingSkipsInternalAndMacroHiddenDefinitions(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "entry.c")
+	src := []byte(`#define local static
+#define GIT_INLINE(type) static __inline type
+#define PRIV(name) _pcre_##name
+
+int pub(int n) { return n * 3; }
+static int priv(int n) { return n * 3; }
+local void macro_storage(int n) { n * 3; }
+GIT_INLINE(void) macro_type(int n) { n * 3; }
+PRIV(macro_name)(int n) { n * 3; }
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exported := map[string]bool{}
+	for _, m := range prog.Modules {
+		for _, st := range m.Body {
+			if fd, ok := st.(nir.FuncDef); ok {
+				exported[fd.Name] = fd.Exported
+			}
+		}
+	}
+	for name, want := range map[string]bool{"pub": true, "priv": false, "macro_storage": false, "macro_type": false, "": false} {
+		if got := exported[name]; got != want {
+			t.Fatalf("exported[%q] = %v, want %v (all: %#v)", name, got, want, exported)
+		}
+	}
+}
+
+func TestCPPDefinitionsAreNotPublicEntries(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "entry.cpp")
+	src := []byte(`class K {
+public:
+  int m(int n) { return n * 3; }
+private:
+  int pm(int n) { return n * 3; }
+};
+namespace { int anon(int n) { return n * 3; } }
+int free_fn(int n) { return n * 3; }
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := ExtractCPP([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range prog.Modules {
+		var walk func(sts []nir.Stmt)
+		walk = func(sts []nir.Stmt) {
+			for _, st := range sts {
+				switch v := st.(type) {
+				case nir.FuncDef:
+					if v.Exported {
+						t.Fatalf("C++ function %q marked exported; C++ visibility is not read", v.Name)
+					}
+				case nir.ClassDef:
+					walk(v.Body)
+				}
+			}
+		}
+		walk(m.Body)
+	}
+}

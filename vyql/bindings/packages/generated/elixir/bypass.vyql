@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m894c4667;
-
-binding urlFetch0 {
-  requires {
-    dependency("bypass")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit sink code.UrlFetch at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mb743da4b;
-
-binding networkSend0 {
-  requires {
-    dependency("org.mule.connectors:mule-http-connector")
-  }
-  query pattern callExpr where callee.method == "send"
-  emit sink code.NetworkSend at args[0]
-}

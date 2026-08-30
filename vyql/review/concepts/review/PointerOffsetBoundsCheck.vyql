@@ -1,7 +1,0 @@
-module code;
-
-review code.PointerOffsetBoundsCheck {
-  category: numeric
-  kind: attention
-  text: "review pointer-plus-length bounds comparisons; compare the length to remaining buffer size before advancing the pointer"
-}

@@ -1,9 +1,0 @@
-module bindings.objc.generated.m271a24f7;
-
-binding xmlParse0 {
-  requires {
-    dependency("SDWebImageSVGCoder")
-  }
-  query pattern callExpr where callee.method == "SDBase64DecodedString"
-  emit sink code.XmlParse at args[0]
-}

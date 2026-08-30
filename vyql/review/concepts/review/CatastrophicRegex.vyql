@@ -1,7 +1,0 @@
-module code;
-
-review code.CatastrophicRegex {
-  category: resource
-  kind: attention
-  text: "review static regex complexity and attacker-controlled match input length"
-}

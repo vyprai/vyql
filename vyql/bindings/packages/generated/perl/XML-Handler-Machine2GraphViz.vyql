@@ -1,9 +1,0 @@
-module bindings.perl.generated.me632cae0;
-
-binding deserialization0 {
-  requires {
-    dependency("XML-Handler-Machine2GraphViz")
-  }
-  query pattern callExpr where callee.method == "start_document"
-  emit sink code.Deserialization at args[0]
-}

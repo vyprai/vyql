@@ -1,8 +1,0 @@
-# Injection graph specs for non-taint presence rules.
-
-test "schema codegen templates missing keyword validation are flagged (INJ-029)"
-  expect VYQL-INJ-029
-  graph
-  ```
-  node sink code.SchemaCodegenValidationBypass
-  ```

@@ -1,9 +1,0 @@
-module bindings.perl.generated.meb0b0e80;
-
-binding logOutput0 {
-  requires {
-    dependency("Plack-Middleware-LogWarn")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit sink code.LogOutput at args[0]
-}

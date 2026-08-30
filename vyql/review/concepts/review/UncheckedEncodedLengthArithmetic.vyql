@@ -1,7 +1,0 @@
-module code;
-
-review code.UncheckedEncodedLengthArithmetic {
-  category: numeric
-  kind: attention
-  text: "review serialized length arithmetic that narrows or scales sizes without checked overflow handling"
-}

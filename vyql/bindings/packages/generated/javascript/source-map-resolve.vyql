@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mb9dea22e;
-
-binding deserialization0 {
-  requires {
-    dependency("source-map-resolve")
-  }
-  query pattern callExpr where callee.method == "parseMapToJSON"
-  emit sink code.Deserialization at args[0]
-}

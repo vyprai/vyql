@@ -1,9 +1,0 @@
-module bindings.java.generated.md908a3df;
-
-binding deserialization0 {
-  requires {
-    dependency("com.github.bumptech.glide:glide")
-  }
-  query pattern callExpr where callee.method == "com.bumptech.glide.module.ManifestParser.parse"
-  emit sink code.Deserialization at args[0]
-}

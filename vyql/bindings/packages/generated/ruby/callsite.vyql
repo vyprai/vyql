@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m2b335f41;
-
-binding deserialization0 {
-  requires {
-    dependency("callsite")
-  }
-  query pattern callExpr where callee.method == "autoload_relative"
-  emit sink code.Deserialization at args[0]
-}

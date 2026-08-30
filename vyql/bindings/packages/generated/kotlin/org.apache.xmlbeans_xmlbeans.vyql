@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mc7192262;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.xmlbeans:xmlbeans")
-  }
-  query pattern callExpr where callee.method == "XmlBase64Binary.parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,6 +1,0 @@
-module code;
-
-concept ArchiveEntryName : source {
-  refines: core.UserControlledData
-  taint: [taint.UntrustedData]
-}

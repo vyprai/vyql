@@ -1,9 +1,0 @@
-module bindings.perl.generated.m546c0252;
-
-binding commandExecution0 {
-  requires {
-    dependency("SOOT")
-  }
-  query pattern callExpr where callee.path ~= "Alien::ROOT.system"
-  emit sink code.CommandExecution at args[0]
-}

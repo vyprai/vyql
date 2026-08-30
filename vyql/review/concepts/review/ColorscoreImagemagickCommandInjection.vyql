@@ -1,8 +1,0 @@
-module code;
-
-review code.ColorscoreImagemagickCommandInjection {
-  category: "command-injection"
-  expected: [core.ShellEscape, core.InputValidation]
-  kind: attention
-  text: "review colorscore ImageMagick convert command construction for shellescape and numeric option coercion"
-}

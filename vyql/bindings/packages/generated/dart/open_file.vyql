@@ -1,9 +1,0 @@
-module bindings.dart.generated.m06271e4a;
-
-binding filePathAccess0 {
-  requires {
-    dependency("open_file")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

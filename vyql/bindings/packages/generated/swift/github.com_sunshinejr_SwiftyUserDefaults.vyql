@@ -1,9 +1,0 @@
-module bindings.swift.generated.me84a4ddb;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/sunshinejr/SwiftyUserDefaults")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

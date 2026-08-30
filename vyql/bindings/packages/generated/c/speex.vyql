@@ -1,9 +1,0 @@
-module bindings.c.generated.mc72f33f0;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("speex")
-  }
-  query pattern callExpr where callee.method == "speex_rand"
-  emit issue code.WeakRandomValue at call
-}

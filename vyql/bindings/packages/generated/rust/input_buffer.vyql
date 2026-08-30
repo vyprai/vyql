@@ -1,9 +1,0 @@
-module bindings.rust.generated.m0aed98db;
-
-binding networkData0 {
-  requires {
-    dependency("input_buffer")
-  }
-  query pattern callExpr where callee.method == "from_partially_read"
-  emit source code.NetworkData at call.result
-}

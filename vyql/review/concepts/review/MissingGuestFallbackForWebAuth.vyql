@@ -1,8 +1,0 @@
-module code;
-
-review code.MissingGuestFallbackForWebAuth {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: attention
-  text: "review web-server authentication flows that can exit or create users before applying the configured guest fallback"
-}

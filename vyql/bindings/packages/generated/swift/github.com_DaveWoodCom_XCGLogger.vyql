@@ -1,9 +1,0 @@
-module bindings.swift.generated.m2087bdc7;
-
-binding logOutput0 {
-  requires {
-    dependency("github.com/DaveWoodCom/XCGLogger")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.LogOutput at args[0]
-}

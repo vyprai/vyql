@@ -1,9 +1,0 @@
-module bindings.java.generated.m3d9cf7e5;
-
-binding httpInput0 {
-  requires {
-    dependency("org.apache.geronimo.specs:geronimo-servlet_3.0_spec")
-  }
-  query pattern callExpr where callee.method == "service"
-  emit source code.HttpInput at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.go.generated.m3124f546;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/mgechev/revive")
-  }
-  query pattern callExpr where callee.method == "GetConfig"
-  emit sink code.FilePathAccess at args[0]
-}

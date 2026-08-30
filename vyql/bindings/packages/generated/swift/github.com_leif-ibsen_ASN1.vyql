@@ -1,9 +1,0 @@
-module bindings.swift.generated.mc05dc21e;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/leif-ibsen/ASN1")
-  }
-  query pattern callExpr where callee.method == "build"
-  emit sink code.Deserialization at args[0]
-}

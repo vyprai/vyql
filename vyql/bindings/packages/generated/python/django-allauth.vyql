@@ -1,9 +1,0 @@
-module bindings.python.generated.m6363b117;
-
-binding httpInput0 {
-  requires {
-    dependency("django-allauth")
-  }
-  query pattern callExpr where callee.method == "get_request_param"
-  emit source code.HttpInput at call.result
-}

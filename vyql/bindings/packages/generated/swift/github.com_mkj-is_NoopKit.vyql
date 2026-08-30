@@ -1,9 +1,0 @@
-module bindings.swift.generated.m3d7ac97e;
-
-binding codeEval0 {
-  requires {
-    dependency("github.com/mkj-is/NoopKit")
-  }
-  query pattern callExpr where callee.method == "undefined"
-  emit sink code.CodeEval at args[0]
-}

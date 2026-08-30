@@ -1,9 +1,0 @@
-module bindings.dart.generated.mfbf9b1e2;
-
-binding deserialization0 {
-  requires {
-    dependency("json2yaml")
-  }
-  query pattern callExpr where callee.method == "json2yaml"
-  emit sink code.Deserialization at args[0]
-}

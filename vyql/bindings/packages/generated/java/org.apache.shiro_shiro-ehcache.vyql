@@ -1,9 +1,0 @@
-module bindings.java.generated.mcf0e38c1;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.shiro:shiro-ehcache")
-  }
-  query pattern callExpr where callee.method == "setCacheManagerConfigFile"
-  emit sink code.Deserialization at args[0]
-}

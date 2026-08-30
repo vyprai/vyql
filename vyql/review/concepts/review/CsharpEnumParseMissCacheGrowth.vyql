@@ -1,7 +1,0 @@
-module code;
-
-review code.CsharpEnumParseMissCacheGrowth {
-  category: resource
-  kind: attention
-  text: "review C# enum string parse caches for inserting arbitrary failed lookup keys instead of precomputing valid enum strings"
-}

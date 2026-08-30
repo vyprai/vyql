@@ -1,9 +1,0 @@
-module bindings.c.generated.mbc244c37;
-
-binding deserialization0 {
-  requires {
-    dependency("ryml")
-  }
-  query pattern callExpr where callee.path ~= "ryml.parse"
-  emit sink code.Deserialization at args[0]
-}

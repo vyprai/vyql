@@ -1,9 +1,0 @@
-module bindings.python.generated.m438e571f;
-
-binding templateRender0 {
-  requires {
-    dependency("pystache")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.TemplateRender at args[0]
-}

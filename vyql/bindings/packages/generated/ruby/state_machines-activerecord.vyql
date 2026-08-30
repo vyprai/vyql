@@ -1,9 +1,0 @@
-module bindings.ruby.generated.ma1efa7d4;
-
-binding deserialization0 {
-  requires {
-    dependency("state_machines-activerecord")
-  }
-  query pattern callExpr where callee.method == "deserialize"
-  emit sink code.Deserialization at args[0]
-}

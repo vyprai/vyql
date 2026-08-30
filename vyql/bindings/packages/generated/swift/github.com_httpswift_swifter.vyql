@@ -1,9 +1,0 @@
-module bindings.swift.generated.m2e9cde2c;
-
-binding httpInput0 {
-  requires {
-    dependency("github.com/httpswift/swifter")
-  }
-  query pattern callExpr where callee.method == "readHttpRequest"
-  emit source code.HttpInput at call.result
-}

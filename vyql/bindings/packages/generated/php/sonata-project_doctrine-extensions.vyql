@@ -1,9 +1,0 @@
-module bindings.php.generated.mdb6093d6;
-
-binding deserialization0 {
-  requires {
-    dependency("sonata-project/doctrine-extensions")
-  }
-  query pattern callExpr where callee.method == "loadClassMetadata"
-  emit sink code.Deserialization at args[0]
-}

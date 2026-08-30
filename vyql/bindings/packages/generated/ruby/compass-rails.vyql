@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mba86b390;
-
-binding filePathAccess0 {
-  requires {
-    dependency("compass-rails")
-  }
-  query pattern callExpr where callee.method == "setup_fake_rails_env_paths"
-  emit sink code.FilePathAccess at args[0]
-}

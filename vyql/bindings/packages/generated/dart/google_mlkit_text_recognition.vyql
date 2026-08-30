@@ -1,9 +1,0 @@
-module bindings.dart.generated.m4ff9735a;
-
-binding userControlledData0 {
-  requires {
-    dependency("google_mlkit_text_recognition")
-  }
-  query pattern callExpr where callee.method == "TextRecognizer.processImage"
-  emit source core.UserControlledData at call.result
-}

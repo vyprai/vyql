@@ -1,8 +1,0 @@
-module code;
-
-review code.GeneratedPathAccessorPrototypePollution {
-  category: prototype_pollution
-  expected: [core.PrototypePollutionGuard]
-  kind: target
-  text: "review generated path accessor helpers for removal or strict path-segment validation before Function compilation"
-}

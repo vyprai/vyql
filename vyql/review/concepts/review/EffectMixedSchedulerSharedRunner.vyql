@@ -1,7 +1,0 @@
-module code;
-
-review code.EffectMixedSchedulerSharedRunner {
-  category: race
-  kind: target
-  text: "verify Effect scheduler task queues are isolated per fiber before preserving AsyncLocalStorage or request-local context across concurrent RPC handlers"
-}

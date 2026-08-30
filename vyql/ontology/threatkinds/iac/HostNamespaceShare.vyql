@@ -1,6 +1,0 @@
-module iac;
-
-threat HostNamespaceShare {
-  cwe: [CWE_653]
-  desc: "Pod/container shares a host namespace or mounts a host path (weak compartmentalization)"
-}

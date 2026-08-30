@@ -1,9 +1,0 @@
-module bindings.python.generated.ma916f603;
-
-binding deserialization0 {
-  requires {
-    dependency("mpmath")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

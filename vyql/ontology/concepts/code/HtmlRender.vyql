@@ -1,8 +1,0 @@
-module code;
-
-concept HtmlRender : sink {
-  cwe: [CWE_79]
-  enabledBy: [taint.UntrustedData]
-  excludedChars: "<>\"'"
-  vulnerableTo: [injection.Xss]
-}

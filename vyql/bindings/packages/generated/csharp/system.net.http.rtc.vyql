@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m2ce7e434;
-
-binding networkSend0 {
-  requires {
-    dependency("system.net.http.rtc")
-  }
-  query pattern callExpr where callee.method == "RtcRequestFactory.Create"
-  emit sink code.NetworkSend at args[0]
-}

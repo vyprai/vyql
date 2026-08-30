@@ -1,9 +1,0 @@
-module bindings.java.generated.m0ca1e27a;
-
-binding commandExecution0 {
-  requires {
-    dependency("org.springframework.boot:spring-boot-loader-tools")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit sink code.CommandExecution at args[0]
-}

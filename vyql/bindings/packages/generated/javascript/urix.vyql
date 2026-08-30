@@ -1,9 +1,0 @@
-module bindings.javascript.generated.maf4c37f5;
-
-binding userControlledData0 {
-  requires {
-    dependency("urix")
-  }
-  query pattern callExpr where callee.method == "urix"
-  emit source core.UserControlledData at call.result
-}

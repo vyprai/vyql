@@ -1,9 +1,0 @@
-module bindings.python.generated.me505bad2;
-
-binding httpInput0 {
-  requires {
-    dependency("gradio")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source code.HttpInput at call.result
-}

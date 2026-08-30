@@ -1,9 +1,0 @@
-module bindings.go.generated.maea0f571;
-
-binding codeEval0 {
-  requires {
-    dependency("github.com/googleapis/gax-go")
-  }
-  query pattern callExpr where callee.method == "Invoke"
-  emit sink code.CodeEval at args[0]
-}

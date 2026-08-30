@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma21461c6;
-
-binding filePathAccess0 {
-  requires {
-    dependency("licensir")
-  }
-  query pattern callExpr where callee.method == "analyze"
-  emit sink code.FilePathAccess at args[0]
-}

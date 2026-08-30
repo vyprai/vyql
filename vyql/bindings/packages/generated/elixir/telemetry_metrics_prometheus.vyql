@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mefb968d9;
-
-binding codeEval0 {
-  requires {
-    dependency("telemetry_metrics_prometheus")
-  }
-  query pattern callExpr where callee.method == "execute_pre_scrape_handler"
-  emit sink code.CodeEval at args[0]
-}

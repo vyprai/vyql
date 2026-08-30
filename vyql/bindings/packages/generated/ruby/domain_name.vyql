@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m0e1940f2;
-
-binding userControlledData0 {
-  requires {
-    dependency("domain_name")
-  }
-  query pattern callExpr where callee.method == "initialize"
-  emit source core.UserControlledData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.m5dcb47cd;
-
-binding secretValue0 {
-  requires {
-    dependency("CryptX")
-  }
-  query pattern callExpr where callee.method == "Crypt::PRNG::random_bytes"
-  emit source code.SecretValue at call.result
-}

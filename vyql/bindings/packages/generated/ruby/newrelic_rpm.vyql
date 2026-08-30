@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m37512d71;
-
-binding httpInput0 {
-  requires {
-    dependency("newrelic_rpm")
-  }
-  query pattern callExpr where callee.method == "session"
-  emit source code.HttpInput at call.result
-}

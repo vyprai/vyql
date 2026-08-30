@@ -1,9 +1,0 @@
-module bindings.swift.generated.m7d506cfe;
-
-binding filePathAccess0 {
-  requires {
-    dependency("github.com/amzn/service-model-swift-code-generate")
-  }
-  query pattern callExpr where callee.method == "write"
-  emit sink code.FilePathAccess at args[0]
-}

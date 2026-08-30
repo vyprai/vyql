@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m9dac4b57;
-
-binding commandExecution0 {
-  requires {
-    dependency("boost-build")
-  }
-  query pattern callExpr where callee.method == "trigger_event_pre_exec_cmd"
-  emit sink code.CommandExecution at args[0]
-}

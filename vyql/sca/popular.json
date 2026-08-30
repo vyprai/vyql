@@ -1,8 +1,0 @@
-{
-  "pypi": ["requests", "urllib3", "numpy", "pandas", "flask", "django", "boto3",
-           "setuptools", "pyyaml", "cryptography", "colorama", "pillow", "scipy",
-           "click", "jinja2", "werkzeug", "sqlalchemy", "certifi", "idna", "six"],
-  "npm": ["react", "lodash", "express", "axios", "chalk", "commander", "request",
-          "debug", "webpack", "moment", "uuid", "dotenv", "async", "bluebird",
-          "underscore", "vue", "typescript", "eslint", "jest", "babel-core"]
-}

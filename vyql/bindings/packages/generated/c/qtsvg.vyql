@@ -1,9 +1,0 @@
-module bindings.c.generated.md383f576;
-
-binding deserialization0 {
-  requires {
-    dependency("qtsvg")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.Deserialization at args[0]
-}

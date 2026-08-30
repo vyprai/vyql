@@ -1,9 +1,0 @@
-module bindings.python.generated.meb09e325;
-
-binding sqlExecution0 {
-  requires {
-    dependency("lmdb")
-  }
-  query pattern callExpr where callee.method == "mdb_mid2l_insert"
-  emit sink code.SqlExecution at args[0]
-}

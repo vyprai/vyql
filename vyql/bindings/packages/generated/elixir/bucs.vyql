@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m453e8472;
-
-binding commandExecution0 {
-  requires {
-    dependency("bucs")
-  }
-  query pattern callExpr where callee.method == "run_hook_cmd"
-  emit sink code.CommandExecution at args[0]
-}

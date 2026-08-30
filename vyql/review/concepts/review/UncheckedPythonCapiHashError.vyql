@@ -1,7 +1,0 @@
-module code;
-
-review code.UncheckedPythonCapiHashError {
-  category: resource
-  kind: attention
-  text: "review Python C extension hash callbacks for -1 error handling before cleanup continues"
-}

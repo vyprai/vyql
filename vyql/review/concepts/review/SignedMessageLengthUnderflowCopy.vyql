@@ -1,8 +1,0 @@
-module code;
-
-review code.SignedMessageLengthUnderflowCopy {
-  category: memory
-  expected: [core.MemoryBoundsCheck]
-  kind: attention
-  text: "review signed-message length subtraction before memcpy; require a minimum signed-message length guard before deriving message length"
-}

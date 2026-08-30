@@ -1,8 +1,0 @@
-# Rank 31 / CVE-2019-15151: adplug failure-path owned-buffer free.
-
-test "rank31: failure-path owned-buffer free is a CVE anchor"
-  expect VYQL-MEM-011
-  graph
-  ```
-  node free code.FailurePathOwnedBufferFree
-  ```

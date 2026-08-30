@@ -1,9 +1,0 @@
-module bindings.go.generated.m346b2342;
-
-binding sqlExecution0 {
-  requires {
-    dependency("gorm.io/driver/postgres")
-  }
-  query pattern callExpr where callee.method == "Open"
-  emit sink code.SqlExecution at args[0]
-}

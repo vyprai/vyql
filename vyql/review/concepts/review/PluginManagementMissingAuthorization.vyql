@@ -1,8 +1,0 @@
-module code;
-
-review code.PluginManagementMissingAuthorization {
-  category: auth
-  expected: [core.AuthorizationCheck]
-  kind: target
-  text: "verify plugin upload, install, uninstall, and status-change endpoints require operation-specific permissions"
-}

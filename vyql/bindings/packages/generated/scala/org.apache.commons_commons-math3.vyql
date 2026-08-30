@@ -1,9 +1,0 @@
-module bindings.scala.generated.m1b8087bf;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.commons:commons-math3")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

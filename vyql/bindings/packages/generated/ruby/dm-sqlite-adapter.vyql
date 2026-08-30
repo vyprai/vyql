@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mfff4d7c8;
-
-binding filePathAccess0 {
-  requires {
-    dependency("dm-sqlite-adapter")
-  }
-  query pattern callExpr where callee.method == "normalize_options"
-  emit sink code.FilePathAccess at args[0]
-}

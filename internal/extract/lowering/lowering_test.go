@@ -777,6 +777,103 @@ func TestLowerPreservesDeclaredReceiverTypeAfterUntypedAssignment(t *testing.T) 
 	t.Fatalf("item.name call not found")
 }
 
+func TestLowerCallLowersCallCalleeInnerCall(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.js",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "handler", Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					// f(x)(y): the callee is itself a call, the curried and
+					// immediate-invocation form. The inner call and its
+					// argument must be lowered, not only the outer call.
+					Callee: nir.Call{
+						Callee: nir.Name{ID: "compile", Loc: "app.js:2"},
+						Args:   []nir.Expr{nir.Name{ID: "payload", Loc: "app.js:2"}},
+						Path:   "compile", Loc: "app.js:2",
+					},
+					Path: "compile", Loc: "app.js:2",
+				}},
+			}, Loc: "app.js:1"},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") != "compile" {
+			continue
+		}
+		if n.Prop("arg0") == "" {
+			t.Fatalf("callee-position call missing its arg slot: %+v", n.Props)
+		}
+		return
+	}
+	t.Fatalf("call in callee position not lowered: no code.Call with callee_path compile")
+}
+
+// An immediately-invoked function expression is the module wrapper of browser
+// JavaScript: `Namespace.module = (function () { ... }())`. The callee slot
+// holds the function expression itself -- directly in the `(function () {
+// ... }())` spelling and behind a parenthesized-expression chain in
+// `(function () { ... })()` -- and the body it names is real program text with
+// its own scope. Both spellings must lower that body.
+func TestLowerCallLowersImmediatelyInvokedFunctionBody(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		callee nir.Expr
+	}{
+		{"direct", nir.Lambda{
+			Body:          []nir.Stmt{callStmt("sink.render", "app.js:3")},
+			ContextTokens: []string{"lang=javascript\x00name=<lambda>"},
+			Loc:           "app.js:2",
+		}},
+		{"parenthesized", nir.Thru{Inner: nir.Lambda{
+			Body:          []nir.Stmt{callStmt("sink.render", "app.js:3")},
+			ContextTokens: []string{"lang=javascript\x00name=<lambda>"},
+			Loc:           "app.js:2",
+		}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prog := nir.Program{Modules: []nir.Module{{
+				Key:  "app",
+				File: "app.js",
+				Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "Namespace", Loc: "app.js:1"}, Attr: "module", Path: "Namespace.module", Loc: "app.js:1"},
+						Args:   []nir.Expr{nir.Call{Callee: tc.callee, Args: []nir.Expr{nir.Name{ID: "jQuery", Loc: "app.js:4"}}, Path: "?", Loc: "app.js:1"}},
+						Path:   "Namespace.module", Loc: "app.js:1",
+					}},
+				},
+			}}}
+			g, err := Lower(prog, true)
+			if err != nil {
+				t.Fatalf("lower: %v", err)
+			}
+			foundCall, foundContext := false, false
+			ids, _ := g.NodesOfType("code.Call")
+			for _, id := range ids {
+				n, _, _ := g.GetNode(id)
+				switch n.Prop("callee_path") {
+				case "sink.render":
+					foundCall = true
+				case "analysis.function.context":
+					foundContext = true
+				}
+			}
+			if !foundCall {
+				t.Fatalf("call inside the invoked function body was not lowered")
+			}
+			if !foundContext {
+				t.Fatalf("invoked function body produced no analysis.function.context")
+			}
+		})
+	}
+}
+
 func TestLowerCallRecordsReceiverNode(t *testing.T) {
 	prog := nir.Program{Modules: []nir.Module{{
 		Key:  "app",

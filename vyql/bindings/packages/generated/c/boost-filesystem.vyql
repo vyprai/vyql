@@ -1,9 +1,0 @@
-module bindings.c.generated.m1613fd04;
-
-binding filePathAccess0 {
-  requires {
-    dependency("boost-filesystem")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

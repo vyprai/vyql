@@ -1,9 +1,0 @@
-module bindings.objc.generated.m379ad586;
-
-binding secretValue0 {
-  requires {
-    dependency("FirebaseAuthInterop")
-  }
-  query pattern callExpr where callee.method == "initWithToken"
-  emit source code.SecretValue at call.result
-}

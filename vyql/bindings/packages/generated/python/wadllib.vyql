@@ -1,9 +1,0 @@
-module bindings.python.generated.m8bdd981f;
-
-binding deserialization0 {
-  requires {
-    dependency("wadllib")
-  }
-  query pattern callExpr where callee.method == "bind"
-  emit sink code.Deserialization at args[0]
-}

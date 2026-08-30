@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m8035501b;
-
-binding commandExecution0 {
-  requires {
-    dependency("libressl")
-  }
-  query pattern callExpr where callee.method == "spawn"
-  emit sink code.CommandExecution at args[0]
-}

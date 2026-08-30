@@ -1,9 +1,0 @@
-module bindings.csharp.generated.m72280539;
-
-binding commandExecution0 {
-  requires {
-    dependency("dynamicinterop")
-  }
-  query pattern callExpr where callee.method == "ExecCommand"
-  emit sink code.CommandExecution at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.perl.generated.mfda1c597;
-
-binding fileUse0 {
-  requires {
-    dependency("Thesaurus")
-  }
-  query pattern callExpr where callee.method == "Thesaurus::CSV.save"
-  emit sink code.FileUseSink at args[0]
-}

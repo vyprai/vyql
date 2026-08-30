@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m27ea8e73;
-
-binding deserialization0 {
-  requires {
-    dependency("ini")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

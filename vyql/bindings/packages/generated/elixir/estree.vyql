@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m46168d77;
-
-binding codeEval0 {
-  requires {
-    dependency("estree")
-  }
-  query pattern callExpr where callee.method == "ESTree.Tools.Generator.generate"
-  emit sink code.CodeEval at args[0]
-}

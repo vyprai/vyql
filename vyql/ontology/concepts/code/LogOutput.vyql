@@ -1,9 +1,0 @@
-module code;
-
-concept LogOutput : sink {
-  cwe: [CWE_117]
-  enabledBy: [taint.UntrustedData]
-  excludedChars: "\n\r"
-  possibility: exclude
-  vulnerableTo: [injection.LogInjection]
-}

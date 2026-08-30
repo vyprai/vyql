@@ -1,9 +1,0 @@
-module bindings.php.generated.ma8b33382;
-
-binding deserialization0 {
-  requires {
-    dependency("symfony/polyfill-php80")
-  }
-  query pattern callExpr where callee.method == "tokenize"
-  emit sink code.Deserialization at args[0]
-}

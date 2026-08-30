@@ -1,7 +1,0 @@
-module cloud;
-
-concept Internet : exposure {
-  contextReachLabel: "internet-reachable"
-  contextReachSource: true
-  contextReachTargetProp: service
-}

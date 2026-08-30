@@ -1,9 +1,0 @@
-module bindings.php.generated.ma9a46b1b;
-
-binding sqlExecution0 {
-  requires {
-    dependency("sentry/sentry-laravel")
-  }
-  query pattern callExpr where callee.method == "queryExecutedHandler"
-  emit sink code.SqlExecution at args[0]
-}

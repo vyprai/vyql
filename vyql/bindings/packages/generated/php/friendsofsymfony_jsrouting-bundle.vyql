@@ -1,9 +1,0 @@
-module bindings.php.generated.m3f453abe;
-
-binding urlFetch0 {
-  requires {
-    dependency("friendsofsymfony/jsrouting-bundle")
-  }
-  query pattern callExpr where callee.method == "getInstance"
-  emit sink code.UrlFetch at args[0]
-}

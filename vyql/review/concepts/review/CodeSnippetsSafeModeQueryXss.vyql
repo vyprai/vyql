@@ -1,8 +1,0 @@
-module code;
-
-review code.CodeSnippetsSafeModeQueryXss {
-  category: xss
-  expected: [core.HtmlEscape, core.InputValidation]
-  kind: attention
-  text: "review Code Snippets safe-mode query URLs for boolean narrowing or escaping before attribute rendering"
-}

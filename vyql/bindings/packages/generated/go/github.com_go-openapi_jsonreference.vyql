@@ -1,9 +1,0 @@
-module bindings.go.generated.m25c3c274;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/go-openapi/jsonreference")
-  }
-  query pattern callExpr where callee.method == "New"
-  emit sink code.Deserialization at args[0]
-}

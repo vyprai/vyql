@@ -1,9 +1,0 @@
-module bindings.ruby.generated.md34123b3;
-
-binding commandExecution0 {
-  requires {
-    dependency("guard")
-  }
-  query pattern callExpr where callee.method == "Releaser.system"
-  emit sink code.CommandExecution at args[0]
-}

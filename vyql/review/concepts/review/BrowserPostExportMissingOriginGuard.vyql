@@ -1,8 +1,0 @@
-module code;
-
-review code.BrowserPostExportMissingOriginGuard {
-  category: request
-  expected: [core.CsrfProtection]
-  kind: target
-  text: "review browser-reachable POST export endpoints for Origin or CSRF validation before export operations"
-}

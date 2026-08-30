@@ -1,7 +1,0 @@
-module code;
-
-review code.ClaxonResidualPartitionBufferExposure {
-  category: memory
-  kind: attention
-  text: "review residual partition decoding for a block-size divisibility guard before slicing the output buffer"
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.me0808d05;
-
-binding deserialization0 {
-  requires {
-    dependency("renderkid")
-  }
-  query pattern callExpr where callee.method == "stringToDom"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m8be28051;
-
-binding deserialization0 {
-  requires {
-    dependency("org.codehaus.groovy:groovy-all")
-  }
-  query pattern callExpr where callee.method == "JsonParser.parse"
-  emit sink code.Deserialization at args[0]
-}

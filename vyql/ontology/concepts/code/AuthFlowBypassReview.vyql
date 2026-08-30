@@ -1,6 +1,0 @@
-module code;
-
-concept AuthFlowBypassReview : issue {
-  cwe: [CWE_287]
-  vulnerableTo: [authentication.ImproperAuthentication]
-}

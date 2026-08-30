@@ -1,9 +1,0 @@
-module bindings.php.generated.m0a333b37;
-
-binding databaseRead0 {
-  requires {
-    dependency("zendframework/zend-mail")
-  }
-  query pattern callExpr where callee.method == "search"
-  emit sink code.DatabaseReadSink at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m6805e737;
-
-binding filePathAccess0 {
-  requires {
-    dependency("escalade")
-  }
-  query pattern callExpr where callee.method == "escalade"
-  emit sink code.FilePathAccess at args[0]
-}

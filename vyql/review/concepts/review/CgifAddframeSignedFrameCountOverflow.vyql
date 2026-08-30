@@ -1,7 +1,0 @@
-module code;
-
-review code.CgifAddframeSignedFrameCountOverflow {
-  category: numeric
-  kind: attention
-  text: "review CGIF frame-count loop bounds for unsigned width-height multiplication before indexing image data"
-}

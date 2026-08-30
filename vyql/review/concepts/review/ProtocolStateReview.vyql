@@ -1,7 +1,0 @@
-module code;
-
-review code.ProtocolStateReview {
-  category: request
-  kind: attention
-  text: "review protocol/state transitions for out-of-sequence, stale, or unauthenticated data accepted without the required state check"
-}

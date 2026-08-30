@@ -1,9 +1,0 @@
-module bindings.cpp.generated.mb2fbfc21;
-
-binding codeEval0 {
-  requires {
-    dependency("qtactiveqt")
-  }
-  query pattern callExpr where callee.method == "load"
-  emit sink code.CodeEval at args[0]
-}

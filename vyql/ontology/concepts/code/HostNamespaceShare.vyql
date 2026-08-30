@@ -1,6 +1,0 @@
-module code;
-
-concept HostNamespaceShare : issue {
-  cwe: [CWE_653]
-  vulnerableTo: [iac.HostNamespaceShare]
-}

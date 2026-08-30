@@ -1,9 +1,0 @@
-module bindings.rust.generated.ma4fa14d3;
-
-binding commandExecution0 {
-  requires {
-    dependency("pkg-config")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit sink code.CommandExecution at args[0]
-}

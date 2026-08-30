@@ -1,9 +1,0 @@
-module bindings.rust.generated.mf2835cae;
-
-binding deserialization0 {
-  requires {
-    dependency("parity-wasm")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.Deserialization at args[0]
-}

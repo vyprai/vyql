@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc79c454e;
-
-binding userControlledData0 {
-  requires {
-    dependency("AlignAid")
-  }
-  query pattern callExpr where callee.method == "new"
-  emit source core.UserControlledData at call.result
-}

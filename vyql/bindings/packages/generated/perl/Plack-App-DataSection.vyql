@@ -1,9 +1,0 @@
-module bindings.perl.generated.m93084124;
-
-binding httpInput0 {
-  requires {
-    dependency("Plack-App-DataSection")
-  }
-  query pattern callExpr where callee.method == "call"
-  emit source code.HttpInput at call.result
-}

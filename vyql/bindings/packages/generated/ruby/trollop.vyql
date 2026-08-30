@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mcff65c60;
-
-binding userControlledData0 {
-  requires {
-    dependency("trollop")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit source core.UserControlledData at call.result
-}

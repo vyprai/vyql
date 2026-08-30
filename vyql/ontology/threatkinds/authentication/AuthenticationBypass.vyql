@@ -1,6 +1,0 @@
-module authentication;
-
-threat AuthenticationBypass {
-  cwe: [CWE_288]
-  desc: "Authentication bypass using an alternate path or condition"
-}

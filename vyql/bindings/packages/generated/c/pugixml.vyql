@@ -1,9 +1,0 @@
-module bindings.c.generated.m554cd835;
-
-binding xmlParse0 {
-  requires {
-    dependency("pugixml")
-  }
-  query pattern callExpr where callee.path ~= "pugixml.parse"
-  emit sink code.XmlParse at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.java.generated.m0c862801;
-
-binding sqlExecution0 {
-  requires {
-    dependency("com.github.pagehelper:pagehelper")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.SqlExecution at args[0]
-}

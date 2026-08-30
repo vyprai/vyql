@@ -1,6 +1,0 @@
-module code;
-
-concept TimeBoundAccessTokenReview : issue {
-  cwe: [CWE_284]
-  vulnerableTo: [access_control.BrokenAccess]
-}

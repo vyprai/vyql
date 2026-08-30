@@ -1,9 +1,0 @@
-module bindings.bash.generated.m01ad9b9d;
-
-binding cliArgument0 {
-  requires {
-    dependency("mcfly")
-  }
-  query pattern callExpr where callee.path ~= "mcfly"
-  emit source code.CliArgument at call.result
-}

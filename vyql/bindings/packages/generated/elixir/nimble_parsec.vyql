@@ -1,9 +1,0 @@
-module bindings.elixir.generated.mcb5e981b;
-
-binding deserialization0 {
-  requires {
-    dependency("nimble_parsec")
-  }
-  query pattern callExpr where callee.method == "parsec"
-  emit sink code.Deserialization at args[0]
-}

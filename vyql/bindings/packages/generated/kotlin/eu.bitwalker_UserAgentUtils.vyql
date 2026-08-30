@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.mbbb463b6;
-
-binding userControlledData0 {
-  requires {
-    dependency("eu.bitwalker:UserAgentUtils")
-  }
-  query pattern callExpr where callee.method == "parseUserAgentString"
-  emit source core.UserControlledData at call.result
-}

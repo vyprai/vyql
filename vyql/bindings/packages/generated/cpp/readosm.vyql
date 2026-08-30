@@ -1,9 +1,0 @@
-module bindings.cpp.generated.me965cc96;
-
-binding deserialization0 {
-  requires {
-    dependency("readosm")
-  }
-  query pattern callExpr where callee.method == "readosm_parse"
-  emit sink code.Deserialization at args[0]
-}

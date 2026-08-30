@@ -1,9 +1,0 @@
-module bindings.elixir.generated.ma85bb290;
-
-binding userControlledData0 {
-  requires {
-    dependency("scrivener")
-  }
-  query pattern callExpr where callee.method == "paginate"
-  emit source core.UserControlledData at call.result
-}

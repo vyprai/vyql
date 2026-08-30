@@ -1,9 +1,0 @@
-module bindings.python.generated.m670ccd79;
-
-binding commandExecution0 {
-  requires {
-    dependency("pre-commit")
-  }
-  query pattern callExpr where callee.method == "cmd_output_b"
-  emit sink code.CommandExecution at args[0]
-}

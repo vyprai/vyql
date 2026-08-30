@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m3ac1aad8;
-
-binding deserialization0 {
-  requires {
-    dependency("jekyll-commonmark")
-  }
-  query pattern callExpr where callee.method == "convert"
-  emit sink code.Deserialization at args[0]
-}

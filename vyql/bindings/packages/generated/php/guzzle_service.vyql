@@ -1,9 +1,0 @@
-module bindings.php.generated.m81025137;
-
-binding deserialization0 {
-  requires {
-    dependency("guzzle/service")
-  }
-  query pattern callExpr where callee.method == "DefaultResponseParser::parse"
-  emit sink code.Deserialization at args[0]
-}

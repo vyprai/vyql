@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m267a881b;
-
-binding htmlRender0 {
-  requires {
-    dependency("gravatar_image_tag")
-  }
-  query pattern callExpr where callee.method == "gravatar_image_tag"
-  emit sink code.HtmlRender at args[0]
-}

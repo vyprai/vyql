@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m291089fb;
-
-binding filePathAccess0 {
-  requires {
-    dependency("seed-fu")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FilePathAccess at args[0]
-}

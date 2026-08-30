@@ -1,9 +1,0 @@
-module bindings.javascript.generated.mebdde8e3;
-
-binding userControlledData0 {
-  requires {
-    dependency("mime")
-  }
-  query pattern callExpr where callee.method == "getType"
-  emit source core.UserControlledData at call.result
-}

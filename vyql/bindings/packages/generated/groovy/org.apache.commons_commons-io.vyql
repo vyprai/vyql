@@ -1,9 +1,0 @@
-module bindings.groovy.generated.mad1894c0;
-
-binding filePathAccess0 {
-  requires {
-    dependency("org.apache.commons:commons-io")
-  }
-  query pattern callExpr where callee.method == "read"
-  emit sink code.FilePathAccess at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.javascript.generated.m4b6762df;
-
-binding deserialization0 {
-  requires {
-    dependency("@webassemblyjs/wasm-opt")
-  }
-  query pattern callExpr where callee.method == "shrinkPaddedLEB128"
-  emit sink code.Deserialization at args[0]
-}

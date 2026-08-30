@@ -1,9 +1,0 @@
-module bindings.php.generated.mede12f86;
-
-binding deserialization0 {
-  requires {
-    dependency("zendframework/zend-serializer")
-  }
-  query pattern callExpr where callee.method == "unserialize"
-  emit sink code.Deserialization at args[0]
-}

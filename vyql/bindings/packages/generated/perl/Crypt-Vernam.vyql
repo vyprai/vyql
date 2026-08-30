@@ -1,9 +1,0 @@
-module bindings.perl.generated.m6d7dec09;
-
-binding weakRandomValue0 {
-  requires {
-    dependency("Crypt-Vernam")
-  }
-  query pattern callExpr where callee.method == "_get_key_mod26"
-  emit issue code.WeakRandomValue at call
-}

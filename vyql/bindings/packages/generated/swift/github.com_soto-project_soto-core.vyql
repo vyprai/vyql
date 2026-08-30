@@ -1,9 +1,0 @@
-module bindings.swift.generated.m6d3a332f;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/soto-project/soto-core")
-  }
-  query pattern callExpr where callee.method == "decode"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.ruby.generated.ma6e32c3a;
-
-binding cliArgument0 {
-  requires {
-    dependency("ruby-debug")
-  }
-  query pattern callExpr where callee.path ~= "rdebug.argv"
-  emit source code.CliArgument at call.result
-}

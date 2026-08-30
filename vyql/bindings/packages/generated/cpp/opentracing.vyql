@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m45ad2e17;
-
-binding deserialization0 {
-  requires {
-    dependency("opentracing")
-  }
-  query pattern callExpr where callee.method == "Extract"
-  emit sink code.Deserialization at args[0]
-}

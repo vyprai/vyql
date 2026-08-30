@@ -1,8 +1,0 @@
-# Rank 609 / CVE-2019-20861: Mattermost Desktop Electron node integration.
-
-test "rank609: Electron node integration is a CVE anchor"
-  expect VYQL-DSK-001
-  graph
-  ```
-  node webview code.ElectronNodeIntegration
-  ```

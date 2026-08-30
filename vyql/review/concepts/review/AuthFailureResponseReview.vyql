@@ -1,8 +1,0 @@
-module code;
-
-review code.AuthFailureResponseReview {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: attention
-  text: "review authentication verification error responses for fail-closed unauthorized behavior expected by the proxy"
-}

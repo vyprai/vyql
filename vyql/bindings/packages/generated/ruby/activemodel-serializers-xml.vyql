@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m1bd52d21;
-
-binding deserialization0 {
-  requires {
-    dependency("activemodel-serializers-xml")
-  }
-  query pattern callExpr where callee.method == "from_xml"
-  emit sink code.Deserialization at args[0]
-}

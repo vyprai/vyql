@@ -1,6 +1,0 @@
-module access_control;
-
-threat Idor {
-  cwe: [CWE_639]
-  desc: "Insecure direct object reference"
-}

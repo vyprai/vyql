@@ -1,9 +1,0 @@
-module bindings.perl.generated.mc50721d3;
-
-binding commandExecution0 {
-  requires {
-    dependency("Silki")
-  }
-  query pattern callExpr where callee.method == "Silki::Web::CSS.system"
-  emit sink code.CommandExecution at args[0]
-}

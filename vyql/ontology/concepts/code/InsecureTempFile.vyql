@@ -1,6 +1,0 @@
-module code;
-
-concept InsecureTempFile : issue {
-  cwe: [CWE_377, CWE_59]
-  vulnerableTo: [path.InsecureTempFile, path.LinkFollowing]
-}

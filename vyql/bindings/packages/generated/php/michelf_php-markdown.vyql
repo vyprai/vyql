@@ -1,9 +1,0 @@
-module bindings.php.generated.m073ff7d1;
-
-binding htmlRender0 {
-  requires {
-    dependency("michelf/php-markdown")
-  }
-  query pattern callExpr where callee.method == "transform"
-  emit sink code.HtmlRender at args[0]
-}

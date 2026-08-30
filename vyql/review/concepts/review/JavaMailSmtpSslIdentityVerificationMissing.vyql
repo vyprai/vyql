@@ -1,8 +1,0 @@
-module code;
-
-review code.JavaMailSmtpSslIdentityVerificationMissing {
-  category: crypto
-  expected: [core.CertificateValidation]
-  kind: attention
-  text: "review JavaMail SMTP SSL/TLS setup for mail.smtp.ssl.checkserveridentity=true before sending mail or credentials"
-}

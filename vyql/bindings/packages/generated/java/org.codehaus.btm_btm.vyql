@@ -1,9 +1,0 @@
-module bindings.java.generated.mb5ff6e31;
-
-binding deserialization0 {
-  requires {
-    dependency("org.codehaus.btm:btm")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

@@ -1,9 +1,0 @@
-module bindings.powershell.generated.m34af7b50;
-
-binding deserialization0 {
-  requires {
-    dependency("jquery.color")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

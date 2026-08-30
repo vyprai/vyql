@@ -1,8 +1,0 @@
-module code;
-
-review code.AuthFlowBypassReview {
-  category: auth
-  expected: [core.AuthenticationCheck]
-  kind: attention
-  text: "review alternate UI or navigation exit paths in this authentication flow"
-}

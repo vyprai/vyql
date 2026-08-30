@@ -34,7 +34,7 @@ type Engine struct {
 	contextConfirmByTarget map[string][]string
 	flowGuards             map[string][]string
 	dominanceGuards        map[string][]string
-	sameReceiverGuards     map[string]map[string]bool
+	sameReceiverGuards     map[string]map[receiverGuardKey]bool
 	sameScopeGuards        map[string]map[string]bool
 	globalGuards           map[string]bool
 	taintFlowCache         map[string][]solvers.TaintFlow
@@ -53,7 +53,7 @@ func New(onto *ontology.Ontology, store usg.Store) *Engine {
 		contextConfirmByTarget: map[string][]string{},
 		flowGuards:             map[string][]string{},
 		dominanceGuards:        map[string][]string{},
-		sameReceiverGuards:     map[string]map[string]bool{},
+		sameReceiverGuards:     map[string]map[receiverGuardKey]bool{},
 		sameScopeGuards:        map[string]map[string]bool{},
 		globalGuards:           map[string]bool{},
 		taintFlowCache:         map[string][]solvers.TaintFlow{},
@@ -1262,7 +1262,7 @@ func (e *Engine) sameReceiverGuarded(sinkID, control string) bool {
 	if sinkRecv == "" {
 		return false
 	}
-	return e.sameReceiverGuardReceivers(control)[sinkRecv]
+	return e.sameReceiverGuardReceivers(control)[receiverGuardKey{file: nodeFile(sink), recv: sinkRecv}]
 }
 
 func (e *Engine) dominatesGuarded(targetID, control string) bool {
@@ -1292,11 +1292,51 @@ func (e *Engine) dominanceGuardCandidates(control string) []string {
 	return out
 }
 
-func (e *Engine) sameReceiverGuardReceivers(control string) map[string]bool {
+// receiverGuardKey identifies a receiver by its name within one file. The name
+// alone is not an object identity: a local spelled `factory` in one file and a
+// local spelled `factory` in another are two objects, and only the recv-node
+// route above carries the real one. Keying the fallback by file keeps the idiom
+// the fallback exists for -- a receiver hardened in a constructor or initialiser
+// covering its uses elsewhere in the same file -- while a same-named receiver in
+// another file no longer inherits that coverage. Nodes with no location and no
+// scope keep the empty key, so they continue to match each other exactly as they
+// did when the receiver name alone was the key.
+type receiverGuardKey struct {
+	file string
+	recv string
+}
+
+// nodeFile returns the file a node belongs to: the path part of its location
+// when it has one, else the leading segment of its lexical scope (frontends
+// that key scopes by file module). Empty when neither is present.
+func nodeFile(n usg.Node) string {
+	if loc := n.Prop("loc"); loc != "" {
+		if i := strings.LastIndexByte(loc, ':'); i > 0 {
+			return loc[:i]
+		}
+		return loc
+	}
+	scope := n.Scope
+	if scope == "" {
+		scope = n.Prop("region")
+	}
+	if scope == "" {
+		scope = n.Region
+	}
+	if at := strings.IndexByte(scope, '@'); at >= 0 {
+		scope = scope[:at]
+	}
+	if i := strings.IndexByte(scope, '/'); i > 0 {
+		return scope[:i]
+	}
+	return ""
+}
+
+func (e *Engine) sameReceiverGuardReceivers(control string) map[receiverGuardKey]bool {
 	if receivers, ok := e.sameReceiverGuards[control]; ok {
 		return receivers
 	}
-	receivers := map[string]bool{}
+	receivers := map[receiverGuardKey]bool{}
 	for _, gid := range e.nodesWithConcept(control) {
 		if !nodeHasConcreteCoverage(e.labels(gid), control, "sameReceiver") {
 			continue
@@ -1306,7 +1346,7 @@ func (e *Engine) sameReceiverGuardReceivers(control string) map[string]bool {
 			continue
 		}
 		if recv := receiverPrefix(guard.Prop("callee_path")); recv != "" {
-			receivers[recv] = true
+			receivers[receiverGuardKey{file: nodeFile(guard), recv: recv}] = true
 		}
 	}
 	e.sameReceiverGuards[control] = receivers

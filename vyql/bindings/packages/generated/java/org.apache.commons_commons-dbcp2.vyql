@@ -1,9 +1,0 @@
-module bindings.java.generated.m175dd295;
-
-binding databaseRead0 {
-  requires {
-    dependency("org.apache.commons:commons-dbcp2")
-  }
-  query pattern callExpr where callee.method == "getConnection"
-  emit sink code.DatabaseReadSink at args[0]
-}

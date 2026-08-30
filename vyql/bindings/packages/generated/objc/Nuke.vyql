@@ -1,9 +1,0 @@
-module bindings.objc.generated.me42228e9;
-
-binding networkData0 {
-  requires {
-    dependency("Nuke")
-  }
-  query pattern callExpr where callee.method == "loadData"
-  emit source code.NetworkData at call.result
-}

@@ -1,9 +1,0 @@
-module bindings.scala.generated.m56aeded7;
-
-binding deserialization0 {
-  requires {
-    dependency("com.google.protobuf:protobuf-java-util")
-  }
-  query pattern callExpr where callee.method == "JsonFormat.Parser.merge"
-  emit sink code.Deserialization at args[0]
-}

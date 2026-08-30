@@ -402,6 +402,7 @@ func (c *conv) typeContextStmts(g *ast.GenDecl, methods map[string]map[string]bo
 		for _, f := range fields {
 			tokens = append(tokens, "field:"+f)
 		}
+		tokens = append(tokens, c.structFieldTags(ts.Type)...)
 		var ms []string
 		for m := range methods[ts.Name.Name] {
 			ms = append(ms, m)
@@ -429,6 +430,55 @@ func (c *conv) structFieldNames(expr ast.Expr) []string {
 			}
 			seen[n.Name] = true
 			out = append(out, n.Name)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// structFieldTags emits one `field_tag:<Name>=<tag>` token per tagged struct field. A Go
+// struct tag is where a declarative constraint lives -- a validator's rule set, a
+// serializer's redaction directive, a configuration loader's variable name -- so a control
+// stated only in a tag is otherwise invisible to every binding. The tag text is carried as
+// written, minus the whitespace between keys as every other Go context token drops it,
+// rather than parsed into keys: which key means what is a per-library convention and
+// belongs in a binding, and the value quotes are what lets a binding anchor the end of a
+// value, so that `env:"JWT_SECRET"` does not read as a prefix of `env:"JWT_SECRET_FILE"`.
+//
+// A needle against those quotes has to spell them `\\\"`, not `\\"`, and that is a
+// property of the node rather than of this token: analysisCall carries every token as a
+// nir.Const whose Value is strconv.Quote(tok), and unquoteLit
+// (extract/lowering/lowering.go:4119) strips only the outer quote pair, so the inner
+// escapes survive into str_args. Tokens that reach a binding through
+// analysis.function.context instead -- assign:, binary:, call_path: -- are handed to the
+// lowerer as raw strings and take a single backslash. The two spellings are not
+// interchangeable.
+func (c *conv) structFieldTags(expr ast.Expr) []string {
+	st, ok := expr.(*ast.StructType)
+	if !ok || st.Fields == nil {
+		return nil
+	}
+	var out []string
+	for _, f := range st.Fields.List {
+		if f.Tag == nil {
+			continue
+		}
+		tag, err := strconv.Unquote(f.Tag.Value)
+		if err != nil {
+			continue
+		}
+		tag = goCompactWhitespaceReplacer.Replace(tag)
+		if tag == "" {
+			continue
+		}
+		if len(tag) > 512 {
+			tag = tag[:512]
+		}
+		for _, n := range f.Names {
+			if n == nil || n.Name == "_" {
+				continue
+			}
+			out = append(out, "field_tag:"+n.Name+"="+tag)
 		}
 	}
 	sort.Strings(out)
@@ -467,6 +517,8 @@ func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, 
 	if bodyNode != nil {
 		body = c.stmts(bodyNode.List)
 		body = append(body, c.goSecurityObservations(name, params, bodyNode)...)
+		body = append(body, c.goDecodeOverwritesPresetObservations(name, bodyNode)...)
+		body = append(body, c.goUnboundedAppendAccumulationObservations(name, bodyNode)...)
 	}
 	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc,
 		ContextTokens: c.goFunctionTokens(name, typ, bodyNode),
@@ -563,6 +615,257 @@ func (c *conv) goPublicUserListRouteMissingAuthObservations(name string, body *a
 		return true
 	})
 	return out
+}
+
+// goDecodeOverwritesPresetObservations records one fact per decode call that
+// writes a request payload over a struct the same function had already preset
+// with explicit field values. The json, xml and yaml/toml decoders all
+// overwrite a struct field the moment the payload names it, so a value
+// initialised before the decode is exactly the value the payload can replace;
+// the fact names the preset fields and anchors at the decode call itself, a
+// single-expression point a binding can consume, rather than at the
+// whole-function context node. Which preset fields matter is a judgement the
+// consumer makes: the fact only states the construct. Presets recorded after
+// the decode do not count -- re-establishing a field once the payload has been
+// read is the remediation, not the exposure.
+func (c *conv) goDecodeOverwritesPresetObservations(name string, body *ast.BlockStmt) []nir.Stmt {
+	if body == nil {
+		return nil
+	}
+	preset := map[string][]string{}
+	recorded := map[string]bool{}
+	addFields := func(varName string, fields ...string) {
+		if varName == "" || varName == "_" {
+			return
+		}
+		for _, f := range fields {
+			if f == "" {
+				continue
+			}
+			key := varName + "." + f
+			if recorded[key] || len(preset[varName]) >= 32 {
+				continue
+			}
+			recorded[key] = true
+			preset[varName] = append(preset[varName], f)
+		}
+	}
+	literalFields := func(lit *ast.CompositeLit) []string {
+		var fields []string
+		for _, elt := range lit.Elts {
+			if kv, ok := elt.(*ast.KeyValueExpr); ok {
+				fields = append(fields, c.path(kv.Key))
+			}
+		}
+		return fields
+	}
+	var out []nir.Stmt
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.AssignStmt:
+			for i, lhs := range x.Lhs {
+				if i >= len(x.Rhs) {
+					break
+				}
+				switch target := lhs.(type) {
+				case *ast.Ident:
+					if lit, ok := x.Rhs[i].(*ast.CompositeLit); ok {
+						addFields(target.Name, literalFields(lit)...)
+					}
+				case *ast.SelectorExpr:
+					if base, ok := target.X.(*ast.Ident); ok {
+						addFields(base.Name, c.path(target.Sel))
+					}
+				}
+			}
+		case *ast.ValueSpec:
+			for i, nm := range x.Names {
+				if nm == nil || i >= len(x.Values) {
+					continue
+				}
+				if lit, ok := x.Values[i].(*ast.CompositeLit); ok {
+					addFields(nm.Name, literalFields(lit)...)
+				}
+			}
+		case *ast.CallExpr:
+			switch goLastSeg(c.path(x.Fun)) {
+			case "Decode", "Unmarshal":
+			default:
+				return true
+			}
+			for _, arg := range x.Args {
+				target := arg
+				if unary, ok := target.(*ast.UnaryExpr); ok && unary.Op == token.AND {
+					target = unary.X
+				}
+				if paren, ok := target.(*ast.ParenExpr); ok {
+					target = paren.X
+				}
+				ident, ok := target.(*ast.Ident)
+				if !ok {
+					continue
+				}
+				fields := preset[ident.Name]
+				if len(fields) == 0 {
+					continue
+				}
+				tokens := make([]string, 0, len(fields)+3)
+				tokens = append(tokens, "lang=go", "function_name:"+name, "var:"+ident.Name)
+				for _, f := range fields {
+					tokens = append(tokens, "field:"+f)
+				}
+				out = append(out, c.goAnalysisObservation("analysis.go.decode_overwrites_preset_fields", "decode_overwrites_preset_fields", x.Pos(), tokens...))
+			}
+		}
+		return true
+	})
+	return out
+}
+
+// goUnboundedAppendAccumulationObservations records one fact per loop that has
+// no exit condition yet keeps growing a slice: an accumulation `x = append(x,
+// ...)` written inside a `for {}` loop, in a function that never compares the
+// accumulated slice's len or cap against anything. That is Go's hand-rolled
+// decode-loop shape -- the loop runs until the input ends and each iteration
+// grows the output by whatever the input says, so the peer chooses the total
+// allocation. A bound check anywhere in the function (`if len(x) > lim`) is
+// the upper bound whose absence the fact states, so a function carrying one
+// records no fact. A slice the loop body itself declares or resets (`x := ...`,
+// `var x ...`, `x = nil`) is recreated every iteration and cannot be the
+// loop's growing accumulator, so it records no fact either. Nested function
+// literals are skipped: a hoisted literal gets its own pass, and its body
+// cannot bound the enclosing loop.
+func (c *conv) goUnboundedAppendAccumulationObservations(name string, body *ast.BlockStmt) []nir.Stmt {
+	if body == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	ast.Inspect(body, func(n ast.Node) bool {
+		if _, ok := n.(*ast.FuncLit); ok {
+			return false
+		}
+		loop, ok := n.(*ast.ForStmt)
+		if !ok || loop.Cond != nil || loop.Body == nil {
+			return true
+		}
+		var accumulated []string
+		seen := map[string]bool{}
+		recreated := map[string]bool{}
+		ast.Inspect(loop.Body, func(m ast.Node) bool {
+			if _, ok := m.(*ast.FuncLit); ok {
+				return false
+			}
+			switch stmt := m.(type) {
+			case *ast.DeclStmt:
+				if gen, ok := stmt.Decl.(*ast.GenDecl); ok && gen.Tok == token.VAR {
+					for _, spec := range gen.Specs {
+						if vs, ok := spec.(*ast.ValueSpec); ok {
+							for _, nm := range vs.Names {
+								if nm != nil {
+									recreated[nm.Name] = true
+								}
+							}
+						}
+					}
+				}
+			case *ast.AssignStmt:
+				for i, lhs := range stmt.Lhs {
+					ident, ok := lhs.(*ast.Ident)
+					if !ok || ident.Name == "_" {
+						continue
+					}
+					if stmt.Tok == token.DEFINE {
+						recreated[ident.Name] = true
+						continue
+					}
+					if i >= len(stmt.Rhs) {
+						continue
+					}
+					if len(stmt.Lhs) == 1 && len(stmt.Rhs) == 1 {
+						if nilIdent, ok := stmt.Rhs[0].(*ast.Ident); ok && nilIdent.Name == "nil" {
+							recreated[ident.Name] = true
+							continue
+						}
+					}
+					call, ok := stmt.Rhs[i].(*ast.CallExpr)
+					if !ok || len(call.Args) == 0 || goLastSeg(c.path(call.Fun)) != "append" {
+						continue
+					}
+					if base, ok := call.Args[0].(*ast.Ident); ok && base.Name == ident.Name && !seen[ident.Name] {
+						seen[ident.Name] = true
+						accumulated = append(accumulated, ident.Name)
+					}
+				}
+			}
+			return true
+		})
+		var kept []string
+		for _, v := range accumulated {
+			if !recreated[v] {
+				kept = append(kept, v)
+			}
+		}
+		sort.Strings(kept)
+		for _, v := range kept {
+			if c.goComparesLenOrCap(body, v) {
+				continue
+			}
+			out = append(out, c.goAnalysisObservation("analysis.go.unbounded_append_accumulation", "unbounded_append_accumulation", loop.Pos(),
+				"lang=go", "function_name:"+name, "var:"+v, "loop:no_exit_condition", "accumulate:append"))
+		}
+		return true
+	})
+	return out
+}
+
+// goComparesLenOrCap reports whether the function compares the named slice's
+// len or cap against anything, in any comparison operator's operand. An
+// equality against the target size counts too (`if len(x) == n` is an
+// exact-size bound); a comparison against the literal 0 does not, because an
+// emptiness check is not a size cap.
+func (c *conv) goComparesLenOrCap(body *ast.BlockStmt, v string) bool {
+	found := false
+	ast.Inspect(body, func(n ast.Node) bool {
+		if _, ok := n.(*ast.FuncLit); ok {
+			return false
+		}
+		bin, ok := n.(*ast.BinaryExpr)
+		if !ok {
+			return true
+		}
+		switch bin.Op {
+		case token.LSS, token.LEQ, token.GTR, token.GEQ, token.EQL:
+		default:
+			return true
+		}
+		if goIsZeroLiteral(bin.X) || goIsZeroLiteral(bin.Y) {
+			return true
+		}
+		ast.Inspect(bin, func(m ast.Node) bool {
+			call, ok := m.(*ast.CallExpr)
+			if !ok || len(call.Args) != 1 {
+				return true
+			}
+			switch goLastSeg(c.path(call.Fun)) {
+			case "len", "cap":
+			default:
+				return true
+			}
+			if arg, ok := call.Args[0].(*ast.Ident); ok && arg.Name == v {
+				found = true
+			}
+			return true
+		})
+		return true
+	})
+	return found
+}
+
+func goIsZeroLiteral(e ast.Expr) bool {
+	lit, ok := e.(*ast.BasicLit)
+	return ok && lit.Kind == token.INT && lit.Value == "0"
 }
 
 func (c *conv) goOsqueryAllowUnsafePlatformArgsObservation(name string, body *ast.BlockStmt) (nir.Stmt, bool) {

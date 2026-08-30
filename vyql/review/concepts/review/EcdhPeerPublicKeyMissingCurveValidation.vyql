@@ -1,8 +1,0 @@
-module code;
-
-review code.EcdhPeerPublicKeyMissingCurveValidation {
-  category: crypto
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review ECDH shared-secret derivation for peer public-key curve membership validation before scalar multiplication"
-}

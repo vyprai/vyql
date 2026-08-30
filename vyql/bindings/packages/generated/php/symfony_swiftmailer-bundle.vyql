@@ -1,9 +1,0 @@
-module bindings.php.generated.m58c135b6;
-
-binding userControlledData0 {
-  requires {
-    dependency("symfony/swiftmailer-bundle")
-  }
-  query pattern callExpr where callee.method == "NewEmailCommand::execute"
-  emit source core.UserControlledData at call.result
-}

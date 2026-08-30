@@ -1,9 +1,0 @@
-module bindings.java.generated.ma57d58f9;
-
-binding deserialization0 {
-  requires {
-    dependency("org.apache.ant:ant")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

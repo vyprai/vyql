@@ -1,9 +1,0 @@
-module bindings.rust.generated.m2a4faf2c;
-
-binding deserialization0 {
-  requires {
-    dependency("headers")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

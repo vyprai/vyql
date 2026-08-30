@@ -1,6 +1,0 @@
-module iac;
-
-threat PrivilegedContainer {
-  cwe: [CWE_250]
-  desc: "Container running privileged / as root (execution with unnecessary privileges)"
-}

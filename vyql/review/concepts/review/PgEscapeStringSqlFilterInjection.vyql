@@ -1,8 +1,0 @@
-module code;
-
-review code.PgEscapeStringSqlFilterInjection {
-  category: sql
-  expected: [core.SqlParameterization]
-  kind: attention
-  text: "review PostgreSQL filter fragments using pg_escape_string where pg_escape_literal or parameterization is required"
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.FrappeLinkExpansionMissingReadPermission {
-  category: auth
-  expected: [core.AuthorizationCheck]
-  kind: attention
-  text: "review Frappe link expansion helpers for read permission checks and field-level read filtering before returning linked documents"
-}

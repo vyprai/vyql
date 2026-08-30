@@ -1,9 +1,0 @@
-module bindings.cpp.generated.meee5a91e;
-
-binding deserialization0 {
-  requires {
-    dependency("boost-spirit")
-  }
-  query pattern callExpr where callee.method == "parse"
-  emit sink code.Deserialization at args[0]
-}

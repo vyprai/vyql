@@ -1,8 +1,0 @@
-# Rank 51 / CVE-2018-20245: Airflow LDAP certificate validation.
-
-test "rank51: disabled certificate validation is a CVE anchor"
-  expect VYQL-CFG-004
-  graph
-  ```
-  node tls code.CertValidationDisabled
-  ```

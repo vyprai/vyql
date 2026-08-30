@@ -1,9 +1,0 @@
-module bindings.perl.generated.m690c12e4;
-
-binding commandExecution0 {
-  requires {
-    dependency("UV")
-  }
-  query pattern callExpr where callee.method == "spawn"
-  emit sink code.CommandExecution at args[0]
-}

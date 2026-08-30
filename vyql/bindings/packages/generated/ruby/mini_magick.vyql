@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mf27b8b28;
-
-binding commandExecution0 {
-  requires {
-    dependency("mini_magick")
-  }
-  query pattern callExpr where callee.method == "run"
-  emit sink code.CommandExecution at args[0]
-}

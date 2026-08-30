@@ -1,6 +1,0 @@
-module injection;
-
-threat UnsafeDynamicLoading {
-  cwe: [CWE_829]
-  desc: "Untrusted data selecting a module, package, or native library to load dynamically"
-}

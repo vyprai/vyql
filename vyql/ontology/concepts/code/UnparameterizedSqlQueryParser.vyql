@@ -1,6 +1,0 @@
-module code;
-
-concept UnparameterizedSqlQueryParser : issue {
-  cwe: [CWE_89]
-  vulnerableTo: [injection.SqlInjection]
-}

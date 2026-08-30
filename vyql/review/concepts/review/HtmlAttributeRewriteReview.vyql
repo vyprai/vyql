@@ -1,7 +1,0 @@
-module code;
-
-review code.HtmlAttributeRewriteReview {
-  category: xss
-  kind: attention
-  text: "review HTML attribute rewrite logic that injects dynamic values into generated markup"
-}

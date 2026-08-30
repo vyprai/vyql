@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m69b2f35d;
-
-binding sqlExecution0 {
-  requires {
-    dependency("prometheus_ecto")
-  }
-  query pattern callExpr where callee.method == "Prometheus.EctoInstrumenter.handle_event"
-  emit sink code.SqlExecution at args[0]
-}

@@ -1,8 +1,0 @@
-module code;
-
-review code.ComrakDangerousUrlCaseSensitiveGrammar {
-  category: xss
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review Comrak dangerous URL grammar for case-insensitive blocking of data:, javascript:, vbscript:, and file: schemes"
-}

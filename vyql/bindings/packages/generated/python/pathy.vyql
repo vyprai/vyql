@@ -1,9 +1,0 @@
-module bindings.python.generated.m59cdc42c;
-
-binding fileUse0 {
-  requires {
-    dependency("pathy")
-  }
-  query pattern callExpr where callee.method == "open"
-  emit sink code.FileUseSink at args[0]
-}

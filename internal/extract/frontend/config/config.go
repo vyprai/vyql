@@ -358,6 +358,95 @@ func scanTextTemplate(src []byte, file, scope string) []nir.Stmt {
 			}})
 		}
 	}
+	if len(profile.AttrEvents) > 0 {
+		spans := attributeValueSpans(src)
+		for _, rule := range profile.AttrEvents {
+			for _, span := range spans {
+				if !strings.EqualFold(span.Name, rule.Attr) || !containsAllFold(span.Value, rule.Needles) {
+					continue
+				}
+				out = append(out, nir.ExprStmt{Value: call(rule.Event, file, span.Line)})
+			}
+		}
+	}
+	return out
+}
+
+// attributeValueSpans reports every quoted attribute value in src as a unit,
+// so a rule can read a value that continues past the end of a physical line.
+// The walk is quote aware but not tag aware, like the rest of this frontend.
+func attributeValueSpans(src []byte) []attributeValueSpan {
+	text := string(src)
+	var out []attributeValueSpan
+	line, i := 1, 0
+	for i < len(text) {
+		c := text[i]
+		if c == '\n' {
+			line++
+			i++
+			continue
+		}
+		if !isAttrNameStart(c) {
+			i++
+			continue
+		}
+		end := i
+		for end < len(text) && isAttrNameChar(text[end]) {
+			end++
+		}
+		name := text[i:end]
+		for end < len(text) && (text[end] == ' ' || text[end] == '\t') {
+			end++
+		}
+		if end >= len(text) || text[end] != '=' {
+			i = end
+			continue
+		}
+		end++
+		for end < len(text) && (text[end] == ' ' || text[end] == '\t') {
+			end++
+		}
+		if end >= len(text) || (text[end] != '"' && text[end] != '\'') {
+			i = end
+			continue
+		}
+		quote := text[end]
+		startLine := line
+		end++
+		value := make([]byte, 0, 64)
+		for end < len(text) && text[end] != quote {
+			if text[end] == '\n' {
+				line++
+			}
+			value = append(value, text[end])
+			end++
+		}
+		if end < len(text) {
+			end++
+		}
+		out = append(out, attributeValueSpan{Name: string(name), Value: string(value), Line: startLine})
+		i = end
+	}
+	return out
+}
+
+func isAttrNameStart(c byte) bool {
+	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+}
+
+func isAttrNameChar(c byte) bool {
+	return isAttrNameStart(c) || c == ':' || c == '-' || c == '.' || (c >= '0' && c <= '9')
+}
+
+// splitNeedles splits a ";;"-separated needle list, the convention the
+// file-contains-all rules already use.
+func splitNeedles(s string) []string {
+	var out []string
+	for _, needle := range strings.Split(s, ";;") {
+		if needle = strings.TrimSpace(needle); needle != "" {
+			out = append(out, needle)
+		}
+	}
 	return out
 }
 
@@ -397,7 +486,8 @@ func scanTemplateExpressions(src []byte, file, scope string) []nir.Stmt {
 				}
 			}
 		}
-		if line == "" || !strings.Contains(line, profile.ExprStart) || containsAny(line, profile.SkipContains) {
+		if line == "" || !strings.Contains(line, profile.ExprStart) ||
+			(containsAny(line, profile.SkipContains) && !containsAny(line, profile.SkipNotContains)) {
 			continue
 		}
 		defaultEscape := escapeActive && containsAnyFold(line, profile.EscapeLineContains)
@@ -541,6 +631,7 @@ type templateProfile struct {
 	ExprEnd              string
 	InputPattern         *regexp.Regexp
 	SkipContains         []string
+	SkipNotContains      []string
 	InputEvent           string
 	RenderEvent          string
 	EscapePrefix         string
@@ -570,12 +661,27 @@ type textTemplateAssignRule struct {
 	InputEvent    string
 }
 
+type textTemplateAttrRule struct {
+	Attr    string
+	Needles []string
+	Event   string
+}
+
+// attributeValueSpan is one quoted attribute value together with the line the
+// attribute starts on.
+type attributeValueSpan struct {
+	Name  string
+	Value string
+	Line  int
+}
+
 type textTemplateProfile struct {
 	Extensions       []string
 	RequiredContains []string
 	LineEvents       []scopedLineRule
 	AssignEvents     []textTemplateAssignRule
 	FlowEvents       []textTemplateFlowRule
+	AttrEvents       []textTemplateAttrRule
 }
 
 type configProfile struct {
@@ -695,6 +801,7 @@ func loadProfile() configProfile {
 				ExprEnd:              firstNonEmpty(metaString(meta, "config_template_expr_end_"+scope), globalExprEnd),
 				InputPattern:         regexp.MustCompile(pattern),
 				SkipContains:         metaList(meta, "config_template_skip_contains_"+scope),
+				SkipNotContains:      metaList(meta, "config_template_skip_not_contains_"+scope),
 				InputEvent:           inputEvent,
 				RenderEvent:          renderEvent,
 				EscapePrefix:         metaString(meta, "config_template_escape_prefix_"+scope),
@@ -755,6 +862,21 @@ func loadProfile() configProfile {
 					SourcePattern:  regexp.MustCompile(parts[1]),
 					InputEvent:     parts[2],
 					OperationEvent: parts[3],
+				})
+			}
+			for _, entry := range metaList(meta, "config_text_template_attr_events_"+scope) {
+				parts := strings.SplitN(entry, "|", 3)
+				if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
+					panic("config: malformed config_text_template_attr_events entry " + entry)
+				}
+				needles := splitNeedles(parts[1])
+				if len(needles) == 0 {
+					panic("config: malformed config_text_template_attr_events entry " + entry)
+				}
+				profile.AttrEvents = append(profile.AttrEvents, textTemplateAttrRule{
+					Attr:    parts[0],
+					Needles: needles,
+					Event:   parts[2],
 				})
 			}
 			configProfileData.TextTemplates[scope] = profile

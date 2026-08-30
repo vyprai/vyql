@@ -1,9 +1,0 @@
-module bindings.ruby.generated.m2904c2c8;
-
-binding codeEval0 {
-  requires {
-    dependency("therubyracer")
-  }
-  query pattern callExpr where callee.method == "eval"
-  emit sink code.CodeEval at args[0]
-}

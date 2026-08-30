@@ -1,9 +1,0 @@
-module bindings.php.generated.m327499c2;
-
-binding commandExecution0 {
-  requires {
-    dependency("laravel/homestead")
-  }
-  query pattern callExpr where callee.method == "shell_exec"
-  emit sink code.CommandExecution at args[0]
-}

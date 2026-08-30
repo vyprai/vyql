@@ -1,9 +1,0 @@
-module bindings.dart.generated.mb5f557f7;
-
-binding commandExecution0 {
-  requires {
-    dependency("launch_review")
-  }
-  query pattern callExpr where callee.method == "launch"
-  emit sink code.CommandExecution at args[0]
-}

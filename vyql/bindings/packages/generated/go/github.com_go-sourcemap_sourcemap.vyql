@@ -1,9 +1,0 @@
-module bindings.go.generated.m21725ab5;
-
-binding deserialization0 {
-  requires {
-    dependency("github.com/go-sourcemap/sourcemap")
-  }
-  query pattern callExpr where callee.method == "Parse"
-  emit sink code.Deserialization at args[0]
-}

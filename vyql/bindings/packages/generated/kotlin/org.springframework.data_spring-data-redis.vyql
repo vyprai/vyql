@@ -1,9 +1,0 @@
-module bindings.kotlin.generated.m9b3b5a03;
-
-binding commandExecution0 {
-  requires {
-    dependency("org.springframework.data:spring-data-redis")
-  }
-  query pattern callExpr where callee.method == "exec"
-  emit sink code.CommandExecution at args[0]
-}

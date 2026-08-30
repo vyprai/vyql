@@ -1,6 +1,0 @@
-module access_control;
-
-threat IncorrectAuthorization {
-  cwe: [CWE_863]
-  desc: "Incorrect authorization logic"
-}

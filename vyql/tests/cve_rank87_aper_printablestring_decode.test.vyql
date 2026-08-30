@@ -1,6 +1,0 @@
-test "rank87: APER PrintableString decode requires structured-input review"
-  expect_review code.StructuredInputDecode
-  graph
-  ```
-  node op code.StructuredInputDecode
-  ```

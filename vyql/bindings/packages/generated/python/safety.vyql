@@ -1,9 +1,0 @@
-module bindings.python.generated.ma4430910;
-
-binding secretValue0 {
-  requires {
-    dependency("safety")
-  }
-  query pattern callExpr where callee.method == "token"
-  emit source code.SecretValue at call.result
-}

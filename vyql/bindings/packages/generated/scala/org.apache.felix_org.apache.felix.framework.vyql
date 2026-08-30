@@ -1,9 +1,0 @@
-module bindings.scala.generated.m5ad5d849;
-
-binding filePathAccess0 {
-  requires {
-    dependency("org.apache.felix:org.apache.felix.framework")
-  }
-  query pattern callExpr where callee.method == "getDataFile"
-  emit sink code.FilePathAccess at args[0]
-}

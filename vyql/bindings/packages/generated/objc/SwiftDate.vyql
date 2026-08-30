@@ -1,9 +1,0 @@
-module bindings.objc.generated.m27bc5a4f;
-
-binding sqlExecution0 {
-  requires {
-    dependency("SwiftDate")
-  }
-  query pattern callExpr where callee.method == "toSQL"
-  emit sink code.SqlExecution at args[0]
-}

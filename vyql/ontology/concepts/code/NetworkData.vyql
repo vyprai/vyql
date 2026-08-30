@@ -1,6 +1,0 @@
-module code;
-
-concept NetworkData : source {
-  refines: core.UserControlledData
-  taint: [taint.UntrustedData]
-}

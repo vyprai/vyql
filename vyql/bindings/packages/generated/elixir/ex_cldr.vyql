@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m9ee70834;
-
-binding userControlledData0 {
-  requires {
-    dependency("ex_cldr")
-  }
-  query pattern callExpr where callee.method == "Cldr.LanguageTag.parse"
-  emit source core.UserControlledData at call.result
-}

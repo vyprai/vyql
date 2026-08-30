@@ -1,7 +1,0 @@
-module code;
-
-review code.UnescapedHtmlOptionRenderer {
-  category: xss
-  kind: attention
-  text: "review option-renderer HTML assembled from option metadata and whether it is sanitized before insertion"
-}

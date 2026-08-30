@@ -1,7 +1,0 @@
-module code;
-
-review code.JenkinsPluginForkedDirectoryBrowserWithoutCsp {
-  category: xss
-  kind: attention
-  text: "review Jenkins report-serving actions for CSP-aware DirectoryBrowserSupport from Jenkins core"
-}

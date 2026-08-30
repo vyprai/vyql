@@ -1,8 +1,0 @@
-module code;
-
-review code.CloudStackBaremetalMacCommandInjection {
-  category: command
-  expected: [core.InputValidation]
-  kind: attention
-  text: "review CloudStack baremetal provision-done MAC validation before passing the value to shell-backed curl"
-}

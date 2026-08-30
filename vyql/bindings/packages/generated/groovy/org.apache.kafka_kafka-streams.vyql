@@ -1,9 +1,0 @@
-module bindings.groovy.generated.md7280db7;
-
-binding databaseRead0 {
-  requires {
-    dependency("org.apache.kafka:kafka-streams")
-  }
-  query pattern callExpr where callee.method == "query"
-  emit sink code.DatabaseReadSink at args[0]
-}

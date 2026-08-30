@@ -1,9 +1,0 @@
-module bindings.rust.generated.m1f953536;
-
-binding secretValue0 {
-  requires {
-    dependency("rocket")
-  }
-  query pattern callExpr where callee.method == "SecretKey.key"
-  emit source code.SecretValue at call.result
-}

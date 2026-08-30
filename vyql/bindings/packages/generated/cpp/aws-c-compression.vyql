@@ -1,9 +1,0 @@
-module bindings.cpp.generated.m316d351b;
-
-binding deserialization0 {
-  requires {
-    dependency("aws-c-compression")
-  }
-  query pattern callExpr where callee.method == "aws_huffman_decode"
-  emit sink code.Deserialization at args[0]
-}

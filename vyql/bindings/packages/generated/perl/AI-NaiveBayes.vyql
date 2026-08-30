@@ -1,9 +1,0 @@
-module bindings.perl.generated.med4eac8d;
-
-binding deserialization0 {
-  requires {
-    dependency("AI-NaiveBayes")
-  }
-  query pattern callExpr where callee.method == "Storage"
-  emit sink code.Deserialization at args[0]
-}

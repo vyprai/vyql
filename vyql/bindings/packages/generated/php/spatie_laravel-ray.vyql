@@ -1,9 +1,0 @@
-module bindings.php.generated.mbfa42723;
-
-binding networkSend0 {
-  requires {
-    dependency("spatie/laravel-ray")
-  }
-  query pattern callExpr where callee.method == "sendRequest"
-  emit sink code.NetworkSend at args[0]
-}

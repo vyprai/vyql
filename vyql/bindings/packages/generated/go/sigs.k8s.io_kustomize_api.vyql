@@ -1,9 +1,0 @@
-module bindings.go.generated.m72854b61;
-
-binding deserialization0 {
-  requires {
-    dependency("sigs.k8s.io/kustomize/api")
-  }
-  query pattern callExpr where callee.method == "parseLiteralSource"
-  emit sink code.Deserialization at args[0]
-}

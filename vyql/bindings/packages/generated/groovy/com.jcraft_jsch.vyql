@@ -1,9 +1,0 @@
-module bindings.groovy.generated.m682c7db8;
-
-binding commandExecution0 {
-  requires {
-    dependency("com.jcraft:jsch")
-  }
-  query pattern callExpr where callee.method == "setCommand"
-  emit sink code.CommandExecution at args[0]
-}

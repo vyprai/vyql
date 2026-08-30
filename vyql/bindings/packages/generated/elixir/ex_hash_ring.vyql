@@ -1,9 +1,0 @@
-module bindings.elixir.generated.m8b02ce7c;
-
-binding weakHash0 {
-  requires {
-    dependency("ex_hash_ring")
-  }
-  query pattern callExpr where callee.method == "ExHashRing.Hash.of"
-  emit issue code.WeakHash at call
-}

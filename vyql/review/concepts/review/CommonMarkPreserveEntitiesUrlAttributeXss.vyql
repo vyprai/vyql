@@ -1,8 +1,0 @@
-module code;
-
-review code.CommonMarkPreserveEntitiesUrlAttributeXss {
-  category: xss
-  expected: [core.HtmlEscape]
-  kind: attention
-  text: "review CommonMark URL attribute escaping for entity preservation that can reconstitute unsafe schemes in browsers"
-}

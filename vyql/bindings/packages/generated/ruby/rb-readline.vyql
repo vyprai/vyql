@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mff445663;
-
-binding userControlledData0 {
-  requires {
-    dependency("rb-readline")
-  }
-  query pattern callExpr where callee.method == "readline"
-  emit source core.UserControlledData at call.result
-}

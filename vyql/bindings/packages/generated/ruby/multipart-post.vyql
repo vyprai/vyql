@@ -1,9 +1,0 @@
-module bindings.ruby.generated.me1b90d73;
-
-binding fileUse0 {
-  requires {
-    dependency("multipart-post")
-  }
-  query pattern callExpr where callee.method == "UploadIO.initialize"
-  emit sink code.FileUseSink at args[0]
-}

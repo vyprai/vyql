@@ -1,9 +1,0 @@
-module bindings.ruby.generated.mef1f74ac;
-
-binding fileUse0 {
-  requires {
-    dependency("ci_reporter")
-  }
-  query pattern callExpr where callee.method == "CI::Reporter::TestSuite.to_xml"
-  emit sink code.FileUseSink at args[0]
-}

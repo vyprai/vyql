@@ -1,9 +1,0 @@
-module bindings.perl.generated.mca62e273;
-
-binding commandExecution0 {
-  requires {
-    dependency("POE")
-  }
-  query pattern callExpr where callee.method == "POE::Wheel::Run::exec"
-  emit sink code.CommandExecution at args[0]
-}
