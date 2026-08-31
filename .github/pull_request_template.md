@@ -16,5 +16,4 @@ Recall and precision separately, if the change trades between them.
 
 - [ ] `make ci` passes locally
 - [ ] `go test -count=1` — never a bare `go test` (the cache does not track `.vyql` data)
-- [ ] New or changed detection has a spec in `vyql/tests/`, including a `reject` case for the safe form
 - [ ] Protected benchmarks did not regress

@@ -49,10 +49,20 @@ labelled (`match` shows nothing), the call did not resolve (`resolve` lists it),
 or a rule's `unless` clause was satisfied by something that should not count
 (`explain` names it).
 
-## Adding coverage
+## Coverage gaps
 
-The vocabulary is in `vyql/ontology/`, what each language *means* is in
-`vyql/bindings/`, and what combinations are vulnerabilities is in `vyql/packs/`.
+The definitions are maintained separately and take no outside changes, so a
+missing binding, concept or rule cannot be fixed here. Report the gap instead,
+with what the diagnosis above showed: whether nothing was labelled, the call did
+not resolve, or an `unless` clause was satisfied. That names the layer and is the
+part that is hard to work out later.
+
+The rest of this section describes what the definitions are made of, because
+reading a scan means reading them.
+
+The vocabulary is in `ontology/`, what each language *means* is in `bindings/`,
+and what combinations are vulnerabilities is in `packs/` — all inside a fetched
+data directory, not this repository.
 
 A binding attaches a concept to a shape in the code:
 
@@ -64,8 +74,8 @@ binding requestJson {
 }
 ```
 
-Every binding and rule needs a spec in `vyql/tests/`. A spec is the executable
-statement of what should and should not fire:
+Every binding and rule has a spec in `tests/`. A spec is the executable statement
+of what should and should not fire:
 
 ```
 test "flask request.json reaches a SQL sink"
