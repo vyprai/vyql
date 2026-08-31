@@ -346,10 +346,20 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		}
 		return cats[c]
 	}
+	// Cases the corpus labels wrongly are dropped rather than scored either way.
+	// Counting them as true positives would credit a scanner for a label nobody
+	// checked; counting them as false positives charges it for one that is wrong.
+	excluded := loadMislabelled(t)
+	applied := 0
+
 	dumpCat, dumpKind := os.Getenv("BENCH_DUMP_CAT"), os.Getenv("BENCH_DUMP_KIND") // cat "all" dumps every category
 	var dumped []string
 	byCat := map[string][]string{} // for dumpCat=="all": category -> matching test names
 	for name, e := range expected {
+		if excluded[mislabelKey{name, e.category}] {
+			applied++
+			continue
+		}
 		got := detected[name][e.category]
 		tl := get(e.category)
 		var kind string
@@ -416,6 +426,9 @@ func score(t *testing.T, expected map[string]expRow, detected map[string]map[str
 		overall = sumY / float64(nCat)
 	}
 	fmt.Printf("%-16s %46s %+7.2f\n", "OVERALL (avg Youden)", "", overall)
+	if note := mislabelNote(excluded, applied); note != "" {
+		fmt.Println(note)
+	}
 	total.overall = overall
 	return total
 }
