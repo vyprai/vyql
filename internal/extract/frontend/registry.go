@@ -75,6 +75,23 @@ var languages = sync.OnceValue(func() []Language {
 // Languages returns the registry in extraction order.
 func Languages() []Language { return languages() }
 
+// BundleKinds returns the extension set of the frontend that parses bundled web
+// code — the JavaScript family, with .html for the scripts inlined in it.
+//
+// A minified bundle is that family's build output, and only there is one
+// enormous line a hazard: in JavaScript it is a megabyte of code, where every
+// token becomes analysis state. Another language's one-line file is a data blob
+// behind a single literal, which parses to one node and carries none of a
+// bundle's cost — so a gate over line shape must not reach it.
+func BundleKinds() map[string]bool {
+	for _, lg := range Languages() {
+		if lg.Name == "javascript" {
+			return lg.Exts
+		}
+	}
+	return nil
+}
+
 // EntryClass records the content-derived facts an extension alone cannot settle: whether a `.h` is
 // C++ rather than C, and whether an extension-less file is a Python script.
 //
