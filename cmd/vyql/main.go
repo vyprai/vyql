@@ -1109,6 +1109,10 @@ func printCoverage(w io.Writer, stats extract.Stats, excludes extract.Excludes) 
 		fmt.Fprintf(w, "  oversized %d file(s) skipped over the -max-file-size ceiling;\n", stats.Oversized)
 		fmt.Fprintln(w, "            raise it or pass 0 to scan them")
 	}
+	if stats.Minified > 0 {
+		fmt.Fprintf(w, "  minified  %d file(s) skipped as machine-generated output;\n", stats.Minified)
+		fmt.Fprintln(w, "            a bundle is an asset, not source; name a file directly to scan it")
+	}
 	if n := stats.UnmatchedTotal(); n > 0 {
 		fmt.Fprintf(w, "  unread    %d file(s) matched no frontend: %s\n", n, topKinds(stats.Unmatched, 12))
 	}
