@@ -49,7 +49,7 @@ func minifiedBundle(path string, size int64) bool {
 	if err != nil {
 		return false
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	n := min(int64(minifiedProbeBytes), size)
 	buf := make([]byte, n)
 	read, _ := io.ReadFull(f, buf)
