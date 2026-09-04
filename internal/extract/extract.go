@@ -19,6 +19,7 @@ import (
 	"github.com/vyprai/vyql/internal/extract/frontend"
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/nir"
+	"github.com/vyprai/vyql/internal/extract/parsecache"
 )
 
 // Stats reports per-language file counts for the run summary, and what the
@@ -33,6 +34,7 @@ type Stats struct {
 	Languages []string       // languages actually present
 	Excluded  int            // files dropped by -exclude
 	Oversized int            // files skipped over the -max-file-size ceiling
+	Minified  int            // files skipped as machine-generated (minified bundles)
 	Unmatched map[string]int // extension -> count, claimed by no frontend
 }
 
@@ -80,18 +82,32 @@ func All(paths []string, excludes Excludes) (nir.Program, []bindings.Applicator,
 			entries, droppedByExclude = treesitter.ListAllFilesCounted(p, pruner(excludes))
 			stats.Excluded += droppedByExclude
 			// Only filtered when walking a tree. Naming a file explicitly is an
-			// instruction to scan that file, whatever its size.
-			if ceiling := treesitter.MaxFileBytes(); ceiling > 0 {
-				kept := entries[:0]
-				for _, e := range entries {
-					if fi, err := os.Stat(e.Path); err == nil && fi.Size() > ceiling {
+			// instruction to scan that file, whatever its size or shape.
+			ceiling := treesitter.MaxFileBytes()
+			bundleKinds := frontend.BundleKinds()
+			kept := entries[:0]
+			oversized := 0
+			for _, e := range entries {
+				fi, err := os.Stat(e.Path)
+				if err == nil {
+					if ceiling > 0 && fi.Size() > ceiling {
+						oversized++
 						continue
 					}
-					kept = append(kept, e)
+					// A minified bundle is build output committed as an asset, not source:
+					// parsing it costs far more memory than its size, and a committed
+					// frontend holds enough bundles to push a bounded scan past its
+					// ceiling before any finding is reported. SCA still reads their
+					// banners — it walks the tree itself, past this filter.
+					if (bundleKinds[e.Ext] || bundleKinds[e.Base]) && minifiedBundle(e.Path, fi.Size()) {
+						stats.Minified++
+						continue
+					}
 				}
-				stats.Oversized += len(entries) - len(kept)
-				entries = kept
+				kept = append(kept, e)
 			}
+			stats.Oversized += oversized
+			entries = kept
 		} else {
 			root = filepath.Dir(p)
 			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}
@@ -123,6 +139,14 @@ func All(paths []string, excludes Excludes) (nir.Program, []bindings.Applicator,
 			sub, err := lg.Extract(files, root)
 			if err != nil {
 				return prog, nil, nil, stats, err
+			}
+			// Native/config frontends do not all pass through tree-sitter's per-file
+			// publisher. Apply the same shared body deferral before retaining their modules.
+			// Tree-sitter stubs have no Body here, so this is idempotent for them.
+			if cache := parsecache.Shared(); cache != nil {
+				for i := range sub.Modules {
+					cache.DeferModuleBodies(&sub.Modules[i])
+				}
 			}
 			prog.Modules = append(prog.Modules, sub.Modules...)
 			present[lg.Name] = true

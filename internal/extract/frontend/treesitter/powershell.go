@@ -16,26 +16,10 @@ import (
 // (cmdlet name -> path, elements -> args); expandable strings ("ping $x")
 // propagate taint.
 type psConv struct {
-	src        []byte
-	file       string
-	key        string
-	childCache map[uintptr][]*tree_sitter.Node
-}
-
-func (c *psConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = make(map[uintptr][]*tree_sitter.Node)
-	}
-	key := uintptr(n.Id())
-	if kids, ok := c.childCache[key]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[key] = kids
-	return kids
+	nodeCache
+	src  []byte
+	file string
+	key  string
 }
 
 // psWrappers are single-child expression-precedence nodes to peel through.
@@ -77,7 +61,7 @@ func (c *psConv) text(n *tree_sitter.Node) string {
 
 // psUnwrap peels single-child precedence wrappers to the meaningful node.
 func (c *psConv) psUnwrap(n *tree_sitter.Node) *tree_sitter.Node {
-	for n != nil && psWrappers[n.Kind()] {
+	for n != nil && psWrappers[c.kind(n)] {
 		k := c.namedChildren(n)
 		if len(k) != 1 {
 			break
@@ -91,7 +75,7 @@ func (c *psConv) program(root *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	// Top-level param() block entries are emitted as neutral parameter-entry events.
 	for _, ch := range c.namedChildren(root) {
-		if ch.Kind() == "param_block" {
+		if c.kind(ch) == "param_block" {
 			for _, p := range c.paramNames(ch) {
 				out = append(out, nir.Assign{Targets: []string{p},
 					Value: nir.Call{
@@ -116,7 +100,7 @@ func (c *psConv) stmtList(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range c.namedChildren(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "statement_list", "script_block", "script_block_body", "named_block":
 				walk(ch)
 			default:
@@ -129,7 +113,7 @@ func (c *psConv) stmtList(n *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *psConv) stmt(n *tree_sitter.Node) []nir.Stmt {
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "function_statement":
 		params, paramTypes := c.functionParams(n)
 		return []nir.Stmt{nir.FuncDef{Name: c.functionName(n), Params: params, ParamTypes: paramTypes, Body: c.stmtList(n), Loc: c.loc(n)}}
@@ -145,14 +129,14 @@ func (c *psConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return out
 	case "assignment_expression":
-		left := c.psUnwrap(field(n, "left"))
+		left := c.psUnwrap(c.field(n, "left"))
 		if left == nil {
 			if k := c.namedChildren(n); len(k) > 0 {
 				left = c.psUnwrap(k[0])
 			}
 		}
-		val := c.expr(field(n, "value"))
-		if left != nil && left.Kind() == "variable" {
+		val := c.expr(c.field(n, "value"))
+		if left != nil && c.kind(left) == "variable" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.varName(left)}, Value: val}}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: val}}
@@ -222,18 +206,18 @@ func (c *psConv) psCmpToken(n *tree_sitter.Node) string {
 // the then/else statement_block (which collectBlocks did not descend — a latent FN).
 func (c *psConv) psIf(n *tree_sitter.Node) nir.Stmt {
 	it := nir.If{Loc: c.loc(n)}
-	if cond := field(n, "condition"); cond != nil {
+	if cond := c.field(n, "condition"); cond != nil {
 		it.Cond = c.expr(cond)
 	}
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "statement_block":
 			if it.Then == nil {
 				it.Then = c.psBlock(ch)
 			}
 		case "else_clause":
 			for _, e := range c.namedChildren(ch) {
-				if e.Kind() == "statement_block" {
+				if c.kind(e) == "statement_block" {
 					it.Else = append(it.Else, c.psBlock(e)...)
 				}
 			}
@@ -263,7 +247,7 @@ func (c *psConv) psSwitch(n *tree_sitter.Node) nir.Stmt {
 		return sw
 	}
 	for _, cl := range c.namedChildren(clauses) {
-		if cl.Kind() != "switch_clause" {
+		if c.kind(cl) != "switch_clause" {
 			continue
 		}
 		condN := lastChildKind(cl, "switch_clause_condition")
@@ -284,7 +268,7 @@ func (c *psConv) psBlock(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range c.namedChildren(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "statement_block", "statement_list", "named_block", "script_block", "script_block_body":
 				walk(ch)
 			default:
@@ -301,7 +285,7 @@ func (c *psConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "statement_block", "script_block", "script_block_body", "statement_list", "named_block",
 				"else_clause", "elseif_clause", "catch_clause", "finally_clause":
 				walk(ch)
@@ -320,7 +304,7 @@ func (c *psConv) paramNames(n *tree_sitter.Node) []string {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range c.namedChildren(m) {
-			if ch.Kind() == "variable" {
+			if c.kind(ch) == "variable" {
 				out = append(out, c.varName(ch))
 			} else {
 				walk(ch)
@@ -350,20 +334,20 @@ func (c *psConv) paramTypes(n *tree_sitter.Node) map[string]string {
 			putParamType(out, name, typ)
 		}
 		for _, ch := range c.namedChildren(m) {
-			if ch.Kind() == "parameter" || ch.Kind() == "parameter_declaration" || ch.Kind() == "variable" {
+			if c.kind(ch) == "parameter" || c.kind(ch) == "parameter_declaration" || c.kind(ch) == "variable" {
 				name := ""
-				if v := field(ch, "name"); v != nil {
+				if v := c.field(ch, "name"); v != nil {
 					name = c.varName(v)
 				}
 				if name == "" {
 					for _, cc := range c.namedChildren(ch) {
-						if cc.Kind() == "variable" {
+						if c.kind(cc) == "variable" {
 							name = c.varName(cc)
 							break
 						}
 					}
 				}
-				if name == "" && ch.Kind() == "variable" {
+				if name == "" && c.kind(ch) == "variable" {
 					name = c.varName(ch)
 				}
 				putParamType(out, name, paramTypeFromField(c, ch))
@@ -379,11 +363,11 @@ func (c *psConv) paramTypes(n *tree_sitter.Node) map[string]string {
 }
 
 func (c *psConv) functionName(n *tree_sitter.Node) string {
-	if name := c.text(field(n, "name")); name != "" {
+	if name := c.text(c.field(n, "name")); name != "" {
 		return name
 	}
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "command_name", "function_name", "identifier":
 			return c.text(ch)
 		case "script_block", "script_block_body", "statement_list":
@@ -402,7 +386,7 @@ func (c *psConv) findParamBlock(n *tree_sitter.Node) *tree_sitter.Node {
 		return nil
 	}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "param_block" {
+		if c.kind(ch) == "param_block" {
 			return ch
 		}
 		if got := c.findParamBlock(ch); got != nil {
@@ -416,11 +400,11 @@ func (c *psConv) directVarName(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
 	}
-	if n.Kind() == "variable" {
+	if c.kind(n) == "variable" {
 		return c.varName(n)
 	}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "variable" {
+		if c.kind(ch) == "variable" {
 			return c.varName(ch)
 		}
 	}
@@ -440,15 +424,15 @@ func psBracketType(s string) string {
 // array_literal_expression elements -> args (skipping separators).
 func (c *psConv) command(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
-	name := lastSeg(strings.TrimPrefix(c.text(field(n, "command_name")), "&"))
+	name := lastSeg(strings.TrimPrefix(c.text(c.field(n, "command_name")), "&"))
 	if name == "" {
 		// `& "cmd"` invocation-operator form
 		name = "&"
 	}
 	var args []nir.Expr
-	if el := field(n, "command_elements"); el != nil {
+	if el := c.field(n, "command_elements"); el != nil {
 		for _, ch := range c.namedChildren(el) {
-			if ch.Kind() == "command_argument_sep" || ch.Kind() == "command_name" {
+			if c.kind(ch) == "command_argument_sep" || c.kind(ch) == "command_name" {
 				continue
 			}
 			args = append(args, c.expr(ch))
@@ -473,7 +457,7 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 	}
 	n = c.psUnwrap(n)
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "variable":
 		if event, ok := sourceVarEvent("powershell", c.varName(n)); ok {
 			return nir.Call{Callee: nir.Name{ID: event, Loc: L}, Path: event, Method: event, Loc: L}
@@ -482,14 +466,14 @@ func (c *psConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "integer_literal", "decimal_integer_literal", "real_literal", "boolean":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "string_literal", "verbatim_string_characters", "expandable_string_literal", "literal_expression":
-		if n.Kind() == "literal_expression" && strings.TrimSpace(c.text(n)) == "payload" {
+		if c.kind(n) == "literal_expression" && strings.TrimSpace(c.text(n)) == "payload" {
 			return nir.Name{ID: "payload", Loc: L}
 		}
 		var parts []nir.Expr
 		var walk func(m *tree_sitter.Node)
 		walk = func(m *tree_sitter.Node) {
 			for _, ch := range c.namedChildren(m) {
-				if ch.Kind() == "variable" || ch.Kind() == "sub_expression" {
+				if c.kind(ch) == "variable" || c.kind(ch) == "sub_expression" {
 					parts = append(parts, c.expr(ch))
 				} else {
 					walk(ch)
@@ -649,7 +633,7 @@ func psLiteralValue(raw string) string {
 
 func (c *psConv) psInvokeArgs(n *tree_sitter.Node) []nir.Expr {
 	var out []nir.Expr
-	if a := field(n, "arguments"); a != nil {
+	if a := c.field(n, "arguments"); a != nil {
 		for _, ch := range c.namedChildren(a) {
 			out = append(out, c.expr(ch))
 		}
@@ -663,7 +647,7 @@ func (c *psConv) psInvokeArgs(n *tree_sitter.Node) []nir.Expr {
 		if i == 0 {
 			continue
 		}
-		if ch.Kind() == "argument_list" {
+		if c.kind(ch) == "argument_list" {
 			for _, arg := range c.namedChildren(ch) {
 				out = append(out, c.expr(arg))
 			}
@@ -765,7 +749,7 @@ func (c *psConv) psExprFromText(raw, loc string) (nir.Expr, bool) {
 }
 
 func (c *psConv) psMemberName(n *tree_sitter.Node) string {
-	if m := field(n, "member"); m != nil {
+	if m := c.field(n, "member"); m != nil {
 		return c.text(m)
 	}
 	raw := strings.TrimSpace(c.text(n))
@@ -784,7 +768,7 @@ func (c *psConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "variable":
 		return c.varName(n)
 	case "member_access":
@@ -793,7 +777,7 @@ func (c *psConv) dotted(n *tree_sitter.Node) string {
 			return c.dotted(base[0]) + "." + c.psMemberName(n)
 		}
 	case "command":
-		return lastSeg(c.text(field(n, "command_name")))
+		return lastSeg(c.text(c.field(n, "command_name")))
 	}
 	if path := c.psStaticPath(n); path != "" {
 		return path

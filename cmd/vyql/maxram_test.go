@@ -38,6 +38,9 @@ func TestApplyMaxRAMKeepsEveryPoolInsideTheBudget(t *testing.T) {
 	if limit > n {
 		t.Errorf("heap limit = %d, above the budget %d", limit, n)
 	}
+	if stopAt := memoryStopThreshold(n); limit >= stopAt {
+		t.Errorf("heap limit = %d, not below resident safety threshold %d", limit, stopAt)
+	}
 	if limit <= n/2 {
 		t.Errorf("heap limit = %d, at or below half the budget %d: the resident graph has no room", limit, n)
 	}

@@ -27,7 +27,7 @@ func init() {
 		Name{}, Const{}, Attr{}, Index{}, Call{}, Format{}, Seq{}, Pair{}, Lambda{}, Thru{},
 		BinOp{}, Unary{}, Ternary{},
 		Assign{}, AugAssign{}, Return{}, ExprStmt{}, FuncDef{}, ClassDef{}, Block{}, If{},
-		Loop{}, Switch{}, Try{}, Defer{}, Validation{}, Terminate{},
+		Loop{}, Switch{}, Try{}, Defer{}, BodyRef{}, Validation{}, Terminate{},
 	} {
 		gob.Register(v)
 	}
@@ -329,6 +329,28 @@ type Defer struct {
 	Loc  string
 }
 
+// BodyRef is an internal, storage-backed statement list. Frontends replace completed
+// function/control bodies with these references when a body cache is available, allowing
+// extraction to release NIR before the whole repository has been parsed. Lowering expands
+// each key in order and otherwise treats the referenced statements exactly as if they were
+// inline. It is deliberately not a language construct and must never create a graph node.
+type BodyRef struct {
+	Keys       []string
+	Summarized bool
+	Summary    BodySummary
+}
+
+// BodySummary is the compact information global/preparatory lowering passes need before a
+// body is emitted. Keeping it beside the references avoids decoding the same body for symbol
+// registration, closure capture, class context, and dynamic-callback discovery.
+type BodySummary struct {
+	Declarations  []Stmt
+	LocalDecls    []string
+	UsedNames     []string
+	AddressTaken  []string
+	ContextTokens []string
+}
+
 func (Assign) isStmt()     {}
 func (AugAssign) isStmt()  {}
 func (Return) isStmt()     {}
@@ -343,6 +365,7 @@ func (Loop) isStmt()       {}
 func (Switch) isStmt()     {}
 func (Try) isStmt()        {}
 func (Defer) isStmt()      {}
+func (BodyRef) isStmt()    {}
 
 // Import is one import binding. Module is the target module key (source-root
 // key) or file path; Symbol is set for `from m import s` (empty for plain module
