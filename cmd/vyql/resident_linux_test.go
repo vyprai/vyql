@@ -12,18 +12,16 @@ RssShmem:	876544 kB
 Threads:	17
 `
 
-// The figure that matters is what the kernel cannot take back: anonymous pages
-// plus shared memory. Mapped files are resident and reclaimable, so a scan must
-// not be stopped over them.
-func TestResidentFromStatusCountsAnonAndSharedOnly(t *testing.T) {
-	want := int64(30655336+876544) * 1024
+// The hard ceiling covers the complete resident set, including file-backed
+// pages that the kernel has not reclaimed yet.
+func TestResidentFromStatusCountsCompleteRSS(t *testing.T) {
+	want := int64(31655336) * 1024
 	if got := residentFromStatus(procStatus); got != want {
 		t.Errorf("residentFromStatus = %d, want %d", got, want)
 	}
 }
 
-// A kernel older than 4.5 reports neither breakdown field.
-func TestResidentFromStatusFallsBackToVmRSS(t *testing.T) {
+func TestResidentFromStatusReadsVmRSS(t *testing.T) {
 	const old = "Name:\tvyql\nVmRSS:\t   4096 kB\nThreads:\t2\n"
 	if got := residentFromStatus(old); got != 4096*1024 {
 		t.Errorf("residentFromStatus = %d, want %d", got, 4096*1024)

@@ -374,7 +374,7 @@ func applyMaxRAM(v string) func() {
 	}
 	dir, err := newGraphStoreDir()
 	if err != nil {
-		debug.SetMemoryLimit(n)
+		debug.SetMemoryLimit(goHeapMemoryLimit(n))
 		lowering.UseIntStore = true // fallback: lower-footprint in-RAM store
 		return noop
 	}
@@ -382,9 +382,10 @@ func applyMaxRAM(v string) func() {
 	// figure and the heap ceiling is that figure less a reserve for the memory the Go runtime
 	// does not account for: tree-sitter's C parse trees and badger's mapped tables.
 	//
-	// The detail buffer gets a quarter. A buffer large enough to hold the whole scan's node
+	// The detail buffer gets an eighth. A buffer large enough to hold the whole scan's node
 	// detail means nothing ever spills and no blob is ever read back, which is by far the
-	// cheapest outcome.
+	// cheapest outcome, but the structural graph is live memory too. Spilling earlier leaves
+	// it room to grow under the same process ceiling.
 	//
 	// Badger's block cache gets a sixteenth and no more than half a gigabyte. It is ordinary Go
 	// heap, because ristretto holds decoded blocks as Go values, so it is spent from the same
@@ -392,16 +393,27 @@ func applyMaxRAM(v string) func() {
 	// share of the budget fills the ceiling before a node is stored, leaving the collector to
 	// run against memory it may not release.
 	lowering.DiskCacheBytes = clampBytes(n/16, 64<<20, 512<<20)
-	lowering.DiskDetailBuf = clampBytes(n/4, 64<<20, 4<<30)
+	lowering.DiskDetailBuf = clampBytes(n/8, 64<<20, 2<<30)
 	lowering.DiskStorePath = dir
 	prev := debug.SetMemoryLimit(-1)
-	debug.SetMemoryLimit(n - cgoReserve(n))
+	// The Go limit is soft, so place it below the resident watchdog's stop point.
+	// This buys the collector time to trade CPU for memory before the process as a
+	// whole reaches the safety threshold.
+	debug.SetMemoryLimit(goHeapMemoryLimit(n))
 	return func() {
 		debug.SetMemoryLimit(prev)
 		lowering.DiskStorePath = ""
 		lowering.DiskCacheBytes, lowering.DiskDetailBuf = 0, 0
 		_ = os.RemoveAll(dir) // best-effort temp cleanup
 	}
+}
+
+func goHeapMemoryLimit(processLimit int64) int64 {
+	limit := memoryStopThreshold(processLimit) - cgoReserve(processLimit)
+	if limit < 1 {
+		return 1
+	}
+	return limit
 }
 
 // clampBytes returns want, held between lo and hi. A budget small enough that a
