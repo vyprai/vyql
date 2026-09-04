@@ -62,8 +62,7 @@ type scopedPredicateHitSet struct {
 }
 
 type contextTokenFacts struct {
-	byPrefix      map[string][]string
-	lowerByPrefix map[string][]string
+	byPrefix map[string][]string
 }
 
 func scopeCallPredicateIndexable(pred flagPredicate) bool {
@@ -1200,11 +1199,279 @@ func flagScopeCallArgHit(s usg.Store, idx *flagMatchIndex, pred flagPredicate, n
 		if tech == "javascript" && !callArgPredicateMayMatchCall(pred, cand) {
 			return false
 		}
-		if contextTokenValuePredicate(pred.Op, pred.Values, callArgContextTokensScoped(s, idx, cand, tech, crossLang)) {
+		if callArgFactsMatch(pred.Op, pred.Values, pred.lowerValues(), callArgContextFactsScoped(s, idx, cand, tech, crossLang)) {
 			return true
 		}
 		return false
 	})
+}
+
+type callArgCacheKey struct {
+	id        string
+	tech      string
+	crossLang bool
+}
+
+// callArgContextFacts is the structured form of the virtual tokens
+// "call_arg:<path>:<value>" and "call_arg_method:<method>:<value>". Keeping the
+// stable pieces separate avoids constructing and retaining the same path/method prefix once per
+// reachable argument, then parsing that large string back into contextTokenFacts.
+type callArgContextFacts struct {
+	path   string
+	method string
+	values []string
+}
+
+type segmentedContextToken struct {
+	parts [4]string
+	n     int
+}
+
+func callArgFactsMatch(op string, values, valuesLower []string, facts *callArgContextFacts) bool {
+	if facts == nil {
+		return false
+	}
+	for _, value := range facts.values {
+		if strings.IndexByte(value, '\x00') >= 0 {
+			// Preserve the legacy interpretation of embedded separators. This is rare
+			// (normal str_args is already tokenized) and keeps the hot path allocation-free.
+			return contextTokenValuePredicateLowerValues(op, values, valuesLower, facts.materialize())
+		}
+	}
+	tokenCount := len(facts.values)
+	if facts.path != "" && facts.method != "" {
+		tokenCount *= 2
+	} else if facts.path == "" && facts.method == "" {
+		tokenCount = 0
+	}
+	if op == "exists" && len(values) == 0 {
+		return tokenCount != 0
+	}
+
+	matchOne := func(value, lowerValue string, mode string) bool {
+		return facts.anyToken(func(tok segmentedContextToken) bool {
+			switch mode {
+			case "equals":
+				return tok.equal(value)
+			case "starts_with":
+				return tok.boundaryFolded(lowerValue, false)
+			case "ends_with":
+				return tok.boundaryFolded(lowerValue, true)
+			default:
+				return tok.containsFolded(lowerValue)
+			}
+		})
+	}
+
+	switch op {
+	case "exists":
+		for _, value := range values {
+			if value == "" && tokenCount != 0 {
+				return true
+			}
+			if _, want, ok := splitContextTokenPredicateValue(value); ok && want == "" &&
+				facts.anyToken(func(tok segmentedContextToken) bool { return tok.hasPrefix(value) }) {
+				return true
+			}
+			if matchOne(value, "", "equals") {
+				return true
+			}
+		}
+		return false
+	case "equals_any":
+		for _, value := range values {
+			if matchOne(value, "", "equals") {
+				return true
+			}
+		}
+		return false
+	case "equals":
+		if len(values) == 0 {
+			return false
+		}
+		for _, value := range values {
+			if !matchOne(value, "", "equals") {
+				return false
+			}
+		}
+		return true
+	case "contains_any":
+		for i, value := range values {
+			lower := lowerString(value)
+			if i < len(valuesLower) {
+				lower = valuesLower[i]
+			}
+			if matchOne(value, lower, "contains") {
+				return true
+			}
+		}
+		return false
+	case "starts_with", "ends_with":
+		for i, value := range values {
+			lower := lowerString(value)
+			if i < len(valuesLower) {
+				lower = valuesLower[i]
+			}
+			if matchOne(value, lower, op) {
+				return true
+			}
+		}
+		return false
+	default: // contains and the historical empty operator both mean all needles
+		for i, value := range values {
+			lower := lowerString(value)
+			if i < len(valuesLower) {
+				lower = valuesLower[i]
+			}
+			if !matchOne(value, lower, "contains") {
+				return false
+			}
+		}
+		return true
+	}
+}
+
+func (f *callArgContextFacts) anyToken(fn func(segmentedContextToken) bool) bool {
+	for _, value := range f.values {
+		if f.path != "" && fn(segmentedContextToken{parts: [4]string{"call_arg:", f.path, ":", value}, n: 4}) {
+			return true
+		}
+		if f.method != "" && fn(segmentedContextToken{parts: [4]string{"call_arg_method:", f.method, ":", value}, n: 4}) {
+			return true
+		}
+	}
+	return false
+}
+
+func (f *callArgContextFacts) materialize() string {
+	if f == nil || len(f.values) == 0 {
+		return ""
+	}
+	var b strings.Builder
+	wrote := false
+	f.anyToken(func(tok segmentedContextToken) bool {
+		if wrote {
+			b.WriteByte(0)
+		}
+		for i := 0; i < tok.n; i++ {
+			b.WriteString(tok.parts[i])
+		}
+		wrote = true
+		return false
+	})
+	return b.String()
+}
+
+func (t segmentedContextToken) len() int {
+	n := 0
+	for i := 0; i < t.n; i++ {
+		n += len(t.parts[i])
+	}
+	return n
+}
+
+func (t segmentedContextToken) byteAt(pos int) byte {
+	for i := 0; i < t.n; i++ {
+		if pos < len(t.parts[i]) {
+			return t.parts[i][pos]
+		}
+		pos -= len(t.parts[i])
+	}
+	return 0
+}
+
+func (t segmentedContextToken) string() string {
+	var b strings.Builder
+	b.Grow(t.len())
+	for i := 0; i < t.n; i++ {
+		b.WriteString(t.parts[i])
+	}
+	return b.String()
+}
+
+func (t segmentedContextToken) equal(want string) bool {
+	if t.len() != len(want) {
+		return false
+	}
+	for i := range want {
+		if t.byteAt(i) != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (t segmentedContextToken) hasPrefix(want string) bool {
+	if len(want) > t.len() {
+		return false
+	}
+	for i := range want {
+		if t.byteAt(i) != want[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func (t segmentedContextToken) containsFolded(lowerWant string) bool {
+	if lowerWant == "" {
+		return true
+	}
+	if len(lowerWant) > t.len() {
+		return false
+	}
+	for _, ch := range []byte(lowerWant) {
+		if ch >= 0x80 {
+			return strings.Contains(lowerString(t.string()), lowerWant)
+		}
+	}
+	limit := t.len() - len(lowerWant)
+	for start := 0; start <= limit; start++ {
+		matched := true
+		for j := range lowerWant {
+			ch := t.byteAt(start + j)
+			if ch >= 0x80 {
+				return strings.Contains(lowerString(t.string()), lowerWant)
+			}
+			if ch >= 'A' && ch <= 'Z' {
+				ch += 'a' - 'A'
+			}
+			if ch != lowerWant[j] {
+				matched = false
+				break
+			}
+		}
+		if matched {
+			return true
+		}
+	}
+	return false
+}
+
+func (t segmentedContextToken) boundaryFolded(lowerWant string, suffix bool) bool {
+	if lowerWant == "" {
+		return true
+	}
+	if len(lowerWant) > t.len() {
+		return false
+	}
+	start := 0
+	if suffix {
+		start = t.len() - len(lowerWant)
+	}
+	for i := range lowerWant {
+		ch := t.byteAt(start + i)
+		if ch >= 0x80 || lowerWant[i] >= 0x80 {
+			return foldedBoundaryMatch(t.string(), lowerWant, suffix)
+		}
+		if ch >= 'A' && ch <= 'Z' {
+			ch += 'a' - 'A'
+		}
+		if ch != lowerWant[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func callArgPredicateMayMatchCall(pred flagPredicate, cand usg.Node) bool {
@@ -1254,43 +1521,36 @@ func callArgPredicatePath(value string) (string, bool) {
 	return rest[:i], true
 }
 
-func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, tech string, crossLang bool) string {
+func callArgContextFactsScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, tech string, crossLang bool) *callArgContextFacts {
 	idx.ensure(s)
-	cacheKey := strings.Join([]string{n.ID, tech, strconv.FormatBool(crossLang)}, "\x1f")
-	if cached, ok := idx.callArgText.Load(cacheKey); ok {
-		return cached.(string)
+	cacheKey := callArgCacheKey{id: n.ID, tech: tech, crossLang: crossLang}
+	if cached, ok := idx.callArgFacts.Load(cacheKey); ok {
+		return cached.(*callArgContextFacts)
 	}
 	path := n.Prop("callee_path")
 	method := n.Prop("method")
+	facts := &callArgContextFacts{path: path, method: method}
 	if path == "" && method == "" {
-		idx.callArgText.Store(cacheKey, "")
-		return ""
+		idx.callArgFacts.Store(cacheKey, facts)
+		return facts
 	}
-	pathPrefix := ""
-	methodPrefix := ""
-	if path != "" {
-		pathPrefix = "call_arg:" + path + ":"
-	}
-	if method != "" {
-		methodPrefix = "call_arg_method:" + method + ":"
-	}
-	var values []string
 	seen := map[string]bool{}
 	addValue := func(text string) {
 		if text == "" || seen[text] {
 			return
 		}
 		seen[text] = true
-		values = append(values, text)
+		facts.values = append(facts.values, text)
 	}
 	add := func(text string) {
 		addValue(strings.TrimSpace(text))
 	}
 	addNode := func(node usg.Node) {
 		add(node.Prop("str_args"))
-		for _, part := range strings.Split(nodeSearchText(node), "\x00") {
-			add(part)
-		}
+		add(node.Type)
+		add(node.Prop("callee_path"))
+		add(node.Prop("method"))
+		add(node.Prop("op"))
 		add(node.Prop("name"))
 		add(node.Prop("path"))
 		add(node.ID)
@@ -1298,7 +1558,7 @@ func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, te
 	// Direct tokens were historically kept verbatim, including duplicates. Keep
 	// that representation stable; only the extra flow-derived values are deduped.
 	forEachNULToken(n.Prop("str_args"), func(text string) {
-		values = append(values, text)
+		facts.values = append(facts.values, text)
 	})
 	rangeFlowIn(s, &idx.flow, n.ID, func(argID string) bool {
 		arg, ok := idx.node(s, argID)
@@ -1316,45 +1576,8 @@ func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, te
 		})
 		return true
 	})
-	prefixBytes, prefixCount := 0, 0
-	if pathPrefix != "" {
-		prefixBytes += len(pathPrefix)
-		prefixCount++
-	}
-	if methodPrefix != "" {
-		prefixBytes += len(methodPrefix)
-		prefixCount++
-	}
-	needed := len(values) * prefixBytes
-	for _, value := range values {
-		needed += prefixCount * len(value)
-	}
-	tokenCount := len(values) * prefixCount
-	if tokenCount > 1 {
-		needed += tokenCount - 1
-	}
-	var result strings.Builder
-	result.Grow(needed)
-	wrote := false
-	write := func(prefix, value string) {
-		if wrote {
-			result.WriteByte(0)
-		}
-		result.WriteString(prefix)
-		result.WriteString(value)
-		wrote = true
-	}
-	for _, value := range values {
-		if pathPrefix != "" {
-			write(pathPrefix, value)
-		}
-		if methodPrefix != "" {
-			write(methodPrefix, value)
-		}
-	}
-	text := result.String()
-	idx.callArgText.Store(cacheKey, text)
-	return text
+	idx.callArgFacts.Store(cacheKey, facts)
+	return facts
 }
 
 func callArgSourceNodeType(typ string) bool {
@@ -1887,8 +2110,8 @@ func contextTokenContainsPredicateCached(op string, values, valuesLower []string
 					}
 				}
 			} else {
-				for _, got := range facts.lowerByPrefix[prefix] {
-					if valContainsLowerNeedle(got, wantLower) {
+				for _, got := range facts.byPrefix[prefix] {
+					if valContainsFoldedNeedle(got, wantLower) {
 						hit = true
 						break
 					}
@@ -1950,10 +2173,6 @@ func contextTokenBoundaryPredicateCached(op string, values, valuesLower []string
 	if len(values) == 0 {
 		return false
 	}
-	match := strings.HasPrefix
-	if op == "ends_with" {
-		match = strings.HasSuffix
-	}
 	for i, v := range values {
 		prefix, want, ok := splitContextTokenPredicateValue(v)
 		if !ok {
@@ -1965,8 +2184,8 @@ func contextTokenBoundaryPredicateCached(op string, values, valuesLower []string
 				wantLower = lowerWant
 			}
 		}
-		for _, got := range facts.lowerByPrefix[prefix] {
-			if match(got, wantLower) {
+		for _, got := range facts.byPrefix[prefix] {
+			if foldedBoundaryMatch(got, wantLower, op == "ends_with") {
 				return true
 			}
 		}
