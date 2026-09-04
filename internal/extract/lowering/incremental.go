@@ -26,10 +26,15 @@ func (discardWriter) Write(p []byte) (int, error) { return len(p), nil }
 
 func nowNano() int64 { return time.Now().UnixNano() }
 
-// DeltaCache is the minimal byte cache the incremental lowerer needs (satisfied by
+// BodyCache is the read side needed to expand deferred modules and function chunks.
+type BodyCache interface {
+	GetRaw(key string) ([]byte, bool)
+}
+
+// DeltaCache is the byte cache the incremental lowerer needs (satisfied by
 // parsecache.Cache). A nil DeltaCache is invalid here — callers gate on cache != nil.
 type DeltaCache interface {
-	GetRaw(key string) ([]byte, bool)
+	BodyCache
 	PutRaw(key string, val []byte)
 	// Salt identifies the binary that wrote the entries. Every delta key folds it in, because a
 	// module's content hash says nothing about which build lowered it: rebuild vyql with a change
@@ -244,6 +249,32 @@ func (l *lowerer) bodyOf(m nir.Module) nir.Module {
 		}
 	}
 	return m
+}
+
+// eachDeferred expands one storage-backed statement chunk at a time. Missing/corrupt data is
+// a hard lowering error: silently treating it as an empty body would turn cache damage or a
+// failed spool write into false negatives. The callback must not retain chunk.
+func (l *lowerer) eachDeferred(ref nir.BodyRef, visit func(chunk []nir.Stmt)) {
+	if len(ref.Keys) == 0 {
+		return
+	}
+	if l.parseCache == nil {
+		l.noteStoreErr(fmt.Errorf("deferred body cache is unavailable"))
+		return
+	}
+	for _, key := range ref.Keys {
+		raw, ok := l.parseCache.GetRaw(key)
+		if !ok {
+			l.noteStoreErr(fmt.Errorf("deferred body %q is unavailable", key))
+			continue
+		}
+		var chunk []nir.Stmt
+		if err := gob.NewDecoder(bytes.NewReader(raw)).Decode(&chunk); err != nil {
+			l.noteStoreErr(fmt.Errorf("decode deferred body %q: %w", key, err))
+			continue
+		}
+		visit(chunk)
+	}
 }
 
 func decodeModule(raw []byte) (nir.Module, bool) {
