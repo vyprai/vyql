@@ -803,16 +803,15 @@ any store left there for more than a day. It is not the system temporary
 directory on purpose: `/tmp` is a memory filesystem on most systemd
 distributions, and a graph stored there is still in RAM.
 
-The flag is a hard limit, not a hint. A scan that reaches it stops and exits `1`,
-naming the figure it passed, rather than growing until the kernel kills it. What
-is measured is the memory the kernel cannot take back, meaning anonymous and
-shared pages. Mapped files are resident too, but the kernel drops them under
-pressure instead of killing anything, so the total RSS a tool like `time -v`
-reports can sit somewhat above the ceiling while the scan is still inside it.
-The graph a scan builds is live memory that no amount of collection can
-release, so a tree large enough will pass any figure you give it. When that
-happens, exclude unwanted files with `-exclude`, or raise the ceiling. With no
-`-max-ram`, the same watch guards what the machine or the cgroup allows.
+The flag is a hard limit, not a hint. A scan stops at a conservative safety
+threshold below it and exits `1`, rather than waiting until the ceiling has
+already been crossed and racing the kernel's OOM killer. The watch counts the
+complete resident set on Linux and the resident high-water mark on macOS,
+including mapped pages. The graph a scan builds is live memory that no amount
+of collection can release, so a tree large enough will still exceed the safe
+working set. When that happens, exclude unwanted files with `-exclude`, or
+raise the ceiling. With no `-max-ram`, the same safety margin guards what the
+machine or the cgroup allows.
 
 ## Languages
 

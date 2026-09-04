@@ -10,6 +10,17 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+### Fixed
+
+- **`--max-ram` now stops with headroom before the requested ceiling on Linux
+  and macOS.** The resident watch samples every 100 ms, counts the complete
+  Linux RSS, and uses Darwin's resident high-water mark; macOS previously had
+  no resident watch at all. The Go heap limit and disk detail buffer are also
+  smaller so GC and spilling get the first chance to trade speed for memory.
+  Signal and memory-limit exits now flush requested CPU and heap profiles. On
+  the 166-file generated stress corpus, a 4 GB scan that previously reached
+  7.6 GB stopped cleanly at 3.65 GB peak RSS.
+
 ## [0.4.1] - 2026-09-04
 
 ### Changed

@@ -98,6 +98,25 @@ func TestMemWatchStopIsRepeatable(t *testing.T) {
 	stop()
 }
 
+func TestMemoryStopThresholdLeavesBoundedHeadroom(t *testing.T) {
+	tests := []struct {
+		limit int64
+		want  int64
+	}{
+		{limit: 1 << 30, want: 768 << 20},
+		{limit: 4 << 30, want: 3584 << 20},
+		{limit: 64 << 30, want: 62 << 30},
+	}
+	for _, tt := range tests {
+		if got := memoryStopThreshold(tt.limit); got != tt.want {
+			t.Errorf("memoryStopThreshold(%d) = %d, want %d", tt.limit, got, tt.want)
+		}
+	}
+	if got := memoryStopThreshold(0); got != 0 {
+		t.Errorf("memoryStopThreshold(0) = %d, want 0", got)
+	}
+}
+
 func drain(c chan struct{}) {
 	for {
 		select {
