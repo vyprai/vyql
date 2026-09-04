@@ -2,6 +2,7 @@ package usg
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 )
 
@@ -82,5 +83,48 @@ func TestSpilledDetailStillRoundTrips(t *testing.T) {
 	}
 	if got.Type != want.Type || got.Loc != want.Loc || got.Scope != want.Scope || got.Props["k"] != "v" {
 		t.Errorf("spilled round-trip mismatch: %+v", got)
+	}
+}
+
+func TestSpilledDenseNodeAccessPreservesIndexesAndHotProps(t *testing.T) {
+	g, err := OpenBadgerGraph(t.TempDir(), 64<<20, 1)
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer func() { _ = g.Close() }()
+	wants := []Node{
+		{ID: "call-0", Type: "Call", Loc: "f.go:1", Method: "Send", CalleePath: "mail.Send", StrArgs: "hello", Vkind: "Resolved"},
+		{ID: "name-1", Type: "Name", Loc: "f.go:2", Props: map[string]string{"name": "recipient"}},
+	}
+	for _, n := range wants {
+		if err := g.AddNode(n); err != nil {
+			t.Fatalf("add: %v", err)
+		}
+	}
+	if got := g.TypeNodeIndexes("Call"); !slices.Equal(got, []int32{0}) {
+		t.Fatalf("Call indexes = %v, want [0]", got)
+	}
+	var indexes []int32
+	var nodes []Node
+	g.RangeNodeIndexes(func(i int32, n Node) bool {
+		indexes = append(indexes, i)
+		nodes = append(nodes, n)
+		return true
+	})
+	if !slices.Equal(indexes, []int32{0, 1}) {
+		t.Fatalf("range indexes = %v, want [0 1]", indexes)
+	}
+	if len(nodes) != 2 || nodes[0].Method != "Send" || nodes[0].CalleePath != "mail.Send" ||
+		nodes[0].StrArgs != "hello" || nodes[0].Vkind != "Resolved" {
+		t.Fatalf("range lost inline hot properties: %+v", nodes)
+	}
+	if got, ok := g.NodeAtIndex(0); !ok || got.ID != "call-0" || got.Method != "Send" {
+		t.Fatalf("NodeAtIndex(0) = %+v, %v", got, ok)
+	}
+	if _, ok := g.NodeAtIndex(-1); ok {
+		t.Fatal("NodeAtIndex(-1) unexpectedly succeeded")
+	}
+	if _, ok := g.NodeAtIndex(2); ok {
+		t.Fatal("NodeAtIndex(2) unexpectedly succeeded")
 	}
 }
