@@ -10,6 +10,29 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+## [0.4.1] - 2026-09-04
+
+### Changed
+
+- **Tree-sitter frontends allocate less and finish sooner.** All 19 frontends
+  now share cached grammar metadata and child traversal instead of repeatedly
+  allocating strings and cursors across the cgo boundary. On a 48-file arm64
+  benchmark, Java, Python, JavaScript and C extraction ran 8–18% faster and
+  allocated 18–55% fewer objects. The larger Java extraction-and-lowering
+  benchmark improved by 14%, with 38% fewer allocations.
+- **Directory scans decline likely minified JavaScript-family bundles before
+  parsing.** The bounded probe prevents generated bundles from exhausting a
+  scan's memory, records them in coverage and through cache replay, and leaves
+  explicitly named files available as an escape hatch. SCA still inspects the
+  files independently.
+
+### Fixed
+
+- **Go map literals preserve their literal keys during lowering.** Reads such
+  as `map[string]string{"v": payload}["v"]` now retain the element's taint.
+  The Go OWASP benchmark moved from +0.7769 to +1.0000 with no new false
+  positives; Java, Python and the other language ports were unchanged.
+
 ## [0.4.0] - 2026-08-24
 
 ### Added
