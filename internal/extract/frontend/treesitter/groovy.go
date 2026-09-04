@@ -13,26 +13,10 @@ import (
 // Gradle) models calls as function_call(function, argument_list); member access is
 // dotted_identifier; `+` and GString interpolation build tainted strings.
 type gvConv struct {
-	src        []byte
-	file       string
-	key        string
-	childCache map[uintptr][]*tree_sitter.Node
-}
-
-func (c *gvConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = make(map[uintptr][]*tree_sitter.Node)
-	}
-	key := uintptr(n.Id())
-	if kids, ok := c.childCache[key]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[key] = kids
-	return kids
+	nodeCache
+	src  []byte
+	file string
+	key  string
 }
 
 // ExtractGroovy parses Groovy files into one NIR Program (one module per file).
@@ -110,13 +94,13 @@ func (c *gvConv) decls(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "function_definition", "method_definition":
 		var name string
 		var params []string
 		paramTypes := map[string]string{}
 		for _, ch := range c.namedChildren(n) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "identifier":
 				if name == "" {
 					name = c.text(ch)
@@ -134,20 +118,20 @@ func (c *gvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ContextTokens: c.gvFunctionContext(name, n)}}
 	case "declaration":
 		kids := c.namedChildren(n)
-		if len(kids) >= 2 && kids[0].Kind() == "identifier" {
+		if len(kids) >= 2 && c.kind(kids[0]) == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(kids[0])}, Value: c.expr(kids[len(kids)-1])}}
 		}
 		return nil
 	case "assignment":
-		left := field(n, "left")
-		right := field(n, "right")
+		left := c.field(n, "left")
+		right := c.field(n, "right")
 		if left == nil || right == nil {
 			kids := c.namedChildren(n)
 			if len(kids) >= 2 {
 				left, right = kids[0], kids[len(kids)-1]
 			}
 		}
-		if left != nil && left.Kind() == "identifier" {
+		if left != nil && c.kind(left) == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: c.expr(right)}}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(n)}}
@@ -198,7 +182,7 @@ func (c *gvConv) block(n *tree_sitter.Node) []nir.Stmt {
 	}
 	var out []nir.Stmt
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "parameter_list" {
+		if c.kind(ch) == "parameter_list" {
 			continue
 		}
 		out = append(out, c.stmt(ch)...)
@@ -209,7 +193,7 @@ func (c *gvConv) block(n *tree_sitter.Node) []nir.Stmt {
 func (c *gvConv) paramName(n *tree_sitter.Node) string {
 	var name string
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "identifier" {
+		if c.kind(ch) == "identifier" {
 			name = c.text(ch)
 		}
 	}
@@ -231,7 +215,7 @@ func (c *gvConv) gvStmts(n *tree_sitter.Node) []nir.Stmt {
 	if n == nil {
 		return nil
 	}
-	if k := n.Kind(); k == "closure" || k == "block" {
+	if k := c.kind(n); k == "closure" || k == "block" {
 		return c.block(n)
 	}
 	return c.stmt(n)
@@ -240,11 +224,11 @@ func (c *gvConv) gvStmts(n *tree_sitter.Node) []nir.Stmt {
 // gvIf lowers an if with its predicate attached so a constant-false arm is pruned.
 func (c *gvConv) gvIf(n *tree_sitter.Node) nir.Stmt {
 	it := nir.If{Loc: c.loc(n)}
-	if cond := field(n, "condition"); cond != nil {
+	if cond := c.field(n, "condition"); cond != nil {
 		it.Cond = c.expr(cond)
 	}
-	it.Then = c.gvStmts(field(n, "body"))
-	if eb := field(n, "else_body"); eb != nil {
+	it.Then = c.gvStmts(c.field(n, "body"))
+	if eb := c.field(n, "else_body"); eb != nil {
 		it.Else = c.gvStmts(eb)
 	}
 	return it
@@ -254,15 +238,15 @@ func (c *gvConv) gvIf(n *tree_sitter.Node) nir.Stmt {
 // (and so case bodies are no longer dropped — closing a latent FN).
 func (c *gvConv) gvSwitch(n *tree_sitter.Node) nir.Stmt {
 	sw := nir.Switch{Loc: c.loc(n)}
-	if v := field(n, "value"); v != nil {
+	if v := c.field(n, "value"); v != nil {
 		sw.Subject = c.expr(v)
 	}
-	body := field(n, "body")
+	body := c.field(n, "body")
 	if body == nil {
 		return sw
 	}
 	for _, cs := range c.namedChildren(body) {
-		if cs.Kind() != "case" {
+		if c.kind(cs) != "case" {
 			continue
 		}
 		var labelExpr nir.Expr
@@ -283,7 +267,7 @@ func (c *gvConv) gvSwitch(n *tree_sitter.Node) nir.Stmt {
 				labelExpr = c.expr(ch) // the case label, before the colon
 				continue
 			}
-			if k := ch.Kind(); k == "break" || k == "continue" {
+			if k := c.kind(ch); k == "break" || k == "continue" {
 				continue
 			}
 			stmts = append(stmts, c.stmt(ch)...)
@@ -303,7 +287,7 @@ func (c *gvConv) collectGvBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "closure", "block":
 				out = append(out, c.block(ch)...)
 			default:
@@ -320,7 +304,7 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier":
 		// tree-sitter-groovy parses boolean/null literals as bare identifiers; carry
 		// their value so value-matching marks can inspect them.
@@ -335,7 +319,7 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 		var parts []nir.Expr
 		var content string
 		for _, ch := range c.namedChildren(n) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "interpolation":
 				for _, e := range c.namedChildren(ch) {
 					parts = append(parts, c.expr(e))
@@ -384,8 +368,8 @@ func (c *gvConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Index{Base: base, Key: key, Path: c.dotted(n), Loc: L}
 	case "ternary_op":
-		return nir.Ternary{Cond: c.expr(field(n, "condition")),
-			Then: c.expr(field(n, "then")), Else: c.expr(field(n, "else")), Loc: L}
+		return nir.Ternary{Cond: c.expr(c.field(n, "condition")),
+			Then: c.expr(c.field(n, "then")), Else: c.expr(c.field(n, "else")), Loc: L}
 	case "unary_op":
 		if k := c.namedChildren(n); len(k) > 0 {
 			return nir.Unary{Op: c.gvOp(n), Operand: c.expr(k[len(k)-1]), Loc: L}
@@ -433,7 +417,7 @@ func (c *gvConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier":
 		return c.text(n)
 	case "dotted_identifier":
