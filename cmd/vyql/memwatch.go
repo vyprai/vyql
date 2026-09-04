@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"sync"
@@ -30,6 +31,13 @@ func memoryStopThreshold(limit int64) int64 {
 		reserve = quarter
 	}
 	return limit - reserve
+}
+
+func boundedMemoryCeiling(avail uint64) int64 {
+	if avail > uint64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	return int64(avail)
 }
 
 // memWatch samples resident memory and hands the first reading above limit to
@@ -122,7 +130,7 @@ func armMemoryWatch(maxRAM string) func() {
 		}
 	}
 	if avail := memoryCeilingBytes(); avail > 0 {
-		limit := int64(avail)
+		limit := boundedMemoryCeiling(avail)
 		return watchResidentMemory(limit, humanBytes(limit)+", what this machine allows")
 	}
 	return func() {}
