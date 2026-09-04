@@ -21,6 +21,7 @@ import (
 
 // pyConv walks a tree-sitter Python CST into NIR.
 type pyConv struct {
+	nodeCache
 	src           []byte
 	root          string // scan root, for display-relative loc
 	file          string // current file (display path, relative to root)
@@ -151,12 +152,12 @@ func (c *pyConv) imports(root *tree_sitter.Node) []nir.Import {
 	var out []nir.Import
 	var walk func(n *tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
-		switch n.Kind() {
+		switch c.kind(n) {
 		case "import_statement":
 			for _, ch := range c.namedChildren(n) {
-				if ch.Kind() == "aliased_import" {
-					nm := c.text(orSelf(field(ch, "name"), ch))
-					al := field(ch, "alias")
+				if c.kind(ch) == "aliased_import" {
+					nm := c.text(orSelf(c.field(ch, "name"), ch))
+					al := c.field(ch, "alias")
 					var local string
 					if al != nil {
 						local = c.text(al)
@@ -170,19 +171,19 @@ func (c *pyConv) imports(root *tree_sitter.Node) []nir.Import {
 				}
 			}
 		case "import_from_statement":
-			mod := field(n, "module_name")
+			mod := c.field(n, "module_name")
 			modtxt := c.text(mod)
 			for _, ch := range c.namedChildren(n) {
 				if ch == mod {
 					continue
 				}
-				switch ch.Kind() {
+				switch c.kind(ch) {
 				case "dotted_name", "identifier":
 					nm := c.text(ch)
 					out = append(out, nir.Import{Local: lastSeg(nm), Module: modtxt, Symbol: nm})
 				case "aliased_import":
-					nm := c.text(field(ch, "name"))
-					al := field(ch, "alias")
+					nm := c.text(c.field(ch, "name"))
+					al := c.field(ch, "alias")
 					local := nm
 					if al != nil {
 						local = c.text(al)
@@ -213,27 +214,27 @@ func (c *pyConv) blockChildren(n *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *pyConv) pyLengthGuardDefinitelyTerminates(statement *tree_sitter.Node, previous []*tree_sitter.Node) bool {
-	if statement == nil || statement.Kind() != "if_statement" || !c.pyConditionAlwaysTrue(field(statement, "condition")) {
+	if statement == nil || c.kind(statement) != "if_statement" || !c.pyConditionAlwaysTrue(c.field(statement, "condition")) {
 		return false
 	}
 	for _, prior := range previous {
 		assignment := prior
-		if assignment.Kind() == "expression_statement" {
+		if c.kind(assignment) == "expression_statement" {
 			children := namedChildren(assignment)
-			if len(children) != 1 || children[0].Kind() != "assignment" {
+			if len(children) != 1 || c.kind(children[0]) != "assignment" {
 				continue
 			}
 			assignment = children[0]
 		}
-		if assignment.Kind() != "assignment" {
+		if c.kind(assignment) != "assignment" {
 			continue
 		}
-		left := field(assignment, "left")
-		if left != nil && left.Kind() == "identifier" && c.text(left) == "len" {
+		left := c.field(assignment, "left")
+		if left != nil && c.kind(left) == "identifier" && c.text(left) == "len" {
 			return false
 		}
 	}
-	_, terminal := c.pyTerminalBranchKind(field(statement, "consequence"))
+	_, terminal := c.pyTerminalBranchKind(c.field(statement, "consequence"))
 	return terminal
 }
 
@@ -245,7 +246,7 @@ func (c *pyConv) vyqlResultEntries(fn *tree_sitter.Node) []nir.ResultEntry {
 			return
 		}
 		for _, ch := range c.children(n) {
-			if ch.Kind() == "comment" {
+			if c.kind(ch) == "comment" {
 				for _, tok := range vyqlMarkerTokens(c.text(ch)) {
 					out = append(out, nir.ResultEntry{Tokens: []string{tok}})
 				}
@@ -253,7 +254,7 @@ func (c *pyConv) vyqlResultEntries(fn *tree_sitter.Node) []nir.ResultEntry {
 		}
 	}
 	scan(fn)
-	scan(field(fn, "body"))
+	scan(c.field(fn, "body"))
 	return out
 }
 
@@ -282,7 +283,7 @@ func (c *pyConv) firstIdent(n *tree_sitter.Node) *tree_sitter.Node {
 	if n == nil {
 		return nil
 	}
-	if n.Kind() == "identifier" {
+	if c.kind(n) == "identifier" {
 		return n
 	}
 	for _, ch := range c.children(n) {
@@ -298,8 +299,8 @@ func (c *pyConv) firstIdent(n *tree_sitter.Node) *tree_sitter.Node {
 func (c *pyConv) stringInterps(n *tree_sitter.Node) []nir.Expr {
 	var interps []nir.Expr
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "interpolation" {
-			e := field(ch, "expression")
+		if c.kind(ch) == "interpolation" {
+			e := c.field(ch, "expression")
 			if e == nil {
 				if kids := c.namedChildren(ch); len(kids) > 0 {
 					e = kids[0]
@@ -318,7 +319,7 @@ func (c *pyConv) stringInterps(n *tree_sitter.Node) []nir.Expr {
 // else (capture, class, value, guard) returns literal=false so the match is left unprunable.
 func (c *pyConv) matchPatternLabels(caseClause *tree_sitter.Node) (labels []nir.Expr, isDefault, literal bool) {
 	for _, ch := range c.children(caseClause) {
-		if ch.Kind() == "case_pattern" {
+		if c.kind(ch) == "case_pattern" {
 			if kids := c.namedChildren(ch); len(kids) > 0 {
 				return c.patternLabels(kids[0])
 			}
@@ -331,7 +332,7 @@ func (c *pyConv) matchPatternLabels(caseClause *tree_sitter.Node) (labels []nir.
 }
 
 func (c *pyConv) patternLabels(p *tree_sitter.Node) (labels []nir.Expr, isDefault, literal bool) {
-	switch p.Kind() {
+	switch c.kind(p) {
 	case "_", "wildcard_pattern":
 		return nil, true, false
 	case "string", "integer", "float", "true", "false", "none", "concatenated_string":
@@ -356,12 +357,12 @@ func (c *pyConv) patternLabels(p *tree_sitter.Node) (labels []nir.Expr, isDefaul
 
 func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "function_definition":
-		name := c.text(field(n, "name"))
-		params := c.params(field(n, "parameters"))
-		paramTypes := c.paramTypes(field(n, "parameters"))
-		body := c.block(field(n, "body"))
+		name := c.text(c.field(n, "name"))
+		params := c.params(c.field(n, "parameters"))
+		paramTypes := c.paramTypes(c.field(n, "parameters"))
+		body := c.block(c.field(n, "body"))
 		body = append(body, c.pyFunctionContext(n, c.decorators)...)
 		var entries []nir.ParamEntry
 		if strings.HasPrefix(name, "resolve_") || name == "mutate" {
@@ -371,7 +372,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		exported := !strings.HasPrefix(name, "_") || (strings.HasPrefix(name, "__") && strings.HasSuffix(name, "__"))
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L, ParamEntries: entries, ResultEntries: c.vyqlResultEntries(n), Exported: exported}}
 	case "decorated_definition":
-		def := field(n, "definition")
+		def := c.field(n, "definition")
 		if def == nil {
 			cs := c.namedChildren(n)
 			if len(cs) > 0 {
@@ -395,11 +396,11 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return out
 	case "class_definition":
-		name := c.text(field(n, "name"))
+		name := c.text(c.field(n, "name"))
 		bases := c.pyClassBases(n)
 		ctx := c.pyClassContext(n, name, bases)
 		c.classContext = append(c.classContext, ctx...)
-		body := c.block(field(n, "body"))
+		body := c.block(c.field(n, "body"))
 		c.classContext = c.classContext[:len(c.classContext)-len(ctx)]
 		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Loc: L, Bases: bases}}
 	case "expression_statement":
@@ -408,17 +409,17 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return nil
 		}
 		inner := kids[0]
-		switch inner.Kind() {
+		switch c.kind(inner) {
 		case "assignment":
 			return c.assignStmts(inner, L)
 		case "augmented_assignment":
-			left := field(inner, "left")
-			if left != nil && left.Kind() == "identifier" {
-				return []nir.Stmt{nir.AugAssign{Target: c.text(left), Value: c.expr(field(inner, "right")), Loc: L}}
+			left := c.field(inner, "left")
+			if left != nil && c.kind(left) == "identifier" {
+				return []nir.Stmt{nir.AugAssign{Target: c.text(left), Value: c.expr(c.field(inner, "right")), Loc: L}}
 			}
 			return nil
 		default:
-			if inner.Kind() == "call" && lastSeg(c.dotted(field(inner, "function"))) == "abort" {
+			if c.kind(inner) == "call" && lastSeg(c.dotted(c.field(inner, "function"))) == "abort" {
 				return []nir.Stmt{nir.Terminate{Value: c.expr(inner), Kind: "abort", Loc: L}}
 			}
 			return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
@@ -441,19 +442,19 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// already gathers the then/elif/else bodies; keep them as the then-branch so the
 		// flattened node set is unchanged.
 		var cond nir.Expr
-		if cn := field(n, "condition"); cn != nil {
+		if cn := c.field(n, "condition"); cn != nil {
 			cond = c.expr(cn)
 		}
-		if n.Kind() == "while_statement" {
+		if c.kind(n) == "while_statement" {
 			return []nir.Stmt{nir.Loop{Cond: cond, Body: c.collectBlocks(n)}}
 		}
 		// Separate Then/Else (the elif/else chain) instead of flattening every clause into
 		// Then, so a value tainted on one path stays tainted past the join even when another
 		// path overwrites it (`if c: p = src()` / `else: p = "safe"`).
-		return []nir.Stmt{nir.If{Cond: cond, Then: c.block(field(n, "consequence")), Else: c.pyIfElse(n)}}
+		return []nir.Stmt{nir.If{Cond: cond, Then: c.block(c.field(n, "consequence")), Else: c.pyIfElse(n)}}
 	case "for_statement":
-		left, right := field(n, "left"), field(n, "right")
-		loop := nir.Loop{Iter: c.expr(right), Vars: c.targets(left), Body: c.block(field(n, "body")), Loc: L}
+		left, right := c.field(n, "left"), c.field(n, "right")
+		loop := nir.Loop{Iter: c.expr(right), Vars: c.targets(left), Body: c.block(c.field(n, "body")), Loc: L}
 		stmts := []nir.Stmt{loop}
 		if validation, ok := c.pyTerminalRejectValidation(n); ok {
 			stmts = append(stmts, validation)
@@ -467,21 +468,21 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		var walkWith func(node *tree_sitter.Node)
 		walkWith = func(node *tree_sitter.Node) {
 			for _, ch := range c.children(node) {
-				switch ch.Kind() {
+				switch c.kind(ch) {
 				case "with_clause":
 					walkWith(ch)
 				case "with_item":
-					val := field(ch, "value")
+					val := c.field(ch, "value")
 					if val == nil {
 						continue
 					}
-					if val.Kind() == "as_pattern" {
+					if c.kind(val) == "as_pattern" {
 						kids := c.namedChildren(val)
 						if len(kids) == 0 {
 							continue
 						}
 						expr := c.expr(kids[0])
-						if alias := field(val, "alias"); alias != nil {
+						if alias := c.field(val, "alias"); alias != nil {
 							if id := c.firstIdent(alias); id != nil {
 								pre = append(pre, nir.Assign{Targets: []string{c.text(id)}, Value: expr})
 								continue
@@ -508,16 +509,16 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		var labels [][]nir.Expr
 		var deflt []nir.Stmt
 		prunable := true
-		body := field(n, "body")
+		body := c.field(n, "body")
 		if body == nil {
 			body = n
 		}
 		for _, cl := range c.children(body) {
-			if cl.Kind() != "case_clause" {
+			if c.kind(cl) != "case_clause" {
 				continue
 			}
 			var stmts []nir.Stmt
-			if b := field(cl, "consequence"); b != nil {
+			if b := c.field(cl, "consequence"); b != nil {
 				stmts = c.block(b)
 			}
 			labs, isDefault, literal := c.matchPatternLabels(cl)
@@ -534,7 +535,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 		if prunable {
-			return []nir.Stmt{nir.Switch{Subject: c.expr(field(n, "subject")), Cases: cases, Labels: labels, Default: deflt}}
+			return []nir.Stmt{nir.Switch{Subject: c.expr(c.field(n, "subject")), Cases: cases, Labels: labels, Default: deflt}}
 		}
 		return []nir.Stmt{nir.Switch{Cases: append(cases, deflt)}} // unprunable: bodies only
 	}
@@ -547,7 +548,7 @@ func (c *pyConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
 	var alts []*tree_sitter.Node
 	for _, ch := range c.children(n) {
-		if ch.Kind() == "elif_clause" || ch.Kind() == "else_clause" {
+		if c.kind(ch) == "elif_clause" || c.kind(ch) == "else_clause" {
 			alts = append(alts, ch)
 		}
 	}
@@ -555,12 +556,12 @@ func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
 	for i := len(alts) - 1; i >= 0; i-- {
 		a := alts[i]
 		body := c.clauseBlock(a)
-		if a.Kind() == "else_clause" {
+		if c.kind(a) == "else_clause" {
 			els = body
 			continue
 		}
 		var cond nir.Expr // elif: a nested If whose Else is the chain built so far
-		if cn := field(a, "condition"); cn != nil {
+		if cn := c.field(a, "condition"); cn != nil {
 			cond = c.expr(cn)
 		}
 		els = []nir.Stmt{nir.If{Cond: cond, Then: body, Else: els}}
@@ -569,11 +570,11 @@ func (c *pyConv) pyIfElse(n *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []nir.Stmt {
-	body := field(fn, "body")
+	body := c.field(fn, "body")
 	if body == nil {
 		return nil
 	}
-	name := c.text(field(fn, "name"))
+	name := c.text(c.field(fn, "name"))
 	bodyText := c.text(body)
 	localBodyText := c.pyScopeLocalText(body)
 	controlFacts := c.pyControlFlowContextFacts(body)
@@ -759,7 +760,7 @@ func (c *pyConv) pyModuleContext(root *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *pyConv) pyStructuredContextTokens(fn *tree_sitter.Node, name string) []string {
-	body := field(fn, "body")
+	body := c.field(fn, "body")
 	if body == nil {
 		body = fn
 	}
@@ -779,7 +780,7 @@ func (c *pyConv) pyStructuredContextTokensScoped(fn *tree_sitter.Node, name stri
 	if name != "" {
 		add("function_name:" + name)
 	}
-	if params := field(fn, "parameters"); params != nil {
+	if params := c.field(fn, "parameters"); params != nil {
 		for i, p := range c.params(params) {
 			add("param_name:" + p)
 			add("param_index:" + itoa(i))
@@ -793,12 +794,12 @@ func (c *pyConv) pyStructuredContextTokensScoped(fn *tree_sitter.Node, name stri
 		if scopeLocal && pyIsNestedContextScope(n) {
 			return
 		}
-		switch n.Kind() {
+		switch c.kind(n) {
 		case "assignment":
 			if scopeLocal && pyContainsNestedContextScope(n) {
 				break
 			}
-			left, right := field(n, "left"), field(n, "right")
+			left, right := c.field(n, "left"), c.field(n, "right")
 			if lhs := c.pyContextPath(left); lhs != "" {
 				if rhs := pyContextValue(c.text(right)); rhs != "" {
 					add("assign:" + lhs + "=" + rhs)
@@ -810,14 +811,14 @@ func (c *pyConv) pyStructuredContextTokensScoped(fn *tree_sitter.Node, name stri
 						add("python_review:overbroad_role_permission_grant")
 					}
 				}
-				if right != nil && right.Kind() == "call" {
-					if path := c.dotted(field(right, "function")); path != "" && path != "?" {
+				if right != nil && c.kind(right) == "call" {
+					if path := c.dotted(c.field(right, "function")); path != "" && path != "?" {
 						add("assign_call:" + lhs + ":" + path)
 					}
 				}
 			}
 		case "call":
-			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+			if path := c.dotted(c.field(n, "function")); path != "" && path != "?" {
 				add("call_path:" + path)
 				if m := lastSeg(path); m != "" {
 					add("call:" + m)
@@ -835,10 +836,10 @@ func (c *pyConv) pyStructuredContextTokensScoped(fn *tree_sitter.Node, name stri
 			if sub := pyContextCompact(c.text(n)); sub != "" {
 				add("subscript:" + sub)
 			}
-			if base := c.dotted(field(n, "value")); base != "" && base != "?" {
+			if base := c.dotted(c.field(n, "value")); base != "" && base != "?" {
 				add("index_base:" + base)
 			}
-			if key := c.pyContextPath(field(n, "subscript")); key != "" {
+			if key := c.pyContextPath(c.field(n, "subscript")); key != "" {
 				add("index_key:" + key)
 			}
 		case "comparison_operator", "boolean_operator":
@@ -854,7 +855,7 @@ func (c *pyConv) pyStructuredContextTokensScoped(fn *tree_sitter.Node, name stri
 			walk(ch)
 		}
 	}
-	body := field(fn, "body")
+	body := c.field(fn, "body")
 	if body == nil {
 		body = fn
 	}
@@ -1590,7 +1591,7 @@ func (c *pyConv) pyContextAssignmentItems(n *tree_sitter.Node) []string {
 	if n == nil {
 		return nil
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "list", "tuple", "set":
 	default:
 		return nil
@@ -1680,7 +1681,7 @@ func pyCompactWhitespace(raw string, maxBytes int) string {
 }
 
 func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string) []string {
-	body := c.text(field(n, "body"))
+	body := c.text(c.field(n, "body"))
 	out := []string{
 		"class_name=" + name,
 		"class_name:" + name,
@@ -1703,7 +1704,7 @@ func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {
 		if n == nil {
 			return
 		}
-		if n.Kind() == "string" || n.Kind() == "concatenated_string" {
+		if c.kind(n) == "string" || c.kind(n) == "concatenated_string" {
 			toks = append(toks, c.text(n))
 			return
 		}
@@ -1718,7 +1719,7 @@ func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {
 // clauseBlock returns the lowered statements of a clause's `block` child.
 func (c *pyConv) clauseBlock(clause *tree_sitter.Node) []nir.Stmt {
 	for _, cc := range c.children(clause) {
-		if cc.Kind() == "block" {
+		if c.kind(cc) == "block" {
 			return c.block(cc)
 		}
 	}
@@ -1728,12 +1729,12 @@ func (c *pyConv) clauseBlock(clause *tree_sitter.Node) []nir.Stmt {
 func (c *pyConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	for _, ch := range c.children(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "block":
 			out = append(out, c.block(ch)...)
 		case "elif_clause", "else_clause", "except_clause", "finally_clause", "with_clause":
 			for _, cc := range c.children(ch) {
-				if cc.Kind() == "block" {
+				if c.kind(cc) == "block" {
 					out = append(out, c.block(cc)...)
 				}
 			}
@@ -1760,7 +1761,7 @@ func (c *pyConv) pyDecoratorTokens(n *tree_sitter.Node) []string {
 		out = append(out, tok)
 	}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() != "decorator" {
+		if c.kind(ch) != "decorator" {
 			continue
 		}
 		path := c.pyDecoratorPath(ch)
@@ -1786,7 +1787,7 @@ func (c *pyConv) pyDecoratorTokens(n *tree_sitter.Node) []string {
 func (c *pyConv) pyDecoratorRouteArg(dec *tree_sitter.Node) string {
 	var call *tree_sitter.Node
 	for _, ch := range namedChildren(dec) {
-		if ch.Kind() == "call" {
+		if c.kind(ch) == "call" {
 			call = ch
 			break
 		}
@@ -1794,12 +1795,12 @@ func (c *pyConv) pyDecoratorRouteArg(dec *tree_sitter.Node) string {
 	if call == nil {
 		return ""
 	}
-	args := field(call, "arguments")
+	args := c.field(call, "arguments")
 	if args == nil {
 		return ""
 	}
 	for _, a := range namedChildren(args) {
-		if a.Kind() == "string" {
+		if c.kind(a) == "string" {
 			s := c.text(a)
 			// strip a string prefix (r/b/f/u) and surrounding quotes
 			for len(s) > 0 && (s[0] == 'r' || s[0] == 'b' || s[0] == 'f' || s[0] == 'u' || s[0] == 'R' || s[0] == 'B' || s[0] == 'F' || s[0] == 'U') {
@@ -1826,17 +1827,17 @@ func (c *pyConv) pyDecoratorPath(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "decorator", "call":
-		if p := c.pyDecoratorPath(field(n, "function")); p != "" {
+		if p := c.pyDecoratorPath(c.field(n, "function")); p != "" {
 			return p
 		}
 	case "attribute":
-		base := c.pyDecoratorPath(field(n, "object"))
+		base := c.pyDecoratorPath(c.field(n, "object"))
 		if base == "" {
-			base = c.pyDecoratorPath(field(n, "value"))
+			base = c.pyDecoratorPath(c.field(n, "value"))
 		}
-		attr := c.text(field(n, "attribute"))
+		attr := c.text(c.field(n, "attribute"))
 		if base == "" {
 			return attr
 		}
@@ -1857,17 +1858,17 @@ func (c *pyConv) pyDecoratorPath(n *tree_sitter.Node) string {
 
 func (c *pyConv) pyClassBases(n *tree_sitter.Node) []string {
 	var bases []string
-	args := field(n, "superclasses")
+	args := c.field(n, "superclasses")
 	if args == nil {
 		return bases
 	}
 	for _, ch := range c.namedChildren(args) {
-		if ch.Kind() == "keyword_argument" {
+		if c.kind(ch) == "keyword_argument" {
 			continue
 		}
 		base := c.dotted(ch)
-		if base == "" && ch.Kind() == "call" {
-			base = c.dotted(field(ch, "function"))
+		if base == "" && c.kind(ch) == "call" {
+			base = c.dotted(c.field(ch, "function"))
 		}
 		if base != "" {
 			bases = append(bases, base)
@@ -1882,11 +1883,11 @@ func (c *pyConv) params(params *tree_sitter.Node) []string {
 	}
 	var out []string
 	for _, ch := range c.namedChildren(params) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "identifier":
 			out = append(out, pyParamName(c.text(ch)))
 		case "default_parameter", "typed_parameter", "typed_default_parameter":
-			if nm := field(ch, "name"); nm != nil {
+			if nm := c.field(ch, "name"); nm != nil {
 				out = append(out, pyParamName(c.text(nm)))
 			} else if kids := c.namedChildren(ch); len(kids) > 0 {
 				out = append(out, pyParamName(c.text(kids[0])))
@@ -1902,10 +1903,10 @@ func (c *pyConv) paramTypes(params *tree_sitter.Node) map[string]string {
 		return out
 	}
 	for _, ch := range c.namedChildren(params) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "typed_parameter", "typed_default_parameter":
 			name := ""
-			if nm := field(ch, "name"); nm != nil {
+			if nm := c.field(ch, "name"); nm != nil {
 				name = pyParamName(c.text(nm))
 			} else if kids := c.namedChildren(ch); len(kids) > 0 {
 				name = pyParamName(c.text(kids[0]))
@@ -1926,27 +1927,27 @@ func pyParamName(name string) string {
 // the JS frontend lowers its chained assignment expressions. Without this the
 // inner targets are never bound and later reads of them see no taint.
 func (c *pyConv) assignStmts(n *tree_sitter.Node, L string) []nir.Stmt {
-	right := field(n, "right")
+	right := c.field(n, "right")
 	var prefix []nir.Stmt
-	if right != nil && right.Kind() == "assignment" {
+	if right != nil && c.kind(right) == "assignment" {
 		prefix = append(prefix, c.assignStmts(right, L)...)
 	}
 	var val nir.Expr = nir.Const{Loc: L}
 	if right != nil {
 		val = c.expr(right)
 	}
-	left := field(n, "left")
+	left := c.field(n, "left")
 	tgts := c.targets(left)
 	// subscript store `container[k] = v` (e.g. bag[key] = v, map[k] = param): no
 	// simple name target, so model it as a mutating setitem that taints the container
 	// from v — otherwise a later read `x = container[k]` loses the taint.
-	if len(tgts) == 0 && left != nil && left.Kind() == "subscript" {
-		base := c.expr(field(left, "value"))
+	if len(tgts) == 0 && left != nil && c.kind(left) == "subscript" {
+		base := c.expr(c.field(left, "value"))
 		args := []nir.Expr{val}
-		if k := field(left, "subscript"); k != nil {
+		if k := c.field(left, "subscript"); k != nil {
 			args = append(args, c.expr(k)) // include the key: bag[dynamic_key] = x
 		}
-		path := c.dotted(field(left, "value"))
+		path := c.dotted(c.field(left, "value"))
 		if path != "" {
 			path += ".__setitem__"
 		}
@@ -1961,7 +1962,7 @@ func (c *pyConv) targets(left *tree_sitter.Node) []string {
 	if left == nil {
 		return nil
 	}
-	switch left.Kind() {
+	switch c.kind(left) {
 	case "identifier":
 		return []string{c.text(left)}
 	case "attribute":
@@ -1972,7 +1973,7 @@ func (c *pyConv) targets(left *tree_sitter.Node) []string {
 	case "pattern_list", "tuple_pattern", "tuple":
 		var out []string
 		for _, ch := range c.namedChildren(left) {
-			if ch.Kind() == "identifier" {
+			if c.kind(ch) == "identifier" {
 				out = append(out, c.text(ch))
 			}
 		}
@@ -1986,7 +1987,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "concatenated_string":
@@ -1995,7 +1996,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		// tainted value or sink call inside the later parts).
 		var interps []nir.Expr
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() == "string" {
+			if c.kind(ch) == "string" {
 				interps = append(interps, c.stringInterps(ch)...)
 			}
 		}
@@ -2011,7 +2012,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 		// carry the literal text so value-matching can see verify=False etc.
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "keyword_argument":
-		return nir.Pair{Key: c.keyName(field(n, "name")), Value: c.expr(field(n, "value")), Loc: L}
+		return nir.Pair{Key: c.keyName(c.field(n, "name")), Value: c.expr(c.field(n, "value")), Loc: L}
 	case "list_splat", "dictionary_splat":
 		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[0])}
@@ -2020,27 +2021,27 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "dictionary":
 		var parts []nir.Expr
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() == "pair" {
-				keyNode := field(ch, "key")
+			if c.kind(ch) == "pair" {
+				keyNode := c.field(ch, "key")
 				parts = append(parts, nir.Pair{
-					Key: c.keyName(keyNode), Value: c.expr(field(ch, "value")), Loc: L,
-					DynamicKey: keyNode == nil || keyNode.Kind() != "string",
+					Key: c.keyName(keyNode), Value: c.expr(c.field(ch, "value")), Loc: L,
+					DynamicKey: keyNode == nil || c.kind(keyNode) != "string",
 				})
 			}
 		}
 		return nir.Seq{Parts: parts, Loc: L}
 	case "attribute":
-		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "attribute")), Path: c.dotted(n), Loc: L}
+		return nir.Attr{Base: c.expr(c.field(n, "object")), Attr: c.text(c.field(n, "attribute")), Path: c.dotted(n), Loc: L}
 	case "subscript":
-		return nir.Index{Base: c.expr(field(n, "value")), Key: c.expr(field(n, "subscript")), Path: c.dotted(field(n, "value")), Loc: L}
+		return nir.Index{Base: c.expr(c.field(n, "value")), Key: c.expr(c.field(n, "subscript")), Path: c.dotted(c.field(n, "value")), Loc: L}
 	case "slice":
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "call":
-		fn := field(n, "function")
+		fn := c.field(n, "function")
 		path := c.dotted(fn)
 		var arglist []nir.Expr
-		if args := field(n, "arguments"); args != nil {
-			if args.Kind() == "generator_expression" {
+		if args := c.field(n, "arguments"); args != nil {
+			if c.kind(args) == "generator_expression" {
 				arglist = append(arglist, c.expr(args))
 			} else {
 				for _, a := range c.namedChildren(args) {
@@ -2058,8 +2059,8 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Thru{Inner: c.expr(kids[0])}
 		}
 	case "binary_operator":
-		op := c.text(field(n, "operator"))
-		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		op := c.text(c.field(n, "operator"))
+		left, right := c.expr(c.field(n, "left")), c.expr(c.field(n, "right"))
 		if op == "%" || op == "+" {
 			// `%` (string-format / modulo) and `+` (concat / add) stay taint-propagating Formats.
 			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
@@ -2068,13 +2069,13 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "comparison_operator":
 		kids := c.namedChildren(n)
 		if len(kids) == 2 { // simple `a OP b` (chained comparisons keep their Seq fallback)
-			return nir.BinOp{Op: c.text(field(n, "operators")), Left: c.expr(kids[0]), Right: c.expr(kids[1]), Loc: L}
+			return nir.BinOp{Op: c.text(c.field(n, "operators")), Left: c.expr(kids[0]), Right: c.expr(kids[1]), Loc: L}
 		}
 		return nir.Seq{Parts: []nir.Expr{c.expr(kids[0])}, Loc: L}
 	case "boolean_operator":
-		return nir.BinOp{Op: c.text(field(n, "operator")), Left: c.expr(field(n, "left")), Right: c.expr(field(n, "right")), Loc: L}
+		return nir.BinOp{Op: c.text(c.field(n, "operator")), Left: c.expr(c.field(n, "left")), Right: c.expr(c.field(n, "right")), Loc: L}
 	case "not_operator":
-		return nir.Unary{Op: "not", Operand: c.expr(field(n, "argument")), Loc: L}
+		return nir.Unary{Op: "not", Operand: c.expr(c.field(n, "argument")), Loc: L}
 	case "conditional_expression":
 		kids := c.namedChildren(n) // [then, cond, else]
 		if len(kids) >= 3 {
@@ -2106,7 +2107,7 @@ func (c *pyConv) expr(n *tree_sitter.Node) nir.Expr {
 }
 
 func (c *pyConv) comprehensionValue(n *tree_sitter.Node, loc string) nir.Expr {
-	body := field(n, "body")
+	body := c.field(n, "body")
 	if body == nil {
 		var parts []nir.Expr
 		for _, ch := range c.namedChildren(n) {
@@ -2116,7 +2117,7 @@ func (c *pyConv) comprehensionValue(n *tree_sitter.Node, loc string) nir.Expr {
 	}
 	parts := []nir.Expr{c.expr(body)}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "if_clause" {
+		if c.kind(ch) == "if_clause" {
 			parts = append(parts, c.expr(ch))
 		}
 	}
@@ -2125,11 +2126,11 @@ func (c *pyConv) comprehensionValue(n *tree_sitter.Node, loc string) nir.Expr {
 		out = nir.Seq{Parts: parts, Loc: loc}
 	}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() != "for_in_clause" {
+		if c.kind(ch) != "for_in_clause" {
 			continue
 		}
-		names := c.targets(field(ch, "left"))
-		iter := field(ch, "right")
+		names := c.targets(c.field(ch, "left"))
+		iter := c.field(ch, "right")
 		if len(names) == 0 || iter == nil {
 			break
 		}
@@ -2291,7 +2292,7 @@ func (c *pyConv) keyName(n *tree_sitter.Node) string {
 		return ""
 	}
 	t := c.text(n)
-	if n.Kind() == "string" && len(t) >= 2 {
+	if c.kind(n) == "string" && len(t) >= 2 {
 		t = t[1 : len(t)-1]
 	}
 	return t
@@ -2301,15 +2302,15 @@ func (c *pyConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier":
 		return c.text(n)
 	case "attribute":
-		return c.dotted(field(n, "object")) + "." + c.text(field(n, "attribute"))
+		return c.dotted(c.field(n, "object")) + "." + c.text(c.field(n, "attribute"))
 	case "call":
-		return c.dotted(field(n, "function"))
+		return c.dotted(c.field(n, "function"))
 	case "subscript":
-		return c.dotted(field(n, "value")) + "[]"
+		return c.dotted(c.field(n, "value")) + "[]"
 	}
 	return "?"
 }
