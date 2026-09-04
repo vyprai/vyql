@@ -31,6 +31,13 @@ behaviour change, even if no code moved.
   appendable representation. On the 73,205-node generated Go template stress
   case, median retained heap fell from 248.1 MiB to 239.4 MiB; median user CPU
   was unchanged.
+- **Scoped call-argument matching keeps structured facts instead of generated
+  token strings.** Callee paths, methods and reachable argument values are now
+  matched as segmented virtual tokens, and general context facts fold case
+  during comparison instead of retaining a second lowercase copy. On the same
+  generated template, three-run median retained heap fell from 229.8 MiB to
+  151.2 MiB and interleaved median user CPU fell from 12.71 s to 4.17 s; wall
+  time moved from 3.89 s to 3.81 s.
 
 ### Fixed
 
