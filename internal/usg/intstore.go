@@ -25,17 +25,20 @@ type IntStore struct {
 	vkind      []string
 	props      []map[string]string // index -> extras (usually nil)
 
-	out     [][]iedge         // index -> outgoing non-compact edges
-	in      map[int32][]iedge // reverse non-compact edges, ONLY for inIndexedTypes (sparse)
-	flowOut [][]int32         // compact prop-less FLOWS adjacency
-	flowIn  [][]int32         // compact prop-less reverse FLOWS adjacency
+	out           [][]iedge         // index -> outgoing non-compact edges
+	in            map[int32][]iedge // reverse non-compact edges, ONLY for inIndexedTypes (sparse)
+	flowOut       [][]int32         // compact prop-less FLOWS adjacency
+	flowIn        [][]int32         // compact prop-less reverse FLOWS adjacency
+	flowOutPacked packedAdj         // immutable CSR form after Freeze
+	flowInPacked  packedAdj
 
-	byType     map[string][]int32
-	typeIDs    map[string][]string
-	byConcept  map[string][]int32
-	conceptHas map[string]map[int32]bool
-	labels     [][]Label // index -> labels
-	epoch      uint64    // structural epoch (see usg/epoch.go); bumped on AddNode/AddEdge
+	byType       map[string][]int32
+	typeIDs      map[string][]string
+	byConcept    map[string][]int32
+	conceptHas   map[string]map[int32]bool
+	labels       [][]Label // index -> labels while mutable
+	labelsPacked packedLabels
+	epoch        uint64 // structural epoch (see usg/epoch.go); bumped on AddNode/AddEdge
 
 	typeMu sync.Mutex // guards the lazy typeIDs cache, written during reads (NodesOfType)
 }
@@ -199,6 +202,8 @@ func (s *IntStore) intern(id string) int32 {
 	if i, ok := s.idx[id]; ok {
 		return i
 	}
+	s.thawFlows()
+	s.thawLabels()
 	i := int32(len(s.ids))
 	s.idx[id] = i
 	s.ids = append(s.ids, id)
@@ -218,6 +223,77 @@ func (s *IntStore) intern(id string) int32 {
 	s.flowIn = append(s.flowIn, nil)
 	s.labels = append(s.labels, nil)
 	return i
+}
+
+// Freeze packs the dominant flow adjacency after graph construction. The graph remains safe to
+// mutate: the next structural write transparently restores appendable rows.
+func (s *IntStore) Freeze() {
+	if s.flowOutPacked.offsets != nil {
+		return
+	}
+	out, okOut := packAdj(s.flowOut)
+	in, okIn := packAdj(s.flowIn)
+	labels, okLabels := packLabelRows(s.labels)
+	if !okOut || !okIn || !okLabels {
+		return
+	}
+	s.flowOutPacked, s.flowInPacked = out, in
+	s.labelsPacked = labels
+	s.flowOut, s.flowIn = nil, nil
+	s.labels = nil
+	s.conceptHas = nil // build-only de-duplication; byConcept is the read index
+}
+
+func (s *IntStore) thawFlows() {
+	if s.flowOutPacked.offsets == nil {
+		return
+	}
+	s.flowOut, s.flowIn = s.flowOutPacked.unpack(), s.flowInPacked.unpack()
+	s.flowOutPacked, s.flowInPacked = packedAdj{}, packedAdj{}
+}
+
+func (s *IntStore) thawLabels() {
+	if s.labelsPacked.offsets == nil {
+		return
+	}
+	s.labels = s.labelsPacked.unpack()
+	s.labelsPacked = packedLabels{}
+}
+
+func (s *IntStore) labelsAt(i int32) []Label {
+	if s.labelsPacked.offsets != nil {
+		return s.labelsPacked.at(i)
+	}
+	return s.labels[i]
+}
+
+func (s *IntStore) conceptSeen(concept string) map[int32]bool {
+	if s.conceptHas == nil {
+		s.conceptHas = map[string]map[int32]bool{}
+	}
+	seen := s.conceptHas[concept]
+	if seen == nil {
+		seen = make(map[int32]bool, len(s.byConcept[concept])+1)
+		for _, i := range s.byConcept[concept] {
+			seen[i] = true
+		}
+		s.conceptHas[concept] = seen
+	}
+	return seen
+}
+
+func (s *IntStore) flowOutAt(i int32) []int32 {
+	if s.flowOutPacked.offsets != nil {
+		return s.flowOutPacked.at(i)
+	}
+	return s.flowOut[i]
+}
+
+func (s *IntStore) flowInAt(i int32) []int32 {
+	if s.flowInPacked.offsets != nil {
+		return s.flowInPacked.at(i)
+	}
+	return s.flowIn[i]
 }
 
 func (s *IntStore) nodeAt(i int32) Node {
@@ -292,6 +368,7 @@ func (s *IntStore) AddEdge(e Edge) error {
 	si, di := s.intern(e.Src), s.intern(e.Dst)
 	typ := edgeTypeIDFor(e.Type)
 	if typ == edgeTypeFlows && len(e.Props) == 0 {
+		s.thawFlows()
 		s.flowOut[si] = append(s.flowOut[si], di)
 		s.flowIn[di] = append(s.flowIn[di], si)
 		s.epoch = nextStructEpoch()
@@ -317,6 +394,7 @@ func (s *IntStore) AddFlowEdgeIfPresent(src, dst string) bool {
 	if !ok {
 		return false
 	}
+	s.thawFlows()
 	s.flowOut[si] = append(s.flowOut[si], di)
 	s.flowIn[di] = append(s.flowIn[di], si)
 	s.epoch = nextStructEpoch()
@@ -325,12 +403,9 @@ func (s *IntStore) AddFlowEdgeIfPresent(src, dst string) bool {
 
 func (s *IntStore) AddLabel(nodeID string, l Label) error {
 	i := s.intern(nodeID)
+	s.thawLabels()
 	s.labels[i] = append(s.labels[i], l)
-	seen := s.conceptHas[l.Concept]
-	if seen == nil {
-		seen = map[int32]bool{}
-		s.conceptHas[l.Concept] = seen
-	}
+	seen := s.conceptSeen(l.Concept)
 	if seen[i] {
 		return nil
 	}
@@ -354,7 +429,7 @@ func (s *IntStore) OutEdges(src, edgeType string) ([]Edge, error) {
 	}
 	var out []Edge
 	if edgeTypeMatches(edgeTypeFlows, edgeType) {
-		for _, dst := range s.flowOut[i] {
+		for _, dst := range s.flowOutAt(i) {
 			out = append(out, Edge{Type: "FLOWS", Src: src, Dst: s.ids[dst]})
 		}
 	}
@@ -373,7 +448,7 @@ func (s *IntStore) InEdges(dst, edgeType string) ([]Edge, error) {
 	}
 	var out []Edge
 	if edgeTypeMatches(edgeTypeFlows, edgeType) {
-		for _, src := range s.flowIn[i] {
+		for _, src := range s.flowInAt(i) {
 			out = append(out, Edge{Type: "FLOWS", Src: s.ids[src], Dst: dst})
 		}
 	}
@@ -391,7 +466,7 @@ func (s *IntStore) RangeInEdges(dst, edgeType string, fn func(src string) bool) 
 		return
 	}
 	if edgeTypeMatches(edgeTypeFlows, edgeType) {
-		for _, src := range s.flowIn[i] {
+		for _, src := range s.flowInAt(i) {
 			if !fn(s.ids[src]) {
 				return
 			}
@@ -474,10 +549,10 @@ func (s *IntStore) AllNodes() ([]Node, error) {
 
 func (s *IntStore) Labels(nodeID string) ([]Label, error) {
 	i, ok := s.idx[nodeID]
-	if !ok || int(i) >= len(s.labels) {
+	if !ok || int(i) >= len(s.ids) {
 		return nil, nil
 	}
-	return s.labels[i], nil
+	return s.labelsAt(i), nil
 }
 
 func (s *IntStore) Close() error { return nil }
@@ -486,10 +561,10 @@ func (s *IntStore) Close() error { return nil }
 
 func (s *IntStore) LabelsOf(nodeID string) []Label {
 	i, ok := s.idx[nodeID]
-	if !ok || int(i) >= len(s.labels) {
+	if !ok || int(i) >= len(s.ids) {
 		return nil
 	}
-	return s.labels[i]
+	return s.labelsAt(i)
 }
 
 func (s *IntStore) RangeOutEdges(src, edgeType string, fn func(dst string) bool) {
@@ -498,7 +573,7 @@ func (s *IntStore) RangeOutEdges(src, edgeType string, fn func(dst string) bool)
 		return
 	}
 	if edgeTypeMatches(edgeTypeFlows, edgeType) {
-		for _, dst := range s.flowOut[i] {
+		for _, dst := range s.flowOutAt(i) {
 			if !fn(s.ids[dst]) {
 				return
 			}
@@ -536,7 +611,7 @@ func (s *IntStore) RangeOut(src int32, edgeType string, fn func(dst int32) bool)
 		return
 	}
 	if edgeTypeMatches(edgeTypeFlows, edgeType) {
-		for _, dst := range s.flowOut[src] {
+		for _, dst := range s.flowOutAt(src) {
 			if !fn(dst) {
 				return
 			}
@@ -553,10 +628,10 @@ func (s *IntStore) RangeOut(src int32, edgeType string, fn func(dst int32) bool)
 
 // LabelsAt returns the labels on a node index (for kill-control checks in the fixpoint).
 func (s *IntStore) LabelsAt(idx int32) []Label {
-	if int(idx) >= len(s.labels) {
+	if idx < 0 || int(idx) >= len(s.ids) {
 		return nil
 	}
-	return s.labels[idx]
+	return s.labelsAt(idx)
 }
 
 // NodeID maps an index back to its string id — used only when emitting findings (a handful),
