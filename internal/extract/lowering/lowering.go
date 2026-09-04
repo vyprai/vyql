@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"hash/fnv"
 	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -784,16 +785,17 @@ type scope struct {
 	iter map[string][]string
 	lex  map[string]bool // JS/TS captured lexical bindings shared across nested functions
 
-	// jn journals writes to node; jc, jt and jl do the same for cnst, typ and lex. The
+	// jn journals writes to node; jc, jt, jl and ji do the same for cnst, typ, lex and iter. The
 	// journals record only while a frame is open, and the two kinds of frame differ on
-	// purpose: a BRANCH restores node alone, because a constant or a type learned in one
-	// arm is deliberately still visible to the next, while a FUNCTION body restores all
-	// four, because a nested function's bindings must not leak into its parent. A clone
+	// purpose: a BRANCH restores node and iter, because constants and types learned in one
+	// arm deliberately remain visible to the next, while a FUNCTION body restores all
+	// five, because a nested function's bindings must not leak into its parent. A clone
 	// starts with everything zeroed: marks never span scope objects.
 	jn          []nodeWrite
 	jc          []cnstWrite
 	jt          []typWrite
 	jl          []lexWrite
+	ji          []iterWrite
 	branchDepth int
 	funcDepth   int
 }
@@ -816,9 +818,7 @@ func (s *scope) clone() *scope {
 	for k, v := range s.cnst {
 		c.cnst[k] = v
 	}
-	for k, v := range s.iter {
-		c.iter[k] = append([]string(nil), v...)
-	}
+	maps.Copy(c.iter, s.iter) // values are immutable once stored
 	for k, v := range s.lex {
 		c.lex[k] = v
 	}
@@ -917,6 +917,17 @@ type lexWrite struct {
 	had bool
 }
 
+type iterWrite struct {
+	key string
+	old []string
+	had bool
+}
+
+type iterEnd struct {
+	values  []string
+	present bool
+}
+
 // setCnst, delCnst, setTyp and setLex journal only inside a FUNCTION frame. Branch
 // lowering never restored these maps, so journaling them at branch depth would change
 // which facts survive an arm.
@@ -951,6 +962,32 @@ func (s *scope) setLex(k string, v bool) {
 		s.jl = append(s.jl, lexWrite{key: k, old: old, had: had})
 	}
 	s.lex[k] = v
+}
+
+// setIter and delIter journal iteration facts in both branch and function
+// frames. Values are immutable once stored, so restoring a slice header is
+// enough; no backing array is copied.
+func (s *scope) setIter(k string, values []string) {
+	if s.branchDepth > 0 || s.funcDepth > 0 {
+		old, had := s.iter[k]
+		s.ji = append(s.ji, iterWrite{key: k, old: old, had: had})
+	}
+	s.iter[k] = values
+}
+
+func (s *scope) delIter(k string) {
+	if s.branchDepth > 0 || s.funcDepth > 0 {
+		if old, had := s.iter[k]; had {
+			s.ji = append(s.ji, iterWrite{key: k, old: old, had: true})
+		}
+	}
+	delete(s.iter, k)
+}
+
+func (s *scope) clearIter() {
+	for k := range s.iter {
+		s.delIter(k)
+	}
 }
 
 func (s *scope) undoCnst(mark int) {
@@ -989,29 +1026,97 @@ func (s *scope) undoLex(mark int) {
 	s.jl = s.jl[:mark]
 }
 
-// funcMark opens a function frame: it marks all four journals and swaps in a private
-// iteration-facts map. undoFunc closes it, restoring the enclosing scope exactly. This is
+func (s *scope) undoIter(mark int) {
+	for i := len(s.ji) - 1; i >= mark; i-- {
+		e := s.ji[i]
+		if e.had {
+			s.iter[e.key] = e.old
+		} else {
+			delete(s.iter, e.key)
+		}
+	}
+	s.ji = s.ji[:mark]
+}
+
+// funcMark opens a function frame across all five journals. undoFunc closes it,
+// restoring the enclosing scope exactly. This is
 // what replaced copying the whole scope per nested function — on generated code, which is
 // dense in hoisted closures, that copy was the largest single allocation left.
 type funcMark struct {
-	n, c, t, x int
-	iter       map[string][]string
+	n, c, t, x, i int
 }
 
 func (s *scope) markFunc() funcMark {
-	m := funcMark{n: len(s.jn), c: len(s.jc), t: len(s.jt), x: len(s.jl), iter: s.iter}
-	s.iter = cloneIterationFacts(s.iter)
+	m := funcMark{n: len(s.jn), c: len(s.jc), t: len(s.jt), x: len(s.jl), i: len(s.ji)}
 	s.funcDepth++
 	return m
 }
 
 func (s *scope) undoFunc(m funcMark) {
 	s.funcDepth--
+	s.undoIter(m.i)
 	s.undoLex(m.x)
 	s.undoTyp(m.t)
 	s.undoCnst(m.c)
 	s.undoNode(m.n)
-	s.iter = m.iter
+}
+
+// iterDelta reports the final state of every iteration fact written since
+// mark. Call it before undoIter, just like nodeDelta.
+func (s *scope) iterDelta(mark int) map[string]iterEnd {
+	if len(s.ji) == mark {
+		return nil
+	}
+	delta := make(map[string]iterEnd)
+	for i := mark; i < len(s.ji); i++ {
+		values, ok := s.iter[s.ji[i].key]
+		delta[s.ji[i].key] = iterEnd{values: values, present: ok}
+	}
+	return delta
+}
+
+// mergeIterationDeltas keeps only facts with the same value after every
+// possible arm. An absent key in a delta means that arm left the pre-branch
+// value untouched. Only keys actually written by an arm are visited, so the
+// merge is proportional to branch writes rather than scope width.
+func (s *scope) mergeIterationDeltas(deltas ...map[string]iterEnd) {
+	var touched map[string]bool
+	for _, delta := range deltas {
+		for key := range delta {
+			if touched == nil {
+				touched = map[string]bool{}
+			}
+			touched[key] = true
+		}
+	}
+	if len(touched) == 0 {
+		return
+	}
+	state := func(delta map[string]iterEnd, key string) iterEnd {
+		if end, ok := delta[key]; ok {
+			return end
+		}
+		values, ok := s.iter[key]
+		return iterEnd{values: values, present: ok}
+	}
+	for key := range touched {
+		want := state(deltas[0], key)
+		stable := true
+		for _, delta := range deltas[1:] {
+			got := state(delta, key)
+			if want.present != got.present || !slices.Equal(want.values, got.values) {
+				stable = false
+				break
+			}
+		}
+		current, present := s.iter[key]
+		switch {
+		case stable && want.present && (!present || !slices.Equal(current, want.values)):
+			s.setIter(key, want.values)
+		case (!stable || !want.present) && present:
+			s.delIter(key)
+		}
+	}
 }
 
 // nodeDelta reports the branch lowered since mark as (final binding per written variable,
@@ -3232,9 +3337,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		iterValues, iterOK := l.constIterationValues(st.Value, sc)
 		for _, target := range st.Targets {
 			if iterOK {
-				sc.iter[target] = append([]string(nil), iterValues...)
+				sc.setIter(target, append([]string(nil), iterValues...))
 			} else {
-				delete(sc.iter, target)
+				sc.delIter(target)
 			}
 		}
 		for _, t := range st.Targets {
@@ -3485,11 +3590,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if zgOK {
 			zgBefore = sc.node[zgName]
 		}
-		// iter snapshots stay map-copies (they are shallow since the values are immutable);
-		// node snapshots are journal marks — undoNode restores, nodeDelta reports.
-		beforeIter := sc.iter
-		sc.iter = cloneIterationFacts(beforeIter)
-		mark := sc.markNode()
+		// Both node bindings and iteration facts use journal marks: each arm is
+		// restored before its sibling and each merge costs only what the arms wrote.
+		mark, iterMark := sc.markNode(), len(sc.ji)
 		sc.branchDepth++
 		l.inRegion("if"+b+".t", func() {
 			// Nothing is journaled yet, so sc.node still holds the pre-branch bindings here.
@@ -3506,15 +3609,16 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			l.block(st.Then, sc)
 		})
 		thenDelta, thenBefore := sc.nodeDelta(mark)
-		thenIter := sc.iter // already private to the then-branch
+		thenIter := sc.iterDelta(iterMark)
 		sc.undoNode(mark)
-		sc.iter = cloneIterationFacts(beforeIter)
+		sc.undoIter(iterMark)
 		l.inRegion("if"+b+".e", func() { l.block(st.Else, sc) })
 		elseDelta, elseBefore := sc.nodeDelta(mark)
-		elseIter := sc.iter
+		elseIter := sc.iterDelta(iterMark)
 		sc.undoNode(mark)
+		sc.undoIter(iterMark)
 		sc.branchDepth--
-		sc.iter = stableIterationFacts(thenIter, elseIter)
+		sc.mergeIterationDeltas(thenIter, elseIter)
 		befores := map[string]string{}
 		maps.Copy(befores, thenBefore)
 		maps.Copy(befores, elseBefore)
@@ -3527,9 +3631,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 	case nir.Loop:
 		l.eval(st.Cond, sc)
-		beforeIter := sc.iter
-		sc.iter = cloneIterationFacts(beforeIter)
-		mark := sc.markNode()
+		mark, iterMark := sc.markNode(), len(sc.ji)
 		sc.branchDepth++
 		iterNode := l.eval(st.Iter, sc)
 		if iterNode != "" {
@@ -3543,10 +3645,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
 		bodyDelta, bodyBefore := sc.nodeDelta(mark)
-		bodyIter := sc.iter
+		bodyIter := sc.iterDelta(iterMark)
 		sc.undoNode(mark)
+		sc.undoIter(iterMark)
 		sc.branchDepth--
-		sc.iter = stableIterationFacts(beforeIter, bodyIter)
+		// A loop may not run, represented by the unchanged nil delta.
+		sc.mergeIterationDeltas(nil, bodyIter)
 		l.mergeDeltas(sc, bodyBefore, []map[string]branchEnd{bodyDelta})
 	case nir.Switch:
 		subject := l.eval(st.Subject, sc)
@@ -3577,30 +3681,31 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		b := l.nextBranch()
-		beforeIter := sc.iter
-		mark := sc.markNode()
+		mark, iterMark := sc.markNode(), len(sc.ji)
 		sc.branchDepth++
 		var deltas []map[string]branchEnd
 		befores := map[string]string{}
-		var iterBranches []map[string][]string
+		var iterBranches []map[string]iterEnd
 		for i, c := range st.Cases {
-			sc.iter = cloneIterationFacts(beforeIter)
 			l.inRegion("sw"+b+".c"+strconv.Itoa(i), func() { l.block(c, sc) })
 			d, bf := sc.nodeDelta(mark)
+			iterDelta := sc.iterDelta(iterMark)
 			sc.undoNode(mark) // each arm starts from the pre-switch bindings
+			sc.undoIter(iterMark)
 			deltas = append(deltas, d)
 			maps.Copy(befores, bf)
-			iterBranches = append(iterBranches, sc.iter) // private to this case
+			iterBranches = append(iterBranches, iterDelta)
 		}
-		sc.iter = cloneIterationFacts(beforeIter)
 		l.inRegion("sw"+b+".d", func() { l.block(st.Default, sc) })
 		d, bf := sc.nodeDelta(mark)
+		iterDelta := sc.iterDelta(iterMark)
 		sc.undoNode(mark)
+		sc.undoIter(iterMark)
 		deltas = append(deltas, d)
 		maps.Copy(befores, bf)
-		iterBranches = append(iterBranches, sc.iter) // private to the default arm
+		iterBranches = append(iterBranches, iterDelta)
 		sc.branchDepth--
-		sc.iter = stableIterationFacts(iterBranches...)
+		sc.mergeIterationDeltas(iterBranches...)
 		l.mergeDeltas(sc, befores, deltas)
 	case nir.Try:
 		b := l.nextBranch()
@@ -3639,7 +3744,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// post-dominates nothing, so `lock(); try { … } finally { unlock(); }` reports a
 		// lock that is never released.
 		l.block(st.Finally, sc)
-		sc.iter = map[string][]string{}
+		sc.clearIter()
 	}
 }
 

@@ -18,6 +18,11 @@ behaviour change, even if no code moved.
   On the 1.25 MB generated system-template stress tier, wall time fell from
   105.84 s to 88.13 s, user CPU from 246.95 s to 217.85 s, and system CPU from
   76.30 s to 38.91 s.
+- **Shared lowering journals iteration facts across control-flow arms.** A
+  branch that changes one fact now records that write instead of copying and
+  intersecting the entire live-fact map. With 4,096 live facts, the operation
+  fell from 432.7 us and 1.17 MB allocated to 163 ns and 16 bytes. This removes
+  the quadratic branch-by-scope-width shape from every language frontend.
 
 ### Fixed
 
