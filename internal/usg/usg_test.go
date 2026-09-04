@@ -151,6 +151,15 @@ func TestCompactFlowEdgesPreserveStoreAPI(t *testing.T) {
 			if err := tc.s.AddEdge(Edge{Type: "NET", Src: "a", Dst: "d", Props: map[string]string{"rule": "net"}}); err != nil {
 				t.Fatalf("AddEdge net: %v", err)
 			}
+			Freeze(tc.s)
+			var frozenFlows []string
+			tc.g.RangeOut(0, "FLOWS", func(dst int32) bool {
+				frozenFlows = append(frozenFlows, tc.g.NodeID(dst))
+				return true
+			})
+			if got, want := sorted(frozenFlows), []string{"b", "c"}; !equal(got, want) {
+				t.Fatalf("RangeOut on frozen graph=%v want %v", got, want)
+			}
 			if ok := tc.s.(interface{ AddFlowEdgeIfPresent(string, string) bool }).AddFlowEdgeIfPresent("a", "missing"); ok {
 				t.Fatal("AddFlowEdgeIfPresent should report missing destination")
 			}

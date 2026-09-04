@@ -11,6 +11,7 @@ import (
 
 // jvConv walks a tree-sitter Java CST into NIR.
 type jvConv struct {
+	nodeCache
 	src                []byte
 	root               string
 	file               string
@@ -30,24 +31,7 @@ type jvConv struct {
 	// the body of an anonymous class (`new T() { ... }`). They are appended
 	// after the statement containing the expression by stmt, so the class's
 	// members become real declarations in the enclosing statement list.
-	hoisted    []nir.Stmt
-	childCache map[uintptr][]*tree_sitter.Node
-}
-
-func (c *jvConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = map[uintptr][]*tree_sitter.Node{}
-	}
-	id := n.Id()
-	if kids, ok := c.childCache[id]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[id] = kids
-	return kids
+	hoisted []nir.Stmt
 }
 
 // javaPublic reports whether a method/constructor is part of the public API surface:
@@ -55,7 +39,7 @@ func (c *jvConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
 // library exposes to arbitrary callers). Used to scope the library param-source.
 func (c *jvConv) javaPublic(n *tree_sitter.Node) bool {
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "modifiers" {
+		if c.kind(ch) == "modifiers" {
 			t := c.text(ch)
 			if strings.Contains(t, "private") || strings.Contains(t, "protected") {
 				return false
@@ -101,7 +85,7 @@ func (c *jvConv) simpleTypeName(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "type_identifier", "scoped_type_identifier":
 		t := c.text(n)
 		if i := strings.LastIndex(t, "."); i >= 0 {
@@ -124,9 +108,9 @@ func (c *jvConv) imports(root *tree_sitter.Node) []nir.Import {
 	var out []nir.Import
 	var walk func(n *tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
-		if n.Kind() == "import_declaration" {
+		if c.kind(n) == "import_declaration" {
 			for _, ch := range c.namedChildren(n) {
-				if ch.Kind() == "scoped_identifier" || ch.Kind() == "identifier" {
+				if c.kind(ch) == "scoped_identifier" || c.kind(ch) == "identifier" {
 					full := c.text(ch)
 					out = append(out, nir.Import{Local: lastSeg(full), Module: full, IsModule: true})
 				}
@@ -164,14 +148,14 @@ func (c *jvConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "class_declaration", "interface_declaration", "enum_declaration", "record_declaration":
-		name := c.text(field(n, "name"))
+		name := c.text(c.field(n, "name"))
 		bases := c.jvClassBases(n)
 		prevParams := c.classParamTokens
 		prevContext := c.classContextTokens
 		prevEnumBases := c.enumBases
-		if n.Kind() == "enum_declaration" {
+		if c.kind(n) == "enum_declaration" {
 			// a constant-specific body subclasses the enum type itself
 			c.enumBases = []string{name}
 		}
@@ -179,8 +163,8 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		c.classContextTokens = append(append([]string{}, prevContext...), javaClassContextTokens(name, bases)...)
 		c.classContextTokens = append(c.classContextTokens, c.jvModifierTokens(n, "class_modifier:")...)
 		prevFieldInit := c.fieldInitTokens
-		c.fieldInitTokens = c.jvFieldInitTokens(field(n, "body"), n.Kind() == "interface_declaration")
-		cd := nir.ClassDef{Name: name, Body: c.decls(field(n, "body")), Loc: L, Bases: bases}
+		c.fieldInitTokens = c.jvFieldInitTokens(c.field(n, "body"), c.kind(n) == "interface_declaration")
+		cd := nir.ClassDef{Name: name, Body: c.decls(c.field(n, "body")), Loc: L, Bases: bases}
 		c.classParamTokens = prevParams
 		c.classContextTokens = prevContext
 		c.fieldInitTokens = prevFieldInit
@@ -195,8 +179,8 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		// class context a named nested class gets. Constants without a body
 		// hold no code. The constant's arguments stay unlowered: they are an
 		// initializer expression, not statements of the body.
-		name := c.text(field(n, "name"))
-		body := field(n, "body")
+		name := c.text(c.field(n, "name"))
+		body := c.field(n, "body")
 		if name == "" || body == nil {
 			return nil
 		}
@@ -209,11 +193,11 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		c.fieldInitTokens = prevFieldInit
 		return []nir.Stmt{cd}
 	case "method_declaration", "constructor_declaration":
-		name := c.text(field(n, "name"))
-		paramsNode := field(n, "parameters")
+		name := c.text(c.field(n, "name"))
+		paramsNode := c.field(n, "parameters")
 		params := c.params(paramsNode)
 		paramTypes := c.paramTypes(paramsNode)
-		body := c.block(field(n, "body"))
+		body := c.block(c.field(n, "body"))
 		body = append(body, c.jvIntegerSizeArithmeticObservations(n)...)
 		body = append(body, c.jvUnverifiedKeyIDPathResolveObservations(n)...)
 		annotationTokens := c.jvAnnotationTokens(n, "annotation:")
@@ -230,11 +214,11 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 			ParamEntries:  c.jvParamEntries(name, params, paramTypes, tokens, c.jvParamAnnotationTokens(paramsNode)), Exported: c.javaPublic(n)}}
 	case "field_declaration", "local_variable_declaration":
 		var out []nir.Stmt
-		declType := c.simpleTypeName(field(n, "type")) // declared class type, for cross-file resolution
+		declType := c.simpleTypeName(c.field(n, "type")) // declared class type, for cross-file resolution
 		for _, d := range c.namedChildren(n) {
-			if d.Kind() == "variable_declarator" {
-				name := field(d, "name")
-				val := field(d, "value")
+			if c.kind(d) == "variable_declarator" {
+				name := c.field(d, "name")
+				val := c.field(d, "value")
 				var v nir.Expr = nir.Const{Loc: L}
 				if val != nil {
 					v = c.expr(val)
@@ -264,14 +248,14 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		// keeps a value tainted on one path even when the other path overwrites it with a
 		// constant (`if (c) x = src(); else x = "safe";`). A nested if/else in either
 		// branch is structured by c.stmt (proper else-if chaining).
-		return []nir.Stmt{nir.If{Cond: c.expr(field(n, "condition")), Then: c.branchBody(field(n, "consequence")), Else: c.branchBody(field(n, "alternative"))}}
+		return []nir.Stmt{nir.If{Cond: c.expr(c.field(n, "condition")), Then: c.branchBody(c.field(n, "consequence")), Else: c.branchBody(c.field(n, "alternative"))}}
 	case "while_statement", "for_statement", "do_statement":
 		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
 	case "enhanced_for_statement":
 		// `for (T x : coll)` — bind the loop variable to the iterable so a tainted
 		// collection taints each element (flow-approximate element-of).
 		body := c.collectBlocks(n)
-		if nm, val := field(n, "name"), field(n, "value"); nm != nil && val != nil {
+		if nm, val := c.field(n, "name"), c.field(n, "value"); nm != nil && val != nil {
 			body = append([]nir.Stmt{nir.Assign{Targets: []string{c.text(nm)}, Value: c.expr(val)}}, body...)
 		}
 		return []nir.Stmt{nir.Loop{Body: body}}
@@ -288,11 +272,11 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		var hasGroups bool
 		var pending []nir.Expr // labels of empty (fall-through) case groups, merged into the next body
 		for _, blk := range children(n) {
-			if blk.Kind() != "switch_block" {
+			if c.kind(blk) != "switch_block" {
 				continue
 			}
 			for _, grp := range children(blk) {
-				if grp.Kind() != "switch_block_statement_group" {
+				if c.kind(grp) != "switch_block_statement_group" {
 					continue
 				}
 				hasGroups = true
@@ -300,7 +284,7 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 				var labs []nir.Expr
 				isDefault := false
 				for _, ch := range children(grp) {
-					if ch.Kind() == "switch_label" {
+					if c.kind(ch) == "switch_label" {
 						if strings.Contains(c.text(ch), "default") {
 							isDefault = true
 						} else if lk := c.namedChildren(ch); len(lk) > 0 {
@@ -323,7 +307,7 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 		if hasGroups {
-			return []nir.Stmt{nir.Switch{Subject: c.expr(field(n, "condition")), Cases: cases, Labels: labels, Default: deflt}}
+			return []nir.Stmt{nir.Switch{Subject: c.expr(c.field(n, "condition")), Cases: cases, Labels: labels, Default: deflt}}
 		}
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	case "block", "synchronized_statement":
@@ -335,11 +319,11 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *jvConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
-	switch inner.Kind() {
+	switch c.kind(inner) {
 	case "assignment_expression":
-		left := field(inner, "left")
-		right := c.expr(field(inner, "right"))
-		if left != nil && left.Kind() == "identifier" {
+		left := c.field(inner, "left")
+		right := c.expr(c.field(inner, "right"))
+		if left != nil && c.kind(left) == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
@@ -353,7 +337,7 @@ func (c *jvConv) branchBody(b *tree_sitter.Node) []nir.Stmt {
 	if b == nil {
 		return nil
 	}
-	if b.Kind() == "block" {
+	if c.kind(b) == "block" {
 		return c.block(b)
 	}
 	return c.stmt(b)
@@ -375,7 +359,7 @@ func (c *jvConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "block", "constructor_body":
 				out = append(out, c.block(ch)...)
 			case "switch_block", "switch_block_statement_group", "catch_clause", "finally_clause",
@@ -384,9 +368,9 @@ func (c *jvConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 			case "resource":
 				// try-with-resources `try (T x = new FileInputStream(path); …)` — lower the
 				// resource initializer (often a file/stream sink) and bind its variable.
-				if val := field(ch, "value"); val != nil {
+				if val := c.field(ch, "value"); val != nil {
 					v := c.expr(val)
-					if nm := field(ch, "name"); nm != nil {
+					if nm := c.field(ch, "name"); nm != nil {
 						out = append(out, nir.Assign{Targets: []string{c.text(nm)}, Value: v})
 					} else {
 						out = append(out, nir.ExprStmt{Value: v})
@@ -399,12 +383,12 @@ func (c *jvConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 		// block, so the children walk above skips it. Lower it here. A nested if/loop/try
 		// body is structured by c.stmt; a block or already-flattened if is skipped.
 		for _, f := range []string{"consequence", "alternative", "body"} {
-			if b := field(m, f); b != nil && !handled(b.Kind()) {
+			if b := c.field(m, f); b != nil && !handled(c.kind(b)) {
 				out = append(out, c.stmt(b)...)
 			}
 		}
 	}
-	if n.Kind() == "block" {
+	if c.kind(n) == "block" {
 		return c.block(n)
 	}
 	walk(n)
@@ -419,7 +403,7 @@ func (c *jvConv) tryStmt(n *tree_sitter.Node) nir.Try {
 	var finally []nir.Stmt
 	bodySeen := false
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "resource_specification":
 			body = append(body, c.collectBlocks(ch)...)
 			resourceNames = append(resourceNames, c.resourceNames(ch)...)
@@ -451,8 +435,8 @@ func (c *jvConv) resourceNames(n *tree_sitter.Node) []string {
 		if m == nil {
 			return
 		}
-		if m.Kind() == "resource" {
-			if nm := field(m, "name"); nm != nil {
+		if c.kind(m) == "resource" {
+			if nm := c.field(m, "name"); nm != nil {
 				names = append(names, c.text(nm))
 			}
 			return
@@ -481,8 +465,8 @@ func (c *jvConv) catchParam(n *tree_sitter.Node) string {
 		if m == nil || found != "" {
 			return
 		}
-		if m.Kind() == "formal_parameter" || m.Kind() == "catch_formal_parameter" {
-			if nm := field(m, "name"); nm != nil {
+		if c.kind(m) == "formal_parameter" || c.kind(m) == "catch_formal_parameter" {
+			if nm := c.field(m, "name"); nm != nil {
 				found = c.text(nm)
 				return
 			}
@@ -518,7 +502,7 @@ func (c *jvConv) catchTypes(n *tree_sitter.Node) []string {
 		if m == nil {
 			return
 		}
-		switch m.Kind() {
+		switch c.kind(m) {
 		case "type_identifier", "scoped_type_identifier":
 			add(c.text(m))
 			return
@@ -532,12 +516,12 @@ func (c *jvConv) catchTypes(n *tree_sitter.Node) []string {
 		if m == nil {
 			return
 		}
-		if m.Kind() == "catch_formal_parameter" || m.Kind() == "formal_parameter" {
-			if typ := field(m, "type"); typ != nil {
+		if c.kind(m) == "catch_formal_parameter" || c.kind(m) == "formal_parameter" {
+			if typ := c.field(m, "type"); typ != nil {
 				walkType(typ)
 			} else {
 				for _, ch := range c.namedChildren(m) {
-					if ch.Kind() == "variable_declarator_id" || ch.Kind() == "identifier" {
+					if c.kind(ch) == "variable_declarator_id" || c.kind(ch) == "identifier" {
 						break
 					}
 					walkType(ch)
@@ -570,8 +554,8 @@ func (c *jvConv) params(params *tree_sitter.Node) []string {
 	}
 	var out []string
 	for _, ch := range c.namedChildren(params) {
-		if ch.Kind() == "formal_parameter" || ch.Kind() == "spread_parameter" {
-			if nm := field(ch, "name"); nm != nil {
+		if c.kind(ch) == "formal_parameter" || c.kind(ch) == "spread_parameter" {
+			if nm := c.field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
 			}
 		}
@@ -585,8 +569,8 @@ func (c *jvConv) paramTypes(params *tree_sitter.Node) map[string]string {
 		return out
 	}
 	for _, ch := range c.namedChildren(params) {
-		if ch.Kind() == "formal_parameter" || ch.Kind() == "spread_parameter" {
-			if nm := field(ch, "name"); nm != nil {
+		if c.kind(ch) == "formal_parameter" || c.kind(ch) == "spread_parameter" {
+			if nm := c.field(ch, "name"); nm != nil {
 				putParamType(out, c.text(nm), paramTypeFromField(c, ch))
 			}
 		}
@@ -613,7 +597,7 @@ func (c *jvConv) jvClassBases(n *tree_sitter.Node) []string {
 		if m == nil {
 			return
 		}
-		switch m.Kind() {
+		switch c.kind(m) {
 		case "type_identifier", "scoped_type_identifier", "generic_type":
 			add(c.text(m))
 			return
@@ -622,8 +606,8 @@ func (c *jvConv) jvClassBases(n *tree_sitter.Node) []string {
 			walkTypes(ch)
 		}
 	}
-	walkTypes(field(n, "superclass"))
-	walkTypes(field(n, "interfaces"))
+	walkTypes(c.field(n, "superclass"))
+	walkTypes(c.field(n, "interfaces"))
 	return out
 }
 
@@ -644,7 +628,7 @@ func javaBaseTypeName(s string) string {
 // a field name.
 func (c *jvConv) anonClassBody(n *tree_sitter.Node) *tree_sitter.Node {
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "class_body" {
+		if c.kind(ch) == "class_body" {
 			return ch
 		}
 	}
@@ -689,28 +673,28 @@ func (c *jvConv) jvFieldInitTokens(body *tree_sitter.Node, interfaceBody bool) [
 		out = append(out, tok)
 	}
 	for _, ch := range c.namedChildren(body) {
-		if ch.Kind() != "field_declaration" && ch.Kind() != "constant_declaration" {
+		if c.kind(ch) != "field_declaration" && c.kind(ch) != "constant_declaration" {
 			continue
 		}
 		static := interfaceBody
 		for _, m := range c.namedChildren(ch) {
-			if m.Kind() == "modifiers" && javaContainsWord(c.text(m), "static") {
+			if c.kind(m) == "modifiers" && javaContainsWord(c.text(m), "static") {
 				static = true
 			}
 		}
 		for _, d := range c.namedChildren(ch) {
-			if d.Kind() != "variable_declarator" {
+			if c.kind(d) != "variable_declarator" {
 				continue
 			}
-			val := field(d, "value")
-			if val == nil || val.Kind() != "object_creation_expression" {
+			val := c.field(d, "value")
+			if val == nil || c.kind(val) != "object_creation_expression" {
 				continue
 			}
 			prefix := "instance_field_init:"
 			if static {
 				prefix = "static_field_init:"
 			}
-			add(prefix + javaBaseTypeName(c.text(field(val, "type"))))
+			add(prefix + javaBaseTypeName(c.text(c.field(val, "type"))))
 		}
 	}
 	return out
@@ -733,9 +717,9 @@ func (c *jvConv) jvAnnotationTokens(n *tree_sitter.Node, prefix string) []string
 		if m == nil {
 			return
 		}
-		if m.Kind() == "marker_annotation" || m.Kind() == "annotation" {
+		if c.kind(m) == "marker_annotation" || c.kind(m) == "annotation" {
 			for _, k := range c.namedChildren(m) {
-				if k.Kind() == "identifier" || k.Kind() == "scoped_identifier" {
+				if c.kind(k) == "identifier" || c.kind(k) == "scoped_identifier" {
 					full := c.text(k)
 					add(full)
 					if short := lastSeg(full); short != "" && short != full {
@@ -751,7 +735,7 @@ func (c *jvConv) jvAnnotationTokens(n *tree_sitter.Node, prefix string) []string
 		}
 	}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "modifiers" {
+		if c.kind(ch) == "modifiers" {
 			walk(ch)
 		}
 	}
@@ -761,7 +745,7 @@ func (c *jvConv) jvAnnotationTokens(n *tree_sitter.Node, prefix string) []string
 func (c *jvConv) jvModifierTokens(n *tree_sitter.Node, prefix string) []string {
 	var mods string
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "modifiers" {
+		if c.kind(ch) == "modifiers" {
 			mods = c.text(ch)
 			break
 		}
@@ -846,12 +830,12 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 			if x == nil {
 				return
 			}
-			switch x.Kind() {
+			switch c.kind(x) {
 			case "method_invocation":
 				if p := c.dotted(x); p != "" && p != "?" {
 					add("return_call_path:" + p)
 				}
-				if nm := c.text(field(x, "name")); nm != "" {
+				if nm := c.text(c.field(x, "name")); nm != "" {
 					add("return_call:" + nm)
 				}
 			case "identifier":
@@ -874,7 +858,7 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 		if m == nil || len(out) >= 512 {
 			return
 		}
-		switch m.Kind() {
+		switch c.kind(m) {
 		case "catch_clause":
 			for _, typ := range c.catchTypes(m) {
 				add("catch_type:" + typ)
@@ -889,11 +873,11 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 				prevCall = p
 				add("call_path:" + p)
 			}
-			if nm := c.text(field(m, "name")); nm != "" {
+			if nm := c.text(c.field(m, "name")); nm != "" {
 				add("call:" + nm)
 			}
 		case "object_creation_expression":
-			if typ := c.dotted(field(m, "type")); typ != "" && typ != "?" {
+			if typ := c.dotted(c.field(m, "type")); typ != "" && typ != "?" {
 				if prevCall != "" {
 					add("call_order:" + prevCall + ">" + typ)
 				}
@@ -905,7 +889,7 @@ func (c *jvConv) jvFunctionTokens(name string, n *tree_sitter.Node, params []str
 			if p := c.dotted(m); p != "" && p != "?" {
 				add("selector:" + p)
 			}
-			if fld := c.text(field(m, "field")); fld != "" {
+			if fld := c.text(c.field(m, "field")); fld != "" {
 				add("selector:" + fld)
 			}
 		case "binary_expression":
@@ -973,11 +957,11 @@ func (c *jvConv) jvSensitiveMetadataExportTokens(n *tree_sitter.Node) []string {
 		if m == nil || len(out) >= 64 {
 			return
 		}
-		if m.Kind() == "enhanced_for_statement" {
-			if base := c.jvPropertiesIterableBase(field(m, "value")); base != "" {
+		if c.kind(m) == "enhanced_for_statement" {
+			if base := c.jvPropertiesIterableBase(c.field(m, "value")); base != "" {
 				stack = append(stack, base)
 				for _, ch := range c.namedChildren(m) {
-					if ch != field(m, "value") {
+					if ch != c.field(m, "value") {
 						walk(ch)
 					}
 				}
@@ -985,7 +969,7 @@ func (c *jvConv) jvSensitiveMetadataExportTokens(n *tree_sitter.Node) []string {
 				return
 			}
 		}
-		if m.Kind() == "method_invocation" {
+		if c.kind(m) == "method_invocation" {
 			path := c.dotted(m)
 			method := lastSeg(path)
 			base := javaPathBase(path)
@@ -1011,7 +995,7 @@ func (c *jvConv) jvSensitiveMetadataExportTokens(n *tree_sitter.Node) []string {
 }
 
 func (c *jvConv) jvPropertiesIterableBase(n *tree_sitter.Node) string {
-	if n == nil || n.Kind() != "method_invocation" {
+	if n == nil || c.kind(n) != "method_invocation" {
 		return ""
 	}
 	path := c.dotted(n)
@@ -1028,12 +1012,12 @@ func (c *jvConv) jvPropertiesIterableBase(n *tree_sitter.Node) string {
 // past the first argument: a later string among the arguments is a different
 // argument with a different meaning, not a fallback for this one.
 func (c *jvConv) jvFirstStringArg(n *tree_sitter.Node) string {
-	args := field(n, "arguments")
+	args := c.field(n, "arguments")
 	if args == nil {
 		return ""
 	}
 	kids := c.namedChildren(args)
-	if len(kids) == 0 || kids[0].Kind() != "string_literal" {
+	if len(kids) == 0 || c.kind(kids[0]) != "string_literal" {
 		return ""
 	}
 	return javaStringToken(c.text(kids[0]))
@@ -1078,12 +1062,12 @@ func (c *jvConv) javaExprShape(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "field_access", "method_invocation":
 		return "ID"
 	case "array_access":
-		base := c.javaExprShape(field(n, "array"))
-		key := c.javaExprShape(field(n, "index"))
+		base := c.javaExprShape(c.field(n, "array"))
+		key := c.javaExprShape(c.field(n, "index"))
 		if base == "" || key == "" {
 			return ""
 		}
@@ -1107,8 +1091,8 @@ func (c *jvConv) javaExprShape(n *tree_sitter.Node) string {
 			return c.javaExprShape(kids[0])
 		}
 	case "binary_expression":
-		left := c.javaExprShape(field(n, "left"))
-		right := c.javaExprShape(field(n, "right"))
+		left := c.javaExprShape(c.field(n, "left"))
+		right := c.javaExprShape(c.field(n, "right"))
 		op := c.javaOp(n)
 		if left == "" || right == "" || op == "" {
 			return ""
@@ -1125,14 +1109,14 @@ func (c *jvConv) jvIntegerSizeArithmeticObservations(fn *tree_sitter.Node) []nir
 		if n == nil {
 			return
 		}
-		if n.Kind() == "binary_expression" && c.javaExprShape(n) == "INT<<ID" {
+		if c.kind(n) == "binary_expression" && c.javaExprShape(n) == "INT<<ID" {
 			loc := c.loc(n)
 			path := "analysis.integer_size.int_shift"
 			out = append(out, nir.ExprStmt{Value: nir.Call{
 				Callee: nir.Name{ID: path, Loc: loc},
 				Args: []nir.Expr{
 					nir.Const{Loc: loc, Value: "left=int_literal"},
-					c.expr(field(n, "right")),
+					c.expr(c.field(n, "right")),
 					nir.Const{Loc: loc, Value: "operator=shift_left"},
 				},
 				Path:   path,
@@ -1144,12 +1128,12 @@ func (c *jvConv) jvIntegerSizeArithmeticObservations(fn *tree_sitter.Node) []nir
 			walk(ch)
 		}
 	}
-	walk(field(fn, "body"))
+	walk(c.field(fn, "body"))
 	return out
 }
 
 func (c *jvConv) jvUnverifiedKeyIDPathResolveObservations(fn *tree_sitter.Node) []nir.Stmt {
-	body := field(fn, "body")
+	body := c.field(fn, "body")
 	if body == nil {
 		return nil
 	}
@@ -1181,15 +1165,15 @@ func (c *jvConv) jvUnverifiedKeyIDPathResolveObservations(fn *tree_sitter.Node) 
 }
 
 func (c *jvConv) javaLengthCheckToken(n *tree_sitter.Node) string {
-	if n == nil || n.Kind() != "binary_expression" {
+	if n == nil || c.kind(n) != "binary_expression" {
 		return ""
 	}
 	op := c.javaOp(n)
 	if op != "==" && op != "!=" {
 		return ""
 	}
-	left := field(n, "left")
-	right := field(n, "right")
+	left := c.field(n, "left")
+	right := c.field(n, "right")
 	if javaIsLengthField(c, left) {
 		if val := javaIntLiteral(c.text(right)); val != "" {
 			return "length_" + op + "_" + val
@@ -1207,7 +1191,7 @@ func (c *jvConv) javaOp(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
 	}
-	if op := strings.TrimSpace(c.text(field(n, "operator"))); op != "" {
+	if op := strings.TrimSpace(c.text(c.field(n, "operator"))); op != "" {
 		return op
 	}
 	for i := uint(0); i < n.ChildCount(); i++ {
@@ -1222,9 +1206,9 @@ func javaIsLengthField(c *jvConv, n *tree_sitter.Node) bool {
 	if n == nil {
 		return false
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "field_access":
-		return c.text(field(n, "field")) == "length"
+		return c.text(c.field(n, "field")) == "length"
 	case "identifier":
 		return false
 	default:
@@ -1276,10 +1260,10 @@ func (c *jvConv) jvParamAnnotationTokens(params *tree_sitter.Node) map[string][]
 		return out
 	}
 	for _, ch := range c.namedChildren(params) {
-		if ch.Kind() != "formal_parameter" && ch.Kind() != "spread_parameter" {
+		if c.kind(ch) != "formal_parameter" && c.kind(ch) != "spread_parameter" {
 			continue
 		}
-		nm := field(ch, "name")
+		nm := c.field(ch, "name")
 		if nm == nil {
 			continue
 		}
@@ -1326,7 +1310,7 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "this", "super":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "null_literal":
@@ -1342,15 +1326,15 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 		// pick up interpolation in text blocks if any; otherwise constant
 		return nir.Const{Loc: L, Value: c.text(n)}
 	case "field_access":
-		return nir.Attr{Base: c.expr(field(n, "object")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
+		return nir.Attr{Base: c.expr(c.field(n, "object")), Attr: c.text(c.field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "array_access":
-		return nir.Index{Base: c.expr(field(n, "array")), Key: c.expr(field(n, "index")), Path: c.dotted(field(n, "array")), Loc: L}
+		return nir.Index{Base: c.expr(c.field(n, "array")), Key: c.expr(c.field(n, "index")), Path: c.dotted(c.field(n, "array")), Loc: L}
 	case "method_invocation":
-		obj := field(n, "object")
-		name := c.text(field(n, "name"))
+		obj := c.field(n, "object")
+		name := c.text(c.field(n, "name"))
 		path := c.dotted(n)
 		var arglist []nir.Expr
-		if args := field(n, "arguments"); args != nil {
+		if args := c.field(n, "arguments"); args != nil {
 			for _, a := range c.namedChildren(args) {
 				arglist = append(arglist, c.expr(a))
 			}
@@ -1363,9 +1347,9 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Call{Callee: callee, Args: arglist, Path: path, Method: name, Loc: L}
 	case "object_creation_expression":
-		typ := c.text(field(n, "type"))
+		typ := c.text(c.field(n, "type"))
 		var arglist []nir.Expr
-		if args := field(n, "arguments"); args != nil {
+		if args := c.field(n, "arguments"); args != nil {
 			for _, a := range c.namedChildren(args) {
 				arglist = append(arglist, c.expr(a))
 			}
@@ -1394,7 +1378,7 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Call{Callee: nir.Name{ID: typ, Loc: L}, Args: arglist, Path: typ, Method: typ, Loc: L}
 	case "binary_expression":
 		op := c.javaOp(n)
-		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		left, right := c.expr(c.field(n, "left")), c.expr(c.field(n, "right"))
 		if op == "+" {
 			// `+` is overloaded (string concat / arithmetic); keep it a taint-propagating
 			// Format so string-building flows are preserved.
@@ -1404,13 +1388,13 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 		// evaluation of opaque branch conditions; BinOp also flows taint through both sides.
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "unary_expression":
-		return nir.Unary{Op: c.javaOp(n), Operand: c.expr(field(n, "operand")), Loc: L}
+		return nir.Unary{Op: c.javaOp(n), Operand: c.expr(c.field(n, "operand")), Loc: L}
 	case "parenthesized_expression", "cast_expression":
 		if kids := c.namedChildren(n); len(kids) > 0 {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
 	case "ternary_expression":
-		return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: c.expr(field(n, "consequence")), Else: c.expr(field(n, "alternative")), Loc: L}
+		return nir.Ternary{Cond: c.expr(c.field(n, "condition")), Then: c.expr(c.field(n, "consequence")), Else: c.expr(c.field(n, "alternative")), Loc: L}
 	case "array_initializer":
 		var parts []nir.Expr
 		for _, ch := range c.namedChildren(n) {
@@ -1429,22 +1413,22 @@ func (c *jvConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "this", "super", "type_identifier", "scoped_identifier":
 		return c.text(n)
 	case "field_access":
-		return c.dotted(field(n, "object")) + "." + c.text(field(n, "field"))
+		return c.dotted(c.field(n, "object")) + "." + c.text(c.field(n, "field"))
 	case "method_invocation":
-		obj := field(n, "object")
-		name := c.text(field(n, "name"))
+		obj := c.field(n, "object")
+		name := c.text(c.field(n, "name"))
 		if obj == nil {
 			return name
 		}
 		return c.dotted(obj) + "." + name
 	case "array_access":
-		return c.dotted(field(n, "array")) + "[]"
+		return c.dotted(c.field(n, "array")) + "[]"
 	case "object_creation_expression":
-		return c.text(field(n, "type"))
+		return c.text(c.field(n, "type"))
 	case "parenthesized_expression":
 		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.dotted(kids[0])

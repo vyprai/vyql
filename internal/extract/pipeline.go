@@ -34,7 +34,7 @@ type Options struct {
 // caching is off. (A nil *parsecache.Cache must become a nil interface, not a non-nil
 // interface holding nil.)
 func SharedDeltaCache() lowering.DeltaCache {
-	if c := parsecache.Shared(); c != nil {
+	if c := parsecache.Shared(); c != nil && c.Persistent() {
 		return c
 	}
 	return nil
@@ -77,6 +77,7 @@ func BuildGraph(paths []string, cache lowering.DeltaCache, opts Options) (usg.St
 			return nil, stats, err
 		}
 		tk.Mark("sca+bindings")
+		usg.Freeze(g)
 		return g, stats, nil
 	}
 	// Incremental lowering when a cache is provided: reuse the lowered sub-graph of unchanged
@@ -89,7 +90,14 @@ func BuildGraph(paths []string, cache lowering.DeltaCache, opts Options) (usg.St
 	if incremental {
 		g, fresh, err = lowering.LowerIncremental(prog, true, ctorTypes, cache, opts.Sync)
 	} else {
-		g, err = lowering.LowerTyped(prog, true, ctorTypes)
+		// Even with cross-scan caching disabled, a bounded scan installs a transient
+		// body spool. It controls frontend/NIR lifetime without paying to encode graph
+		// deltas that cannot be reused after this process exits.
+		var bodies lowering.BodyCache
+		if c := parsecache.Shared(); c != nil {
+			bodies = c
+		}
+		g, err = lowering.LowerTypedDeferred(prog, true, ctorTypes, bodies)
 	}
 	if err != nil {
 		return nil, stats, err
@@ -143,6 +151,7 @@ func BuildGraph(paths []string, cache lowering.DeltaCache, opts Options) (usg.St
 		return nil, stats, err
 	}
 	tk.Mark("bindings")
+	usg.Freeze(g)
 	return g, stats, nil
 }
 

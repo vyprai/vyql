@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -1553,7 +1554,7 @@ func TestScopeFuncFrameRestoresEveryMap(t *testing.T) {
 	sc.setTyp("v", [2]string{"m", "Inner"})
 	sc.setLex("w", true)
 	sc.delCnst("gone")
-	sc.iter["v"] = []string{"b"}
+	sc.setIter("v", []string{"b"})
 	sc.undoFunc(fm)
 
 	if got := sc.node["v"]; got != "outer" {
@@ -1577,9 +1578,66 @@ func TestScopeFuncFrameRestoresEveryMap(t *testing.T) {
 	if got := sc.iter["probe"]; len(got) != 1 || got[0] != "seen" {
 		t.Errorf("frame restored a different map object: probe = %v", got)
 	}
-	if sc.funcDepth != 0 || len(sc.jc) != 0 || len(sc.jt) != 0 || len(sc.jl) != 0 {
-		t.Errorf("journals not unwound: depth=%d c=%d t=%d l=%d",
-			sc.funcDepth, len(sc.jc), len(sc.jt), len(sc.jl))
+	if sc.funcDepth != 0 || len(sc.jc) != 0 || len(sc.jt) != 0 || len(sc.jl) != 0 || len(sc.ji) != 0 {
+		t.Errorf("journals not unwound: depth=%d c=%d t=%d l=%d i=%d",
+			sc.funcDepth, len(sc.jc), len(sc.jt), len(sc.jl), len(sc.ji))
+	}
+}
+
+func TestIterationJournalMergesOnlyStableBranchFacts(t *testing.T) {
+	sc := newScope()
+	sc.iter["kept"] = []string{"same"}
+	sc.iter["changed"] = []string{"before"}
+	sc.iter["deleted"] = []string{"before"}
+
+	mark := len(sc.ji)
+	sc.branchDepth++
+	sc.setIter("created", []string{"both"})
+	sc.setIter("changed", []string{"then"})
+	sc.delIter("deleted")
+	thenDelta := sc.iterDelta(mark)
+	sc.undoIter(mark)
+
+	sc.setIter("created", []string{"both"})
+	sc.setIter("changed", []string{"else"})
+	sc.delIter("deleted")
+	elseDelta := sc.iterDelta(mark)
+	sc.undoIter(mark)
+	sc.branchDepth--
+	sc.mergeIterationDeltas(thenDelta, elseDelta)
+
+	if got := sc.iter["kept"]; !slices.Equal(got, []string{"same"}) {
+		t.Errorf("untouched fact = %v, want [same]", got)
+	}
+	if got := sc.iter["created"]; !slices.Equal(got, []string{"both"}) {
+		t.Errorf("fact created equally in both arms = %v, want [both]", got)
+	}
+	if _, ok := sc.iter["changed"]; ok {
+		t.Error("fact changed differently in the arms survived")
+	}
+	if _, ok := sc.iter["deleted"]; ok {
+		t.Error("fact deleted in both arms survived")
+	}
+	if len(sc.ji) != 0 {
+		t.Fatalf("journal not empty after merge: %d entries", len(sc.ji))
+	}
+}
+
+func BenchmarkIterationFactBranchJournal(b *testing.B) {
+	sc := newScope()
+	for i := range 4096 {
+		sc.iter[strconv.Itoa(i)] = []string{"value"}
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		mark := len(sc.ji)
+		sc.branchDepth++
+		sc.setIter("changed", []string{"branch"})
+		delta := sc.iterDelta(mark)
+		sc.undoIter(mark)
+		sc.branchDepth--
+		sc.mergeIterationDeltas(nil, delta)
 	}
 }
 

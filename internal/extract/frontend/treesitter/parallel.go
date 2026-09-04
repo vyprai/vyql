@@ -104,7 +104,7 @@ func parseModulesPreprocess(
 				if cache != nil {
 					key = cache.Key(root, files[i], src)
 					if m, hit := cache.Get(key); hit {
-						mods[i], ok[i] = m, true
+						mods[i], ok[i] = moduleStub(m, key), true
 						cache.PutStat(root, files[i], key, m) // refresh stat→header for next time
 						continue
 					}
@@ -117,11 +117,21 @@ func parseModulesPreprocess(
 				tree.Close()
 				if good {
 					m.Hash = contentHash(src) // identifies this parse for the incremental-lowering cache
-					mods[i], ok[i] = m, true
 					if cache != nil {
-						cache.Put(key, m)
+						// Persist completed bodies before publishing the module result. Keeping only an
+						// identity stub here makes extraction memory proportional to active workers,
+						// rather than to every file parsed so far.
+						cache.DeferModuleBodies(&m)
+						if cache.PutModule(key, m) {
+							mods[i] = moduleStub(m, key)
+						} else {
+							mods[i] = m
+						}
 						cache.PutStat(root, files[i], key, m)
+					} else {
+						mods[i] = m
 					}
+					ok[i] = true
 				}
 			}
 		}()
@@ -134,4 +144,8 @@ func parseModulesPreprocess(
 		}
 	}
 	return out
+}
+
+func moduleStub(m nir.Module, cacheKey string) nir.Module {
+	return nir.Module{Key: m.Key, File: m.File, Hash: m.Hash, CacheKey: cacheKey}
 }

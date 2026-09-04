@@ -4,4 +4,4 @@
 # Line 2: sha256 of that tarball. A 64-hex pin keeps a tagged engine on one
 # content hash; "pending" would verify against the sibling .sha256 instead.
 https://dl.vyprsec.ai/vyql/definitions/free/latest.tar.gz
-0856d96713ef19855e233764bb546a0e2fece3a2956d2a969f8f461e650e3aa2
+3231d72c27dbca4a70ca7923aafec4b9acf398ae3650ef8c3f4536b374d1c91c

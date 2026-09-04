@@ -44,17 +44,20 @@ type BadgerGraph struct {
 	// Resident structural core (int-indexed). Node DETAIL (loc/region/props/type) is NOT kept
 	// here — it is streamed to badger so peak RAM is bounded by the core + a small write buffer +
 	// badger's cache, not the full payload.
-	idx        map[string]int32
-	ids        []string
-	typs       []string // node type by index; resident because AddNode consults it per call
-	out        [][]iedge
-	in         map[int32][]iedge
-	flowOut    [][]int32
-	flowIn     [][]int32
-	labels     [][]Label
-	byType     map[string][]int32
-	byConcept  map[string][]int32
-	conceptHas map[string]map[int32]bool
+	idx           map[string]int32
+	ids           []string
+	typs          []string // node type by index; resident because AddNode consults it per call
+	out           [][]iedge
+	in            map[int32][]iedge
+	flowOut       [][]int32
+	flowIn        [][]int32
+	flowOutPacked packedAdj
+	flowInPacked  packedAdj
+	labels        [][]Label
+	labelsPacked  packedLabels
+	byType        map[string][]int32
+	byConcept     map[string][]int32
+	conceptHas    map[string]map[int32]bool
 
 	// write-back buffer for node detail, held as STRUCTS so resident reads share the stored
 	// strings and props map instead of decoding a blob per read — encoding happens once, at
@@ -122,6 +125,8 @@ func (g *BadgerGraph) intern(id string) int32 {
 	if i, ok := g.idx[id]; ok {
 		return i
 	}
+	g.thawFlows()
+	g.thawLabels()
 	i := int32(len(g.ids))
 	g.idx[id] = i
 	g.ids = append(g.ids, id)
@@ -131,6 +136,80 @@ func (g *BadgerGraph) intern(id string) int32 {
 	g.flowIn = append(g.flowIn, nil)
 	g.labels = append(g.labels, nil)
 	return i
+}
+
+// Freeze packs the dominant flow adjacency after graph construction. Badger owns cold node
+// detail; CSR keeps the structural hot set small enough that the collector has useful headroom.
+func (g *BadgerGraph) Freeze() {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if g.flowOutPacked.offsets != nil {
+		return
+	}
+	out, okOut := packAdj(g.flowOut)
+	in, okIn := packAdj(g.flowIn)
+	labels, okLabels := packLabelRows(g.labels)
+	if !okOut || !okIn || !okLabels {
+		return
+	}
+	g.flowOutPacked, g.flowInPacked = out, in
+	g.labelsPacked = labels
+	g.flowOut, g.flowIn = nil, nil
+	g.labels = nil
+	g.conceptHas = nil
+}
+
+// Caller holds g.mu whenever this can race with a writer.
+func (g *BadgerGraph) thawFlows() {
+	if g.flowOutPacked.offsets == nil {
+		return
+	}
+	g.flowOut, g.flowIn = g.flowOutPacked.unpack(), g.flowInPacked.unpack()
+	g.flowOutPacked, g.flowInPacked = packedAdj{}, packedAdj{}
+}
+
+func (g *BadgerGraph) thawLabels() {
+	if g.labelsPacked.offsets == nil {
+		return
+	}
+	g.labels = g.labelsPacked.unpack()
+	g.labelsPacked = packedLabels{}
+}
+
+func (g *BadgerGraph) labelsAt(i int32) []Label {
+	if g.labelsPacked.offsets != nil {
+		return g.labelsPacked.at(i)
+	}
+	return g.labels[i]
+}
+
+func (g *BadgerGraph) conceptSeen(concept string) map[int32]bool {
+	if g.conceptHas == nil {
+		g.conceptHas = map[string]map[int32]bool{}
+	}
+	seen := g.conceptHas[concept]
+	if seen == nil {
+		seen = make(map[int32]bool, len(g.byConcept[concept])+1)
+		for _, i := range g.byConcept[concept] {
+			seen[i] = true
+		}
+		g.conceptHas[concept] = seen
+	}
+	return seen
+}
+
+func (g *BadgerGraph) flowOutAt(i int32) []int32 {
+	if g.flowOutPacked.offsets != nil {
+		return g.flowOutPacked.at(i)
+	}
+	return g.flowOut[i]
+}
+
+func (g *BadgerGraph) flowInAt(i int32) []int32 {
+	if g.flowInPacked.offsets != nil {
+		return g.flowInPacked.at(i)
+	}
+	return g.flowIn[i]
 }
 
 // typeOf returns a node's type from the resident core. AddNode consults it on
@@ -201,6 +280,7 @@ func (g *BadgerGraph) AddEdge(e Edge) error {
 	si, di := g.intern(e.Src), g.intern(e.Dst)
 	typ := edgeTypeIDFor(e.Type)
 	if typ == edgeTypeFlows && len(e.Props) == 0 {
+		g.thawFlows()
 		g.flowOut[si] = append(g.flowOut[si], di)
 		g.flowIn[di] = append(g.flowIn[di], si)
 		return nil
@@ -220,11 +300,12 @@ func (g *BadgerGraph) AddFlowEdgeIfPresent(src, dst string) bool {
 	if !ok {
 		return false
 	}
-	g.epoch = nextStructEpoch()
 	di, ok := g.idx[dst]
 	if !ok {
 		return false
 	}
+	g.thawFlows()
+	g.epoch = nextStructEpoch()
 	g.flowOut[si] = append(g.flowOut[si], di)
 	g.flowIn[di] = append(g.flowIn[di], si)
 	return true
@@ -234,12 +315,9 @@ func (g *BadgerGraph) AddLabel(nodeID string, l Label) error {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	i := g.intern(nodeID)
+	g.thawLabels()
 	g.labels[i] = append(g.labels[i], l)
-	seen := g.conceptHas[l.Concept]
-	if seen == nil {
-		seen = map[int32]bool{}
-		g.conceptHas[l.Concept] = seen
-	}
+	seen := g.conceptSeen(l.Concept)
 	if !seen[i] {
 		seen[i] = true
 		g.byConcept[l.Concept] = append(g.byConcept[l.Concept], i)
@@ -294,6 +372,10 @@ func (g *BadgerGraph) nodeAt(i int32) Node {
 	if !ok {
 		d = decDet(g.rawDet(i))
 	}
+	return g.nodeFromDetail(i, d)
+}
+
+func (g *BadgerGraph) nodeFromDetail(i int32, d nodeDetail) Node {
 	return Node{ID: g.ids[i], Type: d.typ, Loc: d.loc, Region: d.region, Order: d.order,
 		HasOrder: d.hasOrder, Scope: d.scope, Props: d.props,
 		Method: d.method, CalleePath: d.calleePath, StrArgs: d.strArgs, Vkind: d.vkind}
@@ -340,7 +422,7 @@ func (g *BadgerGraph) OutEdges(src, edgeType string) ([]Edge, error) {
 	}
 	var out []Edge
 	if edgeTypeMatches(edgeTypeFlows, edgeType) {
-		for _, dst := range g.flowOut[i] {
+		for _, dst := range g.flowOutAt(i) {
 			out = append(out, Edge{Type: "FLOWS", Src: src, Dst: g.ids[dst]})
 		}
 	}
@@ -359,7 +441,7 @@ func (g *BadgerGraph) InEdges(dst, edgeType string) ([]Edge, error) {
 	}
 	var out []Edge
 	if edgeTypeMatches(edgeTypeFlows, edgeType) {
-		for _, src := range g.flowIn[i] {
+		for _, src := range g.flowInAt(i) {
 			out = append(out, Edge{Type: "FLOWS", Src: g.ids[src], Dst: dst})
 		}
 	}
@@ -377,7 +459,7 @@ func (g *BadgerGraph) RangeInEdges(dst, edgeType string, fn func(src string) boo
 		return
 	}
 	if edgeTypeMatches(edgeTypeFlows, edgeType) {
-		for _, src := range g.flowIn[i] {
+		for _, src := range g.flowInAt(i) {
 			if !fn(g.ids[src]) {
 				return
 			}
@@ -397,6 +479,22 @@ func (g *BadgerGraph) NodesWithConcept(concept string) ([]string, error) {
 }
 func (g *BadgerGraph) NodesOfType(nodeType string) ([]string, error) {
 	return g.idsOf(g.byType[nodeType]), nil
+}
+
+// TypeNodeIndexes returns the store-owned dense indexes for a node type.
+// Callers must treat the returned slice as read-only.
+func (g *BadgerGraph) TypeNodeIndexes(nodeType string) []int32 {
+	return g.byType[nodeType]
+}
+
+// NodeAtIndex reads one node without converting its dense index through the
+// string-id map. Binding matching retains these indexes, so the disk-backed
+// path should not pay an id hash lookup for every candidate and predicate.
+func (g *BadgerGraph) NodeAtIndex(i int32) (Node, bool) {
+	if i < 0 || int(i) >= len(g.ids) {
+		return Node{}, false
+	}
+	return g.nodeAt(i), true
 }
 
 func (g *BadgerGraph) RangeNodesOfType(nodeType string, fn func(Node) bool) {
@@ -426,7 +524,7 @@ func (g *BadgerGraph) Labels(nodeID string) ([]Label, error) {
 	if !ok {
 		return nil, nil
 	}
-	return g.labels[i], nil
+	return g.labelsAt(i), nil
 }
 
 func (g *BadgerGraph) Close() error {
@@ -537,16 +635,21 @@ var _ IntGraph = (*BadgerGraph)(nil)
 
 func (g *BadgerGraph) NodeCount() int                      { return len(g.ids) }
 func (g *BadgerGraph) ConceptNodes(concept string) []int32 { return g.byConcept[concept] }
-func (g *BadgerGraph) LabelsAt(idx int32) []Label          { return g.labels[idx] }
-func (g *BadgerGraph) NodeID(idx int32) string             { return g.ids[idx] }
-func (g *BadgerGraph) LabelsOf(nodeID string) []Label      { l, _ := g.Labels(nodeID); return l }
+func (g *BadgerGraph) LabelsAt(idx int32) []Label {
+	if idx < 0 || int(idx) >= len(g.ids) {
+		return nil
+	}
+	return g.labelsAt(idx)
+}
+func (g *BadgerGraph) NodeID(idx int32) string        { return g.ids[idx] }
+func (g *BadgerGraph) LabelsOf(nodeID string) []Label { l, _ := g.Labels(nodeID); return l }
 
 func (g *BadgerGraph) RangeOut(src int32, edgeType string, fn func(dst int32) bool) {
 	if int(src) >= len(g.out) {
 		return
 	}
 	if edgeTypeMatches(edgeTypeFlows, edgeType) {
-		for _, dst := range g.flowOut[src] {
+		for _, dst := range g.flowOutAt(src) {
 			if !fn(dst) {
 				return
 			}
@@ -567,7 +670,7 @@ func (g *BadgerGraph) RangeOutEdges(src, edgeType string, fn func(dst string) bo
 		return
 	}
 	if edgeTypeMatches(edgeTypeFlows, edgeType) {
-		for _, dst := range g.flowOut[i] {
+		for _, dst := range g.flowOutAt(i) {
 			if !fn(g.ids[dst]) {
 				return
 			}
@@ -582,13 +685,18 @@ func (g *BadgerGraph) RangeOutEdges(src, edgeType string, fn func(dst string) bo
 	}
 }
 
-// RangeNodes streams every node. It flushes the detail buffer, then reads detail via a single
-// SEQUENTIAL badger scan of the gn\0 prefix (cheap, cache-friendly) rather than a random Get per
-// node — the binding applicator passes iterate all nodes, and random Gets were the dominant disk-path cost.
+// RangeNodes streams every node in stable dense-index order.
 func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
+	g.RangeNodeIndexes(func(_ int32, n Node) bool { return fn(n) })
+}
+
+// RangeNodeIndexes streams every dense index with its node. It flushes the
+// detail buffer, then reads detail via a single SEQUENTIAL badger scan of the
+// gn\0 prefix rather than a random Get per node. The binding matcher builds its
+// compact indexes through this path and keeps the int32 reference thereafter.
+func (g *BadgerGraph) RangeNodeIndexes(fn func(int32, Node) bool) {
 	emit := func(idx int32, d nodeDetail) bool {
-		return fn(Node{ID: g.ids[idx], Type: d.typ, Loc: d.loc, Region: d.region,
-			Order: d.order, HasOrder: d.hasOrder, Scope: d.scope, Props: d.props})
+		return fn(idx, g.nodeFromDetail(idx, d))
 	}
 	if len(g.det) == len(g.ids) { // everything resident → no badger scan, no decode
 		for idx := range g.ids {
