@@ -294,6 +294,10 @@ func (g *BadgerGraph) nodeAt(i int32) Node {
 	if !ok {
 		d = decDet(g.rawDet(i))
 	}
+	return g.nodeFromDetail(i, d)
+}
+
+func (g *BadgerGraph) nodeFromDetail(i int32, d nodeDetail) Node {
 	return Node{ID: g.ids[i], Type: d.typ, Loc: d.loc, Region: d.region, Order: d.order,
 		HasOrder: d.hasOrder, Scope: d.scope, Props: d.props,
 		Method: d.method, CalleePath: d.calleePath, StrArgs: d.strArgs, Vkind: d.vkind}
@@ -397,6 +401,22 @@ func (g *BadgerGraph) NodesWithConcept(concept string) ([]string, error) {
 }
 func (g *BadgerGraph) NodesOfType(nodeType string) ([]string, error) {
 	return g.idsOf(g.byType[nodeType]), nil
+}
+
+// TypeNodeIndexes returns the store-owned dense indexes for a node type.
+// Callers must treat the returned slice as read-only.
+func (g *BadgerGraph) TypeNodeIndexes(nodeType string) []int32 {
+	return g.byType[nodeType]
+}
+
+// NodeAtIndex reads one node without converting its dense index through the
+// string-id map. Binding matching retains these indexes, so the disk-backed
+// path should not pay an id hash lookup for every candidate and predicate.
+func (g *BadgerGraph) NodeAtIndex(i int32) (Node, bool) {
+	if i < 0 || int(i) >= len(g.ids) {
+		return Node{}, false
+	}
+	return g.nodeAt(i), true
 }
 
 func (g *BadgerGraph) RangeNodesOfType(nodeType string, fn func(Node) bool) {
@@ -582,13 +602,18 @@ func (g *BadgerGraph) RangeOutEdges(src, edgeType string, fn func(dst string) bo
 	}
 }
 
-// RangeNodes streams every node. It flushes the detail buffer, then reads detail via a single
-// SEQUENTIAL badger scan of the gn\0 prefix (cheap, cache-friendly) rather than a random Get per
-// node — the binding applicator passes iterate all nodes, and random Gets were the dominant disk-path cost.
+// RangeNodes streams every node in stable dense-index order.
 func (g *BadgerGraph) RangeNodes(fn func(Node) bool) {
+	g.RangeNodeIndexes(func(_ int32, n Node) bool { return fn(n) })
+}
+
+// RangeNodeIndexes streams every dense index with its node. It flushes the
+// detail buffer, then reads detail via a single SEQUENTIAL badger scan of the
+// gn\0 prefix rather than a random Get per node. The binding matcher builds its
+// compact indexes through this path and keeps the int32 reference thereafter.
+func (g *BadgerGraph) RangeNodeIndexes(fn func(int32, Node) bool) {
 	emit := func(idx int32, d nodeDetail) bool {
-		return fn(Node{ID: g.ids[idx], Type: d.typ, Loc: d.loc, Region: d.region,
-			Order: d.order, HasOrder: d.hasOrder, Scope: d.scope, Props: d.props})
+		return fn(idx, g.nodeFromDetail(idx, d))
 	}
 	if len(g.det) == len(g.ids) { // everything resident → no badger scan, no decode
 		for idx := range g.ids {

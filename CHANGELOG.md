@@ -10,6 +10,15 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+### Changed
+
+- **Disk-backed binding matching uses the graph's dense node indexes.** The
+  `--max-ram` store now builds and visits binding candidate sets as `int32`
+  indexes instead of repeatedly converting string IDs through the graph map.
+  On the 1.25 MB generated system-template stress tier, wall time fell from
+  105.84 s to 88.13 s, user CPU from 246.95 s to 217.85 s, and system CPU from
+  76.30 s to 38.91 s.
+
 ### Fixed
 
 - **`--max-ram` now stops with headroom before the requested ceiling on Linux
