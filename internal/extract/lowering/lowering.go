@@ -143,9 +143,10 @@ type lowerer struct {
 	// registered (pass 1), so they can be cached and replayed without re-reading the module's
 	// NIR. nil on the full (non-incremental) path — zero cost there.
 	p1 *pass1Delta
-	// parseCache, when set (incremental path), lets bodyOf decode a stub module's full NIR on
-	// demand from the parse cache. nil on the full path.
-	parseCache DeltaCache
+	// parseCache, when set, lets bodyOf and eachDeferred decode module/function NIR on demand.
+	// Incremental scans use the persistent parse cache; bounded cache-off scans use a transient
+	// append-only spool. nil only when all NIR is inline.
+	parseCache BodyCache
 
 	tryExceptionTargets []string
 }
@@ -1144,7 +1145,7 @@ func (l *lowerer) promoteCapturedJSBindings(stmts []nir.Stmt, params []string, s
 	if !isJSLikeModule(l.curFile) {
 		return
 	}
-	for name := range freeNames(stmts, params) {
+	for name := range l.freeNames(stmts, params) {
 		if sc.node[name] != "" {
 			l.ensureLexicalBinding(sc, name, loc)
 		}
@@ -1165,16 +1166,16 @@ func (l *lowerer) ensureLexicalBinding(sc *scope, name, loc string) {
 
 }
 
-func freeNames(stmts []nir.Stmt, params []string) map[string]bool {
+func (l *lowerer) freeNames(stmts []nir.Stmt, params []string) map[string]bool {
 	local := map[string]bool{}
 	for _, p := range params {
 		local[p] = true
 	}
-	collectLocalDecls(stmts, local)
+	l.collectLocalDecls(stmts, local)
 
 	used := map[string]bool{}
 	for _, st := range stmts {
-		collectStmtNames(st, used)
+		l.collectStmtNames(st, used)
 	}
 	for name := range local {
 		delete(used, name)
@@ -1182,9 +1183,17 @@ func freeNames(stmts []nir.Stmt, params []string) map[string]bool {
 	return used
 }
 
-func collectLocalDecls(stmts []nir.Stmt, local map[string]bool) {
+func (l *lowerer) collectLocalDecls(stmts []nir.Stmt, local map[string]bool) {
 	for _, st := range stmts {
 		switch s := st.(type) {
+		case nir.BodyRef:
+			if s.Summarized {
+				for _, name := range s.Summary.LocalDecls {
+					local[name] = true
+				}
+			} else {
+				l.eachDeferred(s, func(chunk []nir.Stmt) { l.collectLocalDecls(chunk, local) })
+			}
 		case nir.Assign:
 			if s.Decl {
 				for _, t := range s.Targets {
@@ -1202,36 +1211,48 @@ func collectLocalDecls(stmts []nir.Stmt, local map[string]bool) {
 				local[s.Name] = true
 			}
 		case nir.Block:
-			collectLocalDecls(s.Stmts, local)
+			l.collectLocalDecls(s.Stmts, local)
 		case nir.If:
-			collectLocalDecls(s.Then, local)
-			collectLocalDecls(s.Else, local)
+			l.collectLocalDecls(s.Then, local)
+			l.collectLocalDecls(s.Else, local)
 		case nir.Loop:
 			for _, name := range s.Vars {
 				if name != "" && !strings.ContainsAny(name, ".[") {
 					local[name] = true
 				}
 			}
-			collectLocalDecls(s.Body, local)
+			l.collectLocalDecls(s.Body, local)
 		case nir.Switch:
 			for _, c := range s.Cases {
-				collectLocalDecls(c, local)
+				l.collectLocalDecls(c, local)
 			}
-			collectLocalDecls(s.Default, local)
+			l.collectLocalDecls(s.Default, local)
 		case nir.Try:
-			collectLocalDecls(s.Body, local)
+			l.collectLocalDecls(s.Body, local)
 			for _, h := range s.Handlers {
-				collectLocalDecls(h, local)
+				l.collectLocalDecls(h, local)
 			}
-			collectLocalDecls(s.Finally, local)
+			l.collectLocalDecls(s.Finally, local)
 		case nir.Defer:
-			collectLocalDecls(s.Body, local)
+			l.collectLocalDecls(s.Body, local)
 		}
 	}
 }
 
-func collectStmtNames(st nir.Stmt, used map[string]bool) {
+func (l *lowerer) collectStmtNames(st nir.Stmt, used map[string]bool) {
 	switch s := st.(type) {
+	case nir.BodyRef:
+		if s.Summarized {
+			for _, name := range s.Summary.UsedNames {
+				used[name] = true
+			}
+		} else {
+			l.eachDeferred(s, func(chunk []nir.Stmt) {
+				for _, child := range chunk {
+					l.collectStmtNames(child, used)
+				}
+			})
+		}
 	case nir.Assign:
 		if !s.Decl {
 			for _, t := range s.Targets {
@@ -1240,73 +1261,73 @@ func collectStmtNames(st nir.Stmt, used map[string]bool) {
 				}
 			}
 		}
-		collectExprNames(s.Value, used)
+		l.collectExprNames(s.Value, used)
 	case nir.AugAssign:
 		if s.Target != "" {
 			used[s.Target] = true
 		}
-		collectExprNames(s.Value, used)
+		l.collectExprNames(s.Value, used)
 	case nir.Return:
-		collectExprNames(s.Value, used)
+		l.collectExprNames(s.Value, used)
 	case nir.Validation:
-		collectExprNames(s.Evidence, used)
+		l.collectExprNames(s.Evidence, used)
 	case nir.Terminate:
-		collectExprNames(s.Value, used)
+		l.collectExprNames(s.Value, used)
 	case nir.ExprStmt:
-		collectExprNames(s.Value, used)
+		l.collectExprNames(s.Value, used)
 	case nir.Defer:
 		for _, child := range s.Body {
-			collectStmtNames(child, used)
+			l.collectStmtNames(child, used)
 		}
 	case nir.Block:
 		for _, child := range s.Stmts {
-			collectStmtNames(child, used)
+			l.collectStmtNames(child, used)
 		}
 	case nir.If:
-		collectExprNames(s.Cond, used)
+		l.collectExprNames(s.Cond, used)
 		for _, child := range s.Then {
-			collectStmtNames(child, used)
+			l.collectStmtNames(child, used)
 		}
 		for _, child := range s.Else {
-			collectStmtNames(child, used)
+			l.collectStmtNames(child, used)
 		}
 	case nir.Loop:
-		collectExprNames(s.Cond, used)
-		collectExprNames(s.Iter, used)
+		l.collectExprNames(s.Cond, used)
+		l.collectExprNames(s.Iter, used)
 		for _, child := range s.Body {
-			collectStmtNames(child, used)
+			l.collectStmtNames(child, used)
 		}
 	case nir.Switch:
-		collectExprNames(s.Subject, used)
+		l.collectExprNames(s.Subject, used)
 		for _, labels := range s.Labels {
 			for _, label := range labels {
-				collectExprNames(label, used)
+				l.collectExprNames(label, used)
 			}
 		}
 		for _, c := range s.Cases {
 			for _, child := range c {
-				collectStmtNames(child, used)
+				l.collectStmtNames(child, used)
 			}
 		}
 		for _, child := range s.Default {
-			collectStmtNames(child, used)
+			l.collectStmtNames(child, used)
 		}
 	case nir.Try:
 		for _, child := range s.Body {
-			collectStmtNames(child, used)
+			l.collectStmtNames(child, used)
 		}
 		for _, h := range s.Handlers {
 			for _, child := range h {
-				collectStmtNames(child, used)
+				l.collectStmtNames(child, used)
 			}
 		}
 		for _, child := range s.Finally {
-			collectStmtNames(child, used)
+			l.collectStmtNames(child, used)
 		}
 	}
 }
 
-func collectExprNames(ex nir.Expr, used map[string]bool) {
+func (l *lowerer) collectExprNames(ex nir.Expr, used map[string]bool) {
 	switch e := ex.(type) {
 	case nil:
 	case nir.Name:
@@ -1314,36 +1335,36 @@ func collectExprNames(ex nir.Expr, used map[string]bool) {
 			used[e.ID] = true
 		}
 	case nir.Attr:
-		collectExprNames(e.Base, used)
+		l.collectExprNames(e.Base, used)
 	case nir.Index:
-		collectExprNames(e.Base, used)
-		collectExprNames(e.Key, used)
+		l.collectExprNames(e.Base, used)
+		l.collectExprNames(e.Key, used)
 	case nir.Call:
-		collectExprNames(e.Callee, used)
+		l.collectExprNames(e.Callee, used)
 		for _, a := range e.Args {
-			collectExprNames(a, used)
+			l.collectExprNames(a, used)
 		}
 	case nir.Format:
 		for _, p := range e.Parts {
-			collectExprNames(p, used)
+			l.collectExprNames(p, used)
 		}
 	case nir.Seq:
 		for _, p := range e.Parts {
-			collectExprNames(p, used)
+			l.collectExprNames(p, used)
 		}
 	case nir.Pair:
-		collectExprNames(e.Value, used)
+		l.collectExprNames(e.Value, used)
 	case nir.Thru:
-		collectExprNames(e.Inner, used)
+		l.collectExprNames(e.Inner, used)
 	case nir.BinOp:
-		collectExprNames(e.Left, used)
-		collectExprNames(e.Right, used)
+		l.collectExprNames(e.Left, used)
+		l.collectExprNames(e.Right, used)
 	case nir.Unary:
-		collectExprNames(e.Operand, used)
+		l.collectExprNames(e.Operand, used)
 	case nir.Ternary:
-		collectExprNames(e.Cond, used)
-		collectExprNames(e.Then, used)
-		collectExprNames(e.Else, used)
+		l.collectExprNames(e.Cond, used)
+		l.collectExprNames(e.Then, used)
+		l.collectExprNames(e.Else, used)
 	}
 }
 
@@ -1399,7 +1420,7 @@ func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, me
 	l.nodeInline("Call", loc, nil, analysisClassContext.method, analysisClassContext.path, strings.Join(tokens, "\x00"), "")
 }
 
-func classMemberContextTokens(stmts []nir.Stmt) []string {
+func (l *lowerer) classMemberContextTokens(stmts []nir.Stmt) []string {
 	var tokens []string
 	var walk func([]nir.Stmt)
 	walk = func(stmts []nir.Stmt) {
@@ -1408,6 +1429,12 @@ func classMemberContextTokens(stmts []nir.Stmt) []string {
 				return
 			}
 			switch st := s.(type) {
+			case nir.BodyRef:
+				if st.Summarized {
+					tokens = append(tokens, st.Summary.ContextTokens...)
+				} else {
+					l.eachDeferred(st, walk)
+				}
 			case nir.FuncDef:
 				tokens = append(tokens, st.ContextTokens...)
 				walk(st.Body)
@@ -2534,7 +2561,15 @@ func Lower(prog nir.Program, resolveImports bool) (usg.Store, error) {
 // assigned from a known constructor lets the lowering stamp `recv_type` on its
 // method calls, which type-constrained sink binding applicators use for precision.
 func LowerTyped(prog nir.Program, resolveImports bool, ctorTypes map[string]string) (usg.Store, error) {
+	return LowerTypedDeferred(prog, resolveImports, ctorTypes, nil)
+}
+
+// LowerTypedDeferred is LowerTyped with a backing cache for identity-only modules and
+// storage-backed function bodies. The cache changes only NIR lifetime: referenced chunks are
+// expanded in source order and produce the same graph as inline bodies.
+func LowerTypedDeferred(prog nir.Program, resolveImports bool, ctorTypes map[string]string, bodies BodyCache) (usg.Store, error) {
 	l := newLowerer(prog, resolveImports, ctorTypes)
+	l.parseCache = bodies
 	if err := l.run(); err != nil {
 		return nil, err
 	}
@@ -2904,17 +2939,19 @@ func (l *lowerer) run() error {
 	}
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS, l.curFile = m.Key, "", ModuleNS(m), m.File
-		l.moduleTech[m.Key] = moduleTech(m.File)
-		l.importTables[m.Key] = importTable(m)
-		for _, imp := range m.Imports {
-			l.importNode(m, imp)
+		body := l.bodyOf(m)
+		l.moduleTech[m.Key] = moduleTech(body.File)
+		l.importTables[m.Key] = importTable(body)
+		for _, imp := range body.Imports {
+			l.importNode(body, imp)
 		}
-		l.register(m.Key, m.Body, "")
+		l.register(m.Key, body.Body, "")
 	}
 	l.collectAddressTaken()
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS, l.curFile = m.Key, "", ModuleNS(m), m.File
-		l.block(m.Body, l.moduleScope(m))
+		body := l.bodyOf(m)
+		l.block(body.Body, l.moduleScope(body))
 	}
 	return nil
 }
@@ -3141,6 +3178,12 @@ func (l *lowerer) classMemberSet(modkey, class string) map[string]bool {
 func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 	for _, s := range stmts {
 		switch st := s.(type) {
+		case nir.BodyRef:
+			if st.Summarized {
+				l.register(modkey, st.Summary.Declarations, cls)
+			} else {
+				l.eachDeferred(st, func(chunk []nir.Stmt) { l.register(modkey, chunk, cls) })
+			}
 		case nir.ClassDef:
 			l.classQual[modkey+"::"+st.Name] = true
 			if l.classDefs[st.Name] == nil {
@@ -3221,10 +3264,12 @@ func (l *lowerer) block(stmts []nir.Stmt, sc *scope) {
 
 func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	switch st := s.(type) {
+	case nir.BodyRef:
+		l.eachDeferred(st, func(chunk []nir.Stmt) { l.block(chunk, sc) })
 	case nir.ClassDef:
 		prev := l.curClass
 		l.curClass = st.Name
-		l.classContextAnalysisEvent(st.Loc, st.Name, st.Bases, classMemberContextTokens(st.Body))
+		l.classContextAnalysisEvent(st.Loc, st.Name, st.Bases, l.classMemberContextTokens(st.Body))
 		l.block(st.Body, newScope())
 		l.curClass = prev
 	case nir.FuncDef:
@@ -5167,14 +5212,15 @@ func (l *lowerer) dynamicCallbackTargets() []*funcInfo {
 }
 
 // collectAddressTaken records every function-name candidate that is referenced as a value
-// (so could be bound to a callback parameter). It walks the program NIR directly — which is
-// fully present even on the incremental path (only lowered output is cached, not the input
-// NIR) — so the set is complete in both paths. The only position that does NOT take a
-// function's address is the direct callee of a call by name (an ordinary direct call).
+// (so could be bound to a callback parameter). Inline and storage-backed bodies are walked
+// sequentially, so the set stays complete without retaining the whole program. The only
+// position that does NOT take a function's address is the direct callee of a call by name
+// (an ordinary direct call).
 func (l *lowerer) collectAddressTaken() {
 	l.addrTaken = make(map[string]bool, 256)
 	for _, m := range l.prog.Modules {
-		l.addrTakenStmts(m.Body)
+		body := l.bodyOf(m)
+		l.addrTakenStmts(body.Body)
 	}
 	l.addrTakenReady = true
 }
@@ -5182,6 +5228,14 @@ func (l *lowerer) collectAddressTaken() {
 func (l *lowerer) addrTakenStmts(stmts []nir.Stmt) {
 	for _, s := range stmts {
 		switch st := s.(type) {
+		case nir.BodyRef:
+			if st.Summarized {
+				for _, name := range st.Summary.AddressTaken {
+					l.addrTaken[name] = true
+				}
+			} else {
+				l.eachDeferred(st, func(chunk []nir.Stmt) { l.addrTakenStmts(chunk) })
+			}
 		case nir.ExprStmt:
 			l.addrTakenExpr(st.Value)
 		case nir.Assign:
