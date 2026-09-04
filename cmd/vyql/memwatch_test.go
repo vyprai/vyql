@@ -117,6 +117,15 @@ func TestMemoryStopThresholdLeavesBoundedHeadroom(t *testing.T) {
 	}
 }
 
+func TestBoundedMemoryCeilingDoesNotWrapUint64(t *testing.T) {
+	if got := boundedMemoryCeiling(^uint64(0)); got <= 0 {
+		t.Fatalf("boundedMemoryCeiling(MaxUint64) = %d, want a positive bound", got)
+	}
+	if got := boundedMemoryCeiling(4 << 30); got != 4<<30 {
+		t.Errorf("boundedMemoryCeiling(4 GiB) = %d, want %d", got, int64(4<<30))
+	}
+}
+
 func drain(c chan struct{}) {
 	for {
 		select {
