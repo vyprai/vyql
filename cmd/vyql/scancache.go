@@ -38,6 +38,7 @@ type cachedScan struct {
 	// the same command would report the same findings with less honesty.
 	Excluded  int
 	Oversized int
+	Minified  int
 	Unmatched map[string]int
 	// ExcludeHits carries the per-pattern counts, keyed by the pattern as written.
 	// A replayed scan never walks, so without these the coverage report would
@@ -250,6 +251,7 @@ func cachedScanFrom(all []*findings.Finding, stats extract.Stats, excludes extra
 		Languages:   stats.Languages,
 		Excluded:    stats.Excluded,
 		Oversized:   stats.Oversized,
+		Minified:    stats.Minified,
 		Unmatched:   stats.Unmatched,
 	}
 }
@@ -282,6 +284,7 @@ func statsFromCachedScan(cs cachedScan) extract.Stats {
 		Languages: cs.Languages,
 		Excluded:  cs.Excluded,
 		Oversized: cs.Oversized,
+		Minified:  cs.Minified,
 		Unmatched: cs.Unmatched,
 	}
 }

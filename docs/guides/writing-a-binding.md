@@ -2,9 +2,14 @@
 
 A binding is the join between a language and the security vocabulary: *this shape
 in this language means this concept*. Most coverage gaps are a missing binding,
-not a missing rule, and adding one needs no Go.
+not a missing rule.
 
-They live in `vyql/bindings/<language>/`.
+Bindings are part of the definitions, which are maintained separately and take no
+outside changes. This page describes how they are written, because reading a scan
+means reading them, and because a gap is easier to report when you can say which
+binding is missing.
+
+They live in `bindings/<language>/`, inside a fetched data directory.
 
 ## The four kinds
 
@@ -89,7 +94,7 @@ binding expressBody {
 
 ## Every binding needs a spec
 
-A spec in `vyql/tests/` states what must fire and what must not:
+A spec in `tests/` states what must fire and what must not:
 
 ```
 test "flask request.json reaches a SQL sink"
@@ -121,7 +126,7 @@ at least one spec.
 ## Check your work
 
 ```sh
-vyql validate-binding -file vyql/bindings/python/myframework.vyql
+vyql validate-binding -file bindings/python/myframework.vyql
 go test -count=1 ./...
 ```
 

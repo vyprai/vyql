@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/vyprai/vyql/internal/datadir"
@@ -105,6 +107,81 @@ func TestLowerStringPreservesSemantics(t *testing.T) {
 	}
 	if got := lowerString("already-lower"); got != "already-lower" {
 		t.Fatalf("lowerString should leave lowercase ASCII unchanged, got %q", got)
+	}
+}
+
+func TestCallArgContextTokensScopedPreservesDirectTokens(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "send", Type: "code.Call", Props: map[string]string{
+		"callee_path": "pkg.Send", "method": "Send", "str_args": " raw \x00raw\x00",
+	}})
+	n, _, _ := store.GetNode("send")
+	got := callArgContextFactsScoped(store, &flagMatchIndex{}, n, "go", false).materialize()
+	want := strings.Join([]string{
+		"call_arg:pkg.Send: raw ", "call_arg_method:Send: raw ",
+		"call_arg:pkg.Send:raw", "call_arg_method:Send:raw",
+	}, "\x00")
+	if got != want {
+		t.Fatalf("scoped call-argument tokens = %q, want %q", got, want)
+	}
+}
+
+func TestStructuredCallArgFactsMatchMaterializedSemantics(t *testing.T) {
+	cases := []struct {
+		name   string
+		facts  *callArgContextFacts
+		op     string
+		values []string
+	}{
+		{"contains path and value", &callArgContextFacts{path: "pkg.Send", method: "Send", values: []string{"Recipient"}}, "contains", []string{"call_arg:pkg.send:recipient"}},
+		{"contains every", &callArgContextFacts{path: "pkg.Send", method: "Send", values: []string{"Recipient", "Urgent"}}, "contains", []string{"call_arg:pkg.send:recipient", "call_arg_method:send:urgent"}},
+		{"contains any", &callArgContextFacts{path: "pkg.Send", values: []string{"Recipient"}}, "contains_any", []string{"call_arg:missing", "call_arg:pkg.send:recipient"}},
+		{"equals every", &callArgContextFacts{path: "pkg.Send", values: []string{"one", "two"}}, "equals", []string{"call_arg:pkg.Send:one", "call_arg:pkg.Send:two"}},
+		{"equals any miss", &callArgContextFacts{method: "Send", values: []string{"one"}}, "equals_any", []string{"call_arg_method:Send:two"}},
+		{"exists prefix", &callArgContextFacts{path: "pkg.Send", values: []string{"one"}}, "exists", []string{"call_arg:pkg.Send:"}},
+		{"starts with", &callArgContextFacts{path: "pkg.Send", values: []string{"one"}}, "starts_with", []string{"call_arg:pkg"}},
+		{"ends with", &callArgContextFacts{method: "Send", values: []string{"File.JSON"}}, "ends_with", []string{".json"}},
+		{"unicode fallback", &callArgContextFacts{path: "pkg.Send", values: []string{"Straße"}}, "contains", []string{"straße"}},
+		{"embedded separator fallback", &callArgContextFacts{path: "pkg.Send", values: []string{"one\x00literal:two"}}, "contains_any", []string{"literal:two"}},
+		{"no tokens", &callArgContextFacts{path: "pkg.Send"}, "exists", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			want := contextTokenValuePredicate(tc.op, tc.values, tc.facts.materialize())
+			got := callArgFactsMatch(tc.op, tc.values, lowerStrings(tc.values), tc.facts)
+			if got != want {
+				t.Fatalf("structured=%v materialized=%v text=%q", got, want, tc.facts.materialize())
+			}
+		})
+	}
+}
+
+func BenchmarkCallArgContextTokensScoped(b *testing.B) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "send", Type: "code.Call", Loc: "mail.go:1", Scope: "mail.go/fn", Props: map[string]string{
+		"callee_path": "mail.Send", "method": "Send", "str_args": strings.Repeat("direct-value\x00", 64),
+	}})
+	for i := 0; i < 256; i++ {
+		suffix := strconv.Itoa(i)
+		argID, srcID := "arg-"+suffix, "source-"+suffix
+		store.AddNode(usg.Node{ID: argID, Type: "code.Arg", Loc: "mail.go:1", Scope: "mail.go/fn"})
+		store.AddNode(usg.Node{ID: srcID, Type: "code.Name", Loc: "mail.go:1", Scope: "mail.go/fn", Props: map[string]string{
+			"name": "recipient" + suffix, "path": "request.recipient" + suffix,
+			"str_args": "value-" + suffix,
+		}})
+		store.AddEdge(usg.Edge{Type: "FLOWS", Src: srcID, Dst: argID})
+		store.AddEdge(usg.Edge{Type: "FLOWS", Src: argID, Dst: "send"})
+	}
+	n, _, _ := store.GetNode("send")
+	idx := &flagMatchIndex{}
+	idx.ensure(store)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		idx.callArgFacts = sync.Map{}
+		if got := callArgContextFactsScoped(store, idx, n, "go", false); len(got.values) == 0 {
+			b.Fatal("expected scoped call-argument facts")
+		}
 	}
 }
 

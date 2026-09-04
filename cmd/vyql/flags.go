@@ -323,11 +323,11 @@ func (r runFlags) apply() (func(), error) {
 	if p := firstNonEmpty(*r.memProfile, os.Getenv("VYQL_MEMPROFILE")); p != "" {
 		stops = append(stops, func() { writeHeapProfile(p) })
 	}
-	return func() {
+	return onExit(func() {
 		for _, stop := range stops {
 			stop()
 		}
-	}, nil
+	}), nil
 }
 
 func firstNonEmpty(vs ...string) string {

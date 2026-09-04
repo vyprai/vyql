@@ -30,10 +30,14 @@ Each layer answers one question, and only that one:
 
 | Layer | Where | The one question it answers |
 |---|---|---|
-| binding | `vyql/bindings/` | what does this code *mean* — this call is an `HttpInput` source, that one a `SqlExecution` sink. Technology-specific, judgement-free. |
-| concept | `vyql/ontology/` | what kinds of things exist — the language-neutral vocabulary bindings emit and rules consume. |
-| rule | `vyql/packs/` | which combinations of concepts are a finding, at what severity, under which CWE. Judgement, no APIs. |
+| binding | `bindings/` | what does this code *mean* — this call is an `HttpInput` source, that one a `SqlExecution` sink. Technology-specific, judgement-free. |
+| concept | `ontology/` | what kinds of things exist — the language-neutral vocabulary bindings emit and rules consume. |
+| rule | `packs/` | which combinations of concepts are a finding, at what severity, under which CWE. Judgement, no APIs. |
 | engine | `internal/` | how taint propagates, calls resolve, and patterns match. Semantics, no vocabulary. |
+
+The first three are paths inside the definitions, which this repository fetches
+rather than carries. `scripts/fetch-free-definitions.sh` puts them somewhere and
+`-data` or `$VYQL_HOME` points at it. Only the engine is here.
 
 When a finding is missed, the diagnosis (next section) names the layer, and the
 fix goes there:
@@ -107,12 +111,15 @@ See [docs/guides/debugging-findings.md](docs/guides/debugging-findings.md).
 
 ## Changing detection
 
-Add a binding in `vyql/bindings/<lang>/`, then a spec in `vyql/tests/` with both
-an `expect` **and** a `reject` for the safe form. A spec with only `expect`
-proves you can detect, not that you can tell safe from unsafe — and precision is
-where this class of tool actually fails.
+The definitions are maintained separately and are not open to outside changes, so
+a missed finding that needs a binding, a concept or a rule cannot be fixed from
+this repository. What can be fixed here is the engine: how taint propagates, how
+calls resolve, how patterns match.
 
-Then measure:
+The layer diagnosis above still tells you which it is. When it names a binding, a
+concept or a rule, the fix belongs to the definitions.
+
+A change to the engine moves detection everywhere, so measure it:
 
 ```sh
 ./benchmarks/fetch-corpora.sh
@@ -120,8 +127,9 @@ VYQL_BENCH=1 BENCH_DIR=/tmp/bench/BenchmarkJava   go test -count=1 -v ./cmd/vyql
 VYQL_BENCH=1 BENCH_DIR=/tmp/bench/BenchmarkPython go test -count=1 -v ./cmd/vyql/ -run TestOWASPBenchmark
 ```
 
-Both are gated in CI and must not regress. Current: **+1.00** and **+0.90**,
-Youden (`TPR − FPR`) macro-averaged. `benchmarks/RESULTS.md` has the method.
+Both are gated in CI and must not regress. Current: **+1.00** and **+0.8959**,
+Youden (`TPR − FPR`) macro-averaged. `benchmarks/RESULTS.md` has the method and
+the per-category breakdown.
 
 **After a benchmark run, change the numbers and nothing else.** This governs
 `benchmarks/RESULTS.md` and `README.md` alike. Replace the stale figures in

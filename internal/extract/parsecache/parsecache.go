@@ -15,6 +15,7 @@ import (
 	"encoding/gob"
 	"encoding/hex"
 	"os"
+	"path/filepath"
 	"strconv"
 	"sync"
 
@@ -23,11 +24,29 @@ import (
 	"github.com/vyprai/vyql/internal/extract/nir"
 )
 
-// Cache is a Badger-backed parse-result cache. A nil *Cache is a valid no-op (all methods
-// are safe), so callers can treat "caching disabled" uniformly.
+// Cache is a parse-result cache backed by persistent Badger or a transient append-only spool.
+// A nil *Cache is a valid no-op (all methods are safe), so callers can treat "caching disabled"
+// uniformly.
 type Cache struct {
-	db   *badger.DB
-	salt []byte
+	db         *badger.DB
+	spool      *transientSpool
+	salt       []byte
+	persistent bool
+}
+
+type spoolEntry struct {
+	off int64
+	n   int
+}
+
+// transientSpool is the low-overhead cache used solely to bound one scan. Unlike opening a
+// second Badger instance it has no memtable or block-cache floor: values are appended to one
+// file and only the small key→offset index remains resident.
+type transientSpool struct {
+	mu      sync.Mutex
+	f       *os.File
+	path    string
+	entries map[string]spoolEntry
 }
 
 var shared struct {
@@ -57,8 +76,28 @@ func Open(dir string) (*Cache, error) {
 	if err != nil {
 		return nil, err
 	}
-	return &Cache{db: db, salt: execSalt()}, nil
+	return &Cache{db: db, salt: execSalt(), persistent: true}, nil
 }
+
+// OpenTransient creates a process-local append-only spool. It implements the same raw cache
+// contract as the persistent cache, but is removed on Close and is not eligible for reuse on
+// a later scan. A configured memory ceiling uses this even when -cache=off, because deferred
+// frontend bodies still need somewhere outside the heap to live.
+func OpenTransient(dir string) (*Cache, error) {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return nil, err
+	}
+	f, err := os.CreateTemp(dir, "bodies-*.spool")
+	if err != nil {
+		return nil, err
+	}
+	return &Cache{spool: &transientSpool{f: f, path: f.Name(), entries: map[string]spoolEntry{}}, salt: execSalt()}, nil
+}
+
+// Persistent reports whether this cache may safely back cross-scan lowering deltas. A
+// transient body spool is intentionally excluded: using it as an incremental graph cache
+// would encode a second copy of the just-built graph for no future reuse.
+func (c *Cache) Persistent() bool { return c != nil && c.persistent }
 
 // Shared returns the process-wide cache. Command owners wire this explicitly so
 // library/test callers do not pick up ambient filesystem state.
@@ -119,16 +158,8 @@ func (c *Cache) Get(key string) (nir.Module, bool) {
 	if c == nil {
 		return nir.Module{}, false
 	}
-	var raw []byte
-	err := c.db.View(func(txn *badger.Txn) error {
-		item, err := txn.Get([]byte(key))
-		if err != nil {
-			return err
-		}
-		raw, err = item.ValueCopy(nil)
-		return err
-	})
-	if err != nil {
+	raw, ok := c.GetRaw(key)
+	if !ok {
 		return nir.Module{}, false
 	}
 	var m nir.Module
@@ -140,17 +171,23 @@ func (c *Cache) Get(key string) (nir.Module, bool) {
 
 // Put stores a module's parse result under key (best-effort; errors are ignored).
 func (c *Cache) Put(key string, m nir.Module) {
+	_ = c.putModule(key, m)
+}
+
+// PutModule stores a module and reports whether it is safe for the caller to release the
+// in-memory copy. Put remains the best-effort compatibility wrapper for cache-only callers.
+func (c *Cache) PutModule(key string, m nir.Module) bool { return c.putModule(key, m) }
+
+func (c *Cache) putModule(key string, m nir.Module) bool {
 	if c == nil {
-		return
+		return false
 	}
 	var buf bytes.Buffer
 	if err := gob.NewEncoder(&buf).Encode(m); err != nil {
-		return
+		return false
 	}
 	val := buf.Bytes()
-	_ = c.db.Update(func(txn *badger.Txn) error {
-		return txn.Set([]byte(key), val)
-	})
+	return c.putRaw(key, val)
 }
 
 // statKey keys a file by identity-WITHOUT-content: salt ∥ root ∥ abs ∥ size ∥ mtime. It maps
@@ -276,6 +313,19 @@ func (c *Cache) GetRaw(key string) ([]byte, bool) {
 	if c == nil {
 		return nil, false
 	}
+	if c.spool != nil {
+		c.spool.mu.Lock()
+		defer c.spool.mu.Unlock()
+		e, ok := c.spool.entries[key]
+		if !ok {
+			return nil, false
+		}
+		raw := make([]byte, e.n)
+		if _, err := c.spool.f.ReadAt(raw, e.off); err != nil {
+			return nil, false
+		}
+		return raw, true
+	}
 	var raw []byte
 	err := c.db.View(func(txn *badger.Txn) error {
 		item, err := txn.Get([]byte(key))
@@ -300,6 +350,14 @@ func (c *Cache) GetManyRaw(keys []string) map[string][]byte {
 		return nil
 	}
 	out := make(map[string][]byte, len(keys))
+	if c.spool != nil {
+		for _, k := range keys {
+			if v, ok := c.GetRaw(k); ok {
+				out[k] = v
+			}
+		}
+		return out
+	}
 	_ = c.db.View(func(txn *badger.Txn) error {
 		for _, k := range keys {
 			item, err := txn.Get([]byte(k))
@@ -321,6 +379,12 @@ func (c *Cache) PutManyRaw(kv map[string][]byte) {
 	if c == nil || len(kv) == 0 {
 		return
 	}
+	if c.spool != nil {
+		for k, v := range kv {
+			c.PutRaw(k, v)
+		}
+		return
+	}
 	wb := c.db.NewWriteBatch()
 	defer wb.Cancel()
 	for k, v := range kv {
@@ -333,18 +397,45 @@ func (c *Cache) PutManyRaw(kv map[string][]byte) {
 
 // PutRaw stores raw bytes under key (best-effort).
 func (c *Cache) PutRaw(key string, val []byte) {
+	_ = c.putRaw(key, val)
+}
+
+func (c *Cache) putRaw(key string, val []byte) bool {
 	if c == nil {
-		return
+		return false
 	}
-	_ = c.db.Update(func(txn *badger.Txn) error {
+	if c.spool != nil {
+		c.spool.mu.Lock()
+		defer c.spool.mu.Unlock()
+		if _, exists := c.spool.entries[key]; exists {
+			return true
+		}
+		off, err := c.spool.f.Seek(0, 2)
+		if err != nil {
+			return false
+		}
+		if _, err := c.spool.f.Write(val); err != nil {
+			return false
+		}
+		c.spool.entries[key] = spoolEntry{off: off, n: len(val)}
+		return true
+	}
+	err := c.db.Update(func(txn *badger.Txn) error {
 		return txn.Set([]byte(key), val)
 	})
+	return err == nil
 }
 
 // Clear empties the cache (drops all keys) while keeping the database open. Safe on nil.
 func (c *Cache) Clear() error {
 	if c == nil {
 		return nil
+	}
+	if c.spool != nil {
+		c.spool.mu.Lock()
+		defer c.spool.mu.Unlock()
+		c.spool.entries = map[string]spoolEntry{}
+		return c.spool.f.Truncate(0)
 	}
 	return c.db.DropAll()
 }
@@ -353,6 +444,16 @@ func (c *Cache) Clear() error {
 func (c *Cache) Close() error {
 	if c == nil {
 		return nil
+	}
+	if c.spool != nil {
+		c.spool.mu.Lock()
+		err := c.spool.f.Close()
+		path := c.spool.path
+		c.spool.mu.Unlock()
+		if removeErr := os.Remove(filepath.Clean(path)); err == nil {
+			err = removeErr
+		}
+		return err
 	}
 	return c.db.Close()
 }

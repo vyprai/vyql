@@ -12,26 +12,10 @@ import (
 
 // plConv walks a tree-sitter Perl CST into NIR.
 type plConv struct {
-	src        []byte
-	file       string
-	key        string
-	childCache map[uintptr][]*tree_sitter.Node
-}
-
-func (c *plConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = make(map[uintptr][]*tree_sitter.Node)
-	}
-	key := uintptr(n.Id())
-	if kids, ok := c.childCache[key]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[key] = kids
-	return kids
+	nodeCache
+	src  []byte
+	file string
+	key  string
 }
 
 // ExtractPerl parses .pl/.pm/.cgi files into one NIR Program.
@@ -70,9 +54,9 @@ func (c *plConv) block(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *plConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "subroutine_declaration_statement", "named_block_statement":
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: L}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(c.field(n, "name")), Body: c.block(c.field(n, "body")), Loc: L}}
 	case "package_statement":
 		return c.block(n)
 	case "expression_statement":
@@ -96,17 +80,17 @@ func (c *plConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "block_statement":
 		return []nir.Stmt{nir.Block{Stmts: c.collectBlocks(n)}}
 	}
-	if isPlExpr(n.Kind()) {
+	if isPlExpr(c.kind(n)) {
 		return c.exprStmt(n)
 	}
 	return nil
 }
 
 func (c *plConv) exprStmt(n *tree_sitter.Node) []nir.Stmt {
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "assignment_expression":
-		left := field(n, "left")
-		right := c.expr(field(n, "right"))
+		left := c.field(n, "left")
+		right := c.expr(c.field(n, "right"))
 		if nm := c.lvalName(left); nm != "" {
 			return []nir.Stmt{nir.Assign{Targets: []string{nm}, Value: right}}
 		}
@@ -121,7 +105,7 @@ func (c *plConv) lvalName(n *tree_sitter.Node) string {
 	if n == nil {
 		return ""
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "variable_declaration":
 		for _, ch := range c.namedChildren(n) {
 			if nm := c.lvalName(ch); nm != "" {
@@ -129,11 +113,11 @@ func (c *plConv) lvalName(n *tree_sitter.Node) string {
 			}
 		}
 	case "scalar":
-		if v := field(n, "name"); v != nil {
+		if v := c.field(n, "name"); v != nil {
 			return c.text(v)
 		}
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() == "varname" {
+			if c.kind(ch) == "varname" {
 				return c.text(ch)
 			}
 		}
@@ -153,17 +137,17 @@ func (c *plConv) plIf(n *tree_sitter.Node) nir.Stmt {
 		}
 	}
 	if isIf {
-		if cond := field(n, "condition"); cond != nil {
+		if cond := c.field(n, "condition"); cond != nil {
 			it.Cond = c.expr(cond)
 		}
 	}
-	if blk := field(n, "block"); blk != nil {
+	if blk := c.field(n, "block"); blk != nil {
 		it.Then = c.block(blk)
 	}
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "else", "elsif", "elsif_clause", "else_clause":
-			if b := field(ch, "block"); b != nil {
+			if b := c.field(ch, "block"); b != nil {
 				it.Else = append(it.Else, c.block(b)...)
 			}
 		}
@@ -176,7 +160,7 @@ func (c *plConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "block":
 				out = append(out, c.block(ch)...)
 			case "elsif", "else", "elsif_clause", "else_clause":
@@ -192,7 +176,7 @@ func (c *plConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 	if args == nil {
 		return nil
 	}
-	switch args.Kind() {
+	switch c.kind(args) {
 	case "comma_expression", "list_expression", "parenthesized_expression", "arguments":
 		var out []nir.Expr
 		for _, ch := range c.namedChildren(args) {
@@ -208,7 +192,7 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "scalar", "array", "hash", "varname", "container_variable":
 		return nir.Name{ID: c.plVarName(n), Loc: L}
 	case "number", "boolean":
@@ -225,7 +209,7 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 		var walk func(m *tree_sitter.Node)
 		walk = func(m *tree_sitter.Node) {
 			for _, ch := range c.namedChildren(m) {
-				if k := ch.Kind(); k == "scalar" || k == "array" || k == "hash_element_expression" || k == "scalar_deref_expression" {
+				if k := c.kind(ch); k == "scalar" || k == "array" || k == "hash_element_expression" || k == "scalar_deref_expression" {
 					parts = append(parts, c.expr(ch))
 				} else {
 					walk(ch)
@@ -240,31 +224,31 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 		// stripped text so val-matched marks can inspect the literal value.
 		return nir.Const{Loc: L, Value: strings.Trim(c.text(n), "\"'")}
 	case "method_call_expression":
-		inv := field(n, "invocant")
-		method := c.text(field(n, "method"))
+		inv := c.field(n, "invocant")
+		method := c.text(c.field(n, "method"))
 		path := c.dotted(inv) + "." + method
 		return nir.Call{Callee: nir.Attr{Base: c.expr(inv), Attr: method, Path: path, Loc: L},
-			Args: c.callArgs(field(n, "arguments")), Path: path, Method: method, Loc: L}
+			Args: c.callArgs(c.field(n, "arguments")), Path: path, Method: method, Loc: L}
 	case "function_call_expression", "ambiguous_function_call_expression":
-		fn := field(n, "function")
+		fn := c.field(n, "function")
 		path := c.dotted(fn)
-		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
+		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(c.field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
 	case "func0op_call_expression", "func1op_call_expression":
 		// builtins: system LIST / eval BLOCK etc.
-		fn := c.text(field(n, "function"))
+		fn := c.text(c.field(n, "function"))
 		if fn == "" {
 			if k := c.namedChildren(n); len(k) > 0 {
 				fn = c.text(k[0])
 			}
 		}
-		return nir.Call{Callee: nir.Name{ID: fn, Loc: L}, Args: c.callArgs(field(n, "arguments")), Path: fn, Method: fn, Loc: L}
+		return nir.Call{Callee: nir.Name{ID: fn, Loc: L}, Args: c.callArgs(c.field(n, "arguments")), Path: fn, Method: fn, Loc: L}
 	case "eval_expression":
 		return nir.Call{Callee: nir.Name{ID: "eval", Loc: L}, Args: c.childArgs(n), Path: "eval", Method: "eval", Loc: L}
 	case "require_expression":
 		return nir.Call{Callee: nir.Name{ID: "require", Loc: L}, Args: c.childArgs(n), Path: "require", Method: "require", Loc: L}
 	case "binary_expression", "relational_expression", "equality_expression", "comparison_expression":
-		op := c.text(field(n, "operator"))
-		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		op := c.text(c.field(n, "operator"))
+		left, right := c.expr(c.field(n, "left")), c.expr(c.field(n, "right"))
 		if op == "." {
 			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
@@ -277,19 +261,19 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 		if len(kids) > 0 {
 			t.Cond = c.expr(kids[0])
 		}
-		if then := field(n, "consequent"); then != nil {
+		if then := c.field(n, "consequent"); then != nil {
 			t.Then = c.expr(then)
 		} else if len(kids) > 1 {
 			t.Then = c.expr(kids[1])
 		}
-		if alt := field(n, "alternative"); alt != nil {
+		if alt := c.field(n, "alternative"); alt != nil {
 			t.Else = c.expr(alt)
 		} else if len(kids) > 2 {
 			t.Else = c.expr(kids[2])
 		}
 		return t
 	case "unary_expression":
-		op := c.text(field(n, "operator"))
+		op := c.text(c.field(n, "operator"))
 		var operand nir.Expr = nir.Const{Loc: L}
 		if k := c.namedChildren(n); len(k) > 0 {
 			operand = c.expr(k[len(k)-1])
@@ -297,17 +281,17 @@ func (c *plConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Unary{Op: op, Operand: operand, Loc: L}
 	case "hash_element_expression":
 		// $ENV{X} / $hash{key}
-		base := field(n, "hash")
+		base := c.field(n, "hash")
 		if base == nil {
-			base = field(n, "variable")
+			base = c.field(n, "variable")
 		}
-		return nir.Index{Base: c.expr(base), Key: c.expr(field(n, "key")), Path: c.dotted(base), Loc: L}
+		return nir.Index{Base: c.expr(base), Key: c.expr(c.field(n, "key")), Path: c.dotted(base), Loc: L}
 	case "parenthesized_expression":
 		if k := c.namedChildren(n); len(k) > 0 {
 			return nir.Thru{Inner: c.expr(k[len(k)-1])}
 		}
 	case "assignment_expression":
-		return c.expr(field(n, "right"))
+		return c.expr(c.field(n, "right"))
 	}
 	var parts []nir.Expr
 	for _, ch := range c.namedChildren(n) {
@@ -328,11 +312,11 @@ func (c *plConv) childArgs(n *tree_sitter.Node) []nir.Expr {
 }
 
 func (c *plConv) plVarName(n *tree_sitter.Node) string {
-	if v := field(n, "name"); v != nil {
+	if v := c.field(n, "name"); v != nil {
 		return c.text(v)
 	}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "varname" {
+		if c.kind(ch) == "varname" {
 			return c.text(ch)
 		}
 	}
@@ -347,7 +331,7 @@ func (c *plConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "scalar", "array", "hash", "varname", "container_variable":
 		return c.plVarName(n)
 	case "function", "bareword", "method":
@@ -355,11 +339,11 @@ func (c *plConv) dotted(n *tree_sitter.Node) string {
 		// matchable like every other language (Pkg::Thing::call -> Pkg.Thing.call).
 		return strings.ReplaceAll(c.text(n), "::", ".")
 	case "method_call_expression":
-		return c.dotted(field(n, "invocant")) + "." + strings.ReplaceAll(c.text(field(n, "method")), "::", ".")
+		return c.dotted(c.field(n, "invocant")) + "." + strings.ReplaceAll(c.text(c.field(n, "method")), "::", ".")
 	case "function_call_expression", "ambiguous_function_call_expression":
-		return c.dotted(field(n, "function"))
+		return c.dotted(c.field(n, "function"))
 	case "hash_element_expression":
-		return c.dotted(field(n, "variable"))
+		return c.dotted(c.field(n, "variable"))
 	}
 	return "?"
 }

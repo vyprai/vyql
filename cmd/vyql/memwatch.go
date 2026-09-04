@@ -2,11 +2,43 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"strings"
 	"sync"
 	"time"
 )
+
+const memoryWatchInterval = 100 * time.Millisecond
+
+// memoryStopThreshold leaves room between the last sample and the real ceiling.
+// A watcher that fires AT the ceiling is already too late: one allocation burst,
+// a C parse tree, or the kernel's accounting lag can cross the cgroup limit before
+// cleanups run. The reserve is intentionally conservative; a slower scan or a
+// clean failure is preferable to an OOM kill.
+func memoryStopThreshold(limit int64) int64 {
+	if limit <= 0 {
+		return 0
+	}
+	reserve := limit / 8
+	if reserve < 256<<20 {
+		reserve = 256 << 20
+	}
+	if reserve > 2<<30 {
+		reserve = 2 << 30
+	}
+	if quarter := limit / 4; reserve > quarter {
+		reserve = quarter
+	}
+	return limit - reserve
+}
+
+func boundedMemoryCeiling(avail uint64) int64 {
+	if avail > uint64(math.MaxInt64) {
+		return math.MaxInt64
+	}
+	return int64(avail)
+}
 
 // memWatch samples resident memory and hands the first reading above limit to
 // onExceed. The stop func ends the sampling.
@@ -68,9 +100,10 @@ func watchResidentMemory(limit int64, ceiling string) (stop func()) {
 	if limit <= 0 {
 		return func() {}
 	}
-	return memWatch(limit, 2*time.Second, residentBytes, func(rss int64) {
+	stopAt := memoryStopThreshold(limit)
+	return memWatch(stopAt, memoryWatchInterval, residentBytes, func(rss int64) {
 		fmt.Fprintf(os.Stderr,
-			"vyql: the scan reached %s of resident memory, past the ceiling of %s; stopping\n"+
+			"vyql: the scan reached %s of resident memory, at the safety threshold below %s; stopping\n"+
 				"      exclude unwanted files with -exclude, or raise the ceiling\n",
 			humanBytes(rss), ceiling)
 		runCleanups()
@@ -97,7 +130,7 @@ func armMemoryWatch(maxRAM string) func() {
 		}
 	}
 	if avail := memoryCeilingBytes(); avail > 0 {
-		limit := int64(avail / 100 * 95)
+		limit := boundedMemoryCeiling(avail)
 		return watchResidentMemory(limit, humanBytes(limit)+", what this machine allows")
 	}
 	return func() {}

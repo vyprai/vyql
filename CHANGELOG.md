@@ -10,6 +10,69 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
+### Changed
+
+- **Disk-backed binding matching uses the graph's dense node indexes.** The
+  `--max-ram` store now builds and visits binding candidate sets as `int32`
+  indexes instead of repeatedly converting string IDs through the graph map.
+  On the 1.25 MB generated system-template stress tier, wall time fell from
+  105.84 s to 88.13 s, user CPU from 246.95 s to 217.85 s, and system CPU from
+  76.30 s to 38.91 s.
+- **Shared lowering journals iteration facts across control-flow arms.** A
+  branch that changes one fact now records that write instead of copying and
+  intersecting the entire live-fact map. With 4,096 live facts, the operation
+  fell from 432.7 us and 1.17 MB allocated to 163 ns and 16 bytes. This removes
+  the quadratic branch-by-scope-width shape from every language frontend.
+- **Completed graphs use packed flow and label rows.** Once extraction,
+  lowering, SCA and binding application finish, forward flow, reverse flow and
+  label rows become compact offset-and-value arrays instead of three slice
+  headers per node. The build-only concept de-duplication sets are released.
+  Traversal stays allocation-free, and later mutations safely restore the
+  appendable representation. On the 73,205-node generated Go template stress
+  case, median retained heap fell from 248.1 MiB to 239.4 MiB; median user CPU
+  was unchanged.
+- **Scoped call-argument matching keeps structured facts instead of generated
+  token strings.** Callee paths, methods and reachable argument values are now
+  matched as segmented virtual tokens, and general context facts fold case
+  during comparison instead of retaining a second lowercase copy. On the same
+  generated template, three-run median retained heap fell from 229.8 MiB to
+  151.2 MiB and interleaved median user CPU fell from 12.71 s to 4.17 s; wall
+  time moved from 3.89 s to 3.81 s.
+
+### Fixed
+
+- **`--max-ram` now stops with headroom before the requested ceiling on Linux
+  and macOS.** The resident watch samples every 100 ms, counts the complete
+  Linux RSS, and uses Darwin's resident high-water mark; macOS previously had
+  no resident watch at all. The Go heap limit and disk detail buffer are also
+  smaller so GC and spilling get the first chance to trade speed for memory.
+  Signal and memory-limit exits now flush requested CPU and heap profiles. On
+  the 166-file generated stress corpus, a 4 GB scan that previously reached
+  7.6 GB stopped cleanly at 3.65 GB peak RSS.
+
+## [0.4.1] - 2026-09-04
+
+### Changed
+
+- **Tree-sitter frontends allocate less and finish sooner.** All 19 frontends
+  now share cached grammar metadata and child traversal instead of repeatedly
+  allocating strings and cursors across the cgo boundary. On a 48-file arm64
+  benchmark, Java, Python, JavaScript and C extraction ran 8–18% faster and
+  allocated 18–55% fewer objects. The larger Java extraction-and-lowering
+  benchmark improved by 14%, with 38% fewer allocations.
+- **Directory scans decline likely minified JavaScript-family bundles before
+  parsing.** The bounded probe prevents generated bundles from exhausting a
+  scan's memory, records them in coverage and through cache replay, and leaves
+  explicitly named files available as an escape hatch. SCA still inspects the
+  files independently.
+
+### Fixed
+
+- **Go map literals preserve their literal keys during lowering.** Reads such
+  as `map[string]string{"v": payload}["v"]` now retain the element's taint.
+  The Go OWASP benchmark moved from +0.7769 to +1.0000 with no new false
+  positives; Java, Python and the other language ports were unchanged.
+
 ## [0.4.0] - 2026-08-24
 
 ### Added

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/vyprai/vyql/internal/extract/nir"
+	"github.com/vyprai/vyql/internal/extract/parsecache"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -24,6 +25,45 @@ func modA(hash, retCall string) nir.Module {
 			nir.Return{Value: nir.Call{Callee: nir.Name{ID: retCall, Loc: "a.x:2"}, Path: retCall, Method: retCall, Loc: "a.x:2"}},
 		}},
 	}}
+}
+
+func TestDeferredBodyLoweringIsGraphEquivalent(t *testing.T) {
+	p := prog(modA("a1", "read"), modB("b1", []nir.Stmt{
+		nir.If{Cond: nir.Name{ID: "y"}, Then: []nir.Stmt{
+			nir.Return{Value: nir.Name{ID: "y"}},
+		}},
+	}))
+	want := snapshot(t, lowerFull(t, p))
+
+	c, err := parsecache.OpenTransient(t.TempDir())
+	if err != nil {
+		t.Fatalf("OpenTransient: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	for i := range p.Modules {
+		c.DeferModuleBodies(&p.Modules[i])
+	}
+	gotGraph, err := LowerTypedDeferred(p, true, nil, c)
+	if err != nil {
+		t.Fatalf("LowerTypedDeferred: %v", err)
+	}
+	if got := snapshot(t, gotGraph); got != want {
+		t.Fatalf("deferred graph differs from inline graph\n--- got ---\n%s--- want ---\n%s", got, want)
+	}
+}
+
+func TestDeferredBodyLoweringRejectsMissingChunk(t *testing.T) {
+	p := prog(nir.Module{Key: "m", File: "m.go", Body: []nir.Stmt{
+		nir.FuncDef{Name: "f", Body: []nir.Stmt{nir.BodyRef{Keys: []string{"missing"}}}},
+	}})
+	c, err := parsecache.OpenTransient(t.TempDir())
+	if err != nil {
+		t.Fatalf("OpenTransient: %v", err)
+	}
+	t.Cleanup(func() { _ = c.Close() })
+	if _, err := LowerTypedDeferred(p, true, nil, c); err == nil {
+		t.Fatal("missing deferred chunk was silently accepted")
+	}
 }
 
 // modB builds module "b": handler(req) { y = a.getInput(); sink(y) } — a cross-module call so
