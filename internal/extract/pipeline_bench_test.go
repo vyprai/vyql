@@ -9,6 +9,7 @@ import (
 
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/lowering"
+	"github.com/vyprai/vyql/internal/extract/nir"
 )
 
 // The pipeline's cost is dominated by allocation rather than by algorithmic work — a scan
@@ -134,6 +135,90 @@ func BenchmarkLowerScaling(b *testing.B) {
 				}
 			}
 			b.ReportMetric(float64(b.Elapsed().Nanoseconds())/float64(b.N*n), "ns/file")
+		})
+	}
+}
+
+// BenchmarkTreeSitterExtract exercises the shared CST hot path through four large,
+// structurally different frontends. Java has its dedicated production-shaped benchmark
+// above; these smaller cases keep regressions in the common node metadata and child caches
+// visible for the other grammars without making the benchmark suite expensive to run.
+func BenchmarkTreeSitterExtract(b *testing.B) {
+	type extractor func([]string, string) (nir.Program, error)
+	cases := []struct {
+		name, ext, source string
+		extract           extractor
+	}{
+		{
+			name: "java", ext: ".java", extract: treesitter.ExtractJava,
+			source: `package bench;
+public class Handler {
+  public String handle(String input) {
+    String out = "";
+    for (String value : input.split(",")) {
+      if (!value.isEmpty()) { out += value.trim(); }
+    }
+    return out;
+  }
+}`,
+		},
+		{
+			name: "python", ext: ".py", extract: treesitter.ExtractPython,
+			source: `class Handler:
+    def handle(self, value):
+        out = []
+        for item in value.split(","):
+            if item:
+                out.append(item.strip())
+        return "".join(out)
+`,
+		},
+		{
+			name: "javascript", ext: ".js", extract: treesitter.ExtractJavaScript,
+			source: `export class Handler {
+  handle(value) {
+    const out = [];
+    for (const item of value.split(",")) {
+      if (item) out.push(item.trim());
+    }
+    return out.join("");
+  }
+}`,
+		},
+		{
+			name: "c", ext: ".c", extract: treesitter.ExtractC,
+			source: `#include <string.h>
+size_t handle(const char *value, char *out, size_t cap) {
+  size_t written = 0;
+  for (size_t i = 0; value[i] != '\0' && written + 1 < cap; i++) {
+    if (value[i] != ',') out[written++] = value[i];
+  }
+  out[written] = '\0';
+  return written;
+}`,
+		},
+	}
+	for _, tc := range cases {
+		b.Run(tc.name, func(b *testing.B) {
+			root := b.TempDir()
+			files := make([]string, 48)
+			for i := range files {
+				files[i] = filepath.Join(root, fmt.Sprintf("source-%d%s", i, tc.ext))
+				if err := os.WriteFile(files[i], []byte(tc.source), 0o600); err != nil {
+					b.Fatal(err)
+				}
+			}
+			b.ReportAllocs()
+			b.ResetTimer()
+			for b.Loop() {
+				prog, err := tc.extract(files, root)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if len(prog.Modules) != len(files) {
+					b.Fatalf("extracted %d modules, want %d", len(prog.Modules), len(files))
+				}
+			}
 		})
 	}
 }
