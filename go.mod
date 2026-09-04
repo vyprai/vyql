@@ -13,7 +13,7 @@ retract v0.1.0
 
 require (
 	github.com/bmatcuk/doublestar/v4 v4.10.0
-	github.com/dgraph-io/badger/v4 v4.9.5
+	github.com/dgraph-io/badger/v4 v4.9.6
 	github.com/tree-sitter-grammars/tree-sitter-kotlin v1.1.0
 	github.com/tree-sitter-grammars/tree-sitter-lua v0.5.0
 	github.com/tree-sitter/go-tree-sitter v0.25.0
