@@ -17,7 +17,6 @@ type csConv struct {
 	key               string
 	classParamTokens  []string
 	propertyEntryInfo []csPropertyEntry
-	childCache        map[uintptr][]*tree_sitter.Node
 }
 
 type csPropertyEntry struct {
@@ -50,22 +49,6 @@ func (c *csConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
-}
-
-func (c *csConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = map[uintptr][]*tree_sitter.Node{}
-	}
-	id := n.Id()
-	if kids, ok := c.childCache[id]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[id] = kids
-	return kids
 }
 
 func (c *csConv) imports(root *tree_sitter.Node) []nir.Import {

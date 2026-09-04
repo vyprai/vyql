@@ -26,8 +26,7 @@ type phConv struct {
 	// the body of an anonymous class (`new class extends B { ... }`). They are
 	// appended after the statement containing the expression by stmt, so the
 	// class's methods become FuncDefs in the enclosing statement list.
-	hoisted    []nir.Stmt
-	childCache map[uintptr][]*tree_sitter.Node
+	hoisted []nir.Stmt
 }
 
 // phpBaseClauseTokens returns the base-clause type names of a class-like
@@ -164,22 +163,6 @@ func (c *phConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
-}
-
-func (c *phConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = map[uintptr][]*tree_sitter.Node{}
-	}
-	id := n.Id()
-	if kids, ok := c.childCache[id]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[id] = kids
-	return kids
 }
 
 func (c *phConv) block(n *tree_sitter.Node) []nir.Stmt {

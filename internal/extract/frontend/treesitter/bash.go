@@ -16,29 +16,12 @@ import (
 // becomes a Format.
 type shConv struct {
 	nodeCache
-	src        []byte
-	file       string
-	key        string
-	childCache map[uintptr][]*tree_sitter.Node
+	src  []byte
+	file string
+	key  string
 }
 
 var shCatInputAssignRE = regexp.MustCompile(`(?m)([A-Za-z_][A-Za-z0-9_]*)\s*=\s*\$\(\s*cat\s*\)`)
-
-func (c *shConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = make(map[uintptr][]*tree_sitter.Node)
-	}
-	key := uintptr(n.Id())
-	if kids, ok := c.childCache[key]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[key] = kids
-	return kids
-}
 
 // ExtractBash parses shell scripts into one NIR Program (one module per file).
 func ExtractBash(files []string, root string) (nir.Program, error) {

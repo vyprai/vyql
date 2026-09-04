@@ -22,28 +22,11 @@ import (
 // and drops the function body.
 type jsConv struct {
 	nodeCache
-	src        []byte
-	root       string
-	file       string
-	key        string
-	exported   map[string]bool
-	childCache map[uintptr][]*tree_sitter.Node
-}
-
-func (c *jsConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = map[uintptr][]*tree_sitter.Node{}
-	}
-	id := n.Id()
-	if kids, ok := c.childCache[id]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[id] = kids
-	return kids
+	src      []byte
+	root     string
+	file     string
+	key      string
+	exported map[string]bool
 }
 
 func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {

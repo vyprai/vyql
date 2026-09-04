@@ -20,29 +20,12 @@ type solConv struct {
 	file         string
 	key          string
 	adminGuarded bool
-	childCache   map[uintptr][]*tree_sitter.Node
 }
 
 var (
 	solRsaSha256SuffixRE = regexp.MustCompile(`sha256\([^)]*\)==[A-Za-z_][A-Za-z0-9_]*\.readBytes32\([A-Za-z_][A-Za-z0-9_]*\.length-32\)`)
 	solRsaSha1SuffixRE   = regexp.MustCompile(`SHA1\.sha1\([^)]*\)==[A-Za-z_][A-Za-z0-9_]*\.readBytes20\([A-Za-z_][A-Za-z0-9_]*\.length-20\)`)
 )
-
-func (c *solConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = make(map[uintptr][]*tree_sitter.Node)
-	}
-	key := uintptr(n.Id())
-	if kids, ok := c.childCache[key]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[key] = kids
-	return kids
-}
 
 // ExtractSolidity parses .sol files into one NIR Program.
 func ExtractSolidity(files []string, root string) (nir.Program, error) {

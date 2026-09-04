@@ -13,10 +13,9 @@ import (
 // swConv walks a tree-sitter Swift CST into NIR.
 type swConv struct {
 	nodeCache
-	src        []byte
-	file       string
-	key        string
-	childCache map[uintptr][]*tree_sitter.Node
+	src  []byte
+	file string
+	key  string
 }
 
 // ExtractSwift parses .swift files into one NIR Program (one module per file).
@@ -44,22 +43,6 @@ func (c *swConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
-}
-
-func (c *swConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = map[uintptr][]*tree_sitter.Node{}
-	}
-	id := n.Id()
-	if kids, ok := c.childCache[id]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[id] = kids
-	return kids
 }
 
 func (c *swConv) swModuleContext(root *tree_sitter.Node) []nir.Stmt {

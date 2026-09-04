@@ -45,24 +45,7 @@ type ccConv struct {
 	file               string
 	key                string
 	lang               string
-	childCache         map[uintptr][]*tree_sitter.Node
 	nullCheckMacroArgs map[string][]bool
-}
-
-func (c *ccConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = map[uintptr][]*tree_sitter.Node{}
-	}
-	id := n.Id()
-	if kids, ok := c.childCache[id]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[id] = kids
-	return kids
 }
 
 // cPropagators write their source arguments into destination arg0.

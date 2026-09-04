@@ -30,40 +30,6 @@ type pyConv struct {
 	moduleTokens  []string
 	classContext  []string
 	decorators    []string
-	childCache    map[uintptr][]*tree_sitter.Node
-	allChildCache map[uintptr][]*tree_sitter.Node
-}
-
-func (c *pyConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = map[uintptr][]*tree_sitter.Node{}
-	}
-	id := n.Id()
-	if kids, ok := c.childCache[id]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[id] = kids
-	return kids
-}
-
-func (c *pyConv) children(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.allChildCache == nil {
-		c.allChildCache = map[uintptr][]*tree_sitter.Node{}
-	}
-	id := n.Id()
-	if kids, ok := c.allChildCache[id]; ok {
-		return kids
-	}
-	kids := children(n)
-	c.allChildCache[id] = kids
-	return kids
 }
 
 // ExtractPython parses Python files into one NIR Program (one module per file,

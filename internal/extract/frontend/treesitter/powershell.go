@@ -17,26 +17,9 @@ import (
 // propagate taint.
 type psConv struct {
 	nodeCache
-	src        []byte
-	file       string
-	key        string
-	childCache map[uintptr][]*tree_sitter.Node
-}
-
-func (c *psConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = make(map[uintptr][]*tree_sitter.Node)
-	}
-	key := uintptr(n.Id())
-	if kids, ok := c.childCache[key]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[key] = kids
-	return kids
+	src  []byte
+	file string
+	key  string
 }
 
 // psWrappers are single-child expression-precedence nodes to peel through.

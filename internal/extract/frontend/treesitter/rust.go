@@ -12,10 +12,9 @@ import (
 // rsConv walks a tree-sitter Rust CST into NIR.
 type rsConv struct {
 	nodeCache
-	src        []byte
-	file       string
-	key        string
-	childCache map[uintptr][]*tree_sitter.Node
+	src  []byte
+	file string
+	key  string
 }
 
 // rsFormatMacros build a string from their arguments (taint-propagating).
@@ -48,22 +47,6 @@ func (c *rsConv) text(n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[n.StartByte():n.EndByte()])
-}
-
-func (c *rsConv) namedChildren(n *tree_sitter.Node) []*tree_sitter.Node {
-	if n == nil {
-		return nil
-	}
-	if c.childCache == nil {
-		c.childCache = map[uintptr][]*tree_sitter.Node{}
-	}
-	id := n.Id()
-	if kids, ok := c.childCache[id]; ok {
-		return kids
-	}
-	kids := namedChildren(n)
-	c.childCache[id] = kids
-	return kids
 }
 
 // decls walks a list, tracking preceding attribute_item syntax for the next item.
