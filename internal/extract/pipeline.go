@@ -77,6 +77,7 @@ func BuildGraph(paths []string, cache lowering.DeltaCache, opts Options) (usg.St
 			return nil, stats, err
 		}
 		tk.Mark("sca+bindings")
+		usg.Freeze(g)
 		return g, stats, nil
 	}
 	// Incremental lowering when a cache is provided: reuse the lowered sub-graph of unchanged
@@ -143,6 +144,7 @@ func BuildGraph(paths []string, cache lowering.DeltaCache, opts Options) (usg.St
 		return nil, stats, err
 	}
 	tk.Mark("bindings")
+	usg.Freeze(g)
 	return g, stats, nil
 }
 
