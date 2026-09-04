@@ -274,12 +274,12 @@ type flagMatchIndex struct {
 	// (lowering/parsing/scope of a node or text), so concurrent racing producers compute
 	// the same value; sync.Map only has to keep the map itself race-free under the parallel
 	// binding phase, without serializing the hot read path the way an RWMutex would.
-	scopes      sync.Map // nodeID -> string
-	lowerText   sync.Map // text -> string
-	tokenFacts  sync.Map // text -> *contextTokenFacts
-	callArgText sync.Map // key -> string
-	operands    sync.Map // nodeID/includeFlow -> [][]usg.Node
-	predHitSets sync.Map // key -> scopedPredicateHitSet
+	scopes       sync.Map // nodeID -> string
+	lowerText    sync.Map // text -> string
+	tokenFacts   sync.Map // text -> *contextTokenFacts
+	callArgFacts sync.Map // callArgCacheKey -> *callArgContextFacts
+	operands     sync.Map // nodeID/includeFlow -> [][]usg.Node
+	predHitSets  sync.Map // key -> scopedPredicateHitSet
 }
 
 func (idx *flagMatchIndex) rangeTechNodes(s usg.Store, tech string, crossLang bool, fn func(usg.Node) bool, types ...string) {
@@ -583,8 +583,7 @@ func (idx *flagMatchIndex) contextFacts(text string) *contextTokenFacts {
 		return facts.(*contextTokenFacts)
 	}
 	facts := &contextTokenFacts{
-		byPrefix:      map[string][]string{},
-		lowerByPrefix: map[string][]string{},
+		byPrefix: map[string][]string{},
 	}
 	for start := 0; start <= len(text); {
 		end := strings.IndexByte(text[start:], '\x00')
@@ -604,7 +603,6 @@ func (idx *flagMatchIndex) contextFacts(text string) *contextTokenFacts {
 			continue
 		}
 		facts.byPrefix[prefix] = append(facts.byPrefix[prefix], value)
-		facts.lowerByPrefix[prefix] = append(facts.lowerByPrefix[prefix], lowerString(value))
 	}
 	idx.tokenFacts.Store(text, facts)
 	return facts
