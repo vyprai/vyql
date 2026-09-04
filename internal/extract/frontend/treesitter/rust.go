@@ -11,6 +11,7 @@ import (
 
 // rsConv walks a tree-sitter Rust CST into NIR.
 type rsConv struct {
+	nodeCache
 	src        []byte
 	file       string
 	key        string
@@ -70,7 +71,7 @@ func (c *rsConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	var attrs []string
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "attribute_item" {
+		if c.kind(ch) == "attribute_item" {
 			attrs = append(attrs, c.rsAttrTokens(ch)...)
 			continue
 		}
@@ -103,9 +104,9 @@ func (c *rsConv) rsAttrTokens(n *tree_sitter.Node) []string {
 	}
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
-		if m.Kind() == "attribute" {
+		if c.kind(m) == "attribute" {
 			for _, ch := range c.namedChildren(m) {
-				if ch.Kind() == "identifier" || ch.Kind() == "scoped_identifier" {
+				if c.kind(ch) == "identifier" || c.kind(ch) == "scoped_identifier" {
 					path := c.dotted(ch)
 					add("attr_path:" + path)
 					add("attr_name:" + lastSeg(path))
@@ -125,29 +126,29 @@ func (c *rsConv) stmt(n *tree_sitter.Node) []nir.Stmt { return c.stmtH(n, nil) }
 
 func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "function_item":
-		params := c.params(field(n, "parameters"))
-		paramTypes := c.paramTypes(field(n, "parameters"))
-		body := c.block(field(n, "body"))
+		params := c.params(c.field(n, "parameters"))
+		paramTypes := c.paramTypes(c.field(n, "parameters"))
+		body := c.block(c.field(n, "body"))
 		body = append(body, c.rsFunctionContext(n)...)
 		body = append(body, c.rsTypeErasureMetadata(n)...)
 		exported := false
 		for _, ch := range children(n) {
-			if ch.Kind() == "visibility_modifier" {
+			if c.kind(ch) == "visibility_modifier" {
 				exported = true
 				break
 			}
 		}
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Params: params, ParamTypes: paramTypes, ParamEntries: c.rsParamEntries(c.text(field(n, "name")), params, attrs), Body: body, Loc: L, Exported: exported}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(c.field(n, "name")), Params: params, ParamTypes: paramTypes, ParamEntries: c.rsParamEntries(c.text(c.field(n, "name")), params, attrs), Body: body, Loc: L, Exported: exported}}
 	case "impl_item":
 		out := c.rsUnsafeImplMetadata(n)
 		out = append(out, c.rsUnpinImplMetadata(n)...)
 		out = append(out, c.rsRunTestsAutoApprovalMetadata(n)...)
-		out = append(out, c.decls(field(n, "body"))...)
+		out = append(out, c.decls(c.field(n, "body"))...)
 		return out
 	case "mod_item", "trait_item":
-		return c.decls(field(n, "body"))
+		return c.decls(c.field(n, "body"))
 	case "enum_item":
 		return c.rsEnumMetadata(n, attrs)
 	case "struct_item":
@@ -155,11 +156,11 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 	case "use_declaration", "const_item", "static_item":
 		return nil
 	case "let_declaration":
-		val := field(n, "value")
+		val := c.field(n, "value")
 		if val == nil {
 			return nil
 		}
-		name := c.patName(field(n, "pattern"))
+		name := c.patName(c.field(n, "pattern"))
 		if name != "" {
 			return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(val)}}
 		}
@@ -237,7 +238,7 @@ func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt 
 	}
 	loc := c.loc(n)
 	path := "analysis.rust.enum"
-	name := c.text(field(n, "name"))
+	name := c.text(c.field(n, "name"))
 	tokens := []string{"lang=rust", "kind:enum"}
 	if name != "" {
 		tokens = append(tokens, "enum_name:"+name)
@@ -262,7 +263,7 @@ func (c *rsConv) rsEnumMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt 
 }
 
 func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []nir.Stmt {
-	name := c.text(field(n, "name"))
+	name := c.text(c.field(n, "name"))
 	if name == "" {
 		return nil
 	}
@@ -274,15 +275,15 @@ func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []ni
 		if m == nil {
 			return
 		}
-		if m.Kind() == "field_declaration_list" {
+		if c.kind(m) == "field_declaration_list" {
 			var pendingAttrs []string
 			for _, ch := range c.namedChildren(m) {
-				if ch.Kind() == "attribute_item" {
+				if c.kind(ch) == "attribute_item" {
 					pendingAttrs = append(pendingAttrs, c.rsAttrTokens(ch)...)
 					pendingAttrs = append(pendingAttrs, rsSerdeTokens(c.text(ch))...)
 					continue
 				}
-				if ch.Kind() == "field_declaration" {
+				if c.kind(ch) == "field_declaration" {
 					if stmt, ok := c.rsStructFieldMetadataCall(ch, structTokens, pendingAttrs); ok {
 						out = append(out, stmt)
 					}
@@ -294,7 +295,7 @@ func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []ni
 			}
 			return
 		}
-		if m.Kind() == "field_declaration" {
+		if c.kind(m) == "field_declaration" {
 			if stmt, ok := c.rsStructFieldMetadataCall(m, structTokens, nil); ok {
 				out = append(out, stmt)
 			}
@@ -309,10 +310,10 @@ func (c *rsConv) rsStructFieldMetadata(n *tree_sitter.Node, attrs []string) []ni
 }
 
 func (c *rsConv) rsStructFieldMetadataCall(n *tree_sitter.Node, structTokens, pendingAttrs []string) (nir.Stmt, bool) {
-	name := c.text(field(n, "name"))
+	name := c.text(c.field(n, "name"))
 	if name == "" {
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() == "field_identifier" || ch.Kind() == "identifier" {
+			if c.kind(ch) == "field_identifier" || c.kind(ch) == "identifier" {
 				name = c.text(ch)
 				break
 			}
@@ -321,10 +322,10 @@ func (c *rsConv) rsStructFieldMetadataCall(n *tree_sitter.Node, structTokens, pe
 	if name == "" {
 		return nil, false
 	}
-	typ := c.text(field(n, "type"))
+	typ := c.text(c.field(n, "type"))
 	fieldAttrs := append([]string{}, pendingAttrs...)
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "attribute_item" {
+		if c.kind(ch) == "attribute_item" {
 			fieldAttrs = append(fieldAttrs, c.rsAttrTokens(ch)...)
 			fieldAttrs = append(fieldAttrs, rsSerdeTokens(c.text(ch))...)
 		}
@@ -447,37 +448,37 @@ func dedupeStrings(values []string) []string {
 // nothing this impl is generic over.
 func (c *rsConv) rsImplParameterBounds(n *tree_sitter.Node) ([]string, map[string]bool) {
 	bounded := map[string]bool{}
-	tp := field(n, "type_parameters")
+	tp := c.field(n, "type_parameters")
 	if tp == nil {
 		return nil, bounded
 	}
 	params := []string{}
 	declared := map[string]bool{}
 	for _, ch := range children(tp) {
-		if ch.Kind() != "type_parameter" {
+		if c.kind(ch) != "type_parameter" {
 			continue
 		}
-		name := c.text(orSelf(field(ch, "name"), ch))
+		name := c.text(orSelf(c.field(ch, "name"), ch))
 		params = append(params, name)
 		declared[strings.TrimSpace(name)] = true
-		c.rsCollectAutoTraitBounds(field(ch, "bounds"), bounded)
+		c.rsCollectAutoTraitBounds(c.field(ch, "bounds"), bounded)
 	}
 	for _, ch := range children(n) {
-		if ch.Kind() != "where_clause" {
+		if c.kind(ch) != "where_clause" {
 			continue
 		}
 		for _, pred := range children(ch) {
-			if pred.Kind() != "where_predicate" {
+			if c.kind(pred) != "where_predicate" {
 				continue
 			}
-			left := field(pred, "left")
-			if left == nil || left.Kind() != "type_identifier" {
+			left := c.field(pred, "left")
+			if left == nil || c.kind(left) != "type_identifier" {
 				continue
 			}
 			if !declared[strings.TrimSpace(c.text(left))] {
 				continue
 			}
-			c.rsCollectAutoTraitBounds(field(pred, "bounds"), bounded)
+			c.rsCollectAutoTraitBounds(c.field(pred, "bounds"), bounded)
 		}
 	}
 	return params, bounded
@@ -486,11 +487,11 @@ func (c *rsConv) rsImplParameterBounds(n *tree_sitter.Node) ([]string, map[strin
 // rsCollectAutoTraitBounds records which of Send and Sync appear among a
 // parameter's trait bounds.
 func (c *rsConv) rsCollectAutoTraitBounds(bounds *tree_sitter.Node, into map[string]bool) {
-	if bounds == nil || bounds.Kind() != "trait_bounds" {
+	if bounds == nil || c.kind(bounds) != "trait_bounds" {
 		return
 	}
 	for _, b := range children(bounds) {
-		if b.Kind() == "lifetime" {
+		if c.kind(b) == "lifetime" {
 			continue
 		}
 		name := c.text(b)
@@ -610,17 +611,17 @@ func (c *rsConv) rsAnalysisCall(path, method, loc string, tokens ...string) nir.
 // The check reads the cast from the syntax tree, so prose and comments cannot
 // satisfy or defeat it, and it names no crate's identifiers.
 func (c *rsConv) rsTypeErasureMetadata(n *tree_sitter.Node) []nir.Stmt {
-	tp := field(n, "type_parameters")
-	body := field(n, "body")
+	tp := c.field(n, "type_parameters")
+	body := c.field(n, "body")
 	if tp == nil || body == nil {
 		return nil
 	}
 	var typeParams []string
 	for _, p := range c.namedChildren(tp) {
-		if p.Kind() != "type_parameter" {
+		if c.kind(p) != "type_parameter" {
 			continue
 		}
-		name := c.text(field(p, "name"))
+		name := c.text(c.field(p, "name"))
 		if name == "" {
 			continue
 		}
@@ -633,20 +634,20 @@ func (c *rsConv) rsTypeErasureMetadata(n *tree_sitter.Node) []nir.Stmt {
 	// clause, or on a declared lifetime -- means the signature already states
 	// the constraint the erasure needs.
 	for _, p := range c.namedChildren(tp) {
-		if rsBoundsCarryLifetime(field(p, "bounds")) {
+		if c.rsBoundsCarryLifetime(c.field(p, "bounds")) {
 			return nil
 		}
 	}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "where_clause" {
+		if c.kind(ch) == "where_clause" {
 			for _, pred := range c.namedChildren(ch) {
-				if rsBoundsCarryLifetime(field(pred, "bounds")) {
+				if c.rsBoundsCarryLifetime(c.field(pred, "bounds")) {
 					return nil
 				}
 			}
 		}
 	}
-	if !c.rsErasesUntypedPointer(body, typeParams, c.rsGenericCarrierParams(field(n, "parameters"), typeParams)) {
+	if !c.rsErasesUntypedPointer(body, typeParams, c.rsGenericCarrierParams(c.field(n, "parameters"), typeParams)) {
 		return nil
 	}
 	loc := c.loc(n)
@@ -656,12 +657,12 @@ func (c *rsConv) rsTypeErasureMetadata(n *tree_sitter.Node) []nir.Stmt {
 
 // rsBoundsCarryLifetime reports whether a trait_bounds node contains a
 // lifetime, i.e. the bound list constrains the bounded parameter's lifetime.
-func rsBoundsCarryLifetime(bounds *tree_sitter.Node) bool {
-	if bounds == nil || bounds.Kind() != "trait_bounds" {
+func (c *rsConv) rsBoundsCarryLifetime(bounds *tree_sitter.Node) bool {
+	if bounds == nil || c.kind(bounds) != "trait_bounds" {
 		return false
 	}
 	for _, ch := range namedChildren(bounds) {
-		if ch.Kind() == "lifetime" {
+		if c.kind(ch) == "lifetime" {
 			return true
 		}
 	}
@@ -681,11 +682,11 @@ func (c *rsConv) rsGenericCarrierParams(params *tree_sitter.Node, typeParams []s
 		return carrier
 	}
 	for _, ch := range c.namedChildren(params) {
-		if ch.Kind() != "parameter" {
+		if c.kind(ch) != "parameter" {
 			continue
 		}
-		if c.rsExprMentions(field(ch, "type"), nil, typeParamSet) {
-			if nm := c.patName(field(ch, "pattern")); nm != "" {
+		if c.rsExprMentions(c.field(ch, "type"), nil, typeParamSet) {
+			if nm := c.patName(c.field(ch, "pattern")); nm != "" {
 				carrier[nm] = true
 			}
 		}
@@ -707,10 +708,10 @@ func (c *rsConv) rsErasesUntypedPointer(body *tree_sitter.Node, typeParams []str
 		if n == nil {
 			return false
 		}
-		if n.Kind() == "type_cast_expression" {
-			if pt := field(n, "type"); pt != nil && pt.Kind() == "pointer_type" {
-				if el := field(pt, "type"); el != nil && el.Kind() == "unit_type" {
-					if c.rsExprMentions(field(n, "value"), carrier, typeParamSet) {
+		if c.kind(n) == "type_cast_expression" {
+			if pt := c.field(n, "type"); pt != nil && c.kind(pt) == "pointer_type" {
+				if el := c.field(pt, "type"); el != nil && c.kind(el) == "unit_type" {
+					if c.rsExprMentions(c.field(n, "value"), carrier, typeParamSet) {
 						return true
 					}
 				}
@@ -733,7 +734,7 @@ func (c *rsConv) rsExprMentions(n *tree_sitter.Node, paramSet, typeParamSet map[
 	if n == nil {
 		return false
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier":
 		if paramSet[c.text(n)] {
 			return true
@@ -774,7 +775,7 @@ func (c *rsConv) rsParamEntries(name string, params []string, attrs []string) []
 }
 
 func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
-	body := field(fn, "body")
+	body := c.field(fn, "body")
 	if body == nil {
 		return nil
 	}
@@ -783,7 +784,7 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	path := "analysis.function.context"
 	args := []nir.Expr{
 		nir.Const{Loc: loc, Value: "lang=rust"},
-		nir.Const{Loc: loc, Value: "name=" + c.text(field(fn, "name"))},
+		nir.Const{Loc: loc, Value: "name=" + c.text(c.field(fn, "name"))},
 		nir.Const{Loc: loc, Value: text},
 		nir.Const{Loc: loc, Value: rustCompactText(text)},
 	}
@@ -811,15 +812,15 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 // extern modifier returns "".
 func (c *rsConv) rsExternAbi(fn *tree_sitter.Node) string {
 	for _, ch := range c.namedChildren(fn) {
-		if ch.Kind() != "function_modifiers" {
+		if c.kind(ch) != "function_modifiers" {
 			continue
 		}
 		for _, m := range c.namedChildren(ch) {
-			if m.Kind() != "extern_modifier" {
+			if c.kind(m) != "extern_modifier" {
 				continue
 			}
 			for _, lit := range c.namedChildren(m) {
-				if lit.Kind() == "string_literal" {
+				if c.kind(lit) == "string_literal" {
 					return strings.Trim(c.text(lit), "\"")
 				}
 			}
@@ -853,18 +854,18 @@ func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
 		if n == nil || len(out) >= 512 {
 			return
 		}
-		switch n.Kind() {
+		switch c.kind(n) {
 		case "assignment_expression":
-			left := atom(field(n, "left"))
-			right := atom(field(n, "right"))
+			left := atom(c.field(n, "left"))
+			right := atom(c.field(n, "right"))
 			if left != "" && right != "" {
 				add("assign:" + left + "=" + right)
 			}
 		case "call_expression":
-			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+			if path := c.dotted(c.field(n, "function")); path != "" && path != "?" {
 				add("call_path:" + path)
 				add("call:" + lastSeg(path))
-				for _, arg := range c.namedChildren(field(n, "arguments")) {
+				for _, arg := range c.namedChildren(c.field(n, "arguments")) {
 					if a := atom(arg); a != "" {
 						add("call_arg:" + path + ":" + a)
 					}
@@ -875,7 +876,7 @@ func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
 				add("selector:" + sel)
 			}
 		case "match_arm":
-			if pat := rustMatchArmPattern(n); pat != nil {
+			if pat := c.rustMatchArmPattern(n); pat != nil {
 				if label := atom(pat); label != "" {
 					add("match_arm:" + label)
 				}
@@ -916,7 +917,7 @@ func (c *rsConv) rustClosureUnwindStaleLength(fn, body *tree_sitter.Node) string
 	if !strings.Contains(sig, "FnMut") && !strings.Contains(sig, "FnOnce") && !strings.Contains(sig, "Fn(") {
 		return ""
 	}
-	for _, p := range c.params(field(fn, "parameters")) {
+	for _, p := range c.params(c.field(fn, "parameters")) {
 		name := strings.TrimSpace(strings.TrimPrefix(strings.TrimSpace(p), "mut "))
 		if name == "" || name == "self" || !rustCompactCallsIdent(bodyText, name) {
 			continue
@@ -1143,12 +1144,12 @@ func rustCryptoScalarRandomBitsByteLengthConfusion(compact string) bool {
 		!strings.Contains(compact, "NonZeroScalar")
 }
 
-func rustMatchArmPattern(n *tree_sitter.Node) *tree_sitter.Node {
-	if p := field(n, "pattern"); p != nil {
+func (c *rsConv) rustMatchArmPattern(n *tree_sitter.Node) *tree_sitter.Node {
+	if p := c.field(n, "pattern"); p != nil {
 		return p
 	}
 	for _, ch := range namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "identifier", "scoped_identifier", "match_pattern", "tuple_struct_pattern", "literal_pattern":
 			return ch
 		}
@@ -1163,16 +1164,16 @@ func rustCompactText(s string) string {
 }
 
 func (c *rsConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
-	switch inner.Kind() {
+	switch c.kind(inner) {
 	case "if_expression":
 		return []nir.Stmt{c.rsIf(inner)}
 	case "match_expression":
 		return []nir.Stmt{c.rsMatch(inner)}
 	}
-	if inner.Kind() == "assignment_expression" {
-		left := field(inner, "left")
-		right := c.expr(field(inner, "right"))
-		if left != nil && left.Kind() == "identifier" {
+	if c.kind(inner) == "assignment_expression" {
+		left := c.field(inner, "left")
+		right := c.expr(c.field(inner, "right"))
+		if left != nil && c.kind(left) == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
@@ -1197,8 +1198,8 @@ func (c *rsConv) params(params *tree_sitter.Node) []string {
 	}
 	var out []string
 	for _, ch := range c.namedChildren(params) {
-		if ch.Kind() == "parameter" {
-			if nm := c.patName(field(ch, "pattern")); nm != "" {
+		if c.kind(ch) == "parameter" {
+			if nm := c.patName(c.field(ch, "pattern")); nm != "" {
 				out = append(out, nm)
 			}
 		}
@@ -1212,8 +1213,8 @@ func (c *rsConv) paramTypes(params *tree_sitter.Node) map[string]string {
 		return out
 	}
 	for _, ch := range c.namedChildren(params) {
-		if ch.Kind() == "parameter" {
-			if nm := c.patName(field(ch, "pattern")); nm != "" {
+		if c.kind(ch) == "parameter" {
+			if nm := c.patName(c.field(ch, "pattern")); nm != "" {
 				putParamType(out, nm, paramTypeFromField(c, ch))
 			}
 		}
@@ -1224,7 +1225,7 @@ func (c *rsConv) paramTypes(params *tree_sitter.Node) map[string]string {
 // patName extracts the bound identifier from a pattern (unwrapping ref/mut).
 func (c *rsConv) patName(p *tree_sitter.Node) string {
 	for p != nil {
-		switch p.Kind() {
+		switch c.kind(p) {
 		case "identifier":
 			return c.text(p)
 		case "ref_pattern", "mut_pattern", "reference_pattern":
@@ -1256,7 +1257,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "self", "field_identifier", "type_identifier", "scoped_identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "boolean_literal", "unit_expression":
@@ -1266,7 +1267,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "string_literal", "raw_string_literal":
 		return nir.Const{Loc: L, Value: rustStringValue(c.text(n))}
 	case "field_expression":
-		return nir.Attr{Base: c.expr(field(n, "value")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
+		return nir.Attr{Base: c.expr(c.field(n, "value")), Attr: c.text(c.field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "index_expression":
 		kids := c.namedChildren(n)
 		var base, key nir.Expr = nir.Const{Loc: L}, nil
@@ -1278,15 +1279,15 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Index{Base: base, Key: key, Path: c.dotted(n), Loc: L}
 	case "call_expression":
-		fn := field(n, "function")
+		fn := c.field(n, "function")
 		path := c.dotted(fn)
-		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
+		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(c.field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
 	case "macro_invocation":
-		name := lastSeg(c.dotted(field(n, "macro")))
+		name := lastSeg(c.dotted(c.field(n, "macro")))
 		var parts []nir.Expr
 		if tt := lastChildKind(n, "token_tree"); tt != nil {
 			for _, ch := range c.namedChildren(tt) {
-				if isRustExprTok(ch.Kind()) {
+				if isRustExprTok(c.kind(ch)) {
 					parts = append(parts, c.expr(ch))
 				}
 			}
@@ -1297,8 +1298,8 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 		// other macros (e.g. query!) — model as a call so they can be sinks
 		return nir.Call{Callee: nir.Name{ID: name, Loc: L}, Args: parts, Path: name, Method: name, Loc: L}
 	case "binary_expression":
-		op := c.text(field(n, "operator"))
-		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		op := c.text(c.field(n, "operator"))
+		left, right := c.expr(c.field(n, "left")), c.expr(c.field(n, "right"))
 		if op == "+" {
 			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
@@ -1325,11 +1326,11 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "if_expression":
 		// `let x = if c { A } else { B }` — model as a Ternary on the arms' tail values so a
 		// constant condition prunes. Falls back to Seq when an arm isn't a simple value.
-		then := c.blockTail(field(n, "consequence"))
+		then := c.blockTail(c.field(n, "consequence"))
 		var els nir.Expr
-		if alt := field(n, "alternative"); alt != nil {
+		if alt := c.field(n, "alternative"); alt != nil {
 			if k := c.namedChildren(alt); len(k) > 0 {
-				if k[0].Kind() == "block" {
+				if c.kind(k[0]) == "block" {
 					els = c.blockTail(k[0])
 				} else {
 					els = c.expr(k[0]) // else if …
@@ -1337,7 +1338,7 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 			}
 		}
 		if then != nil && els != nil {
-			return nir.Ternary{Cond: c.expr(field(n, "condition")), Then: then, Else: els, Loc: L}
+			return nir.Ternary{Cond: c.expr(c.field(n, "condition")), Then: then, Else: els, Loc: L}
 		}
 		return nir.Seq{Parts: c.blockValues(n), Loc: L}
 	case "match_expression", "block":
@@ -1400,9 +1401,9 @@ unquote:
 // rsIf lowers a statement-position if with its predicate so constant-false arms prune.
 func (c *rsConv) rsIf(n *tree_sitter.Node) nir.Stmt {
 	it := nir.If{Loc: c.loc(n)}
-	it.Cond = c.expr(field(n, "condition"))
-	it.Then = c.block(field(n, "consequence"))
-	if alt := field(n, "alternative"); alt != nil {
+	it.Cond = c.expr(c.field(n, "condition"))
+	it.Then = c.block(c.field(n, "consequence"))
+	if alt := c.field(n, "alternative"); alt != nil {
 		it.Else = c.rsElse(alt)
 	}
 	return it
@@ -1410,7 +1411,7 @@ func (c *rsConv) rsIf(n *tree_sitter.Node) nir.Stmt {
 
 // rsElse unwraps an else branch: a block, a chained else-if, or an else_clause wrapper.
 func (c *rsConv) rsElse(alt *tree_sitter.Node) []nir.Stmt {
-	switch alt.Kind() {
+	switch c.kind(alt) {
 	case "block":
 		return c.block(alt)
 	case "if_expression":
@@ -1428,17 +1429,17 @@ func (c *rsConv) rsElse(alt *tree_sitter.Node) []nir.Stmt {
 // rsMatch lowers a statement-position match to a subject+labelled Switch so dead arms
 // prune. A wildcard `_` arm is the default; literal patterns become case labels.
 func (c *rsConv) rsMatch(n *tree_sitter.Node) nir.Stmt {
-	sw := nir.Switch{Loc: c.loc(n), Subject: c.expr(field(n, "value"))}
-	body := field(n, "body")
+	sw := nir.Switch{Loc: c.loc(n), Subject: c.expr(c.field(n, "value"))}
+	body := c.field(n, "body")
 	if body == nil {
 		return sw
 	}
 	for _, arm := range c.namedChildren(body) {
-		if arm.Kind() != "match_arm" {
+		if c.kind(arm) != "match_arm" {
 			continue
 		}
-		pat := field(arm, "pattern")
-		stmts := c.rsArmBody(field(arm, "value"))
+		pat := c.field(arm, "pattern")
+		stmts := c.rsArmBody(c.field(arm, "value"))
 		if pat == nil || c.text(pat) == "_" {
 			sw.Default = append(sw.Default, stmts...)
 			continue
@@ -1457,7 +1458,7 @@ func (c *rsConv) rsArmBody(v *tree_sitter.Node) []nir.Stmt {
 	if v == nil {
 		return nil
 	}
-	if v.Kind() == "block" {
+	if c.kind(v) == "block" {
 		return c.block(v)
 	}
 	return c.exprStmt(v)
@@ -1466,7 +1467,7 @@ func (c *rsConv) rsArmBody(v *tree_sitter.Node) []nir.Stmt {
 // blockTail returns the tail (value) expression of a `{ … }` block, or nil if the last
 // element isn't a bare expression (e.g. a let/assignment) — used to model an if-as-value.
 func (c *rsConv) blockTail(block *tree_sitter.Node) nir.Expr {
-	if block == nil || block.Kind() != "block" {
+	if block == nil || c.kind(block) != "block" {
 		return nil
 	}
 	kids := c.namedChildren(block)
@@ -1474,7 +1475,7 @@ func (c *rsConv) blockTail(block *tree_sitter.Node) nir.Expr {
 		return nil
 	}
 	last := kids[len(kids)-1]
-	switch last.Kind() {
+	switch c.kind(last) {
 	case "let_declaration", "expression_statement", "empty_statement":
 		return nil
 	}
@@ -1493,24 +1494,24 @@ func (c *rsConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "field_identifier", "type_identifier", "self", "primitive_type":
 		return c.text(n)
 	case "scoped_identifier", "scoped_type_identifier":
-		path := field(n, "path")
-		name := field(n, "name")
+		path := c.field(n, "path")
+		name := c.field(n, "name")
 		if path == nil {
 			return c.dotted(name)
 		}
 		return c.dotted(path) + "." + c.dotted(name)
 	case "field_expression":
-		return c.dotted(field(n, "value")) + "." + c.text(field(n, "field"))
+		return c.dotted(c.field(n, "value")) + "." + c.text(c.field(n, "field"))
 	case "call_expression":
-		return c.dotted(field(n, "function"))
+		return c.dotted(c.field(n, "function"))
 	case "generic_function":
-		return c.dotted(field(n, "function"))
+		return c.dotted(c.field(n, "function"))
 	case "generic_type":
-		return c.dotted(field(n, "type"))
+		return c.dotted(c.field(n, "type"))
 	case "index_expression":
 		if kids := c.namedChildren(n); len(kids) > 0 {
 			return c.dotted(kids[0]) + "[]"
