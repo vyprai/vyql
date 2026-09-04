@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/internal/extract/nir"
+	"github.com/vyprai/vyql/internal/extract/parsecache"
 )
 
 // modCache memoizes go.mod lookups by directory: dir -> (module path, module root dir).
@@ -519,6 +520,9 @@ func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, 
 		body = append(body, c.goSecurityObservations(name, params, bodyNode)...)
 		body = append(body, c.goDecodeOverwritesPresetObservations(name, bodyNode)...)
 		body = append(body, c.goUnboundedAppendAccumulationObservations(name, bodyNode)...)
+	}
+	if cache := parsecache.Shared(); cache != nil {
+		body = cache.DeferFunctionBody(body)
 	}
 	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc,
 		ContextTokens: c.goFunctionTokens(name, typ, bodyNode),
@@ -1814,6 +1818,9 @@ func (c *conv) stmts(list []ast.Stmt) []nir.Stmt {
 		if st := c.stmt(s); st != nil {
 			out = append(out, st)
 		}
+	}
+	if cache := parsecache.Shared(); cache != nil {
+		return cache.MaybeDeferStatements(out)
 	}
 	return out
 }

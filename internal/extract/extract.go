@@ -19,6 +19,7 @@ import (
 	"github.com/vyprai/vyql/internal/extract/frontend"
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/nir"
+	"github.com/vyprai/vyql/internal/extract/parsecache"
 )
 
 // Stats reports per-language file counts for the run summary, and what the
@@ -138,6 +139,14 @@ func All(paths []string, excludes Excludes) (nir.Program, []bindings.Applicator,
 			sub, err := lg.Extract(files, root)
 			if err != nil {
 				return prog, nil, nil, stats, err
+			}
+			// Native/config frontends do not all pass through tree-sitter's per-file
+			// publisher. Apply the same shared body deferral before retaining their modules.
+			// Tree-sitter stubs have no Body here, so this is idempotent for them.
+			if cache := parsecache.Shared(); cache != nil {
+				for i := range sub.Modules {
+					cache.DeferModuleBodies(&sub.Modules[i])
+				}
 			}
 			prog.Modules = append(prog.Modules, sub.Modules...)
 			present[lg.Name] = true

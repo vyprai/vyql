@@ -394,7 +394,20 @@ func applyMaxRAM(v string) func() {
 	// run against memory it may not release.
 	lowering.DiskCacheBytes = clampBytes(n/16, 64<<20, 512<<20)
 	lowering.DiskDetailBuf = clampBytes(n/8, 64<<20, 2<<30)
-	lowering.DiskStorePath = dir
+	graphDir := filepath.Join(dir, "graph")
+	if err := os.MkdirAll(graphDir, 0o700); err != nil {
+		graphDir = dir
+	}
+	lowering.DiskStorePath = graphDir
+	// A memory-bounded scan must be able to release completed frontend bodies even when
+	// the user explicitly disables the persistent scan cache. This append-only spool has
+	// no Badger cache/memtable floor and disappears with the graph directory at cleanup.
+	var bodyCache *parsecache.Cache
+	var restoreBodies = func() {}
+	if c, openErr := parsecache.OpenTransient(filepath.Join(dir, "bodies")); openErr == nil {
+		bodyCache = c
+		restoreBodies = parsecache.SetShared(c)
+	}
 	prev := debug.SetMemoryLimit(-1)
 	// The Go limit is soft, so place it below the resident watchdog's stop point.
 	// This buys the collector time to trade CPU for memory before the process as a
@@ -402,6 +415,10 @@ func applyMaxRAM(v string) func() {
 	debug.SetMemoryLimit(goHeapMemoryLimit(n))
 	return func() {
 		debug.SetMemoryLimit(prev)
+		restoreBodies()
+		if bodyCache != nil {
+			_ = bodyCache.Close()
+		}
 		lowering.DiskStorePath = ""
 		lowering.DiskCacheBytes, lowering.DiskDetailBuf = 0, 0
 		_ = os.RemoveAll(dir) // best-effort temp cleanup
