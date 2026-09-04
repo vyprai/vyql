@@ -23,6 +23,14 @@ behaviour change, even if no code moved.
   intersecting the entire live-fact map. With 4,096 live facts, the operation
   fell from 432.7 us and 1.17 MB allocated to 163 ns and 16 bytes. This removes
   the quadratic branch-by-scope-width shape from every language frontend.
+- **Completed graphs use packed flow and label rows.** Once extraction,
+  lowering, SCA and binding application finish, forward flow, reverse flow and
+  label rows become compact offset-and-value arrays instead of three slice
+  headers per node. The build-only concept de-duplication sets are released.
+  Traversal stays allocation-free, and later mutations safely restore the
+  appendable representation. On the 73,205-node generated Go template stress
+  case, median retained heap fell from 248.1 MiB to 239.4 MiB; median user CPU
+  was unchanged.
 
 ### Fixed
 
