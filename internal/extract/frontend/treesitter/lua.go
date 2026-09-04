@@ -11,6 +11,7 @@ import (
 
 // luaConv walks a tree-sitter Lua CST into NIR.
 type luaConv struct {
+	nodeCache
 	src        []byte
 	file       string
 	key        string
@@ -69,18 +70,18 @@ func (c *luaConv) block(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *luaConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "function_declaration", "function_definition_statement", "local_function_declaration_statement":
 		return []nir.Stmt{nir.FuncDef{
-			Name:   lastSeg(c.dotted(field(n, "name"))),
-			Params: c.params(field(n, "parameters")),
-			Body:   c.block(field(n, "body")),
+			Name:   lastSeg(c.dotted(c.field(n, "name"))),
+			Params: c.params(c.field(n, "parameters")),
+			Body:   c.block(c.field(n, "body")),
 			Loc:    L,
 		}}
 	case "variable_declaration", "local_variable_declaration":
 		var out []nir.Stmt
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() == "assignment_statement" {
+			if c.kind(ch) == "assignment_statement" {
 				out = append(out, c.stmt(ch)...)
 			}
 		}
@@ -88,7 +89,7 @@ func (c *luaConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			return out
 		}
 		// local x = v  with fields directly on the node
-		return c.assign(field(n, "name"), field(n, "value"), c.namedChildren(n))
+		return c.assign(c.field(n, "name"), c.field(n, "value"), c.namedChildren(n))
 	case "assignment_statement":
 		return c.assignStmt(n)
 	case "function_call":
@@ -115,7 +116,7 @@ func (c *luaConv) assignStmt(n *tree_sitter.Node) []nir.Stmt {
 	var names []string
 	var vals []nir.Expr
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "variable_list":
 			for _, v := range c.namedChildren(ch) {
 				names = append(names, c.lvalName(v))
@@ -146,7 +147,7 @@ func (c *luaConv) assign(nameNode, valNode *tree_sitter.Node, kids []*tree_sitte
 // lvalName returns a simple assignable name (bare identifier only; field/index
 // targets aren't tracked as scalar vars).
 func (c *luaConv) lvalName(n *tree_sitter.Node) string {
-	if n != nil && n.Kind() == "identifier" {
+	if n != nil && c.kind(n) == "identifier" {
 		return c.text(n)
 	}
 	return ""
@@ -156,17 +157,17 @@ func (c *luaConv) lvalName(n *tree_sitter.Node) string {
 // bodies are folded into Else as an over-approximation (no per-elseif pruning) — FN-safe.
 func (c *luaConv) luaIf(n *tree_sitter.Node) nir.Stmt {
 	it := nir.If{Loc: c.loc(n)}
-	if cond := field(n, "condition"); cond != nil {
+	if cond := c.field(n, "condition"); cond != nil {
 		it.Cond = c.expr(cond)
 	}
-	if cons := field(n, "consequence"); cons != nil {
+	if cons := c.field(n, "consequence"); cons != nil {
 		it.Then = c.block(cons)
 	}
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "else_statement", "elseif_statement":
 			for _, b := range c.namedChildren(ch) {
-				if b.Kind() == "block" {
+				if c.kind(b) == "block" {
 					it.Else = append(it.Else, c.block(b)...)
 				}
 			}
@@ -180,7 +181,7 @@ func (c *luaConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "block":
 				out = append(out, c.block(ch)...)
 			case "elseif_statement", "else_statement":
@@ -198,7 +199,7 @@ func (c *luaConv) params(params *tree_sitter.Node) []string {
 	}
 	var out []string
 	for _, ch := range c.namedChildren(params) {
-		if ch.Kind() == "identifier" {
+		if c.kind(ch) == "identifier" {
 			out = append(out, c.text(ch))
 		}
 	}
@@ -221,7 +222,7 @@ func (c *luaConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "self", "vararg_expression":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "true", "false", "nil":
@@ -233,24 +234,24 @@ func (c *luaConv) expr(n *tree_sitter.Node) nir.Expr {
 		// through str_args.
 		return nir.Const{Loc: L, Value: luaStringValue(c.text(n))}
 	case "dot_index_expression":
-		return nir.Attr{Base: c.expr(field(n, "table")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
+		return nir.Attr{Base: c.expr(c.field(n, "table")), Attr: c.text(c.field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "bracket_index_expression":
-		return nir.Index{Base: c.expr(field(n, "table")), Key: c.expr(field(n, "field")), Path: c.dotted(field(n, "table")), Loc: L}
+		return nir.Index{Base: c.expr(c.field(n, "table")), Key: c.expr(c.field(n, "field")), Path: c.dotted(c.field(n, "table")), Loc: L}
 	case "method_index_expression":
-		return nir.Attr{Base: c.expr(field(n, "table")), Attr: c.text(field(n, "method")), Path: c.dotted(n), Loc: L}
+		return nir.Attr{Base: c.expr(c.field(n, "table")), Attr: c.text(c.field(n, "method")), Path: c.dotted(n), Loc: L}
 	case "function_call":
-		fn := field(n, "name")
+		fn := c.field(n, "name")
 		path := c.dotted(fn)
-		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
+		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(c.field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
 	case "binary_expression":
-		op := c.text(field(n, "operator"))
-		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		op := c.text(c.field(n, "operator"))
+		left, right := c.expr(c.field(n, "left")), c.expr(c.field(n, "right"))
 		if op == ".." || op == "+" {
 			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
 	case "unary_expression":
-		op := c.text(field(n, "operator"))
+		op := c.text(c.field(n, "operator"))
 		var operand nir.Expr = nir.Const{Loc: L}
 		if k := c.namedChildren(n); len(k) > 0 {
 			operand = c.expr(k[len(k)-1])
@@ -287,17 +288,17 @@ func (c *luaConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "self":
 		return c.text(n)
 	case "dot_index_expression":
-		return c.dotted(field(n, "table")) + "." + c.text(field(n, "field"))
+		return c.dotted(c.field(n, "table")) + "." + c.text(c.field(n, "field"))
 	case "method_index_expression":
-		return c.dotted(field(n, "table")) + "." + c.text(field(n, "method"))
+		return c.dotted(c.field(n, "table")) + "." + c.text(c.field(n, "method"))
 	case "bracket_index_expression":
-		return c.dotted(field(n, "table")) + "[]"
+		return c.dotted(c.field(n, "table")) + "[]"
 	case "function_call":
-		return c.dotted(field(n, "name"))
+		return c.dotted(c.field(n, "name"))
 	}
 	return "?"
 }

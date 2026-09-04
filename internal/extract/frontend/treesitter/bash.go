@@ -15,6 +15,7 @@ import (
 // expansions become synthetic event calls; a string with embedded expansions
 // becomes a Format.
 type shConv struct {
+	nodeCache
 	src        []byte
 	file       string
 	key        string
@@ -135,19 +136,19 @@ func (c *shConv) block(n *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *shConv) stmt(n *tree_sitter.Node) []nir.Stmt {
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "function_definition":
-		return []nir.Stmt{nir.FuncDef{Name: c.text(field(n, "name")), Body: c.block(field(n, "body")), Loc: c.loc(n)}}
+		return []nir.Stmt{nir.FuncDef{Name: c.text(c.field(n, "name")), Body: c.block(c.field(n, "body")), Loc: c.loc(n)}}
 	case "variable_assignment":
-		name := c.text(field(n, "name"))
-		if v := field(n, "value"); name != "" && v != nil {
+		name := c.text(c.field(n, "name"))
+		if v := c.field(n, "value"); name != "" && v != nil {
 			return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(v)}}
 		}
 		return nil
 	case "declaration_command", "unset_command":
 		var out []nir.Stmt
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() == "variable_assignment" {
+			if c.kind(ch) == "variable_assignment" {
 				out = append(out, c.stmt(ch)...)
 			}
 		}
@@ -174,7 +175,7 @@ func (c *shConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "command", "variable_assignment", "declaration_command", "pipeline",
 				"list", "if_statement", "for_statement", "while_statement", "case_statement":
 				out = append(out, c.stmt(ch)...)
@@ -192,14 +193,14 @@ func (c *shConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 // is stripped so sink patterns match the basename.
 func (c *shConv) command(n *tree_sitter.Node) nir.Expr {
 	L := c.loc(n)
-	nameNode := field(n, "name")
+	nameNode := c.field(n, "name")
 	prog := c.text(nameNode)
 	if i := strings.LastIndexByte(prog, '/'); i >= 0 {
 		prog = prog[i+1:]
 	}
 	var args []nir.Expr
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "command_name":
 			continue
 		case "file_redirect", "heredoc_redirect", "herestring_redirect", "variable_assignment":
@@ -216,7 +217,7 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "word", "number", "raw_string", "test_operator":
 		return nir.Const{Loc: L, Value: c.text(n)} // carry value for constant-folding
 	case "simple_expansion", "expansion":
@@ -233,7 +234,7 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "string", "concatenation":
 		var parts []nir.Expr
 		for _, ch := range c.namedChildren(n) {
-			if k := ch.Kind(); k == "simple_expansion" || k == "expansion" ||
+			if k := c.kind(ch); k == "simple_expansion" || k == "expansion" ||
 				k == "command_substitution" || k == "string" || k == "concatenation" {
 				parts = append(parts, c.expr(ch))
 			}
@@ -248,7 +249,7 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "command_substitution":
 		var parts []nir.Expr
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() == "command" {
+			if c.kind(ch) == "command" {
 				parts = append(parts, c.command(ch))
 			} else {
 				parts = append(parts, c.expr(ch))
@@ -263,11 +264,11 @@ func (c *shConv) expr(n *tree_sitter.Node) nir.Expr {
 			return c.expr(k[0])
 		}
 	case "binary_expression":
-		op := c.text(field(n, "operator"))
+		op := c.text(c.field(n, "operator"))
 		if m, ok := shTestOp[op]; ok { // map `-gt`/`-eq`/… so const-eval can fold
 			op = m
 		}
-		return nir.BinOp{Op: op, Left: c.expr(field(n, "left")), Right: c.expr(field(n, "right")), Loc: L}
+		return nir.BinOp{Op: op, Left: c.expr(c.field(n, "left")), Right: c.expr(c.field(n, "right")), Loc: L}
 	case "unary_expression":
 		if k := c.namedChildren(n); len(k) > 0 {
 			op := "?"
@@ -305,7 +306,7 @@ func (c *shConv) shNestedSourceRefs(root *tree_sitter.Node, outer string) []nir.
 		if n == nil {
 			return
 		}
-		switch n.Kind() {
+		switch c.kind(n) {
 		case "variable_name", "special_variable_name":
 			name := c.text(n)
 			if name != outer {
@@ -385,7 +386,7 @@ func (c *shConv) shIf(n *tree_sitter.Node) nir.Stmt {
 		if !ch.IsNamed() {
 			continue
 		}
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "else_clause":
 			for _, e := range c.namedChildren(ch) {
 				it.Else = append(it.Else, c.stmt(e)...)
@@ -404,11 +405,11 @@ func (c *shConv) shIf(n *tree_sitter.Node) nir.Stmt {
 // shCase lowers a case to a subject+labelled Switch so a constant subject prunes arms.
 func (c *shConv) shCase(n *tree_sitter.Node) nir.Stmt {
 	sw := nir.Switch{Loc: c.loc(n)}
-	if v := field(n, "value"); v != nil {
+	if v := c.field(n, "value"); v != nil {
 		sw.Subject = c.expr(v)
 	}
 	for _, ci := range c.namedChildren(n) {
-		if ci.Kind() != "case_item" {
+		if c.kind(ci) != "case_item" {
 			continue
 		}
 		var labs []nir.Expr
@@ -420,14 +421,14 @@ func (c *shConv) shCase(n *tree_sitter.Node) nir.Stmt {
 				continue
 			}
 			if ci.FieldNameForChild(uint32(i)) == "value" {
-				if c.text(ch) == "*" || ch.Kind() == "extglob_pattern" {
+				if c.text(ch) == "*" || c.kind(ch) == "extglob_pattern" {
 					isDefault = true
 				} else {
 					labs = append(labs, c.expr(ch))
 				}
 				continue
 			}
-			if ch.Kind() == "termination" {
+			if c.kind(ch) == "termination" {
 				continue
 			}
 			stmts = append(stmts, c.stmt(ch)...)
@@ -445,11 +446,11 @@ func (c *shConv) shCase(n *tree_sitter.Node) nir.Stmt {
 // expansionVar extracts the variable name from $x or ${x...}.
 func (c *shConv) expansionVar(n *tree_sitter.Node) string {
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "variable_name" || ch.Kind() == "special_variable_name" {
+		if c.kind(ch) == "variable_name" || c.kind(ch) == "special_variable_name" {
 			return c.text(ch)
 		}
-		if ch.Kind() == "subscript" {
-			return c.text(field(ch, "name"))
+		if c.kind(ch) == "subscript" {
+			return c.text(c.field(ch, "name"))
 		}
 	}
 	// ${x} sometimes exposes the name as the raw text between braces

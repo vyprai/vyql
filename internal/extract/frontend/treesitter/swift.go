@@ -12,6 +12,7 @@ import (
 
 // swConv walks a tree-sitter Swift CST into NIR.
 type swConv struct {
+	nodeCache
 	src        []byte
 	file       string
 	key        string
@@ -130,9 +131,9 @@ func (c *swConv) swStructuredContextTokens(root *tree_sitter.Node) []string {
 		if n == nil || len(out) >= 2048 {
 			return
 		}
-		switch n.Kind() {
+		switch c.kind(n) {
 		case "function_declaration", "init_declaration":
-			if name := c.text(field(n, "name")); name != "" {
+			if name := c.text(c.field(n, "name")); name != "" {
 				add("function_name:" + name)
 			}
 			for _, p := range c.paramPairs(n) {
@@ -195,11 +196,11 @@ func (c *swConv) decls(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "class_declaration", "protocol_declaration", "extension_declaration", "enum_declaration":
-		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(c.swBody(n)), Loc: L}}
+		return []nir.Stmt{nir.ClassDef{Name: c.text(c.field(n, "name")), Body: c.decls(c.swBody(n)), Loc: L}}
 	case "function_declaration", "init_declaration", "deinit_declaration":
-		name := c.text(field(n, "name"))
+		name := c.text(c.field(n, "name"))
 		pairs := c.paramPairs(n)
 		params := make([]string, 0, len(pairs))
 		for _, p := range pairs {
@@ -223,11 +224,11 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: L}}
 	case "property_declaration":
-		v := field(n, "value")
+		v := c.field(n, "value")
 		if v == nil {
 			return nil
 		}
-		name := c.bindingName(field(n, "name"))
+		name := c.bindingName(c.field(n, "name"))
 		if name != "" {
 			out := []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(v)}}
 			return append(out, c.trailingLambdaStmts(v)...)
@@ -236,8 +237,8 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		out := []nir.Stmt{nir.ExprStmt{Value: c.expr(v)}}
 		return append(out, c.trailingLambdaStmts(v)...)
 	case "assignment":
-		target := field(n, "target")
-		resultNode := field(n, "result")
+		target := c.field(n, "target")
+		resultNode := c.field(n, "result")
 		result := c.expr(resultNode)
 		if nm := c.assignTargetName(target); nm != "" {
 			out := []nir.Stmt{nir.Assign{Targets: []string{nm}, Value: result}}
@@ -261,7 +262,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 	case "control_transfer_statement":
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() != "throw_keyword" {
+			if c.kind(ch) != "throw_keyword" {
 				return []nir.Stmt{nir.Return{Value: c.expr(ch)}}
 			}
 		}
@@ -281,7 +282,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			var then, els []nir.Stmt
 			seenBody := false
 			for _, ch := range c.namedChildren(n) {
-				switch ch.Kind() {
+				switch c.kind(ch) {
 				case "statements":
 					if !seenBody {
 						then = c.decls(ch)
@@ -304,7 +305,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		var then, els []nir.Stmt
 		seenBody := false
 		for _, ch := range c.namedChildren(n) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "statements":
 				if !seenBody {
 					then = c.decls(ch)
@@ -317,7 +318,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			case "if_statement":
 				els = c.stmt(ch) // else-if
 			default:
-				if cond == nil && n.Kind() == "if_statement" {
+				if cond == nil && c.kind(n) == "if_statement" {
 					cond = c.expr(ch)
 				}
 			}
@@ -333,7 +334,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// body statements as the named ones.
 		loop := nir.Loop{Body: c.collectBlocks(n), Loc: L}
 		for _, ch := range c.namedChildren(n) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "pattern":
 				loop.Vars = c.swPatternBindings(ch)
 			case "statements", "else":
@@ -356,7 +357,7 @@ func (c *swConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *swConv) swBody(n *tree_sitter.Node) *tree_sitter.Node {
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "function_body", "class_body", "enum_class_body", "protocol_body", "statements":
 			return ch
 		}
@@ -370,7 +371,7 @@ func (c *swConv) block(body *tree_sitter.Node) []nir.Stmt {
 	}
 	var out []nir.Stmt
 	for _, ch := range c.namedChildren(body) {
-		if ch.Kind() == "statements" {
+		if c.kind(ch) == "statements" {
 			out = append(out, c.decls(ch)...)
 		} else {
 			out = append(out, c.stmt(ch)...)
@@ -385,7 +386,7 @@ func (c *swConv) block(body *tree_sitter.Node) []nir.Stmt {
 func (c *swConv) swSwitch(n *tree_sitter.Node) nir.Stmt {
 	sw := nir.Switch{Loc: c.loc(n)}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() != "switch_entry" {
+		if c.kind(ch) != "switch_entry" {
 			if sw.Subject == nil {
 				sw.Subject = c.expr(ch) // the scrutinee precedes the entries
 			}
@@ -395,7 +396,7 @@ func (c *swConv) swSwitch(n *tree_sitter.Node) nir.Stmt {
 		var labs []nir.Expr
 		var stmts []nir.Stmt
 		for _, e := range c.namedChildren(ch) {
-			switch e.Kind() {
+			switch c.kind(e) {
 			case "default_keyword":
 				isDefault = true
 			case "switch_pattern":
@@ -449,19 +450,19 @@ func (c *swConv) swOp(n *tree_sitter.Node) string {
 // Matching it here keeps the block out of trailingLambdaStmts, which would otherwise
 // lower it inline at the `defer` rather than at the function's exit.
 func (c *swConv) swDeferBody(n *tree_sitter.Node) ([]nir.Stmt, bool) {
-	if n.Kind() != "call_expression" {
+	if c.kind(n) != "call_expression" {
 		return nil, false
 	}
 	kids := c.namedChildren(n)
-	if len(kids) < 2 || kids[0].Kind() != "simple_identifier" || c.text(kids[0]) != "defer" {
+	if len(kids) < 2 || c.kind(kids[0]) != "simple_identifier" || c.text(kids[0]) != "defer" {
 		return nil, false
 	}
 	for _, ch := range kids[1:] {
-		if ch.Kind() != "call_suffix" {
+		if c.kind(ch) != "call_suffix" {
 			continue
 		}
 		for _, sub := range c.namedChildren(ch) {
-			if sub.Kind() == "lambda_literal" {
+			if c.kind(sub) == "lambda_literal" {
 				return c.collectBlocks(sub), true
 			}
 		}
@@ -474,7 +475,7 @@ func (c *swConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "statements", "function_body":
 				out = append(out, c.decls(ch)...)
 			case "if_statement", "else", "switch_entry", "catch_block", "lambda_literal":
@@ -494,7 +495,7 @@ func (c *swConv) trailingLambdaStmts(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "lambda_literal":
 				out = append(out, c.collectBlocks(ch)...)
 			case "call_suffix", "value_arguments", "_fn_call_lambda_arguments", "value_argument":
@@ -512,12 +513,12 @@ func (c *swConv) trailingLambdaStmts(n *tree_sitter.Node) []nir.Stmt {
 func (c *swConv) paramPairs(n *tree_sitter.Node) [][2]string {
 	var out [][2]string
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() != "parameter" {
+		if c.kind(ch) != "parameter" {
 			continue
 		}
 		var ids []string
 		for _, id := range c.namedChildren(ch) {
-			if id.Kind() == "simple_identifier" {
+			if c.kind(id) == "simple_identifier" {
 				ids = append(ids, c.text(id))
 			}
 		}
@@ -532,12 +533,12 @@ func (c *swConv) paramPairs(n *tree_sitter.Node) [][2]string {
 func (c *swConv) paramTypes(n *tree_sitter.Node) map[string]string {
 	out := map[string]string{}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() != "parameter" {
+		if c.kind(ch) != "parameter" {
 			continue
 		}
 		var ids []string
 		for _, id := range c.namedChildren(ch) {
-			if id.Kind() == "simple_identifier" {
+			if c.kind(id) == "simple_identifier" {
 				ids = append(ids, c.text(id))
 			}
 		}
@@ -563,11 +564,11 @@ func (c *swConv) bindingName(pat *tree_sitter.Node) string {
 	if pat == nil {
 		return ""
 	}
-	if pat.Kind() == "simple_identifier" {
+	if c.kind(pat) == "simple_identifier" {
 		return c.text(pat)
 	}
 	for _, ch := range c.namedChildren(pat) {
-		if ch.Kind() == "simple_identifier" || ch.Kind() == "bound_identifier" {
+		if c.kind(ch) == "simple_identifier" || c.kind(ch) == "bound_identifier" {
 			return c.text(ch)
 		}
 		if nm := c.bindingName(ch); nm != "" {
@@ -581,12 +582,12 @@ func (c *swConv) assignTargetName(t *tree_sitter.Node) string {
 	if t == nil {
 		return ""
 	}
-	if t.Kind() == "simple_identifier" {
+	if c.kind(t) == "simple_identifier" {
 		return c.text(t)
 	}
-	if t.Kind() == "directly_assignable_expression" {
+	if c.kind(t) == "directly_assignable_expression" {
 		k := c.namedChildren(t)
-		if len(k) == 1 && k[0].Kind() == "simple_identifier" {
+		if len(k) == 1 && c.kind(k[0]) == "simple_identifier" {
 			return c.text(k[0])
 		}
 	}
@@ -597,7 +598,7 @@ func (c *swConv) callArgs(suffix *tree_sitter.Node) []nir.Expr {
 	var out []nir.Expr
 	var va *tree_sitter.Node
 	for _, ch := range c.namedChildren(suffix) {
-		if ch.Kind() == "value_arguments" {
+		if c.kind(ch) == "value_arguments" {
 			va = ch
 		}
 	}
@@ -605,8 +606,8 @@ func (c *swConv) callArgs(suffix *tree_sitter.Node) []nir.Expr {
 		return nil
 	}
 	for _, a := range c.namedChildren(va) {
-		if a.Kind() == "value_argument" {
-			if v := field(a, "value"); v != nil {
+		if c.kind(a) == "value_argument" {
+			if v := c.field(a, "value"); v != nil {
 				out = append(out, c.expr(v))
 			} else if k := c.namedChildren(a); len(k) > 0 {
 				out = append(out, c.expr(k[len(k)-1]))
@@ -620,7 +621,7 @@ func (c *swConv) callArgLabels(suffix *tree_sitter.Node) []string {
 	var out []string
 	var va *tree_sitter.Node
 	for _, ch := range c.namedChildren(suffix) {
-		if ch.Kind() == "value_arguments" {
+		if c.kind(ch) == "value_arguments" {
 			va = ch
 		}
 	}
@@ -628,11 +629,11 @@ func (c *swConv) callArgLabels(suffix *tree_sitter.Node) []string {
 		return nil
 	}
 	for _, a := range c.namedChildren(va) {
-		if a.Kind() != "value_argument" {
+		if c.kind(a) != "value_argument" {
 			continue
 		}
 		for _, ch := range c.namedChildren(a) {
-			if ch.Kind() != "value_argument_label" {
+			if c.kind(ch) != "value_argument_label" {
 				continue
 			}
 			if ids := c.namedChildren(ch); len(ids) > 0 {
@@ -649,7 +650,7 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "simple_identifier", "self_expression", "super_expression":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "boolean_literal", "nil_literal":
@@ -661,8 +662,8 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 		var walk func(m *tree_sitter.Node)
 		walk = func(m *tree_sitter.Node) {
 			for _, ch := range c.namedChildren(m) {
-				if ch.Kind() == "interpolated_expression" || ch.Kind() == "interpolation" {
-					if v := field(ch, "value"); v != nil {
+				if c.kind(ch) == "interpolated_expression" || c.kind(ch) == "interpolation" {
+					if v := c.field(ch, "value"); v != nil {
 						parts = append(parts, c.expr(v))
 					} else {
 						for _, e := range c.namedChildren(ch) {
@@ -680,8 +681,8 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Const{Loc: L, Value: c.text(n)} // literal text for `val` matching
 	case "navigation_expression":
-		tgt := field(n, "target")
-		suf := field(n, "suffix")
+		tgt := c.field(n, "target")
+		suf := c.field(n, "suffix")
 		return nir.Attr{Base: c.expr(tgt), Attr: c.navSuf(suf), Path: c.dotted(n), Loc: L}
 	case "call_expression":
 		callee := c.swCallee(n)
@@ -689,7 +690,7 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 		method := lastSeg(path)
 		var args []nir.Expr
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() == "call_suffix" {
+			if c.kind(ch) == "call_suffix" {
 				args = c.callArgs(ch)
 				if labels := c.callArgLabels(ch); len(labels) > 0 {
 					path += "." + strings.Join(labels, ".")
@@ -706,7 +707,7 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Call{Callee: c.expr(callee), Args: args, Path: path, Method: method, Loc: L}
 	case "additive_expression":
-		l, r := c.expr(field(n, "lhs")), c.expr(field(n, "rhs"))
+		l, r := c.expr(c.field(n, "lhs")), c.expr(c.field(n, "rhs"))
 		op := c.swOp(n)
 		if op == "+" {
 			return nir.Format{Parts: []nir.Expr{l, r}, Loc: L} // string concat
@@ -714,7 +715,7 @@ func (c *swConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.BinOp{Op: op, Left: l, Right: r, Loc: L}
 	case "multiplicative_expression", "comparison_expression", "equality_expression",
 		"conjunction_expression", "disjunction_expression":
-		return nir.BinOp{Op: c.swOp(n), Left: c.expr(field(n, "lhs")), Right: c.expr(field(n, "rhs")), Loc: L}
+		return nir.BinOp{Op: c.swOp(n), Left: c.expr(c.field(n, "lhs")), Right: c.expr(c.field(n, "rhs")), Loc: L}
 	case "prefix_expression":
 		// `-x`, `!x` — operator is the leading token, operand the trailing child.
 		var operand nir.Expr = nir.Const{Loc: L}
@@ -780,7 +781,7 @@ func (c *swConv) swPatternBindings(n *tree_sitter.Node) []string {
 	var out []string
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
-		if m.Kind() == "simple_identifier" {
+		if c.kind(m) == "simple_identifier" {
 			if id := c.text(m); id != "" && id != "_" {
 				out = append(out, id)
 			}
@@ -806,8 +807,8 @@ func (c *swConv) swLetBindings(n *tree_sitter.Node) []string {
 	var out []string
 	kids := c.namedChildren(n)
 	for i, ch := range kids {
-		if ch.Kind() == "value_binding_pattern" {
-			if i+1 < len(kids) && kids[i+1].Kind() == "simple_identifier" {
+		if c.kind(ch) == "value_binding_pattern" {
+			if i+1 < len(kids) && c.kind(kids[i+1]) == "simple_identifier" {
 				if id := c.text(kids[i+1]); id != "" && id != "_" {
 					out = append(out, id)
 				}
@@ -826,7 +827,7 @@ func (c *swConv) swLetBindings(n *tree_sitter.Node) []string {
 func (c *swConv) swCaseMatch(n *tree_sitter.Node) (nir.Expr, []string, bool) {
 	isCase, eqEnd := false, uint(0)
 	for i := uint(0); i < n.ChildCount(); i++ {
-		switch n.Child(i).Kind() {
+		switch c.kind(n.Child(i)) {
 		case "case":
 			isCase = true
 		case "=":
@@ -839,7 +840,7 @@ func (c *swConv) swCaseMatch(n *tree_sitter.Node) (nir.Expr, []string, bool) {
 	var vars []string
 	var subject *tree_sitter.Node
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "statements", "else", "if_statement":
 		default:
 			if ch.EndByte() <= eqEnd {
@@ -860,17 +861,17 @@ func (c *swConv) swCaseMatch(n *tree_sitter.Node) (nir.Expr, []string, bool) {
 // rather than `(`, and an empty argument list is a call, not an index.
 func (c *swConv) swIsSubscript(n *tree_sitter.Node) bool {
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() != "call_suffix" {
+		if c.kind(ch) != "call_suffix" {
 			continue
 		}
 		for _, va := range c.namedChildren(ch) {
-			if va.Kind() != "value_arguments" {
+			if c.kind(va) != "value_arguments" {
 				continue
 			}
 			if va.ChildCount() == 0 {
 				return false
 			}
-			return va.Child(0).Kind() == "["
+			return c.kind(va.Child(0)) == "["
 		}
 	}
 	return false
@@ -881,7 +882,7 @@ func (c *swConv) swIsSubscript(n *tree_sitter.Node) bool {
 // callee to return.
 func (c *swConv) swCallee(n *tree_sitter.Node) *tree_sitter.Node {
 	kids := c.namedChildren(n)
-	if len(kids) == 0 || kids[0].Kind() == "call_suffix" {
+	if len(kids) == 0 || c.kind(kids[0]) == "call_suffix" {
 		return nil
 	}
 	return kids[0]
@@ -891,11 +892,11 @@ func (c *swConv) navSuf(suf *tree_sitter.Node) string {
 	if suf == nil {
 		return ""
 	}
-	if s := field(suf, "suffix"); s != nil {
+	if s := c.field(suf, "suffix"); s != nil {
 		return c.text(s)
 	}
 	for _, ch := range c.namedChildren(suf) {
-		if ch.Kind() == "simple_identifier" {
+		if c.kind(ch) == "simple_identifier" {
 			return c.text(ch)
 		}
 	}
@@ -906,11 +907,11 @@ func (c *swConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "simple_identifier", "self_expression", "type_identifier":
 		return c.text(n)
 	case "navigation_expression":
-		return c.dotted(field(n, "target")) + "." + c.navSuf(field(n, "suffix"))
+		return c.dotted(c.field(n, "target")) + "." + c.navSuf(c.field(n, "suffix"))
 	case "call_expression":
 		return c.dotted(c.swCallee(n))
 	case "subscript_expression":

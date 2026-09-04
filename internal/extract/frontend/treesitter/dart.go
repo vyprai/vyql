@@ -13,6 +13,7 @@ import (
 // flat selector chain (base · .method · (args)) and splits a function into a
 // `function_signature` followed by a sibling `function_body`.
 type dartConv struct {
+	nodeCache
 	src        []byte
 	file       string
 	key        string
@@ -68,16 +69,16 @@ func (c *dartConv) decls(n *tree_sitter.Node) []nir.Stmt {
 	kids := c.namedChildren(n)
 	for i := 0; i < len(kids); i++ {
 		ch := kids[i]
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "function_signature", "method_signature":
 			var body *tree_sitter.Node
-			if i+1 < len(kids) && kids[i+1].Kind() == "function_body" {
+			if i+1 < len(kids) && c.kind(kids[i+1]) == "function_body" {
 				body = kids[i+1]
 				i++
 			}
 			out = append(out, c.funcDef(ch, body))
 		case "class_definition", "mixin_declaration", "extension_declaration":
-			if b := field(ch, "body"); b != nil {
+			if b := c.field(ch, "body"); b != nil {
 				out = append(out, c.decls(b)...)
 			}
 		case "function_body", "block":
@@ -92,17 +93,17 @@ func (c *dartConv) decls(n *tree_sitter.Node) []nir.Stmt {
 func (c *dartConv) funcDef(sig, body *tree_sitter.Node) nir.Stmt {
 	L := c.loc(sig)
 	fs := sig
-	if sig.Kind() == "method_signature" {
+	if c.kind(sig) == "method_signature" {
 		if inner := lastChildKind(sig, "function_signature"); inner != nil {
 			fs = inner
 		}
 	}
-	name := c.text(field(fs, "name"))
+	name := c.text(c.field(fs, "name"))
 	var params []string
 	paramTypes := map[string]string{}
 	if pl := lastChildKind(fs, "formal_parameter_list"); pl != nil {
 		for _, p := range c.namedChildren(pl) {
-			if nm := field(p, "name"); nm != nil {
+			if nm := c.field(p, "name"); nm != nil {
 				name := c.text(nm)
 				params = append(params, name)
 				putParamType(paramTypes, name, paramTypeFromField(c, p))
@@ -124,7 +125,7 @@ func (c *dartConv) block(n *tree_sitter.Node) []nir.Stmt {
 	if n == nil {
 		return nil
 	}
-	if n.Kind() == "function_body" {
+	if c.kind(n) == "function_body" {
 		if b := lastChildKind(n, "block"); b != nil {
 			return c.block(b)
 		}
@@ -143,10 +144,10 @@ func (c *dartConv) block(n *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *dartConv) stmt(n *tree_sitter.Node) []nir.Stmt {
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "local_variable_declaration":
 		if ivd := lastChildKind(n, "initialized_variable_definition"); ivd != nil {
-			name := c.text(field(ivd, "name"))
+			name := c.text(c.field(ivd, "name"))
 			// The initializer is a flat `base · selector · …` chain after the name
 			// identifier, so fold all value-side siblings (the `value` field only
 			// exposes the chain's base).
@@ -161,13 +162,13 @@ func (c *dartConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		// a bare `c = v;` parses as expression_statement>assignment_expression; route it
 		// through the assignment case so block-nested reassignments are tracked (no FN).
 		kids := c.namedChildren(n)
-		if len(kids) == 1 && kids[0].Kind() == "assignment_expression" {
+		if len(kids) == 1 && c.kind(kids[0]) == "assignment_expression" {
 			return c.stmt(kids[0])
 		}
 		return []nir.Stmt{nir.ExprStmt{Value: c.foldChain(kids)}}
 	case "assignment_expression":
-		if name := c.assignTargetName(field(n, "left")); name != "" {
-			if v := field(n, "right"); v != nil {
+		if name := c.assignTargetName(c.field(n, "left")); name != "" {
+			if v := c.field(n, "right"); v != nil {
 				return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(v)}}
 			}
 		}
@@ -197,7 +198,7 @@ func (c *dartConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 func (c *dartConv) chainAfterName(ivd *tree_sitter.Node, name string) nir.Expr {
 	kids := c.namedChildren(ivd)
 	for i, k := range kids {
-		if k.Kind() == "identifier" && c.text(k) == name {
+		if c.kind(k) == "identifier" && c.text(k) == name {
 			if i+1 < len(kids) {
 				return c.foldChain(kids[i+1:])
 			}
@@ -212,11 +213,11 @@ func (c *dartConv) assignTargetName(left *tree_sitter.Node) string {
 	if left == nil {
 		return ""
 	}
-	switch left.Kind() {
+	switch c.kind(left) {
 	case "identifier":
 		return c.text(left)
 	case "assignable_expression":
-		if k := c.namedChildren(left); len(k) == 1 && k[0].Kind() == "identifier" {
+		if k := c.namedChildren(left); len(k) == 1 && c.kind(k[0]) == "identifier" {
 			return c.text(k[0])
 		}
 	}
@@ -254,7 +255,7 @@ func (c *dartConv) dartBranch(n *tree_sitter.Node) []nir.Stmt {
 	if n == nil {
 		return nil
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "block":
 		return c.block(n)
 	case "if_statement":
@@ -288,20 +289,20 @@ func (c *dartConv) dartIf(n *tree_sitter.Node) nir.Stmt {
 // dartSwitch lowers a switch to subject+labelled branches so dead arms are pruned.
 func (c *dartConv) dartSwitch(n *tree_sitter.Node) nir.Stmt {
 	sw := nir.Switch{Loc: c.loc(n)}
-	if cond := field(n, "condition"); cond != nil {
+	if cond := c.field(n, "condition"); cond != nil {
 		sw.Subject = c.expr(cond)
 	}
-	body := field(n, "body")
+	body := c.field(n, "body")
 	if body == nil {
 		return sw
 	}
 	for _, cs := range c.namedChildren(body) {
-		switch cs.Kind() {
+		switch c.kind(cs) {
 		case "switch_statement_case":
 			var labs []nir.Expr
 			var stmts []nir.Stmt
 			for _, ch := range c.namedChildren(cs) {
-				switch ch.Kind() {
+				switch c.kind(ch) {
 				case "case_builtin":
 					// the `case` keyword wrapper
 				case "constant_pattern":
@@ -316,7 +317,7 @@ func (c *dartConv) dartSwitch(n *tree_sitter.Node) nir.Stmt {
 			sw.Labels = append(sw.Labels, labs)
 		case "switch_statement_default":
 			for _, ch := range c.namedChildren(cs) {
-				if k := ch.Kind(); k == "break_statement" || k == "continue_statement" {
+				if k := c.kind(ch); k == "break_statement" || k == "continue_statement" {
 					continue
 				}
 				sw.Default = append(sw.Default, c.stmt(ch)...)
@@ -331,7 +332,7 @@ func (c *dartConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			if ch.Kind() == "block" {
+			if c.kind(ch) == "block" {
 				out = append(out, c.block(ch)...)
 			} else {
 				walk(ch)
@@ -351,7 +352,7 @@ func (c *dartConv) foldChain(nodes []*tree_sitter.Node) nir.Expr {
 	cur := c.expr(nodes[0])
 	path := c.dotted(nodes[0])
 	for _, sel := range nodes[1:] {
-		if sel.Kind() != "selector" {
+		if c.kind(sel) != "selector" {
 			continue
 		}
 		inner := firstNamed(sel)
@@ -359,7 +360,7 @@ func (c *dartConv) foldChain(nodes []*tree_sitter.Node) nir.Expr {
 			continue
 		}
 		L := c.loc(sel)
-		switch inner.Kind() {
+		switch c.kind(inner) {
 		case "unconditional_assignable_selector", "conditional_assignable_selector":
 			nm := lastChildKind(inner, "identifier")
 			name := c.text(nm)
@@ -373,7 +374,7 @@ func (c *dartConv) foldChain(nodes []*tree_sitter.Node) nir.Expr {
 			cur = nir.Call{Callee: cur, Args: c.args(inner), Path: path, Method: lastSeg(path), Loc: L}
 		default: // index selector etc.
 			var key nir.Expr
-			if inner.Kind() == "index_selector" {
+			if c.kind(inner) == "index_selector" {
 				if k := c.namedChildren(inner); len(k) > 0 {
 					key = c.expr(k[0])
 				}
@@ -392,7 +393,7 @@ func (c *dartConv) args(argPart *tree_sitter.Node) []nir.Expr {
 		return nil
 	}
 	for _, arg := range c.namedChildren(a) {
-		if arg.Kind() == "argument" {
+		if c.kind(arg) == "argument" {
 			out = append(out, c.foldChain(c.namedChildren(arg)))
 		} else {
 			out = append(out, c.expr(arg))
@@ -406,7 +407,7 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "this", "type_identifier":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "true", "false", "null":
@@ -419,7 +420,7 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		var ops []nir.Expr
 		op := "?"
 		for _, ch := range c.namedChildren(n) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "relational_operator", "equality_operator", "multiplicative_operator":
 				op = c.text(ch)
 			default:
@@ -434,7 +435,7 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		// interpolated strings ("$x"/"${x}") carry taint via template_substitution.
 		var parts []nir.Expr
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() == "template_substitution" || ch.Kind() == "interpolation" {
+			if c.kind(ch) == "template_substitution" || c.kind(ch) == "interpolation" {
 				for _, e := range c.namedChildren(ch) {
 					parts = append(parts, c.expr(e))
 				}
@@ -449,7 +450,7 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "additive_expression":
 		var parts []nir.Expr
 		for _, ch := range c.namedChildren(n) {
-			if ch.Kind() == "additive_operator" {
+			if c.kind(ch) == "additive_operator" {
 				continue
 			}
 			parts = append(parts, c.expr(ch))
@@ -478,7 +479,7 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		var op string
 		var operand nir.Expr = nir.Const{Loc: L}
 		for _, ch := range c.namedChildren(n) {
-			if k := ch.Kind(); k == "prefix_operator" || k == "postfix_operator" {
+			if k := c.kind(ch); k == "prefix_operator" || k == "postfix_operator" {
 				op = c.text(ch)
 			} else {
 				operand = c.expr(ch)
@@ -486,8 +487,8 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Unary{Op: op, Operand: operand, Loc: L}
 	case "assignment_expression":
-		path := c.assignTargetPath(field(n, "left"))
-		right := c.expr(field(n, "right"))
+		path := c.assignTargetPath(c.field(n, "left"))
+		right := c.expr(c.field(n, "right"))
 		if path != "" {
 			return nir.Call{Callee: nir.Name{ID: path, Loc: L}, Args: []nir.Expr{right}, Path: path, Method: lastSeg(path), Loc: L}
 		}
@@ -500,14 +501,14 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 		path := "?"
 		var args []nir.Expr
 		for _, ch := range c.namedChildren(n) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "type_identifier", "identifier", "scoped_identifier":
 				if path == "?" {
 					path = c.text(ch)
 				}
 			case "arguments":
 				for _, arg := range c.namedChildren(ch) {
-					if arg.Kind() == "argument" {
+					if c.kind(arg) == "argument" {
 						args = append(args, c.foldChain(c.namedChildren(arg)))
 					} else {
 						args = append(args, c.expr(arg))
@@ -535,7 +536,7 @@ func (c *dartConv) expr(n *tree_sitter.Node) nir.Expr {
 	}
 	// node that begins a selector chain (identifier followed by selectors)
 	kids := c.namedChildren(n)
-	if len(kids) > 1 && kids[1].Kind() == "selector" {
+	if len(kids) > 1 && c.kind(kids[1]) == "selector" {
 		return c.foldChain(kids)
 	}
 	if len(kids) == 1 {
@@ -552,7 +553,7 @@ func (c *dartConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "type_identifier", "this":
 		return c.text(n)
 	}

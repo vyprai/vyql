@@ -11,6 +11,7 @@ import (
 
 // ktConv walks a tree-sitter Kotlin CST into NIR.
 type ktConv struct {
+	nodeCache
 	src              []byte
 	file             string
 	key              string
@@ -70,7 +71,7 @@ func (c *ktConv) decls(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "class_declaration", "object_declaration", "interface_declaration":
 		prev := c.classParamTokens
 		c.classParamTokens = append(append([]string{}, prev...), c.ktAnnotationTokens(n, "class_annotation:")...)
@@ -96,7 +97,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return nil
 	case "assignment":
-		left := field(n, "left")
+		left := c.field(n, "left")
 		if left == nil {
 			if k := c.namedChildren(n); len(k) > 0 {
 				left = k[0]
@@ -104,7 +105,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}
 		right := c.lastExpr(n)
 		if left != nil {
-			switch left.Kind() {
+			switch c.kind(left) {
 			case "identifier", "simple_identifier":
 				return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 			case "navigation_expression", "indexing_expression":
@@ -144,7 +145,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			// a then/else body is a `{…}` block or a brace-less control_structure_body; the
 			// first remaining child is the condition. (Only control_structure_body was matched
 			// before, so braced `if (c) { sink(x) }` dropped its body → no CFG region.)
-			if k := ch.Kind(); k == "control_structure_body" || k == "block" {
+			if k := c.kind(ch); k == "control_structure_body" || k == "block" {
 				bodies = append(bodies, ch)
 			} else if cond == nil {
 				cond = c.expr(ch)
@@ -176,7 +177,7 @@ func (c *ktConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 func (c *ktConv) ktWhen(n *tree_sitter.Node) nir.Stmt {
 	sw := nir.Switch{Loc: c.loc(n)}
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "when_subject":
 			if k := c.namedChildren(ch); len(k) > 0 {
 				sw.Subject = c.expr(k[len(k)-1])
@@ -195,7 +196,7 @@ func (c *ktConv) ktWhen(n *tree_sitter.Node) nir.Stmt {
 					labs = append(labs, c.expr(e))
 					continue
 				}
-				switch e.Kind() {
+				switch c.kind(e) {
 				case "block", "control_structure_body", "statements":
 					stmts = append(stmts, c.collectBlocks(e)...)
 				default:
@@ -203,7 +204,7 @@ func (c *ktConv) ktWhen(n *tree_sitter.Node) nir.Stmt {
 					// expression with no block wrapper, so it reaches neither the
 					// cases above nor collectBlocks' own statement fallback. Lower
 					// it the way that fallback does or the arm's code is dropped.
-					if isKtStmt(e.Kind()) {
+					if isKtStmt(c.kind(e)) {
 						stmts = append(stmts, c.stmt(e)...)
 					}
 				}
@@ -238,7 +239,7 @@ func (c *ktConv) trailingLambdaStmts(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "annotated_lambda", "lambda_literal":
 				out = append(out, c.collectBlocks(ch)...)
 			case "value_arguments", "call_suffix":
@@ -257,7 +258,7 @@ func (c *ktConv) trailingLambdaStmts(n *tree_sitter.Node) []nir.Stmt {
 // library param-source to the public surface.
 func ktPublic(c *ktConv, n *tree_sitter.Node) bool {
 	for _, ch := range children(n) {
-		if ch.Kind() == "modifiers" {
+		if c.kind(ch) == "modifiers" {
 			t := c.text(ch)
 			if strings.Contains(t, "private") || strings.Contains(t, "internal") || strings.Contains(t, "protected") {
 				return false
@@ -272,14 +273,14 @@ func (c *ktConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "statements":
 				out = append(out, c.decls(ch)...)
 			case "control_structure_body", "when_entry", "catch_block", "finally_block", "block",
 				"annotated_lambda", "lambda_literal":
 				walk(ch)
 			default:
-				if ch.IsNamed() && isKtStmt(ch.Kind()) {
+				if ch.IsNamed() && isKtStmt(c.kind(ch)) {
 					out = append(out, c.stmt(ch)...)
 				}
 			}
@@ -303,7 +304,7 @@ func isKtStmt(k string) bool {
 
 func (c *ktConv) declName(n *tree_sitter.Node) string {
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "identifier" || ch.Kind() == "type_identifier" {
+		if c.kind(ch) == "identifier" || c.kind(ch) == "type_identifier" {
 			return c.text(ch)
 		}
 	}
@@ -312,7 +313,7 @@ func (c *ktConv) declName(n *tree_sitter.Node) string {
 
 func (c *ktConv) classBody(n *tree_sitter.Node) *tree_sitter.Node {
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "class_body" || ch.Kind() == "enum_class_body" {
+		if c.kind(ch) == "class_body" || c.kind(ch) == "enum_class_body" {
 			return ch
 		}
 	}
@@ -321,7 +322,7 @@ func (c *ktConv) classBody(n *tree_sitter.Node) *tree_sitter.Node {
 
 func (c *ktConv) funcBody(n *tree_sitter.Node) *tree_sitter.Node {
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "function_body" {
+		if c.kind(ch) == "function_body" {
 			return ch
 		}
 	}
@@ -334,7 +335,7 @@ func (c *ktConv) block(body *tree_sitter.Node) []nir.Stmt {
 	}
 	var out []nir.Stmt
 	for _, ch := range c.namedChildren(body) {
-		kind := ch.Kind()
+		kind := c.kind(ch)
 		if kind == "block" || kind == "statements" {
 			out = append(out, c.decls(ch)...)
 		} else if ktExprBodyKind(kind) {
@@ -373,11 +374,11 @@ func ktExprBodyKind(kind string) bool {
 func (c *ktConv) params(n *tree_sitter.Node) []string {
 	var out []string
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "function_value_parameters" {
+		if c.kind(ch) == "function_value_parameters" {
 			for _, p := range c.namedChildren(ch) {
-				if p.Kind() == "parameter" {
+				if c.kind(p) == "parameter" {
 					for _, id := range c.namedChildren(p) {
-						if id.Kind() == "identifier" {
+						if c.kind(id) == "identifier" {
 							out = append(out, c.text(id))
 							break
 						}
@@ -392,16 +393,16 @@ func (c *ktConv) params(n *tree_sitter.Node) []string {
 func (c *ktConv) paramTypes(n *tree_sitter.Node) map[string]string {
 	out := map[string]string{}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() != "function_value_parameters" {
+		if c.kind(ch) != "function_value_parameters" {
 			continue
 		}
 		for _, p := range c.namedChildren(ch) {
-			if p.Kind() != "parameter" {
+			if c.kind(p) != "parameter" {
 				continue
 			}
 			name := ""
 			for _, id := range c.namedChildren(p) {
-				if id.Kind() == "identifier" {
+				if c.kind(id) == "identifier" {
 					name = c.text(id)
 					break
 				}
@@ -414,9 +415,9 @@ func (c *ktConv) paramTypes(n *tree_sitter.Node) map[string]string {
 
 func (c *ktConv) propName(n *tree_sitter.Node) string {
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "variable_declaration" {
+		if c.kind(ch) == "variable_declaration" {
 			for _, id := range c.namedChildren(ch) {
-				if id.Kind() == "identifier" {
+				if c.kind(id) == "identifier" {
 					return c.text(id)
 				}
 			}
@@ -427,7 +428,7 @@ func (c *ktConv) propName(n *tree_sitter.Node) string {
 
 func (c *ktConv) propValue(n *tree_sitter.Node) *tree_sitter.Node {
 	for _, ch := range c.namedChildren(n) {
-		switch ch.Kind() {
+		switch c.kind(ch) {
 		case "variable_declaration", "modifiers", "type_annotation":
 			continue
 		default:
@@ -455,7 +456,7 @@ func (c *ktConv) branchValue(n *tree_sitter.Node) nir.Expr {
 			return nir.Const{Loc: c.loc(cur)}
 		}
 		last := k[len(k)-1]
-		if kind := last.Kind(); kind == "block" || kind == "control_structure_body" || kind == "statements" {
+		if kind := c.kind(last); kind == "block" || kind == "control_structure_body" || kind == "statements" {
 			cur = last
 			continue
 		}
@@ -478,7 +479,7 @@ func (c *ktConv) ktAnnotationTokens(n *tree_sitter.Node, prefix string) []string
 	}
 	var deep func(m *tree_sitter.Node)
 	deep = func(m *tree_sitter.Node) {
-		if k := m.Kind(); k == "identifier" || k == "type_identifier" {
+		if k := c.kind(m); k == "identifier" || k == "type_identifier" {
 			add(c.text(m))
 		}
 		for _, ch := range c.namedChildren(m) {
@@ -486,7 +487,7 @@ func (c *ktConv) ktAnnotationTokens(n *tree_sitter.Node, prefix string) []string
 		}
 	}
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "modifiers" {
+		if c.kind(ch) == "modifiers" {
 			deep(ch)
 		}
 	}
@@ -515,7 +516,7 @@ func (c *ktConv) callArgs(args *tree_sitter.Node) []nir.Expr {
 	}
 	var out []nir.Expr
 	for _, a := range c.namedChildren(args) {
-		if a.Kind() == "value_argument" {
+		if c.kind(a) == "value_argument" {
 			if k := c.namedChildren(a); len(k) > 0 {
 				out = append(out, c.expr(k[len(k)-1]))
 			}
@@ -531,7 +532,7 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "simple_identifier", "this_expression", "super_expression":
 		// tree-sitter-kotlin parses boolean/null literals as bare identifiers; carry
 		// their value so value-matching marks can inspect them.
@@ -551,7 +552,7 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "string_literal":
 		var parts []nir.Expr
 		for _, ch := range c.namedChildren(n) {
-			if k := ch.Kind(); k == "interpolation" || k == "interpolated_expression" || k == "interpolated_identifier" {
+			if k := c.kind(ch); k == "interpolation" || k == "interpolated_expression" || k == "interpolated_identifier" {
 				for _, e := range c.namedChildren(ch) {
 					parts = append(parts, c.expr(e))
 				}
@@ -582,8 +583,8 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Index{Base: base, Key: key, Path: c.dotted(n), Loc: L}
 	case "binary_expression", "additive_expression":
-		l := field(n, "left")
-		r := field(n, "right")
+		l := c.field(n, "left")
+		r := c.field(n, "right")
 		if l == nil || r == nil {
 			k := c.namedChildren(n)
 			if len(k) >= 2 {
@@ -603,8 +604,8 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		// not change the flowing value (`x!!` asserts non-null, `x++` yields
 		// the pre-increment value), so it lowers as a pass-through; a prefix
 		// one keeps the operator, as the java and rust frontends lower theirs.
-		arg := field(n, "argument")
-		op := field(n, "operator")
+		arg := c.field(n, "argument")
+		op := c.field(n, "operator")
 		var operand nir.Expr = nir.Const{Loc: L}
 		if arg != nil {
 			operand = c.expr(arg)
@@ -619,7 +620,7 @@ func (c *ktConv) expr(n *tree_sitter.Node) nir.Expr {
 		var cond nir.Expr
 		var branches []nir.Expr
 		for _, ch := range c.namedChildren(n) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "control_structure_body", "block", "statements":
 				branches = append(branches, c.branchValue(ch))
 			default:
@@ -684,7 +685,7 @@ func (c *ktConv) callee(n *tree_sitter.Node) *tree_sitter.Node {
 	if len(kids) == 0 {
 		return nil
 	}
-	switch kids[0].Kind() {
+	switch c.kind(kids[0]) {
 	case "value_arguments", "call_suffix", "annotated_lambda":
 		return nil
 	}
@@ -693,12 +694,12 @@ func (c *ktConv) callee(n *tree_sitter.Node) *tree_sitter.Node {
 
 func (c *ktConv) valueArgs(n *tree_sitter.Node) *tree_sitter.Node {
 	for _, ch := range c.namedChildren(n) {
-		if ch.Kind() == "value_arguments" {
+		if c.kind(ch) == "value_arguments" {
 			return ch
 		}
-		if ch.Kind() == "call_suffix" {
+		if c.kind(ch) == "call_suffix" {
 			for _, s := range c.namedChildren(ch) {
-				if s.Kind() == "value_arguments" {
+				if c.kind(s) == "value_arguments" {
 					return s
 				}
 			}
@@ -711,7 +712,7 @@ func (c *ktConv) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "simple_identifier", "this_expression", "type_identifier":
 		return c.text(n)
 	case "navigation_expression":

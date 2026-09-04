@@ -11,6 +11,7 @@ import (
 
 // scConvScala walks a tree-sitter Scala CST into NIR.
 type scConvScala struct {
+	nodeCache
 	src         []byte
 	file        string
 	key         string
@@ -70,40 +71,40 @@ func (c *scConvScala) decls(n *tree_sitter.Node) []nir.Stmt {
 
 func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "package_clause", "package_object":
-		if b := field(n, "body"); b != nil {
+		if b := c.field(n, "body"); b != nil {
 			return c.decls(b)
 		}
 		return c.decls(n)
 	case "object_definition", "class_definition", "trait_definition", "enum_definition":
-		return []nir.Stmt{nir.ClassDef{Name: c.text(field(n, "name")), Body: c.decls(field(n, "body")), Loc: L}}
+		return []nir.Stmt{nir.ClassDef{Name: c.text(c.field(n, "name")), Body: c.decls(c.field(n, "body")), Loc: L}}
 	case "function_definition":
-		params := c.params(field(n, "parameters"))
-		name := c.text(field(n, "name"))
+		params := c.params(c.field(n, "parameters"))
+		name := c.text(c.field(n, "name"))
 		prev := c.currentFunc
 		c.currentFunc = name
-		body := c.bodyStmts(field(n, "body"))
+		body := c.bodyStmts(c.field(n, "body"))
 		c.currentFunc = prev
 		return []nir.Stmt{nir.FuncDef{
 			Name:          name,
 			Params:        params,
-			ParamTypes:    c.paramTypes(field(n, "parameters")),
+			ParamTypes:    c.paramTypes(c.field(n, "parameters")),
 			Body:          body,
 			Loc:           L,
-			ContextTokens: c.scFunctionContext(name, field(n, "body")),
+			ContextTokens: c.scFunctionContext(name, c.field(n, "body")),
 		}}
 	case "val_definition", "var_definition", "val_declaration", "var_declaration":
-		name := c.patName(field(n, "pattern"))
-		if v := field(n, "value"); name != "" && v != nil {
+		name := c.patName(c.field(n, "pattern"))
+		if v := c.field(n, "value"); name != "" && v != nil {
 			return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(v)}}
 		}
 		return nil
 	case "assignment_expression":
-		left := field(n, "left")
-		right := c.expr(field(n, "right"))
+		left := c.field(n, "left")
+		right := c.expr(c.field(n, "right"))
 		if left != nil {
-			switch left.Kind() {
+			switch c.kind(left) {
 			case "identifier":
 				return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 			case "field_expression", "indexed_expression":
@@ -118,13 +119,13 @@ func (c *scConvScala) stmt(n *tree_sitter.Node) []nir.Stmt {
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	// branch-structured (B1); Cond nil (Scala did not evaluate the predicate) -> byte-identical.
 	case "if_expression":
-		condNode := field(n, "condition")
+		condNode := c.field(n, "condition")
 		cond := c.expr(condNode)
 		ifn := nir.If{Cond: cond}
-		if cons := field(n, "consequence"); cons != nil {
+		if cons := c.field(n, "consequence"); cons != nil {
 			ifn.Then = c.collectBlocks(cons)
 		}
-		if alt := field(n, "alternative"); alt != nil {
+		if alt := c.field(n, "alternative"); alt != nil {
 			ifn.Else = c.collectBlocks(alt)
 		}
 		return []nir.Stmt{
@@ -184,18 +185,18 @@ func scHasIncompleteCsrfDoubleSubmit(raw, fn string) bool {
 // subject prunes non-matching arms (instead of flattening, which let a later arm mask a
 // live arm's taint). A wildcard `_` pattern is the default.
 func (c *scConvScala) scMatch(n *tree_sitter.Node) nir.Stmt {
-	sw := nir.Switch{Loc: c.loc(n), Subject: c.expr(field(n, "value"))}
-	body := field(n, "body")
+	sw := nir.Switch{Loc: c.loc(n), Subject: c.expr(c.field(n, "value"))}
+	body := c.field(n, "body")
 	if body == nil {
 		return sw
 	}
 	for _, cl := range c.namedChildren(body) {
-		if cl.Kind() != "case_clause" {
+		if c.kind(cl) != "case_clause" {
 			continue
 		}
-		pat := field(cl, "pattern")
-		stmts := c.scArmBody(field(cl, "body"))
-		if pat == nil || pat.Kind() == "wildcard" || c.text(pat) == "_" {
+		pat := c.field(cl, "pattern")
+		stmts := c.scArmBody(c.field(cl, "body"))
+		if pat == nil || c.kind(pat) == "wildcard" || c.text(pat) == "_" {
 			sw.Default = append(sw.Default, stmts...)
 			continue
 		}
@@ -209,7 +210,7 @@ func (c *scConvScala) scArmBody(b *tree_sitter.Node) []nir.Stmt {
 	if b == nil {
 		return nil
 	}
-	switch b.Kind() {
+	switch c.kind(b) {
 	case "block", "indented_block":
 		return c.collectBlocks(b)
 	}
@@ -220,7 +221,7 @@ func (c *scConvScala) bodyStmts(body *tree_sitter.Node) []nir.Stmt {
 	if body == nil {
 		return nil
 	}
-	if body.Kind() == "block" {
+	if c.kind(body) == "block" {
 		return c.block(body)
 	}
 	return []nir.Stmt{nir.Return{Value: c.expr(body)}}
@@ -239,7 +240,7 @@ func (c *scConvScala) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var walk func(m *tree_sitter.Node)
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
-			switch ch.Kind() {
+			switch c.kind(ch) {
 			case "block":
 				out = append(out, c.block(ch)...)
 			case "indented_block", "case_clause", "catch_clause", "finally_clause", "else_clause", "guard":
@@ -251,7 +252,7 @@ func (c *scConvScala) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 			}
 		}
 	}
-	if n.Kind() == "block" {
+	if c.kind(n) == "block" {
 		return c.block(n)
 	}
 	walk(n)
@@ -264,8 +265,8 @@ func (c *scConvScala) params(params *tree_sitter.Node) []string {
 	}
 	var out []string
 	for _, ch := range c.namedChildren(params) {
-		if ch.Kind() == "parameter" {
-			if nm := field(ch, "name"); nm != nil {
+		if c.kind(ch) == "parameter" {
+			if nm := c.field(ch, "name"); nm != nil {
 				out = append(out, c.text(nm))
 			}
 		}
@@ -279,8 +280,8 @@ func (c *scConvScala) paramTypes(params *tree_sitter.Node) map[string]string {
 		return out
 	}
 	for _, ch := range c.namedChildren(params) {
-		if ch.Kind() == "parameter" {
-			if nm := field(ch, "name"); nm != nil {
+		if c.kind(ch) == "parameter" {
+			if nm := c.field(ch, "name"); nm != nil {
 				putParamType(out, c.text(nm), paramTypeFromField(c, ch))
 			}
 		}
@@ -307,25 +308,25 @@ func (c *scConvScala) scFunctionContext(name string, body *tree_sitter.Node) []s
 		if n == nil || len(out) >= 512 {
 			return
 		}
-		switch n.Kind() {
+		switch c.kind(n) {
 		case "val_definition", "var_definition":
-			left := c.patName(field(n, "pattern"))
-			if right := scContextValue(c.text(field(n, "value"))); left != "" && right != "" {
+			left := c.patName(c.field(n, "pattern"))
+			if right := scContextValue(c.text(c.field(n, "value"))); left != "" && right != "" {
 				add("assign:" + left + "=" + right)
 			}
 		case "assignment_expression":
-			left := scContextPath(c, field(n, "left"))
-			right := scContextValue(c.text(field(n, "right")))
+			left := scContextPath(c, c.field(n, "left"))
+			right := scContextValue(c.text(c.field(n, "right")))
 			if left != "" && right != "" {
 				add("assign:" + left + "=" + right)
 			}
 		case "call_expression":
-			if path := c.dotted(field(n, "function")); path != "" && path != "?" {
+			if path := c.dotted(c.field(n, "function")); path != "" && path != "?" {
 				add("call_path:" + path)
 				if m := lastSeg(path); m != "" {
 					add("call:" + m)
 				}
-				for _, arg := range c.namedChildren(field(n, "arguments")) {
+				for _, arg := range c.namedChildren(c.field(n, "arguments")) {
 					if a := scContextPath(c, arg); a != "" {
 						add("call_arg:" + path + ":" + a)
 					}
@@ -378,7 +379,7 @@ func (c *scConvScala) patName(p *tree_sitter.Node) string {
 	if p == nil {
 		return ""
 	}
-	switch p.Kind() {
+	switch c.kind(p) {
 	case "identifier":
 		return c.text(p)
 	case "typed_pattern", "tuple_pattern":
@@ -405,7 +406,7 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: "?:0"}
 	}
 	L := c.loc(n)
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "this", "stable_identifier", "wildcard":
 		return nir.Name{ID: c.text(n), Loc: L}
 	case "integer_literal", "floating_point_literal", "character_literal":
@@ -420,7 +421,7 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 			var walk func(m *tree_sitter.Node)
 			walk = func(m *tree_sitter.Node) {
 				for _, ch := range c.namedChildren(m) {
-					if ch.Kind() == "interpolation" {
+					if c.kind(ch) == "interpolation" {
 						for _, e := range c.namedChildren(ch) {
 							parts = append(parts, c.expr(e))
 						}
@@ -433,19 +434,19 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 		}
 		return nir.Format{Parts: parts, Loc: L}
 	case "field_expression":
-		return nir.Attr{Base: c.expr(field(n, "value")), Attr: c.text(field(n, "field")), Path: c.dotted(n), Loc: L}
+		return nir.Attr{Base: c.expr(c.field(n, "value")), Attr: c.text(c.field(n, "field")), Path: c.dotted(n), Loc: L}
 	case "call_expression":
-		fn := field(n, "function")
+		fn := c.field(n, "function")
 		path := c.dotted(fn)
-		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
+		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(c.field(n, "arguments")), Path: path, Method: lastSeg(path), Loc: L}
 	case "generic_function":
-		return c.expr(field(n, "function"))
+		return c.expr(c.field(n, "function"))
 	case "instance_expression":
 		// `new Type(args)` — model as a constructor call so type/arg sinks and marks match
 		// (e.g. new pkg.Widget(p), new pkg.Builder()). Grammar nests a call_expression
 		// (type applied to arguments) or carries the type + arguments directly.
 		for _, ch := range c.namedChildren(n) {
-			if k := ch.Kind(); k == "call_expression" || k == "generic_function" {
+			if k := c.kind(ch); k == "call_expression" || k == "generic_function" {
 				return c.expr(ch)
 			}
 		}
@@ -458,16 +459,16 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 				path = c.text(kids[0])
 			}
 			var args []nir.Expr
-			if a := field(n, "arguments"); a != nil {
+			if a := c.field(n, "arguments"); a != nil {
 				args = c.callArgs(a)
-			} else if len(kids) >= 2 && kids[1].Kind() == "arguments" {
+			} else if len(kids) >= 2 && c.kind(kids[1]) == "arguments" {
 				args = c.callArgs(kids[1])
 			}
 			return nir.Call{Callee: nir.Name{ID: path, Loc: L}, Args: args, Path: path, Method: lastSeg(path), Loc: L}
 		}
 	case "infix_expression":
-		op := c.text(field(n, "operator"))
-		left, right := c.expr(field(n, "left")), c.expr(field(n, "right"))
+		op := c.text(c.field(n, "operator"))
+		left, right := c.expr(c.field(n, "left")), c.expr(c.field(n, "right"))
 		if op == "+" {
 			return nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
 		}
@@ -477,7 +478,7 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Thru{Inner: c.expr(kids[len(kids)-1])}
 		}
 	case "prefix_expression", "unary_expression":
-		op := c.text(field(n, "operator"))
+		op := c.text(c.field(n, "operator"))
 		var operand nir.Expr = nir.Const{Loc: L}
 		if kids := c.namedChildren(n); len(kids) > 0 {
 			operand = c.expr(kids[len(kids)-1])
@@ -486,11 +487,11 @@ func (c *scConvScala) expr(n *tree_sitter.Node) nir.Expr {
 	case "if_expression":
 		// if-as-expression `if (c) a else b` → Ternary so the engine merges both branch
 		// values into a Phi (a tainted branch then taints the result).
-		condNode := field(n, "condition")
+		condNode := c.field(n, "condition")
 		cond := c.expr(condNode)
 		t := nir.Ternary{Cond: cond, Loc: L}
-		t.Then = c.blockTail(field(n, "consequence"))
-		if alt := field(n, "alternative"); alt != nil {
+		t.Then = c.blockTail(c.field(n, "consequence"))
+		if alt := c.field(n, "alternative"); alt != nil {
 			t.Else = c.blockTail(alt)
 		} else {
 			t.Else = nir.Const{Loc: L}
@@ -516,7 +517,7 @@ func (c *scConvScala) blockTail(n *tree_sitter.Node) nir.Expr {
 	if n == nil {
 		return nir.Const{Loc: "?:0"}
 	}
-	if k := n.Kind(); k == "block" || k == "indented_block" {
+	if k := c.kind(n); k == "block" || k == "indented_block" {
 		kids := c.namedChildren(n)
 		if len(kids) == 0 {
 			return nir.Const{Loc: c.loc(n)}
@@ -530,17 +531,17 @@ func (c *scConvScala) dotted(n *tree_sitter.Node) string {
 	if n == nil {
 		return "?"
 	}
-	switch n.Kind() {
+	switch c.kind(n) {
 	case "identifier", "this", "operator_identifier", "type_identifier":
 		return c.text(n)
 	case "stable_identifier":
 		return c.text(n)
 	case "field_expression":
-		return c.dotted(field(n, "value")) + "." + c.text(field(n, "field"))
+		return c.dotted(c.field(n, "value")) + "." + c.text(c.field(n, "field"))
 	case "call_expression":
-		return c.dotted(field(n, "function"))
+		return c.dotted(c.field(n, "function"))
 	case "generic_function":
-		return c.dotted(field(n, "function"))
+		return c.dotted(c.field(n, "function"))
 	}
 	return "?"
 }
