@@ -4,7 +4,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strconv"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/vyprai/vyql/internal/datadir"
@@ -105,6 +107,51 @@ func TestLowerStringPreservesSemantics(t *testing.T) {
 	}
 	if got := lowerString("already-lower"); got != "already-lower" {
 		t.Fatalf("lowerString should leave lowercase ASCII unchanged, got %q", got)
+	}
+}
+
+func TestCallArgContextTokensScopedPreservesDirectTokens(t *testing.T) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "send", Type: "code.Call", Props: map[string]string{
+		"callee_path": "pkg.Send", "method": "Send", "str_args": " raw \x00raw\x00",
+	}})
+	n, _, _ := store.GetNode("send")
+	got := callArgContextTokensScoped(store, &flagMatchIndex{}, n, "go", false)
+	want := strings.Join([]string{
+		"call_arg:pkg.Send: raw ", "call_arg_method:Send: raw ",
+		"call_arg:pkg.Send:raw", "call_arg_method:Send:raw",
+	}, "\x00")
+	if got != want {
+		t.Fatalf("scoped call-argument tokens = %q, want %q", got, want)
+	}
+}
+
+func BenchmarkCallArgContextTokensScoped(b *testing.B) {
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "send", Type: "code.Call", Loc: "mail.go:1", Scope: "mail.go/fn", Props: map[string]string{
+		"callee_path": "mail.Send", "method": "Send", "str_args": strings.Repeat("direct-value\x00", 64),
+	}})
+	for i := 0; i < 256; i++ {
+		suffix := strconv.Itoa(i)
+		argID, srcID := "arg-"+suffix, "source-"+suffix
+		store.AddNode(usg.Node{ID: argID, Type: "code.Arg", Loc: "mail.go:1", Scope: "mail.go/fn"})
+		store.AddNode(usg.Node{ID: srcID, Type: "code.Name", Loc: "mail.go:1", Scope: "mail.go/fn", Props: map[string]string{
+			"name": "recipient" + suffix, "path": "request.recipient" + suffix,
+			"str_args": "value-" + suffix,
+		}})
+		store.AddEdge(usg.Edge{Type: "FLOWS", Src: srcID, Dst: argID})
+		store.AddEdge(usg.Edge{Type: "FLOWS", Src: argID, Dst: "send"})
+	}
+	n, _, _ := store.GetNode("send")
+	idx := &flagMatchIndex{}
+	idx.ensure(store)
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		idx.callArgText = sync.Map{}
+		if got := callArgContextTokensScoped(store, idx, n, "go", false); got == "" {
+			b.Fatal("expected scoped call-argument tokens")
+		}
 	}
 }
 

@@ -1260,37 +1260,31 @@ func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, te
 	if cached, ok := idx.callArgText.Load(cacheKey); ok {
 		return cached.(string)
 	}
-	tokens := callArgContextTokens(n)
 	path := n.Prop("callee_path")
 	method := n.Prop("method")
 	if path == "" && method == "" {
-		idx.callArgText.Store(cacheKey, tokens)
-		return tokens
+		idx.callArgText.Store(cacheKey, "")
+		return ""
 	}
-	var out []string
-	if tokens != "" {
-		out = append(out, strings.Split(tokens, "\x00")...)
+	pathPrefix := ""
+	methodPrefix := ""
+	if path != "" {
+		pathPrefix = "call_arg:" + path + ":"
 	}
+	if method != "" {
+		methodPrefix = "call_arg_method:" + method + ":"
+	}
+	var values []string
 	seen := map[string]bool{}
-	add := func(text string) {
-		text = strings.TrimSpace(text)
-		if text == "" {
+	addValue := func(text string) {
+		if text == "" || seen[text] {
 			return
 		}
-		if path != "" {
-			tok := "call_arg:" + path + ":" + text
-			if !seen[tok] {
-				seen[tok] = true
-				out = append(out, tok)
-			}
-		}
-		if method != "" {
-			tok := "call_arg_method:" + method + ":" + text
-			if !seen[tok] {
-				seen[tok] = true
-				out = append(out, tok)
-			}
-		}
+		seen[text] = true
+		values = append(values, text)
+	}
+	add := func(text string) {
+		addValue(strings.TrimSpace(text))
 	}
 	addNode := func(node usg.Node) {
 		add(node.Prop("str_args"))
@@ -1301,6 +1295,11 @@ func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, te
 		add(node.Prop("path"))
 		add(node.ID)
 	}
+	// Direct tokens were historically kept verbatim, including duplicates. Keep
+	// that representation stable; only the extra flow-derived values are deduped.
+	forEachNULToken(n.Prop("str_args"), func(text string) {
+		values = append(values, text)
+	})
 	rangeFlowIn(s, &idx.flow, n.ID, func(argID string) bool {
 		arg, ok := idx.node(s, argID)
 		if !ok || arg.Type != "code.Arg" || !idx.scopedCallArgCandidate(arg, n, tech, crossLang) {
@@ -1317,9 +1316,45 @@ func callArgContextTokensScoped(s usg.Store, idx *flagMatchIndex, n usg.Node, te
 		})
 		return true
 	})
-	result := strings.Join(out, "\x00")
-	idx.callArgText.Store(cacheKey, result)
-	return result
+	prefixBytes, prefixCount := 0, 0
+	if pathPrefix != "" {
+		prefixBytes += len(pathPrefix)
+		prefixCount++
+	}
+	if methodPrefix != "" {
+		prefixBytes += len(methodPrefix)
+		prefixCount++
+	}
+	needed := len(values) * prefixBytes
+	for _, value := range values {
+		needed += prefixCount * len(value)
+	}
+	tokenCount := len(values) * prefixCount
+	if tokenCount > 1 {
+		needed += tokenCount - 1
+	}
+	var result strings.Builder
+	result.Grow(needed)
+	wrote := false
+	write := func(prefix, value string) {
+		if wrote {
+			result.WriteByte(0)
+		}
+		result.WriteString(prefix)
+		result.WriteString(value)
+		wrote = true
+	}
+	for _, value := range values {
+		if pathPrefix != "" {
+			write(pathPrefix, value)
+		}
+		if methodPrefix != "" {
+			write(methodPrefix, value)
+		}
+	}
+	text := result.String()
+	idx.callArgText.Store(cacheKey, text)
+	return text
 }
 
 func callArgSourceNodeType(typ string) bool {
@@ -1338,7 +1373,30 @@ func callArgContextTokens(n usg.Node) string {
 		return ""
 	}
 	text := n.Prop("str_args")
+	pathPrefix := ""
+	methodPrefix := ""
+	if path != "" {
+		pathPrefix = "call_arg:" + path + ":"
+	}
+	if method != "" {
+		methodPrefix = "call_arg_method:" + method + ":"
+	}
+	needed, count := 0, 0
+	forEachNULToken(text, func(arg string) {
+		if pathPrefix != "" {
+			needed += len(pathPrefix) + len(arg)
+			count++
+		}
+		if methodPrefix != "" {
+			needed += len(methodPrefix) + len(arg)
+			count++
+		}
+	})
+	if count > 1 {
+		needed += count - 1
+	}
 	var b strings.Builder
+	b.Grow(needed)
 	wrote := false
 	add := func(prefix, arg string) {
 		if wrote {
@@ -1348,6 +1406,18 @@ func callArgContextTokens(n usg.Node) string {
 		b.WriteString(arg)
 		wrote = true
 	}
+	forEachNULToken(text, func(arg string) {
+		if pathPrefix != "" {
+			add(pathPrefix, arg)
+		}
+		if methodPrefix != "" {
+			add(methodPrefix, arg)
+		}
+	})
+	return b.String()
+}
+
+func forEachNULToken(text string, fn func(string)) {
 	for start := 0; start <= len(text); {
 		end := strings.IndexByte(text[start:], '\x00')
 		var arg string
@@ -1361,14 +1431,8 @@ func callArgContextTokens(n usg.Node) string {
 		if arg == "" {
 			continue
 		}
-		if path != "" {
-			add("call_arg:"+path+":", arg)
-		}
-		if method != "" {
-			add("call_arg_method:"+method+":", arg)
-		}
+		fn(arg)
 	}
-	return b.String()
 }
 
 func trimFlagValuePrefix(values []string, prefix string) []string {
