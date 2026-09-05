@@ -1985,6 +1985,131 @@
           "vyql_v0.2.0_linux_arm64.tar.gz.sha256": 3
         }
       }
+    },
+    {
+      "date": "2026-09-05",
+      "releases": {
+        "v0.4.3": {
+          "vyql_v0.4.3_darwin_amd64.tar.gz": 1,
+          "vyql_v0.4.3_darwin_amd64.tar.gz.sha256": 2,
+          "vyql_v0.4.3_darwin_arm64.tar.gz": 1,
+          "vyql_v0.4.3_darwin_arm64.tar.gz.sha256": 2,
+          "vyql_v0.4.3_linux_amd64.tar.gz": 3,
+          "vyql_v0.4.3_linux_amd64.tar.gz.sha256": 3,
+          "vyql_v0.4.3_linux_arm64.tar.gz": 3,
+          "vyql_v0.4.3_linux_arm64.tar.gz.sha256": 4
+        },
+        "v0.4.2": {
+          "vyql_v0.4.2_darwin_amd64.tar.gz": 1,
+          "vyql_v0.4.2_darwin_amd64.tar.gz.sha256": 2,
+          "vyql_v0.4.2_darwin_arm64.tar.gz": 1,
+          "vyql_v0.4.2_darwin_arm64.tar.gz.sha256": 2,
+          "vyql_v0.4.2_linux_amd64.tar.gz": 2,
+          "vyql_v0.4.2_linux_amd64.tar.gz.sha256": 3,
+          "vyql_v0.4.2_linux_arm64.tar.gz": 3,
+          "vyql_v0.4.2_linux_arm64.tar.gz.sha256": 4
+        },
+        "v0.4.1": {
+          "vyql_v0.4.1_darwin_amd64.tar.gz": 1,
+          "vyql_v0.4.1_darwin_amd64.tar.gz.sha256": 2,
+          "vyql_v0.4.1_darwin_arm64.tar.gz": 2,
+          "vyql_v0.4.1_darwin_arm64.tar.gz.sha256": 2,
+          "vyql_v0.4.1_linux_amd64.tar.gz": 2,
+          "vyql_v0.4.1_linux_amd64.tar.gz.sha256": 3,
+          "vyql_v0.4.1_linux_arm64.tar.gz": 2,
+          "vyql_v0.4.1_linux_arm64.tar.gz.sha256": 3
+        },
+        "v0.4.0": {
+          "vyql_v0.4.0_darwin_amd64.tar.gz": 1,
+          "vyql_v0.4.0_darwin_amd64.tar.gz.sha256": 2,
+          "vyql_v0.4.0_darwin_arm64.tar.gz": 13,
+          "vyql_v0.4.0_darwin_arm64.tar.gz.sha256": 14,
+          "vyql_v0.4.0_linux_amd64.tar.gz": 56,
+          "vyql_v0.4.0_linux_amd64.tar.gz.sha256": 55,
+          "vyql_v0.4.0_linux_arm64.tar.gz": 4,
+          "vyql_v0.4.0_linux_arm64.tar.gz.sha256": 5
+        },
+        "v0.3.1": {
+          "vyql_v0.3.1_darwin_amd64.tar.gz": 1,
+          "vyql_v0.3.1_darwin_amd64.tar.gz.sha256": 2,
+          "vyql_v0.3.1_darwin_arm64.tar.gz": 17,
+          "vyql_v0.3.1_darwin_arm64.tar.gz.sha256": 18,
+          "vyql_v0.3.1_linux_amd64.tar.gz": 38,
+          "vyql_v0.3.1_linux_amd64.tar.gz.sha256": 39,
+          "vyql_v0.3.1_linux_arm64.tar.gz": 2,
+          "vyql_v0.3.1_linux_arm64.tar.gz.sha256": 3
+        },
+        "v0.3.0": {
+          "vyql_v0.3.0_darwin_amd64.tar.gz": 0,
+          "vyql_v0.3.0_darwin_amd64.tar.gz.sha256": 1,
+          "vyql_v0.3.0_darwin_arm64.tar.gz": 11,
+          "vyql_v0.3.0_darwin_arm64.tar.gz.sha256": 12,
+          "vyql_v0.3.0_linux_amd64.tar.gz": 21,
+          "vyql_v0.3.0_linux_amd64.tar.gz.sha256": 22,
+          "vyql_v0.3.0_linux_arm64.tar.gz": 1,
+          "vyql_v0.3.0_linux_arm64.tar.gz.sha256": 2
+        },
+        "v0.2.5": {
+          "vyql_v0.2.5_darwin_amd64.tar.gz": 1,
+          "vyql_v0.2.5_darwin_amd64.tar.gz.sha256": 2,
+          "vyql_v0.2.5_darwin_arm64.tar.gz": 10,
+          "vyql_v0.2.5_darwin_arm64.tar.gz.sha256": 11,
+          "vyql_v0.2.5_linux_amd64.tar.gz": 19,
+          "vyql_v0.2.5_linux_amd64.tar.gz.sha256": 19,
+          "vyql_v0.2.5_linux_arm64.tar.gz": 1,
+          "vyql_v0.2.5_linux_arm64.tar.gz.sha256": 2
+        },
+        "v0.2.4": {
+          "vyql_v0.2.4_darwin_amd64.tar.gz": 0,
+          "vyql_v0.2.4_darwin_amd64.tar.gz.sha256": 2,
+          "vyql_v0.2.4_darwin_arm64.tar.gz": 6,
+          "vyql_v0.2.4_darwin_arm64.tar.gz.sha256": 7,
+          "vyql_v0.2.4_linux_amd64.tar.gz": 12,
+          "vyql_v0.2.4_linux_amd64.tar.gz.sha256": 14,
+          "vyql_v0.2.4_linux_arm64.tar.gz": 1,
+          "vyql_v0.2.4_linux_arm64.tar.gz.sha256": 3
+        },
+        "v0.2.3": {
+          "vyql_v0.2.3_darwin_amd64.tar.gz": 0,
+          "vyql_v0.2.3_darwin_amd64.tar.gz.sha256": 2,
+          "vyql_v0.2.3_darwin_arm64.tar.gz": 6,
+          "vyql_v0.2.3_darwin_arm64.tar.gz.sha256": 7,
+          "vyql_v0.2.3_linux_amd64.tar.gz": 7,
+          "vyql_v0.2.3_linux_amd64.tar.gz.sha256": 9,
+          "vyql_v0.2.3_linux_arm64.tar.gz": 1,
+          "vyql_v0.2.3_linux_arm64.tar.gz.sha256": 3
+        },
+        "v0.2.2": {
+          "vyql_v0.2.2_darwin_amd64.tar.gz": 0,
+          "vyql_v0.2.2_darwin_amd64.tar.gz.sha256": 1,
+          "vyql_v0.2.2_darwin_arm64.tar.gz": 9,
+          "vyql_v0.2.2_darwin_arm64.tar.gz.sha256": 9,
+          "vyql_v0.2.2_linux_amd64.tar.gz": 20,
+          "vyql_v0.2.2_linux_amd64.tar.gz.sha256": 20,
+          "vyql_v0.2.2_linux_arm64.tar.gz": 0,
+          "vyql_v0.2.2_linux_arm64.tar.gz.sha256": 1
+        },
+        "v0.2.1": {
+          "vyql_v0.2.1_darwin_amd64.tar.gz": 0,
+          "vyql_v0.2.1_darwin_amd64.tar.gz.sha256": 2,
+          "vyql_v0.2.1_darwin_arm64.tar.gz": 11,
+          "vyql_v0.2.1_darwin_arm64.tar.gz.sha256": 11,
+          "vyql_v0.2.1_linux_amd64.tar.gz": 11,
+          "vyql_v0.2.1_linux_amd64.tar.gz.sha256": 13,
+          "vyql_v0.2.1_linux_arm64.tar.gz": 0,
+          "vyql_v0.2.1_linux_arm64.tar.gz.sha256": 2
+        },
+        "v0.2.0": {
+          "vyql_v0.2.0_darwin_amd64.tar.gz": 0,
+          "vyql_v0.2.0_darwin_amd64.tar.gz.sha256": 1,
+          "vyql_v0.2.0_darwin_arm64.tar.gz": 18,
+          "vyql_v0.2.0_darwin_arm64.tar.gz.sha256": 20,
+          "vyql_v0.2.0_linux_amd64.tar.gz": 11,
+          "vyql_v0.2.0_linux_amd64.tar.gz.sha256": 13,
+          "vyql_v0.2.0_linux_arm64.tar.gz": 2,
+          "vyql_v0.2.0_linux_arm64.tar.gz.sha256": 3
+        }
+      }
     }
   ],
   "origin": "2026-08-05"
