@@ -32,15 +32,23 @@ behaviour change, even if no code moved.
   case, median retained heap fell from 248.1 MiB to 239.4 MiB; median user CPU
   was unchanged.
 - **Scoped call-argument matching keeps structured facts instead of generated
-  token strings.** Callee paths, methods and reachable argument values are now
-  matched as segmented virtual tokens, and general context facts fold case
+  token strings.** Callee paths, methods and reachable argument values are held
+  as structured facts on the node index, the token text a predicate reads is
+  built once per call and kept with them, and general context facts fold case
   during comparison instead of retaining a second lowercase copy. On the same
   generated template, three-run median retained heap fell from 229.8 MiB to
-  151.2 MiB and interleaved median user CPU fell from 12.71 s to 4.17 s; wall
-  time moved from 3.89 s to 3.81 s.
+  151.2 MiB.
 
 ### Fixed
 
+- **A scoped call-argument predicate reads the value part of the token again.**
+  A predicate value written as `<prefix>:<want>` names a token prefix and what
+  the rest of that token must satisfy, so `call_arg:startswith:__` matches a
+  call whose callee path is `key.startswith`. Comparing the value against the
+  whole token instead is a different question, and it silenced 14 rules across
+  the CVE corpus -- among them VYQL-SEC-043, VYQL-CFG-004, VYQL-DOS-042 and
+  VYQL-INJ-024 -- and made VYQL-AUTH-082 and VYQL-INJ-143 report a finding whose
+  guard clause should have stopped them.
 - **`--max-ram` now stops with headroom before the requested ceiling on Linux
   and macOS.** The resident watch samples every 100 ms, counts the complete
   Linux RSS, and uses Darwin's resident high-water mark; macOS previously had

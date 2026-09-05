@@ -126,31 +126,32 @@ func TestCallArgContextTokensScopedPreservesDirectTokens(t *testing.T) {
 	}
 }
 
-func TestStructuredCallArgFactsMatchMaterializedSemantics(t *testing.T) {
+// A predicate value of the form `<prefix>:<want>` names a token prefix and what
+// the rest of that token must satisfy. It is not a substring of the whole token:
+// a call whose callee path is `key.startswith` carries the token
+// `call_arg:key.startswith:__`, and the definitions ask for
+// `call_arg:startswith:__`, which the whole token does not contain.
+func TestCallArgFactsMatchScopesValuesByTokenPrefix(t *testing.T) {
+	facts := &callArgContextFacts{
+		path:   "key.startswith",
+		method: "startswith",
+		values: []string{"__", "code.Arg"},
+	}
 	cases := []struct {
 		name   string
-		facts  *callArgContextFacts
 		op     string
 		values []string
+		want   bool
 	}{
-		{"contains path and value", &callArgContextFacts{path: "pkg.Send", method: "Send", values: []string{"Recipient"}}, "contains", []string{"call_arg:pkg.send:recipient"}},
-		{"contains every", &callArgContextFacts{path: "pkg.Send", method: "Send", values: []string{"Recipient", "Urgent"}}, "contains", []string{"call_arg:pkg.send:recipient", "call_arg_method:send:urgent"}},
-		{"contains any", &callArgContextFacts{path: "pkg.Send", values: []string{"Recipient"}}, "contains_any", []string{"call_arg:missing", "call_arg:pkg.send:recipient"}},
-		{"equals every", &callArgContextFacts{path: "pkg.Send", values: []string{"one", "two"}}, "equals", []string{"call_arg:pkg.Send:one", "call_arg:pkg.Send:two"}},
-		{"equals any miss", &callArgContextFacts{method: "Send", values: []string{"one"}}, "equals_any", []string{"call_arg_method:Send:two"}},
-		{"exists prefix", &callArgContextFacts{path: "pkg.Send", values: []string{"one"}}, "exists", []string{"call_arg:pkg.Send:"}},
-		{"starts with", &callArgContextFacts{path: "pkg.Send", values: []string{"one"}}, "starts_with", []string{"call_arg:pkg"}},
-		{"ends with", &callArgContextFacts{method: "Send", values: []string{"File.JSON"}}, "ends_with", []string{".json"}},
-		{"unicode fallback", &callArgContextFacts{path: "pkg.Send", values: []string{"Straße"}}, "contains", []string{"straße"}},
-		{"embedded separator fallback", &callArgContextFacts{path: "pkg.Send", values: []string{"one\x00literal:two"}}, "contains_any", []string{"literal:two"}},
-		{"no tokens", &callArgContextFacts{path: "pkg.Send"}, "exists", nil},
+		{"a scoped value reads the rest of the token", "contains_any", []string{"call_arg:startswith:__"}, true},
+		{"the whole token is still a value", "contains_any", []string{"call_arg:key.startswith:__"}, true},
+		{"the method prefix is scoped the same way", "contains_any", []string{"call_arg_method:startswith:code.arg"}, true},
+		{"a path the call does not carry", "contains_any", []string{"call_arg:nowhere:__"}, false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			want := contextTokenValuePredicate(tc.op, tc.values, tc.facts.materialize())
-			got := callArgFactsMatch(tc.op, tc.values, lowerStrings(tc.values), tc.facts)
-			if got != want {
-				t.Fatalf("structured=%v materialized=%v text=%q", got, want, tc.facts.materialize())
+			if got := callArgFactsMatch(tc.op, tc.values, lowerStrings(tc.values), facts); got != tc.want {
+				t.Fatalf("callArgFactsMatch(%q, %q) = %v, want %v", tc.op, tc.values, got, tc.want)
 			}
 		})
 	}
