@@ -8,6 +8,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/vyprai/vyql/internal/usg"
 )
@@ -1220,6 +1221,17 @@ type callArgContextFacts struct {
 	path   string
 	method string
 	values []string
+
+	// The token text these facts stand for, built on first use. The index holds
+	// one facts value per node, so every predicate about that node reads the
+	// same string and no call rebuilds it.
+	once sync.Once
+	text string
+}
+
+func (f *callArgContextFacts) tokens() string {
+	f.once.Do(func() { f.text = f.materialize() })
+	return f.text
 }
 
 type segmentedContextToken struct {
@@ -1227,108 +1239,23 @@ type segmentedContextToken struct {
 	n     int
 }
 
+// callArgFactsMatch answers a predicate about one call's argument facts.
+//
+// The facts are the structured form of the virtual tokens, so the predicate is
+// answered against the token text they stand for. Matching a token by its parts
+// is not the same question: a predicate value of the form `<prefix>:<want>` is
+// scoped to tokens carrying that prefix and is compared against the rest of the
+// token, and `contains` over several values is one conjunction over the token
+// text ORed with another over the prefix-scoped values. Comparing whole tokens
+// instead misses a call the definitions expect to match.
+//
+// The token text is built once per call and held on the facts, which the index
+// keeps per node, so the work is the same whichever predicate asks first.
 func callArgFactsMatch(op string, values, valuesLower []string, facts *callArgContextFacts) bool {
 	if facts == nil {
 		return false
 	}
-	for _, value := range facts.values {
-		if strings.IndexByte(value, '\x00') >= 0 {
-			// Preserve the legacy interpretation of embedded separators. This is rare
-			// (normal str_args is already tokenized) and keeps the hot path allocation-free.
-			return contextTokenValuePredicateLowerValues(op, values, valuesLower, facts.materialize())
-		}
-	}
-	tokenCount := len(facts.values)
-	if facts.path != "" && facts.method != "" {
-		tokenCount *= 2
-	} else if facts.path == "" && facts.method == "" {
-		tokenCount = 0
-	}
-	if op == "exists" && len(values) == 0 {
-		return tokenCount != 0
-	}
-
-	matchOne := func(value, lowerValue string, mode string) bool {
-		return facts.anyToken(func(tok segmentedContextToken) bool {
-			switch mode {
-			case "equals":
-				return tok.equal(value)
-			case "starts_with":
-				return tok.boundaryFolded(lowerValue, false)
-			case "ends_with":
-				return tok.boundaryFolded(lowerValue, true)
-			default:
-				return tok.containsFolded(lowerValue)
-			}
-		})
-	}
-
-	switch op {
-	case "exists":
-		for _, value := range values {
-			if value == "" && tokenCount != 0 {
-				return true
-			}
-			if _, want, ok := splitContextTokenPredicateValue(value); ok && want == "" &&
-				facts.anyToken(func(tok segmentedContextToken) bool { return tok.hasPrefix(value) }) {
-				return true
-			}
-			if matchOne(value, "", "equals") {
-				return true
-			}
-		}
-		return false
-	case "equals_any":
-		for _, value := range values {
-			if matchOne(value, "", "equals") {
-				return true
-			}
-		}
-		return false
-	case "equals":
-		if len(values) == 0 {
-			return false
-		}
-		for _, value := range values {
-			if !matchOne(value, "", "equals") {
-				return false
-			}
-		}
-		return true
-	case "contains_any":
-		for i, value := range values {
-			lower := lowerString(value)
-			if i < len(valuesLower) {
-				lower = valuesLower[i]
-			}
-			if matchOne(value, lower, "contains") {
-				return true
-			}
-		}
-		return false
-	case "starts_with", "ends_with":
-		for i, value := range values {
-			lower := lowerString(value)
-			if i < len(valuesLower) {
-				lower = valuesLower[i]
-			}
-			if matchOne(value, lower, op) {
-				return true
-			}
-		}
-		return false
-	default: // contains and the historical empty operator both mean all needles
-		for i, value := range values {
-			lower := lowerString(value)
-			if i < len(valuesLower) {
-				lower = valuesLower[i]
-			}
-			if !matchOne(value, lower, "contains") {
-				return false
-			}
-		}
-		return true
-	}
+	return contextTokenValuePredicateLowerValues(op, values, valuesLower, facts.tokens())
 }
 
 func (f *callArgContextFacts) anyToken(fn func(segmentedContextToken) bool) bool {
@@ -1360,118 +1287,6 @@ func (f *callArgContextFacts) materialize() string {
 		return false
 	})
 	return b.String()
-}
-
-func (t segmentedContextToken) len() int {
-	n := 0
-	for i := 0; i < t.n; i++ {
-		n += len(t.parts[i])
-	}
-	return n
-}
-
-func (t segmentedContextToken) byteAt(pos int) byte {
-	for i := 0; i < t.n; i++ {
-		if pos < len(t.parts[i]) {
-			return t.parts[i][pos]
-		}
-		pos -= len(t.parts[i])
-	}
-	return 0
-}
-
-func (t segmentedContextToken) string() string {
-	var b strings.Builder
-	b.Grow(t.len())
-	for i := 0; i < t.n; i++ {
-		b.WriteString(t.parts[i])
-	}
-	return b.String()
-}
-
-func (t segmentedContextToken) equal(want string) bool {
-	if t.len() != len(want) {
-		return false
-	}
-	for i := range want {
-		if t.byteAt(i) != want[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (t segmentedContextToken) hasPrefix(want string) bool {
-	if len(want) > t.len() {
-		return false
-	}
-	for i := range want {
-		if t.byteAt(i) != want[i] {
-			return false
-		}
-	}
-	return true
-}
-
-func (t segmentedContextToken) containsFolded(lowerWant string) bool {
-	if lowerWant == "" {
-		return true
-	}
-	if len(lowerWant) > t.len() {
-		return false
-	}
-	for _, ch := range []byte(lowerWant) {
-		if ch >= 0x80 {
-			return strings.Contains(lowerString(t.string()), lowerWant)
-		}
-	}
-	limit := t.len() - len(lowerWant)
-	for start := 0; start <= limit; start++ {
-		matched := true
-		for j := range lowerWant {
-			ch := t.byteAt(start + j)
-			if ch >= 0x80 {
-				return strings.Contains(lowerString(t.string()), lowerWant)
-			}
-			if ch >= 'A' && ch <= 'Z' {
-				ch += 'a' - 'A'
-			}
-			if ch != lowerWant[j] {
-				matched = false
-				break
-			}
-		}
-		if matched {
-			return true
-		}
-	}
-	return false
-}
-
-func (t segmentedContextToken) boundaryFolded(lowerWant string, suffix bool) bool {
-	if lowerWant == "" {
-		return true
-	}
-	if len(lowerWant) > t.len() {
-		return false
-	}
-	start := 0
-	if suffix {
-		start = t.len() - len(lowerWant)
-	}
-	for i := range lowerWant {
-		ch := t.byteAt(start + i)
-		if ch >= 0x80 || lowerWant[i] >= 0x80 {
-			return foldedBoundaryMatch(t.string(), lowerWant, suffix)
-		}
-		if ch >= 'A' && ch <= 'Z' {
-			ch += 'a' - 'A'
-		}
-		if ch != lowerWant[i] {
-			return false
-		}
-	}
-	return true
 }
 
 func callArgPredicateMayMatchCall(pred flagPredicate, cand usg.Node) bool {
