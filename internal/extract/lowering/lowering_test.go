@@ -1659,3 +1659,118 @@ func TestScopeBranchDoesNotRestoreConstants(t *testing.T) {
 		t.Errorf("cnst = %q — a branch must NOT restore constants", got)
 	}
 }
+
+// A Java inner class's method reads the ENCLOSING instance's field (Druid's
+// BasicHTTPAuthenticationFilter reading BasicHTTPAuthenticator.credentialsValidator).
+// The field's declared type is what names the callee; without it the call falls back to
+// keying on the callee name alone, which goes silent as soon as a second declaration of
+// that name exists — here the interface and the sibling implementation.
+func TestNestedClassMethodResolvesEnclosingClassFieldReceiver(t *testing.T) {
+	validatorMethod := func(cls string, body []nir.Stmt) nir.Stmt {
+		return nir.ClassDef{Name: cls, Body: []nir.Stmt{
+			nir.FuncDef{Name: "validateCredentials", Params: []string{"username"}, Body: body, Loc: cls + ".java:2"},
+		}, Loc: cls + ".java:1"}
+	}
+	prog := nir.Program{Modules: []nir.Module{
+		{
+			Key:  "validator",
+			File: "LDAPCredentialsValidator.java",
+			Body: []nir.Stmt{
+				// the interface and the sibling implementation: three declarations of the
+				// name in all, so name-only resolution has nothing unambiguous to pick.
+				validatorMethod("CredentialsValidator", nil),
+				validatorMethod("MetadataStoreCredentialsValidator", nil),
+				validatorMethod("LDAPCredentialsValidator", []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "search", Loc: "LDAPCredentialsValidator.java:3"},
+						Args:   []nir.Expr{nir.Name{ID: "username", Loc: "LDAPCredentialsValidator.java:3"}},
+						Path:   "search", Method: "search", Loc: "LDAPCredentialsValidator.java:3",
+					}},
+				}),
+			},
+		},
+		{
+			Key:  "auth",
+			File: "BasicHTTPAuthenticator.java",
+			Body: []nir.Stmt{
+				nir.ClassDef{Name: "BasicHTTPAuthenticator", Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"credentialsValidator"}, Value: nir.Const{Loc: "BasicHTTPAuthenticator.java:2"},
+						Type: "LDAPCredentialsValidator", Decl: true, Loc: "BasicHTTPAuthenticator.java:2"},
+					nir.ClassDef{Name: "BasicHTTPAuthenticationFilter", Body: []nir.Stmt{
+						nir.FuncDef{Name: "doFilter", Params: []string{"user"}, Body: []nir.Stmt{
+							nir.ExprStmt{Value: nir.Call{
+								Callee: nir.Attr{Base: nir.Name{ID: "credentialsValidator", Loc: "BasicHTTPAuthenticator.java:5"},
+									Attr: "validateCredentials", Path: "credentialsValidator.validateCredentials", Loc: "BasicHTTPAuthenticator.java:5"},
+								Args: []nir.Expr{nir.Name{ID: "user", Loc: "BasicHTTPAuthenticator.java:5"}},
+								Path: "credentialsValidator.validateCredentials", Method: "validateCredentials", Loc: "BasicHTTPAuthenticator.java:5",
+							}},
+						}, Loc: "BasicHTTPAuthenticator.java:4"},
+					}, Loc: "BasicHTTPAuthenticator.java:3"},
+				}, Loc: "BasicHTTPAuthenticator.java:1"},
+			},
+		},
+	}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "user")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "LDAPCredentialsValidator.java:3")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("doFilter's argument did not reach LDAPCredentialsValidator.validateCredentials' body: " +
+			"the enclosing class's field receiver was not typed")
+	}
+}
+
+// The enclosing-class seeding is Java's rule, not every language's: a nested class in
+// Python (or JS, or C#) does not see the enclosing class's fields, so the same shape in a
+// .py module must leave the receiver untyped rather than borrow the outer class's field.
+func TestNestedClassDoesNotBorrowEnclosingFieldReceiverOutsideJava(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{
+		{
+			Key:  "validator",
+			File: "validator.py",
+			Body: []nir.Stmt{
+				nir.ClassDef{Name: "LdapValidator", Body: []nir.Stmt{
+					nir.FuncDef{Name: "validate", Params: []string{"username"}, Loc: "validator.py:2"},
+				}, Loc: "validator.py:1"},
+			},
+		},
+		{
+			Key:  "auth",
+			File: "auth.py",
+			Body: []nir.Stmt{
+				nir.ClassDef{Name: "Authenticator", Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"validator"}, Value: nir.Const{Loc: "auth.py:2"},
+						Type: "LdapValidator", Decl: true, Loc: "auth.py:2"},
+					nir.ClassDef{Name: "Filter", Body: []nir.Stmt{
+						nir.FuncDef{Name: "handle", Params: []string{"user"}, Body: []nir.Stmt{
+							nir.ExprStmt{Value: nir.Call{
+								Callee: nir.Attr{Base: nir.Name{ID: "validator", Loc: "auth.py:5"},
+									Attr: "validate", Path: "validator.validate", Loc: "auth.py:5"},
+								Args: []nir.Expr{nir.Name{ID: "user", Loc: "auth.py:5"}},
+								Path: "validator.validate", Method: "validate", Loc: "auth.py:5",
+							}},
+						}, Loc: "auth.py:4"},
+					}, Loc: "auth.py:3"},
+				}, Loc: "auth.py:1"},
+			},
+		},
+	}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	call := findNodeID(t, g, "code.Call", "loc", "auth.py:5")
+	n, _, err := g.GetNode(call)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := n.Prop("recv_type"); got != "" {
+		t.Fatalf("recv_type = %q, want empty: a Python nested class does not see the enclosing class's fields", got)
+	}
+}

@@ -92,6 +92,7 @@ type lowerer struct {
 	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
 	curFile       string   // the module's display path; curNS is a hash, so language sniffs read THIS
 	curClass      string   // "" = none
+	classNest     []string // the enclosing class names, outermost first; last element is curClass
 	curDecorators []string // syntax annotations/decorators on the enclosing function
 
 	// B1 structured-CFG metadata. `region` is the current control-region path, namespaced by
@@ -3269,8 +3270,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.ClassDef:
 		prev := l.curClass
 		l.curClass = st.Name
+		l.classNest = append(l.classNest, st.Name)
 		l.classContextAnalysisEvent(st.Loc, st.Name, st.Bases, l.classMemberContextTokens(st.Body))
 		l.block(st.Body, newScope())
+		l.classNest = l.classNest[:len(l.classNest)-1]
 		l.curClass = prev
 	case nir.FuncDef:
 		prefix := ""
@@ -3331,10 +3334,25 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			inner.setNode("this", info.selfNode)
 			inner.setTyp("this", [2]string{l.curModule, l.curClass})
 		}
-		// seed enclosing-class field receivers so `field.method()` resolves
-		for fld, typ := range l.classFields[l.curModule+"::"+l.curClass] {
-			if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-				inner.setTyp(fld, [2]string{cm, typ})
+		// seed enclosing-class field receivers so `field.method()` resolves. In Java a method of
+		// a NESTED class also sees the lexically enclosing classes' fields — an inner class holds
+		// an implicit reference to the enclosing instance, and a static nested class reaches the
+		// outer class's static fields the same way — so `field.method()` there is a call on the
+		// OUTER class's field. Without those scopes the receiver has no type, resolution falls
+		// back to keying the call by callee name alone, and a name declared more than once (an
+		// interface plus its implementations) resolves to nothing. Java-only: a nested class in
+		// Python/JS/C# does NOT see the enclosing class's fields, so seeding them there would
+		// type a name the language resolves elsewhere. Outermost first, so an inner class's own
+		// field of the same name shadows — the language's own lookup order.
+		classScopes := []string{l.curClass}
+		if len(l.classNest) > 1 && moduleTech(l.curFile) == "java" {
+			classScopes = l.classNest
+		}
+		for _, cls := range classScopes {
+			for fld, typ := range l.classFields[l.curModule+"::"+cls] {
+				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
+					inner.setTyp(fld, [2]string{cm, typ})
+				}
 			}
 		}
 		// each function gets a distinct region ROOT, so structural dominance never spans
