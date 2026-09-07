@@ -692,8 +692,9 @@ func (g *BadgerGraph) LabelsAt(idx int32) []Label {
 	}
 	return g.labelsAt(idx)
 }
-func (g *BadgerGraph) NodeID(idx int32) string        { return g.ids[idx] }
-func (g *BadgerGraph) LabelsOf(nodeID string) []Label { l, _ := g.Labels(nodeID); return l }
+func (g *BadgerGraph) NodeID(idx int32) string           { return g.ids[idx] }
+func (g *BadgerGraph) NodeIndex(id string) (int32, bool) { return g.idxOf(id) }
+func (g *BadgerGraph) LabelsOf(nodeID string) []Label    { l, _ := g.Labels(nodeID); return l }
 
 func (g *BadgerGraph) RangeOut(src int32, edgeType string, fn func(dst int32) bool) {
 	if int(src) >= len(g.out) {

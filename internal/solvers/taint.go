@@ -49,6 +49,34 @@ func firstKey(m map[string]bool) string {
 	return "UNTRUSTED_DATA"
 }
 
+// receiverAnchor returns the node whose taint a receiver-anchored sink on this node
+// consumes, or "" when no constraint applies.
+//
+// A sink bound at callee.receiver ("the tainted data is the receiver") is labelled on
+// the CALL node, because that is where the finding is reported. But a call node is also
+// the confluence of its ARGUMENTS: `Path("/const").write_bytes(tainted)` taints the call
+// node through arg0, and the bare label would fire even though the receiver — the path
+// this sink is about — is a constant. The binding records the receiver node in the label
+// detail; a sink carrying it fires only when that node is itself tainted.
+//
+// The constraint is per NODE, while flows are emitted per node, so a node carrying an
+// unconstrained sink concept as well (a different rule's sink on the same call) keeps the
+// unconstrained meaning: narrowing it would suppress a sink nobody anchored at a receiver.
+func receiverAnchor(labels []usg.Label, sinkConcepts map[string]bool) string {
+	anchor := ""
+	for _, l := range labels {
+		if !sinkConcepts[l.Concept] {
+			continue
+		}
+		recv := l.Detail[usg.TaintReceiverDetail]
+		if recv == "" || (anchor != "" && recv != anchor) {
+			return ""
+		}
+		anchor = recv
+	}
+	return anchor
+}
+
 // FindTaintFlows enumerates source->sink paths; a path yields a flow iff no
 // kill-control node lies on it (the control killed the fact). Records near-miss
 // controls seen on killed sibling paths.
@@ -254,6 +282,28 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 			continue
 		}
 		path := pathTo(sink)
+		if recv := receiverAnchor(labelsOf(sink), sinkConcepts); recv != "" && recv != sink {
+			// receiver-anchored sink: the fact must be live AT THE RECEIVER, not merely
+			// somewhere in the call. Report the receiver's witness so the path shown is
+			// the one the finding rests on.
+			if !tainted[recv] {
+				continue
+			}
+			if k, _ := killOf(recv); k {
+				continue
+			}
+			if pred[sink] != recv {
+				flowsToSink := false
+				forEachSucc(recv, func(dst string) {
+					if dst == sink {
+						flowsToSink = true
+					}
+				})
+				if flowsToSink {
+					path = append(pathTo(recv), sink)
+				}
+			}
+		}
 		out = append(out, TaintFlow{SourceID: path[0], SinkID: sink, Kind: kind, Path: path, NearMiss: nm})
 	}
 	return out, nil
@@ -420,6 +470,35 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 			continue
 		}
 		path := pathTo(sink)
+		// receiver-anchored sink — same rule as the string path: the receiver named by the
+		// label must itself carry a live fact, and it roots the reported witness.
+		if id := receiverAnchor(g.LabelsAt(sink), sinkConcepts); id != "" {
+			recv, ok := g.NodeIndex(id)
+			if !ok {
+				continue
+			}
+			if recv != sink {
+				if !tainted[recv] {
+					continue
+				}
+				if k, _ := killOf(recv); k {
+					continue
+				}
+				if pred[sink] != recv {
+					flowsToSink := false
+					g.RangeOut(recv, "FLOWS", func(dst int32) bool {
+						if dst == sink {
+							flowsToSink = true
+							return false
+						}
+						return true
+					})
+					if flowsToSink {
+						path = append(pathTo(recv), g.NodeID(sink))
+					}
+				}
+			}
+		}
 		out = append(out, TaintFlow{SourceID: path[0], SinkID: g.NodeID(sink), Kind: kind, Path: path, NearMiss: nm})
 	}
 	return out

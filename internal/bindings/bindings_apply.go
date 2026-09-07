@@ -232,6 +232,23 @@ func sourceReceiverType(n usg.Node) string {
 	return n.Prop("recv_may_type")
 }
 
+// withReceiverAnchor records the receiver node a receiver-anchored sink consumes,
+// so a flow solver can require THAT node to be tainted rather than accepting any
+// taint that reaches the call node (docs/08). An empty recv leaves the detail
+// untouched: with no receiver node there is nothing to constrain, and dropping the
+// sink instead would lose the recall the receiver binding exists for.
+func withReceiverAnchor(detail map[string]string, recv string) map[string]string {
+	if recv == "" {
+		return detail
+	}
+	out := make(map[string]string, len(detail)+1)
+	for k, v := range detail {
+		out[k] = v
+	}
+	out[usg.TaintReceiverDetail] = recv
+	return out
+}
+
 func (spec bindingSpec) sourceApplicator() Applicator {
 	fidelity := "resolved"
 	if spec.containsMatch {
@@ -521,6 +538,12 @@ func (spec bindingSpec) sinkApplicator() Applicator {
 					}
 					// receiver-sink: the tainted data is the receiver; the call node
 					// carries that taint, so label the node itself rather than an arg.
+					// The call node also carries the taint of every ARGUMENT, so the
+					// label alone would fire for `p.write_bytes(tainted)` on a constant
+					// receiver. Name the receiver node in the detail so the taint solver
+					// can require the receiver itself to be tainted. When the receiver
+					// node is unknown there is nothing to constrain and the label keeps
+					// its unconstrained meaning.
 					if sk.Receiver {
 						if sk.Constraint != "" && recvType != "" && !constraintAllows(sk.Constraint, recvType) {
 							continue
@@ -528,6 +551,7 @@ func (spec bindingSpec) sinkApplicator() Applicator {
 						detail, conf := reviewDetail(sk.Concept, sk.Pattern)
 						conf = mappingConfidence(sk.Confidence, conf)
 						conf, detail = effects[i].apply(conf, detail)
+						detail = withReceiverAnchor(detail, n.Prop("recv"))
 						out = append(out, Mapping{NodeID: id, Concept: sk.Concept, Fidelity: mappingFidelity(sk.Fidelity, "syntactic"), Confidence: conf, Specificity: pkgSpec, Detail: detail})
 						if sinkTimingOn {
 							sinkProgress.Mappings++

@@ -162,6 +162,9 @@ type IntGraph interface {
 	RangeOut(src int32, edgeType string, fn func(dst int32) bool)
 	LabelsAt(idx int32) []Label
 	NodeID(idx int32) string
+	// NodeIndex maps a string id back to its index. Used only when a solver must
+	// look up ONE named node (a sink's receiver anchor), never in the hot loop.
+	NodeIndex(id string) (int32, bool)
 }
 
 var _ IntGraph = (*IntStore)(nil)
@@ -637,3 +640,7 @@ func (s *IntStore) LabelsAt(idx int32) []Label {
 // NodeID maps an index back to its string id — used only when emitting findings (a handful),
 // never in the hot loop, so it can become a disk lookup in the out-of-core store.
 func (s *IntStore) NodeID(idx int32) string { return s.ids[idx] }
+
+// NodeIndex maps a string id to its index, reporting whether the node exists. The
+// reverse of NodeID and, like it, off the hot loop.
+func (s *IntStore) NodeIndex(id string) (int32, bool) { i, ok := s.idx[id]; return i, ok }
