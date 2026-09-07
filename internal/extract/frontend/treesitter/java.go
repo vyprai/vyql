@@ -159,12 +159,17 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 			// a constant-specific body subclasses the enum type itself
 			c.enumBases = []string{name}
 		}
+		// classParamTokens accumulates the enclosing classes' annotations too, because they
+		// apply to code written inside them. ClassDef.Annotations is this declaration's OWN
+		// annotations, unprefixed: it is the enclosing class that reads them, and an outer
+		// class does not inherit its own annotations from itself.
+		ownAnnotations := c.jvAnnotationTokens(n, "")
 		c.classParamTokens = append(append([]string{}, prevParams...), c.jvAnnotationTokens(n, "class_annotation:")...)
 		c.classContextTokens = append(append([]string{}, prevContext...), javaClassContextTokens(name, bases)...)
 		c.classContextTokens = append(c.classContextTokens, c.jvModifierTokens(n, "class_modifier:")...)
 		prevFieldInit := c.fieldInitTokens
 		c.fieldInitTokens = c.jvFieldInitTokens(c.field(n, "body"), c.kind(n) == "interface_declaration")
-		cd := nir.ClassDef{Name: name, Body: c.decls(c.field(n, "body")), Loc: L, Bases: bases}
+		cd := nir.ClassDef{Name: name, Body: c.decls(c.field(n, "body")), Loc: L, Bases: bases, Annotations: ownAnnotations}
 		c.classParamTokens = prevParams
 		c.classContextTokens = prevContext
 		c.fieldInitTokens = prevFieldInit

@@ -1107,3 +1107,96 @@ public class Registries {
 		}
 	}
 }
+
+// Every Jenkins extension point is two classes: the class that does the work, and a
+// nested Descriptor whose @Extension/@Symbol registers it. hashicorp-vault-plugin's
+// CVE-2022-23109 fix deletes @Symbol("withVault") from VaultBuildWrapper.DescriptorImpl
+// and leaves the masking method in the enclosing class untouched, so the two facts have
+// to meet on one event. The enclosing class's context is where they meet.
+func TestJavaClassContextCarriesNestedDescriptorAnnotations(t *testing.T) {
+	classContextArgs := func(t *testing.T, src, className string) string {
+		t.Helper()
+		dir := t.TempDir()
+		path := filepath.Join(dir, "VaultBuildWrapper.java")
+		if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		prog, err := treesitter.ExtractJava([]string{path}, dir)
+		if err != nil {
+			t.Fatal(err)
+		}
+		g, err := lowering.Lower(prog, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		nodes, err := g.AllNodes()
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, n := range nodes {
+			if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.class.context" &&
+				strings.Contains(n.Prop("str_args"), "class_name:"+className) {
+				return n.Prop("str_args")
+			}
+		}
+		t.Fatalf("no class-context event for %s", className)
+		return ""
+	}
+
+	const vulnerable = `package com.datapipe.jenkins.vault;
+
+public class VaultBuildWrapper extends SimpleBuildWrapper {
+  protected void provideEnvironmentVariablesFromVault(Context context, Run build, EnvVars envVars) {
+    valuesToMask.add(secret);
+    context.env(envVar.getKey(), envVar.getValue());
+  }
+
+  @Extension
+  @Symbol("withVault")
+  public static class DescriptorImpl extends BuildWrapperDescriptor {
+    public boolean isApplicable(AbstractProject<?, ?> item) {
+      return true;
+    }
+  }
+}`
+	args := classContextArgs(t, vulnerable, "VaultBuildWrapper")
+	for _, want := range []string{
+		"nested_class_annotation:Extension",
+		"nested_class_annotation:Symbol",
+		"call_path:context.env", // the sibling behaviour, on the same event
+	} {
+		if !strings.Contains(args, want) {
+			t.Errorf("VaultBuildWrapper class context is missing %q: %q", want, args)
+		}
+	}
+	if strings.Contains(args, "function_name:isApplicable") {
+		t.Errorf("the nested Descriptor's members leaked onto the enclosing class: %q", args)
+	}
+	// the Descriptor's own event still carries the Descriptor's own evidence
+	if nested := classContextArgs(t, vulnerable, "DescriptorImpl"); !strings.Contains(nested, "function_name:isApplicable") {
+		t.Errorf("DescriptorImpl class context lost its own members: %q", nested)
+	}
+
+	const fixed = `package com.datapipe.jenkins.vault;
+
+public class VaultBuildWrapper extends SimpleBuildWrapper {
+  protected void provideEnvironmentVariablesFromVault(Context context, Run build, EnvVars envVars) {
+    valuesToMask.add(secret);
+    context.env(envVar.getKey(), envVar.getValue());
+  }
+
+  @Extension
+  public static class DescriptorImpl extends BuildWrapperDescriptor {
+    public boolean isApplicable(AbstractProject<?, ?> item) {
+      return true;
+    }
+  }
+}`
+	fixedArgs := classContextArgs(t, fixed, "VaultBuildWrapper")
+	if !strings.Contains(fixedArgs, "nested_class_annotation:Extension") {
+		t.Errorf("fixed revision lost the annotation it still carries: %q", fixedArgs)
+	}
+	if strings.Contains(fixedArgs, "nested_class_annotation:Symbol") {
+		t.Errorf("deleting @Symbol from the nested class did not remove the token: %q", fixedArgs)
+	}
+}

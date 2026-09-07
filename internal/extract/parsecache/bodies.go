@@ -562,7 +562,9 @@ func summarizeContextTokens(stmts []nir.Stmt, out *[]string) {
 			*out = append(*out, s.ContextTokens...)
 			summarizeContextTokens(s.Body, out)
 		case nir.ClassDef:
-			continue
+			// Same rule as the lowering's class-context walk: a nested class's members are
+			// its own, but its annotations are evidence about the class that declares it.
+			*out = append(*out, nir.NestedClassContextTokens(s)...)
 		case nir.Block:
 			summarizeContextTokens(s.Stmts, out)
 		case nir.If:

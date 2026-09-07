@@ -3633,3 +3633,62 @@ func TestReceiverSinkHonorsReceiverTypeConstraint(t *testing.T) {
 		t.Fatalf("receiver sink did not fire for matching receiver type: %+v", got)
 	}
 }
+
+// A binding has to be able to name the nested-class annotation evidence the lowering
+// records, and to join it with the enclosing class's own member evidence on one event —
+// the Jenkins shape, where the registration annotation and the behaviour it registers
+// are declared in two different classes.
+func TestNestedClassAnnotationContextFieldMatchesEnclosingClassEvent(t *testing.T) {
+	sets, err := compileV2BindingsForTest(`
+module bindings.java.test;
+
+binding vaultSymbolMasking {
+  query pattern presenceNode where node.scope == "class" and node.context.nestedClassAnnotation contains "Symbol" and node.context.callPath contains "context.env"
+  emit issue custom.SymbolRegisteredMasking at node
+}
+`)
+	if err != nil {
+		t.Fatalf("compile: %v", err)
+	}
+	spec := specFromBindingSet(firstBindingSet(t, sets))
+	if len(spec.Flags) != 1 {
+		t.Fatalf("expected one flag spec, got %#v", spec.Flags)
+	}
+	flag := spec.Flags[0]
+	if flag.Scope != "class" || len(flag.Predicates) != 2 ||
+		flag.Predicates[0].Values[0] != "nested_class_annotation:Symbol" {
+		t.Fatalf("unexpected flag spec: %#v", flag)
+	}
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "outer", Type: "code.Call", Props: map[string]string{
+		"loc":         "VaultBuildWrapper.java:3",
+		"callee_path": "analysis.class.context",
+		"method":      "context",
+		"str_args": "class_name:VaultBuildWrapper\x00call_path:valuesToMask.add\x00call_path:context.env" +
+			"\x00nested_class_annotation:Extension\x00nested_class_annotation:Symbol",
+	}})
+	store.AddNode(usg.Node{ID: "nested", Type: "code.Call", Props: map[string]string{
+		"loc":         "VaultBuildWrapper.java:9",
+		"callee_path": "analysis.class.context",
+		"method":      "context",
+		"str_args":    "class_name:DescriptorImpl\x00function_name:isApplicable",
+	}})
+	got := spec.presenceApplicator().Apply(store)
+	if len(got) != 1 || got[0].NodeID != "outer" || got[0].Concept != "custom.SymbolRegisteredMasking" {
+		t.Fatalf("binding did not join the nested annotation with the sibling behaviour: %+v", got)
+	}
+
+	// the fix deletes @Symbol from the nested class; the same binding must go quiet
+	fixed := usg.NewInMemStore()
+	fixed.AddNode(usg.Node{ID: "outer", Type: "code.Call", Props: map[string]string{
+		"loc":         "VaultBuildWrapper.java:3",
+		"callee_path": "analysis.class.context",
+		"method":      "context",
+		"str_args": "class_name:VaultBuildWrapper\x00call_path:valuesToMask.add\x00call_path:context.env" +
+			"\x00nested_class_annotation:Extension",
+	}})
+	if got := spec.presenceApplicator().Apply(fixed); len(got) != 0 {
+		t.Fatalf("binding still fired without the nested @Symbol: %+v", got)
+	}
+}

@@ -1905,3 +1905,105 @@ func TestSameArityOverloadsAreNotDisambiguatedByArgumentCount(t *testing.T) {
 		}
 	}
 }
+
+// The Jenkins two-class shape: an extension class whose behaviour lives in its own
+// methods, registered under a name by a nested Descriptor carrying @Symbol/@Extension.
+// The enclosing class's context must carry the nested class's annotations, or the
+// registration and the behaviour it registers sit on two events no binding can join.
+// The nested class's MEMBER evidence still stays its own.
+func TestLowerClassContextCarriesNestedClassAnnotations(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "VaultBuildWrapper.java",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "VaultBuildWrapper", Loc: "VaultBuildWrapper.java:1", Bases: []string{"SimpleBuildWrapper"}, Body: []nir.Stmt{
+				nir.FuncDef{Name: "provideEnvironmentVariablesFromVault", Loc: "VaultBuildWrapper.java:2", ContextTokens: []string{
+					"class_name:VaultBuildWrapper",
+					"function_name:provideEnvironmentVariablesFromVault",
+					"call_path:valuesToMask.add",
+					"call_path:context.env",
+				}},
+				nir.ClassDef{Name: "DescriptorImpl", Loc: "VaultBuildWrapper.java:9",
+					Bases:       []string{"BuildWrapperDescriptor"},
+					Annotations: []string{"Extension", "Symbol"},
+					Body: []nir.Stmt{
+						nir.FuncDef{Name: "isApplicable", Loc: "VaultBuildWrapper.java:11", ContextTokens: []string{
+							"class_name:DescriptorImpl",
+							"function_name:isApplicable",
+						}},
+					}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	var sawOuter bool
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") != "analysis.class.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if !strings.Contains(args, "class_name:VaultBuildWrapper") {
+			continue
+		}
+		sawOuter = true
+		for _, want := range []string{
+			"nested_class_annotation:Extension",
+			"nested_class_annotation:Symbol",
+			"call_path:context.env",
+		} {
+			if !strings.Contains(args, want) {
+				t.Errorf("enclosing class context is missing %q: %q", want, args)
+			}
+		}
+		// the nested class's own members remain its own evidence
+		if strings.Contains(args, "function_name:isApplicable") {
+			t.Errorf("enclosing class context absorbed the nested class's members: %q", args)
+		}
+	}
+	if !sawOuter {
+		t.Fatal("no class-context event for the enclosing class")
+	}
+}
+
+// Deleting the registration annotation from the nested class is exactly what the
+// hashicorp-vault-plugin fix does, so the token must disappear with it.
+func TestLowerClassContextNestedAnnotationsAreTheNestedClassesOwn(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "VaultBuildWrapper.java",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "VaultBuildWrapper", Loc: "VaultBuildWrapper.java:1", Annotations: []string{"Deprecated"}, Body: []nir.Stmt{
+				nir.ClassDef{Name: "DescriptorImpl", Loc: "VaultBuildWrapper.java:9", Annotations: []string{"Extension"}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") != "analysis.class.context" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if strings.Contains(args, "class_name:VaultBuildWrapper") {
+			if strings.Contains(args, "nested_class_annotation:Symbol") {
+				t.Errorf("annotation the nested class does not carry reached the enclosing class: %q", args)
+			}
+			// the enclosing class's OWN annotation is not a nested one
+			if strings.Contains(args, "nested_class_annotation:Deprecated") {
+				t.Errorf("enclosing class reported its own annotation as nested: %q", args)
+			}
+		}
+		if strings.Contains(args, "class_name:DescriptorImpl") && strings.Contains(args, "nested_class_annotation:") {
+			t.Errorf("leaf class reported a nested annotation: %q", args)
+		}
+	}
+}

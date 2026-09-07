@@ -1443,8 +1443,13 @@ func (l *lowerer) classMemberContextTokens(stmts []nir.Stmt) []string {
 				walk(st.Body)
 			case nir.ClassDef:
 				// Nested classes get their own class-context event; do not smear their
-				// member evidence onto the enclosing class.
-				continue
+				// member evidence onto the enclosing class. The nested DECLARATION is a
+				// fact about the enclosing class, though: the two-class shape every Jenkins
+				// extension point uses registers the outer class through a nested Descriptor
+				// carrying @Extension/@Symbol, and without this the annotation is reachable
+				// only from code written inside the Descriptor -- never from the class it
+				// describes. Record the nested class's own annotations and nothing else.
+				tokens = append(tokens, nir.NestedClassContextTokens(st)...)
 			case nir.Block:
 				walk(st.Stmts)
 			case nir.If:

@@ -443,6 +443,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "class_attribute:"
 	case "classAnnotation":
 		return "class_annotation:"
+	case "nestedClassAnnotation":
+		return "nested_class_annotation:"
 	case "methodAttribute":
 		return "method_attribute:"
 	case "attrName":

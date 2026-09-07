@@ -267,6 +267,28 @@ type ClassDef struct {
 	// Members are the data-member names (fields + properties) declared on this class, so a
 	// bare member reference inside a method can be resolved to `this.<member>`.
 	Members []string
+	// Annotations are the syntax annotation/decorator names written on THIS class's own
+	// declaration (both the spelled form and its last segment, e.g. `hudson.Extension` and
+	// `Extension`). They are the declaration's own text with no framework meaning attached --
+	// what an annotation means is a binding's decision. A class's annotations otherwise reach
+	// only code written inside it, so an enclosing class cannot see that it declares an
+	// annotated nested class; the lowering turns these into the enclosing class's context.
+	Annotations []string
+}
+
+// NestedClassContextTokens is the evidence a nested class contributes to the class that
+// declares it: its own annotations, and nothing else -- its members keep their own
+// class-context event. One spelling, because two walks produce it (the lowering's
+// class-context walk and the parse cache's body summariser) and a deferred body must yield
+// the same tokens as a resident one.
+func NestedClassContextTokens(cd ClassDef) []string {
+	var out []string
+	for _, a := range cd.Annotations {
+		if a != "" {
+			out = append(out, "nested_class_annotation:"+a)
+		}
+	}
+	return out
 }
 
 // Block is a flattened control-flow body, processed once in scope

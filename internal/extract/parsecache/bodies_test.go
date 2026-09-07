@@ -96,3 +96,27 @@ func TestDeferModuleBodiesLeavesSignaturesInline(t *testing.T) {
 		t.Fatalf("function body = %#v, want BodyRef", fn.Body[0])
 	}
 }
+
+// A deferred body must summarise to the same class-context evidence a resident one
+// produces, or a cached scan and a cold scan disagree about which classes are annotated.
+func TestSummarizeBodyCarriesNestedClassAnnotations(t *testing.T) {
+	sum := summarizeBody([]nir.Stmt{
+		nir.ClassDef{Name: "DescriptorImpl", Annotations: []string{"Extension", "Symbol"}, Body: []nir.Stmt{
+			nir.FuncDef{Name: "isApplicable", ContextTokens: []string{"function_name:isApplicable"}},
+		}},
+	})
+	var sawExtension, sawSymbol bool
+	for _, tok := range sum.ContextTokens {
+		switch tok {
+		case "nested_class_annotation:Extension":
+			sawExtension = true
+		case "nested_class_annotation:Symbol":
+			sawSymbol = true
+		case "function_name:isApplicable":
+			t.Errorf("summary absorbed the nested class's members: %v", sum.ContextTokens)
+		}
+	}
+	if !sawExtension || !sawSymbol {
+		t.Fatalf("summary context tokens = %v, want the nested class's annotations", sum.ContextTokens)
+	}
+}
