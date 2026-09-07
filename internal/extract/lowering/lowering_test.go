@@ -1774,3 +1774,134 @@ func TestNestedClassDoesNotBorrowEnclosingFieldReceiverOutsideJava(t *testing.T)
 		t.Fatalf("recv_type = %q, want empty: a Python nested class does not see the enclosing class's fields", got)
 	}
 }
+
+// A Java class that declares the same method name at two arities (Goobi viewer's
+// DataFileTools.getDataFilePath, four parameters beside an unrelated two-parameter
+// sibling). The call site names the four-parameter one by passing four arguments, so
+// that is the body its arguments have to reach.
+func TestOverloadedMethodResolvesByCallSiteArgumentCount(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{
+		{
+			Key:  "tools",
+			File: "DataFileTools.java",
+			Body: []nir.Stmt{
+				nir.ClassDef{Name: "DataFileTools", Body: []nir.Stmt{
+					nir.FuncDef{Name: "getDataFilePath", Params: []string{"pi", "dataFolderName", "altDataFolderName", "fileName"},
+						Body: []nir.Stmt{
+							nir.ExprStmt{Value: nir.Call{
+								Callee: nir.Name{ID: "resolve", Loc: "DataFileTools.java:5"},
+								Args:   []nir.Expr{nir.Name{ID: "fileName", Loc: "DataFileTools.java:5"}},
+								Path:   "resolve", Method: "resolve", Loc: "DataFileTools.java:5",
+							}},
+						}, Loc: "DataFileTools.java:4"},
+					// the sibling overload, declared last so it is the one a name-keyed
+					// table keeps, and never called from this program.
+					nir.FuncDef{Name: "getDataFilePath", Params: []string{"pi", "relativeFilePath"},
+						Body: []nir.Stmt{
+							nir.ExprStmt{Value: nir.Call{
+								Callee: nir.Name{ID: "resolve", Loc: "DataFileTools.java:9"},
+								Args:   []nir.Expr{nir.Name{ID: "relativeFilePath", Loc: "DataFileTools.java:9"}},
+								Path:   "resolve", Method: "resolve", Loc: "DataFileTools.java:9",
+							}},
+						}, Loc: "DataFileTools.java:8"},
+				}, Loc: "DataFileTools.java:1"},
+			},
+		},
+		{
+			Key:  "servlet",
+			File: "FileServlet.java",
+			Body: []nir.Stmt{
+				nir.ClassDef{Name: "FileServlet", Body: []nir.Stmt{
+					nir.FuncDef{Name: "getFile", Params: []string{"pi", "fileName"}, Body: []nir.Stmt{
+						nir.ExprStmt{Value: nir.Call{
+							Callee: nir.Attr{Base: nir.Name{ID: "DataFileTools", Loc: "FileServlet.java:5"},
+								Attr: "getDataFilePath", Path: "DataFileTools.getDataFilePath", Loc: "FileServlet.java:5"},
+							Args: []nir.Expr{
+								nir.Name{ID: "pi", Loc: "FileServlet.java:5"},
+								nir.Const{Loc: "FileServlet.java:5"},
+								nir.Const{Loc: "FileServlet.java:5"},
+								nir.Name{ID: "fileName", Loc: "FileServlet.java:5"},
+							},
+							Path: "DataFileTools.getDataFilePath", Method: "getDataFilePath", Loc: "FileServlet.java:5",
+						}},
+					}, Loc: "FileServlet.java:4"},
+				}, Loc: "FileServlet.java:1"},
+			},
+		},
+	}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "fileName", "func", "getFile")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "DataFileTools.java:5")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("getFile's fourth argument did not reach the four-parameter getDataFilePath body: " +
+			"the call resolved to the sibling overload instead of the one its argument count names")
+	}
+}
+
+// Two declarations at the SAME arity are told apart by parameter types, which call
+// resolution does not carry, so the call site's argument count decides nothing between
+// them. The call must keep the target it resolved to before rather than pick whichever
+// same-arity declaration comes first.
+func TestSameArityOverloadsAreNotDisambiguatedByArgumentCount(t *testing.T) {
+	method := func(params []string, line string) nir.Stmt {
+		return nir.FuncDef{Name: "write", Params: params, Body: []nir.Stmt{
+			nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "emit", Loc: "Writer.java:" + line},
+				Args:   []nir.Expr{nir.Name{ID: params[len(params)-1], Loc: "Writer.java:" + line}},
+				Path:   "emit", Method: "emit", Loc: "Writer.java:" + line,
+			}},
+		}, Loc: "Writer.java:" + line}
+	}
+	prog := nir.Program{Modules: []nir.Module{
+		{
+			Key:  "writer",
+			File: "Writer.java",
+			Body: []nir.Stmt{
+				nir.ClassDef{Name: "Writer", Body: []nir.Stmt{
+					method([]string{"text", "flush"}, "9"),
+					method([]string{"bytes", "offset"}, "13"),
+					// declared last, so this is the one the name-keyed table holds and the
+					// one the two-argument call site does NOT match.
+					method([]string{"a", "b", "c"}, "17"),
+				}, Loc: "Writer.java:1"},
+			},
+		},
+		{
+			Key:  "caller",
+			File: "Caller.java",
+			Body: []nir.Stmt{
+				nir.ClassDef{Name: "Caller", Body: []nir.Stmt{
+					nir.FuncDef{Name: "run", Params: []string{"payload"}, Body: []nir.Stmt{
+						nir.ExprStmt{Value: nir.Call{
+							Callee: nir.Attr{Base: nir.Name{ID: "Writer", Loc: "Caller.java:5"},
+								Attr: "write", Path: "Writer.write", Loc: "Caller.java:5"},
+							Args: []nir.Expr{nir.Const{Loc: "Caller.java:5"}, nir.Name{ID: "payload", Loc: "Caller.java:5"}},
+							Path: "Writer.write", Method: "write", Loc: "Caller.java:5",
+						}},
+					}, Loc: "Caller.java:4"},
+				}, Loc: "Caller.java:1"},
+			},
+		},
+	}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "payload")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, loc := range []string{"Writer.java:9", "Writer.java:13"} {
+		if reachable[findNodeID(t, g, "code.Arg", "loc", loc)] {
+			t.Errorf("the argument count picked %s out of two same-arity declarations; it cannot tell them apart", loc)
+		}
+	}
+}

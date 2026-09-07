@@ -83,6 +83,42 @@ func modB(hash string, extra []nir.Stmt) nir.Module {
 		Body:    []nir.Stmt{nir.FuncDef{Name: "handler", Params: []string{"req"}, Loc: "b.x:1", Body: body}}}
 }
 
+// modOverload builds a Java module whose class declares one method name at two arities, plus
+// a caller that names the four-parameter one by passing four arguments. Overload selection
+// keeps its declarations in a table pass 1 fills, so the cached-replay path has to refill it.
+func modOverload(hash string) []nir.Module {
+	decl := func(params []string, line string) nir.Stmt {
+		return nir.FuncDef{Name: "getPath", Params: params, Body: []nir.Stmt{
+			nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "resolve", Loc: "Tools.java:" + line},
+				Args:   []nir.Expr{nir.Name{ID: params[len(params)-1], Loc: "Tools.java:" + line}},
+				Path:   "resolve", Method: "resolve", Loc: "Tools.java:" + line,
+			}},
+		}, Loc: "Tools.java:" + line}
+	}
+	return []nir.Module{
+		{Key: "tools", File: "Tools.java", Hash: "tools1", Body: []nir.Stmt{
+			nir.ClassDef{Name: "Tools", Body: []nir.Stmt{
+				decl([]string{"pi", "folder", "alt", "fileName"}, "4"),
+				decl([]string{"pi", "relative"}, "8"),
+			}, Loc: "Tools.java:1"},
+		}},
+		{Key: "srv", File: "Srv.java", Hash: hash, Body: []nir.Stmt{
+			nir.ClassDef{Name: "Srv", Body: []nir.Stmt{
+				nir.FuncDef{Name: "get", Params: []string{"name"}, Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "Tools", Loc: "Srv.java:5"}, Attr: "getPath",
+							Path: "Tools.getPath", Loc: "Srv.java:5"},
+						Args: []nir.Expr{nir.Const{Loc: "Srv.java:5"}, nir.Const{Loc: "Srv.java:5"},
+							nir.Const{Loc: "Srv.java:5"}, nir.Name{ID: "name", Loc: "Srv.java:5"}},
+						Path: "Tools.getPath", Method: "getPath", Loc: "Srv.java:5",
+					}},
+				}, Loc: "Srv.java:4"},
+			}, Loc: "Srv.java:1"},
+		}},
+	}
+}
+
 func prog(mods ...nir.Module) nir.Program {
 	return nir.Program{Modules: mods, SelfName: "self"}
 }
@@ -192,6 +228,9 @@ func TestIncrementalEquivalence(t *testing.T) {
 			prog(modPhpA("a1", "read"), modPhpB("b2", []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: "log", Loc: "b.php:4"}, Path: "log", Method: "log", Loc: "b.php:4"}}}))},
 		{"php a body edit (b reused)", prog(modPhpA("a1", "read"), modPhpB("b1", nil)),
 			prog(modPhpA("a2", "fetch"), modPhpB("b1", nil))},
+		// overload set replayed from the pass-1 cache: the caller's module is edited, so the
+		// class carrying both declarations is restored from the cache rather than re-registered.
+		{"overload set, callee module reused", prog(modOverload("srv1")...), prog(modOverload("srv2")...)},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -340,6 +340,7 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 			resultEntries: f.ResultEntries, abstract: f.Abstract,
 		}
 		l.funcQual[f.Qual] = fi
+		l.funcOverloads[f.Qual] = append(l.funcOverloads[f.Qual], fi)
 		l.funcShort[f.Short] = append(l.funcShort[f.Short], fi)
 	}
 	for _, k := range d.ClassQual {
