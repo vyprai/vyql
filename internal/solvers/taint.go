@@ -242,6 +242,9 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	}
 	var nearMiss [][2]string
 	contradicted := map[string]bool{}
+	// sinks whose own call is a neutralizing control for this rule (the sink label on
+	// the argument, the check on the call it flows into). See the emit loop.
+	selfChecked := map[string]bool{}
 	queue := make([]string, 0, len(srcs)*4)
 	for _, s := range srcs {
 		if !tainted[s] {
@@ -276,11 +279,14 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 			// different, untainted argument (jQuery's `$("<div/>", {text: t})` is a
 			// core.HtmlEscape check whose code.HtmlRender sink is the constant markup argument,
 			// not the escaped one) is an ordinary sanitizer and still absorbs the taint.
-			if nodeIsSink && !contradicted[dst] {
+			if nodeIsSink {
 				if kill, _ := killOf(dst); kill {
-					contradicted[dst] = true
-					if tainted[dst] { // already absorbed the taint once — let it propagate now
-						queue = append(queue, dst)
+					selfChecked[node] = true
+					if !contradicted[dst] {
+						contradicted[dst] = true
+						if tainted[dst] { // already absorbed the taint once — let it propagate now
+							queue = append(queue, dst)
+						}
 					}
 				}
 			}
@@ -317,6 +323,56 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 		return rev
 	}
 
+	// A sink whose own call is one of this rule's neutralizing controls is a witness of
+	// last resort. The definitions say two things about that one call — `emit sink
+	// <threat> at args[..]` on the argument, `emit check <control> at call` on the call the
+	// argument flows into — and the engine cannot act on both, so it reports the argument
+	// only where the same flow reports nothing further along. Java's `Paths.get` builds a
+	// path that `Files.newInputStream` then opens: the read is the operation a containment
+	// check can be placed at, and reporting the construction as well is what left jmix's
+	// CVE-2025-32950 report identical on both revisions — that second witness sits in a
+	// helper the fix never touches, so no check placed at the read can cover it. Where
+	// nothing further along is reported the construction is the whole of the dangerous
+	// operation — jQuery's `$("<span>" + label + "</span>")` parses the markup right there
+	// — and it stays the finding.
+	//
+	// Supersession is keyed on the CALL, not on the argument the witness path happens to
+	// run through: `Paths.get(a, b, c)` labels every argument, and reporting the two the
+	// path missed would put the witness back in the helper.
+	supersededCall := map[string]bool{}
+	if len(selfChecked) > 0 {
+		for _, sink := range sinks {
+			if !tainted[sink] || selfChecked[sink] {
+				continue
+			}
+			if k, _ := killOf(sink); k {
+				continue
+			}
+			for n, steps := sink, 0; steps <= len(tainted); steps++ {
+				p, ok := pred[n]
+				if !ok {
+					break
+				}
+				if contradicted[p] {
+					supersededCall[p] = true
+				}
+				n = p
+			}
+		}
+	}
+	superseded := func(sink string) bool {
+		if !selfChecked[sink] || len(supersededCall) == 0 {
+			return false
+		}
+		found := false
+		forEachSucc(sink, func(dst string) {
+			if supersededCall[dst] {
+				found = true
+			}
+		})
+		return found
+	}
+
 	// emit one flow per tainted live sink (findings dedup to one per (rule, sink) anyway);
 	// witness source = the recorded path's root.
 	nm := dedupPairs(nearMiss)
@@ -325,6 +381,9 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 			continue
 		}
 		if k, _ := killOf(sink); k { // a sink that is itself a neutralizer sanitizes its own use
+			continue
+		}
+		if superseded(sink) {
 			continue
 		}
 		path := pathTo(sink)
@@ -459,6 +518,8 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 	}
 	var nearMiss []intNearMiss
 	contradicted := make([]bool, n)
+	selfChecked := make([]bool, n)
+	anySelfChecked := false
 	isSink := make([]bool, n)
 	for _, s := range sinks {
 		isSink[s] = true
@@ -482,12 +543,16 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 		nodeIsSink := isSink[node]
 		g.RangeOut(node, "FLOWS", func(dst int32) bool {
 			// a neutralizer reached by this rule's own tainted sink at the same call does not
-			// absorb the taint — see the string path for why.
-			if nodeIsSink && !contradicted[dst] {
+			// absorb the taint, and that sink is not the finding — see the string path for why.
+			if nodeIsSink {
 				if kill, _ := killOf(dst); kill {
-					contradicted[dst] = true
-					if tainted[dst] { // already absorbed the taint once — let it propagate now
-						queue = append(queue, dst)
+					selfChecked[node] = true
+					anySelfChecked = true
+					if !contradicted[dst] {
+						contradicted[dst] = true
+						if tainted[dst] { // already absorbed the taint once — let it propagate now
+							queue = append(queue, dst)
+						}
 					}
 				}
 			}
@@ -527,6 +592,46 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 		return out
 	}
 
+	// a sink whose own call is one of this rule's neutralizing controls is reported only
+	// where the same witness path reports nothing further along — see the string path.
+	supersededCall := make([]bool, n)
+	anySupersededCall := false
+	if anySelfChecked {
+		for _, sink := range sinks {
+			if !tainted[sink] || selfChecked[sink] {
+				continue
+			}
+			if k, _ := killOf(sink); k {
+				continue
+			}
+			for i, steps := sink, 0; steps <= n; steps++ {
+				p := pred[i]
+				if p < 0 {
+					break
+				}
+				if contradicted[p] {
+					supersededCall[p] = true
+					anySupersededCall = true
+				}
+				i = p
+			}
+		}
+	}
+	superseded := func(sink int32) bool {
+		if !selfChecked[sink] || !anySupersededCall {
+			return false
+		}
+		found := false
+		g.RangeOut(sink, "FLOWS", func(dst int32) bool {
+			if supersededCall[dst] {
+				found = true
+				return false
+			}
+			return true
+		})
+		return found
+	}
+
 	// one flow per tainted live sink.
 	nm = dedupPairs(nm)
 	var out []TaintFlow
@@ -535,6 +640,9 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 			continue
 		}
 		if k, _ := killOf(sink); k {
+			continue
+		}
+		if superseded(sink) {
 			continue
 		}
 		path := pathTo(sink)

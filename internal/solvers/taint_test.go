@@ -39,11 +39,8 @@ func TestNeutralizerAtItsOwnTaintedSinkDoesNotAbsorbTaint(t *testing.T) {
 		for _, f := range flows {
 			got[f.SinkID] = true
 		}
-		// The construction is still reported: the change adds the operation
-		// downstream of it, it does not move or drop anything.
-		if !got["ctorArg"] {
-			t.Errorf("construction sink no longer reported: %v", got)
-		}
+		// Whether the construction itself is reported is the other half of the
+		// contradiction, pinned by TestSinkNeutralizedAtItsOwnCallIsNotReported.
 		if !got["useArg"] {
 			t.Errorf("sink downstream of the neutralizing construction was not reported: %v", got)
 		}
@@ -53,6 +50,102 @@ func TestNeutralizerAtItsOwnTaintedSinkDoesNotAbsorbTaint(t *testing.T) {
 					t.Errorf("neutralizer the flow ran straight through is still offered as near-miss evidence: %v", f.NearMiss)
 				}
 			}
+		}
+	})
+}
+
+// The other half of the same contradiction. The call the tainted sink is an
+// argument of is declared a neutralizing control for this very rule, so it
+// decides nothing here: with the operation the constructed value is handed to
+// reported on the same witness path, the construction is not a second finding.
+// jmix's CVE-2025-32950 fix inserts
+// `path.toRealPath().startsWith(root.toRealPath())` immediately before
+// `Files.newInputStream`; while the `Paths.get` inside an untouched helper was
+// reported as well, no check at that operation — the fix's own idiom or any
+// other — could cover it, and the report was identical on both revisions.
+func TestSinkNeutralizedAtItsOwnCallIsNotReported(t *testing.T) {
+	tg := taintedConstructionGraph()
+	forEachStore(t, tg, func(t *testing.T, flows []TaintFlow) {
+		got := map[string]bool{}
+		for _, f := range flows {
+			got[f.SinkID] = true
+		}
+		if got["ctorArg"] {
+			t.Errorf("sink whose own call is a neutralizer for this rule is still reported: %v", got)
+		}
+		if !got["useArg"] {
+			t.Errorf("the operation the constructed value is used in was not reported: %v", got)
+		}
+	})
+}
+
+// And it is a witness of last resort, not a witness the engine throws away.
+// Where the flow reports nothing further along, the construction is the whole of
+// the dangerous operation and stays the finding: jQuery's `$("<span>" + label +
+// "</span>")` parses the markup at that very call, and javascript.controls also
+// labels it core.HtmlEscape, so a rule that dropped it would lose the jQuery UI
+// datepicker XSS (cve_rank1239) outright. Dropping the sink unconditionally does
+// exactly that, measured in the spec suite.
+func TestSinkNeutralizedAtItsOwnCallWithNothingDownstreamIsStillReported(t *testing.T) {
+	tg := taintedConstructionGraph()
+	tg.nodes = []string{"src", "ctorArg", "ctor"}
+	tg.edges = [][2]string{{"src", "ctorArg"}, {"ctorArg", "ctor"}}
+	delete(tg.labels, "useArg")
+	forEachStore(t, tg, func(t *testing.T, flows []TaintFlow) {
+		if len(flows) != 1 || flows[0].SinkID != "ctorArg" {
+			t.Errorf("construction is the only sink the flow reaches and must still be reported: %v", flows)
+		}
+	})
+}
+
+// Supersession is keyed on the call, not on the one argument the witness path
+// runs through. `Paths.get(parts[0], parts[1], parts[2], parts[3])` labels every
+// argument a sink and jmix taints all four; keying it on the argument left the
+// other three reported at the same line in the same helper, which is the whole
+// of what the guard could not dominate.
+func TestEveryArgumentOfANeutralizingCallIsSuperseded(t *testing.T) {
+	tg := taintGraph{
+		name:  "two tainted sink arguments of one neutralizing call",
+		nodes: []string{"src", "argA", "argB", "ctor", "use", "useArg"},
+		labels: map[string]string{
+			"src": "test.Source", "argA": "test.Sink", "argB": "test.Sink",
+			"ctor": "test.Kill", "useArg": "test.Sink",
+		},
+		edges: [][2]string{
+			{"src", "argA"}, {"src", "argB"}, {"argA", "ctor"}, {"argB", "ctor"},
+			{"ctor", "use"}, {"use", "useArg"},
+		},
+		kills: map[string]bool{"test.Kill": true},
+	}
+	forEachStore(t, tg, func(t *testing.T, flows []TaintFlow) {
+		got := map[string]bool{}
+		for _, f := range flows {
+			got[f.SinkID] = true
+		}
+		if got["argA"] || got["argB"] {
+			t.Errorf("an argument of the neutralizing call the witness path missed is still reported: %v", got)
+		}
+		if !got["useArg"] {
+			t.Errorf("the operation the constructed value is used in was not reported: %v", got)
+		}
+	})
+}
+
+// The supersession is per witness path, not per run: an unrelated flow's sink
+// elsewhere in the graph does not stand in for this one.
+func TestSinkNeutralizedAtItsOwnCallSurvivesAnUnrelatedSink(t *testing.T) {
+	tg := taintedConstructionGraph()
+	tg.nodes = []string{"src", "ctorArg", "ctor", "other", "otherArg"}
+	tg.edges = [][2]string{{"src", "ctorArg"}, {"ctorArg", "ctor"}, {"src", "other"}, {"other", "otherArg"}}
+	delete(tg.labels, "useArg")
+	tg.labels["otherArg"] = "test.Sink"
+	forEachStore(t, tg, func(t *testing.T, flows []TaintFlow) {
+		got := map[string]bool{}
+		for _, f := range flows {
+			got[f.SinkID] = true
+		}
+		if !got["ctorArg"] || !got["otherArg"] {
+			t.Errorf("a sink on a sibling path is not this flow's witness: %v", got)
 		}
 	})
 }
