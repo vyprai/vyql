@@ -393,7 +393,7 @@ func applyMaxRAM(v string) func() {
 	// ceiling as the graph itself, and it only earns anything after a spill. A cache sized as a large
 	// share of the budget fills the ceiling before a node is stored, leaving the collector to
 	// run against memory it may not release.
-	lowering.DiskCacheBytes = clampBytes(n/16, 64<<20, 512<<20)
+	lowering.DiskCacheBytes = clampBytes(n/16, min(64<<20, n/16), 512<<20)
 	lowering.DiskDetailBuf = detailBufferBytes(n)
 	graphDir := filepath.Join(dir, "graph")
 	if err := os.MkdirAll(graphDir, 0o700); err != nil {
@@ -443,7 +443,9 @@ const detailBytesPerSourceByte = 64
 
 // detailBufferBytes is the share of the ceiling the node detail buffer gets. See applyMaxRAM
 // for why an eighth, and oneGraphSourceBytes for why the partition sizes are read off it.
-func detailBufferBytes(ceiling int64) int64 { return clampBytes(ceiling/8, 64<<20, 2<<30) }
+func detailBufferBytes(ceiling int64) int64 {
+	return clampBytes(ceiling/8, min(64<<20, ceiling/8), 2<<30)
+}
 
 // oneGraphSourceBytes is the most analysable source one resident graph may be built from under
 // a ceiling: past it the scan is partitioned, and inside it nothing about the scan changes.

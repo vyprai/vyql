@@ -114,11 +114,23 @@ func OpenBadgerGraph(path string, cacheBytes, detailBufBytes int64) (*BadgerGrap
 	} else {
 		opts = badger.DefaultOptions(path)
 	}
+	memTableSize := int64(32 << 20)
+	if cacheBytes > 0 && cacheBytes/2 < memTableSize {
+		// Badger's own max batch size is a fraction of the memtable arena, and must stay
+		// above its ValueThreshold (1MiB by default) or Open refuses outright -- so this
+		// floor cannot chase the cache budget all the way down to it.
+		memTableSize = clampInt64(cacheBytes/2, 16<<20, memTableSize)
+	}
 	opts = opts.WithLogger(nil).
-		WithSyncWrites(false).      // a scan-scoped graph: durability not needed, speed is
-		WithCompression(0).         // skip per-block (de)compression CPU
-		WithNumVersionsToKeep(1).   // no MVCC history
-		WithMemTableSize(32 << 20). // memtable arenas are eager Go-heap allocations inside a RAM-bounded mode
+		WithSyncWrites(false).    // a scan-scoped graph: durability not needed, speed is
+		WithCompression(0).       // skip per-block (de)compression CPU
+		WithNumVersionsToKeep(1). // no MVCC history
+		// The memtable arena is an eager Go-heap allocation, paid once per graph the moment
+		// it opens. A scan bounded to a small partition budget opens many of these in turn
+		// (one per partition), so a flat 32MiB here taxes every partition regardless of how
+		// little it holds -- scaling it down with the cache budget keeps that tax
+		// proportionate instead of dominating a tight -max-ram ceiling.
+		WithMemTableSize(memTableSize).
 		WithDetectConflicts(false)
 	if cacheBytes > 0 {
 		// The whole cache budget goes to the block cache. The index cache is only
@@ -133,6 +145,16 @@ func OpenBadgerGraph(path string, cacheBytes, detailBufBytes int64) (*BadgerGrap
 	g := NewBadgerGraphDB(db, true)
 	g.detCapByte = detailBufBytes // 0 = unbounded; else spill detail to badger past this many bytes
 	return g, nil
+}
+
+func clampInt64(want, lo, hi int64) int64 {
+	if want < lo {
+		return lo
+	}
+	if want > hi {
+		return hi
+	}
+	return want
 }
 
 // NewBadgerGraphDB wraps an existing *badger.DB (e.g. the shared parse cache db) as a graph store.
