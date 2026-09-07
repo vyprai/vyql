@@ -1390,6 +1390,160 @@ int quiet_wide_cast_zero_literal(unsigned int a, unsigned int b) {
 	}
 }
 
+func TestCNarrowingCastBoundsCheckObservation(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "narrow.c")
+	src := []byte(`
+#include <stddef.h>
+#include <stdint.h>
+
+struct string_buf {
+  unsigned char *data;
+  unsigned char *dataptr;
+  size_t len;
+};
+
+struct reader {
+  size_t avail_in;
+};
+
+static size_t remaining_bytes(struct reader *br) {
+  return br->avail_in;
+}
+
+/* the copy size narrowed on its way into a local the guard then reads */
+int vulnerable_narrowed_local(struct reader *br, int limit) {
+  int nbytes = (int)remaining_bytes(br);
+  if (nbytes > limit) {
+    nbytes = limit;
+  }
+  return nbytes;
+}
+
+/* the same narrowing written inside the comparison itself */
+int vulnerable_cast_in_comparison(struct string_buf *buf, size_t len) {
+  return ((int)(buf->len - len) <= (int)len) ? 1 : 0;
+}
+
+/* a sum widened for the addition and narrowed again before the guard reads it */
+int vulnerable_widened_then_narrowed(unsigned int a, unsigned int b, int limit) {
+  int total = (int)((uint64_t)a + b);
+  if (total > limit) {
+    return 0;
+  }
+  return 1;
+}
+
+/* the fix: the remainder is computed and compared at width */
+int fixed_compared_at_width(struct string_buf *buf, size_t len) {
+  size_t left = buf->len - len;
+  return (len <= left) && (left <= buf->len);
+}
+
+/* widening is not narrowing */
+int quiet_widening_cast(struct reader *br, int limit) {
+  size_t nbytes = (size_t)limit;
+  if (nbytes > remaining_bytes(br)) {
+    return 0;
+  }
+  return 1;
+}
+
+/* a compile-time bound carries no width this file states */
+int quiet_sizeof_bound(const char *s, int n) {
+  char name[64];
+  if (n > (int)(sizeof(name) - 1)) {
+    return 0;
+  }
+  return (int)s[0];
+}
+
+/* a shift count is not a comparison operand */
+int quiet_shift_count(struct reader *br) {
+  size_t bits = remaining_bytes(br);
+  return 1 << (unsigned int)(bits & 7);
+}
+
+/* a shift of the narrowed local is not a bounds check either */
+int quiet_shifted_local(struct reader *br) {
+  int nbytes = (int)remaining_bytes(br);
+  return nbytes >> 3;
+}
+
+/* the narrowed value is never compared here */
+int quiet_uncompared_local(struct reader *br) {
+  int nbytes = (int)remaining_bytes(br);
+  return nbytes;
+}
+
+/* a pointer to a wide integer is an address, not a wide value */
+int quiet_pointer_to_wide(size_t *lenp, int limit) {
+  int n = (int)lenp;
+  if (n > limit) {
+    return 0;
+  }
+  return 1;
+}
+
+/* a callee this file does not type is not typed by its name */
+int quiet_untyped_callee(const char *s, int limit) {
+  int n = (int)strlen(s);
+  if (n > limit) {
+    return 0;
+  }
+  return 1;
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "analysis.narrow_cast.bounds_check"
+	for _, tc := range []struct {
+		fn     string
+		tokens []string
+	}{
+		{"vulnerable_narrowed_local", []string{
+			"target=int", "source=wide_result", "origin=remaining_bytes",
+			"read=narrowed_local_compared", "dest=nbytes",
+		}},
+		{"vulnerable_widened_then_narrowed", []string{
+			"target=int", "source=wide_cast", "origin=uint64_t",
+			"read=narrowed_local_compared", "dest=total",
+		}},
+		{"vulnerable_cast_in_comparison", []string{
+			"target=int", "source=wide_declared", "origin=len",
+			"read=cast_in_comparison", "operand=(buf->len-len)",
+		}},
+	} {
+		for _, token := range tc.tokens {
+			if !cFuncHasAnalysisToken(prog.Modules[0].Body, tc.fn, path, token) {
+				t.Fatalf("%s missing narrowing-cast bounds check token %q", tc.fn, token)
+			}
+		}
+	}
+	for _, quiet := range []string{
+		"fixed_compared_at_width",
+		"quiet_widening_cast",
+		"quiet_sizeof_bound",
+		"quiet_shift_count",
+		"quiet_shifted_local",
+		"quiet_uncompared_local",
+		"quiet_pointer_to_wide",
+		"quiet_untyped_callee",
+		"remaining_bytes",
+	} {
+		if cFuncHasAnalysisToken(prog.Modules[0].Body, quiet, path, "read=cast_in_comparison") ||
+			cFuncHasAnalysisToken(prog.Modules[0].Body, quiet, path, "read=narrowed_local_compared") {
+			t.Fatalf("%s should not emit a narrowing-cast bounds check observation", quiet)
+		}
+	}
+}
+
 func TestCPublicEntryMarkingSkipsInternalAndMacroHiddenDefinitions(t *testing.T) {
 	dir := t.TempDir()
 	file := filepath.Join(dir, "entry.c")
