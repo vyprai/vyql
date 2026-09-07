@@ -83,6 +83,14 @@ func scanFingerprint(salt []byte, paths []string, ruleSources []parser.V2Definit
 	// another ceiling's cached findings.
 	hashString(h, "\x00max-file-size\x00")
 	hashString(h, strconv.FormatInt(treesitter.MaxFileBytes(), 10))
+	// The partition budget changes which flows have a graph containing both ends, so a run
+	// under a tighter memory ceiling must never replay a looser one's findings, or the looser
+	// run's cross-partition findings would be reported by a scan that could not derive them —
+	// and the reverse, silently, is worse.
+	hashString(h, "\x00source-budget\x00")
+	hashString(h, strconv.FormatInt(scanSourceLimit, 10))
+	hashString(h, "\x00/\x00")
+	hashString(h, strconv.FormatInt(scanSourceBudget, 10))
 	for _, p := range paths {
 		hashString(h, "\x00src\x00")
 		statWalk(h, p)

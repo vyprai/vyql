@@ -60,6 +60,14 @@ func (s Stats) TotalFiles() int {
 // Program, and returns the union of binding applicators + constructor→type
 // tables for the languages present.
 func All(paths []string, excludes Excludes) (nir.Program, []bindings.Applicator, map[string]string, Stats, error) {
+	return AllIn(paths, excludes, nil)
+}
+
+// AllIn is All restricted to one partition of the target: only is the set of file paths this
+// build covers, and a nil set covers everything. It is applied to the walk's own output, before
+// the size and bundle filters, so each partition counts only the files it reads and the merged
+// per-file counts add up to the whole tree exactly once (see MergeStats).
+func AllIn(paths []string, excludes Excludes, only map[string]bool) (nir.Program, []bindings.Applicator, map[string]string, Stats, error) {
 	var prog nir.Program
 	present := map[string]bool{}
 	stats := Stats{Files: map[string]int{}, Unmatched: map[string]int{}}
@@ -81,36 +89,16 @@ func All(paths []string, excludes Excludes) (nir.Program, []bindings.Applicator,
 			var droppedByExclude int
 			entries, droppedByExclude = treesitter.ListAllFilesCounted(p, pruner(excludes))
 			stats.Excluded += droppedByExclude
+			entries = keepOnly(entries, only)
 			// Only filtered when walking a tree. Naming a file explicitly is an
 			// instruction to scan that file, whatever its size or shape.
-			ceiling := treesitter.MaxFileBytes()
-			bundleKinds := frontend.BundleKinds()
-			kept := entries[:0]
-			oversized := 0
-			for _, e := range entries {
-				fi, err := os.Stat(e.Path)
-				if err == nil {
-					if ceiling > 0 && fi.Size() > ceiling {
-						oversized++
-						continue
-					}
-					// A minified bundle is build output committed as an asset, not source:
-					// parsing it costs far more memory than its size, and a committed
-					// frontend holds enough bundles to push a bounded scan past its
-					// ceiling before any finding is reported. SCA still reads their
-					// banners — it walks the tree itself, past this filter.
-					if (bundleKinds[e.Ext] || bundleKinds[e.Base]) && minifiedBundle(e.Path, fi.Size()) {
-						stats.Minified++
-						continue
-					}
-				}
-				kept = append(kept, e)
-			}
+			var oversized, minified int
+			entries, oversized, minified = keepAnalysable(entries)
 			stats.Oversized += oversized
-			entries = kept
+			stats.Minified += minified
 		} else {
 			root = filepath.Dir(p)
-			entries = []treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}
+			entries = keepOnly([]treesitter.Entry{{Path: p, Ext: strings.ToLower(filepath.Ext(p)), Base: strings.ToLower(filepath.Base(p))}}, only)
 		}
 		for _, e := range entries {
 			kind := e.Ext
@@ -177,6 +165,21 @@ func All(paths []string, excludes Excludes) (nir.Program, []bindings.Applicator,
 		bindingApps = append(bindingApps, bindings.AutoBindings()...)
 	}
 	return prog, bindingApps, ctorTypes, stats, nil
+}
+
+// keepOnly restricts a walk's entries to one partition. A nil set is the whole target, which
+// is what every unpartitioned scan passes, so it costs nothing.
+func keepOnly(entries []treesitter.Entry, only map[string]bool) []treesitter.Entry {
+	if only == nil {
+		return entries
+	}
+	kept := entries[:0]
+	for _, e := range entries {
+		if only[e.Path] {
+			kept = append(kept, e)
+		}
+	}
+	return kept
 }
 
 // pruner adapts the compiled exclusions to the walk. A nil set becomes a nil

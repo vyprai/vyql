@@ -372,11 +372,12 @@ func applyMaxRAM(v string) func() {
 		fmt.Fprintf(os.Stderr, "vyql: invalid --max-ram %q (use e.g. 8GB, 16GiB)\n", v)
 		return noop
 	}
+	scanSourceLimit, scanSourceBudget = oneGraphSourceBytes(n), sourceBudgetBytes(n)
 	dir, err := newGraphStoreDir()
 	if err != nil {
 		debug.SetMemoryLimit(goHeapMemoryLimit(n))
 		lowering.UseIntStore = true // fallback: lower-footprint in-RAM store
-		return noop
+		return func() { scanSourceLimit, scanSourceBudget = 0, 0 }
 	}
 	// The flag names a ceiling on the whole process, so every pool is carved out of the one
 	// figure and the heap ceiling is that figure less a reserve for the memory the Go runtime
@@ -392,8 +393,8 @@ func applyMaxRAM(v string) func() {
 	// ceiling as the graph itself, and it only earns anything after a spill. A cache sized as a large
 	// share of the budget fills the ceiling before a node is stored, leaving the collector to
 	// run against memory it may not release.
-	lowering.DiskCacheBytes = clampBytes(n/16, 64<<20, 512<<20)
-	lowering.DiskDetailBuf = clampBytes(n/8, 64<<20, 2<<30)
+	lowering.DiskCacheBytes = clampBytes(n/16, min(64<<20, n/16), 512<<20)
+	lowering.DiskDetailBuf = detailBufferBytes(n)
 	graphDir := filepath.Join(dir, "graph")
 	if err := os.MkdirAll(graphDir, 0o700); err != nil {
 		graphDir = dir
@@ -421,9 +422,69 @@ func applyMaxRAM(v string) func() {
 		}
 		lowering.DiskStorePath = ""
 		lowering.DiskCacheBytes, lowering.DiskDetailBuf = 0, 0
+		scanSourceLimit, scanSourceBudget = 0, 0
 		_ = os.RemoveAll(dir) // best-effort temp cleanup
 	}
 }
+
+// scanSourceLimit is the most analysable source one resident program graph may be built from
+// under the ceiling in force, and scanSourceBudget is how much each partition holds once a
+// target passes it. Both zero — no ceiling was asked for — means the target is scanned as one
+// graph however large it is, which is what every scan did before partitioning existed.
+var (
+	scanSourceLimit  int64
+	scanSourceBudget int64
+)
+
+// detailBytesPerSourceByte is how much node detail a byte of source lowers to: type, location,
+// region, scope and the match-path properties of every node the byte becomes. Measured at ~58
+// bytes on the JavaScript corpus, rounded up.
+const detailBytesPerSourceByte = 64
+
+// detailBufferBytes is the share of the ceiling the node detail buffer gets. See applyMaxRAM
+// for why an eighth, and oneGraphSourceBytes for why the partition sizes are read off it.
+func detailBufferBytes(ceiling int64) int64 {
+	return clampBytes(ceiling/8, min(64<<20, ceiling/8), 2<<30)
+}
+
+// oneGraphSourceBytes is the most analysable source one resident graph may be built from under
+// a ceiling: past it the scan is partitioned, and inside it nothing about the scan changes.
+//
+// It is read off the node detail buffer rather than the ceiling directly, because that is where
+// the sharp limit is. Memory is the looser one: lowering source costs on the order of two
+// hundred times its own size in live graph and lowering state, and the peak lands mid-lower,
+// before a rule has run — 13MB of JavaScript peaks near 3GB, which a 4GB ceiling does not
+// survive. Detail is the buffer's own arithmetic and lands close to the same place.
+func oneGraphSourceBytes(ceiling int64) int64 {
+	if ceiling <= 0 {
+		return 0
+	}
+	return detailBufferBytes(ceiling) / detailBytesPerSourceByte
+}
+
+// sourceBudgetBytes is how much source each partition holds once a target is being partitioned.
+//
+// Half the limit, not the limit, because the limit is a cliff rather than a slope: a partition
+// whose detail overruns the buffer spills it to the store, and binding matching then reads
+// every node's detail back. Measured on the same corpus under a 4GB ceiling, 5.2MB of source
+// binds in 13s and 7.8MB in 85s. Half leaves room for source that lowers more densely than what
+// this was measured on.
+//
+// The floor keeps a small ceiling from producing a partition too small to hold a source file.
+// It is the one case where the budget is knowingly above what the buffer holds: a partition
+// that cannot hold one file is not a partition.
+func sourceBudgetBytes(ceiling int64) int64 {
+	if ceiling <= 0 {
+		return 0
+	}
+	if budget := oneGraphSourceBytes(ceiling) / 2; budget > minPartitionBytes {
+		return budget
+	}
+	return minPartitionBytes
+}
+
+// minPartitionBytes is the smallest partition worth building a graph for.
+const minPartitionBytes = 2 << 20
 
 func goHeapMemoryLimit(processLimit int64) int64 {
 	limit := memoryStopThreshold(processLimit) - cgoReserve(processLimit)
@@ -529,6 +590,57 @@ func scanPaths(paths []string, ruleSources []parser.V2DefinitionSource) ([]*find
 
 func scanPathsWithProfile(paths []string, ruleSources []parser.V2DefinitionSource, profileName string) ([]*findings.Finding, extract.Stats, usg.Store, error) {
 	return scanPathsWithProfileDemand(paths, ruleSources, profileName, false, extract.Options{})
+}
+
+// scanPartitions scans a target that holds more analysable source than one graph may cover
+// under the configured ceiling, one partition at a time.
+//
+// A scan otherwise builds a single resident graph over the whole target, so its peak memory
+// tracks the clone rather than the budget, and past a few megabytes of source the memory watch
+// stops the run before the first rule has run: no findings, no report, nothing to raise the
+// ceiling on. Scanning partition by partition bounds the graph by the partition instead.
+//
+// What that costs is said once, on stderr, rather than left for the reader to infer from a
+// finding that is not there: a flow whose source and sink land in different partitions has no
+// graph containing both, so it is not reported.
+func scanPartitions(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, build extract.Options, parts []map[string]bool) ([]*findings.Finding, extract.Stats, error) {
+	fmt.Fprintf(os.Stderr,
+		"vyql: this target carries more analysable source than one graph can hold inside the\n"+
+			"      memory ceiling; scanning it as %d partitions. A flow whose source and sink are\n"+
+			"      in different partitions is not reported — raise -max-ram to scan it as one graph.\n",
+		len(parts))
+	var all []*findings.Finding
+	var stats extract.Stats
+	seen := map[string]bool{}
+	for _, part := range parts {
+		opts := build
+		opts.Only = part
+		got, st, g, err := scanPathsWithProfileDemand(paths, ruleSources, profileName, true, opts)
+		if err != nil {
+			return nil, stats, err
+		}
+		// The next partition's graph is built while this one is still reachable unless it is
+		// released here: the store holds an open database and its directory, and the binding
+		// matcher's indexes are held by a process-wide cache that has no other reason to
+		// forget them. Holding one finished partition is what the ceiling cannot afford.
+		if g != nil {
+			bindings.ReleaseStoreIndexes(g)
+			_ = usg.Close(g)
+		}
+		stats = extract.MergeStats(stats, st)
+		for _, f := range got {
+			// SCA reads the target's manifests from the paths the scan was given, not from the
+			// partition, so a dependency finding is produced once per partition. Findings that
+			// come from source cannot repeat: the partitions are disjoint file sets.
+			fp := resultpolicy.Fingerprint(f)
+			if seen[fp] {
+				continue
+			}
+			seen[fp] = true
+			all = append(all, f)
+		}
+	}
+	return all, stats, nil
 }
 
 func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, pruneBindings bool, build extract.Options) ([]*findings.Finding, extract.Stats, usg.Store, error) {
@@ -721,14 +833,29 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	}
 	tk.Mark("fingerprint")
 	if !hit {
+		build := extract.Options{BindingOverlay: opts.BindingOverlay, Excludes: opts.Excludes}
+		// A target too large to hold as one graph inside the ceiling is scanned as several.
+		// Not when the run needs the graph itself (graph-json, -stats, the flag reports):
+		// those serialise one store, and there is no one store to hand them.
+		var parts []map[string]bool
+		if !needsGraph {
+			parts = extract.PlanPartitions(paths, opts.Excludes, scanSourceLimit, scanSourceBudget)
+		}
+		scanNow := func() {
+			if len(parts) > 1 {
+				all, stats, err = scanPartitions(paths, ruleSources, prof.Name, build, parts)
+				return
+			}
+			all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph, build)
+		}
 		if cache != nil && !opts.GraphCache {
 			func() {
 				restore := parsecache.SetShared(nil)
 				defer restore()
-				all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph, extract.Options{BindingOverlay: opts.BindingOverlay, Excludes: opts.Excludes})
+				scanNow()
 			}()
 		} else {
-			all, stats, graph, err = scanPathsWithProfileDemand(paths, ruleSources, prof.Name, !needsGraph, extract.Options{BindingOverlay: opts.BindingOverlay, Excludes: opts.Excludes})
+			scanNow()
 		}
 		if err != nil {
 			return err
