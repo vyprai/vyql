@@ -10,15 +10,15 @@ import (
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 )
 
-// A scan builds one resident program graph, and that graph's size tracks the target's total
-// analysable source rather than the budget the scan was given. Past a few megabytes of source
-// the graph alone passes a fixed per-scan ceiling, and the run ends with no report at all —
-// the memory watch stops it before the first rule runs.
-//
 // PlanPartitions divides the target's source files into groups small enough that one group's
 // graph fits the budget, so a scan under a ceiling analyses the target as a sequence of graphs
 // instead of one. It is the same partition boundary docs/adr/0001 draws around a repository,
 // applied inside a repository that is itself too large for the budget.
+//
+// A scan builds one resident program graph, and that graph's size tracks the target's total
+// analysable source rather than the budget the scan was given. Past a few megabytes of source
+// the graph alone passes a fixed per-scan ceiling, and the run ends with no report at all —
+// the memory watch stops it before the first rule runs.
 //
 // The cost is stated where it is paid: a flow whose source and sink land in different groups is
 // not reported. Grouping walks the tree in path order so a directory's files stay together and
