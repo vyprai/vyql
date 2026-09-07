@@ -100,6 +100,27 @@ func taintScenarios() []taintGraph {
 			edges:  [][2]string{{"src", "sink"}},
 			kills:  map[string]bool{"test.Sink": true},
 		},
+		taintedConstructionGraph(),
+		{
+			name:  "two tainted sink arguments of one neutralizing call",
+			nodes: []string{"src", "argA", "argB", "ctor", "use", "useArg"},
+			labels: map[string]string{
+				"src": "test.Source", "argA": "test.Sink", "argB": "test.Sink",
+				"ctor": "test.Kill", "useArg": "test.Sink",
+			},
+			edges: [][2]string{
+				{"src", "argA"}, {"src", "argB"}, {"argA", "ctor"}, {"argB", "ctor"},
+				{"ctor", "use"}, {"use", "useArg"},
+			},
+			kills: map[string]bool{"test.Kill": true},
+		},
+		{
+			name:   "neutralizing call is the only sink the taint reaches",
+			nodes:  []string{"src", "ctorArg", "ctor"},
+			labels: map[string]string{"src": "test.Source", "ctorArg": "test.Sink", "ctor": "test.Kill"},
+			edges:  [][2]string{{"src", "ctorArg"}, {"ctorArg", "ctor"}},
+			kills:  map[string]bool{"test.Kill": true},
+		},
 		{
 			name:   "two sources, one sink",
 			nodes:  []string{"s1", "s2", "sink"},
