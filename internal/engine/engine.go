@@ -40,7 +40,19 @@ type Engine struct {
 	globalGuards           map[string]bool
 	nestedScopeFns         map[string]bool
 	taintFlowCache         map[string][]solvers.TaintFlow
+	storage                *solvers.StorageJoin
 	exits                  *solvers.ExitIndex
+}
+
+// storageJoin returns the pointer-identity join an order rule falls back to when the CFG
+// relation cannot decide a pair. It is built once per engine, and its index is built
+// lazily inside it, so a scan whose order rules are all decided by region order pays
+// nothing for it.
+func (e *Engine) storageJoin() *solvers.StorageJoin {
+	if e.storage == nil {
+		e.storage = solvers.NewStorageJoin(e.Store)
+	}
+	return e.storage
 }
 
 func New(onto *ontology.Ontology, store usg.Store) *Engine {
@@ -168,7 +180,7 @@ func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 	var out []*findings.Finding
 	for _, a := range firsts {
 		for _, b := range seconds {
-			if !solvers.Reaches(e.Store, a, b) {
+			if !solvers.Reaches(e.Store, a, b) && !e.storageJoin().Joins(a, b) {
 				continue
 			}
 			out = append(out, &findings.Finding{
