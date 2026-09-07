@@ -66,7 +66,8 @@ type lowerer struct {
 	storeErr error
 	modCtr   map[string]int // per-module node-id counter (stable, module-local ids)
 
-	funcQual      map[string]*funcInfo         // "modkey::qual" -> info
+	funcQual      map[string]*funcInfo         // "modkey::qual" -> info (last declaration wins)
+	funcOverloads map[string][]*funcInfo       // "modkey::qual" -> EVERY declaration, in source order
 	funcShort     map[string][]*funcInfo       // short name -> infos
 	classQual     map[string]bool              // "modkey::Class"
 	classDefs     map[string]map[string]bool   // bare class name -> SET of modules that define it
@@ -92,6 +93,7 @@ type lowerer struct {
 	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
 	curFile       string   // the module's display path; curNS is a hash, so language sniffs read THIS
 	curClass      string   // "" = none
+	classNest     []string // the enclosing class names, outermost first; last element is curClass
 	curDecorators []string // syntax annotations/decorators on the enclosing function
 
 	// B1 structured-CFG metadata. `region` is the current control-region path, namespaced by
@@ -2601,6 +2603,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		modOrder:        map[string]int{},
 		modBranch:       map[string]int{},
 		funcQual:        map[string]*funcInfo{},
+		funcOverloads:   map[string][]*funcInfo{},
 		funcShort:       map[string][]*funcInfo{},
 		classQual:       map[string]bool{},
 		classDefs:       map[string]map[string]bool{},
@@ -3238,6 +3241,7 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 			qual := modkey + "::" + prefix + st.Name
 			info := l.makeFuncInfo(modkey, cls, st)
 			l.funcQual[qual] = info
+			l.funcOverloads[qual] = append(l.funcOverloads[qual], info)
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
 			if l.p1 != nil {
 				l.p1.Funcs = append(l.p1.Funcs, fiGob{
@@ -3269,19 +3273,35 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.ClassDef:
 		prev := l.curClass
 		l.curClass = st.Name
+		l.classNest = append(l.classNest, st.Name)
 		l.classContextAnalysisEvent(st.Loc, st.Name, st.Bases, l.classMemberContextTokens(st.Body))
 		l.block(st.Body, newScope())
+		l.classNest = l.classNest[:len(l.classNest)-1]
 		l.curClass = prev
 	case nir.FuncDef:
 		prefix := ""
 		if l.curClass != "" {
 			prefix = l.curClass + "."
 		}
-		qual := l.curModule + "::" + prefix + st.Name
+		rel := prefix + st.Name
+		qual := l.curModule + "::" + rel
 		info := l.funcQual[qual]
+		// Overload set: funcQual keeps ONE declaration per name, so a body lowered against it
+		// binds THIS declaration's parameters to a SIBLING overload's param nodes — every name
+		// only this signature has goes unbound, and the body is cut off from every call site.
+		// Bind the body to its own signature instead, but only when funcQual's pick genuinely
+		// cannot serve it: two files declaring the same class and method identically (a PHP
+		// vulnerable/fixed pair, a Java same-package duplicate) are NOT overloads, and they keep
+		// sharing one signature exactly as before.
+		if cands := l.funcOverloads[qual]; len(cands) > 1 && !hasParams(info, st.Params) {
+			if own := overloadForSignature(cands, st.Params, sigID(l.curNS, rel, "ret", "")); own != nil {
+				info = own
+			}
+		}
 		if info == nil {
 			info = l.makeFuncInfo(l.curModule, l.curClass, st)
 			l.funcQual[qual] = info
+			l.funcOverloads[qual] = append(l.funcOverloads[qual], info)
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
 		}
 		l.promoteCapturedJSBindings(st.Body, st.Params, sc, st.Loc)
@@ -3331,10 +3351,25 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			inner.setNode("this", info.selfNode)
 			inner.setTyp("this", [2]string{l.curModule, l.curClass})
 		}
-		// seed enclosing-class field receivers so `field.method()` resolves
-		for fld, typ := range l.classFields[l.curModule+"::"+l.curClass] {
-			if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-				inner.setTyp(fld, [2]string{cm, typ})
+		// seed enclosing-class field receivers so `field.method()` resolves. In Java a method of
+		// a NESTED class also sees the lexically enclosing classes' fields — an inner class holds
+		// an implicit reference to the enclosing instance, and a static nested class reaches the
+		// outer class's static fields the same way — so `field.method()` there is a call on the
+		// OUTER class's field. Without those scopes the receiver has no type, resolution falls
+		// back to keying the call by callee name alone, and a name declared more than once (an
+		// interface plus its implementations) resolves to nothing. Java-only: a nested class in
+		// Python/JS/C# does NOT see the enclosing class's fields, so seeding them there would
+		// type a name the language resolves elsewhere. Outermost first, so an inner class's own
+		// field of the same name shadows — the language's own lookup order.
+		classScopes := []string{l.curClass}
+		if len(l.classNest) > 1 && moduleTech(l.curFile) == "java" {
+			classScopes = l.classNest
+		}
+		for _, cls := range classScopes {
+			for fld, typ := range l.classFields[l.curModule+"::"+cls] {
+				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
+					inner.setTyp(fld, [2]string{cm, typ})
+				}
 			}
 		}
 		// each function gets a distinct region ROOT, so structural dominance never spans
@@ -5015,6 +5050,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// arg NOT mapped to any resolved param keeps the conservative direct `arg → result` edge
 	// (unknown/library callee, or a vararg beyond the param list), preserving recall there.
 	targets, reachOnly := l.resolveTargets(call.Callee, sc)
+	// resolution keys a call by name, which cannot tell two declarations of the same name
+	// apart; the call site's own argument count can. See selectOverloads.
+	targets = l.selectOverloads(targets, len(args), recvNode)
 	dynamicCallback := len(targets) == 0 && l.dynamicFunctionParamCall(call.Callee, sc)
 	if dynamicCallback {
 		targets = l.dynamicCallbackTargets()
@@ -5028,10 +5066,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			// routing the shared return to this call's result would merge taint from
 			// other sites into this one. The call's own args keep the conservative
 			// arg→result edge below (mapped stays unset), matching an unresolved call.
-			paramOffset := 0
-			if recvNode != "" && target.cls != "" && len(target.paramNames) > 0 && target.paramNames[0] == l.selfName {
-				paramOffset = 1
-			}
+			paramOffset := l.paramOffset(target, recvNode)
 			for i, a := range args {
 				if i+paramOffset < len(target.paramNames) {
 					l.flow(a, target.params[target.paramNames[i+paramOffset]])
@@ -5047,14 +5082,13 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.flow(target.ret, result)
 			continue
 		}
-		paramOffset := 0
-		if recvNode != "" && target.cls != "" && len(target.paramNames) > 0 && target.paramNames[0] == l.selfName {
+		paramOffset := l.paramOffset(target, recvNode)
+		if paramOffset == 1 {
 			selfParam := target.params[target.paramNames[0]]
 			l.flow(recvNode, selfParam)
 			if l.containers[recvNode] != nil {
 				l.aliasReceiverSelf(recvNode, selfParam)
 			}
-			paramOffset = 1
 		}
 		for i, a := range args {
 			paramIndex := i + paramOffset
@@ -5567,6 +5601,115 @@ func (l *lowerer) sameTechFuncInfos(in []*funcInfo) []*funcInfo {
 		}
 	}
 	return out
+}
+
+// --- overloads ---------------------------------------------------------
+//
+// A name declared more than once at the same qualified key is an OVERLOAD SET. funcQual
+// keys a declaration by "modkey::Class.method" with nothing about the signature in it, so
+// it holds exactly one of them — the last registered — and every call to that name lands
+// on that one whatever it passes. The set is kept beside it in funcOverloads so a body can
+// be lowered against its own signature (see the nir.FuncDef arm of stmt) and a call site
+// can name the declaration its own argument count names (selectOverloads).
+
+// funcQualKey rebuilds the "modkey::qual" registration key of a declaration.
+func funcQualKey(fi *funcInfo) string {
+	if fi.cls != "" {
+		return fi.module + "::" + fi.cls + "." + fi.name
+	}
+	return fi.module + "::" + fi.name
+}
+
+// hasParams reports whether fi's parameter list is exactly `params`.
+func hasParams(fi *funcInfo, params []string) bool {
+	if fi == nil || len(fi.paramNames) != len(params) {
+		return false
+	}
+	for i, p := range fi.paramNames {
+		if p != params[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// overloadForSignature returns the declaration in `in` whose parameter list is exactly
+// `params`, preferring the one declared in the file that mints `retID` — signature node ids
+// are per-file, so that is what tells a local declaration from a same-named one in another
+// file when a whole overload set is visible under one resolution key.
+func overloadForSignature(in []*funcInfo, params []string, retID string) *funcInfo {
+	var any *funcInfo
+	for _, fi := range in {
+		if !hasParams(fi, params) {
+			continue
+		}
+		if fi.ret == retID {
+			return fi
+		}
+		if any == nil {
+			any = fi
+		}
+	}
+	return any
+}
+
+// paramOffset is 1 when the callee declares its receiver as an explicit first parameter
+// (Python/Go style `self`), so the call's own arguments start at param 1.
+func (l *lowerer) paramOffset(fi *funcInfo, recvNode string) int {
+	if recvNode != "" && fi.cls != "" && len(fi.paramNames) > 0 && fi.paramNames[0] == l.selfName {
+		return 1
+	}
+	return 0
+}
+
+// callArity is how many arguments a call site has to pass to name this declaration: its
+// declared parameters, less an explicit receiver parameter and less the JavaScript
+// frontend's synthetic `arguments` parameter, neither of which is ever passed.
+func (l *lowerer) callArity(fi *funcInfo, recvNode string) int {
+	n := len(fi.paramNames) - l.paramOffset(fi, recvNode)
+	if _, ok := fi.params[nir.JSArgumentsParam]; ok {
+		n--
+	}
+	return n
+}
+
+// selectOverloads re-points a resolved target at the declaration of its own name that this
+// call site's argument count names. It only ever moves within one overload set, and only
+// when the choice is forced: a name declared once is left alone, and so is a call whose
+// argument count matches no declaration (a vararg or defaulted call) or more than one (two
+// same-arity overloads, told apart by parameter TYPES, which resolution does not carry).
+// Everything else keeps exactly the target it had.
+func (l *lowerer) selectOverloads(targets []*funcInfo, argc int, recvNode string) []*funcInfo {
+	cloned := false
+	for i, t := range targets {
+		if t == nil {
+			continue
+		}
+		cands := l.funcOverloads[funcQualKey(t)]
+		if len(cands) < 2 || l.callArity(t, recvNode) == argc {
+			continue
+		}
+		var match *funcInfo
+		for _, c := range cands {
+			if c == nil || l.callArity(c, recvNode) != argc {
+				continue
+			}
+			if match != nil {
+				match = nil // two declarations at this arity — the argument count decides nothing
+				break
+			}
+			match = c
+		}
+		if match == nil {
+			continue
+		}
+		if !cloned { // resolveTargets can hand back a slice the lowerer keeps (funcShort)
+			targets = append([]*funcInfo(nil), targets...)
+			cloned = true
+		}
+		targets[i] = match
+	}
+	return targets
 }
 
 // uniqueTechFuncInfo returns the single tech-compatible info in `in`, if exactly
