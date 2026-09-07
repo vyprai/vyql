@@ -164,7 +164,11 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		// annotations, unprefixed: it is the enclosing class that reads them, and an outer
 		// class does not inherit its own annotations from itself.
 		ownAnnotations := c.jvAnnotationTokens(n, "")
-		c.classParamTokens = append(append([]string{}, prevParams...), c.jvAnnotationTokens(n, "class_annotation:")...)
+		classAnnotationTokens := make([]string, len(ownAnnotations))
+		for i, a := range ownAnnotations {
+			classAnnotationTokens[i] = "class_annotation:" + a
+		}
+		c.classParamTokens = append(append([]string{}, prevParams...), classAnnotationTokens...)
 		c.classContextTokens = append(append([]string{}, prevContext...), javaClassContextTokens(name, bases)...)
 		c.classContextTokens = append(c.classContextTokens, c.jvModifierTokens(n, "class_modifier:")...)
 		prevFieldInit := c.fieldInitTokens
