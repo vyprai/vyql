@@ -164,6 +164,12 @@ type containerInfo struct {
 	composite bool
 }
 
+// branchRegion is the region string inRegion(seg) opens from the region currently open —
+// the name a merge records for the branch that segment lowered.
+func (l *lowerer) branchRegion(seg string) string {
+	return l.region + "/" + seg
+}
+
 // inRegion lowers f inside a nested control region (then/else/loop/case/handler).
 func (l *lowerer) inRegion(seg string, f func()) {
 	save := l.region
@@ -731,7 +737,14 @@ func (l *lowerer) propConst(e nir.Expr) (string, bool) {
 // never need a Phi, so scanning the whole scope per branch bought nothing. `before` is the
 // union of the branches' pre-branch values; a variable absent from it was unbound before
 // the branch, which reads as "" exactly as it did from the old snapshot map.
-func (l *lowerer) mergeDeltas(sc *scope, before map[string]string, deltas []map[string]branchEnd) {
+//
+// regions names the control region each delta was lowered in, positionally. When every
+// operand of a merge came from a branch the merge itself knows the region of — no operand
+// survives from before the branch, and none arrives from a delta with no region — the Phi
+// records those regions in `merge_branches`. That is what makes a check applied on ONE
+// incoming branch of a join legible: a guard is only branch-covering when every branch that
+// can deliver the joined value carries one, and the region is what says which branch it sat in.
+func (l *lowerer) mergeDeltas(sc *scope, before map[string]string, deltas []map[string]branchEnd, regions []string) {
 	changed := map[string]bool{}
 	for _, d := range deltas {
 		for v, e := range d {
@@ -746,13 +759,18 @@ func (l *lowerer) mergeDeltas(sc *scope, before map[string]string, deltas []map[
 	}
 	sort.Strings(vars)
 	for _, v := range vars {
-		phi := l.node("Phi", "?:0", nil)
 		srcs := map[string]bool{}
-		for _, d := range deltas {
+		var branches []string
+		unattributed := false
+		for i, d := range deltas {
 			val := ""
+			branch := ""
 			if e, ok := d[v]; ok {
 				if e.present {
 					val = e.val
+					if val != "" && i < len(regions) {
+						branch = regions[i]
+					}
 				}
 			} else {
 				val = before[v] // this branch never touched v, so it ended at the pre-branch value
@@ -763,10 +781,22 @@ func (l *lowerer) mergeDeltas(sc *scope, before map[string]string, deltas []map[
 			if val != "" {
 				srcs[val] = true
 			}
+			switch {
+			case branch != "":
+				branches = append(branches, branch)
+			case val != "":
+				unattributed = true // a value this branch did not itself produce
+			}
 		}
 		if before[v] != "" {
 			srcs[before[v]] = true // the branch(es) may not run — keep the pre-branch value
+			unattributed = true
 		}
+		var props map[string]string
+		if !unattributed && len(branches) > 0 {
+			props = map[string]string{"merge_branches": strings.Join(branches, "\x00")}
+		}
+		phi := l.node("Phi", "?:0", props)
 		var srcIDs []string
 		for s := range srcs {
 			srcIDs = append(srcIDs, s)
@@ -3716,7 +3746,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		befores := map[string]string{}
 		maps.Copy(befores, thenBefore)
 		maps.Copy(befores, elseBefore)
-		l.mergeDeltas(sc, befores, []map[string]branchEnd{thenDelta, elseDelta})
+		l.mergeDeltas(sc, befores, []map[string]branchEnd{thenDelta, elseDelta},
+			[]string{l.branchRegion("if" + b + ".t"), l.branchRegion("if" + b + ".e")})
 		if zgOK {
 			if observed := zgBefore; observed != "" {
 				sc.setNode(zgName, l.guardObservation("analysis.guard.value_exclusion", "value_exclusion", observed, "", "value=0"))
@@ -3737,7 +3768,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				sc.delCnst(name)
 			}
 		}
-		l.inRegion("loop"+l.nextBranch(), func() { l.block(st.Body, sc) })
+		loopSeg := "loop" + l.nextBranch()
+		loopRegion := l.branchRegion(loopSeg)
+		l.inRegion(loopSeg, func() { l.block(st.Body, sc) })
 		bodyDelta, bodyBefore := sc.nodeDelta(mark)
 		bodyIter := sc.iterDelta(iterMark)
 		sc.undoNode(mark)
@@ -3745,7 +3778,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		sc.branchDepth--
 		// A loop may not run, represented by the unchanged nil delta.
 		sc.mergeIterationDeltas(nil, bodyIter)
-		l.mergeDeltas(sc, bodyBefore, []map[string]branchEnd{bodyDelta})
+		l.mergeDeltas(sc, bodyBefore, []map[string]branchEnd{bodyDelta}, []string{loopRegion})
 	case nir.Switch:
 		subject := l.eval(st.Subject, sc)
 		// constant subject → lower only the matching case (or default), like if/ternary
@@ -3780,8 +3813,11 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		var deltas []map[string]branchEnd
 		befores := map[string]string{}
 		var iterBranches []map[string]iterEnd
+		var caseRegions []string
 		for i, c := range st.Cases {
-			l.inRegion("sw"+b+".c"+strconv.Itoa(i), func() { l.block(c, sc) })
+			seg := "sw" + b + ".c" + strconv.Itoa(i)
+			caseRegions = append(caseRegions, l.branchRegion(seg))
+			l.inRegion(seg, func() { l.block(c, sc) })
 			d, bf := sc.nodeDelta(mark)
 			iterDelta := sc.iterDelta(iterMark)
 			sc.undoNode(mark) // each arm starts from the pre-switch bindings
@@ -3790,6 +3826,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			maps.Copy(befores, bf)
 			iterBranches = append(iterBranches, iterDelta)
 		}
+		caseRegions = append(caseRegions, l.branchRegion("sw"+b+".d"))
 		l.inRegion("sw"+b+".d", func() { l.block(st.Default, sc) })
 		d, bf := sc.nodeDelta(mark)
 		iterDelta := sc.iterDelta(iterMark)
@@ -3800,7 +3837,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		iterBranches = append(iterBranches, iterDelta)
 		sc.branchDepth--
 		sc.mergeIterationDeltas(iterBranches...)
-		l.mergeDeltas(sc, befores, deltas)
+		l.mergeDeltas(sc, befores, deltas, caseRegions)
 	case nir.Try:
 		b := l.nextBranch()
 		exn := l.nodeInline("Exception", st.Loc, nil, "exception", "analysis.exception", "", "")
