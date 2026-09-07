@@ -211,14 +211,16 @@ func (c *conv) imports(f *ast.File) []nir.Import {
 func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	var out []nir.Stmt
 	methods := c.methodMap(decls)
+	ifaces := c.interfaceMethodSets(decls)
 	c.constValues = c.collectConstValues(decls)
 	for _, d := range decls {
 		switch fn := d.(type) {
 		case *ast.FuncDecl:
-			out = append(out, c.funcDef(fn.Name.Name, fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos())))
+			out = append(out, c.funcDef(fn.Name.Name, c.receiverType(fn.Recv), fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos())))
 		case *ast.GenDecl:
 			out = append(out, c.moduleContextStmts(fn)...)
 			out = append(out, c.typeContextStmts(fn, methods)...)
+			out = append(out, c.typeDeclStmts(fn, methods, ifaces)...)
 			out = append(out, c.valueDeclStmts(fn)...)
 		}
 	}
@@ -385,6 +387,146 @@ func (c *conv) receiverType(recv *ast.FieldList) string {
 	return c.typeName(recv.List[0].Type)
 }
 
+// interfaceMethodSets collects, per interface type declared in this file, the method names
+// it requires. Go states interface satisfaction NOWHERE -- a type belongs to an interface by
+// having its methods -- so the implementation graph other languages spell with `implements`
+// has to be recovered from these sets (see typeDeclStmts).
+func (c *conv) interfaceMethodSets(decls []ast.Decl) map[string]map[string]bool {
+	out := map[string]map[string]bool{}
+	for _, d := range decls {
+		g, ok := d.(*ast.GenDecl)
+		if !ok || g.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range g.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok || ts.Name == nil {
+				continue
+			}
+			it, ok := ts.Type.(*ast.InterfaceType)
+			if !ok || it.Methods == nil {
+				continue
+			}
+			set := map[string]bool{}
+			for _, f := range it.Methods.List {
+				for _, n := range f.Names {
+					if n != nil {
+						set[n.Name] = true
+					}
+				}
+			}
+			if len(set) > 0 {
+				out[ts.Name.Name] = set
+			}
+		}
+	}
+	return out
+}
+
+// typeDeclStmts turns a Go `type` declaration into the IR's class vocabulary: one ClassDef
+// per declared type, an interface's methods as its abstract members, and as bases both the
+// types it embeds and the interfaces it structurally satisfies.
+//
+// Go writes a method apart from its type and never writes `implements`, so without this a
+// Go program reaches call resolution as a flat list of functions: the receiver-type route
+// has no type to key on and the interface route has no implementation to dispatch to,
+// leaving every method call to the unique-short-name fallback and any repository that names
+// a route handler after the service method it calls with no dispatch at all.
+//
+// Satisfaction is matched on method NAMES, and only against the interfaces declared in the
+// same file -- the over-approximation adds a dispatch target where the names line up, which
+// the resolution routes already treat as one possible continuation among several, and the
+// per-file limit is where the frontend's own view of the program ends.
+func (c *conv) typeDeclStmts(g *ast.GenDecl, methods map[string]map[string]bool, ifaces map[string]map[string]bool) []nir.Stmt {
+	if g == nil || g.Tok != token.TYPE {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, spec := range g.Specs {
+		ts, ok := spec.(*ast.TypeSpec)
+		if !ok || ts.Name == nil {
+			continue
+		}
+		cd := nir.ClassDef{Name: ts.Name.Name, Loc: c.loc(ts.Pos())}
+		_, isIface := ts.Type.(*ast.InterfaceType)
+		switch t := ts.Type.(type) {
+		case *ast.InterfaceType:
+			if t.Methods != nil {
+				for _, f := range t.Methods.List {
+					if len(f.Names) == 0 { // embedded interface
+						if base := c.typeName(f.Type); base != "" {
+							cd.Bases = append(cd.Bases, base)
+						}
+						continue
+					}
+					ft, _ := f.Type.(*ast.FuncType)
+					for _, n := range f.Names {
+						if n == nil {
+							continue
+						}
+						// no body: an abstract member, which is what makes a call typed to
+						// this interface dispatch to the implementations instead of sinking
+						// the taint in a declaration that runs nothing.
+						cd.Body = append(cd.Body, c.funcDef(n.Name, "", ft, nil, n.IsExported(), c.loc(n.Pos())))
+					}
+				}
+			}
+		case *ast.StructType:
+			if t.Fields != nil {
+				for _, f := range t.Fields.List {
+					if len(f.Names) == 0 { // embedded struct/interface: Go's method promotion
+						if base := c.typeName(f.Type); base != "" {
+							cd.Bases = append(cd.Bases, base)
+						}
+					}
+				}
+			}
+		}
+		if !isIface {
+			var names []string
+			for iface := range ifaces {
+				names = append(names, iface)
+			}
+			sort.Strings(names)
+			for _, iface := range names {
+				if iface == ts.Name.Name {
+					continue
+				}
+				if goCoversMethods(methods[ts.Name.Name], ifaces[iface]) {
+					cd.Bases = append(cd.Bases, iface)
+				}
+			}
+		}
+		out = append(out, cd)
+	}
+	return out
+}
+
+// goCoversMethods reports whether a type declaring `have` satisfies an interface requiring
+// `want`. An empty requirement is satisfied by everything, which says nothing about any
+// type, so it is not a match.
+func goCoversMethods(have, want map[string]bool) bool {
+	if len(want) == 0 {
+		return false
+	}
+	for m := range want {
+		if !have[m] {
+			return false
+		}
+	}
+	return true
+}
+
+// resultTypeName is the declared type of a function's FIRST result -- what a call to it
+// evaluates to, for the purpose of typing the value a caller binds or calls a method on.
+// Go's second result is the error convention and never the receiver of the next call.
+func (c *conv) resultTypeName(typ *ast.FuncType) string {
+	if typ == nil || typ.Results == nil || len(typ.Results.List) == 0 {
+		return ""
+	}
+	return c.typeName(typ.Results.List[0].Type)
+}
+
 func (c *conv) typeContextStmts(g *ast.GenDecl, methods map[string]map[string]bool) []nir.Stmt {
 	var out []nir.Stmt
 	if g == nil || g.Tok != token.TYPE {
@@ -500,7 +642,7 @@ func analysisCall(path, method, loc string, tokens ...string) nir.Call {
 // funcDef builds a FuncDef from a function type+body (shared by top-level FuncDecl and
 // hoisted func literals): extracts params/types, records neutral parameter-entry facts,
 // and lowers the body.
-func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, exported bool, loc string) nir.FuncDef {
+func (c *conv) funcDef(name, recv string, typ *ast.FuncType, bodyNode *ast.BlockStmt, exported bool, loc string) nir.FuncDef {
 	var params []string
 	paramTypes := map[string]string{}
 	if typ != nil && typ.Params != nil {
@@ -524,7 +666,7 @@ func (c *conv) funcDef(name string, typ *ast.FuncType, bodyNode *ast.BlockStmt, 
 	if cache := parsecache.Shared(); cache != nil {
 		body = cache.DeferFunctionBody(body)
 	}
-	return nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: body, Loc: loc,
+	return nir.FuncDef{Name: name, Recv: recv, Returns: c.resultTypeName(typ), Params: params, ParamTypes: paramTypes, Body: body, Loc: loc,
 		ContextTokens: c.goFunctionTokens(name, typ, bodyNode),
 		ParamEntries:  c.goParamEntries(name, params, paramTypes), Exported: exported}
 }
@@ -2033,7 +2175,7 @@ func (c *conv) expr(e ast.Expr) nir.Expr {
 		// synthetic anonymous FuncDef so the body and parameter-entry facts are analyzed;
 		// the closure value itself flows nothing.
 		c.anonSeq++
-		fd := c.funcDef("func#"+strconv.Itoa(c.anonSeq), ex.Type, ex.Body, false, c.loc(ex.Pos()))
+		fd := c.funcDef("func#"+strconv.Itoa(c.anonSeq), "", ex.Type, ex.Body, false, c.loc(ex.Pos()))
 		c.hoisted = append(c.hoisted, fd)
 		return nir.Const{Loc: c.loc(ex.Pos())}
 	case *ast.BinaryExpr:
@@ -2084,7 +2226,7 @@ func (c *conv) exprWithFuncHint(e ast.Expr, hint string) nir.Expr {
 		if hint != "" {
 			name = hint
 		}
-		fd := c.funcDef(name, ex.Type, ex.Body, false, c.loc(ex.Pos()))
+		fd := c.funcDef(name, "", ex.Type, ex.Body, false, c.loc(ex.Pos()))
 		c.hoisted = append(c.hoisted, fd)
 		return nir.Const{Loc: c.loc(ex.Pos())}
 	}

@@ -261,6 +261,7 @@ func encodePass1(d *pass1Delta) []byte {
 		w.smap(f.Params)
 		w.smap(f.ParamTypes)
 		w.str(f.Ret)
+		w.str(f.RetType)
 		w.str(f.Module)
 		w.str(f.Cls)
 		w.str(f.Name)
@@ -275,6 +276,17 @@ func encodePass1(d *pass1Delta) []byte {
 		w.str(cf.Key)
 		w.str(cf.Field)
 		w.str(cf.Type)
+	}
+	w.uvar(len(d.ClassBases))
+	for _, cb := range d.ClassBases {
+		w.str(cb.Key)
+		w.strs(cb.Bases)
+	}
+	w.uvar(len(d.Globals))
+	for _, g := range d.Globals {
+		w.str(g.Key)
+		w.str(g.Field)
+		w.str(g.Type)
 	}
 	w.uvar(d.Counter)
 	w.uvar(d.Order)
@@ -307,7 +319,7 @@ func decodePass1(raw []byte) (d *pass1Delta, err error) {
 			d.Funcs[i] = fiGob{
 				Qual: r.str(), Short: r.str(), ParamNames: r.strs(),
 				Params: r.smap(), ParamTypes: r.smap(),
-				Ret: r.str(), Module: r.str(), Cls: r.str(), Name: r.str(),
+				Ret: r.str(), RetType: r.str(), Module: r.str(), Cls: r.str(), Name: r.str(),
 				ParamEntries: r.paramEntries(), ResultEntries: r.resultEntries(), Abstract: r.boolean(),
 			}
 		}
@@ -318,6 +330,18 @@ func decodePass1(raw []byte) (d *pass1Delta, err error) {
 		d.ClassFields = make([]cfGob, n)
 		for i := range d.ClassFields {
 			d.ClassFields[i] = cfGob{Key: r.str(), Field: r.str(), Type: r.str()}
+		}
+	}
+	if n := r.uvar(); n > 0 {
+		d.ClassBases = make([]cbGob, n)
+		for i := range d.ClassBases {
+			d.ClassBases[i] = cbGob{Key: r.str(), Bases: r.strs()}
+		}
+	}
+	if n := r.uvar(); n > 0 {
+		d.Globals = make([]cfGob, n)
+		for i := range d.Globals {
+			d.Globals[i] = cfGob{Key: r.str(), Field: r.str(), Type: r.str()}
 		}
 	}
 	d.Counter = r.uvar()

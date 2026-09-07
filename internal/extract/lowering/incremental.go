@@ -103,6 +103,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 			l.importNode(body, imp)
 		}
 		l.register(m.Key, body.Body, "")
+		l.registerGlobals(m.Key, body.Body)
 		l.g = base
 		l.p1.Nodes = rec.d.Nodes
 		l.p1.Counter = l.modCtr[l.curNS]
@@ -298,12 +299,17 @@ type fiGob struct {
 	ParamNames         []string
 	Params, ParamTypes map[string]string
 	Ret, Module, Cls   string
+	RetType            string
 	Name               string
 	ParamEntries       []nir.ParamEntry
 	ResultEntries      []nir.ResultEntry
 	Abstract           bool
 }
 type cfGob struct{ Key, Field, Type string }
+type cbGob struct {
+	Key   string
+	Bases []string
+}
 
 // pass1Delta is one module's pass-1 output: the import/signature store nodes, its import table,
 // the functions/classes it contributes to the global symbol table, and the post-pass-1 value of
@@ -316,8 +322,16 @@ type pass1Delta struct {
 	ClassQual   []string
 	ClassDefs   []string
 	ClassFields []cfGob
-	Counter     int // modCtr[ns] after pass 1 (node-id counter)
-	Order       int // modOrder[ns] after pass 1 (CFG order counter)
+	// ClassBases is the inheritance/implementation graph the module contributes. It replays
+	// with the rest of pass 1 because derived dispatch is resolution, not body lowering: a
+	// module read back from the cache still has to be a dispatch target for the modules that
+	// are not.
+	ClassBases []cbGob
+	// Globals is the module's declared module-level variable types — the receiver types
+	// another module dispatches on when it calls a method on this module's variable.
+	Globals []cfGob
+	Counter int // modCtr[ns] after pass 1 (node-id counter)
+	Order   int // modOrder[ns] after pass 1 (CFG order counter)
 }
 
 func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
@@ -336,7 +350,8 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 	for _, f := range d.Funcs {
 		fi := &funcInfo{
 			paramNames: f.ParamNames, params: f.Params, paramTypes: f.ParamTypes, ret: f.Ret,
-			module: f.Module, cls: f.Cls, name: f.Name, paramEntries: f.ParamEntries,
+			retType: f.RetType,
+			module:  f.Module, cls: f.Cls, name: f.Name, paramEntries: f.ParamEntries,
 			resultEntries: f.ResultEntries, abstract: f.Abstract,
 		}
 		l.funcQual[f.Qual] = fi
@@ -357,6 +372,15 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 			l.classFields[cf.Key] = map[string]string{}
 		}
 		l.classFields[cf.Key][cf.Field] = cf.Type
+	}
+	for _, g := range d.Globals {
+		l.globalTypes[g.Key+"::"+g.Field] = g.Type
+	}
+	for _, cb := range d.ClassBases {
+		l.classBaseNames[cb.Key] = cb.Bases
+		for _, base := range cb.Bases {
+			l.derivedChildren[shortClassName(base)] = append(l.derivedChildren[shortClassName(base)], cb.Key)
+		}
 	}
 	if d.Counter > l.modCtr[ns] {
 		l.modCtr[ns] = d.Counter
@@ -434,7 +458,7 @@ func (l *lowerer) sigFingerprint() string {
 	}
 	for _, q := range sortedFuncKeys(l.funcQual) {
 		fi := l.funcQual[q]
-		fmt.Fprintf(h, "F %s ret=%s abstract=%v cls=%s\n", q, fi.ret, fi.abstract, fi.cls)
+		fmt.Fprintf(h, "F %s ret=%s rettype=%s abstract=%v cls=%s\n", q, fi.ret, fi.retType, fi.abstract, fi.cls)
 		for _, entry := range fi.resultEntries {
 			fmt.Fprintf(h, "  r %s\n", strings.Join(entry.Tokens, "\x00"))
 		}
@@ -453,6 +477,12 @@ func (l *lowerer) sigFingerprint() string {
 	}
 	for _, c := range sortedBoolKeys(l.classQual) {
 		fmt.Fprintf(h, "Q %s\n", c)
+	}
+	for _, g := range sortedStrKeys(l.globalTypes) {
+		fmt.Fprintf(h, "G %s=%s\n", g, l.globalTypes[g])
+	}
+	for _, cq := range sortedStrsKeys(l.classBaseNames) {
+		fmt.Fprintf(h, "B %s %v\n", cq, l.classBaseNames[cq])
 	}
 	for _, cf := range sortedFieldKeys(l.classFields) {
 		for _, fld := range sortedStrKeys(l.classFields[cf]) {
@@ -512,6 +542,15 @@ func (r *recordingStore) AddLabel(nodeID string, l usg.Label) error {
 // --- deterministic map iteration helpers for the fingerprint ------------------------------
 
 func sortedStrKeys(m map[string]string) []string {
+	out := make([]string, 0, len(m))
+	for k := range m {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func sortedStrsKeys(m map[string][]string) []string {
 	out := make([]string, 0, len(m))
 	for k := range m {
 		out = append(out, k)

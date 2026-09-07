@@ -216,7 +216,17 @@ type ExprStmt struct{ Value Expr }
 
 // FuncDef is a function/method definition.
 type FuncDef struct {
-	Name       string
+	Name string
+	// Recv is the declared receiver type of a method whose declaration is written OUTSIDE
+	// the type it belongs to (Go's `func (c *T) M()`). Languages that nest a method inside
+	// its type leave this empty and are keyed by the enclosing ClassDef instead; both end
+	// up registered under the same "module::Type.method" resolution key.
+	Recv string
+	// Returns is the declared type name of the value this function evaluates to (the FIRST
+	// declared result where a language has several). It is the declaration's own text with
+	// no resolution attached — what type that names, and whether a call site can be typed by
+	// it, is the lowering's question.
+	Returns    string
 	Params     []string
 	ParamTypes map[string]string
 	Body       []Stmt

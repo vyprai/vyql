@@ -9,6 +9,7 @@ import (
 	gofrontend "github.com/vyprai/vyql/internal/extract/frontend/golang"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/nir"
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 func TestGoFunctionContextIncludesIndexAndSliceTokens(t *testing.T) {
@@ -1078,4 +1079,201 @@ func TestGoMapLiteralKeepsItsLiteralKey(t *testing.T) {
 	if pairs[0].Key != "v" {
 		t.Errorf("map element key = %q, want %q", pairs[0].Key, "v")
 	}
+}
+
+// A Go method call whose receiver is the RESULT of another call, dispatched through the
+// service-registry indirection every Go web application writes:
+//
+//	MyService.ZeroTier().ZeroTierJoinNetwork(networkId)
+//
+// Both hops go through an interface, and the route handler carries the same short name as
+// the service method it calls, so no unique-short-name fallback can carry the dispatch —
+// only the receiver types can. CasaOS/CVE-2022-24193 is this shape verbatim.
+func TestGoCallResultReceiverDispatchesThroughInterfaceImplementation(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "zerotier.go")
+	src := []byte(`package casaos
+
+import "os/exec"
+
+func OnlyExec(cmdStr string) {
+	cmd := exec.Command("/bin/bash", "-c", cmdStr)
+	_ = cmd
+}
+
+type ZeroTierService interface {
+	ZeroTierJoinNetwork(networkId string)
+}
+
+type zerotierStruct struct {
+}
+
+func (c *zerotierStruct) ZeroTierJoinNetwork(networkId string) {
+	OnlyExec("zerotier-cli join " + networkId)
+}
+
+type Repository interface {
+	ZeroTier() ZeroTierService
+}
+
+type store struct {
+}
+
+func (c *store) ZeroTier() ZeroTierService { return &zerotierStruct{} }
+
+var MyService Repository
+
+func ZeroTierJoinNetwork(networkId string) {
+	MyService.ZeroTier().ZeroTierJoinNetwork(networkId)
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The handler and the method are two declarations, so they are two signature nodes.
+	// Keyed by short name alone they are one — the method's parameter IS the handler's, and
+	// the sink looks reachable from a handler that never calls it.
+	handlerParam := goFindNode(t, g, "code.Param", map[string]string{"name": "networkId", "loc": "zerotier.go:32"})
+	methodParam := goFindNode(t, g, "code.Param", map[string]string{"name": "networkId", "loc": "zerotier.go:17"})
+	if handlerParam == methodParam {
+		t.Fatalf("the route handler and the method it calls share one parameter node: %s", handlerParam)
+	}
+	// the command string of `exec.Command("/bin/bash", "-c", cmdStr)`, by argument position.
+	execCall, ok, err := g.GetNode(goFindNode(t, g, "code.Call", map[string]string{"loc": "zerotier.go:6", "lit0": "/bin/bash"}))
+	if err != nil || !ok {
+		t.Fatalf("exec.Command call node: ok=%v err=%v", ok, err)
+	}
+	sinkArg := execCall.Prop("arg2")
+	if sinkArg == "" {
+		t.Fatalf("exec.Command call has no third argument node: %#v", execCall)
+	}
+	reachable, err := usg.BFS(g, handlerParam, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[methodParam] {
+		t.Fatalf("handler parameter did not reach the implementation's own parameter: the call-result receiver dispatched to nothing")
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("handler parameter did not reach the exec.Command argument through the interface method")
+	}
+}
+
+// The same dispatch across PACKAGES, which is how a Go application actually writes it:
+// the route package calls `service.MyService.ZeroTier().ZeroTierJoinNetwork(id)`, where
+// `MyService` is the service package's own variable and everything it dispatches to is
+// declared there. CasaOS/CVE-2022-24193 is this file layout.
+func TestGoQualifiedRegistryVariableDispatchesAcrossPackages(t *testing.T) {
+	dir := t.TempDir()
+	write := func(rel, body string) {
+		path := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("go.mod", "module casaos\n\ngo 1.21\n")
+	write("service/service.go", `package service
+
+var MyService Repository
+
+type Repository interface {
+	ZeroTier() ZeroTierService
+}
+
+type store struct {
+}
+
+func (c *store) ZeroTier() ZeroTierService { return &zerotierStruct{} }
+`)
+	write("service/zerotier.go", `package service
+
+import "os/exec"
+
+type ZeroTierService interface {
+	ZeroTierJoinNetwork(networkId string)
+}
+
+type zerotierStruct struct {
+}
+
+func (c *zerotierStruct) ZeroTierJoinNetwork(networkId string) {
+	cmd := exec.Command("/bin/bash", "-c", "zerotier-cli join "+networkId)
+	_ = cmd
+}
+`)
+	write("route/zerotier.go", `package route
+
+import "casaos/service"
+
+func JoinRoute(networkId string) {
+	service.MyService.ZeroTier().ZeroTierJoinNetwork(networkId)
+}
+`)
+	prog, err := gofrontend.ExtractDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	routeParam := goFindNode(t, g, "code.Param", map[string]string{"name": "networkId", "loc": "route/zerotier.go:5"})
+	execCall, ok, err := g.GetNode(goFindNode(t, g, "code.Call", map[string]string{"loc": "service/zerotier.go:13", "lit0": "/bin/bash"}))
+	if err != nil || !ok {
+		t.Fatalf("exec.Command call node: ok=%v err=%v", ok, err)
+	}
+	sinkArg := execCall.Prop("arg2")
+	if sinkArg == "" {
+		t.Fatalf("exec.Command call has no third argument node: %#v", execCall)
+	}
+	reachable, err := usg.BFS(g, routeParam, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("the route parameter did not reach the shell argument through the service registry")
+	}
+}
+
+func goFindNode(t *testing.T, g usg.Store, typ string, props map[string]string) string {
+	t.Helper()
+	ids, err := g.NodesOfType(typ)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var found []string
+	for _, id := range ids {
+		n, ok, err := g.GetNode(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			continue
+		}
+		match := true
+		for k, v := range props {
+			if n.Prop(k) != v {
+				match = false
+				break
+			}
+		}
+		if match {
+			found = append(found, id)
+		}
+	}
+	if len(found) == 0 {
+		t.Fatalf("no %s node with %v", typ, props)
+	}
+	return found[0]
 }
