@@ -407,6 +407,20 @@ func v2PresenceValuePrefix(field string) string {
 		return "call_arg_shape_at:"
 	case "callMethod":
 		return "call_method:"
+	// The facts of a sibling helper the function calls, attributed one hop by
+	// the frontend. One prefix with the fact's own key inside it, so a
+	// delegated fact can never satisfy a predicate over what the function
+	// itself does (`call:test` is not a substring of `callee:call=test`).
+	case "callee":
+		return "callee:"
+	case "calleeCall":
+		return "callee:call="
+	case "calleeCallPath":
+		return "callee:call_path="
+	case "calleeLiteral":
+		return "callee:literal="
+	case "calleeRegex":
+		return "callee:regex="
 	case "callOrder":
 		return "call_order:"
 	case "entryKind":

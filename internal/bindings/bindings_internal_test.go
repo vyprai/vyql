@@ -199,6 +199,36 @@ func TestContextTokenBoundaryPredicatesMatchTokenValues(t *testing.T) {
 	}
 }
 
+// A fact attributed from a sibling helper answers only what the helper does.
+// It must never satisfy a predicate over what the function itself does, in any
+// operator that falls back to searching the context text.
+func TestDelegatedCalleeFactsDoNotSatisfyTheCallersOwnCallFamilies(t *testing.T) {
+	tokens := "function_name:renderNode\x00call:isSSRUnsafeAttr\x00call_path:isSSRUnsafeAttr\x00callee:call=test\x00callee:call_path=unsafeAttrCharRE.test\x00callee:literal=&amp;"
+	for _, op := range []string{"contains", "equals", "ends_with"} {
+		if contextTokenValuePredicate(op, []string{"call:test"}, tokens) {
+			t.Fatalf("%s: a delegated call fact satisfied the caller's own call predicate", op)
+		}
+		if contextTokenValuePredicate(op, []string{"call_path:unsafeAttrCharRE.test"}, tokens) {
+			t.Fatalf("%s: a delegated call path satisfied the caller's own call path predicate", op)
+		}
+		if contextTokenValuePredicate(op, []string{"literal:&amp;"}, tokens) {
+			t.Fatalf("%s: a delegated literal satisfied the caller's own literal predicate", op)
+		}
+	}
+	if !contextTokenValuePredicate("equals", []string{"callee:call=test"}, tokens) {
+		t.Fatal("the delegated call fact should satisfy a calleeCall predicate")
+	}
+	if !contextTokenValuePredicate("contains", []string{"callee:call_path=unsafeAttrCharRE"}, tokens) {
+		t.Fatal("the delegated call path should satisfy a calleeCallPath predicate")
+	}
+	if !contextTokenValuePredicate("exists", []string{"callee:"}, tokens) {
+		t.Fatal("a function that delegates should satisfy a callee existence predicate")
+	}
+	if contextTokenValuePredicate("exists", []string{"callee:"}, "function_name:voidTag\x00call:write") {
+		t.Fatal("a function that delegates nothing should not satisfy a callee existence predicate")
+	}
+}
+
 func TestFlagPredicateOrderChecksSelectiveContextBeforeLanguage(t *testing.T) {
 	preds := []flagPredicate{
 		newFlagPredicate("node", "tokens", "contains", []string{"lang=python"}, false, false),

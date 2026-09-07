@@ -22,11 +22,13 @@ import (
 // and drops the function body.
 type jsConv struct {
 	nodeCache
-	src      []byte
-	root     string
-	file     string
-	key      string
-	exported map[string]bool
+	src         []byte
+	root        string
+	file        string
+	key         string
+	exported    map[string]bool
+	siblings    map[string]*tree_sitter.Node
+	calleeFacts map[string][]string
 }
 
 func jsParserFor(lang unsafe.Pointer) func() *tree_sitter.Parser {
@@ -61,6 +63,8 @@ func ExtractJavaScript(files []string, root string) (nir.Program, error) {
 		c := &jsConv{src: src, root: root, file: rel, key: jsModuleKey(root, abs)}
 		root0 := tree.RootNode()
 		c.exported = c.exportedNames(root0)
+		c.siblings = c.jsSiblingFunctionBodies(root0)
+		c.calleeFacts = map[string][]string{}
 		body := append(c.jsModuleContext(root0), c.blockChildren(root0)...)
 		return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: body}, true
 	}
@@ -3120,15 +3124,7 @@ func (c *jsConv) jsFunctionContext(name string, n *tree_sitter.Node) []string {
 	if n == nil {
 		return nil
 	}
-	body := c.field(n, "body")
-	if body == nil {
-		for _, ch := range c.namedChildren(n) {
-			if c.kind(ch) == "statement_block" {
-				body = ch
-				break
-			}
-		}
-	}
+	body := c.jsFuncBodyNode(n)
 	if body == nil {
 		return nil
 	}
@@ -3140,7 +3136,196 @@ func (c *jsConv) jsFunctionContext(name string, n *tree_sitter.Node) []string {
 		strings.Join(strings.Fields(bodyText), ""),
 	}
 	tokens = append(tokens, c.jsStructuredContextTokens(body)...)
+	tokens = append(tokens, c.jsDelegatedContextTokens(name, c.funcParams(n), body)...)
 	return tokens
+}
+
+// jsFuncBodyNode returns the node a function's facts are collected from: the
+// `body` field for both statement-block and expression-bodied forms, falling
+// back to a statement_block child for the grammars that do not label it.
+func (c *jsConv) jsFuncBodyNode(n *tree_sitter.Node) *tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if body := c.field(n, "body"); body != nil {
+		return body
+	}
+	for _, ch := range c.namedChildren(n) {
+		if c.kind(ch) == "statement_block" {
+			return ch
+		}
+	}
+	return nil
+}
+
+// Bounds on delegated attribution. One hop, a handful of helpers, a handful of
+// facts each: a function that calls twenty helpers gets the first few, not a
+// transitive summary of the module.
+const (
+	jsDelegatedCalleeLimit    = 8
+	jsDelegatedCalleeFacts    = 24
+	jsDelegatedTokenLimit     = 64
+	jsDelegatedCalleeBodyMaxB = 8192
+)
+
+// jsSiblingFunctionBodies indexes the file's function definitions by the name a
+// call site would spell, so a check delegated to a sibling helper can be
+// attributed back to the caller (jsDelegatedContextTokens). Declarations and
+// `const helper = (x) => ...` bindings both count. A name defined more than
+// once in the file is dropped: the hop has to resolve to exactly one body, and
+// a shadowed name resolves to none.
+func (c *jsConv) jsSiblingFunctionBodies(root *tree_sitter.Node) map[string]*tree_sitter.Node {
+	if root == nil {
+		return nil
+	}
+	out := map[string]*tree_sitter.Node{}
+	ambiguous := map[string]bool{}
+	record := func(name string, fn *tree_sitter.Node) {
+		if name == "" || ambiguous[name] {
+			return
+		}
+		body := c.jsFuncBodyNode(fn)
+		if body == nil {
+			return
+		}
+		if _, dup := out[name]; dup {
+			delete(out, name)
+			ambiguous[name] = true
+			return
+		}
+		out[name] = body
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "function_declaration", "generator_function_declaration":
+			record(c.text(c.field(n, "name")), n)
+		case "variable_declarator":
+			if name := c.field(n, "name"); name != nil && c.kind(name) == "identifier" {
+				if val := c.unwrapJsTransparentExpr(c.field(n, "value")); c.isJsFuncNode(val) {
+					record(c.text(name), val)
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+	return out
+}
+
+// jsDelegatedContextTokens attributes what the sibling helpers a function calls
+// by name do to that function's own presence context, one hop deep.
+//
+// A check or an escape a function delegates -- `if (isSSRUnsafeAttr(name))`,
+// `escapeAttr(value)` -- leaves nothing behind in the caller's context but the
+// helper's name, because the context is collected from the caller's own body
+// subtree. Nothing can then require that the helper is the one performing the
+// validation the weakness turns on, and the caller of a helper that checks
+// reads identically to the caller of a helper that does not.
+//
+// Only what the helper does crosses the hop: the calls it makes, the regexes it
+// matches with and the literals it names. Its identifiers and expressions stay
+// behind, because a helper's local variable names describe the incident it was
+// written for rather than the behaviour anything can require of it.
+//
+// Delegated facts are re-keyed under one `callee:` prefix (`callee:call=test`),
+// never merged into the caller's own families, so nothing that asks what this
+// function does can be satisfied by what a helper it calls does instead.
+func (c *jsConv) jsDelegatedContextTokens(self string, params []string, body *tree_sitter.Node) []string {
+	if body == nil || len(c.siblings) == 0 {
+		return nil
+	}
+	var out []string
+	// The index is keyed by name over the whole file, so a callee this function
+	// received as a parameter is not the sibling that name happens to hold at
+	// file scope. Neither is the function itself.
+	seenCallee := map[string]bool{self: true}
+	for _, p := range params {
+		seenCallee[p] = true
+	}
+	seenTok := map[string]bool{}
+	callees := 0
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= jsDelegatedTokenLimit || callees >= jsDelegatedCalleeLimit {
+			return
+		}
+		if c.kind(n) == "call_expression" {
+			// A bare identifier callee is the sibling-helper form; a member call
+			// (`obj.escape(x)`) needs a receiver resolved, which this does not do.
+			if fn := c.unwrapJsTransparentExpr(c.field(n, "function")); fn != nil && c.kind(fn) == "identifier" {
+				name := c.text(fn)
+				if !seenCallee[name] {
+					seenCallee[name] = true
+					// A name that resolves to nothing -- an import, a parameter, a
+					// callee defined in another file -- spends no budget: only a
+					// helper whose body was actually read counts against it.
+					if facts := c.jsCalleeFacts(name); len(facts) > 0 {
+						callees++
+						for _, tok := range facts {
+							if len(out) >= jsDelegatedTokenLimit {
+								break
+							}
+							if seenTok[tok] {
+								continue
+							}
+							seenTok[tok] = true
+							out = append(out, tok)
+						}
+					}
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// jsCalleeFacts is the `callee:`-keyed view of one sibling helper's own facts,
+// computed once per file. The helper's facts are its body subtree's alone: the
+// hop never recurses, so a chain of helpers contributes only its first link.
+func (c *jsConv) jsCalleeFacts(name string) []string {
+	if facts, ok := c.calleeFacts[name]; ok {
+		return facts
+	}
+	facts := c.jsCalleeFactsUncached(name)
+	if c.calleeFacts == nil {
+		c.calleeFacts = map[string][]string{}
+	}
+	c.calleeFacts[name] = facts
+	return facts
+}
+
+func (c *jsConv) jsCalleeFactsUncached(name string) []string {
+	body := c.siblings[name]
+	if body == nil || body.EndByte()-body.StartByte() > jsDelegatedCalleeBodyMaxB {
+		return nil
+	}
+	var facts []string
+	for _, tok := range c.jsStructuredContextTokens(body) {
+		key, value, ok := strings.Cut(tok, ":")
+		if !ok || value == "" {
+			continue
+		}
+		switch key {
+		case "call", "call_path", "literal", "regex":
+		default:
+			continue
+		}
+		facts = append(facts, "callee:"+key+"="+value)
+		if len(facts) >= jsDelegatedCalleeFacts {
+			break
+		}
+	}
+	return facts
 }
 
 func (c *jsConv) isFunctionLikeDeclarator(n *tree_sitter.Node) bool {

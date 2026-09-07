@@ -1852,6 +1852,41 @@ binding contextFields {
 	}
 }
 
+// A binding has to be able to require that the sibling helper a function
+// delegates to is the one performing the check or the escape, which is what
+// the frontend's one-hop `callee:` facts carry.
+func TestV2PresenceNodeDelegatedCalleeContextFields(t *testing.T) {
+	sets, err := compileV2BindingsForTest(`
+module bindings.javascript.native;
+binding delegatedFields {
+  query pattern presenceNode where node.scope == "function" and node.context.calleeCall == "test" and containsAny(node.context.calleeCallPath, ["unsafeAttrCharRE.test", "attrNameRE.test"]) and node.context.calleeLiteral contains "&amp;" and node.context.calleeRegex contains "[&\"]" and node.context.callee exists
+  emit issue code.SecretComparisonReview at node
+}
+`)
+	if err != nil {
+		t.Fatalf("parser.ParseV2Definitions: %v", err)
+	}
+	flag := sets[0].Mappings[0].Flag
+	if flag.Scope != "function" || len(flag.Predicates) != 5 {
+		t.Fatalf("flag predicates wrong: %+v", flag)
+	}
+	if got := flag.Predicates[0]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "callee:call=test" {
+		t.Fatalf("calleeCall predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[1]; got.Property != "tokens" || got.Op != "contains_any" || got.Values[0] != "callee:call_path=unsafeAttrCharRE.test" || got.Values[1] != "callee:call_path=attrNameRE.test" {
+		t.Fatalf("calleeCallPath predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[2]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "callee:literal=&amp;" {
+		t.Fatalf("calleeLiteral predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[3]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "callee:regex=[&\"]" {
+		t.Fatalf("calleeRegex predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[4]; got.Property != "tokens" || got.Op != "exists" || got.Values[0] != "callee:" {
+		t.Fatalf("callee exists predicate wrong: %+v", got)
+	}
+}
+
 func TestV2PresenceNodeBoundaryTextOperators(t *testing.T) {
 	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.native;
