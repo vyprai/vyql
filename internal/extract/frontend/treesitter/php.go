@@ -1802,6 +1802,49 @@ func (c *phConv) phpSwitch(n *tree_sitter.Node) nir.Stmt {
 	return nir.Switch{Subject: c.expr(c.field(n, "condition")), Cases: cases, Labels: labels, Default: deflt}
 }
 
+// phpMatch lowers a match expression into the right-nested Ternary chain it is: every arm
+// value flows into the result, while the scrutinee and the arm conditions sit in condition
+// position, where they are still evaluated — a call in `match (f($x))` or in an arm's
+// condition keeps its node — but do not reach the result. An arm whose value names the
+// scrutinee still carries its taint, because that value is lowered like any other.
+//
+// The scrutinee is lowered once, wrapped alone in a Seq at the head of the chain: lowering
+// it per arm would duplicate any call inside it, and a bare scrutinee in condition position
+// would let a compile-time-constant one (`match (true) { … }`) prune the arms away.
+func (c *phConv) phpMatch(n *tree_sitter.Node, L string) nir.Expr {
+	type matchArm struct {
+		conds []nir.Expr
+		value nir.Expr
+	}
+	var arms []matchArm
+	var deflt nir.Expr
+	for _, ch := range c.namedChildren(c.field(n, "body")) {
+		switch c.kind(ch) {
+		case "match_conditional_expression":
+			arm := matchArm{value: c.expr(c.field(ch, "return_expression"))}
+			for _, cond := range c.namedChildren(c.field(ch, "conditional_expressions")) {
+				arm.conds = append(arm.conds, c.expr(cond))
+			}
+			arms = append(arms, arm)
+		case "match_default_expression":
+			deflt = c.expr(c.field(ch, "return_expression"))
+		}
+	}
+	res := deflt
+	if res == nil {
+		res = nir.Const{Loc: L} // no default arm: an unmatched scrutinee throws instead
+	}
+	for i := len(arms) - 1; i >= 0; i-- {
+		var cond nir.Expr = nir.Const{Loc: L}
+		if len(arms[i].conds) > 0 {
+			cond = nir.Seq{Parts: arms[i].conds, Loc: L}
+		}
+		res = nir.Ternary{Cond: cond, Then: arms[i].value, Else: res, Loc: L}
+	}
+	return nir.Ternary{Cond: nir.Seq{Parts: []nir.Expr{c.expr(c.field(n, "condition"))}, Loc: L},
+		Then: res, Else: nir.Const{Loc: L}, Loc: L}
+}
+
 func (c *phConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	var walk func(m *tree_sitter.Node)
@@ -2109,6 +2152,13 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 			then = c.field(n, "body")
 		}
 		return nir.Ternary{Cond: c.expr(c.field(n, "condition")), Then: c.expr(then), Else: c.expr(c.field(n, "alternative")), Loc: L}
+	case "match_expression":
+		// `match ($x) { 'a', 'b' => 1, default => 2 }` — the value of a match is the selected
+		// arm's, never the scrutinee's. Without this case the generic Seq fallback below made
+		// the construct a container over the scrutinee AND the arms, so a tainted scrutinee
+		// tainted the result even when every arm returns a fixed constant — the shape used to
+		// bound a value to an allowlisted set, so such a fix never cleared taint.
+		return c.phpMatch(n, L)
 	case "anonymous_function", "anonymous_function_creation_expression":
 		// `function ($req, $res) use ($x) { … }` — a closure (the dominant PHP route-handler
 		// shape, e.g. Utopia/Slim `->action(function (...) { … })`). Without this it fell to the
