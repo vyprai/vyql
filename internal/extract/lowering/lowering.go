@@ -73,6 +73,7 @@ type lowerer struct {
 	classDefs     map[string]map[string]bool   // bare class name -> SET of modules that define it
 	classFields   map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables  map[string]map[string]importEntry
+	aliasTables   map[string]map[string]calleeAlias // module key -> name bound by a declaration to a callable
 	moduleTech    map[string]string
 	moduleGlobals map[string]map[string]string // JS/TS module-level binding name -> stable slot node
 
@@ -2609,6 +2610,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		classDefs:       map[string]map[string]bool{},
 		classFields:     map[string]map[string]string{},
 		importTables:    map[string]map[string]importEntry{},
+		aliasTables:     map[string]map[string]calleeAlias{},
 		moduleTech:      map[string]string{},
 		moduleGlobals:   map[string]map[string]string{},
 		containers:      map[string]*containerInfo{},
@@ -2960,6 +2962,13 @@ func (l *lowerer) run() error {
 }
 
 func (l *lowerer) moduleScope(m nir.Module) *scope {
+	// Built here, at the one point that means "this module's body is about to
+	// lower", rather than in pass 1 with the import table: only this module's
+	// own body reads its alias table, so an unchanged module still replays from
+	// the incremental cache without its NIR being decoded at all.
+	if aliases := calleeAliasTable(m); len(aliases) != 0 {
+		l.aliasTables[m.Key] = aliases
+	}
 	sc := newScope()
 	if !usesModuleGlobalSlots(m.File) {
 		return sc
@@ -4675,7 +4684,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	calleePath := call.Path
 	if l.resolveImports {
 		if nm, ok := call.Callee.(nir.Name); ok {
-			if imp, ok := l.importTables[l.curModule][nm.ID]; ok {
+			name := nm.ID
+			// An identifier a module-level declaration bound to a callable
+			// stands for that callable: `const runIt = exec` and
+			// `const execAsync = promisify(exec)` both call `exec`, so the call
+			// carries the path the direct call would have (see callee_alias.go).
+			if aliased, ok := l.resolveCalleeAlias(name); ok {
+				calleePath, name = aliased, aliased
+			}
+			if imp, ok := l.importTables[l.curModule][name]; ok {
 				switch imp.kind {
 				case "sym":
 					calleePath = imp.module + "." + imp.symbol
