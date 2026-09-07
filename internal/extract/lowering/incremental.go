@@ -208,7 +208,7 @@ func newGraphStore(hint int) usg.Store {
 	if UseIntStore || DiskStorePath == "" {
 		return usg.NewIntStore(hint)
 	}
-	if g, err := usg.OpenBadgerGraph(DiskStorePath, DiskCacheBytes, DiskDetailBuf); err == nil {
+	if g, err := usg.OpenBadgerGraphUnder(DiskStorePath, DiskCacheBytes, DiskDetailBuf); err == nil {
 		return g
 	}
 	// Badger unavailable → fall back to the in-RAM store so scans still work.

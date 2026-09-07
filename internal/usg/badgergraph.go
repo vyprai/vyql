@@ -2,6 +2,7 @@ package usg
 
 import (
 	"encoding/binary"
+	"os"
 	"sync"
 
 	badger "github.com/dgraph-io/badger/v4"
@@ -29,8 +30,9 @@ import (
 // badger on Finalize). Streaming the build to bound PEAK RAM, and the make-default wiring, are
 // the follow-on steps. Reads after Finalize are served from badger (cache-bounded).
 type BadgerGraph struct {
-	db    *badger.DB
-	owned bool // we opened db and must close it
+	db     *badger.DB
+	owned  bool   // we opened db and must close it
+	ownDir string // a directory this graph created and removes on Close
 
 	mu sync.Mutex
 
@@ -79,6 +81,28 @@ type nodeDetail struct {
 	order                              int32
 	hasOrder                           bool
 	props                              map[string]string
+}
+
+// OpenBadgerGraphUnder opens a graph in a directory of its own beneath base, and removes that
+// directory when the graph is closed.
+//
+// Badger holds a lock on its directory, so two graphs opened at one path cannot both exist: the
+// second falls back to the in-RAM store, which is the whole graph resident — the opposite of
+// what a memory ceiling asked for, and silent. A scan that builds one graph per partition opens
+// several in turn, so each needs its own directory and each needs it gone once its partition is
+// scanned.
+func OpenBadgerGraphUnder(base string, cacheBytes, detailBufBytes int64) (*BadgerGraph, error) {
+	dir, err := os.MkdirTemp(base, "g-")
+	if err != nil {
+		return nil, err
+	}
+	g, err := OpenBadgerGraph(dir, cacheBytes, detailBufBytes)
+	if err != nil {
+		_ = os.RemoveAll(dir)
+		return nil, err
+	}
+	g.ownDir = dir
+	return g, nil
 }
 
 // OpenBadgerGraph opens a graph store at path (":memory:" for an in-memory Badger) with a cache
@@ -529,10 +553,15 @@ func (g *BadgerGraph) Labels(nodeID string) ([]Label, error) {
 
 func (g *BadgerGraph) Close() error {
 	g.flushDet()
+	var err error
 	if g.owned {
-		return g.db.Close()
+		err = g.db.Close()
 	}
-	return nil
+	if g.ownDir != "" {
+		_ = os.RemoveAll(g.ownDir)
+		g.ownDir = ""
+	}
+	return err
 }
 
 // --- node-detail binary codec ---------------------------------------------------------------

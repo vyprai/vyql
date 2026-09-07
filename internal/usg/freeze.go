@@ -104,6 +104,19 @@ func (p packedLabels) unpack() [][]Label {
 	return rows
 }
 
+// Close releases a store that is finished with. Store remains the stable public contract, so
+// a store with nothing to release — the in-memory ones — is a no-op rather than an error.
+//
+// It exists for the scan that builds more than one graph: a store holding an open database and
+// a directory releases neither when it merely goes out of scope, and the next graph is built
+// while the last one is still holding both.
+func Close(s Store) error {
+	if c, ok := s.(interface{ Close() error }); ok {
+		return c.Close()
+	}
+	return nil
+}
+
 // Freeze compacts completed stores that support a frozen representation. Store remains the
 // stable public contract; callers that build hand-written stores do not need to know about it.
 // A subsequent mutation is still supported: compact stores transparently restore mutable rows.

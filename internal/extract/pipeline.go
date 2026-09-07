@@ -26,6 +26,9 @@ type Options struct {
 	// Excludes are the compiled -exclude patterns. A directory pattern prunes the
 	// walk; a file glob drops entries as they are listed.
 	Excludes Excludes
+	// Only, when non-nil, restricts this build to one partition of the target: the set of
+	// file paths it covers. See PlanPartitions.
+	Only map[string]bool
 	// Sync, when non-nil, collects a graph-database change-feed during the build.
 	Sync *graphsync.Collector
 }
@@ -48,7 +51,7 @@ func BuildGraph(paths []string, cache lowering.DeltaCache, opts Options) (usg.St
 	defer restoreConcepts()
 
 	tk := timing.New()
-	prog, bindingApps, ctorTypes, stats, err := All(paths, opts.Excludes)
+	prog, bindingApps, ctorTypes, stats, err := AllIn(paths, opts.Excludes, opts.Only)
 	if err != nil {
 		return nil, stats, err
 	}

@@ -62,6 +62,30 @@ func storeIndexes(s usg.Store) *sharedStoreIndexes {
 	return v.(*sharedStoreIndexes)
 }
 
+// ReleaseStoreIndexes drops the per-pass indexes built over s.
+//
+// The cache is keyed by structural epoch and by nothing else, and an epoch is never reused, so
+// nothing ever removes an entry. That is free for a scan that builds one graph and exits. It is
+// not free for a scan that builds one graph per partition: the largest index here holds a
+// lowercased copy of the graph's text — around half the live heap of a completed build — so
+// every finished partition would stay resident for the whole run, and the ceiling that made the
+// scan partition in the first place would be reached anyway, a partition or two later.
+//
+// A build calls into the binding matcher only after its last node and edge are in place, so one
+// build contributes one epoch and this removes it.
+func ReleaseStoreIndexes(s usg.Store) {
+	es, ok := s.(interface{ StructEpoch() uint64 })
+	if !ok {
+		return
+	}
+	// Epoch zero is "never structurally mutated", and every such store carries it, so its
+	// entry belongs to no one store in particular and is not this one's to remove. A store a
+	// scan built always has a real epoch: it took at least one node to build.
+	if epoch := es.StructEpoch(); epoch != 0 {
+		sharedStoreIndexCache.Delete(epoch)
+	}
+}
+
 func sharedFlagIndex(s usg.Store) *flagMatchIndex {
 	si := storeIndexes(s)
 	si.flagOnce.Do(func() { si.flag = &flagMatchIndex{} })
