@@ -18,6 +18,7 @@ var extTech = map[string]string{
 	".ex": "elixir", ".exs": "elixir",
 	".dart":   "dart",
 	".groovy": "groovy", ".gradle": "groovy",
+	".as": "actionscript",
 }
 
 // nodeTech returns the language technology of a node from its loc ("file.ext:line").

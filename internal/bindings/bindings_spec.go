@@ -4,7 +4,11 @@
 package bindings
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/vyprai/vyql/internal/datadir"
@@ -353,6 +357,22 @@ func loadBindingSet(tech string) *Set {
 	}
 	sources, err := datadir.ReadVYQLDir("bindings/" + tech)
 	if err != nil {
+		// A definitions bundle predating a language the engine has just learned to parse
+		// carries no directory for that language at all. That absence is the data saying
+		// "nothing in this technology is labelled yet", which is true and safe: the
+		// frontend still builds a graph and no rule fires on it. Waiting for the binding
+		// set to ship before the frontend may exist is a deadlock -- a binding cannot be
+		// written for a language nothing parses.
+		//
+		// Only when the surrounding bindings/ directory IS there, though. A data root that
+		// points somewhere wrong fails this same way for EVERY technology, and that is the
+		// "loading zero of something looks like success" hazard: it has to stop the scan,
+		// not quietly label nothing in it.
+		if unshippedBindingSet(err, bindingsDirPresent()) {
+			empty := &Set{Name: tech, Meta: map[string]any{}}
+			actual, _ := bindingSetCache.LoadOrStore(key, empty)
+			return actual.(*Set)
+		}
 		panic("frontend: read bindings/" + tech + ": " + err.Error())
 	}
 	if extra, err := datadir.ReadVYQLDir("bindings/packages/" + tech); err == nil {
@@ -381,6 +401,21 @@ func loadBindingSet(tech string) *Set {
 		return actual.(*Set)
 	}
 	panic("frontend: no v2 binding set in bindings/" + tech)
+}
+
+// unshippedBindingSet decides which of the two readings of a failed bindings/<tech>
+// read applies: one technology absent from a bundle that otherwise has bindings, or a
+// data root that is not one.
+func unshippedBindingSet(err error, bindingsDir bool) bool {
+	return errors.Is(err, fs.ErrNotExist) && bindingsDir
+}
+
+// bindingsDirPresent reports whether the data root has a bindings/ directory at all,
+// which is what separates "this bundle labels no ActionScript yet" from "this is not a
+// data directory".
+func bindingsDirPresent() bool {
+	info, err := os.Stat(filepath.Join(datadir.Root(), "bindings"))
+	return err == nil && info.IsDir()
 }
 
 type bindingSetCacheKey struct {

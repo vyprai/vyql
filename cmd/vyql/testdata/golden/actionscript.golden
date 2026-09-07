@@ -1,0 +1,4 @@
+call analysis.class.context
+call analysis.function.context
+call source.value
+call worker.run
