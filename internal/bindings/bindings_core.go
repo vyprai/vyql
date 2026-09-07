@@ -1240,6 +1240,8 @@ func SolidityBindings() []Applicator { return BindingsFor("solidity") }
 
 func ObjCBindings() []Applicator { return BindingsFor("objc") }
 
+func ActionScriptBindings() []Applicator { return BindingsFor("actionscript") }
+
 // containsStr reports whether xs contains v.
 
 func containsStr(xs []string, v string) bool {

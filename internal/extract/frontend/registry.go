@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/vyprai/vyql/internal/bindings"
+	"github.com/vyprai/vyql/internal/extract/frontend/actionscript"
 	cfgfront "github.com/vyprai/vyql/internal/extract/frontend/config"
 	"github.com/vyprai/vyql/internal/extract/frontend/golang"
 	"github.com/vyprai/vyql/internal/extract/frontend/textpattern"
@@ -63,6 +64,10 @@ var languages = sync.OnceValue(func() []Language {
 		{"elixir", map[string]bool{".ex": true, ".exs": true}, treesitter.ExtractElixir, bindings.ElixirBindings},
 		{"dart", map[string]bool{".dart": true}, treesitter.ExtractDart, bindings.DartBindings},
 		{"groovy", map[string]bool{".groovy": true, ".gradle": true}, treesitter.ExtractGroovy, bindings.GroovyBindings},
+		// ActionScript (Flash/AIR). Its own hand-written frontend: no tree-sitter grammar
+		// parses `package a.b { … }` or `private var x:String`, and the JavaScript grammar
+		// reads a whole .as file as one error.
+		{"actionscript", map[string]bool{".as": true}, actionscript.Extract, bindings.ActionScriptBindings},
 		// config / IaC files (AndroidManifest.xml, Info.plist, Dockerfile, K8s YAML, Terraform,
 		// Python setup.cfg, JSP/Jelly templates) — a non-tree-sitter frontend; non-matching files
 		// yield no nodes so other repos are unaffected. "dockerfile" matches by basename.
