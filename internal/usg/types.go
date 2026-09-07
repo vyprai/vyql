@@ -24,6 +24,13 @@ type Label struct {
 	Detail     map[string]string `json:"detail,omitempty"`
 }
 
+// TaintReceiverDetail is the label-detail key a receiver-anchored sink carries: the
+// id of the node holding the receiver whose taint the sink consumes. The label sits
+// on the CALL node (that is the reporting location), but a call node also carries the
+// taint of its arguments, so a flow solver reading this key requires the named node to
+// be tainted before the sink fires. Absent means "no receiver constraint".
+const TaintReceiverDetail = "taint_receiver"
+
 // Node is a graph vertex with a namespaced type and typed properties. The three properties
 // every lowered code node carries — loc, region, order — are stored inline (Loc/Region/Order)
 // instead of in the Props map, so the common node needs no map allocation at all. Props holds

@@ -3603,6 +3603,55 @@ func TestReceiverControlLabelsReceiverNode(t *testing.T) {
 	}
 }
 
+// A receiver-anchored sink is labelled on the CALL node, which also carries the taint
+// of every argument. The mapping must name the receiver node so the taint solver can
+// require THAT node to be tainted — otherwise `Path("/const").write_bytes(tainted)`
+// reports as path traversal on the strength of the content alone.
+func TestReceiverSinkRecordsReceiverAnchor(t *testing.T) {
+	// spelled out rather than read from usg: the key is the contract between this
+	// mapping and solvers.FindTaintFlows, so both ends pin the literal.
+	const anchorKey = "taint_receiver"
+
+	spec := bindingSpec{
+		Name:       "neutral",
+		Technology: "neutral",
+		Sinks: []sinkSpec{{
+			Concept:  "custom.ReceiverSink",
+			Pattern:  "danger",
+			ByMethod: true,
+			Receiver: true,
+		}},
+	}
+	binding := spec.sinkApplicator()
+
+	store := usg.NewInMemStore()
+	store.AddNode(usg.Node{ID: "recv", Type: "code.Name", Props: map[string]string{"loc": "sample.x:1"}})
+	store.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:1", "callee_path": "obj.danger", "method": "danger", "recv": "recv",
+	}})
+	got := binding.Apply(store)
+	if len(got) != 1 || got[0].NodeID != "call" {
+		t.Fatalf("receiver sink mapping wrong: %+v", got)
+	}
+	if got[0].Detail[anchorKey] != "recv" {
+		t.Fatalf("receiver anchor not recorded: %+v", got[0].Detail)
+	}
+
+	// No receiver node to name: the label keeps its unconstrained meaning rather than
+	// losing the recall the receiver binding exists for.
+	noRecv := usg.NewInMemStore()
+	noRecv.AddNode(usg.Node{ID: "call", Type: "code.Call", Props: map[string]string{
+		"loc": "sample.x:1", "callee_path": "obj.danger", "method": "danger",
+	}})
+	got = binding.Apply(noRecv)
+	if len(got) != 1 || got[0].NodeID != "call" {
+		t.Fatalf("receiver sink mapping wrong without a receiver node: %+v", got)
+	}
+	if _, ok := got[0].Detail[anchorKey]; ok {
+		t.Fatalf("unresolved receiver recorded an anchor: %+v", got[0].Detail)
+	}
+}
+
 func TestReceiverSinkHonorsReceiverTypeConstraint(t *testing.T) {
 	spec := bindingSpec{
 		Name:       "neutral",
