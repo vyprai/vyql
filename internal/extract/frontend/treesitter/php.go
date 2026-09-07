@@ -301,7 +301,10 @@ func (c *phConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 	// branch-structured (B1). PHP did not evaluate the condition before → Cond stays nil,
 	// byte-identical.
 	case "if_statement":
-		return []nir.Stmt{nir.If{Cond: c.expr(c.field(n, "condition")), Then: c.phpBranch(c.field(n, "body")), Else: c.phpElse(n)}}
+		// A condition-position assignment (`if ($row = db_fetch_assoc($res))`) is hoisted
+		// ahead of the branch it guards, so the branch reads a defined variable.
+		pre, cond := c.phpCondLower(c.field(n, "condition"))
+		return append(pre, nir.If{Cond: cond, Then: c.phpBranch(c.field(n, "body")), Else: c.phpElse(n)})
 	case "foreach_statement":
 		// `foreach ($coll as $k => $v) {…}` — bind the loop key/value vars to the collection
 		// (conservative whole-collection taint) so element taint flows into the body. Without
@@ -332,7 +335,12 @@ func (c *phConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		}
 		return []nir.Stmt{nir.Loop{Body: body}}
 	case "while_statement", "for_statement", "do_statement":
-		return []nir.Stmt{nir.Loop{Body: c.collectBlocks(n)}}
+		// `while ($row = db_fetch_row($res)) {…}` — the condition binds the variable the body
+		// reads, so its assignment is prepended to the body it dominates, the way
+		// foreach_statement above binds its loop variables. The condition itself is not part of
+		// a Loop, so only the assignment survives.
+		pre, _ := c.phpCondLower(c.field(n, "condition"))
+		return []nir.Stmt{nir.Loop{Body: append(pre, c.collectBlocks(n)...)}}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
 	case "switch_statement":
@@ -1760,9 +1768,81 @@ func (c *phConv) phpElse(n *tree_sitter.Node) []nir.Stmt {
 			els = c.phpBranch(c.field(a, "body"))
 			continue
 		}
-		els = []nir.Stmt{nir.If{Cond: c.expr(c.field(a, "condition")), Then: c.phpBranch(c.field(a, "body")), Else: els}}
+		pre, cond := c.phpCondLower(c.field(a, "condition"))
+		els = append(pre, nir.If{Cond: cond, Then: c.phpBranch(c.field(a, "body")), Else: els})
 	}
 	return els
+}
+
+// phpCondLower splits a condition into the assignments it performs and the expression that
+// is then tested. PHP writes the read and the test together — `while ($row = db_fetch_row($res))`,
+// `if ($row = db_fetch_assoc($res))`, `while (($row = f()) !== false)` — and the condition
+// used to be lowered as an expression only, which kept the call but emitted no definition:
+// $row was unbound everywhere in the body, so a database value read through the idiomatic
+// loop reached nothing. The caller places the returned statements ahead of the body the
+// condition dominates, exactly as foreach_statement binds its loop variables.
+//
+// The tested expression refers to the assigned variable instead of repeating the
+// assignment, so the call is lowered once and a call in condition position that is itself a
+// sink is not reported twice. A condition with no assignment in it lowers as before.
+func (c *phConv) phpCondLower(cond *tree_sitter.Node) ([]nir.Stmt, nir.Expr) {
+	if !c.phpCondHasAssign(cond) {
+		return nil, c.expr(cond)
+	}
+	switch c.kind(cond) {
+	case "assignment_expression", "augmented_assignment_expression":
+		return c.exprStmt(cond), nir.Name{ID: c.text(c.field(cond, "left")), Loc: c.loc(c.field(cond, "left"))}
+	case "parenthesized_expression", "cast_expression":
+		kids := c.namedChildren(cond)
+		pre, inner := c.phpCondLower(kids[len(kids)-1])
+		return pre, nir.Thru{Inner: inner}
+	case "binary_expression":
+		// `($row = f()) !== false`, `$row = f() && $ok` — either side may hold the assignment.
+		lpre, left := c.phpCondLower(c.field(cond, "left"))
+		rpre, right := c.phpCondLower(c.field(cond, "right"))
+		L := c.loc(cond)
+		if op := c.text(c.field(cond, "operator")); op != "." && op != "+" {
+			return append(lpre, rpre...), nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
+		}
+		return append(lpre, rpre...), nir.Format{Parts: []nir.Expr{left, right}, Loc: L}
+	case "unary_op_expression":
+		// `!($row = f())`
+		pre, inner := c.phpCondLower(c.phpUnaryOperand(cond))
+		return pre, nir.Unary{Op: c.text(c.field(cond, "operator")), Operand: inner, Loc: c.loc(cond)}
+	}
+	return nil, c.expr(cond)
+}
+
+// phpCondHasAssign reports whether a condition assigns to a variable in a position
+// phpCondLower can hoist. Asking first keeps every ordinary condition on the single c.expr
+// call it always took: the walk in phpCondLower would otherwise lower each side of a nested
+// binary condition and then lower the whole condition again on finding no assignment.
+func (c *phConv) phpCondHasAssign(cond *tree_sitter.Node) bool {
+	switch c.kind(cond) {
+	case "assignment_expression", "augmented_assignment_expression":
+		left := c.field(cond, "left")
+		return left != nil && c.kind(left) == "variable_name"
+	case "parenthesized_expression", "cast_expression":
+		kids := c.namedChildren(cond)
+		return len(kids) > 0 && c.phpCondHasAssign(kids[len(kids)-1])
+	case "binary_expression":
+		return c.phpCondHasAssign(c.field(cond, "left")) || c.phpCondHasAssign(c.field(cond, "right"))
+	case "unary_op_expression":
+		return c.phpCondHasAssign(c.phpUnaryOperand(cond))
+	}
+	return false
+}
+
+// phpUnaryOperand is the operand of a unary expression, falling back to the last named child
+// for the grammar shapes that carry no operand field (as expr does).
+func (c *phConv) phpUnaryOperand(n *tree_sitter.Node) *tree_sitter.Node {
+	if operand := c.field(n, "operand"); operand != nil {
+		return operand
+	}
+	if kids := c.namedChildren(n); len(kids) > 0 {
+		return kids[len(kids)-1]
+	}
+	return nil
 }
 
 // phpSwitch lowers a switch into separate case branches with labels (consecutive
