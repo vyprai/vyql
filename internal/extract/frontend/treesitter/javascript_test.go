@@ -2278,3 +2278,53 @@ func TestJavaScriptTernaryAllocatedContainerWriteObservation(t *testing.T) {
 		t.Fatalf("ternary-allocated container kinds not observed: allocated=%v both=%v computed=%v", sawAllocated, sawBoth, sawComputed)
 	}
 }
+
+// The promisified-wrapper idiom, as TypeScript actually spells it: the calls
+// through `runIt` and `execAsync` have to carry the same callee path as the
+// direct `exec(cmd)` above them, or no binding naming child_process.exec sees
+// them (CVE-2026-8112's shape).
+func TestTypeScriptConstAliasedCalleeResolvesToTheWrappedImport(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "kernel.ts")
+	src := []byte(`import { exec } from "node:child_process";
+import { promisify } from "node:util";
+
+const execAsync = promisify(exec);
+const runIt = exec;
+
+export async function pulse(cmd: string) {
+  exec(cmd);
+  runIt(cmd);
+  await execAsync(cmd, { env: {} });
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{
+		"kernel.ts:8":  "node:child_process.exec",
+		"kernel.ts:9":  "node:child_process.exec",
+		"kernel.ts:10": "node:child_process.exec",
+	}
+	got := map[string]string{}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if _, ok := want[n.Prop("loc")]; ok {
+			got[n.Prop("loc")] = n.Prop("callee_path")
+		}
+	}
+	for loc, w := range want {
+		if got[loc] != w {
+			t.Errorf("callee_path at %s = %q, want %q", loc, got[loc], w)
+		}
+	}
+}
