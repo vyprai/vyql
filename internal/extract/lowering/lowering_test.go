@@ -2117,3 +2117,294 @@ func TestCallResultReceiverDispatchesOnDeclaredResultType(t *testing.T) {
 		t.Fatalf("payload did not reach the sink arg inside the implementation body")
 	}
 }
+
+// exitNodes returns the conditional-exit markers in a lowered graph.
+func exitNodes(t *testing.T, g usg.Store) []usg.Node {
+	t.Helper()
+	ids, _ := g.NodesOfType(usg.ExitNodeType)
+	var out []usg.Node
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		out = append(out, n)
+	}
+	return out
+}
+
+// A `return` inside a branch ends the function without reaching what follows the branch.
+// The lowering marks it, because region and order alone cannot say so — and a release
+// written after the branch was read as covering the path the return takes.
+func TestLowerEarlyReturnLeavesTrailingReleaseUncovered(t *testing.T) {
+	g, err := Lower(funcProgram("app.go",
+		callStmt("res.Acquire", "app.go:2"),
+		nir.If{Then: []nir.Stmt{nir.Return{}}, Loc: "app.go:3"},
+		callStmt("res.Release", "app.go:5"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	acquire := callNodeByPath(t, g, "res.Acquire")
+	release := callNodeByPath(t, g, "res.Release")
+
+	exits := exitNodes(t, g)
+	if len(exits) != 1 {
+		t.Fatalf("want one exit marker for the return inside the branch, got %d", len(exits))
+	}
+	if r := exits[0].Prop("region"); !strings.HasPrefix(r, acquire.Prop("region")+"/") {
+		t.Errorf("exit marker region = %q, want one nested under the body's %q", r, acquire.Prop("region"))
+	}
+	if o := nodeOrder(t, exits[0]); o <= nodeOrder(t, acquire) || o >= nodeOrder(t, release) {
+		t.Errorf("exit marker order %d must fall between the acquisition and the release", o)
+	}
+
+	if !solvers.PostDominates(g, release.ID, acquire.ID) {
+		t.Fatal("the structural relation still holds: the release follows in the enclosing region")
+	}
+	if solvers.PostDominatesCovered(g, solvers.NewExitIndex(g), []string{release.ID}, acquire.ID) {
+		t.Error("the branch returns before the release, so it does not run on every path")
+	}
+}
+
+// A release inside the branch that returns covers the path that branch takes, and the
+// trailing one covers the path that falls through it.
+func TestLowerEarlyReturnCoveredByReleaseInTheBranch(t *testing.T) {
+	g, err := Lower(funcProgram("app.go",
+		callStmt("res.Acquire", "app.go:2"),
+		nir.If{Then: []nir.Stmt{
+			callStmt("res.ReleaseEarly", "app.go:4"),
+			nir.Return{},
+		}, Loc: "app.go:3"},
+		callStmt("res.Release", "app.go:6"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	acquire := callNodeByPath(t, g, "res.Acquire")
+	releases := []string{
+		callNodeByPath(t, g, "res.Release").ID,
+		callNodeByPath(t, g, "res.ReleaseEarly").ID,
+	}
+	if !solvers.PostDominatesCovered(g, solvers.NewExitIndex(g), releases, acquire.ID) {
+		t.Error("every path out of the function runs a release")
+	}
+}
+
+// A `return` written at the top level of the body ends the function where nothing
+// follows it anyway, so it needs no marker.
+func TestLowerTopLevelReturnNeedsNoExitMarker(t *testing.T) {
+	g, err := Lower(funcProgram("app.go",
+		callStmt("res.Acquire", "app.go:2"),
+		nir.Return{},
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	if n := len(exitNodes(t, g)); n != 0 {
+		t.Errorf("want no exit marker for a top-level return, got %d", n)
+	}
+}
+
+// A `return` inside a callback leaves the callback, not the function that passes it, so
+// it must not be read as an exit of the enclosing function.
+func TestLowerReturnInsideCallbackDoesNotSkipTheEnclosingRelease(t *testing.T) {
+	g, err := Lower(funcProgram("app.go",
+		callStmt("res.Acquire", "app.go:2"),
+		nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Attr{Base: nir.Name{ID: "list", Loc: "app.go:3"}, Attr: "each", Path: "list.each", Loc: "app.go:3"},
+			Path:   "list.each", Method: "each", Loc: "app.go:3",
+			Args: []nir.Expr{nir.Lambda{Body: []nir.Stmt{
+				nir.If{Then: []nir.Stmt{nir.Return{}}, Loc: "app.go:4"},
+			}, Loc: "app.go:3"}},
+		}},
+		callStmt("res.Release", "app.go:6"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	acquire := callNodeByPath(t, g, "res.Acquire")
+	release := callNodeByPath(t, g, "res.Release")
+	if !solvers.PostDominatesCovered(g, solvers.NewExitIndex(g), []string{release.ID}, acquire.ID) {
+		t.Error("a return inside a callback does not leave the enclosing function")
+	}
+}
+
+// A deferred release runs on every path out of the function, early returns included, so
+// the lowering marks it as unwind cleanup and the exit markers do not unseat it.
+func TestLowerDeferredReleaseCoversAnEarlyReturn(t *testing.T) {
+	g, err := Lower(funcProgram("app.go",
+		callStmt("mu.Lock", "app.go:2"),
+		deferStmt("mu.Unlock", "app.go:3"),
+		nir.If{Then: []nir.Stmt{nir.Return{}}, Loc: "app.go:4"},
+		callStmt("w.Work", "app.go:6"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	lock := callNodeByPath(t, g, "mu.Lock")
+	unlock := callNodeByPath(t, g, "mu.Unlock")
+	if unlock.Prop(usg.UnwindProp) == "" {
+		t.Errorf("deferred call must carry %s", usg.UnwindProp)
+	}
+	if !solvers.PostDominatesCovered(g, solvers.NewExitIndex(g), []string{unlock.ID}, lock.ID) {
+		t.Error("a deferred release runs on the early-return path too")
+	}
+}
+
+// The same for a `finally`: it runs however the try statement is left.
+func TestLowerFinallyReleaseCoversAnEarlyReturn(t *testing.T) {
+	g, err := Lower(funcProgram("app.java",
+		callStmt("lock.lock", "app.java:2"),
+		nir.Try{
+			Body:    []nir.Stmt{nir.If{Then: []nir.Stmt{nir.Return{}}, Loc: "app.java:4"}},
+			Finally: []nir.Stmt{callStmt("lock.unlock", "app.java:7")},
+			Loc:     "app.java:3",
+		},
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	acquire := callNodeByPath(t, g, "lock.lock")
+	release := callNodeByPath(t, g, "lock.unlock")
+	if release.Prop(usg.UnwindProp) == "" {
+		t.Errorf("a call in a finally body must carry %s", usg.UnwindProp)
+	}
+	if !solvers.PostDominatesCovered(g, solvers.NewExitIndex(g), []string{release.ID}, acquire.ID) {
+		t.Error("a finally release runs on the path a return inside the try takes")
+	}
+}
+
+// The shape the gap is about, lowered end to end: a handle is acquired, used, and released
+// at the bottom of the function, and a branch in between returns without releasing it. The
+// trailing release covers the path that falls through the branch and nothing covers the
+// path the branch takes.
+func TestLowerReturnAfterTheHandleIsUsedLeavesTheReleaseUncovered(t *testing.T) {
+	use := func(path, loc string) nir.ExprStmt {
+		base, method, _ := strings.Cut(path, ".")
+		return nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Attr{Base: nir.Name{ID: base, Loc: loc}, Attr: method, Path: path, Loc: loc},
+			Args:   []nir.Expr{nir.Name{ID: "h", Loc: loc}},
+			Path:   path, Method: method, Loc: loc,
+		}}
+	}
+	g, err := Lower(funcProgram("app.c",
+		nir.Assign{Targets: []string{"h"}, Decl: true, Loc: "app.c:2", Value: nir.Call{
+			Callee: nir.Attr{Base: nir.Name{ID: "res", Loc: "app.c:2"}, Attr: "Acquire", Path: "res.Acquire", Loc: "app.c:2"},
+			Path:   "res.Acquire", Method: "Acquire", Loc: "app.c:2",
+		}},
+		use("res.Work", "app.c:3"),
+		nir.If{Then: []nir.Stmt{nir.Return{}}, Loc: "app.c:4"},
+		use("res.Release", "app.c:6"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	acquire := callNodeByPath(t, g, "res.Acquire")
+	release := callNodeByPath(t, g, "res.Release")
+
+	if !solvers.PostDominates(g, release.ID, acquire.ID) {
+		t.Fatal("the structural relation still holds: the release follows in the enclosing region")
+	}
+	if solvers.PostDominatesCovered(g, solvers.NewExitIndex(g), []string{release.ID}, acquire.ID) {
+		t.Error("the branch returns with the handle in use and releases nothing")
+	}
+}
+
+// A defer registered inside a NESTED function runs when that function returns, so the
+// region it covers is the nested one — it must not cover the enclosing function.
+func TestLowerDeferredReleaseInNestedFunctionCoversOnlyIt(t *testing.T) {
+	g, err := Lower(nir.Program{Modules: []nir.Module{{
+		Key: "app", File: "app.go",
+		Body: []nir.Stmt{nir.FuncDef{Name: "outer", Body: []nir.Stmt{
+			callStmt("mu.Lock", "app.go:2"),
+			nir.FuncDef{Name: "inner", Body: []nir.Stmt{
+				deferStmt("mu.Unlock", "app.go:4"),
+			}, Loc: "app.go:3"},
+		}, Loc: "app.go:1"}},
+	}}}, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	lock := callNodeByPath(t, g, "mu.Lock")
+	unlock := callNodeByPath(t, g, "mu.Unlock")
+	if solvers.PostDominatesCovered(g, solvers.NewExitIndex(g), []string{unlock.ID}, lock.ID) {
+		t.Error("a defer in a nested function must not cover the enclosing function")
+	}
+}
+
+// A `raise` inside a try body resumes in the handler rather than leaving the function, so
+// it must not be recorded as an exit — the release written after the try still runs.
+func TestLowerThrowInsideTryIsNotAnExit(t *testing.T) {
+	caught, err := Lower(funcProgram("app.py",
+		callStmt("res.Acquire", "app.py:2"),
+		nir.Try{
+			Body:     []nir.Stmt{nir.Terminate{Kind: "raise", Loc: "app.py:4"}},
+			Handlers: [][]nir.Stmt{{callStmt("log.Warn", "app.py:6")}},
+			Loc:      "app.py:3",
+		},
+		callStmt("res.Release", "app.py:7"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	if n := len(exitNodes(t, caught)); n != 0 {
+		t.Errorf("a raise inside a try body is not a function exit, got %d marker(s)", n)
+	}
+	acquire := callNodeByPath(t, caught, "res.Acquire")
+	release := callNodeByPath(t, caught, "res.Release")
+	if !solvers.PostDominatesCovered(caught, solvers.NewExitIndex(caught), []string{release.ID}, acquire.ID) {
+		t.Error("the release after the try still runs on every path")
+	}
+
+	// The same raise written in a branch, with nothing to catch it, does leave.
+	uncaught, err := Lower(funcProgram("app.py",
+		callStmt("res.Acquire", "app.py:2"),
+		nir.If{Then: []nir.Stmt{nir.Terminate{Kind: "raise", Loc: "app.py:4"}}, Loc: "app.py:3"},
+		callStmt("res.Release", "app.py:6"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	if n := len(exitNodes(t, uncaught)); n != 1 {
+		t.Fatalf("want one exit marker for the uncaught raise, got %d", n)
+	}
+	if solvers.PostDominatesCovered(uncaught, solvers.NewExitIndex(uncaught),
+		[]string{callNodeByPath(t, uncaught, "res.Release").ID}, callNodeByPath(t, uncaught, "res.Acquire").ID) {
+		t.Error("the branch raises before the release, so it does not run on every path")
+	}
+}
+
+// An exit marker records the condition of the branch it sits in, because that is what says
+// WHY the function leaves there: a branch on what an acquisition returned is the guard that
+// checks whether the acquisition succeeded. The condition of an ENCLOSING branch is not
+// that, so a region opened inside one carries no guard of its own.
+func TestLowerExitMarkerCarriesTheConditionOfItsOwnBranch(t *testing.T) {
+	cond := nir.Name{ID: "status", Loc: "app.go:3"}
+	g, err := Lower(funcProgram("app.go",
+		callStmt("res.Acquire", "app.go:2"),
+		nir.If{Cond: cond, Then: []nir.Stmt{
+			nir.If{Then: []nir.Stmt{callStmt("l.Log", "app.go:5")}, Loc: "app.go:4"},
+			nir.Return{},
+		}, Loc: "app.go:3"},
+		nir.Loop{Body: []nir.Stmt{nir.Return{}}, Loc: "app.go:8"},
+		callStmt("res.Release", "app.go:9"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	exits := exitNodes(t, g)
+	if len(exits) != 2 {
+		t.Fatalf("want two exit markers, got %d", len(exits))
+	}
+	sort.Slice(exits, func(i, j int) bool { return nodeOrder(t, exits[i]) < nodeOrder(t, exits[j]) })
+
+	guard := exits[0].Prop(usg.ExitGuardProp)
+	if guard == "" {
+		t.Fatal("the return inside the branch carries no condition")
+	}
+	n, ok, _ := g.GetNode(guard)
+	if !ok || n.Type != "code.Name" || n.Prop("callee_path") != "status" {
+		t.Errorf("exit guard = %s (%s), want the node the branch condition evaluated to", guard, n.Type)
+	}
+	if got := exits[1].Prop(usg.ExitGuardProp); got != "" {
+		t.Errorf("a return inside a loop body is not taken on any branch condition, got guard %q", got)
+	}
+}
