@@ -4706,11 +4706,11 @@ func (c *ccConv) ccNarrowingCastSites(root *tree_sitter.Node, wide, wideResults 
 			return
 		case "binary_expression":
 			left, right := c.field(n, "left"), c.field(n, "right")
-			switch op := c.text(c.field(n, "operator")); {
-			case op == "<" || op == "<=" || op == ">" || op == ">=":
+			switch c.text(c.field(n, "operator")) {
+			case "<", "<=", ">", ">=":
 				walk(left, true, "")
 				walk(right, true, "")
-			case op == "&&" || op == "||" || op == "==" || op == "!=":
+			case "&&", "||", "==", "!=":
 				walk(left, false, "")
 				walk(right, false, "")
 			default: // arithmetic: the comparison reads this operand through it
