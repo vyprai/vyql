@@ -100,6 +100,7 @@ func taintScenarios() []taintGraph {
 			edges:  [][2]string{{"src", "sink"}},
 			kills:  map[string]bool{"test.Sink": true},
 		},
+		taintedConstructionGraph(),
 		{
 			name:   "two sources, one sink",
 			nodes:  []string{"s1", "s2", "sink"},

@@ -42,6 +42,25 @@ func coversAll(chars, excluded string) bool {
 	return true
 }
 
+// intNearMiss defers NodeID lookup until the near-miss survives the contradiction filter,
+// keeping the int fixpoint free of string ids.
+type intNearMiss struct {
+	node    int32
+	concept string
+}
+
+// dropContradicted removes near-miss entries for neutralizers that turned out not to
+// neutralize: a control the flow ran straight through is not evidence of a near miss.
+func dropContradicted(ps [][2]string, contradicted func(string) bool) [][2]string {
+	out := ps[:0]
+	for _, p := range ps {
+		if !contradicted(p[0]) {
+			out = append(out, p)
+		}
+	}
+	return out
+}
+
 func firstKey(m map[string]bool) string {
 	for k := range m {
 		return k
@@ -222,6 +241,7 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 		return best
 	}
 	var nearMiss [][2]string
+	contradicted := map[string]bool{}
 	queue := make([]string, 0, len(srcs)*4)
 	for _, s := range srcs {
 		if !tainted[s] {
@@ -233,12 +253,37 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 	for len(queue) > 0 {
 		node := queue[0]
 		queue = queue[1:]
-		if kill, c := killOf(node); kill { // reached a neutralizer: record near-miss, don't propagate
+		if kill, c := killOf(node); kill && !contradicted[node] { // reached a neutralizer: record near-miss, don't propagate
 			nearMiss = append(nearMiss, [2]string{node, c})
 			continue
 		}
 		nodeFid := srcFid[node]
+		nodeIsSink := sinkSet[node]
 		forEachSucc(node, func(dst string) {
+			// A neutralizing control and the rule's own sink can land on the same call: a
+			// binding describes one call with two outputs, `emit sink <threat> at args[..]`
+			// labelling the argument node and `emit check <control> at call` labelling the call
+			// node that argument flows into. Java's `Paths.get` is both — a code.FilePathAccess
+			// sink at its arguments and a core.PathCanonicalization check at the call — so a
+			// path built from tainted components ended the flow at the construction, and
+			// everything the constructed value was then handed to (`Files.newInputStream`) was
+			// never reported at all. The engine cannot act on both readings at once: it reports
+			// the argument as a sink, so it must not also credit the call with neutralizing what
+			// it just reported.
+			//
+			// Narrow on purpose: only the TAINTED value reaching the neutralizer being one of
+			// this rule's own sinks disqualifies it. A sanitizer whose sink label sits on a
+			// different, untainted argument (jQuery's `$("<div/>", {text: t})` is a
+			// core.HtmlEscape check whose code.HtmlRender sink is the constant markup argument,
+			// not the escaped one) is an ordinary sanitizer and still absorbs the taint.
+			if nodeIsSink && !contradicted[dst] {
+				if kill, _ := killOf(dst); kill {
+					contradicted[dst] = true
+					if tainted[dst] { // already absorbed the taint once — let it propagate now
+						queue = append(queue, dst)
+					}
+				}
+			}
 			switch {
 			case !tainted[dst]:
 				tainted[dst] = true
@@ -252,6 +297,7 @@ func FindTaintFlows(store usg.Store, sourceConcepts, sinkConcepts, taintKinds, k
 			}
 		})
 	}
+	nearMiss = dropContradicted(nearMiss, func(id string) bool { return contradicted[id] })
 
 	// witness path: walk pred from a tainted node back to its source root (recorded during the
 	// fixpoint, so no second traversal). path[0] is a valid source for the (rule, sink) finding.
@@ -411,7 +457,12 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 		}
 		return best
 	}
-	var nearMiss [][2]string
+	var nearMiss []intNearMiss
+	contradicted := make([]bool, n)
+	isSink := make([]bool, n)
+	for _, s := range sinks {
+		isSink[s] = true
+	}
 	queue := make([]int32, 0, len(srcs)*4)
 	for _, s := range srcs {
 		if !tainted[s] {
@@ -423,12 +474,23 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 	for len(queue) > 0 {
 		node := queue[0]
 		queue = queue[1:]
-		if kill, c := killOf(node); kill {
-			nearMiss = append(nearMiss, [2]string{g.NodeID(node), c})
+		if kill, c := killOf(node); kill && !contradicted[node] {
+			nearMiss = append(nearMiss, intNearMiss{node: node, concept: c})
 			continue
 		}
 		nodeFid := srcFid[node]
+		nodeIsSink := isSink[node]
 		g.RangeOut(node, "FLOWS", func(dst int32) bool {
+			// a neutralizer reached by this rule's own tainted sink at the same call does not
+			// absorb the taint — see the string path for why.
+			if nodeIsSink && !contradicted[dst] {
+				if kill, _ := killOf(dst); kill {
+					contradicted[dst] = true
+					if tainted[dst] { // already absorbed the taint once — let it propagate now
+						queue = append(queue, dst)
+					}
+				}
+			}
 			switch {
 			case !tainted[dst]:
 				tainted[dst] = true
@@ -446,6 +508,12 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 			return true
 		})
 	}
+	nm := make([][2]string, 0, len(nearMiss))
+	for _, m := range nearMiss {
+		if !contradicted[m.node] {
+			nm = append(nm, [2]string{g.NodeID(m.node), m.concept})
+		}
+	}
 
 	pathTo := func(sink int32) []string {
 		var rev []int32
@@ -460,7 +528,7 @@ func findTaintFlowsInt(g usg.IntGraph, sourceConcepts, sinkConcepts, taintKinds,
 	}
 
 	// one flow per tainted live sink.
-	nm := dedupPairs(nearMiss)
+	nm = dedupPairs(nm)
 	var out []TaintFlow
 	for _, sink := range sinks {
 		if !tainted[sink] {
