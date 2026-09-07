@@ -5200,7 +5200,7 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.flow(av, result)
 		}
 	}
-	l.applyCallEffects(call, argVals, result, recvNode, sc)
+	l.applyCallEffects(call, args, argVals, result, recvNode, sc)
 	return result
 }
 
@@ -5473,7 +5473,7 @@ func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
 	}
 }
 
-func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result, recvNode string, sc *scope) {
+func (l *lowerer) applyCallEffects(call nir.Call, args, argVals []string, result, recvNode string, sc *scope) {
 	for _, effect := range call.Effects {
 		if effect.Receiver {
 			l.flow(recvNode, result)
@@ -5484,6 +5484,18 @@ func (l *lowerer) applyCallEffects(call nir.Call, argVals []string, result, recv
 		}
 		dest := callEffectDestName(call.Args[effect.DestArg])
 		if dest == "" {
+			continue
+		}
+		// In-place mutation: the call rewrote the storage `dest` names, so a read of it after
+		// this call reads what the call left there. Re-bind to the ARGUMENT SLOT rather than to
+		// the value that was passed in, which is what puts the call on the later read's path:
+		// binding a check at this argument then covers those reads, where re-binding to the
+		// value would leave them siblings of the check off the shared definition.
+		if effect.InPlace {
+			if effect.DestArg < len(args) {
+				sc.setNode(dest, args[effect.DestArg])
+				sc.delCnst(dest)
+			}
 			continue
 		}
 		if effect.SourceResult {

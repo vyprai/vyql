@@ -91,6 +91,13 @@ type CallEffect struct {
 	SourceResult bool
 	Identity     bool
 	Receiver     bool
+	// InPlace marks a call that rewrites the destination argument's own storage instead of
+	// producing a new value — a C void function handed a pointer. The destination re-binds to
+	// the call's ARGUMENT SLOT, so a later read of that variable is a successor of the slot the
+	// call mutated through and whatever a binding labelled there sits on the path. Identity
+	// re-binds to the argument's VALUE, which leaves later reads siblings of the call rather
+	// than successors of it.
+	InPlace bool
 }
 
 // Format is a taint-propagating string build (f-string, %, +, .format).
