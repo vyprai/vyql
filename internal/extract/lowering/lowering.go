@@ -2966,7 +2966,9 @@ func (l *lowerer) moduleScope(m nir.Module) *scope {
 	// lower", rather than in pass 1 with the import table: only this module's
 	// own body reads its alias table, so an unchanged module still replays from
 	// the incremental cache without its NIR being decoded at all.
-	l.aliasTables[m.Key] = calleeAliasTable(m)
+	if aliases := calleeAliasTable(m); len(aliases) != 0 {
+		l.aliasTables[m.Key] = aliases
+	}
 	sc := newScope()
 	if !usesModuleGlobalSlots(m.File) {
 		return sc

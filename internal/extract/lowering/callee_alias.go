@@ -50,8 +50,8 @@ type calleeAlias struct {
 // through.
 func calleeAliasTable(m nir.Module) map[string]calleeAlias {
 	var out map[string]calleeAlias
-	bound := map[string]bool{}
-	sites := map[string]int{}
+	var bound map[string]bool
+	var sites map[string]int
 	for _, s := range m.Body {
 		a, ok := s.(nir.Assign)
 		if !ok || len(a.Targets) != 1 {
@@ -65,6 +65,9 @@ func calleeAliasTable(m nir.Module) map[string]calleeAlias {
 			delete(out, name) // rebound: the name does not stand for one callable
 			continue
 		}
+		if bound == nil {
+			bound = map[string]bool{}
+		}
 		bound[name] = true
 		if !a.Decl {
 			continue
@@ -77,6 +80,9 @@ func calleeAliasTable(m nir.Module) map[string]calleeAlias {
 			out = map[string]calleeAlias{}
 		}
 		out[name] = al
+		if sites == nil {
+			sites = map[string]int{}
+		}
 		sites[al.site]++
 	}
 	// Several names bound to one initialiser expression are the properties a
