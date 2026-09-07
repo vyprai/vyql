@@ -30,7 +30,7 @@ var treeFieldNames = [...]string{
 	"base", "block", "body", "bounds", "command_elements", "command_name", "condition",
 	"consequence", "consequent", "constructor", "declarator", "definition", "else",
 	"else_body", "expression", "field", "function", "hash", "import_clause", "index",
-	"interfaces", "invocant", "key", "label", "left", "lhs", "macro", "member", "method",
+	"indices", "interfaces", "invocant", "key", "label", "left", "lhs", "macro", "member", "method",
 	"module_name", "name", "object", "operand", "operator", "operators", "parameter",
 	"parameters", "path", "pattern", "property", "receiver", "result", "rhs", "right",
 	"scope", "size", "source", "subject", "subscript", "suffix", "superclass",

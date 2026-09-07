@@ -53,6 +53,10 @@ type ccConv struct {
 	// voidPtrParams caches, per void-returning function this file declares, which of its
 	// parameter positions take a mutable pointer; nil until the first ask.
 	voidPtrParams map[string][]bool
+	// constSizedArrays caches the dimensions of the file's constant-size array
+	// declarations outside any function body, which every function in it asks
+	// for; nil until the first ask.
+	constSizedArrays map[string][]string
 }
 
 // cPropagators write their source arguments into destination arg0.
@@ -1854,7 +1858,11 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 		return nil
 	}
 	bodyText := compactCExprText(c.text(body))
+	arrays := c.ccConstantSizedArrays(fn)
 	seen := map[string]bool{}
+	// loops is the stack of enclosing for-loops whose induction variable a
+	// field read bounds; innermost last.
+	var loops []ccLoopFieldBound
 	var out []nir.Stmt
 	var walk func(*tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
@@ -1862,7 +1870,7 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 			return
 		}
 		if c.kind(n) == "subscript_expression" {
-			idx := c.field(n, "index")
+			idx := c.ccSubscriptIndex(n)
 			idxText := c.text(idx)
 			compactIdx := compactCExprText(idxText)
 			// ctype.h contract: tolower/toupper/isdigit & friends take and return
@@ -1908,6 +1916,30 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 					}})
 				}
 			}
+			// The index is the bare induction variable of a loop a field read
+			// bounds: the field states how far the loop runs, the array
+			// declaration states how far it may run, and nothing in the
+			// function relates the two.
+			if bound, capacity, ok := c.ccLoopBoundFixedArrayIndex(n, compactIdx, loops, arrays, bodyText); ok {
+				loc := c.loc(n)
+				if !seen[loc] {
+					seen[loc] = true
+					path := "analysis.index.field_derived_missing_upper_bound"
+					out = append(out, nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: path, Loc: loc},
+						Args: []nir.Expr{
+							nir.Const{Loc: loc, Value: "index_kind=field_derived"},
+							nir.Const{Loc: loc, Value: "guard=missing_upper_bound"},
+							nir.Const{Loc: loc, Value: "index=" + compactIdx},
+							nir.Const{Loc: loc, Value: "bound=" + bound},
+							nir.Const{Loc: loc, Value: "capacity=" + capacity},
+						},
+						Path:   path,
+						Method: "field_derived_missing_upper_bound",
+						Loc:    loc,
+					}})
+				}
+			}
 			if count, ok := ccLastElementCountExpr(compactIdx); ok {
 				loc := c.loc(n)
 				prefixText := compactCExprText(c.textBefore(body, n))
@@ -1935,12 +1967,284 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 				}})
 			}
 		}
+		pushed := false
+		if c.kind(n) == "for_statement" {
+			if loop, ok := c.ccLoopFieldBound(n); ok {
+				loops = append(loops, loop)
+				pushed = true
+			}
+		}
 		for _, ch := range c.namedChildren(n) {
 			walk(ch)
+		}
+		if pushed {
+			loops = loops[:len(loops)-1]
 		}
 	}
 	walk(body)
 	return out
+}
+
+// ccSubscriptIndex returns a subscript's index expression. The C grammar names
+// it in the field `index`; the C++ grammar wraps the indices in a
+// subscript_argument_list under the field `indices`, so a subscript in C++
+// source has no `index` field at all and reading only that field leaves every
+// C++ index empty. A C++23 multi-index subscript names no single index and is
+// left unresolved.
+func (c *ccConv) ccSubscriptIndex(n *tree_sitter.Node) *tree_sitter.Node {
+	if idx := c.field(n, "index"); idx != nil {
+		return idx
+	}
+	if kids := c.namedChildren(c.field(n, "indices")); len(kids) == 1 {
+		return kids[0]
+	}
+	return nil
+}
+
+// ccLoopFieldBound is one for-loop whose induction variable a field read
+// bounds: `for (i = 0; i <= s->max_sub_layers - 1; i++)`.
+type ccLoopFieldBound struct {
+	variable string // the induction variable, as written
+	bound    string // the field read bounding it, with any subscript of it, compacted
+	limit    string // the whole bounding expression, compacted
+}
+
+// ccLoopFieldBound reads a for-loop's condition as a bound on one induction
+// variable. Both operand orders are read (`i < s->n`, `s->n > i`), and the
+// bound is the first field read inside the limit, so the arithmetic a limit
+// carries -- `s->n - 1`, `s->n * 2` -- does not hide the field that supplies
+// it. A condition that is not a single relational comparison, or whose limit
+// names no field, bounds nothing this reads.
+func (c *ccConv) ccLoopFieldBound(loop *tree_sitter.Node) (ccLoopFieldBound, bool) {
+	cond := c.field(loop, "condition")
+	if cond == nil || c.kind(cond) != "binary_expression" {
+		return ccLoopFieldBound{}, false
+	}
+	var variable, limit *tree_sitter.Node
+	switch c.text(c.field(cond, "operator")) {
+	case "<", "<=":
+		variable, limit = c.field(cond, "left"), c.field(cond, "right")
+	case ">", ">=":
+		variable, limit = c.field(cond, "right"), c.field(cond, "left")
+	default:
+		return ccLoopFieldBound{}, false
+	}
+	if variable == nil || c.kind(variable) != "identifier" || limit == nil {
+		return ccLoopFieldBound{}, false
+	}
+	field := c.ccFirstFieldExpression(limit)
+	if field == nil {
+		return ccLoopFieldBound{}, false
+	}
+	// A field the limit subscripts states the count as a whole -- the count is
+	// `h->cpb_cnt_minus1[i]`, not `h->cpb_cnt_minus1` -- so a check on it is
+	// looked for under the spelling the code uses.
+	count := field
+	for {
+		parent := count.Parent()
+		if parent == nil || c.kind(parent) != "subscript_expression" ||
+			parent.StartByte() < limit.StartByte() || parent.EndByte() > limit.EndByte() {
+			break
+		}
+		count = parent
+	}
+	return ccLoopFieldBound{
+		variable: c.text(variable),
+		bound:    compactCExprText(c.text(count)),
+		limit:    compactCExprText(c.text(limit)),
+	}, true
+}
+
+func (c *ccConv) ccFirstFieldExpression(n *tree_sitter.Node) *tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	if c.kind(n) == "field_expression" {
+		return n
+	}
+	for _, ch := range c.namedChildren(n) {
+		if found := c.ccFirstFieldExpression(ch); found != nil {
+			return found
+		}
+	}
+	return nil
+}
+
+// ccLoopBoundFixedArrayIndex reports whether one subscript is an array of
+// constant size indexed by the bare induction variable of an enclosing loop
+// that a field read bounds, with nothing in the function relating the field to
+// the array's stated capacity. The field is then the index's real range even
+// though the index expression itself names no field: the loop runs to whatever
+// the field says, the array holds what its declaration says, and the write
+// leaves the array exactly when the field is the larger of the two
+// (CWE-129/787, the shape a length field parsed out of an input carries).
+//
+// It is deliberately narrower than the loop shape in general. The array's
+// capacity must be stated in this file -- a member declared in a header this
+// file only includes is not read -- because the capacity is what makes the
+// field a bound the code never checks rather than the size the destination was
+// allocated with. `for (i = 0; i < v->len; i++) v->data[i] = 0` over a
+// heap-allocated buffer is the common safe spelling of the same syntax and is
+// not reported.
+//
+// The capacity counts as consulted if any identifier the declared size names
+// appears in a relational comparison anywhere in the body, if sizeof the array
+// is compared, or if the loop's own limit mentions the size -- a clamp
+// (`i < MIN(s->n, MAX)`), an early return and a break inside the loop all read
+// as consulting it. The count counts as bounded only in the count-on-the-left
+// spellings (`s->n > MAX`, `s->n >= sizeof(buf)`): the mirrored form is how the
+// loop condition itself is written, so crediting it would clear every loop this
+// exists to report.
+//
+// Residuals, all false-negative: the comparison is not required to relate the
+// count to the capacity, so a bound checked for an unrelated value clears every
+// access in the function; a compound index (`arr[i + 1]`, `arr[i & 7]`) is not
+// read, so only the bare induction variable is reported; a count copied into a
+// local before the loop names no field in the condition and is not read; and an
+// array whose declared size names a lowercase constant is not treated as
+// constant-sized.
+func (c *ccConv) ccLoopBoundFixedArrayIndex(n *tree_sitter.Node, compactIdx string, loops []ccLoopFieldBound, arrays map[string][]string, bodyText string) (string, string, bool) {
+	if compactIdx == "" || len(loops) == 0 || len(arrays) == 0 {
+		return "", "", false
+	}
+	name, dimension := c.ccSubscriptArray(n)
+	dims, ok := arrays[name]
+	if !ok || dimension >= len(dims) {
+		return "", "", false
+	}
+	capacity := dims[dimension]
+	for i := len(loops) - 1; i >= 0; i-- {
+		loop := loops[i]
+		if loop.variable != compactIdx {
+			continue
+		}
+		if ccLoopCountBounded(bodyText, loop.bound) ||
+			ccCapacityConsultedIn(bodyText, "sizeof("+name+")") {
+			return "", "", false
+		}
+		for _, id := range ccIdentRe.FindAllString(capacity, -1) {
+			if strings.Contains(loop.limit, id) || (len(id) > 2 && ccCapacityConsultedIn(bodyText, id)) {
+				return "", "", false
+			}
+		}
+		return loop.bound, capacity, true
+	}
+	return "", "", false
+}
+
+// ccLoopCountBounded reports whether the function relates a loop's count to
+// anything. Only the count-on-the-left spellings are read; see
+// ccLoopBoundFixedArrayIndex for why the mirrored form cannot count.
+func ccLoopCountBounded(bodyText, count string) bool {
+	return ccComparisonAfter(bodyText, count, '<', true) ||
+		ccComparisonAfter(bodyText, count, '>', true)
+}
+
+// ccSubscriptArray names the array a subscript indexes and which of its
+// dimensions this subscript selects: the identifier itself, or the member name
+// when the array is reached through an object (`h->flags[i]`), and the count of
+// subscripts already applied to it (`a[i][j]` selects dimension 1 of `a`).
+// Anything else -- a call result, a pointer expression -- names no declaration
+// this can look up.
+func (c *ccConv) ccSubscriptArray(n *tree_sitter.Node) (string, int) {
+	dimension := 0
+	base := c.field(n, "argument")
+	for c.kind(base) == "subscript_expression" {
+		dimension++
+		base = c.field(base, "argument")
+	}
+	switch c.kind(base) {
+	case "identifier", "field_identifier":
+		return c.text(base), dimension
+	case "field_expression":
+		return c.text(c.field(base, "field")), dimension
+	}
+	return "", 0
+}
+
+// ccConstantSizedArrays maps every name reachable in this file that is
+// declared as an array of constant size -- a local of the function under
+// analysis, a global, or a struct or class member declared in this file -- to
+// its dimensions as written, outermost first. Another function's locals are
+// excluded: the name would vouch for an unrelated declaration.
+func (c *ccConv) ccConstantSizedArrays(fn *tree_sitter.Node) map[string][]string {
+	sizes := map[string][]string{}
+	for name, dims := range c.ccFileConstantSizedArrays(fn) {
+		sizes[name] = dims
+	}
+	var collect func(*tree_sitter.Node)
+	collect = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		c.ccAddConstantSizedArray(sizes, n)
+		for _, ch := range c.namedChildren(n) {
+			collect(ch)
+		}
+	}
+	collect(c.field(fn, "body"))
+	return sizes
+}
+
+// ccFileConstantSizedArrays holds the part of that map every function in the
+// file shares, so the walk over the translation unit runs once per file.
+func (c *ccConv) ccFileConstantSizedArrays(n *tree_sitter.Node) map[string][]string {
+	if c.constSizedArrays != nil {
+		return c.constSizedArrays
+	}
+	root := n
+	for parent := root.Parent(); parent != nil; parent = parent.Parent() {
+		root = parent
+	}
+	sizes := map[string][]string{}
+	var collect func(*tree_sitter.Node)
+	collect = func(n *tree_sitter.Node) {
+		if n == nil || c.kind(n) == "function_definition" {
+			return
+		}
+		c.ccAddConstantSizedArray(sizes, n)
+		for _, ch := range c.namedChildren(n) {
+			collect(ch)
+		}
+	}
+	collect(root)
+	c.constSizedArrays = sizes
+	return sizes
+}
+
+func (c *ccConv) ccAddConstantSizedArray(sizes map[string][]string, n *tree_sitter.Node) {
+	// Only the outermost declarator of a chain states the whole shape;
+	// ccArrayDimensions reads the rest of it.
+	if c.kind(n) != "array_declarator" || c.kind(n.Parent()) == "array_declarator" {
+		return
+	}
+	name := c.declName(n)
+	if dims := c.ccArrayDimensions(n); name != "" && len(dims) > 0 {
+		sizes[name] = dims
+	}
+}
+
+// ccArrayDimensions reads a declarator chain's constant dimensions, outermost
+// first: `x[7][32][2]` states 7, then 32, then 2. A chain with any dimension
+// that is not constant -- unsized, or sized by something the compiler does not
+// fix -- states no capacity at all and reads as none.
+func (c *ccConv) ccArrayDimensions(n *tree_sitter.Node) []string {
+	if c.kind(n) != "array_declarator" {
+		return nil
+	}
+	size := compactCExprText(c.text(c.field(n, "size")))
+	if size == "" || !ccConstantSizeExpr(size) {
+		return nil
+	}
+	inner := c.field(n, "declarator")
+	if c.kind(inner) != "array_declarator" {
+		return []string{size}
+	}
+	dims := c.ccArrayDimensions(inner)
+	if len(dims) == 0 {
+		return nil
+	}
+	return append(dims, size)
 }
 
 // ccDestCapacityUncheckedObservations reports an unbounded string copy into a
