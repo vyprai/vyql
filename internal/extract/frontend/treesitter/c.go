@@ -46,6 +46,9 @@ type ccConv struct {
 	key                string
 	lang               string
 	nullCheckMacroArgs map[string][]bool
+	// wideReturnFuncs caches the file's wide-integer-returning function names,
+	// which every function in it asks for; nil until the first ask.
+	wideReturnFuncs map[string]bool
 }
 
 // cPropagators write their source arguments into destination arg0.
@@ -1046,6 +1049,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccCursorLoopMissingEndSentinelObservations(n, params)...)
 			bodyStmts = append(bodyStmts, c.ccStackFallbackStrideUnderallocObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowDeclaredBoundsCheckObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccNarrowingCastBoundsCheckObservations(n)...)
 		}
 		return []nir.Stmt{nir.FuncDef{
 			Name:          name,
@@ -4438,6 +4442,455 @@ func (c *ccConv) ccNarrowDeclaredBoundsCheckObservations(fn *tree_sitter.Node) [
 		}
 	}
 	return nil
+}
+
+// ccWideIntTypes are the integer spellings that hold more than 32 bits on the
+// targets this weakness is reported on. A value of one of these narrowed to a
+// 32-bit-or-smaller type loses its high half, and it is the truncated value --
+// which may have gone negative -- that every later read of it sees. The
+// pointer-width spellings sit here because a ptrdiff_t or an intptr_t is as
+// wide as the size_t beside it.
+var ccWideIntTypes = map[string]bool{
+	"size_t": true, "ssize_t": true, "ptrdiff_t": true,
+	"off_t": true, "off64_t": true, "loff_t": true,
+	"uint64_t": true, "int64_t": true, "u_int64_t": true,
+	"uintmax_t": true, "intmax_t": true,
+	"uintptr_t": true, "intptr_t": true,
+	"long": true, "long int": true, "signed long": true, "signed long int": true,
+	"unsigned long": true, "unsigned long int": true,
+	"long long": true, "long long int": true, "signed long long": true,
+	"signed long long int": true, "unsigned long long": true,
+	"unsigned long long int": true,
+}
+
+// ccNarrowIntTypes are the integer spellings a cast to which discards the high
+// half of a wide value: the 32-bit family, which is where the truncation this
+// observation reports lands in practice, and the narrower spellings beneath it,
+// which discard strictly more.
+var ccNarrowIntTypes = map[string]bool{
+	"int": true, "signed": true, "signed int": true,
+	"unsigned": true, "unsigned int": true,
+	"int32_t": true, "uint32_t": true, "u_int32_t": true,
+	"short": true, "short int": true, "signed short": true,
+	"unsigned short": true, "unsigned short int": true,
+	"int16_t": true, "uint16_t": true,
+	"char": true, "signed char": true, "unsigned char": true,
+	"int8_t": true, "uint8_t": true,
+}
+
+// ccNarrowCastNeedles are the narrow spellings as they read in compacted text
+// with the cast's closing paren attached, so a function with no cast to a
+// narrow type at all is skipped before its CST is walked.
+var ccNarrowCastNeedles = func() []string {
+	out := make([]string, 0, len(ccNarrowIntTypes))
+	for spelling := range ccNarrowIntTypes {
+		out = append(out, compactCExprText(spelling)+")")
+	}
+	sort.Strings(out)
+	return out
+}()
+
+// ccWideReturnDeclRe matches a function this file declares or defines with a
+// wide integer return type: the type spelling, the name, then the parameter
+// list's '('. Whatever precedes the type -- a storage class, an inline macro --
+// is not read, and a function returning a POINTER to a wide type does not match
+// because the '*' sits between the type and the name.
+var ccWideReturnDeclRe = ccRe(`\b(size_t|ssize_t|ptrdiff_t|off64_t|off_t|loff_t|uint64_t|int64_t|u_int64_t|uintmax_t|intmax_t|uintptr_t|intptr_t|unsigned long long int|unsigned long long|unsigned long int|unsigned long|long long int|long long|long int|long)[ \t\r\n]+([A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\(`)
+
+// ccTypeSpelling normalizes a declared or cast type to the form the width
+// tables are keyed by: whitespace collapsed to single spaces and the
+// qualifiers a type may carry dropped, so `const size_t` reads as `size_t`.
+// A pointer or array spelling normalizes to nothing at all: those are not the
+// integer conversions this reads, and a `size_t *` is not a wide value.
+func ccTypeSpelling(raw string) string {
+	if raw == "" || strings.ContainsAny(raw, "*[") {
+		return ""
+	}
+	var parts []string
+	for _, f := range strings.Fields(raw) {
+		switch f {
+		case "const", "volatile", "static", "register", "extern", "auto", "inline":
+			continue
+		}
+		parts = append(parts, f)
+	}
+	return strings.Join(parts, " ")
+}
+
+// ccWideDeclaredNames collects the parameters and locals a function declares at
+// one of the wide integer spellings. A pointer or array declarator is skipped
+// however wide its element type: the name then holds an address, and reading it
+// as the wide value it points at would type an operand the cast never converts.
+func (c *ccConv) ccWideDeclaredNames(fn *tree_sitter.Node) map[string]bool {
+	names := map[string]bool{}
+	if pl := c.paramList(c.field(fn, "declarator")); pl != nil {
+		for _, ch := range c.namedChildren(pl) {
+			if !isCParamDecl(c.kind(ch)) {
+				continue
+			}
+			c.ccAddWideDeclarator(names, ccTypeSpelling(paramTypeFromField(c, ch)), c.field(ch, "declarator"))
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "declaration" {
+			typ := ccTypeSpelling(c.text(c.field(n, "type")))
+			for _, ch := range c.namedChildren(n) {
+				d := ch
+				if c.kind(d) == "init_declarator" {
+					d = c.field(d, "declarator")
+				}
+				c.ccAddWideDeclarator(names, typ, d)
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(c.field(fn, "body"))
+	return names
+}
+
+func (c *ccConv) ccAddWideDeclarator(names map[string]bool, typ string, decl *tree_sitter.Node) {
+	if !ccWideIntTypes[typ] || decl == nil {
+		return
+	}
+	switch c.kind(decl) {
+	case "pointer_declarator", "array_declarator", "function_declarator":
+		return
+	}
+	if name := c.declName(decl); name != "" {
+		names[name] = true
+	}
+}
+
+// ccWideReturningFunctions names the functions this file declares to return a
+// wide integer, so a cast of one of their results is typed from the same
+// translation unit the cast is read in. A callee declared in a header this file
+// only includes is not typed here and its narrowing is not reported.
+func (c *ccConv) ccWideReturningFunctions() map[string]bool {
+	if c.wideReturnFuncs != nil {
+		return c.wideReturnFuncs
+	}
+	names := map[string]bool{}
+	for _, m := range ccWideReturnDeclRe.FindAllStringSubmatch(string(c.src), -1) {
+		if len(m) == 3 {
+			names[m[2]] = true
+		}
+	}
+	c.wideReturnFuncs = names
+	return names
+}
+
+// ccNarrowingCast is one cast that discards a wide value's high half, with the
+// context that says what the truncated value is then read as.
+type ccNarrowingCast struct {
+	node     *tree_sitter.Node
+	target   string // the cast's target spelling
+	source   string // wide_declared (a name) or wide_result (a call this file types)
+	origin   string // the name that carries the width
+	operand  string // the operand as written
+	compared bool   // the cast's own value is an operand of a relational comparison
+	dest     string // the local the cast initializes or is assigned to
+}
+
+// ccNarrowingCastBoundsCheckObservations reports a value the frontend can see
+// is wider than 32 bits -- a local or parameter declared size_t, ptrdiff_t,
+// uint64_t and their spellings, or the result of a function this file declares
+// to return one -- narrowed by an explicit cast to a 32-bit-or-narrower type,
+// where the narrowed value is what a relational bounds check then reads. The
+// check is written over a value that has already truncated, so it discharges
+// nothing for an input large enough: the wide value's high half is gone before
+// the comparison, and on the signed spellings the remainder can be negative.
+//
+// The narrowing is read in both spellings the weakness is written in: the cast
+// inside the comparison itself (`(int)(a - b) <= (int)(c - d)`), and the cast
+// that initializes a local the function compares afterwards (`int n =
+// (int)wide(); if (n > limit)`). Only the conversion is reported -- whether the
+// wide value is attacker-chosen, and whether the code capped it before
+// narrowing, are the rule's questions, not this observation's.
+//
+// The width comes from the file being read and nowhere else, which is what
+// separates this from a text match on the cast: an operand of unknown type is
+// not reported, so a cast of a sizeof-derived bound, of a shift count, or of a
+// double is never this observation, and neither is a callee whose return type
+// this file does not carry.
+func (c *ccConv) ccNarrowingCastBoundsCheckObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	text := compactCExprText(c.text(body))
+	if !ccHasNarrowCastText(text) {
+		return nil
+	}
+	wide := c.ccWideDeclaredNames(fn)
+	wideResults := c.ccWideReturningFunctions()
+	if len(wide) == 0 && len(wideResults) == 0 {
+		return nil
+	}
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	for _, site := range c.ccNarrowingCastSites(body, wide, wideResults) {
+		read := ""
+		switch {
+		case site.compared:
+			read = "cast_in_comparison"
+		case site.dest != "" && ccComparedRelationally(text, site.dest):
+			read = "narrowed_local_compared"
+		default:
+			continue
+		}
+		loc := c.loc(site.node)
+		if seen[loc] {
+			continue
+		}
+		seen[loc] = true
+		path := "analysis.narrow_cast.bounds_check"
+		args := []nir.Expr{
+			nir.Const{Loc: loc, Value: "target=" + site.target},
+			nir.Const{Loc: loc, Value: "source=" + site.source},
+			nir.Const{Loc: loc, Value: "origin=" + site.origin},
+			nir.Const{Loc: loc, Value: "operand=" + site.operand},
+			nir.Const{Loc: loc, Value: "read=" + read},
+		}
+		if site.dest != "" {
+			args = append(args, nir.Const{Loc: loc, Value: "dest=" + site.dest})
+		}
+		out = append(out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: path, Loc: loc},
+			Args:   args,
+			Path:   path,
+			Method: "bounds_check",
+			Loc:    loc,
+		}})
+	}
+	return out
+}
+
+// ccHasNarrowCastText reports whether a compacted body could hold a cast to a
+// narrow integer type at all, which almost no function does.
+func ccHasNarrowCastText(text string) bool {
+	for _, needle := range ccNarrowCastNeedles {
+		if strings.Contains(text, needle) {
+			return true
+		}
+	}
+	return false
+}
+
+// ccNarrowingCastSites walks a body for casts that narrow a value of known wide
+// type, carrying down the two contexts that make the truncated value a bounds
+// check's operand: the arithmetic spine of a relational comparison, and the
+// name a declaration or assignment binds the cast's value to. Every other
+// position -- a call argument, a subscript key, an initializer element -- opens
+// a fresh context, because a cast there is not the value being compared.
+func (c *ccConv) ccNarrowingCastSites(root *tree_sitter.Node, wide, wideResults map[string]bool) []ccNarrowingCast {
+	var out []ccNarrowingCast
+	var walk func(n *tree_sitter.Node, compared bool, dest string)
+	walk = func(n *tree_sitter.Node, compared bool, dest string) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "cast_expression":
+			value := c.ccCastValue(n)
+			if site, ok := c.ccNarrowingCastSite(n, value, wide, wideResults); ok {
+				site.compared, site.dest = compared, dest
+				out = append(out, site)
+			}
+			walk(value, compared, dest)
+			return
+		case "binary_expression":
+			left, right := c.field(n, "left"), c.field(n, "right")
+			switch c.text(c.field(n, "operator")) {
+			case "<", "<=", ">", ">=":
+				walk(left, true, "")
+				walk(right, true, "")
+			case "&&", "||", "==", "!=":
+				walk(left, false, "")
+				walk(right, false, "")
+			default: // arithmetic: the comparison reads this operand through it
+				walk(left, compared, "")
+				walk(right, compared, "")
+			}
+			return
+		case "parenthesized_expression", "unary_expression":
+			for _, ch := range c.namedChildren(n) {
+				walk(ch, compared, dest)
+			}
+			return
+		case "init_declarator":
+			walk(c.field(n, "value"), false, c.declName(c.field(n, "declarator")))
+			return
+		case "assignment_expression":
+			left := c.field(n, "left")
+			name := ""
+			// Only a plain assignment binds the cast's value to the name. A
+			// compound one (`ix &= (uint32_t)mask`) combines the narrowed value
+			// with what the name already holds, so the cast is an operand of that
+			// arithmetic and not the value a later comparison reads.
+			if c.kind(left) == "identifier" && c.assignmentOp(n) == "=" {
+				name = c.text(left)
+			}
+			walk(left, false, "")
+			walk(c.field(n, "right"), false, name)
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch, false, "")
+		}
+	}
+	walk(root, false, "")
+	return out
+}
+
+func (c *ccConv) ccCastValue(n *tree_sitter.Node) *tree_sitter.Node {
+	if value := c.field(n, "value"); value != nil {
+		return value
+	}
+	if kids := c.namedChildren(n); len(kids) > 0 {
+		return kids[len(kids)-1]
+	}
+	return nil
+}
+
+// ccNarrowingCastSite reports the cast when its target is narrow and its
+// operand carries a width this file states.
+func (c *ccConv) ccNarrowingCastSite(n, value *tree_sitter.Node, wide, wideResults map[string]bool) (ccNarrowingCast, bool) {
+	target := ccTypeSpelling(c.text(c.field(n, "type")))
+	if !ccNarrowIntTypes[target] || value == nil {
+		return ccNarrowingCast{}, false
+	}
+	source, origin := c.ccWideValueOrigin(value, wide, wideResults)
+	if source == "" {
+		return ccNarrowingCast{}, false
+	}
+	return ccNarrowingCast{
+		node:    n,
+		target:  target,
+		source:  source,
+		origin:  origin,
+		operand: ccTruncateToken(compactCExprText(c.text(value))),
+	}, true
+}
+
+// ccWideValueOrigin names what makes an operand wide: a call this file declares
+// to return a wide integer, a name it declares at one, or an inner cast that
+// widened the value before this one narrowed it again. The walk follows only
+// the positions whose width the operand's own value carries -- parentheses,
+// arithmetic, the arms of a conditional -- and stops at a subscript, a member
+// selection, a dereference and a call this file does not type, because the
+// value there is an element, a field or a result whose width the name beside it
+// does not state.
+func (c *ccConv) ccWideValueOrigin(n *tree_sitter.Node, wide, wideResults map[string]bool) (string, string) {
+	if n == nil {
+		return "", ""
+	}
+	switch c.kind(n) {
+	case "identifier":
+		if name := c.text(n); wide[name] {
+			return "wide_declared", name
+		}
+	case "call_expression":
+		if name := lastSeg(c.dotted(c.field(n, "function"))); wideResults[name] {
+			return "wide_result", name
+		}
+	case "cast_expression":
+		if typ := ccTypeSpelling(c.text(c.field(n, "type"))); ccWideIntTypes[typ] {
+			return "wide_cast", typ
+		}
+		return c.ccWideValueOrigin(c.ccCastValue(n), wide, wideResults)
+	case "parenthesized_expression":
+		return c.ccWideValueOrigins(c.namedChildren(n), wide, wideResults)
+	case "binary_expression":
+		switch c.text(c.field(n, "operator")) {
+		case "+", "-", "*", "/", "%", "&", "|", "^", "<<", ">>":
+			return c.ccWideValueOrigins([]*tree_sitter.Node{c.field(n, "left"), c.field(n, "right")}, wide, wideResults)
+		}
+	case "unary_expression":
+		switch c.unaryOp(n) {
+		case "-", "+", "~":
+			return c.ccWideValueOrigin(c.field(n, "argument"), wide, wideResults)
+		}
+	case "conditional_expression":
+		return c.ccWideValueOrigins([]*tree_sitter.Node{c.field(n, "consequence"), c.field(n, "alternative")}, wide, wideResults)
+	}
+	return "", ""
+}
+
+// ccWideValueOrigins takes the first operand of a compound expression that
+// carries a width: one wide operand is enough, because the arithmetic around it
+// is computed at that width and truncated with it.
+func (c *ccConv) ccWideValueOrigins(nodes []*tree_sitter.Node, wide, wideResults map[string]bool) (string, string) {
+	for _, n := range nodes {
+		if source, origin := c.ccWideValueOrigin(n, wide, wideResults); source != "" {
+			return source, origin
+		}
+	}
+	return "", ""
+}
+
+// ccTruncateToken bounds an operand token, which is source text and otherwise
+// unbounded.
+func ccTruncateToken(s string) string {
+	const max = 96
+	if len(s) > max {
+		return s[:max]
+	}
+	return s
+}
+
+// ccComparedRelationally reports whether the compacted body reads name as an
+// operand of a relational comparison. A shift is not a comparison, and a name
+// that only appears inside a longer identifier is not this name.
+func ccComparedRelationally(text, name string) bool {
+	if name == "" {
+		return false
+	}
+	for i := 0; i+len(name) <= len(text); {
+		j := strings.Index(text[i:], name)
+		if j < 0 {
+			return false
+		}
+		start := i + j
+		end := start + len(name)
+		i = start + 1
+		if start > 0 && ccIsIdentChar(text[start-1]) {
+			continue
+		}
+		if end < len(text) && ccIsIdentChar(text[end]) {
+			continue
+		}
+		if ccRelationalOpAt(text, end) || ccRelationalOpBefore(text, start) {
+			return true
+		}
+	}
+	return false
+}
+
+func ccRelationalOpAt(text string, pos int) bool {
+	if pos >= len(text) || (text[pos] != '<' && text[pos] != '>') {
+		return false
+	}
+	return pos+1 >= len(text) || text[pos+1] != text[pos] // '<<' and '>>' shift
+}
+
+func ccRelationalOpBefore(text string, start int) bool {
+	pos := start - 1
+	if pos < 0 {
+		return false
+	}
+	if text[pos] == '=' && pos > 0 && (text[pos-1] == '<' || text[pos-1] == '>') {
+		pos--
+	}
+	if text[pos] != '<' && text[pos] != '>' {
+		return false
+	}
+	return pos == 0 || text[pos-1] != text[pos] // '<<' and '>>' shift
 }
 
 func (c *ccConv) ccPostCopyMissingBoundsObservations(fn *tree_sitter.Node) []nir.Stmt {
