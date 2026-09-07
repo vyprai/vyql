@@ -34,6 +34,7 @@ type Engine struct {
 	contextConfirmByTarget map[string][]string
 	flowGuards             map[string][]string
 	dominanceGuards        map[string][]string
+	branchGuardRegions     map[string][]string
 	sameReceiverGuards     map[string]map[receiverGuardKey]bool
 	sameScopeGuards        map[string]map[string]bool
 	globalGuards           map[string]bool
@@ -53,6 +54,7 @@ func New(onto *ontology.Ontology, store usg.Store) *Engine {
 		contextConfirmByTarget: map[string][]string{},
 		flowGuards:             map[string][]string{},
 		dominanceGuards:        map[string][]string{},
+		branchGuardRegions:     map[string][]string{},
 		sameReceiverGuards:     map[string]map[receiverGuardKey]bool{},
 		sameScopeGuards:        map[string]map[string]bool{},
 		globalGuards:           map[string]bool{},
@@ -713,7 +715,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		ne = append(ne, e.neutralizerAdvisoryEvidence(fl.Path, fl.SinkID, sinkConcepts)...)
 		suppressed := false
 		for _, g := range guards {
-			ok := e.endpointGuarded(fl.SinkID, g) || e.flowGuarded(fl.Path, g)
+			ok := e.endpointGuarded(fl.SinkID, g) || e.flowGuarded(fl.Path, g) || e.joinGuarded(fl.Path, g)
 			detail := "no guard on sink"
 			if ok {
 				detail = "guard covers sink"
@@ -1495,6 +1497,99 @@ func (e *Engine) flowGuarded(path []string, control string) bool {
 		}
 	}
 	return false
+}
+
+// joinGuarded reports whether the value reached the sink through a control-flow merge every
+// one of whose incoming branches applies `control`.
+//
+// This is the branch-sensitive half of endpoint coverage. endpointGuarded asks for a guard
+// that DOMINATES the sink, which a guard written inside one arm of a branch never does — the
+// sibling arm reaches the same code without it. That is the right answer when only one arm
+// screens the value and the wrong one when they all do:
+//
+//	let peer = match dest {
+//	    Address(a)  => { if !is_global(&a) { return Err(..) } a }
+//	    HostName(h) => { let a = resolve(h)?; if !is_global(&a) { return Err(..) } a }
+//	};
+//	TcpStream::connect(peer)
+//
+// Nothing dominates the connect, and the guard rejects the value rather than transforming it,
+// so path coverage cannot see it either — yet every value that arrives at the join was
+// screened. The lowering records, per merge, the region of each branch that can deliver the
+// joined value (`merge_branches`); a merge is covered when each of those regions contains a
+// guard. Recording the regions is what keeps this branch-SENSITIVE: a guard in a branch that
+// does not feed the join, or one branch left unguarded, leaves the merge uncovered, which is
+// exactly the difference between the two revisions of the shape above.
+//
+// A guard anywhere inside the branch counts, including one nested in a loop or an `if` within
+// it, because a screen written in an arm is what the arm is for; requiring the guard to sit at
+// the arm's top level would miss the resolve-then-check loop above. Merges whose value can
+// also arrive from before the branch carry no regions at all, so they are never covered here.
+func (e *Engine) joinGuarded(path []string, control string) bool {
+	for _, pid := range path {
+		n, ok, _ := e.Store.GetNode(pid)
+		if !ok {
+			continue
+		}
+		branches := splitMergeBranches(n.Prop("merge_branches"))
+		if len(branches) == 0 {
+			continue
+		}
+		if e.everyBranchGuarded(branches, control) {
+			return true
+		}
+	}
+	return false
+}
+
+func (e *Engine) everyBranchGuarded(branches []string, control string) bool {
+	regions := e.branchGuardedRegions(control)
+	if len(regions) == 0 {
+		return false
+	}
+	for _, b := range branches {
+		covered := false
+		for _, r := range regions {
+			if r == b || strings.HasPrefix(r, b+"/") {
+				covered = true
+				break
+			}
+		}
+		if !covered {
+			return false
+		}
+	}
+	return true
+}
+
+// branchGuardedRegions is the region of every concrete endpoint-coverage guard carrying
+// `control`, cached per control the way the dominance candidates are.
+func (e *Engine) branchGuardedRegions(control string) []string {
+	if rs, ok := e.branchGuardRegions[control]; ok {
+		return rs
+	}
+	var out []string
+	for _, gid := range e.nodesWithConcept(control) {
+		if !nodeHasConcreteCoverage(e.labels(gid), control, "endpoint") {
+			continue
+		}
+		n, ok, _ := e.Store.GetNode(gid)
+		if !ok {
+			continue
+		}
+		if r := n.Prop("region"); r != "" {
+			out = append(out, r)
+		}
+	}
+	e.branchGuardRegions[control] = out
+	return out
+}
+
+func splitMergeBranches(v string) []string {
+	if v == "" {
+		return nil
+	}
+	return strings.Split(v, "\x00")
 }
 
 func (e *Engine) flowGuardCandidates(nodeID, control string) []string {

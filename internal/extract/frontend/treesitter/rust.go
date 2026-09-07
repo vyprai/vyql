@@ -12,9 +12,10 @@ import (
 // rsConv walks a tree-sitter Rust CST into NIR.
 type rsConv struct {
 	nodeCache
-	src  []byte
-	file string
-	key  string
+	src           []byte
+	file          string
+	key           string
+	matchSubjects int // per-file counter for the synthetic locals match scrutinees bind to
 }
 
 // rsFormatMacros build a string from their arguments (taint-propagating).
@@ -145,6 +146,13 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		}
 		name := c.patName(c.field(n, "pattern"))
 		if name != "" {
+			// `let x = match subj { … }` — lower the match as the branch-structured statement it
+			// is, assigning each arm's tail to x, rather than as one expression container over
+			// every arm at once. The join that follows then has one operand per arm, which is
+			// what makes a check applied in ONE arm distinguishable from none at all.
+			if c.kind(val) == "match_expression" {
+				return c.rsMatch(val, name)
+			}
 			return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: c.expr(val)}}
 		}
 		// `let _ = expr;` binds no name, but the call still matters for sinks/marks.
@@ -161,7 +169,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 	case "if_expression":
 		return []nir.Stmt{c.rsIf(n)}
 	case "match_expression":
-		return []nir.Stmt{c.rsMatch(n)}
+		return c.rsMatch(n, "")
 	case "block":
 		return c.block(n)
 	}
@@ -1151,7 +1159,7 @@ func (c *rsConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 	case "if_expression":
 		return []nir.Stmt{c.rsIf(inner)}
 	case "match_expression":
-		return []nir.Stmt{c.rsMatch(inner)}
+		return c.rsMatch(inner, "")
 	}
 	if c.kind(inner) == "assignment_expression" {
 		left := c.field(inner, "left")
@@ -1409,20 +1417,30 @@ func (c *rsConv) rsElse(alt *tree_sitter.Node) []nir.Stmt {
 	return nil
 }
 
-// rsMatch lowers a statement-position match to a subject+labelled Switch so dead arms
-// prune. A wildcard `_` arm is the default; literal patterns become case labels.
-func (c *rsConv) rsMatch(n *tree_sitter.Node) nir.Stmt {
-	sw := nir.Switch{Loc: c.loc(n), Subject: c.expr(c.field(n, "value"))}
+// rsMatch lowers a match to a subject+labelled Switch so dead arms prune and each arm is a
+// control region of its own. A wildcard `_` arm is the default; literal patterns become case
+// labels. The scrutinee is bound to a synthetic local first so each arm can bind the names ITS
+// pattern destructures without re-lowering (and so duplicating) the scrutinee expression.
+//
+// target names the variable a value-position match feeds (`let x = match … { … }`); each arm's
+// tail expression is assigned to it, so the join that follows the switch carries one operand
+// per arm. Empty for a statement-position match, whose arms produce no value.
+func (c *rsConv) rsMatch(n *tree_sitter.Node, target string) []nir.Stmt {
+	L := c.loc(n)
+	subj := c.rsMatchSubjectName()
+	out := []nir.Stmt{nir.Assign{Targets: []string{subj}, Value: c.expr(c.field(n, "value")), Decl: true, Loc: L}}
+	sw := nir.Switch{Loc: L, Subject: nir.Name{ID: subj, Loc: L}}
 	body := c.field(n, "body")
 	if body == nil {
-		return sw
+		return append(out, sw)
 	}
 	for _, arm := range c.namedChildren(body) {
 		if c.kind(arm) != "match_arm" {
 			continue
 		}
 		pat := c.field(arm, "pattern")
-		stmts := c.rsArmBody(c.field(arm, "value"))
+		stmts := c.rsArmBinding(pat, subj, L)
+		stmts = append(stmts, c.rsArmBody(c.field(arm, "value"), target)...)
 		if pat == nil || c.text(pat) == "_" {
 			sw.Default = append(sw.Default, stmts...)
 			continue
@@ -1434,22 +1452,110 @@ func (c *rsConv) rsMatch(n *tree_sitter.Node) nir.Stmt {
 		sw.Cases = append(sw.Cases, stmts)
 		sw.Labels = append(sw.Labels, []nir.Expr{c.expr(label)})
 	}
-	return sw
+	return append(out, sw)
 }
 
-func (c *rsConv) rsArmBody(v *tree_sitter.Node) []nir.Stmt {
+// rsMatchSubjectName mints the synthetic local one match binds its scrutinee to. Per-file
+// counter: the conversion of a file is single-threaded and its locals are file-scoped.
+func (c *rsConv) rsMatchSubjectName() string {
+	c.matchSubjects++
+	return "__vyql_match" + itoa(c.matchSubjects)
+}
+
+// rsArmBinding binds every name an arm's pattern destructures to the scrutinee. A pattern is
+// how a Rust match names the value it is matching on, so without this the arm body reads an
+// identifier bound to nothing and the scrutinee's taint stops at the match.
+func (c *rsConv) rsArmBinding(pat *tree_sitter.Node, subj, loc string) []nir.Stmt {
+	var names []string
+	c.rsPatternNames(pat, &names)
+	if len(names) == 0 {
+		return nil
+	}
+	return []nir.Stmt{nir.Assign{Targets: names, Value: nir.Name{ID: subj, Loc: loc}, Decl: true, Loc: loc}}
+}
+
+// rsPatternNames appends the identifiers a pattern BINDS. A path or a literal in a pattern
+// selects the arm rather than naming a value, and an arm guard (`Some(x) if ready()`) is a
+// condition, so neither contributes a binding.
+func (c *rsConv) rsPatternNames(n *tree_sitter.Node, out *[]string) {
+	if n == nil {
+		return
+	}
+	switch c.kind(n) {
+	case "identifier":
+		if t := c.text(n); t != "" && t != "_" {
+			*out = append(*out, t)
+		}
+	case "match_pattern":
+		// the second child, when present, is the `if` guard -- a condition, not a binding.
+		if kids := c.namedChildren(n); len(kids) > 0 {
+			c.rsPatternNames(kids[0], out)
+		}
+	case "tuple_struct_pattern", "struct_pattern":
+		// the `type` field is the variant being matched, not a name the arm binds.
+		typ := c.field(n, "type")
+		for _, ch := range c.namedChildren(n) {
+			if sameRustNode(ch, typ) {
+				continue
+			}
+			c.rsPatternNames(ch, out)
+		}
+	case "field_pattern":
+		if p := c.field(n, "pattern"); p != nil {
+			c.rsPatternNames(p, out) // `Foo { field: name }`
+			return
+		}
+		if nm := c.field(n, "name"); nm != nil { // shorthand `Foo { name }`
+			if t := c.text(nm); t != "" && t != "_" {
+				*out = append(*out, t)
+			}
+		}
+	case "tuple_pattern", "slice_pattern", "or_pattern", "ref_pattern", "mut_pattern",
+		"reference_pattern", "captured_pattern", "parenthesized_pattern":
+		for _, ch := range c.namedChildren(n) {
+			c.rsPatternNames(ch, out)
+		}
+	}
+}
+
+func sameRustNode(a, b *tree_sitter.Node) bool {
+	return a != nil && b != nil && a.StartByte() == b.StartByte() && a.EndByte() == b.EndByte()
+}
+
+// rsArmBody lowers one arm's body. With a target the arm is producing a value: its block's
+// statements are lowered as statements — so a check written in the arm keeps its own node and
+// its own region — and only the block's TAIL expression is assigned to the target.
+func (c *rsConv) rsArmBody(v *tree_sitter.Node, target string) []nir.Stmt {
 	if v == nil {
 		return nil
 	}
-	if c.kind(v) == "block" {
+	if c.kind(v) != "block" {
+		if target == "" {
+			return c.exprStmt(v)
+		}
+		if c.kind(v) == "match_expression" {
+			return c.rsMatch(v, target) // an arm that is itself a value-position match
+		}
+		return []nir.Stmt{nir.Assign{Targets: []string{target}, Value: c.expr(v), Loc: c.loc(v)}}
+	}
+	if target == "" {
 		return c.block(v)
 	}
-	return c.exprStmt(v)
+	kids := c.namedChildren(v)
+	tailNode := c.rsBlockTailNode(v)
+	if tailNode == nil {
+		return c.block(v) // the arm never falls out of its block (it returns or breaks)
+	}
+	var out []nir.Stmt
+	for _, st := range kids[:len(kids)-1] {
+		out = append(out, c.stmt(st)...)
+	}
+	return append(out, c.rsArmBody(tailNode, target)...)
 }
 
-// blockTail returns the tail (value) expression of a `{ … }` block, or nil if the last
-// element isn't a bare expression (e.g. a let/assignment) — used to model an if-as-value.
-func (c *rsConv) blockTail(block *tree_sitter.Node) nir.Expr {
+// rsBlockTailNode returns the CST node of a block's tail (value) expression, or nil when the
+// block ends in something that is not a bare expression — the node form of blockTail.
+func (c *rsConv) rsBlockTailNode(block *tree_sitter.Node) *tree_sitter.Node {
 	if block == nil || c.kind(block) != "block" {
 		return nil
 	}
@@ -1460,6 +1566,16 @@ func (c *rsConv) blockTail(block *tree_sitter.Node) nir.Expr {
 	last := kids[len(kids)-1]
 	switch c.kind(last) {
 	case "let_declaration", "expression_statement", "empty_statement":
+		return nil
+	}
+	return last
+}
+
+// blockTail returns the tail (value) expression of a `{ … }` block, or nil if the last
+// element isn't a bare expression (e.g. a let/assignment) — used to model an if-as-value.
+func (c *rsConv) blockTail(block *tree_sitter.Node) nir.Expr {
+	last := c.rsBlockTailNode(block)
+	if last == nil {
 		return nil
 	}
 	return c.expr(last)
