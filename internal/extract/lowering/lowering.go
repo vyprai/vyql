@@ -6014,6 +6014,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 	}
+	// string-keyed dispatch: `presets.apply('env')` runs whatever a plugin registered under
+	// that key, an edge no callee name reaches. See dispatch_key.go.
+	l.flowDispatchKeyCall(call, args, result, sc)
 	for i, a := range args {
 		if !mapped[i] {
 			l.flow(a, result)
