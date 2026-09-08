@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"regexp"
@@ -49,6 +50,9 @@ type ccConv struct {
 	// wideReturnFuncs caches the file's wide-integer-returning function names,
 	// which every function in it asks for; nil until the first ask.
 	wideReturnFuncs map[string]bool
+	// voidPtrParams caches, per void-returning function this file declares, which of its
+	// parameter positions take a mutable pointer; nil until the first ask.
+	voidPtrParams map[string][]bool
 }
 
 // cPropagators write their source arguments into destination arg0.
@@ -1260,8 +1264,175 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 				}
 			}
 		}
+		// The call's result is discarded, so a void callee this file types is here for what
+		// it wrote through its pointer arguments. Record that, and lowering re-binds each
+		// mutated variable to this call's argument slot: a read of it afterwards runs
+		// through the call rather than beside it, off the definition they share.
+		if eff := c.ccInPlaceMutationEffects(name, args); len(eff) > 0 {
+			if call, ok := c.expr(inner).(nir.Call); ok {
+				call.Effects = eff
+				return []nir.Stmt{nir.ExprStmt{Value: call}}
+			}
+		}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
+}
+
+// ccVoidDeclAt reads a declaration or definition of a void-returning function
+// starting at the `void` keyword at i: the name and the open paren of its
+// parameter list. It reports the name and the index of that paren, and ok only
+// when the whole shape is there. `void *f(` is a pointer-returning function and
+// not a void one, and is rejected because `*` cannot start the name. `(void)x`
+// casts, a `void (*fp)(int)` member and `void_helper(` are rejected the same way.
+func ccVoidDeclAt(src []byte, i int) (name string, open int, ok bool) {
+	if i > 0 && ccIdentByte(src[i-1]) {
+		return "", 0, false
+	}
+	k := i + len("void")
+	sep := k
+	for k < len(src) && ccLayoutByte(src[k]) {
+		k++
+	}
+	if k == sep || k >= len(src) || !ccNameStartByte(src[k]) {
+		return "", 0, false
+	}
+	start := k
+	for k < len(src) && ccIdentByte(src[k]) {
+		k++
+	}
+	name = string(src[start:k])
+	for k < len(src) && ccLayoutByte(src[k]) {
+		k++
+	}
+	if k >= len(src) || src[k] != '(' {
+		return "", 0, false
+	}
+	return name, k, true
+}
+
+// ccLayoutByte reports whether b separates tokens without ending a declaration.
+func ccLayoutByte(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\r' || b == '\n'
+}
+
+// ccNameStartByte reports whether b can begin an identifier. A digit cannot, so
+// a name is never read out of the middle of a number.
+func ccNameStartByte(b byte) bool {
+	return b == '_' || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+// ccVoidPointerMutators names the functions this file declares or defines as
+// returning void, each with the parameter positions it takes a mutable pointer
+// at. A void function has no result to read, so what it is called for is what it
+// writes, and a pointer parameter names storage it can write into: the variable
+// handed to that position holds whatever the call left behind, not what it was
+// passed. The typing comes from the same translation unit the call is read in --
+// a callee only a header this file includes declares is not typed here and its
+// calls keep the shape they had.
+//
+// The file is walked for the `void` keyword with a literal search rather than a
+// pattern, and only a hit is parsed. A regular expression over the whole source
+// runs at about 70 MB/s, which a multi-megabyte C file pays in full; the literal
+// search runs at memory speed and reads no copy of the source.
+func (c *ccConv) ccVoidPointerMutators() map[string][]bool {
+	if c.voidPtrParams != nil {
+		return c.voidPtrParams
+	}
+	out := map[string][]bool{}
+	src := c.src
+	for at := 0; at < len(src); {
+		hit := bytes.Index(src[at:], []byte("void"))
+		if hit < 0 {
+			break
+		}
+		i := at + hit
+		at = i + len("void")
+		name, open, ok := ccVoidDeclAt(src, i)
+		if !ok {
+			continue
+		}
+		at = open + 1
+		end := ccCallArgsClose(src, open)
+		if end < 0 {
+			continue
+		}
+		flags := ccMutablePointerParams(string(src[open+1 : end]))
+		if len(flags) == 0 {
+			continue
+		}
+		if prev, seen := out[name]; seen {
+			out[name] = ccIntersectFlags(prev, flags)
+			continue
+		}
+		out[name] = flags
+	}
+	c.voidPtrParams = out
+	return out
+}
+
+// ccMutablePointerParams reports, per parameter of a declared parameter list,
+// whether it is a pointer the callee may write through. An array parameter
+// decays to one and counts; a `const` anywhere in the parameter is the
+// declaration promising it does not write, and does not.
+func ccMutablePointerParams(list string) []bool {
+	var flags []bool
+	depth := 0
+	start := 0
+	push := func(param string) {
+		param = strings.TrimSpace(param)
+		if param == "" || param == "void" {
+			return
+		}
+		ptr := strings.ContainsAny(param, "*[") && !ccContainsWord(param, "const")
+		flags = append(flags, ptr)
+	}
+	for i := 0; i < len(list); i++ {
+		switch list[i] {
+		case '(', '[':
+			depth++
+		case ')', ']':
+			depth--
+		case ',':
+			if depth == 0 {
+				push(list[start:i])
+				start = i + 1
+			}
+		}
+	}
+	push(list[start:])
+	return flags
+}
+
+// ccIntersectFlags keeps only the positions both declarations agree are mutable
+// pointers, so two spellings of the same name that disagree type nothing rather
+// than the analysis picking one.
+func ccIntersectFlags(a, b []bool) []bool {
+	n := minInt(len(a), len(b))
+	out := make([]bool, n)
+	for i := 0; i < n; i++ {
+		out[i] = a[i] && b[i]
+	}
+	return out
+}
+
+// ccInPlaceMutationEffects returns the in-place mutation effects for a call in
+// statement position: one per argument written as a bare identifier that this
+// file's own declaration of the callee places at a mutable pointer parameter.
+// Only a bare identifier is re-bound -- `f(&x)`, `f(p->buf)` and `f(x + 1)`
+// name storage the frontend cannot re-bind a variable for.
+func (c *ccConv) ccInPlaceMutationEffects(name string, args []*tree_sitter.Node) []nir.CallEffect {
+	flags := c.ccVoidPointerMutators()[name]
+	if len(flags) == 0 {
+		return nil
+	}
+	var out []nir.CallEffect
+	for i, a := range args {
+		if i >= len(flags) || !flags[i] || c.kind(a) != "identifier" {
+			continue
+		}
+		out = append(out, nir.CallEffect{DestArg: i, SourceArg: i, InPlace: true})
+	}
+	return out
 }
 
 func (c *ccConv) assignmentFallback(left *tree_sitter.Node, right nir.Expr) []nir.Stmt {
@@ -3202,7 +3373,7 @@ func ccIdentifierArg(s string) bool {
 
 // ccCallArgsClose returns the index of the closing parenthesis of the call
 // whose own opens at open, or -1 when the call does not close within text.
-func ccCallArgsClose(text string, open int) int {
+func ccCallArgsClose[T ~string | ~[]byte](text T, open int) int {
 	depth := 0
 	for i := open; i < len(text); i++ {
 		switch text[i] {
