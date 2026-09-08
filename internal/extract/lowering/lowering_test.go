@@ -2057,6 +2057,99 @@ func TestUntypedCallResultReceiverDoesNotBorrowASameNamedHelper(t *testing.T) {
 	}
 }
 
+// A PHP controller reaching its model through an UNTYPED property — the CodeIgniter
+// `$this->model->list_items($q)` shape, where nothing declares what `$this->model` holds.
+// The receiver is a project value (the chain roots at `$this`), so the same
+// unique-method-name fallback a receiver held in a local gets applies, and taint follows
+// into the model's own body. Without it the call is a dead end and a sink declared in the
+// model is unreachable from the controller's parameter.
+func TestUntypedPropertyReceiverResolvesUniqueMethodName(t *testing.T) {
+	prog := nir.Program{SelfName: "this", Modules: []nir.Module{
+		{Key: "", File: "controllers/Items.php", Body: []nir.Stmt{
+			nir.ClassDef{Name: "Items", Loc: "controllers/Items.php:1", Members: []string{"model"}, Body: []nir.Stmt{
+				nir.FuncDef{Name: "index", Loc: "controllers/Items.php:3", Params: []string{"q"}, Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Attr{
+							Base: nir.Name{ID: "$this", Loc: "controllers/Items.php:4"},
+							Attr: "model", Path: "$this.model", Loc: "controllers/Items.php:4",
+						}, Attr: "list_items", Path: "$this.model.list_items", Loc: "controllers/Items.php:4"},
+						Args: []nir.Expr{nir.Name{ID: "q", Loc: "controllers/Items.php:4"}},
+						Path: "$this.model.list_items", Method: "list_items", Loc: "controllers/Items.php:4",
+					}},
+				}},
+			}},
+		}},
+		{Key: "", File: "models/Item_model.php", Body: []nir.Stmt{
+			nir.ClassDef{Name: "Item_model", Loc: "models/Item_model.php:1", Body: []nir.Stmt{
+				nir.FuncDef{Name: "list_items", Loc: "models/Item_model.php:3", Params: []string{"needle"}, Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "mysql_query", Loc: "models/Item_model.php:4"},
+						Args:   []nir.Expr{nir.Name{ID: "needle", Loc: "models/Item_model.php:4"}},
+						Path:   "mysql_query", Method: "mysql_query", Loc: "models/Item_model.php:4",
+					}},
+				}},
+			}},
+		}},
+	}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "q")
+	modelParam := findNodeID(t, g, "code.Param", "func", "list_items", "name", "needle")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "models/Item_model.php:4")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[modelParam] {
+		t.Fatalf("taint did not follow into the method invoked on the untyped property")
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("taint did not reach the sink declared in the model's own body")
+	}
+}
+
+// The same property-access shape rooted at an IMPORT is not a project value: `boto3.client.upload`
+// names a library's object, and routing it into the project's own same-named helper would run a
+// body the program never runs. The unique-name guess stops at the receiver's root, so this call
+// keeps its conservative argument-to-result edge and resolves to nothing.
+func TestImportRootedPropertyReceiverDoesNotBorrowASameNamedHelper(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:     "app",
+		File:    "app.py",
+		Imports: []nir.Import{{Local: "boto3", Module: "boto3", IsModule: true}},
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "upload", Loc: "app.py:1", Params: []string{"value"}, Body: []nir.Stmt{
+				nir.Return{Value: nir.Const{Loc: "app.py:2", Value: "done"}},
+			}},
+			nir.FuncDef{Name: "entry", Loc: "app.py:5", Params: []string{"payload"}, Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Attr{
+						Base: nir.Name{ID: "boto3", Loc: "app.py:6"},
+						Attr: "client", Path: "boto3.client", Loc: "app.py:6",
+					}, Attr: "upload", Path: "boto3.client.upload", Loc: "app.py:6"},
+					Args: []nir.Expr{nir.Name{ID: "payload", Loc: "app.py:6"}},
+					Path: "boto3.client.upload", Method: "upload", Loc: "app.py:6",
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "payload")
+	helperParam := findNodeID(t, g, "code.Param", "func", "upload", "name", "value")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[helperParam] {
+		t.Fatalf("a property receiver rooted at an import resolved to a same-named project helper")
+	}
+}
+
 // The service-registry indirection, with every name it dispatches on ambiguous: the entry
 // point carries the same short name as the method it calls, so the unique-method-name
 // fallback is starved and only the receiver TYPES can carry the dispatch — the interface a

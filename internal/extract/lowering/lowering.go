@@ -6341,6 +6341,22 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 					}
 				}
 			}
+			// `$this->model->list_items()` — a method invoked on a PROPERTY of a project
+			// value. Nothing declares what the property holds (an untyped property is the
+			// norm in PHP, and a framework that assigns the property from a loader declares
+			// nothing anywhere), so no type route exists and the call used to resolve to
+			// nothing at all — a controller calling into its model was a dead end for every
+			// sink written in the model's own body. The receiver is the project's own
+			// object, which is exactly the condition the receiver-in-a-local route below
+			// takes its unique-method-name guess under, so take the same guess here.
+			// Restricted to a chain rooted at a project value: a root that is an import or
+			// a name nothing in scope holds names a library, and there the guess would run
+			// a project body the program never runs (see the call-result case above).
+			if l.receiverRootIsProjectValue(baseExpr, sc, imports) {
+				if f, ok := l.uniqueTechFuncInfo(l.funcShort[c.Attr]); ok {
+					return []*funcInfo{f}, false
+				}
+			}
 			return nil, false
 		}
 		base, isName := baseExpr.(nir.Name)
@@ -6380,6 +6396,35 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 		}
 	}
 	return nil, false
+}
+
+// receiverRootIsProjectValue reports whether a property-access receiver chain roots at a
+// value this project owns — the enclosing method's `this`, or a local or parameter the
+// scope holds. `$this->model`, `$conn->handle` and `$rows[0]->row` all qualify; `pkg.Cfg`
+// and a bare unknown global do not, because what they name is declared elsewhere.
+func (l *lowerer) receiverRootIsProjectValue(e nir.Expr, sc *scope, imports map[string]importEntry) bool {
+	for {
+		switch v := e.(type) {
+		case nir.Thru:
+			e = v.Inner
+		case nir.Attr:
+			e = v.Base
+		case nir.Index:
+			e = v.Base
+		case nir.Name:
+			if _, isImport := imports[v.ID]; isImport {
+				return false
+			}
+			// PHP spells the implicit receiver `$this` while the program's self name is
+			// `this`, the same mapping `eval` makes for a `$this->prop` read.
+			if l.curClass != "" && (v.ID == l.selfName || v.ID == "$"+l.selfName) {
+				return true
+			}
+			return sc.node[v.ID] != ""
+		default:
+			return false
+		}
+	}
 }
 
 // resolveOnType returns the targets of `attr` called on a receiver of the given type, and
