@@ -37,19 +37,21 @@ import (
 // vocabulary for (code.OwnerFieldClear sits on the `o->f = NULL` the frontend emits).
 type StorageJoin struct {
 	store usg.Store
-	// storesByField indexes every field store in the graph by the field name it writes.
-	storesByField map[string][]fieldStore
+	// storesByField indexes every field store in the graph by the field name it writes
+	// and then by the function it is written in, so a lookup reaches one function's
+	// stores directly instead of walking every store of that field name.
+	storesByField map[string]map[string][]fieldStore
 	built         bool
 	back          map[string]map[string]bool
 	origins       map[string]map[string]bool
 	reads         map[string][]fieldRead
 }
 
-// fieldStore is one `base.field = value` write: the object written, the function it was
-// written in, and the argument nodes carrying the values written.
+// fieldStore is one `base.field = value` write: the object written and the argument
+// nodes carrying the values written. The function it is written in is the key it is
+// indexed under, so it is not repeated here.
 type fieldStore struct {
 	base   string
-	region string
 	values []string
 }
 
@@ -90,10 +92,7 @@ func (j *StorageJoin) Joins(aID, bID string) bool {
 	}
 	j.build()
 	for _, read := range reads {
-		for _, st := range j.storesByField[read.field] {
-			if funcRegion(st.region) != aFunc {
-				continue
-			}
+		for _, st := range j.storesByField[read.field][aFunc] {
 			if !j.sameObject(st.base, read.bases) {
 				continue
 			}
@@ -146,7 +145,7 @@ func (j *StorageJoin) build() {
 		return
 	}
 	j.built = true
-	j.storesByField = map[string][]fieldStore{}
+	j.storesByField = map[string]map[string][]fieldStore{}
 	nodes, err := j.store.AllNodes()
 	if err != nil {
 		return
@@ -166,9 +165,13 @@ func (j *StorageJoin) build() {
 			continue
 		}
 		field := path[i+1:]
-		j.storesByField[field] = append(j.storesByField[field], fieldStore{
-			base: bases[0], region: n.Prop("region"), values: values,
-		})
+		byFunc := j.storesByField[field]
+		if byFunc == nil {
+			byFunc = map[string][]fieldStore{}
+			j.storesByField[field] = byFunc
+		}
+		fn := funcRegion(n.Prop("region"))
+		byFunc[fn] = append(byFunc[fn], fieldStore{base: bases[0], values: values})
 	}
 }
 
