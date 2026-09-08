@@ -38,6 +38,7 @@ type Engine struct {
 	sameReceiverGuards     map[string]map[receiverGuardKey]bool
 	sameScopeGuards        map[string]map[string]bool
 	globalGuards           map[string]bool
+	nestedScopeFns         map[string]bool
 	taintFlowCache         map[string][]solvers.TaintFlow
 }
 
@@ -715,7 +716,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 		ne = append(ne, e.neutralizerAdvisoryEvidence(fl.Path, fl.SinkID, sinkConcepts)...)
 		suppressed := false
 		for _, g := range guards {
-			ok := e.endpointGuarded(fl.SinkID, g) || e.flowGuarded(fl.Path, g) || e.joinGuarded(fl.Path, g)
+			ok := e.endpointGuarded(fl.Path, fl.SinkID, g) || e.flowGuarded(fl.Path, g) || e.joinGuarded(fl.Path, g)
 			detail := "no guard on sink"
 			if ok {
 				detail = "guard covers sink"
@@ -1159,7 +1160,12 @@ func labelConfidenceRank(l usg.Label) int {
 // sibling branch (the presence model's false-negative). Without CFG metadata (hand-built
 // graphs, frontends not yet converted to structured NIR) it falls back to presence
 // semantics at a lower fidelity, so existing behaviour and tests are unchanged.
-func (e *Engine) endpointGuarded(sinkID, control string) bool {
+//
+// `path` is the taint path the sink terminates, or nil when the caller has no flow to
+// offer (the `match` verb evaluates coverage against a lone node). It is used only by the
+// function-scope arm below, which is the one arm that asks for neither dominance nor an
+// edge and therefore needs the value to tie it down.
+func (e *Engine) endpointGuarded(path []string, sinkID, control string) bool {
 	sinkCFG := e.hasCFG(sinkID)
 	// (1) an explicit PROTECTS/CHECKS edge (graph specs; a future endpoint-linking pass).
 	for _, et := range []string{"PROTECTS", "CHECKS"} {
@@ -1186,11 +1192,29 @@ func (e *Engine) endpointGuarded(sinkID, control string) bool {
 	// not guard a sibling branch). Requires CFG metadata, so it never fires on metadata-free
 	// graphs — those rely on the explicit edge above.
 	guards := e.nodesWithConcept(control)
+	// (2a) a FUNCTION-SCOPE check: a control anchored on the synthetic
+	// `analysis.function.context` node, which a binding emits when the idiom it recognises
+	// is only visible at function granularity (a containment comparison written as a bare
+	// statement inside a try block, say, whose handler turns the raise into a rejection —
+	// an exception region is not on the straight-line path to the access it protects, so
+	// no call-anchored control can dominate it). It asks for neither dominance nor an
+	// edge: it summarises a function and covers every sink in it.
+	//
+	// That summary is only about THIS function while the function is the only one there.
+	// A function's context facts are collected over its whole subtree, nested definitions
+	// included, so a call written inside a closure — made in another frame, on another
+	// function's parameters — is credited to the enclosing function as if it had been
+	// written in its body. When the function encloses one, the summary can no longer be
+	// taken to be about the value at hand, and the control has to have touched it:
+	// somewhere on this flow a node carrying the control is on the path or consumes a
+	// node on it. Without that, one library call bound to the control inside some nested
+	// helper silences every sink in the parent, whatever it is about.
 	for _, gid := range guards {
 		if !nodeHasConcreteCoverage(e.labels(gid), control, "endpoint") {
 			continue
 		}
-		if gid != sinkID && e.sameFunctionContextGuarded(gid, sinkID) {
+		if gid != sinkID && e.sameFunctionContextGuarded(gid, sinkID) &&
+			(!e.enclosesNestedFunction(gid) || e.controlTouchedFlow(path, control)) {
 			return true
 		}
 	}
@@ -1227,7 +1251,124 @@ func (e *Engine) sameFunctionContextGuarded(guardID, sinkID string) bool {
 	return functionScopeKey(guard) != "" && functionScopeKey(guard) == functionScopeKey(sink)
 }
 
-func functionScopeKey(n usg.Node) string {
+// controlTouchedFlow reports whether `control` was applied to the value this flow
+// carries: a concrete node labelled with it sits ON the path, or consumes a node that
+// does (the same short FLOWS neighbourhood flowGuarded reads, so "the guard saw this
+// value" means one thing in both places). Unlike flowGuarded it does not ask the guard
+// to dominate anything afterwards — a function-scope check exists precisely because the
+// check does not dominate — so this is a relevance test, not a coverage test on its own.
+//
+// A nil/empty path is a caller with no flow to inspect. There is nothing to be relevant
+// to, so the answer is yes and the scope check keeps its presence semantics.
+func (e *Engine) controlTouchedFlow(path []string, control string) bool {
+	if len(path) == 0 {
+		return true
+	}
+	for _, pid := range path {
+		if nodeHasConcreteCoverage(e.labels(pid), control, "endpoint") {
+			return true
+		}
+		if len(e.flowGuardCandidates(pid, control)) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// enclosesNestedFunction reports whether the function this node sits in has another
+// function defined inside it. A function-scope check is anchored on the synthetic node
+// the frontend emits for the function, so the node's own region IS the function's, and
+// the question is whether anything opens a function below it.
+func (e *Engine) enclosesNestedFunction(id string) bool {
+	n, ok, _ := e.Store.GetNode(id)
+	if !ok {
+		return false
+	}
+	own := ""
+	rangeFunctionScopes(nodeScopeOrRegion(n), func(scope string) { own = scope })
+	if own == "" {
+		return false
+	}
+	return e.nestedScopeFunctions()[own]
+}
+
+// nestedScopeFunctions is the set of function regions that have a function defined inside
+// them. It costs a single pass over the graph, taken once per scan and only when a
+// function-scope check has already matched a sink.
+func (e *Engine) nestedScopeFunctions() map[string]bool {
+	if e.nestedScopeFns != nil {
+		return e.nestedScopeFns
+	}
+	out := map[string]bool{}
+	visit := func(n usg.Node) bool {
+		// every function on a node's chain but the innermost has one inside it
+		enclosing := ""
+		rangeFunctionScopes(nodeScopeOrRegion(n), func(scope string) {
+			if enclosing != "" {
+				out[enclosing] = true
+			}
+			enclosing = scope
+		})
+		return true
+	}
+	if rg, ok := e.Store.(interface {
+		RangeNodes(func(usg.Node) bool)
+	}); ok {
+		rg.RangeNodes(visit)
+	} else if nodes, err := e.Store.AllNodes(); err == nil {
+		for _, n := range nodes {
+			visit(n)
+		}
+	}
+	e.nestedScopeFns = out
+	return out
+}
+
+// functionScopeChain returns the region of every function a node is inside, outermost
+// first, so the last entry is the function that owns the node and an empty result means
+// the node is not in one.
+//
+// The lowerer gives a module-level function a fresh region root, "<ns>/fnN", and opens a
+// function written INSIDE another one by joining it to the enclosing region with "#fnN"
+// (see lowering.functionRegion). Those two spellings are the only places one function's
+// body stops and another's starts — the dominance tests in this package already read
+// "#fn" that way, treating only "/" as nesting within a single body.
+func functionScopeChain(region string) []string {
+	var out []string
+	rangeFunctionScopes(region, func(scope string) { out = append(out, scope) })
+	return out
+}
+
+// rangeFunctionScopes is functionScopeChain without the slice, for the one pass that
+// visits every node in the graph.
+func rangeFunctionScopes(region string, fn func(scope string)) {
+	root := false
+	for i := 0; i < len(region); {
+		var end int
+		switch {
+		case !root && region[i] == '/' && strings.HasPrefix(region[i+1:], "fn"):
+			end = i + 3 + leadingDigits(region[i+3:])
+		case root && strings.HasPrefix(region[i:], "#fn"):
+			end = i + 3 + leadingDigits(region[i+3:])
+		default:
+			i++
+			continue
+		}
+		root = true
+		fn(region[:end])
+		i = end
+	}
+}
+
+func leadingDigits(s string) int {
+	n := 0
+	for n < len(s) && s[n] >= '0' && s[n] <= '9' {
+		n++
+	}
+	return n
+}
+
+func nodeScopeOrRegion(n usg.Node) string {
 	scope := n.Scope
 	if scope == "" {
 		scope = n.Prop("region")
@@ -1235,7 +1376,11 @@ func functionScopeKey(n usg.Node) string {
 	if at := strings.IndexByte(scope, '@'); at >= 0 {
 		scope = scope[:at]
 	}
-	parts := strings.Split(scope, "/")
+	return scope
+}
+
+func functionScopeKey(n usg.Node) string {
+	parts := strings.Split(nodeScopeOrRegion(n), "/")
 	for i, part := range parts {
 		if strings.HasPrefix(part, "fn") {
 			return strings.Join(parts[:i+1], "/")

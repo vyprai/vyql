@@ -61,7 +61,9 @@ func (e *Engine) evalMatch(cr *CompiledRule) ([]*findings.Finding, error) {
 		suppressed := false
 		var ne []findings.NegationEvidence
 		for _, g := range guards {
-			ok := e.endpointGuarded(node, g)
+			// No flow here: `match` evaluates coverage against a lone node, so a
+			// function-scope check has no value to be judged relevant to.
+			ok := e.endpointGuarded(nil, node, g)
 			ne = append(ne, findings.NegationEvidence{Clause: "endpoint coveredBy " + g, Satisfied: ok})
 			suppressed = suppressed || ok
 		}
