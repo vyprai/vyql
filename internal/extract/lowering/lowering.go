@@ -147,7 +147,7 @@ type lowerer struct {
 	// pendingReads holds field reads made on a node that is not (yet) a tracked container, keyed
 	// by node then by key. A read does not itself create the container — `l.containers[x] != nil`
 	// is what marks x as one everywhere else — so a getter's `this.X`, lowered before any call
-	// site put a value in that slot, had nothing to attach to and the read was simply lost.
+	// site puts a value in that slot, has nothing to attach to without a record.
 	// Recording it keeps it live: cinfo folds these into the containerInfo the moment one
 	// exists, and elemNode wires the slot to them when the slot appears.
 	pendingReads map[string]map[string][]string
@@ -3860,6 +3860,24 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 						"target:" + t,
 					})
 					l.flow(targetVal, slot)
+				}
+			}
+			// bare member write `remoteAddr = value` — the spelling Java uses for what C# may
+			// also write `this.remoteAddr = value`. A bare READ of a member already resolves to
+			// ONE node for the whole class (the field's declaration, or the receiver's field slot
+			// where the declaration produced no node), but a write that only rebinds the name
+			// inside the method that makes it leaves a constructor storing a value and a getter
+			// returning it as unrelated nodes. Route the value into the node a read of that member resolves
+			// to — the same thing the lexical-binding case just below does for a write that
+			// rebinds a captured name. A declaration introduces a local, which is not the field.
+			if !st.Decl && !sc.lex[t] && !strings.Contains(t, ".") && l.curClass != "" &&
+				l.classMemberSet(l.curModule, l.curClass)[t] {
+				if d := sc.node[t]; d != "" {
+					if d != targetVal {
+						l.flow(targetVal, d)
+					}
+				} else if self := sc.node["this"]; self != "" {
+					l.flow(targetVal, l.elemNode(self, t, st.Loc))
 				}
 			}
 			if sc.lex[t] && !st.Decl {

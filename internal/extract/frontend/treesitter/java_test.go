@@ -1205,8 +1205,8 @@ public class VaultBuildWrapper extends SimpleBuildWrapper {
 // A value parked on an object by a setter and handed back by a getter has to survive the two
 // call boundaries between them: the write is in one method body, the read in another, and only
 // the receiver at the call sites ties them together. Java also has to MODEL the write at all —
-// `this.v = x` is an assignment whose left side is a field access, which the frontend used to
-// drop, keeping the whole stored-value shape out of the graph.
+// `this.v = x` is an assignment whose left side is a field access, and the model has to carry
+// that write for the whole stored-value shape to be in the graph.
 func TestJavaStoredFieldSurvivesGetterCallBoundary(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "App.java")
@@ -1264,5 +1264,77 @@ class App {
 	}
 	if reachable[siblingArg] {
 		t.Fatalf("taint on field v leaked into the sibling field safe")
+	}
+}
+
+// The shape rank 2289 is blocked on, with the session store taken out: a constructor stores a
+// request value on a field spelled without `this.` -- Java's usual form -- and a getter hands it
+// back to a consumer that renders it. Java declares no `this.`, so the write is a bare
+// assignment and the read a bare identifier; both have to resolve to the field.
+func TestJavaConstructorStoredBareFieldReachesGetter(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "App.java")
+	src := []byte(`class SessionInformations {
+    private final String remoteAddr;
+    private final String safe;
+
+    SessionInformations(HttpServletRequest httpRequest) {
+        remoteAddr = httpRequest.getHeader("X-Forwarded-For");
+    }
+
+    String getRemoteAddr() {
+        return remoteAddr;
+    }
+
+    String getSafe() {
+        return safe;
+    }
+}
+
+class Report {
+    void writeSession(SessionInformations session) {
+        sink(session.getRemoteAddr());
+        other(session.getSafe());
+    }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source, storedArg, siblingArg string
+	for _, n := range nodes {
+		switch {
+		case n.Prop("callee_path") == "httpRequest.getHeader":
+			source = n.ID
+		case n.Prop("callee_path") == "sink":
+			storedArg = n.Prop("arg0")
+		case n.Prop("callee_path") == "other":
+			siblingArg = n.Prop("arg0")
+		}
+	}
+	if source == "" || storedArg == "" || siblingArg == "" {
+		t.Fatalf("missing nodes: source=%q sink arg=%q sibling arg=%q", source, storedArg, siblingArg)
+	}
+	reachable, err := usg.BFS(g, source, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[storedArg] {
+		t.Fatalf("the header the constructor stored on the field did not reach the getter that returns it")
+	}
+	if reachable[siblingArg] {
+		t.Fatalf("taint on field remoteAddr leaked into the sibling field safe")
 	}
 }

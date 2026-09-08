@@ -173,7 +173,8 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		c.classContextTokens = append(c.classContextTokens, c.jvModifierTokens(n, "class_modifier:")...)
 		prevFieldInit := c.fieldInitTokens
 		c.fieldInitTokens = c.jvFieldInitTokens(c.field(n, "body"), c.kind(n) == "interface_declaration")
-		cd := nir.ClassDef{Name: name, Body: c.decls(c.field(n, "body")), Loc: L, Bases: bases, Annotations: ownAnnotations}
+		cd := nir.ClassDef{Name: name, Body: c.decls(c.field(n, "body")), Loc: L, Bases: bases,
+			Members: c.jvFieldNames(c.field(n, "body")), Annotations: ownAnnotations}
 		c.classParamTokens = prevParams
 		c.classContextTokens = prevContext
 		c.fieldInitTokens = prevFieldInit
@@ -337,9 +338,9 @@ func (c *jvConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		}
 		// field write `this.v = x` / `obj.v = x`: model as a path call with no method
 		// (mirrors the C#/JS/Kotlin member-write modeling) so the assigned value lands in
-		// the field's slot. Dropping it kept the whole store-then-read-back shape — a
-		// constructor or setter parking a value on the object, a getter handing it out —
-		// out of the graph, since the write simply was not there.
+		// the field's slot. The model has to carry the whole store-then-read-back shape —
+		// a constructor or setter parking a value on the object, a getter handing it out —
+		// so the write itself has to be in the graph.
 		if left != nil && c.kind(left) == "field_access" {
 			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
 				Callee: c.expr(left), Args: []nir.Expr{right},
@@ -663,6 +664,32 @@ func javaClassContextTokens(name string, bases []string) []string {
 	for _, base := range bases {
 		if base != "" {
 			out = append(out, "class_base:"+base)
+		}
+	}
+	return out
+}
+
+// jvFieldNames lists the class's own declared field names, so a bare identifier in a method
+// body that is neither a local nor a parameter can be resolved to the field it names. Java
+// writes `remoteAddr = value` and `return remoteAddr` for what C# may also spell
+// `this.remoteAddr`; without the names those are unrelated nodes in two method bodies. Direct
+// children only: a nested class declares its own.
+func (c *jvConv) jvFieldNames(body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	var out []string
+	for _, ch := range c.namedChildren(body) {
+		if c.kind(ch) != "field_declaration" && c.kind(ch) != "constant_declaration" {
+			continue
+		}
+		for _, d := range c.namedChildren(ch) {
+			if c.kind(d) != "variable_declarator" {
+				continue
+			}
+			if name := c.field(d, "name"); name != nil {
+				out = append(out, c.text(name))
+			}
 		}
 	}
 	return out
