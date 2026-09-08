@@ -28,7 +28,6 @@ type flagPredicate struct {
 // context token FAMILIES compared to each other (`node.context.call ==
 // node.context.name`), not a family compared to a literal. Values carries the two
 // families' token prefixes, left then right.
-
 const presenceSameValueOp = "same_value"
 
 func sameValueFamilies(values []string) (left, right string, ok bool) {
@@ -42,7 +41,6 @@ func sameValueFamilies(values []string) (left, right string, ok bool) {
 // value equals a token of the right family's. Both families are read off the node's own
 // tokens, so no scope, flow or AST search is involved: the frontend already attributed
 // both facts to this node (a Rust function context carries `name=` and its `call:` list).
-
 func flagSameValueHit(idx *flagMatchIndex, pred flagPredicate, n usg.Node) bool {
 	left, right, ok := sameValueFamilies(pred.Values)
 	if !ok {
