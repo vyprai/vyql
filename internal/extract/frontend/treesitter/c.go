@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"regexp"
@@ -1277,12 +1278,48 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}
 }
 
-// ccVoidDeclRe matches a function this file declares or defines to return void:
-// the `void` keyword, the name, and the open paren of its parameter list.
-// `void *f(` is a pointer-returning function and not a void one, and does not
-// match -- the name capture cannot begin with `*`. `(void)x` casts, a
-// `void (*fp)(int)` member and `void_helper(` all fail the same way.
-var ccVoidDeclRe = ccRe(`\bvoid[ \t\r\n]+([A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\(`)
+// ccVoidDeclAt reads a declaration or definition of a void-returning function
+// starting at the `void` keyword at i: the name and the open paren of its
+// parameter list. It reports the name and the index of that paren, and ok only
+// when the whole shape is there. `void *f(` is a pointer-returning function and
+// not a void one, and is rejected because `*` cannot start the name. `(void)x`
+// casts, a `void (*fp)(int)` member and `void_helper(` are rejected the same way.
+func ccVoidDeclAt(src []byte, i int) (name string, open int, ok bool) {
+	if i > 0 && ccIdentByte(src[i-1]) {
+		return "", 0, false
+	}
+	k := i + len("void")
+	sep := k
+	for k < len(src) && ccLayoutByte(src[k]) {
+		k++
+	}
+	if k == sep || k >= len(src) || !ccNameStartByte(src[k]) {
+		return "", 0, false
+	}
+	start := k
+	for k < len(src) && ccIdentByte(src[k]) {
+		k++
+	}
+	name = string(src[start:k])
+	for k < len(src) && ccLayoutByte(src[k]) {
+		k++
+	}
+	if k >= len(src) || src[k] != '(' {
+		return "", 0, false
+	}
+	return name, k, true
+}
+
+// ccLayoutByte reports whether b separates tokens without ending a declaration.
+func ccLayoutByte(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\r' || b == '\n'
+}
+
+// ccNameStartByte reports whether b can begin an identifier. A digit cannot, so
+// a name is never read out of the middle of a number.
+func ccNameStartByte(b byte) bool {
+	return b == '_' || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
 
 // ccVoidPointerMutators names the functions this file declares or defines as
 // returning void, each with the parameter positions it takes a mutable pointer
@@ -1292,23 +1329,37 @@ var ccVoidDeclRe = ccRe(`\bvoid[ \t\r\n]+([A-Za-z_][A-Za-z0-9_]*)[ \t\r\n]*\(`)
 // passed. The typing comes from the same translation unit the call is read in --
 // a callee only a header this file includes declares is not typed here and its
 // calls keep the shape they had.
+//
+// The file is walked for the `void` keyword with a literal search rather than a
+// pattern, and only a hit is parsed. A regular expression over the whole source
+// runs at about 70 MB/s, which a multi-megabyte C file pays in full; the literal
+// search runs at memory speed and reads no copy of the source.
 func (c *ccConv) ccVoidPointerMutators() map[string][]bool {
 	if c.voidPtrParams != nil {
 		return c.voidPtrParams
 	}
 	out := map[string][]bool{}
-	src := string(c.src)
-	for _, m := range ccVoidDeclRe.FindAllStringSubmatchIndex(src, -1) {
-		open := m[1] - 1 // the '(' the pattern ends on
+	src := c.src
+	for at := 0; at < len(src); {
+		hit := bytes.Index(src[at:], []byte("void"))
+		if hit < 0 {
+			break
+		}
+		i := at + hit
+		at = i + len("void")
+		name, open, ok := ccVoidDeclAt(src, i)
+		if !ok {
+			continue
+		}
+		at = open + 1
 		end := ccCallArgsClose(src, open)
 		if end < 0 {
 			continue
 		}
-		flags := ccMutablePointerParams(src[open+1 : end])
+		flags := ccMutablePointerParams(string(src[open+1 : end]))
 		if len(flags) == 0 {
 			continue
 		}
-		name := src[m[2]:m[3]]
 		if prev, seen := out[name]; seen {
 			out[name] = ccIntersectFlags(prev, flags)
 			continue
@@ -3322,7 +3373,7 @@ func ccIdentifierArg(s string) bool {
 
 // ccCallArgsClose returns the index of the closing parenthesis of the call
 // whose own opens at open, or -1 when the call does not close within text.
-func ccCallArgsClose(text string, open int) int {
+func ccCallArgsClose[T ~string | ~[]byte](text T, open int) int {
 	depth := 0
 	for i := open; i < len(text); i++ {
 		switch text[i] {

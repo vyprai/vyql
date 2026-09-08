@@ -98,6 +98,21 @@ void handler(char *url) {
 	}
 }
 
+// The declaration is read straight out of the file text, so the layout it is
+// written in must not change what it says. A name split from `void` or from its
+// parameter list by tabs or newlines is the same declaration.
+func TestCVoidPointerCallTypedAcrossLineBreaks(t *testing.T) {
+	const src = "\nvoid\n\tfix_google_param\t(char *s);\n\nvoid handler(char *url) {\n" +
+		"    char *p = url_param(url, \"callback\");\n" +
+		"    fix_google_param(p);\n" +
+		"    emit(\"%s(\", p);\n}\n"
+	got := ccInPlaceEffects(t, src)
+	want := []string{"fix_google_param#0"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Fatalf("got %v, want %v", got, want)
+	}
+}
+
 // Each rejection is a declaration saying the call does not write there, or a
 // call site naming storage no variable stands for. Typing this wrong is how a
 // check gets credited with covering a read it never touched, so nothing that
@@ -131,6 +146,22 @@ void note_count(int n);
 void handler(int n) { note_count(n); emit("%d", n); }
 `,
 			because: "C cannot mutate a by-value argument",
+		},
+		{
+			name: "the name runs on from another word",
+			src: `
+void avoid_google_param(char *s);
+void handler(char *p) { google_param(p); emit("%s", p); }
+`,
+			because: "`avoid_google_param` declares avoid_google_param, not google_param",
+		},
+		{
+			name: "the declaration is a function pointer",
+			src: `
+void (*fix_google_param)(char *s);
+void handler(char *p) { fix_google_param(p); emit("%s", p); }
+`,
+			because: "a pointer variable is not a callee this file gives a shape",
 		},
 		{
 			name: "the callee returns a pointer",
