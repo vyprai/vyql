@@ -24,6 +24,43 @@ type flagPredicate struct {
 	Negative    bool
 }
 
+// presenceSameValueOp marks a same-node unification predicate: the two sides are
+// context token FAMILIES compared to each other (`node.context.call ==
+// node.context.name`), not a family compared to a literal. Values carries the two
+// families' token prefixes, left then right.
+const presenceSameValueOp = "same_value"
+
+func sameValueFamilies(values []string) (left, right string, ok bool) {
+	if len(values) != 2 || values[0] == "" || values[1] == "" {
+		return "", "", false
+	}
+	return values[0], values[1], true
+}
+
+// flagSameValueHit reports whether the node carries a token of the left family whose
+// value equals a token of the right family's. Both families are read off the node's own
+// tokens, so no scope, flow or AST search is involved: the frontend already attributed
+// both facts to this node (a Rust function context carries `name=` and its `call:` list).
+func flagSameValueHit(idx *flagMatchIndex, pred flagPredicate, n usg.Node) bool {
+	left, right, ok := sameValueFamilies(pred.Values)
+	if !ok {
+		return false
+	}
+	facts := idx.contextFacts(n.Prop("str_args"))
+	lefts, rights := facts.byPrefix[left], facts.byPrefix[right]
+	if len(lefts) == 0 || len(rights) == 0 {
+		return false
+	}
+	for _, l := range lefts {
+		for _, r := range rights {
+			if l == r {
+				return true
+			}
+		}
+	}
+	return false
+}
+
 func nodeTypeAllowed(want, got string) bool {
 	return want == "" || got == want
 }
@@ -279,6 +316,11 @@ func flagPredicateNeedsFullIndex(fl flagSpec, pred flagPredicate) bool {
 		return true
 	}
 	if fl.Scope == "" || pred.Property != "tokens" {
+		return false
+	}
+	if pred.Op == presenceSameValueOp {
+		// Values are token families, not values to look for elsewhere: the match reads
+		// only this node's own tokens, so the full node index buys nothing.
 		return false
 	}
 	for _, v := range pred.Values {
@@ -589,6 +631,13 @@ func flagPredicateMatches(s usg.Store, idx *flagMatchIndex, pred flagPredicate, 
 		if !ok {
 			hit = flagScopeNodeHit(s, idx, probe, n, []string{"code.Call"}, tech, crossLang)
 		}
+		if pred.Negative {
+			return !hit
+		}
+		return hit
+	}
+	if pred.Op == presenceSameValueOp {
+		hit := flagSameValueHit(idx, pred, n)
 		if pred.Negative {
 			return !hit
 		}

@@ -226,7 +226,7 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x parser.V2BinaryExpr, 
 	case "~=", "==", "!=", "contains", "startsWith", "endsWith":
 		value, ok := parser.V2LiteralString(x.Right)
 		if !ok {
-			return PresencePredicate{}, fmt.Errorf("%s predicate right side must be a string", field)
+			return lowerV2PresenceSameValue(alias, defaultSubject, subject, prop, field, x, neg)
 		}
 		value = prefixV2PresenceValue(field, value)
 		pred := PresencePredicate{Subject: subject, Property: prop, Values: []string{value}, Negative: neg != (x.Op == "!=")}
@@ -275,6 +275,40 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x parser.V2BinaryExpr, 
 	default:
 		return PresencePredicate{}, fmt.Errorf("unsupported operator %q", x.Op)
 	}
+}
+
+// lowerV2PresenceSameValue lowers a predicate whose right side names another field of the
+// same alias instead of a literal -- `node.context.call == node.context.name`. Both sides
+// name a context token family carried by the one node, so the comparison is decidable from
+// that node alone: it holds when some value of the left family equals some value of the
+// right one. That is what lets a binding say a function calls itself, where the callee to
+// look for is not known until the node is in hand.
+//
+// Anything else on the right side is still an error, with the message it always had.
+func lowerV2PresenceSameValue(alias, defaultSubject, subject, prop, field string, x parser.V2BinaryExpr, neg bool) (PresencePredicate, error) {
+	notLiteral := fmt.Errorf("%s predicate right side must be a string", field)
+	if x.Op != "==" && x.Op != "!=" {
+		return PresencePredicate{}, notLiteral
+	}
+	rightField, ok := v2PresenceField(alias, x.Right)
+	if !ok {
+		return PresencePredicate{}, notLiteral
+	}
+	rightSubject, rightProp, ok := v2PresenceProperty(defaultSubject, rightField)
+	if !ok {
+		return PresencePredicate{}, fmt.Errorf("unsupported predicate field %q", rightField)
+	}
+	left, right := v2PresenceValuePrefix(field), v2PresenceValuePrefix(rightField)
+	if subject != rightSubject || prop != "tokens" || rightProp != "tokens" || left == "" || right == "" {
+		return PresencePredicate{}, fmt.Errorf("%s %s %s: both sides must be context token families of the same node", field, x.Op, rightField)
+	}
+	return PresencePredicate{
+		Subject:  subject,
+		Property: "tokens",
+		Op:       presenceSameValueOp,
+		Values:   []string{left, right},
+		Negative: neg != (x.Op == "!="),
+	}, nil
 }
 
 func lowerV2PresenceCall(alias, defaultSubject string, x parser.V2CallExpr, neg bool) (PresencePredicate, error) {
