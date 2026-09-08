@@ -569,6 +569,28 @@ func (c *jvConv) block(block *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
+// jvLambdaParams reads a lambda's parameter list, which the grammar writes three ways: a
+// bare identifier (`v -> …`), inferred_parameters (`(a, b) -> …`) and formal_parameters
+// (`(String a) -> …`, the only one carrying declared types).
+func (c *jvConv) jvLambdaParams(n *tree_sitter.Node) ([]string, map[string]string) {
+	if n == nil {
+		return nil, nil
+	}
+	switch c.kind(n) {
+	case "identifier":
+		return []string{c.text(n)}, nil
+	case "formal_parameters":
+		return c.params(n), c.paramTypes(n)
+	}
+	var out []string
+	for _, ch := range c.namedChildren(n) {
+		if c.kind(ch) == "identifier" {
+			out = append(out, c.text(ch))
+		}
+	}
+	return out, nil
+}
+
 func (c *jvConv) params(params *tree_sitter.Node) []string {
 	if params == nil {
 		return nil
@@ -1448,6 +1470,23 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 			parts = append(parts, c.expr(ch))
 		}
 		return nir.Seq{Parts: parts, Loc: L}
+	case "lambda_expression":
+		// Lower as nir.Lambda — as C#, PHP and JavaScript already do — so the parameter is
+		// a Param node the higher-order dispatch can route into and the body is a body,
+		// with its own statements and control flow. A lambda lowered as a generic Seq has
+		// no parameters and no body: the name it binds resolves to whatever the ENCLOSING
+		// scope happens to bind it to, and the value the lambda is invoked with has nowhere
+		// to flow.
+		params, paramTypes := c.jvLambdaParams(c.field(n, "parameters"))
+		var body []nir.Stmt
+		if b := c.field(n, "body"); b != nil {
+			if c.kind(b) == "block" {
+				body = c.block(b)
+			} else {
+				body = []nir.Stmt{nir.Return{Value: c.expr(b)}} // expression-bodied lambda
+			}
+		}
+		return nir.Lambda{Params: params, ParamTypes: paramTypes, Body: body, Loc: L}
 	}
 	var parts []nir.Expr
 	for _, ch := range c.namedChildren(n) {
