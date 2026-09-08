@@ -37,10 +37,10 @@ end
 }
 
 // `class << self` declares CLASS-level methods. A class is free to declare an instance method
-// of the same name, and the two are different methods with different bodies. Both used to
-// register under "Repo.checkout", so the later declaration took the name and the call
-// `Repo.checkout(tainted)` landed on it — the singleton body was left with no edge from any
-// call site and the taint into it was dropped.
+// of the same name, and the two are different methods with different bodies. Both register
+// under "Repo.checkout", and a name-keyed table holds only the last — so the two have to be
+// told apart downstream, or the singleton body has no edge from any call site and the taint
+// into it is dropped.
 func TestRubySingletonClassMethodIsNotShadowedBySameNamedInstanceMethod(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "repo.rb")
@@ -79,6 +79,65 @@ end
 	if !reachable[rubyNodeID(t, g, "code.Call", "callee_path", "system")] {
 		t.Fatalf("handle's tainted parameter did not reach system() in the `class << self` body of " +
 			"Repo.checkout; the call resolved to the instance method of the same name")
+	}
+}
+
+// A call with no receiver names the method of the body it is written in: a bare `checkout(url)`
+// inside `class << self` names the class-level declaration, and inside an instance method the
+// instance one. Both share the name "Repo.checkout", so this is the same choice the class
+// constant makes at an outside call site, asked from within the class.
+func TestRubyBareCallNamesTheMethodOfTheBodyItIsWrittenIn(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "repo.rb")
+	src := []byte(`class Repo
+  class << self
+    def checkout(url)
+      system("git clone " + url)
+    end
+
+    def entry(url)
+      checkout(url)
+    end
+  end
+
+  def checkout(name)
+    log(name)
+  end
+
+  def notify(name)
+    checkout(name)
+  end
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	classLevelBody := rubyNodeID(t, g, "code.Call", "callee_path", "system")
+	instanceBody := rubyNodeID(t, g, "code.Call", "callee_path", "log")
+	for _, tc := range []struct {
+		caller, param, want, notWant, desc string
+	}{
+		{"entry", "url", classLevelBody, instanceBody, "a bare call inside `class << self`"},
+		{"notify", "name", instanceBody, classLevelBody, "a bare call inside an instance method"},
+	} {
+		reachable, err := usg.BFS(g, rubyNodeID(t, g, "code.Param", "name", tc.param, "func", tc.caller), "FLOWS", 60)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reachable[tc.want] {
+			t.Errorf("%s did not reach the body it names", tc.desc)
+		}
+		if reachable[tc.notWant] {
+			t.Errorf("%s reached the other declaration's body", tc.desc)
+		}
 	}
 }
 

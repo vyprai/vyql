@@ -50,8 +50,11 @@ type importEntry struct {
 }
 
 type lowerer struct {
-	prog           nir.Program
-	selfName       string
+	prog     nir.Program
+	selfName string
+	// curStatic is set while lowering the body of a CLASS-LEVEL declaration, where a call with no
+	// receiver names the class's own class-level method. See callNamesClassLevel.
+	curStatic      bool
 	resolveImports bool
 	ctorTypes      map[string]string // constructor callee-path -> returned type name
 	// phiOperands holds, per control-flow merge node, the values that merge joins.
@@ -3798,10 +3801,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		saveDecorators := l.curDecorators
 		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
 		l.functionContextAnalysisEvent(st.Loc, l.curDecorators)
+		saveStatic := l.curStatic
+		l.curStatic = st.Static // a nested `def` is an instance method again, so this is not inherited
 		l.deferred = append(l.deferred, nil)
 		l.block(st.Body, inner)
 		l.flushDeferred() // deferred bodies belong to THIS function, so flush inside the frame
 		sc.undoFunc(fm)
+		l.curStatic = saveStatic
 		l.curDecorators = saveDecorators
 		l.region, l.funcRoot, l.branchCond = saveRegion, saveRoot, saveCond
 	case nir.Assign:
@@ -6336,11 +6342,11 @@ func (l *lowerer) selectOverloads(targets []*funcInfo, argc int, recvNode string
 	return targets
 }
 
-// receiverClassName returns the name the call's RECEIVER was written as — "Repo" in
-// `Repo.checkout(x)`, and the last segment of a namespaced receiver (`Foo::Repo.checkout`,
-// which the Ruby frontend flattens to the dotted path "Foo.Repo"). It reports false for a
-// call with no receiver at all.
-func receiverClassName(callee nir.Expr) (string, bool) {
+// receiverName returns the dotted name the call's RECEIVER was written as — "Repo" in
+// `Repo.checkout(x)`, "Foo.Repo" in `Foo::Repo.checkout(x)`, which the Ruby frontend flattens to
+// a dotted path. It reports false for a call with no receiver, and for a receiver that is not a
+// name at all (a call result, a literal), which is never the class.
+func receiverName(callee nir.Expr) (string, bool) {
 	attr, ok := callee.(nir.Attr)
 	if !ok {
 		return "", false
@@ -6357,13 +6363,27 @@ func receiverClassName(callee nir.Expr) (string, bool) {
 	default:
 		return "", false
 	}
-	if i := strings.LastIndexByte(recv, '.'); i >= 0 {
-		recv = recv[i+1:]
-	}
 	if recv == "" {
 		return "", false
 	}
 	return recv, true
+}
+
+// callNamesClassLevel reports whether this call site names the CLASS-LEVEL declaration of the
+// method rather than the instance one. A receiver that is the class itself — the class constant,
+// possibly namespaced (`Repo.checkout(x)`, `Foo::Repo.checkout(x)`) — names the class-level
+// declaration. A call with NO receiver is the same question one level up: written inside a
+// class-level body it names the class-level method, written inside an instance body the instance
+// one. Every other receiver is an instance.
+func callNamesClassLevel(callee nir.Expr, cls string, inStatic bool) bool {
+	recv, ok := receiverName(callee)
+	if !ok {
+		return inStatic // bare call — the enclosing declaration's own kind decides
+	}
+	if i := strings.LastIndexByte(recv, '.'); i >= 0 {
+		recv = recv[i+1:]
+	}
+	return recv == cls
 }
 
 // selectStaticOverloads re-points a resolved target at the declaration of its own name that
@@ -6374,10 +6394,11 @@ func receiverClassName(callee nir.Expr) (string, bool) {
 // argument count, so a same-arity pair leaves the earlier body with no edge from any call
 // site at all — the taint into it is dropped.
 //
-// `Repo.checkout(url)` names the class-level one, anything else the instance one. The move is
-// made only when it is forced: exactly one declaration of the wanted kind (or, if several,
-// exactly one of those at this call's arity). An overload set that is all one kind — which is
-// every set in every language whose frontend does not set the flag — is left exactly as it was.
+// `Repo.checkout(url)` names the class-level one, anything else the instance one; see
+// callNamesClassLevel, which also answers it for a call with no receiver. The move is made only
+// when it is forced: exactly one declaration of the wanted kind, or — if several — exactly one of
+// those at this call's arity. An overload set that is all one kind, which is every set in every
+// language whose frontend does not set the flag, is left exactly as it was.
 func (l *lowerer) selectStaticOverloads(targets []*funcInfo, callee nir.Expr, argc int, recvNode string) []*funcInfo {
 	cloned := false
 	for i, t := range targets {
@@ -6388,8 +6409,7 @@ func (l *lowerer) selectStaticOverloads(targets []*funcInfo, callee nir.Expr, ar
 		if len(cands) < 2 {
 			continue
 		}
-		recv, hasRecv := receiverClassName(callee)
-		wantStatic := hasRecv && recv == t.cls
+		wantStatic := callNamesClassLevel(callee, t.cls, l.curStatic)
 		if t.static == wantStatic {
 			continue // resolution already landed on a declaration of the right kind
 		}
