@@ -127,20 +127,108 @@ func reachesRegion(rA, oA, rB, oB string) bool {
 }
 
 // regionsSequenced reports whether two regions can lie on one execution path.
-// Control regions nest with "/", so a prefix relation puts one inside the other;
-// disjoint sibling branches never both run. A function body written inline hangs
-// off its enclosing region with "#", and its code runs somewhere after the code
-// that passes it, so it is sequenced with that region and with everything that
-// region is sequenced with.
+// Control regions nest with "/", so a prefix relation puts one inside the other.
+// Siblings need a closer look: only the ARMS OF ONE construct exclude each other
+// (then vs else, case vs case, try body vs handler). Two separate constructs at
+// the same nesting depth — `if (a) { free(p); }` followed by `if (b) { free(p); }`
+// — are written one after the other and both run whenever both guards hold, so
+// they are sequenced. A function body written inline hangs off its enclosing
+// region with "#", and its code runs somewhere after the code that passes it, so
+// it is sequenced with that region and with everything that region is sequenced
+// with.
 func regionsSequenced(a, b string) bool {
 	for _, ra := range regionScopeChain(a) {
 		for _, rb := range regionScopeChain(b) {
-			if ra == rb || strings.HasPrefix(rb, ra+"/") || strings.HasPrefix(ra, rb+"/") {
+			if regionPathsSequenced(ra, rb) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// regionPathsSequenced is regionsSequenced for two region paths with the inline-body
+// chain already resolved. It walks the two paths in place, because Reaches is asked
+// about every pair of candidate nodes and a per-call split would allocate on each.
+func regionPathsSequenced(a, b string) bool {
+	if a == b || hasSegmentPrefix(b, a) || hasSegmentPrefix(a, b) {
+		return true
+	}
+	// Advance segment by segment to the first segment that differs: i is where that
+	// segment starts in both paths, ea and eb are where it ends in each.
+	i, ea, eb := 0, 0, 0
+	for {
+		ea, eb = segmentEnd(a, i), segmentEnd(b, i)
+		if a[i:ea] != b[i:eb] {
+			break
+		}
+		if ea == len(a) || eb == len(b) {
+			// One path ends while every segment so far is shared, which the
+			// prefix cases above already answered.
+			return false
+		}
+		i = ea + 1
+	}
+	if i == 0 {
+		return false // the paths share no enclosing scope, so different modules
+	}
+	// The paths first differ at this segment. They are on one execution path only if
+	// the two segments are two DISTINCT control constructs of the same enclosing
+	// scope, lowered in program order. Same construct → alternative arms, which
+	// never both run; anything that is not a control construct (a function root)
+	// → separate function bodies, which Reaches does not sequence.
+	ca, ok1 := controlConstruct(a[i:ea])
+	cb, ok2 := controlConstruct(b[i:eb])
+	return ok1 && ok2 && ca != cb
+}
+
+// hasSegmentPrefix reports whether prefix covers a whole leading run of path's
+// segments, which is strings.HasPrefix(path, prefix+"/") without building the
+// concatenation.
+func hasSegmentPrefix(path, prefix string) bool {
+	return len(path) > len(prefix) && path[len(prefix)] == '/' && path[:len(prefix)] == prefix
+}
+
+// segmentEnd returns the index just past the path segment that starts at i.
+func segmentEnd(path string, i int) int {
+	if j := strings.IndexByte(path[i:], '/'); j >= 0 {
+		return i + j
+	}
+	return len(path)
+}
+
+// controlConstruct names the control-flow construct a region segment belongs to —
+// "if7" for both "if7.t" and "if7.e", "sw3" for every "sw3.cN" and "sw3.d", "try2"
+// for "try2" and its "try2.hN" handlers, "loop4" for "loop4". The segment of an
+// inline function body ("if7.t#fn9") still belongs to the construct it was written
+// in. Reports false for a segment that is not a control construct — a function
+// region root, or a shape a frontend introduced that this does not model.
+func controlConstruct(seg string) (string, bool) {
+	id := seg
+	if i := strings.IndexByte(id, '.'); i >= 0 {
+		id = id[:i]
+	}
+	if i := strings.IndexByte(id, '#'); i >= 0 {
+		id = id[:i]
+	}
+	for _, kind := range []string{"if", "loop", "sw", "try"} {
+		if rest, ok := strings.CutPrefix(id, kind); ok && isDigits(rest) {
+			return id, true
+		}
+	}
+	return "", false
+}
+
+func isDigits(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
 }
 
 // regionScopeChain returns r followed by each region it is nested inside as an

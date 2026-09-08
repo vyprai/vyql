@@ -302,3 +302,59 @@ func TestPostDominatesCoveredIgnoresTheGuardThatTestsTheAcquisitionsResult(t *te
 		t.Error("an exit whose branch condition was not recorded is not read as a guard")
 	}
 }
+
+// Two sequential single-armed if-blocks are siblings in the region tree, but nothing
+// makes them exclusive: `if (a) free(p); if (b) free(p);` runs both bodies whenever
+// both guards hold, so a release in the first block reaches a release or a use in the
+// second and the double-free and use-after-free shapes have a pair to report. Only the
+// ARMS OF ONE construct exclude each other.
+func TestReachesSequencesSeparateSiblingConstructs(t *testing.T) {
+	const fn = "app.c/fn1"
+	cases := []struct {
+		name           string
+		rA, oA, rB, oB string
+		want           bool
+		because        string
+	}{
+		{"two sequential if-blocks", fn + "/if2.t", "3", fn + "/if4.t", "7", true,
+			"both guards can hold, so both bodies run"},
+		{"reverse order of the same pair", fn + "/if4.t", "7", fn + "/if2.t", "3", false,
+			"order still decides the direction"},
+		{"a later if reached from an earlier else", fn + "/if2.e", "3", fn + "/if4.t", "7", true,
+			"the else arm falls through into the next statement"},
+		{"if then a switch case", fn + "/if2.t", "3", fn + "/sw4.c1", "7", true,
+			"separate constructs written one after the other"},
+		{"if then a loop body", fn + "/if2.t", "3", fn + "/loop4", "7", true,
+			"the loop runs after the guarded block"},
+		{"nested under separate constructs", fn + "/if2.t/loop3", "4", fn + "/if5.t/if6.e", "9", true,
+			"the first differing segments are two distinct constructs"},
+
+		// The exclusive cases the sibling rule exists for must be unchanged.
+		{"the two arms of one if", fn + "/if2.t", "3", fn + "/if2.e", "7", false,
+			"then and else never both run"},
+		{"two arms of one switch", fn + "/sw2.c0", "3", fn + "/sw2.c1", "7", false,
+			"one case arm excludes the other"},
+		{"a case and the default arm", fn + "/sw2.c0", "3", fn + "/sw2.d", "7", false,
+			"the default runs only when no case did"},
+		{"a try body and its handler", fn + "/try2", "3", fn + "/try2.h0", "7", false,
+			"the handler is the alternative to completing the body"},
+		{"deeper under exclusive arms", fn + "/if2.t/loop3", "4", fn + "/if2.e/if5.t", "9", false,
+			"the exclusion at the first difference still holds below it"},
+		{"an inline callback under an exclusive arm", fn + "/if2.t#fn9", "3", fn + "/if2.e", "7", false,
+			"a body written in one arm belongs to that arm"},
+
+		// Separate function bodies are not control constructs of one function.
+		{"two module-level functions", "app.c/fn1", "3", "app.c/fn2", "7", false,
+			"Reaches is intraprocedural by construction"},
+		{"a branch of one function and a branch of another", "app.c/fn1/if2.t", "3", "app.c/fn3/if4.t", "7", false,
+			"different function roots share no execution path"},
+		{"segment-boundary safety", fn + "/if2.t", "3", fn + "/if20.t", "7", true,
+			"if2 and if20 are distinct constructs, not one construct's arms"},
+	}
+	for _, c := range cases {
+		if got := reachesRegion(c.rA, c.oA, c.rB, c.oB); got != c.want {
+			t.Errorf("%s: reachesRegion(%q@%s -> %q@%s) = %v, want %v: %s",
+				c.name, c.rA, c.oA, c.rB, c.oB, got, c.want, c.because)
+		}
+	}
+}

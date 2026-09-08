@@ -2408,3 +2408,42 @@ func TestLowerExitMarkerCarriesTheConditionOfItsOwnBranch(t *testing.T) {
 		t.Errorf("a return inside a loop body is not taken on any branch condition, got guard %q", got)
 	}
 }
+
+// The end-to-end shape: two sequential single-armed if-blocks, each releasing the
+// same pointer. The lowering gives each its own control region, and those regions
+// are siblings — but they are separate constructs, not the arms of one, so the
+// first release reaches the second and the double-free pair exists to report.
+func TestLowerSequentialGuardedBlocksReachEachOther(t *testing.T) {
+	g, err := Lower(funcProgram("app.c",
+		callStmt("p.alloc", "app.c:2"),
+		nir.If{Then: []nir.Stmt{callStmt("p.free", "app.c:4")}, Loc: "app.c:3"},
+		nir.If{Then: []nir.Stmt{callStmt("p.freeAgain", "app.c:7")}, Loc: "app.c:6"},
+		nir.If{Then: []nir.Stmt{callStmt("p.use", "app.c:10")},
+			Else: []nir.Stmt{callStmt("p.otherArm", "app.c:12")}, Loc: "app.c:9"},
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	first := callNodeByPath(t, g, "p.free")
+	second := callNodeByPath(t, g, "p.freeAgain")
+	use := callNodeByPath(t, g, "p.use")
+	otherArm := callNodeByPath(t, g, "p.otherArm")
+
+	if first.Prop("region") == second.Prop("region") {
+		t.Fatalf("the two guarded blocks must lower to distinct regions, both are %q", first.Prop("region"))
+	}
+	if !solvers.Reaches(g, first.ID, second.ID) {
+		t.Errorf("release in %q must reach the release in %q", first.Prop("region"), second.Prop("region"))
+	}
+	if !solvers.Reaches(g, first.ID, use.ID) {
+		t.Errorf("release in %q must reach the use in %q", first.Prop("region"), use.Prop("region"))
+	}
+	if solvers.Reaches(g, use.ID, otherArm.ID) {
+		t.Error("the then arm of one if must not reach its own else arm")
+	}
+	// The widening must not reach into dominance: a release inside a guarded block
+	// still does not always run.
+	if solvers.PostDominates(g, first.ID, callNodeByPath(t, g, "p.alloc").ID) {
+		t.Error("a release inside a guarded block must not post-dominate the allocation")
+	}
+}
