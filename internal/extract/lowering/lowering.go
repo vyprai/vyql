@@ -38,7 +38,8 @@ type funcInfo struct {
 	paramEntries  []nir.ParamEntry
 	resultEntries []nir.ResultEntry
 	abstract      bool   // an interface/abstract method (empty body) — dispatch to concrete impls
-	selfNode      string // stable `this` node for a method (alias target for the receiver); "" if none
+	selfNode      string // stable `this` node for the DECLARING CLASS (alias target for the receiver); "" if none
+	ctor          bool   // the class's constructor: a call naming the class runs this body on a new object
 }
 
 type importEntry struct {
@@ -174,6 +175,21 @@ type lowerer struct {
 	// taint into the callback's parameters.
 	lambdaParams map[string][]string
 
+	// classSelf is the stable implicit-`this` node of a class, keyed by "ns\x1fClass" — one
+	// node for the whole class, not one per method, so a field one method writes through
+	// `this` and another method reads through `this` land on the SAME element slot.
+	classSelf map[string]string
+	// classCtors maps "modkey::Class" to the resolution key of the class's constructor, so
+	// `new T(a)` (or, in languages with no `new`, `T(a)`) routes its arguments into that body.
+	// The key, not the declaration: a class may declare several constructors, and the call
+	// site's own argument count is what picks between them (selectOverloads).
+	classCtors map[string]string
+	// paramObjects marks the signature nodes a value enters a function through (parameters and
+	// the implicit `this`). A field read through one of them materializes its element slot
+	// even when no write has been lowered yet: the write is in another function, and lowering
+	// order is source order, not execution order. See the nir.Attr arm of eval.
+	paramObjects map[string]bool
+
 	// p1, when non-nil, captures the symbol-table contributions of the module currently being
 	// registered (pass 1), so they can be cached and replayed without re-reading the module's
 	// NIR. nil on the full (non-incremental) path — zero cost there.
@@ -192,9 +208,14 @@ type containerInfo struct {
 	// long before the write it must see (they sit in two method bodies, and only a call site
 	// ties the two objects together), so the read is recorded rather than resolved on the spot;
 	// elemNode and aliasReceiverSelf connect it to the slot whenever the slot turns up.
-	reads   map[string][]string
-	dirty   bool // a write with a NON-constant key happened (any key may be tainted)
-	nextIdx int  // append counter for add()/append()/push()
+	reads map[string][]string
+	// modelsWrites is set once a WRITE recorded a slot on this record. The element-sensitive
+	// reads conclude that a key they cannot find is CLEAN, which holds only if every write to
+	// the object is in the record; a record built by readFieldSlot alone carries no such claim,
+	// because the write it is waiting for is in another function.
+	modelsWrites bool
+	dirty        bool // a write with a NON-constant key happened (any key may be tainted)
+	nextIdx      int  // append counter for add()/append()/push()
 	// composite marks a two-part-key container — `cfg.set(section, key, val)` /
 	// `cfg.get(section, key)` (configparser and friends). Only a 3-arg keyed write sets
 	// it, which a dict/list never performs, so plain `d.get(key, default)` is unaffected.
@@ -336,7 +357,7 @@ var appendMutators = map[string]bool{
 // dirty, so later keyed reads fall back to the whole container. Never produces a false negative.
 func (l *lowerer) containerInvalidate(call nir.Call, recv string, sc *scope) {
 	ci := l.containers[recv]
-	if ci == nil || ci.dirty {
+	if ci == nil || !ci.modelsWrites || ci.dirty {
 		return
 	}
 	// Python's list.remove(x) removes by VALUE, not index. The language of the CALL decides that,
@@ -399,8 +420,17 @@ func modeledContainerMethod(m string) bool {
 }
 
 // cinfo returns (creating if needed) the element-taint record for a container node, adopting
-// any reads of that node recorded before it became a tracked container.
+// any reads of that node recorded before it became a tracked container. Every caller is a
+// WRITE (or an invalidation) of the container, so the record is marked as modelling this
+// object's writes; readFieldSlot is the one path that must not claim that.
 func (l *lowerer) cinfo(node string) *containerInfo {
+	ci := l.record(node)
+	ci.modelsWrites = true
+	return ci
+}
+
+// record returns (creating if needed) the element-taint record, claiming nothing about it.
+func (l *lowerer) record(node string) *containerInfo {
 	ci := l.containers[node]
 	if ci == nil {
 		ci = &containerInfo{elems: map[string]string{}, reads: map[string][]string{}}
@@ -460,9 +490,12 @@ func (l *lowerer) noteFieldRead(base, key, reader string) {
 	}
 }
 
-// elemNode returns the synthetic node holding container[key]'s taint (created on first use).
-func (l *lowerer) elemNode(container, key, loc string) string {
-	ci := l.cinfo(container)
+// readFieldSlot returns the element slot a READ of container.field draws its taint from,
+// creating it if nothing has mentioned that field yet. It shares one node with the write
+// side, so the merge that later ties two objects together (aliasReceiverSelf) connects the
+// read to the write whichever of the two the lowering walked first.
+func (l *lowerer) readFieldSlot(container, key, loc string) string {
+	ci := l.record(container)
 	if id := ci.elems[key]; id != "" {
 		return id
 	}
@@ -475,6 +508,13 @@ func (l *lowerer) elemNode(container, key, loc string) string {
 		l.flow(id, reader)
 	}
 	return id
+}
+
+// elemNode returns the synthetic node holding container[key]'s taint (created on first use).
+// The caller is a WRITE, so the record is marked as modelling this object's writes.
+func (l *lowerer) elemNode(container, key, loc string) string {
+	l.cinfo(container)
+	return l.readFieldSlot(container, key, loc)
 }
 
 // constKey resolves a subscript/argument expression to a constant key string (a string or
@@ -711,7 +751,7 @@ func (l *lowerer) compositeKey(a, b nir.Expr, sc *scope) (string, bool) {
 // whitelist maps such as `$files[$request_key]` whose values are compile-time constants.
 func (l *lowerer) containerRead(recv, result string, keyExpr nir.Expr, sc *scope) bool {
 	ci := l.containers[recv]
-	if ci == nil {
+	if ci == nil || !ci.modelsWrites {
 		return false
 	}
 	key, ok := l.constKey(keyExpr, sc)
@@ -734,7 +774,7 @@ func (l *lowerer) containerReadKey(recv, result, key string, ok bool) bool {
 		return false
 	}
 	ci := l.containers[recv]
-	if ci == nil {
+	if ci == nil || !ci.modelsWrites {
 		return false
 	}
 	switch {
@@ -2793,6 +2833,9 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		dynSQLVar:       map[string]bool{},
 		debugPayloadVar: map[string]bool{},
 		lambdaParams:    map[string][]string{},
+		classSelf:       map[string]string{},
+		classCtors:      map[string]string{},
+		paramObjects:    map[string]bool{},
 		directMembers:   map[string]map[string]bool{},
 		classBaseNames:  map[string][]string{},
 		derivedChildren: map[string][]string{},
@@ -3347,6 +3390,7 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 			props["exported"] = "true"
 		}
 		params[p] = l.nodeWithID(sigID(ns, rel, "param", p), "Param", st.Loc, props)
+		l.paramObjects[params[p]] = true
 		order = append(order, p)
 	}
 	fi := &funcInfo{
@@ -3365,11 +3409,44 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 	// A method (no explicit self param[0]) gets a STABLE `this` node, so the receiver at every
 	// call site can be ALIASED to it (field mutations via this reach the receiver object —
 	// object-sensitivity for fluent/builder mutators). Languages with an explicit self param
-	// (Python/Go) keep param[0]; this is the C#-style implicit-this case.
+	// (Python/Go) keep param[0]; this is the implicit-this case.
+	//
+	// The node belongs to the CLASS, not to the method. A field is written by one call
+	// (`this.p = v` in a constructor or a setter) and read by a separate, later one
+	// (`this.p` in a renderer); with a node per method those are two unrelated containers
+	// and the taint stops at the property. One node per class makes them one element slot.
 	if cls != "" && (len(order) == 0 || order[0] != l.selfName) {
-		fi.selfNode = l.nodeWithID(sigID(ns, rel, "self", ""), "Param", st.Loc, map[string]string{"name": "this", "func": st.Name})
+		fi.selfNode = l.classSelfNode(ns, cls, st.Loc)
 	}
+	fi.ctor = isConstructorName(st.Name, cls)
 	return fi
+}
+
+// classSelfNode returns (creating on first use) the class's stable implicit-`this` node.
+func (l *lowerer) classSelfNode(ns, cls, loc string) string {
+	key := ns + "\x1f" + cls
+	if id := l.classSelf[key]; id != "" {
+		return id
+	}
+	id := l.nodeWithID(sigID(ns, cls, "self", ""), "Param", loc, map[string]string{"name": "this", "class": cls})
+	l.classSelf[key] = id
+	l.paramObjects[id] = true
+	return id
+}
+
+// isConstructorName reports whether a method of `cls` is the class's constructor. A
+// construction site names the CLASS, not the method, so resolving `new T(a)` to a body needs
+// the declaration the language spells the constructor with: the class's own name (Java, C#,
+// ActionScript, PHP 4-style) or one of the reserved names.
+func isConstructorName(name, cls string) bool {
+	if cls == "" || name == "" {
+		return false
+	}
+	switch name {
+	case "constructor", "__init__", "__construct":
+		return true
+	}
+	return name == cls
 }
 
 // --- pass 1: registration ----------------------------------------------
@@ -3407,6 +3484,9 @@ func (l *lowerer) aliasReceiverSelf(recv, self string) {
 			for _, reader := range readers {
 				l.addFieldReader(rc, k, reader)
 			}
+		}
+		if sc.modelsWrites {
+			rc.modelsWrites = true
 		}
 	}
 	l.containers[self] = rc // future this.X / recv.X accesses share the same slots
@@ -3560,6 +3640,9 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 			}
 			qual := modkey + "::" + prefix + st.Name
 			info := l.makeFuncInfo(modkey, cls, st)
+			if info.ctor {
+				l.classCtors[modkey+"::"+cls] = qual
+			}
 			l.funcQual[qual] = info
 			l.funcOverloads[qual] = append(l.funcOverloads[qual], info)
 			l.funcShort[st.Name] = append(l.funcShort[st.Name], info)
@@ -3568,6 +3651,7 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 					Qual: qual, Short: st.Name, ParamNames: info.paramNames, Params: info.params,
 					ParamTypes: info.paramTypes, Ret: info.ret, RetType: info.retType, Module: info.module, Cls: info.cls,
 					Name: info.name, ParamEntries: info.paramEntries, ResultEntries: info.resultEntries, Abstract: info.abstract,
+					SelfNode: info.selfNode,
 				})
 			}
 			// recurse into the body to register NESTED LOCAL FUNCTIONS (C# local functions, JS
@@ -3667,15 +3751,16 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if l.curClass != "" && len(st.Params) > 0 && st.Params[0] == l.selfName {
 			inner.setTyp(l.selfName, [2]string{l.curModule, l.curClass})
 		}
-		// languages with no explicit self param (C#, Java, …) still need a STABLE `this` node per
-		// method so `this.Field` writes/reads connect within the method and escape via
-		// `return this` — and so a call site can alias its receiver to it, which is what carries
-		// a value a setter parked on a field to the getter that reads it back.
-		// C#'s self keyword is "this" (the merged multi-language Program loses per-language
-		// SelfName), so key on "this".
-		// Not gated on the class having declared members: that set comes from ClassDef.Members,
-		// which only the C# frontend populates, and it is what the INHERITANCE-AWARE bare
-		// identifier path below needs — an explicitly spelled `this` needs nothing but the node.
+		// languages with no explicit self param (C#, Java, JS/TS, …) need a STABLE `this` node
+		// so `this.Field` writes/reads — and inheritance-aware implicit-`this` member refs —
+		// connect within the method, connect ACROSS the class's methods, and escape via
+		// `return this`. Without it every `this` occurrence is a fresh node with its own
+		// element slots, so a property one method writes is invisible to the method that
+		// reads it. The node is also the alias target a call site merges its receiver into,
+		// which is what carries a value a setter parked on a field to the getter that reads
+		// it back. The keyword is "this" in every language that has no explicit self param
+		// (the merged multi-language Program loses per-language SelfName), so key on "this";
+		// PHP's `$this` maps onto the same node in eval.
 		// Use the STABLE funcInfo.selfNode so call sites can alias the receiver to it.
 		if l.curClass != "" && inner.node["this"] == "" && info != nil && info.selfNode != "" {
 			inner.setNode("this", info.selfNode)
@@ -4291,9 +4376,24 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		n := l.nodeInline("Attr", ex.Loc, props, ex.Attr, ex.Path, "", "")
 		l.flow(base, n)
 		// field-sensitive read: if obj.field was written element-sensitively (directly or via
-		// an alias sharing this base node), pull that slot's taint too. Recorded rather than
-		// merely looked up, so a write that only becomes visible later — the receiver of THIS
-		// call being aliased with a setter's `this` at some other call site — reaches it.
+		// an alias sharing this base node), pull that slot's taint too.
+		slot := ""
+		if ci := l.containers[base]; ci != nil {
+			slot = ci.elems[ex.Attr]
+		}
+		// A value that entered this function from OUTSIDE it (a parameter, or the implicit
+		// `this`) is written by another function, and bodies are lowered in source order,
+		// which is not execution order: the write may not have been seen yet. Materialize
+		// the slot on the read as well, so the merge that later ties this parameter to the
+		// caller's object (aliasReceiverSelf) connects the two slots in both directions.
+		if slot == "" && l.paramObjects[base] {
+			slot = l.readFieldSlot(base, ex.Attr, ex.Loc)
+		}
+		l.flow(slot, n)
+		// Recorded rather than merely looked up, so a read on a base that is not (yet) a
+		// tracked container — a local holding an object, not a parameter — still reaches a
+		// write that only becomes visible later, when the base turns into a container or is
+		// aliased with one at a call site.
 		l.noteFieldRead(base, ex.Attr, n)
 		return n
 	case nir.Index:
@@ -5008,6 +5108,12 @@ func (l *lowerer) typedBindingNode(val, typ string) string {
 	}
 	typed := l.nodeInline("Name", loc, map[string]string{"decl_type": typ}, typ, typ, "", "")
 	l.flow(val, typed)
+	// The typed node stands for the SAME object under its declared type, so it holds the same
+	// field slots. Without carrying them, `Holder h = new Holder(x); h.run()` loses the identity
+	// between the object the constructor filled and the variable a later call reads it back on.
+	if ci := l.containers[val]; ci != nil {
+		l.containers[typed] = ci
+	}
 	return typed
 }
 
@@ -5459,9 +5565,18 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// arg NOT mapped to any resolved param keeps the conservative direct `arg → result` edge
 	// (unknown/library callee, or a vararg beyond the param list), preserving recall there.
 	targets, reachOnly := l.resolveTargets(call.Callee, sc)
+	// A construction has no syntactic receiver: the object the constructor runs on is the
+	// call's own result. Standing it in as the receiver is what maps the arguments past an
+	// explicit `self` parameter and aliases the new object with the class's `this`, so a
+	// property the constructor stores is readable from every other method of the class.
+	ctorCall := recvNode == "" && len(targets) > 0 && targets[0].ctor
+	recvForTargets := recvNode
+	if ctorCall {
+		recvForTargets = result
+	}
 	// resolution keys a call by name, which cannot tell two declarations of the same name
 	// apart; the call site's own argument count can. See selectOverloads.
-	targets = l.selectOverloads(targets, len(args), recvNode)
+	targets = l.selectOverloads(targets, len(args), recvForTargets)
 	dynamicCallback := len(targets) == 0 && l.dynamicFunctionParamCall(call.Callee, sc)
 	if dynamicCallback {
 		targets = l.dynamicCallbackTargets()
@@ -5491,12 +5606,12 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			l.flow(target.ret, result)
 			continue
 		}
-		paramOffset := l.paramOffset(target, recvNode)
+		paramOffset := l.paramOffset(target, recvForTargets)
 		if paramOffset == 1 {
 			selfParam := target.params[target.paramNames[0]]
-			l.flow(recvNode, selfParam)
-			if l.containers[recvNode] != nil {
-				l.aliasReceiverSelf(recvNode, selfParam)
+			l.flow(recvForTargets, selfParam)
+			if l.containers[recvForTargets] != nil {
+				l.aliasReceiverSelf(recvForTargets, selfParam)
 			}
 		}
 		for i, a := range args {
@@ -5504,13 +5619,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			if paramIndex < len(target.paramNames) {
 				pnode := target.params[target.paramNames[paramIndex]]
 				l.flow(a, pnode)
-				// cross-method object identity: C# objects are reference types, so a field
+				// cross-method object identity: an object argument is a reference, so a field
 				// mutation inside the callee (`p.field = …` / `p.list.Add(…)`) is visible to the
 				// CALLER's object. Share the container (field slots) between the arg and the param
 				// — bidirectional, so both the callee reading the arg's existing field taint AND
-				// the caller seeing the callee's mutations work. Only fires when the arg carries
-				// field/element slots (an object/collection), so scalars are unaffected.
-				if l.containers[argVals[i]] != nil {
+				// the caller seeing the callee's mutations work. It fires when EITHER side has a
+				// field so far: the caller's object when the write is in the caller, the parameter
+				// when the write is inside the callee. A scalar has fields on neither side, so it
+				// is still unaffected.
+				if l.containers[argVals[i]] != nil || l.containers[pnode] != nil {
 					l.aliasReceiverSelf(argVals[i], pnode)
 				}
 				mapped[i] = true
@@ -5526,8 +5643,8 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		// mutations performed via `this` inside the method reach the receiver object (and reads
 		// of the receiver's fields are visible inside the method). Enables fluent/builder
 		// mutators whose bodies update fields on the receiver.
-		if recvNode != "" && target.selfNode != "" {
-			l.aliasReceiverSelf(recvNode, target.selfNode)
+		if recvForTargets != "" && target.selfNode != "" {
+			l.aliasReceiverSelf(recvForTargets, target.selfNode)
 		}
 		for _, entry := range target.resultEntries {
 			if len(entry.Tokens) > 0 {
@@ -5544,8 +5661,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// wrapper-object taint: `new T(taintedArg)` builds an object that CONTAINS its args, so the
 	// constructed object (result) carries each arg's taint — even when the ctor body is resolved
 	// (args mapped to params). Lets a tainted value wrapped in an object propagate through it
-	// FN-safe over-approximation.
-	if call.IsCtor {
+	// FN-safe over-approximation. ctorCall carries the same fact for the languages whose
+	// frontend does not mark `new` on the call.
+	if call.IsCtor || ctorCall {
 		for _, av := range argVals {
 			l.flow(av, result)
 		}
@@ -5920,6 +6038,15 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 		if l.curClass != "" {
 			if f := l.funcQual[l.curModule+"::"+l.curClass+"."+nm]; f != nil {
 				return []*funcInfo{f}, false
+			}
+		}
+		// `new T(a)` — and, in languages that spell construction as a plain call, `T(a)` —
+		// runs T's constructor. The callee names the CLASS, so no lookup keyed by the method
+		// name can find that body; without this the arguments never reach it and a property
+		// the constructor stores is not tainted by what was passed in.
+		if cm, ok := l.classModule(nm, imports); ok {
+			if qual := l.classCtors[cm+"::"+nm]; qual != "" {
+				return l.funcOverloads[qual], false
 			}
 		}
 		if f, ok := l.uniqueTechFuncInfo(l.funcShort[nm]); ok { // guarded fallback
