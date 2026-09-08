@@ -139,7 +139,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 			rec := &recordingStore{Store: base, d: &moduleDelta{}}
 			l.g = rec
 			body := l.bodyOf(m)
-			l.block(body.Body, l.moduleScope(body))
+			l.lowerModuleBody(body)
 			l.g = base
 			fresh[ns] = true
 			sync.MarkFresh(ns)
@@ -158,7 +158,7 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		rec := &recordingStore{Store: base, d: &moduleDelta{}}
 		l.g = rec
 		body := l.bodyOf(m)
-		l.block(body.Body, l.moduleScope(body))
+		l.lowerModuleBody(body)
 		l.g = base
 		writes[keys[i]] = encodeDelta(rec.d)
 		fresh[ns] = true
