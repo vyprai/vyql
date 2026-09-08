@@ -1058,6 +1058,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccStackFallbackStrideUnderallocObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowDeclaredBoundsCheckObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowingCastBoundsCheckObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccBufferRelocationOriginObservations(n)...)
 		}
 		return []nir.Stmt{nir.FuncDef{
 			Name:          name,
@@ -5391,6 +5392,363 @@ func ccRelationalOpBefore(text string, start int) bool {
 		return false
 	}
 	return pos == 0 || text[pos-1] != text[pos] // '<<' and '>>' shift
+}
+
+// ccRawCopyCallees are the raw byte copies this observation reads an origin
+// from: the two spellings whose first argument is the destination and whose
+// second is the source. bcopy is deliberately absent -- its operands run the
+// other way round, and reading it in this order would name the destination as
+// the origin the bytes came from.
+var ccRawCopyCallees = map[string]bool{"memmove": true, "memcpy": true}
+
+// ccBufferRelocationCopy is one raw copy in a routine: the pointer the bytes
+// landed on and the pointer they started from. The copy's contract puts the
+// byte that was at the source at the destination, so a saved position that
+// points inside the copied bytes keeps naming its own byte only when it moves
+// by destination - source. Every other displacement moves it somewhere else.
+type ccBufferRelocationCopy struct {
+	callee string
+	dest   string
+	origin string
+	// end is the byte the copy call ends at, so that a difference can be
+	// required to reach its call after the bytes it claims to follow moved.
+	end uint
+}
+
+// ccBufferDisplacement is one pointer difference the routine hands to a call:
+// the two operands as keys, the difference as written, the callee it reaches
+// and where it is written.
+type ccBufferDisplacement struct {
+	minuend    string
+	subtrahend string
+	text       string
+	applied    string
+	loc        string
+	// useAt is the byte the call that receives the difference starts at.
+	useAt uint
+}
+
+// ccBufferRelocationOriginObservations reports a routine that relocates a
+// buffer with a raw copy and then rebases from a pointer the copy did not
+// start from: the copy carried the bytes from `origin` to `destination`, and a
+// displacement `destination - other` reaches a call in the same routine.
+// Whether the rebased values are cursors into the copied bytes, and whether
+// the difference is therefore a bug, stay the rule's questions; what the
+// frontend can see and nothing downstream could reconstruct is which pointer
+// the copy read from, because a binding predicate tests one context token at a
+// time and cannot relate the copy's source operand to the displacement's.
+//
+// The displacement reaches the call either directly (f(buf - bot)) or through
+// a local the routine binds it to and then passes (d = buf - bot; f(d)). A
+// difference that is merely computed and never handed anywhere is not read:
+// the relocation this names is one that moves other people's saved positions.
+func (c *ccConv) ccBufferRelocationOriginObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	copies, displacements, aliases := c.ccBufferRelocationSites(fn, body)
+	if len(copies) == 0 || len(displacements) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []nir.Stmt
+	for _, d := range displacements {
+		cp, ok := ccRelocationCopyFor(copies, d)
+		if !ok || ccPointerDerivedFrom(aliases, d.minuend, d.subtrahend) {
+			continue
+		}
+		key := d.loc + "|" + d.text
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		path := "analysis.buffer_relocation.displacement_not_copy_origin"
+		out = append(out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: path, Loc: d.loc},
+			Args: []nir.Expr{
+				nir.Const{Loc: d.loc, Value: "copy=" + cp.callee},
+				nir.Const{Loc: d.loc, Value: "destination=" + cp.dest},
+				nir.Const{Loc: d.loc, Value: "origin=" + cp.origin},
+				nir.Const{Loc: d.loc, Value: "displacement=" + d.text},
+				nir.Const{Loc: d.loc, Value: "applied=" + d.applied},
+			},
+			Path:   path,
+			Method: "displacement_not_copy_origin",
+			Loc:    d.loc,
+		}})
+	}
+	return out
+}
+
+// ccRelocationCopyFor pairs a displacement with the copy that landed bytes on
+// its minuend, and reports it only when no such copy started from its
+// subtrahend. A routine that relocates twice into the same destination is
+// quiet as soon as one of those copies read from the pointer the displacement
+// subtracts: that difference is then some copy's own, and naming it would be
+// reporting the correct form.
+//
+// The difference has to reach its call after the copy. One computed before the
+// bytes moved is measuring the destination as it stood, which is a length, not
+// a rebase of positions the copy carried.
+func ccRelocationCopyFor(copies []ccBufferRelocationCopy, d ccBufferDisplacement) (ccBufferRelocationCopy, bool) {
+	var found ccBufferRelocationCopy
+	ok := false
+	for _, cp := range copies {
+		if cp.dest != d.minuend || cp.end > d.useAt {
+			continue
+		}
+		if cp.origin == d.subtrahend {
+			return ccBufferRelocationCopy{}, false
+		}
+		if !ok {
+			found, ok = cp, true
+		}
+	}
+	return found, ok
+}
+
+// ccPointerDerivedFrom reports whether one name in the routine was ever
+// written from the other, following the chains of plain pointer copies. A
+// destination derived from the pointer the difference subtracts names the same
+// allocation as it does, so the difference is an offset inside one buffer --
+// how far a write cursor has advanced -- and not a displacement between two.
+// Every pointer a name was written from counts, because a routine that wrote
+// the subtracted pointer into the destination even once has not shown the two
+// to be separate allocations.
+func ccPointerDerivedFrom(aliases map[string][]string, name, origin string) bool {
+	seen := map[string]bool{name: true}
+	queue := []string{name}
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		for _, src := range aliases[cur] {
+			if src == origin {
+				return true
+			}
+			if !seen[src] {
+				seen[src] = true
+				queue = append(queue, src)
+			}
+		}
+	}
+	return false
+}
+
+// ccBufferRelocationSites walks a routine once for all three parts of the
+// fact: every raw copy between two named pointers, every pointer difference
+// that reaches a call, and the plain pointer copies that tell which names hold
+// the same allocation. A difference bound to a local is carried only while the
+// binding is unambiguous -- a name assigned two different differences names
+// neither at the call that passes it.
+func (c *ccConv) ccBufferRelocationSites(fn, body *tree_sitter.Node) ([]ccBufferRelocationCopy, []ccBufferDisplacement, map[string][]string) {
+	var copies []ccBufferRelocationCopy
+	var out []ccBufferDisplacement
+	scalars := c.ccNonPointerDeclaredNames(fn)
+	aliases := map[string][]string{}
+	bound := map[string]*ccBufferDisplacement{}
+	type namePass struct {
+		name, applied string
+		useAt         uint
+	}
+	var passes []namePass
+
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "call_expression":
+			callee := lastSeg(c.dotted(c.field(n, "function")))
+			args := c.namedChildren(c.field(n, "arguments"))
+			if ccRawCopyCallees[callee] {
+				if len(args) >= 3 {
+					dest := ccPointerAtomKey(c, args[0])
+					origin := ccPointerAtomKey(c, args[1])
+					if dest != "" && origin != "" && dest != origin {
+						copies = append(copies, ccBufferRelocationCopy{callee: callee, dest: dest, origin: origin, end: n.EndByte()})
+					}
+				}
+				break // a copy's own size argument is not a rebase
+			}
+			for _, a := range args {
+				if d, ok := c.ccPointerDisplacement(a, scalars); ok {
+					d.applied, d.useAt = callee, n.StartByte()
+					out = append(out, d)
+					continue
+				}
+				if name := ccIdentifierText(c, a); name != "" {
+					passes = append(passes, namePass{name: name, applied: callee, useAt: n.StartByte()})
+				}
+			}
+		case "init_declarator":
+			c.ccBindPointerWrite(bound, aliases, scalars, c.declName(c.field(n, "declarator")), c.field(n, "value"))
+		case "assignment_expression":
+			if c.assignmentOp(n) == "=" {
+				c.ccBindPointerWrite(bound, aliases, scalars, ccPointerAtomKey(c, c.field(n, "left")), c.field(n, "right"))
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+
+	for _, p := range passes {
+		d := bound[p.name]
+		if d == nil {
+			continue
+		}
+		carried := *d
+		carried.applied, carried.useAt = p.applied, p.useAt
+		out = append(out, carried)
+	}
+	return copies, out, aliases
+}
+
+// ccBindPointerWrite reads one write to a name: the pointer difference it now
+// holds, or the pointer it was copied from. A name assigned a second, different
+// difference holds neither at the call that passes it, and one written twice
+// from different pointers aliases neither.
+func (c *ccConv) ccBindPointerWrite(bound map[string]*ccBufferDisplacement, aliases map[string][]string, scalars map[string]bool, name string, value *tree_sitter.Node) {
+	if name == "" || value == nil {
+		return
+	}
+	if c.kind(value) == "assignment_expression" {
+		// a = b = p writes one pointer to both names at once, so neither is
+		// the other's origin and the two run in both directions.
+		if other := ccPointerAtomKey(c, c.field(value, "left")); other != "" {
+			ccNoteAlias(aliases, name, other)
+			ccNoteAlias(aliases, other, name)
+		}
+		return
+	}
+	if d, ok := c.ccPointerDisplacement(value, scalars); ok {
+		if prev, seen := bound[name]; seen && (prev == nil || prev.text != d.text) {
+			bound[name] = nil
+			return
+		}
+		bound[name] = &d
+		return
+	}
+	if src := ccPointerAtomKey(c, value); src != "" {
+		ccNoteAlias(aliases, name, src)
+	}
+}
+
+// ccNoteAlias records that one name was written from another. A name written
+// from several pointers keeps all of them: which one it holds at the
+// difference is a question this walk does not answer, and each is a reason to
+// doubt that the two names are separate allocations.
+func ccNoteAlias(aliases map[string][]string, name, src string) {
+	if name == "" || src == "" || name == src {
+		return
+	}
+	for _, prev := range aliases[name] {
+		if prev == src {
+			return
+		}
+	}
+	aliases[name] = append(aliases[name], src)
+}
+
+// ccPointerDisplacement reads an expression written as one named pointer minus
+// another -- through the casts and parentheses a ptrdiff_t difference is
+// usually written with -- and returns its operands. A difference with a
+// computed operand has no key on that side and is not read: the observation
+// compares operands to a copy's, and an operand it cannot name cannot match
+// one. An operand this routine declares at a non-pointer type is not read
+// either, because subtracting a count from a pointer walks inside one buffer
+// and states nothing about where a copy started.
+func (c *ccConv) ccPointerDisplacement(n *tree_sitter.Node, scalars map[string]bool) (ccBufferDisplacement, bool) {
+	n = ccUnwrapCExpr(n)
+	if n == nil || c.kind(n) != "binary_expression" || c.text(c.field(n, "operator")) != "-" {
+		return ccBufferDisplacement{}, false
+	}
+	minuend := ccPointerAtomKey(c, c.field(n, "left"))
+	subtrahend := ccPointerAtomKey(c, c.field(n, "right"))
+	if minuend == "" || subtrahend == "" || minuend == subtrahend {
+		return ccBufferDisplacement{}, false
+	}
+	if scalars[minuend] || scalars[subtrahend] {
+		return ccBufferDisplacement{}, false // p - n advances a pointer, it does not measure one
+	}
+	return ccBufferDisplacement{
+		minuend:    minuend,
+		subtrahend: subtrahend,
+		text:       compactCExprText(c.text(n)),
+		loc:        c.loc(n),
+	}, true
+}
+
+// ccNonPointerDeclaredNames names the parameters and locals a routine declares
+// at a non-pointer type, read from the declarators alone so that no type table
+// is needed: a pointer, array or reference declarator is a pointer here and
+// everything else a scalar. A name the routine does not declare -- a member, a
+// global, a name from an enclosing scope -- is in neither set, and is read as
+// a pointer wherever a copy's operand says it is one.
+func (c *ccConv) ccNonPointerDeclaredNames(fn *tree_sitter.Node) map[string]bool {
+	scalars := map[string]bool{}
+	note := func(decl *tree_sitter.Node) {
+		if decl == nil {
+			return
+		}
+		if c.kind(decl) == "init_declarator" {
+			decl = c.field(decl, "declarator")
+		}
+		switch c.kind(decl) {
+		case "pointer_declarator", "array_declarator", "reference_declarator", "function_declarator":
+			return
+		}
+		if name := c.declName(decl); name != "" {
+			scalars[name] = true
+		}
+	}
+	if pl := c.paramList(c.field(fn, "declarator")); pl != nil {
+		for _, ch := range c.namedChildren(pl) {
+			if isCParamDecl(c.kind(ch)) {
+				note(c.field(ch, "declarator"))
+			}
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "declaration" {
+			for _, ch := range c.namedChildren(n) {
+				note(ch)
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(c.field(fn, "body"))
+	return scalars
+}
+
+// ccPointerAtomKey normalizes a pointer-valued operand to the text two facts
+// can be compared by: a bare name, or a member selection in dotted form so
+// that `r->base` and `r.base` read alike. Anything else -- a call, a
+// subscript, an arithmetic expression, a literal -- has no key, because a copy
+// whose origin is itself computed states no single pointer to compare against.
+func ccPointerAtomKey(c *ccConv, n *tree_sitter.Node) string {
+	n = ccUnwrapCExpr(n)
+	if n == nil {
+		return ""
+	}
+	if id := ccIdentifierText(c, n); id != "" {
+		return id
+	}
+	if c.kind(n) == "field_expression" {
+		if key := c.dotted(n); key != "" && !strings.Contains(key, "?") {
+			return key
+		}
+	}
+	return ""
 }
 
 func (c *ccConv) ccPostCopyMissingBoundsObservations(fn *tree_sitter.Node) []nir.Stmt {
