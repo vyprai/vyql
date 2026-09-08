@@ -1776,15 +1776,16 @@ func (c *phConv) phpElse(n *tree_sitter.Node) []nir.Stmt {
 
 // phpCondLower splits a condition into the assignments it performs and the expression that
 // is then tested. PHP writes the read and the test together — `while ($row = db_fetch_row($res))`,
-// `if ($row = db_fetch_assoc($res))`, `while (($row = f()) !== false)` — and the condition
-// used to be lowered as an expression only, which kept the call but emitted no definition:
-// $row was unbound everywhere in the body, so a database value read through the idiomatic
-// loop reached nothing. The caller places the returned statements ahead of the body the
-// condition dominates, exactly as foreach_statement binds its loop variables.
+// `if ($row = db_fetch_assoc($res))`, `while (($row = f()) !== false)`. Lowering such a
+// condition as an expression alone keeps the call but emits no definition, which leaves $row
+// unbound throughout the body, so a database value read through the idiomatic loop reaches
+// nothing. Splitting the assignment out binds the variable: the caller places the returned
+// statements ahead of the body the condition dominates, exactly as foreach_statement binds
+// its loop variables.
 //
 // The tested expression refers to the assigned variable instead of repeating the
 // assignment, so the call is lowered once and a call in condition position that is itself a
-// sink is not reported twice. A condition with no assignment in it lowers as before.
+// sink is not reported twice. A condition holding no assignment lowers as a plain expression.
 func (c *phConv) phpCondLower(cond *tree_sitter.Node) ([]nir.Stmt, nir.Expr) {
 	if !c.phpCondHasAssign(cond) {
 		return nil, c.expr(cond)
