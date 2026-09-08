@@ -1055,6 +1055,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccJpegSetjmpConstructorObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccParsedUserDefaultRootObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccUncheckedNullableResultDerefObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccNullExclusionObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccConditionalFallbackDoubleFreeObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccGlibCommandLineAssemblyObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccWebRequestPathTraversalObservations(n)...)
@@ -7674,6 +7675,507 @@ func (c *ccConv) ccNullCheckedMacroArgs() map[string][]bool {
 	}
 	c.nullCheckMacroArgs = out
 	return out
+}
+
+// ccStoredCallPointer is a local holding the result of a call: the pointer the
+// null-exclusion observation follows, the call that produced it, where the
+// store is written and where it ends.
+type ccStoredCallPointer struct {
+	name   string
+	source string
+	at     uint
+	after  uint
+}
+
+// ccNullFact is what holding a condition says about one pointer: that it is
+// null, that it is not, or nothing.
+type ccNullFact int
+
+const (
+	ccNullUnknown ccNullFact = iota
+	ccNullIsNull
+	ccNullNonNull
+)
+
+// ccNullExclusion is the answer for one use: whether a guard excludes null on
+// the path that reaches it, which guard did, and the connective joining the
+// null test that decided to the rest of its condition.
+type ccNullExclusion struct {
+	excluded   bool
+	guard      string
+	connective string
+}
+
+// ccNoReturnCalls do not return, so a branch that calls one leaves the
+// statement list the same way `return` does.
+var ccNoReturnCalls = map[string]bool{
+	"exit": true, "_exit": true, "_Exit": true, "abort": true,
+	"longjmp": true, "siglongjmp": true, "__builtin_unreachable": true,
+}
+
+// ccNullExclusionObservations records what the guards on the path to a
+// dereference prove about the pointer being dereferenced. A call result stored
+// into a local is the nullable pointer of C, and whether the dereference is
+// reached with it null turns on the branch taken and on the connective joining
+// the null test to the rest of the condition:
+//
+//	s = strchr(p, '(');
+//	if (!s && p[i - 1] != ')') err(); else *s = 0;   /* reached with s null */
+//	if (!s || p[i - 1] != ')') err(); else *s = 0;   /* not reached */
+//
+// One operator apart. A disjunction that is false has every disjunct false, so
+// `!s` is false and s is non-null on the else path; a conjunction that is false
+// has only one of them false, which proves nothing about s. The condition is
+// read as a boolean tree over null atoms and evaluated for the branch the use
+// sits in, so the connective decides the answer instead of being invisible.
+//
+// The fact names the guard that excluded null -- the branch test, an early
+// return, a file-local check macro -- or says a null test stood on the path and
+// did not exclude it, which is what the guarded and unguarded revisions of a
+// fixed null dereference differ by.
+func (c *ccConv) ccNullExclusionObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	stores := c.ccStoredCallPointers(body)
+	var out []nir.Stmt
+	for i, store := range stores {
+		until := uint(len(c.src))
+		for _, later := range stores[i+1:] {
+			if later.name == store.name {
+				until = later.at
+				break
+			}
+		}
+		use, useKind := c.ccFirstFaultingUse(body, store.name, store.after, until)
+		if use == nil {
+			continue
+		}
+		loc := c.loc(use)
+		ex := c.ccNullExclusionOnPath(body, use, store.name, store.after)
+		path, method, exclusion := "analysis.null_exclusion.unguarded_deref", "unguarded_deref", "exclusion=none"
+		if ex.excluded {
+			path, method, exclusion = "analysis.null_exclusion.deref", "deref", "exclusion=guarded"
+		}
+		out = append(out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: path, Loc: loc},
+			Args: []nir.Expr{
+				nir.Const{Loc: loc, Value: "source=" + store.source},
+				nir.Const{Loc: loc, Value: "use=" + useKind},
+				nir.Const{Loc: loc, Value: exclusion},
+				nir.Const{Loc: loc, Value: "guard=" + ex.guard},
+				nir.Const{Loc: loc, Value: "connective=" + ex.connective},
+			},
+			Path:   path,
+			Method: method,
+			Loc:    loc,
+		}})
+	}
+	return out
+}
+
+// ccStoredCallPointers lists the locals a call result is stored into, in source
+// order, from both spellings of the store: the declaration with an initialiser
+// and the plain assignment.
+func (c *ccConv) ccStoredCallPointers(body *tree_sitter.Node) []ccStoredCallPointer {
+	var out []ccStoredCallPointer
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "init_declarator":
+			if source, ok := c.ccCallResultSource(c.field(n, "value")); ok {
+				if name := c.declName(c.field(n, "declarator")); name != "" {
+					out = append(out, ccStoredCallPointer{name: name, source: source, at: n.StartByte(), after: n.EndByte()})
+				}
+			}
+		case "assignment_expression":
+			left := c.field(n, "left")
+			if c.assignmentOp(n) == "=" && c.kind(left) == "identifier" {
+				if source, ok := c.ccCallResultSource(c.field(n, "right")); ok {
+					out = append(out, ccStoredCallPointer{name: c.text(left), source: source, at: n.StartByte(), after: n.EndByte()})
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	sort.Slice(out, func(i, j int) bool { return out[i].at < out[j].at })
+	return out
+}
+
+// ccCallResultSource names the function whose result an expression is, looking
+// through the casts a C store writes around it. The C++ named casts are spelled
+// as a call wrapping the call that produced the value, so the name to record is
+// what they wrap.
+func (c *ccConv) ccCallResultSource(value *tree_sitter.Node) (string, bool) {
+	call := ccUnwrapCExpr(value)
+	if call == nil || c.kind(call) != "call_expression" {
+		return "", false
+	}
+	fn := c.field(call, "function")
+	if c.kind(fn) == "template_function" && ccNamedCasts[c.text(c.field(fn, "name"))] {
+		if args := c.namedChildren(c.field(call, "arguments")); len(args) == 1 {
+			return c.ccCallResultSource(args[0])
+		}
+	}
+	name := lastSeg(c.dotted(fn))
+	if name == "" || name == "?" {
+		return "", false
+	}
+	return name, true
+}
+
+// ccNamedCasts are the C++ casts, which the grammar shapes as a call.
+var ccNamedCasts = map[string]bool{
+	"static_cast": true, "reinterpret_cast": true, "const_cast": true, "dynamic_cast": true,
+}
+
+// ccCondValue unwraps the condition_clause the C++ grammar puts between an
+// if_statement and its condition; the C grammar holds the expression directly.
+func (c *ccConv) ccCondValue(n *tree_sitter.Node) *tree_sitter.Node {
+	if n != nil && c.kind(n) == "condition_clause" {
+		if v := c.field(n, "value"); v != nil {
+			return v
+		}
+	}
+	return n
+}
+
+// ccFirstFaultingUse finds the first use of the stored pointer that would fault
+// on null -- a dereference, a member access through it, or a subscript of it --
+// between the store and whatever store replaces it. Reads that only observe the
+// value, `s + 1` handed to a call among them, do not fault and are not uses.
+func (c *ccConv) ccFirstFaultingUse(body *tree_sitter.Node, name string, after, until uint) (*tree_sitter.Node, string) {
+	var found *tree_sitter.Node
+	var kind string
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || n.StartByte() >= until {
+			return
+		}
+		if n.StartByte() >= after {
+			if k, ok := c.ccFaultingUseKind(n, name); ok {
+				if found == nil || n.StartByte() < found.StartByte() {
+					found, kind = n, k
+				}
+				return
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return found, kind
+}
+
+// ccFaultingUseKind names the way a node uses the pointer if that use faults
+// when the pointer is null.
+func (c *ccConv) ccFaultingUseKind(n *tree_sitter.Node, name string) (string, bool) {
+	switch c.kind(n) {
+	case "pointer_expression", "unary_expression":
+		if c.unaryOp(n) == "*" && c.ccNamesPointer(c.field(n, "argument"), name) {
+			return "dereference", true
+		}
+	case "field_expression":
+		if c.ccFieldThroughPointer(n) && c.ccNamesPointer(c.field(n, "argument"), name) {
+			return "member", true
+		}
+	case "subscript_expression":
+		if c.ccNamesPointer(c.field(n, "argument"), name) {
+			return "subscript", true
+		}
+	}
+	return "", false
+}
+
+// ccFieldThroughPointer reports whether a member access reads through a pointer
+// (`s->f`) rather than out of a value (`s.f`).
+func (c *ccConv) ccFieldThroughPointer(n *tree_sitter.Node) bool {
+	arg, fld := c.field(n, "argument"), c.field(n, "field")
+	if arg == nil || fld == nil || fld.StartByte() < arg.EndByte() {
+		return false
+	}
+	return strings.Contains(string(c.src[arg.EndByte():fld.StartByte()]), "->")
+}
+
+// ccNamesPointer reports whether an expression is the bare pointer, through the
+// parentheses and casts a use writes around it.
+func (c *ccConv) ccNamesPointer(n *tree_sitter.Node, name string) bool {
+	n = ccUnwrapCExpr(n)
+	return n != nil && c.kind(n) == "identifier" && c.text(n) == name
+}
+
+// ccNullExclusionOnPath walks out from the use to the function body and asks of
+// every guard on the way what it proves about the pointer: the branch tests the
+// use sits under, the guards earlier in each enclosing statement list that
+// leave when the pointer is null, and the file-local check macros invoked on
+// it. A guard positioned before the store proves nothing about what the store
+// wrote and is skipped.
+func (c *ccConv) ccNullExclusionOnPath(body, use *tree_sitter.Node, name string, after uint) ccNullExclusion {
+	res := ccNullExclusion{guard: "none", connective: "none"}
+	macros := c.ccNullCheckedMacroArgs()
+	note := func(cond *tree_sitter.Node) {
+		if !res.excluded && res.guard == "none" {
+			res.guard = "null_test_not_excluding"
+			res.connective = c.ccNullTestConnective(cond)
+		}
+	}
+	for cur := use; cur != nil; cur = cur.Parent() {
+		parent := cur.Parent()
+		if parent == nil {
+			break
+		}
+		switch c.kind(parent) {
+		case "if_statement":
+			cond := c.field(parent, "condition")
+			if cond == nil || cond.StartByte() < after || sameCNode(cond, cur) {
+				break
+			}
+			alt := c.field(parent, "alternative")
+			inElse := alt != nil && sameCNode(alt, cur)
+			if c.ccNullFactOf(cond, name, inElse) == ccNullNonNull {
+				return ccNullExclusion{excluded: true, guard: "branch_null_test", connective: c.ccNullTestConnective(cond)}
+			}
+			if c.ccMentionsNullTest(cond, name) {
+				note(cond)
+			}
+		case "binary_expression":
+			// A short-circuit operand is a branch too: the right operand of
+			// `&&` is evaluated only when the left holds, and the right operand
+			// of `||` only when it does not.
+			op := c.text(c.field(parent, "operator"))
+			left := c.field(parent, "left")
+			if op != "&&" && op != "||" || left == nil || left.StartByte() < after || !sameCNode(c.field(parent, "right"), cur) {
+				break
+			}
+			if c.ccNullFactOf(left, name, op == "||") == ccNullNonNull {
+				return ccNullExclusion{excluded: true, guard: "short_circuit_null_test", connective: c.ccNullTestConnective(parent)}
+			}
+			if c.ccMentionsNullTest(left, name) {
+				note(parent)
+			}
+		case "conditional_expression":
+			cond := c.field(parent, "condition")
+			if cond == nil || cond.StartByte() < after || sameCNode(cond, cur) {
+				break
+			}
+			inElse := sameCNode(c.field(parent, "alternative"), cur)
+			if c.ccNullFactOf(cond, name, inElse) == ccNullNonNull {
+				return ccNullExclusion{excluded: true, guard: "branch_null_test", connective: c.ccNullTestConnective(cond)}
+			}
+			if c.ccMentionsNullTest(cond, name) {
+				note(cond)
+			}
+		case "compound_statement":
+			for _, sib := range c.namedChildren(parent) {
+				if sib.StartByte() >= cur.StartByte() {
+					break
+				}
+				switch c.kind(sib) {
+				case "if_statement":
+					cond := c.field(sib, "condition")
+					if cond == nil || cond.StartByte() < after {
+						continue
+					}
+					// The statements after a branch that leaves are reached
+					// with the condition false, so what excludes null here is
+					// what the else of the same test would exclude.
+					if c.ccNullFactOf(cond, name, true) == ccNullNonNull && c.ccBranchLeaves(c.field(sib, "consequence")) {
+						return ccNullExclusion{excluded: true, guard: "early_return_null_test", connective: c.ccNullTestConnective(cond)}
+					}
+					if c.ccMentionsNullTest(cond, name) {
+						note(cond)
+					}
+				case "expression_statement":
+					if c.ccMacroChecksPointer(sib, name, macros) {
+						return ccNullExclusion{excluded: true, guard: "macro_null_check", connective: "simple"}
+					}
+				}
+			}
+		}
+		if sameCNode(parent, body) {
+			break
+		}
+	}
+	return res
+}
+
+// ccNullFactOf reports what the condition, held true -- or held false when
+// negated -- proves about the pointer. The connectives are read as the boolean
+// operators they are: a conjunction that holds carries every operand's proof, a
+// disjunction that holds carries only what all of its operands agree on, and
+// negation is pushed through both.
+func (c *ccConv) ccNullFactOf(n *tree_sitter.Node, name string, negated bool) ccNullFact {
+	n = c.ccCondValue(n)
+	if n == nil {
+		return ccNullUnknown
+	}
+	switch c.kind(n) {
+	case "parenthesized_expression", "cast_expression":
+		return c.ccNullFactOf(ccUnwrapCExpr(n), name, negated)
+	case "unary_expression":
+		if c.unaryOp(n) == "!" {
+			return c.ccNullFactOf(c.field(n, "argument"), name, !negated)
+		}
+	case "binary_expression":
+		left, right := c.field(n, "left"), c.field(n, "right")
+		op := c.text(c.field(n, "operator"))
+		switch op {
+		case "&&", "||":
+			l := c.ccNullFactOf(left, name, negated)
+			r := c.ccNullFactOf(right, name, negated)
+			// De Morgan: a negated conjunction is a disjunction of the
+			// negated operands, and the operands are already negated here.
+			if (op == "&&") != negated {
+				return ccNullFactAnd(l, r)
+			}
+			return ccNullFactOr(l, r)
+		case "==":
+			if c.ccNullComparison(left, right, name) {
+				return ccNullFactNegate(ccNullIsNull, negated)
+			}
+		case "!=":
+			if c.ccNullComparison(left, right, name) {
+				return ccNullFactNegate(ccNullNonNull, negated)
+			}
+		}
+	case "identifier":
+		if c.text(n) == name {
+			return ccNullFactNegate(ccNullNonNull, negated)
+		}
+	}
+	return ccNullUnknown
+}
+
+// ccMentionsNullTest reports whether a condition tests the pointer against null
+// at all, whichever branch of it the use sits in. A test that is present and
+// excludes nothing is not the same fact as no test at all: it is the shape a
+// null dereference behind a mis-joined guard has.
+func (c *ccConv) ccMentionsNullTest(cond *tree_sitter.Node, name string) bool {
+	return c.ccNullFactOf(cond, name, false) != ccNullUnknown ||
+		c.ccNullFactOf(cond, name, true) != ccNullUnknown
+}
+
+// ccNullComparison reports whether a comparison stands the pointer against a
+// null constant, either way round.
+func (c *ccConv) ccNullComparison(left, right *tree_sitter.Node, name string) bool {
+	return c.ccNamesPointer(left, name) && c.isNullExpr(ccUnwrapCExpr(right)) ||
+		c.ccNamesPointer(right, name) && c.isNullExpr(ccUnwrapCExpr(left))
+}
+
+// ccNullFactAnd combines the operands of a conjunction that holds: every
+// operand holds, so whatever any one of them proves is proved.
+func ccNullFactAnd(a, b ccNullFact) ccNullFact {
+	switch {
+	case a == ccNullNonNull || b == ccNullNonNull:
+		return ccNullNonNull
+	case a == ccNullIsNull || b == ccNullIsNull:
+		return ccNullIsNull
+	}
+	return ccNullUnknown
+}
+
+// ccNullFactOr combines the operands of a disjunction that holds: only one of
+// them need hold, so only what they all prove is proved.
+func ccNullFactOr(a, b ccNullFact) ccNullFact {
+	if a == b {
+		return a
+	}
+	return ccNullUnknown
+}
+
+func ccNullFactNegate(f ccNullFact, negated bool) ccNullFact {
+	if !negated {
+		return f
+	}
+	switch f {
+	case ccNullIsNull:
+		return ccNullNonNull
+	case ccNullNonNull:
+		return ccNullIsNull
+	}
+	return ccNullUnknown
+}
+
+// ccNullTestConnective names the operator joining the null test to the rest of
+// its condition, which is what decides whether the branch that fails the
+// condition excludes null.
+func (c *ccConv) ccNullTestConnective(cond *tree_sitter.Node) string {
+	n := ccUnwrapCExpr(c.ccCondValue(cond))
+	for n != nil && c.kind(n) == "unary_expression" && c.unaryOp(n) == "!" {
+		n = ccUnwrapCExpr(c.field(n, "argument"))
+	}
+	if n != nil && c.kind(n) == "binary_expression" {
+		switch c.text(c.field(n, "operator")) {
+		case "&&":
+			return "conjunction"
+		case "||":
+			return "disjunction"
+		}
+	}
+	return "simple"
+}
+
+// ccBranchLeaves reports whether a branch leaves the statement list it sits in,
+// which is what makes the statements after it unreachable with the branch's
+// condition true.
+func (c *ccConv) ccBranchLeaves(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	switch c.kind(n) {
+	case "return_statement", "goto_statement", "break_statement", "continue_statement":
+		return true
+	case "expression_statement":
+		call := ccUnwrapCExpr(c.ccFirstNamedChild(n))
+		if call != nil && c.kind(call) == "call_expression" {
+			return ccNoReturnCalls[lastSeg(c.dotted(c.field(call, "function")))]
+		}
+	case "compound_statement":
+		for _, ch := range c.namedChildren(n) {
+			if c.ccBranchLeaves(ch) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// ccMacroChecksPointer reports whether a statement is a call to a file-local
+// check macro that tests the pointer against null in the argument it was
+// passed as -- `CHECK_NULL(p);`, the C spelling the preprocessor leaves only a
+// name behind at.
+func (c *ccConv) ccMacroChecksPointer(stmt *tree_sitter.Node, name string, macros map[string][]bool) bool {
+	call := ccUnwrapCExpr(c.ccFirstNamedChild(stmt))
+	if call == nil || c.kind(call) != "call_expression" {
+		return false
+	}
+	flags, ok := macros[lastSeg(c.dotted(c.field(call, "function")))]
+	if !ok {
+		return false
+	}
+	for pos, arg := range c.namedChildren(c.field(call, "arguments")) {
+		if pos < len(flags) && flags[pos] && c.ccNamesPointer(arg, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// ccFirstNamedChild is the first named child of a node, or nil.
+func (c *ccConv) ccFirstNamedChild(n *tree_sitter.Node) *tree_sitter.Node {
+	kids := c.namedChildren(n)
+	if len(kids) == 0 {
+		return nil
+	}
+	return kids[0]
 }
 
 func (c *ccConv) ccConditionalFallbackDoubleFreeObservations(fn *tree_sitter.Node) []nir.Stmt {
