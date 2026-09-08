@@ -335,6 +335,17 @@ func (c *jvConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		if left != nil && c.kind(left) == "identifier" {
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
 		}
+		// field write `this.v = x` / `obj.v = x`: model as a path call with no method
+		// (mirrors the C#/JS/Kotlin member-write modeling) so the assigned value lands in
+		// the field's slot. Dropping it kept the whole store-then-read-back shape — a
+		// constructor or setter parking a value on the object, a getter handing it out —
+		// out of the graph, since the write simply was not there.
+		if left != nil && c.kind(left) == "field_access" {
+			return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+				Callee: c.expr(left), Args: []nir.Expr{right},
+				Path: c.dotted(left), Method: "", Loc: c.loc(inner),
+			}}}
+		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: c.expr(inner)}}

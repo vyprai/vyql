@@ -10,6 +10,7 @@ import (
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/nir"
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 func TestJavaExtractsClassBases(t *testing.T) {
@@ -1198,5 +1199,70 @@ public class VaultBuildWrapper extends SimpleBuildWrapper {
 	}
 	if strings.Contains(fixedArgs, "nested_class_annotation:Symbol") {
 		t.Errorf("deleting @Symbol from the nested class did not remove the token: %q", fixedArgs)
+	}
+}
+
+// A value parked on an object by a setter and handed back by a getter has to survive the two
+// call boundaries between them: the write is in one method body, the read in another, and only
+// the receiver at the call sites ties them together. Java also has to MODEL the write at all —
+// `this.v = x` is an assignment whose left side is a field access, which the frontend used to
+// drop, keeping the whole stored-value shape out of the graph.
+func TestJavaStoredFieldSurvivesGetterCallBoundary(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "App.java")
+	src := []byte(`class Holder {
+  private String v;
+  private String safe;
+  void setV(String v) { this.v = v; }
+  String getV() { return this.v; }
+  String getSafe() { return this.safe; }
+}
+class App {
+  void handle(String taint) {
+    Holder h = new Holder();
+    h.setV(taint);
+    sink(h.getV());
+    other(h.getSafe());
+  }
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source, storedArg, siblingArg string
+	for _, n := range nodes {
+		switch {
+		case n.Type == "code.Param" && n.Prop("name") == "taint":
+			source = n.ID
+		case n.Prop("callee_path") == "sink":
+			storedArg = n.Prop("arg0")
+		case n.Prop("callee_path") == "other":
+			siblingArg = n.Prop("arg0")
+		}
+	}
+	if source == "" || storedArg == "" || siblingArg == "" {
+		t.Fatalf("missing nodes: source=%q sink arg=%q sibling arg=%q", source, storedArg, siblingArg)
+	}
+	reachable, err := usg.BFS(g, source, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[storedArg] {
+		t.Fatalf("value stored by setV did not reach the getV read at the sink")
+	}
+	if reachable[siblingArg] {
+		t.Fatalf("taint on field v leaked into the sibling field safe")
 	}
 }
