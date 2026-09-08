@@ -2246,11 +2246,25 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		val := c.field(n, "value")
 		if val == nil {
 			for _, ch := range namedChildren(n) {
-				if c.kind(ch) == "object" {
+				if c.kind(ch) == "object" || c.isJsFuncNode(ch) {
 					val = ch
 					break
 				}
 			}
+		}
+		// a class field whose value is a function, e.g. `run = (cmd) => { … }`
+		// (the class-property arrow, how a method that must keep `this` bound is
+		// written). The grammar gives it a field_definition rather than a
+		// method_definition, so without this it is not a function definition at all
+		// and the calls in its body never reach the graph.
+		if c.isJsFuncNode(val) {
+			name := c.keyName(c.field(n, "name"))
+			exported := c.exported[name]
+			params := c.exportedFuncParams(val, exported, c.funcParams(val))
+			decorators := c.jsDecoratorTokens(n)
+			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: c.funcParamTypes(val),
+				Body: c.funcBody(val), Loc: L, ContextTokens: c.jsFunctionContext(name, val),
+				Decorators: decorators, ParamEntries: c.jsParamEntries(name, params, decorators), Exported: exported}}
 		}
 		if val != nil && c.kind(val) == "object" {
 			var out []nir.Stmt
