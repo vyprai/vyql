@@ -216,7 +216,9 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	for _, d := range decls {
 		switch fn := d.(type) {
 		case *ast.FuncDecl:
-			out = append(out, c.funcDef(fn.Name.Name, c.receiverType(fn.Recv), fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos())))
+			fd := c.funcDef(fn.Name.Name, c.receiverType(fn.Recv), fn.Type, fn.Body, fn.Name.IsExported(), c.loc(fn.Pos()))
+			fd.RecvName = c.receiverName(fn.Recv)
+			out = append(out, fd)
 		case *ast.GenDecl:
 			out = append(out, c.moduleContextStmts(fn)...)
 			out = append(out, c.typeContextStmts(fn, methods)...)
@@ -378,6 +380,19 @@ func (c *conv) methodMap(decls []ast.Decl) map[string]map[string]bool {
 		out[recv][fn.Name.Name] = true
 	}
 	return out
+}
+
+// receiverName is the receiver's variable name in `func (r *T) M()`. Go declares it outside
+// the parameter list, so it reaches lowering only through FuncDef.RecvName. An anonymous or
+// blank receiver (`func (*T) M()`, `func (_ T) M()`) names nothing and returns "".
+func (c *conv) receiverName(recv *ast.FieldList) string {
+	if recv == nil || len(recv.List) == 0 || len(recv.List[0].Names) == 0 {
+		return ""
+	}
+	if name := recv.List[0].Names[0].Name; name != "_" {
+		return name
+	}
+	return ""
 }
 
 func (c *conv) receiverType(recv *ast.FieldList) string {

@@ -167,6 +167,15 @@ type lowerer struct {
 	pendingReads map[string]map[string][]string
 	templates    map[string]templateInfo
 
+	// structFields holds one taint slot per DECLARED struct field — "module::Type.Field" —
+	// shared by every value of that type. See structFieldSlot for why the object-sensitive
+	// slots above cannot serve a Go struct field.
+	structFields map[string]string
+	// goRecv is the receiver binding of the Go method being lowered: {variable name, type}.
+	// Go declares the receiver outside the parameter list, so nothing in scope types it, and
+	// structFieldOwner is the only thing that reads this.
+	goRecv [2]string
+
 	// modStr maps a module-level (top-level) variable name to its string-constant value, so a
 	// regex call `re.match(PATTERN, x)` referring to a `PATTERN = r"..."` module constant can be
 	// resolved to its literal for catastrophic-backtracking (ReDoS) detection even from inside a
@@ -531,6 +540,54 @@ func (l *lowerer) readFieldSlot(container, key, loc string) string {
 	}
 	return id
 }
+
+// structFieldSlot returns the stable node holding the taint of ONE declared struct field of
+// ONE project type — `Rule.Spec` — shared by every value of that type. Created on first use
+// from either side, so a read lowered before the write that fills it still sees it.
+//
+// The object-sensitive slots (elemNode) join a field write to a field read only when both
+// run through the same object node, which needs a call site aliasing the two. Go's idiom has
+// none: one function stores into a `*Rule` parameter, a method on Rule reads the field back,
+// and the object they share is chosen by the caller of both — often in another package. The
+// value dead-ends at the store. Keying the slot on the TYPE instead of the object joins them,
+// at the cost of merging distinct values of that type: FN-safe, and narrow because it needs a
+// field of a type DECLARED in the scanned code on both ends.
+//
+// The id is derived from the key, not minted from the node counter, so the slot is the same
+// node whichever module reaches it first and an incremental scan that re-lowers only some of
+// them still agrees on it.
+func (l *lowerer) structFieldSlot(mod, typ, field, loc string) string {
+	key := mod + "::" + typ + "." + field
+	if id := l.structFields[key]; id != "" {
+		return id
+	}
+	id := l.nodeWithID("structfield#"+key, "Elem", loc, nil)
+	l.structFields[key] = id
+	return id
+}
+
+// structFieldOwner resolves the project type whose field a `base.field` access names, for a
+// base written as a plain identifier: a parameter or local declared to be that type, or the
+// receiver of the enclosing Go method. Reports false for anything else — a library type, an
+// untyped local, a chained expression — so nothing outside a declared struct gets a slot.
+func (l *lowerer) structFieldOwner(base string, sc *scope) (mod, typ string, ok bool) {
+	if base == "" || !goStructFields(l.curFile) {
+		return "", "", false
+	}
+	if t, has := sc.typ[base]; has && t[0] != "" && t[1] != "" {
+		return t[0], t[1], true
+	}
+	if base == l.goRecv[0] && l.goRecv[1] != "" && l.curClass != "" {
+		return l.curModule, l.goRecv[1], true
+	}
+	return "", "", false
+}
+
+// goStructFields gates type-keyed field slots to Go. Every other frontend here either models
+// a field write as a method-less path call, which the object-sensitive slots already handle,
+// or drops it; turning the coarser type-keyed join on for them would move detection for
+// languages this does not need to change.
+func goStructFields(file string) bool { return strings.HasSuffix(file, ".go") }
 
 // elemNode returns the synthetic node holding container[key]'s taint (created on first use).
 // The caller is a WRITE, so the record is marked as modelling this object's writes.
@@ -2850,6 +2907,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		staticDeclMemo:  map[string]string{},
 		containers:      map[string]*containerInfo{},
 		pendingReads:    map[string]map[string][]string{},
+		structFields:    map[string]string{},
 		templates:       map[string]templateInfo{},
 		modStr:          map[string]string{},
 		dynSQLVar:       map[string]bool{},
@@ -3783,6 +3841,16 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if l.curClass != "" && len(st.Params) > 0 && st.Params[0] == l.selfName {
 			inner.setTyp(l.selfName, [2]string{l.curModule, l.curClass})
 		}
+		// Go's receiver is declared outside the parameter list, so `r` in `func (r *Rule) M()`
+		// is a free name in the body with no binding and no type. Record it for the duration of
+		// the body so a field access through it is known to be a field of Rule.
+		prevRecv := l.goRecv
+		l.goRecv = [2]string{}
+		if st.RecvName != "" && l.curClass != "" {
+			l.goRecv = [2]string{st.RecvName, l.curClass}
+		}
+		defer func() { l.goRecv = prevRecv }()
+		// languages with no explicit self param (C#) still need a STABLE `this` node per method
 		// languages with no explicit self param (C#, Java, JS/TS, …) need a STABLE `this` node
 		// so `this.Field` writes/reads — and inheritance-aware implicit-`this` member refs —
 		// connect within the method, connect ACROSS the class's methods, and escape via
@@ -3976,6 +4044,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				targetTyp, targetHasTyp = callTyp, true
 			}
 			if base, field, ok := splitFieldTarget(t); ok && !localDecl {
+				// `r.Spec = v` on a value of a declared struct type: store into that type's
+				// field slot, which a read of the same field anywhere pulls from.
+				if !strings.Contains(field, ".") {
+					if mod, typ, known := l.structFieldOwner(base, sc); known {
+						l.flow(targetVal, l.structFieldSlot(mod, typ, field, st.Loc))
+					}
+				}
 				if slot := l.moduleGlobalSlot(base); slot != "" {
 					l.globalMutationAnalysisEvent(st.Loc, []string{
 						"base:" + base,
@@ -4436,6 +4511,14 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// write that only becomes visible later, when the base turns into a container or is
 		// aliased with one at a call site.
 		l.noteFieldRead(base, ex.Attr, n)
+		// type-sensitive read: a field of a declared struct carries whatever any function
+		// stored into that field, including one that reached the value through a pointer
+		// parameter this method's receiver never passed through.
+		if name, isName := ex.Base.(nir.Name); isName {
+			if mod, typ, known := l.structFieldOwner(name.ID, sc); known {
+				l.flow(l.structFieldSlot(mod, typ, ex.Attr, ex.Loc), n)
+			}
+		}
 		return n
 	case nir.Index:
 		base := l.eval(ex.Base, sc)

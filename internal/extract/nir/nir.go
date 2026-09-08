@@ -229,6 +229,11 @@ type FuncDef struct {
 	// its type leave this empty and are keyed by the enclosing ClassDef instead; both end
 	// up registered under the same "module::Type.method" resolution key.
 	Recv string
+	// RecvName is the receiver's own variable name in that declaration — the `c` of
+	// `func (c *T) M()`. Go binds the receiver outside the parameter list, so without this
+	// the name is free in the body and nothing types it; languages that pass the receiver
+	// as param[0] (Python) or leave it implicit (C#'s `this`) leave it empty.
+	RecvName string
 	// Returns is the declared type name of the value this function evaluates to (the FIRST
 	// declared result where a language has several). It is the declaration's own text with
 	// no resolution attached — what type that names, and whether a call site can be typed by
