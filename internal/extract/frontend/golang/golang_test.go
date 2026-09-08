@@ -9,6 +9,7 @@ import (
 	gofrontend "github.com/vyprai/vyql/internal/extract/frontend/golang"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/nir"
+	"github.com/vyprai/vyql/internal/extract/parsecache"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -1364,4 +1365,197 @@ func goCommandArg(t *testing.T, g usg.Store, loc string) string {
 		t.Fatalf("exec.Command at %s has no third argument node: %#v", loc, call)
 	}
 	return arg
+}
+
+// A func literal bound to a local, and one invoked where it is written, are calls into a
+// body this file contains. Both are the shape nektos/act's artifact server (CVE-2023-22726)
+// writes: the path parameter is joined into a file path in the handler, and the open call
+// that consumes it sits inside an immediately-invoked literal that captured it.
+func TestGoFuncLiteralCallsCarryTaint(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "server.go")
+	src := []byte(`package artifacts
+
+import (
+	"fmt"
+	"io/fs"
+	"net/http"
+	"os"
+
+	"github.com/julienschmidt/httprouter"
+)
+
+func uploads(router *httprouter.Router, fsys MkdirFS) {
+	router.POST("/_apis/pipelines/workflows/:runId/artifacts", func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
+		runID := params.ByName("runId")
+		itemPath := req.URL.Query().Get("itemPath")
+		filePath := fmt.Sprintf("%s/%s", runID, itemPath)
+
+		file, err := func() (fs.File, error) {
+			if req.Header.Get("Content-Range") != "" {
+				return fsys.OpenAtEnd(filePath)
+			}
+			return fsys.Open(filePath)
+		}()
+		_ = file
+		_ = err
+	})
+}
+
+func downloads(router *httprouter.Router) {
+	router.GET("/download/:container", func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
+		read := func(name string) ([]byte, error) {
+			return os.ReadFile(name)
+		}
+		body, err := read(params.ByName("container"))
+		_ = body
+		_ = err
+	})
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// the immediately-invoked literal: the captured filePath reaches BOTH opens inside it.
+	runID := goFindNode(t, g, "code.Call", map[string]string{"callee_path": "params.ByName", "lit0": "runId"})
+	reachable, err := usg.BFS(g, runID, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, callee := range []string{"fsys.OpenAtEnd", "fsys.Open"} {
+		open, ok, err := g.GetNode(goFindNode(t, g, "code.Call", map[string]string{"callee_path": callee}))
+		if err != nil || !ok {
+			t.Fatalf("%s call node: ok=%v err=%v", callee, ok, err)
+		}
+		arg := open.Prop("arg0")
+		if arg == "" {
+			t.Fatalf("%s call has no argument node: %#v", callee, open)
+		}
+		if !reachable[arg] {
+			t.Fatalf("the path parameter did not reach %s inside the invoked func literal", callee)
+		}
+	}
+
+	// the call through the func-typed local: the argument reaches the literal's parameter
+	// and the body it flows through.
+	container := goFindNode(t, g, "code.Call", map[string]string{"callee_path": "params.ByName", "lit0": "container"})
+	reachable, err = usg.BFS(g, container, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	param := goFindNode(t, g, "code.Param", map[string]string{"name": "name"})
+	if !reachable[param] {
+		t.Fatalf("the path parameter did not reach the parameter of the func-typed local's literal")
+	}
+	readFile, ok, err := g.GetNode(goFindNode(t, g, "code.Call", map[string]string{"callee_path": "os.ReadFile"}))
+	if err != nil || !ok {
+		t.Fatalf("os.ReadFile call node: ok=%v err=%v", ok, err)
+	}
+	if arg := readFile.Prop("arg0"); arg == "" || !reachable[arg] {
+		t.Fatalf("the path parameter did not reach os.ReadFile inside the func-typed local's literal")
+	}
+
+	// and the call's RESULT comes from that literal's return, not from an opaque callee.
+	readCall := goFindNode(t, g, "code.Call", map[string]string{"callee_path": "read"})
+	ret := goFindNode(t, g, "code.Return", map[string]string{"func": goFuncOfParam(t, g, param)})
+	outs, err := g.OutEdges(ret, "FLOWS")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, e := range outs {
+		if e.Dst == readCall {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("the result of the call through the func-typed local does not come from the literal's return")
+	}
+}
+
+// goFuncOfParam reports the synthetic function name a parameter node belongs to.
+func goFuncOfParam(t *testing.T, g usg.Store, param string) string {
+	t.Helper()
+	n, ok, err := g.GetNode(param)
+	if err != nil || !ok {
+		t.Fatalf("param node %s: ok=%v err=%v", param, ok, err)
+	}
+	return n.Prop("func")
+}
+
+// The same two shapes under the deferred-body cache a memory-bounded scan installs: the
+// synthetic FuncDefs are emitted into the statement list BEFORE it is spooled, so they
+// have to survive the round trip and still register as the enclosing body's declarations.
+func TestGoFuncLiteralCallsCarryTaintWithDeferredBodies(t *testing.T) {
+	cache, err := parsecache.OpenTransient(t.TempDir())
+	if err != nil {
+		t.Fatalf("OpenTransient: %v", err)
+	}
+	defer cache.Close()
+	restore := parsecache.SetShared(cache)
+	defer restore()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "server.go")
+	src := []byte(`package artifacts
+
+import (
+	"fmt"
+	"io/fs"
+	"net/http"
+	"os"
+
+	"github.com/julienschmidt/httprouter"
+)
+
+func uploads(router *httprouter.Router, fsys MkdirFS) {
+	router.POST("/x/:runId", func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
+		filePath := fmt.Sprintf("%s/x", params.ByName("runId"))
+
+		file, err := func() (fs.File, error) {
+			return fsys.OpenAtEnd(filePath)
+		}()
+		_ = file
+		_ = err
+
+		read := func(name string) ([]byte, error) { return os.ReadFile(name) }
+		body, _ := read(filePath)
+		_ = body
+	})
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.LowerTypedDeferred(prog, true, nil, cache)
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := goFindNode(t, g, "code.Call", map[string]string{"callee_path": "params.ByName"})
+	reachable, err := usg.BFS(g, source, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, callee := range []string{"fsys.OpenAtEnd", "os.ReadFile"} {
+		n, ok, err := g.GetNode(goFindNode(t, g, "code.Call", map[string]string{"callee_path": callee}))
+		if err != nil || !ok {
+			t.Fatalf("%s call node: ok=%v err=%v", callee, ok, err)
+		}
+		if arg := n.Prop("arg0"); arg == "" || !reachable[arg] {
+			t.Fatalf("with bodies deferred to the parse cache, the path parameter did not reach %s", callee)
+		}
+	}
 }
