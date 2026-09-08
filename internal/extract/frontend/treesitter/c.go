@@ -1440,10 +1440,35 @@ func (c *ccConv) ccInPlaceMutationEffects(name string, args []*tree_sitter.Node)
 }
 
 func (c *ccConv) assignmentFallback(left *tree_sitter.Node, right nir.Expr) []nir.Stmt {
+	if st, ok := c.fieldStoreStmt(left, right); ok {
+		return []nir.Stmt{st}
+	}
 	if left != nil {
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(left)}, nir.ExprStmt{Value: right}}
 	}
 	return []nir.Stmt{nir.ExprStmt{Value: right}}
+}
+
+// fieldStoreStmt models `base->field = value` (and `base.field = value`) as the
+// Method-less field-write call the other frontends emit for a member store, which is the
+// shape lowering reads as "this value is stored into that field". Two things follow: the
+// store itself is a node, so a binding has somewhere to say what the write means; and the
+// assigned value is routed into the base's per-field slot, so a later read of that field
+// resolves to the same allocation the local names. The node carries the target's dotted
+// path, so path-matched labelling selects it by the path the LHS read carries.
+func (c *ccConv) fieldStoreStmt(left *tree_sitter.Node, right nir.Expr) (nir.Stmt, bool) {
+	base, fld, ok := c.fieldTarget(left)
+	if !ok {
+		return nil, false
+	}
+	L := c.loc(left)
+	path := c.dotted(left)
+	return nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Attr{Base: c.expr(base), Attr: fld, Path: path, Loc: L},
+		Args:   []nir.Expr{right},
+		Path:   path,
+		Loc:    L,
+	}}, true
 }
 
 func (c *ccConv) fieldClearNullEvent(assign, left, right *tree_sitter.Node) *nir.ExprStmt {
