@@ -2523,6 +2523,50 @@ func enumerationErrorResponse(valToks []string) bool {
 	return errStatus && existMsg
 }
 
+// isFlashedPreviousInputCall reports whether a call reads a framework's flashed
+// PREVIOUS INPUT — the request values a framework re-flashes into the session when a
+// request fails validation, so that the re-rendered form shows what was typed. Laravel
+// spells it `old($field)`, `Request::old($field)` and `session()->getOldInput($field)`;
+// the name is what identifies it, since the helper is receiverless in a view.
+func isFlashedPreviousInputCall(method string) bool {
+	switch method {
+	case "old", "getOldInput", "oldInput":
+		return true
+	}
+	return false
+}
+
+// accountIdentityField reports whether a field name is the value a user types to
+// identify an account. Echoing one back is what makes a re-rendered form distinguish a
+// known account from an unknown one; echoing back a password or a message does not.
+func accountIdentityField(name string) bool {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "email", "e-mail", "e_mail", "mail", "email_address", "emailaddress",
+		"username", "user_name", "user", "login", "handle", "account",
+		"phone", "mobile", "msisdn", "identity", "identifier":
+		return true
+	}
+	return false
+}
+
+// isCredentialRecoveryView reports whether a file belongs to a credential-recovery flow
+// — forgotten password, account recovery — the one place a flashed identifier is an
+// enumeration oracle. A login or registration form repopulates the same field, but its
+// failure branch is taken for a wrong password or a duplicate address as well, so the
+// echo there does not by itself separate a known account from an unknown one.
+func isCredentialRecoveryView(file string) bool {
+	f := strings.ToLower(file)
+	if inTestOrSeedFile(f) {
+		return false
+	}
+	for _, w := range []string{"password", "passwd", "forgot", "recover", "reset"} {
+		if strings.Contains(f, w) {
+			return true
+		}
+	}
+	return false
+}
+
 // isLogSinkCall reports whether a call is a logging/print output sink.
 func isLogSinkCall(path, method string) bool {
 	if path == "print" || method == "print" {
@@ -5598,6 +5642,19 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// SMELL (user enumeration): auth error response disclosing account existence.
 	if isResponseSinkCall(calleePath, call.Method) && enumerationErrorResponse(valToks) {
 		l.syntheticCall("analysis.smell.user_enum", "smell", result, call.Loc, "existence_disclosing_error")
+	}
+	// SMELL (user enumeration), the same weakness with no status code and no message: a
+	// credential-recovery view repopulates the account identifier from the framework's
+	// FLASHED PREVIOUS INPUT (Laravel's `old('email')`). A framework flashes that input on
+	// the validation-failure branch only, so whether the field comes back filled in is
+	// itself the differential response — the unknown-account probe re-renders the form with
+	// the address in it, the known-account probe redirects with a status and nothing
+	// flashed. Nothing in the application writes a status or a string for the check above
+	// to find; the presence of the echo is the whole oracle.
+	if len(call.Args) >= 1 && isFlashedPreviousInputCall(call.Method) && isCredentialRecoveryView(l.curFile) {
+		if field, ok := l.constStrVal(call.Args[0], sc); ok && accountIdentityField(field) {
+			l.syntheticCall("analysis.smell.user_enum", "smell", result, call.Loc, "flashed_input_differential", "field="+strings.ToLower(field))
+		}
 	}
 	// SMELL (business-logic gap): a user-controlled value assigned to a business-state field in a
 	// route (`ledger["state"] = payload.get("state")`) — agent verifies the transition is validated.
