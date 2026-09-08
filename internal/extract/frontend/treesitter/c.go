@@ -60,6 +60,10 @@ type ccConv struct {
 	// inFunc counts the function bodies the walk is currently inside, so a
 	// declaration can tell a local from a file-scope one.
 	inFunc int
+	// fileScopeVars caches the names the file declares at file scope as
+	// mutable objects, which every function in it asks for; nil until the
+	// first ask.
+	fileScopeVars map[string]bool
 }
 
 // cPropagators write their source arguments into destination arg0.
@@ -1090,6 +1094,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccSelfSizedCopyIntoDeclaredArrayObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccAssertOnlyLengthCopyObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccUnboundedCallSizedStackArrayObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccUnassignedSizedStackArrayObservations(n, params)...)
 			bodyStmts = append(bodyStmts, c.ccDestCapacityUncheckedCursorPairObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccFormatTruncationUncheckedReuseObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccOutParamStatusUncheckedObservations(n)...)
@@ -3411,6 +3416,296 @@ func (c *ccConv) ccUnboundedCallSizedStackArrayObservations(fn *tree_sitter.Node
 	}
 	scan(body)
 	return out
+}
+
+// ccUnassignedSizedStackArrayObservations reports the other half of the
+// variable-length-array family: a stack array whose declared size is a bare
+// identifier the function itself never computes. The frame still claims
+// whatever that identifier holds when it is laid out, but the value arrives
+// from outside the body -- a parameter the caller chose, a name the file
+// scope holds and any function may have written, or a local a call filled
+// through its address -- so the body carries no assignment a reader could
+// point at as the size's origin.
+//
+// This is disjoint from ccUnboundedCallSizedStackArrayObservations by
+// construction: that observation reports a size the same function assigns
+// (from a call, or from anything else with the callee left empty), and this
+// one skips every identifier it finds assigned. Together they cover every
+// array declarator whose size is a plain identifier; separately, a binding
+// that wants only the call-sized shape keeps the fact it already reads.
+//
+// The origin is stated rather than guessed, and it is the one thing that
+// separates the three shapes:
+//
+//   - out_param -- the body passes `&size` to a call, which is the C
+//     spelling of "another function computed this"; the callee is carried
+//     in the fact, so which calls report attacker-chosen lengths stays a
+//     binding question, exactly as it is for the call-sized sibling.
+//   - parameter -- the name is in the function's own parameter list.
+//   - global -- the name is not a parameter, the body does not declare it,
+//     and the file declares it at file scope as a mutable object.
+//
+// The global case is stated positively on purpose. A size the file never
+// declares could be a global from a header, but it could equally be a
+// header's macro or enumerator -- fontforge's `real data[MmMax]` is
+// `#define MmMax 16` two headers away, sixty-three times over -- and one
+// translation unit cannot tell them apart. Requiring the file's own
+// declaration keeps the fact to names it can see are variables and turns
+// the rest into a false negative, which is the safe direction for a fact
+// every rule reads. The all-uppercase spelling is read as a macro constant
+// by ccConstantSizeExpr as it is for the sibling fact.
+//
+// A name the body declares and never writes is not reported at all: its
+// value is indeterminate, which is a different defect from an unbounded
+// one. A declaration carrying a storage class or a typedef lays out no
+// frame and is skipped.
+//
+// The remediation is matched exactly as the sibling matches it: any
+// relational comparison naming the size identifier, in either operand
+// order, anywhere in the body, clears the observation, so a clamp, an early
+// return and the mirrored spellings all read as consulting it. An equality
+// check does not clear, because the compacted text cannot tell an
+// exact-match fix from an error-sentinel check.
+//
+// Residuals, all in the direction of the sibling's: the comparison is not
+// required to precede the declaration; a global some other function bounds
+// before the call reaches this one is still reported, because the guard is
+// function-scoped; and a global this file only uses, declaring it in a
+// header, earns no fact at all.
+func (c *ccConv) ccUnassignedSizedStackArrayObservations(fn *tree_sitter.Node, params []string) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	sites := c.ccRuntimeSizedArraySites(body)
+	if len(sites) == 0 {
+		// the overwhelming majority of bodies: one walk, no maps, no text
+		return nil
+	}
+	assigned, declared, filled := c.ccBodyNameOrigins(body)
+	text := compactCExprText(c.text(body))
+
+	seen := map[string]bool{}
+	var out []nir.Stmt
+	for _, site := range sites {
+		if assigned[site.sizeID] || ccCapacityConsultedIn(text, site.sizeID) {
+			continue
+		}
+		origin, callee := "", ""
+		switch {
+		case filled[site.sizeID] != "":
+			origin, callee = "out_param", filled[site.sizeID]
+		case ccContainsParam(params, site.sizeID):
+			origin = "parameter"
+		case declared[site.sizeID]:
+			continue // declared and never written: indeterminate, not unbounded
+		case c.ccFileScopeVariableNames(fn)[site.sizeID]:
+			origin = "global"
+		default:
+			continue // a name this translation unit does not state is a variable
+		}
+		key := site.array + "/" + site.sizeID + "/" + origin
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		loc := c.loc(site.node)
+		path := "analysis.alloc.unbounded_stack_array"
+		args := []nir.Expr{
+			nir.Const{Loc: loc, Value: "origin=" + origin},
+			nir.Const{Loc: loc, Value: "array=" + site.array},
+			nir.Const{Loc: loc, Value: "size=" + site.sizeID},
+		}
+		if callee != "" {
+			args = append(args, nir.Const{Loc: loc, Value: "callee=" + callee})
+		}
+		args = append(args, nir.Const{Loc: loc, Value: "guard=missing_size_bound_check"})
+		out = append(out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: path, Loc: loc},
+			Args:   args,
+			Path:   path,
+			Method: "unbounded_stack_array",
+			Loc:    loc,
+		}})
+	}
+	return out
+}
+
+// ccRuntimeSizedArraySite is one array declarator in a body whose size is a
+// plain identifier that is not macro-shaped -- the syntax of a
+// variable-length array, before anything is known about where the size
+// comes from.
+type ccRuntimeSizedArraySite struct {
+	node   *tree_sitter.Node
+	array  string
+	sizeID string
+}
+
+// ccRuntimeSizedArraySites collects the body's variable-length array
+// declarations. A body with none -- nearly every body -- costs this walk
+// and nothing else.
+func (c *ccConv) ccRuntimeSizedArraySites(body *tree_sitter.Node) []ccRuntimeSizedArraySite {
+	var sites []ccRuntimeSizedArraySite
+	var scan func(*tree_sitter.Node)
+	scan = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "array_declarator" {
+			name := c.declName(c.field(n, "declarator"))
+			size := c.field(n, "size")
+			if name != "" && size != nil && c.kind(size) == "identifier" {
+				if sizeID := c.text(size); !ccConstantSizeExpr(sizeID) && c.ccAutomaticArrayDeclaration(n) {
+					sites = append(sites, ccRuntimeSizedArraySite{node: n, array: name, sizeID: sizeID})
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			scan(ch)
+		}
+	}
+	scan(body)
+	return sites
+}
+
+// ccAutomaticArrayDeclaration reports whether an array declarator is the
+// declarator of an ordinary automatic declaration, which is the only shape
+// that lays out a stack frame. Everything between the declarator and its
+// declaration has to be a declarator itself: that rejects a typedef and a
+// field, and it rejects the subscripts a macro invocation leaves behind
+// when the grammar reads the statement as a declaration -- netxduo's
+// `NX_TRACE_IN_LINE_INSERT(ip_ptr, ip_ptr -> nx_ip_interface[idx], ...)`
+// parses as a function_declarator whose parameter list holds an
+// array_declarator that declares nothing. The declaration must also state
+// no storage class, since a static or extern name is not on the frame.
+func (c *ccConv) ccAutomaticArrayDeclaration(n *tree_sitter.Node) bool {
+	for p := n.Parent(); p != nil; p = p.Parent() {
+		switch c.kind(p) {
+		case "array_declarator", "pointer_declarator", "parenthesized_declarator",
+			"init_declarator":
+			continue
+		case "declaration":
+			for _, ch := range c.namedChildren(p) {
+				if c.kind(ch) == "storage_class_specifier" {
+					return false
+				}
+			}
+			return true
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+// ccBodyNameOrigins reads, from one walk of a function body, the names the
+// body assigns, the names it declares, and the names it hands to a call by
+// address together with that call's name. A name in none of the three is
+// one the body does not bind at all.
+func (c *ccConv) ccBodyNameOrigins(body *tree_sitter.Node) (assigned, declared map[string]bool, filled map[string]string) {
+	assigned, declared, filled = map[string]bool{}, map[string]bool{}, map[string]string{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "declaration":
+			for _, ch := range c.namedChildren(n) {
+				switch c.kind(ch) {
+				case "init_declarator":
+					if nm := c.declName(c.field(ch, "declarator")); nm != "" {
+						declared[nm] = true
+						if c.field(ch, "value") != nil {
+							assigned[nm] = true
+						}
+					}
+				case "identifier", "pointer_declarator", "array_declarator",
+					"function_declarator", "parenthesized_declarator":
+					if nm := c.declName(ch); nm != "" {
+						declared[nm] = true
+					}
+				}
+			}
+		case "assignment_expression":
+			if l := c.field(n, "left"); l != nil && c.kind(l) == "identifier" {
+				assigned[c.text(l)] = true
+			}
+		case "update_expression":
+			if a := c.field(n, "argument"); a != nil && c.kind(a) == "identifier" {
+				assigned[c.text(a)] = true
+			}
+		case "call_expression":
+			callee := c.dotted(c.field(n, "function"))
+			if args := c.field(n, "arguments"); args != nil && callee != "" && callee != "?" {
+				for _, a := range c.namedChildren(args) {
+					if c.kind(a) != "pointer_expression" || c.unaryOp(a) != "&" {
+						continue
+					}
+					if id := c.field(a, "argument"); id != nil && c.kind(id) == "identifier" {
+						filled[c.text(id)] = callee
+					}
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return assigned, declared, filled
+}
+
+// ccFileScopeVariableNames collects the names this translation unit
+// declares at file scope as mutable objects: the globals any function in
+// the program may have written before this one runs. A function
+// declaration binds no object, a `const` binds a value the program does
+// not choose, and a macro or an enumerator is not a declaration at all --
+// so a size identifier that reaches this set is a variable, and one that
+// does not is either a constant or a name the file never states, which is
+// the frontend's limit and not a fact it should assert. Cached per file,
+// like the file's constant-sized arrays, because every function in it
+// asks.
+func (c *ccConv) ccFileScopeVariableNames(n *tree_sitter.Node) map[string]bool {
+	if c.fileScopeVars != nil {
+		return c.fileScopeVars
+	}
+	root := n
+	for parent := root.Parent(); parent != nil; parent = parent.Parent() {
+		root = parent
+	}
+	names := map[string]bool{}
+	var collect func(*tree_sitter.Node)
+	collect = func(n *tree_sitter.Node) {
+		if n == nil || c.kind(n) == "function_definition" {
+			return
+		}
+		if c.kind(n) == "declaration" {
+			isConst := false
+			for _, ch := range c.namedChildren(n) {
+				if c.kind(ch) == "type_qualifier" && c.text(ch) == "const" {
+					isConst = true
+				}
+			}
+			if !isConst {
+				for _, ch := range c.namedChildren(n) {
+					switch c.kind(ch) {
+					case "init_declarator", "identifier", "pointer_declarator",
+						"array_declarator", "parenthesized_declarator":
+						if nm := c.declName(ch); nm != "" {
+							names[nm] = true
+						}
+					}
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			collect(ch)
+		}
+	}
+	collect(root)
+	c.fileScopeVars = names
+	return names
 }
 
 func (c *ccConv) ccFormatTruncationUncheckedReuseObservations(fn *tree_sitter.Node) []nir.Stmt {
