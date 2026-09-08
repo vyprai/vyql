@@ -31,6 +31,24 @@ type Label struct {
 // be tainted before the sink fires. Absent means "no receiver constraint".
 const TaintReceiverDetail = "taint_receiver"
 
+// ExitNodeType is the type of the marker node the lowering emits for a `return`/`raise`
+// written inside a control region — a point where the function leaves without reaching the
+// statements that follow that branch. Nothing labels or reports these; solvers.PostDominates
+// reads them to tell a release that really runs on every path from one an early exit skips.
+const ExitNodeType = "code.Exit"
+
+// ExitGuardProp names, on an exit marker, the node the condition of the branch that exit
+// sits in evaluated to. It is what tells an exit taken because an acquisition FAILED --
+// `status = open(...); if (status != OK) return;` -- from one that abandons a resource the
+// acquisition handed back: the first tests the acquisition's own result, and there is
+// nothing to release on the path it takes.
+const ExitGuardProp = "guard"
+
+// UnwindProp marks a call the language runs on every path out of the region it was written
+// in — a `finally` body, a Go/Swift `defer`. An early exit of that region does not skip it,
+// so the CFG solver credits it without consulting the exit markers.
+const UnwindProp = "unwind"
+
 // Node is a graph vertex with a namespaced type and typed properties. The three properties
 // every lowered code node carries — loc, region, order — are stored inline (Loc/Region/Order)
 // instead of in the Props map, so the common node needs no map allocation at all. Props holds

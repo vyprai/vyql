@@ -111,6 +111,27 @@ type lowerer struct {
 	modOrder  map[string]int
 	modBranch map[string]int
 
+	// funcRoot is the region root of the function body being lowered — the region a
+	// `return` written at the top level of that body sits in. A return written anywhere
+	// deeper is a CONDITIONAL exit: the path it takes leaves the function without
+	// reaching the statements that follow the branch, which is what an exit marker
+	// records (see exitMarker).
+	funcRoot string
+
+	// branchCond is the node the condition of the innermost `if` currently being lowered
+	// evaluated to, or "" outside one. An exit marker records it, because the branch a
+	// `return` sits in is what says WHY the function leaves there: an acquisition that
+	// hands back a status is followed by `if (status != OK) return;`, and that path
+	// releases nothing because the acquisition failed. Nothing else in the encoding
+	// relates a control region to the value its branch tested.
+	branchCond string
+
+	// unwind counts the cleanup bodies (a `finally`, a flushed `defer`) currently being
+	// lowered. A call emitted inside one runs on every path out of the region it was
+	// registered in, the abrupt ones included, so it is stamped usg.UnwindProp and no exit
+	// marker is read as skipping it.
+	unwind int
+
 	// deferred is a stack of the nir.Defer registrations seen in each function body
 	// currently being lowered — one frame per function, so a nested function's defers
 	// never escape into its parent's. Each frame is emitted at the end of its function
@@ -173,11 +194,49 @@ func (l *lowerer) branchRegion(seg string) string {
 }
 
 // inRegion lowers f inside a nested control region (then/else/loop/case/handler).
+//
+// branchCond is cleared for the duration: the condition that opened the ENCLOSING
+// branch is not the condition of this one, and an exit written here would otherwise
+// be attributed to it. The `if` lowering sets it again inside each arm.
 func (l *lowerer) inRegion(seg string, f func()) {
-	save := l.region
-	l.region = save + "/" + seg
+	save, saveCond := l.region, l.branchCond
+	l.region, l.branchCond = save+"/"+seg, ""
 	f()
-	l.region = save
+	l.region, l.branchCond = save, saveCond
+}
+
+// nodeLoc returns a node's source location, empty when the id names nothing.
+func (l *lowerer) nodeLoc(id string) string {
+	if id == "" {
+		return ""
+	}
+	if n, ok, _ := l.g.GetNode(id); ok {
+		return n.Loc
+	}
+	return ""
+}
+
+// exitMarker records a `return`/`raise` written inside a control region: a point where the
+// function leaves without reaching whatever follows the branch it sits in.
+//
+// The structured encoding (region + order) says which statements are nested inside which
+// branch, but nothing in it says that a branch ENDS the function, so a release written
+// after the branch reads as running on every path when the early exit skips it — the
+// question solvers.PostDominates is asked. One marker node per conditional exit is what
+// makes those paths visible; a return at the top level of the body needs none, since
+// nothing after it runs at all.
+// The marker carries the condition of the branch it sits in (usg.ExitGuardProp) when
+// there is one, so a solver can tell an exit taken because the acquisition itself
+// failed from one that abandons a resource the acquisition handed back.
+func (l *lowerer) exitMarker(loc string) {
+	if l.region == l.funcRoot {
+		return
+	}
+	var props map[string]string
+	if l.branchCond != "" {
+		props = map[string]string{usg.ExitGuardProp: l.branchCond}
+	}
+	l.node("Exit", loc, props)
 }
 
 // functionRegion opens the region root for a function body.
@@ -885,10 +944,12 @@ func (l *lowerer) flushDeferred() {
 	frame := l.deferred[len(l.deferred)-1]
 	l.deferred = l.deferred[:len(l.deferred)-1]
 	save := l.region
+	l.unwind++
 	for i := len(frame) - 1; i >= 0; i-- {
 		l.region = frame[i].region
 		l.block(frame[i].body, frame[i].sc)
 	}
+	l.unwind--
 	l.region = save
 }
 
@@ -2893,6 +2954,15 @@ func (l *lowerer) nodeWithID(id, kind, loc string, props map[string]string) stri
 }
 
 func (l *lowerer) nodeInlineWithID(id, kind, loc string, props map[string]string, method, calleePath, strArgs, vkind string) string {
+	if l.unwind > 0 && kind == "Call" {
+		// A call inside a `finally` or a flushed `defer` runs on every path out of the
+		// region it was registered in, abrupt ones included; the marker tells the CFG
+		// solver not to read an early exit as skipping it.
+		if props == nil {
+			props = map[string]string{}
+		}
+		props[usg.UnwindProp] = "1"
+	}
 	ord := l.modOrder[l.curNS]
 	l.modOrder[l.curNS]++
 	// loc/region/order live inline on the Node; props (the freshly-built extras map, often empty)
@@ -3493,8 +3563,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		// each function gets a distinct region ROOT, so structural dominance never spans
 		// functions (cross-function flows fall back to presence semantics — conservative).
-		saveRegion := l.region
+		saveRegion, saveRoot, saveCond := l.region, l.funcRoot, l.branchCond
 		l.region = l.functionRegion()
+		l.funcRoot = l.region
+		l.branchCond = "" // a body of its own: the enclosing branch's condition is not its
 		saveDecorators := l.curDecorators
 		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
 		l.functionContextAnalysisEvent(st.Loc, l.curDecorators)
@@ -3503,7 +3575,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.flushDeferred() // deferred bodies belong to THIS function, so flush inside the frame
 		sc.undoFunc(fm)
 		l.curDecorators = saveDecorators
-		l.region = saveRegion
+		l.region, l.funcRoot, l.branchCond = saveRegion, saveRoot, saveCond
 	case nir.Assign:
 		val := l.eval(st.Value, sc)
 		var typ [2]string
@@ -3738,8 +3810,15 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				l.syntheticCall("analysis.xss.raw_html_response", "raw_html", rv, retLoc, "html_string_return")
 			}
 		}
+		l.exitMarker(l.nodeLoc(rv))
 	case nir.Terminate:
 		l.eval(st.Value, sc)
+		// Only when nothing here can catch it: a `raise`/`throw` inside a try body resumes
+		// in that statement's handler, so it does not leave the function and the code after
+		// the try still runs. A `return` is never caught, and is marked unconditionally.
+		if len(l.tryExceptionTargets) == 0 {
+			l.exitMarker(st.Loc)
+		}
 	case nir.Validation:
 		l.applyValidation(st, sc)
 	case nir.ExprStmt:
@@ -3805,6 +3884,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		mark, iterMark := sc.markNode(), len(sc.ji)
 		sc.branchDepth++
 		l.inRegion("if"+b+".t", func() {
+			l.branchCond = condNode
 			// Nothing is journaled yet, so sc.node still holds the pre-branch bindings here.
 			if name, ok := allowlistMembershipVar(st.Cond); ok && sc.node[name] != "" {
 				loc := st.Loc
@@ -3822,7 +3902,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		thenIter := sc.iterDelta(iterMark)
 		sc.undoNode(mark)
 		sc.undoIter(iterMark)
-		l.inRegion("if"+b+".e", func() { l.block(st.Else, sc) })
+		l.inRegion("if"+b+".e", func() {
+			l.branchCond = condNode
+			l.block(st.Else, sc)
+		})
 		elseDelta, elseBefore := sc.nodeDelta(mark)
 		elseIter := sc.iterDelta(iterMark)
 		sc.undoNode(mark)
@@ -3960,7 +4043,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// region, `finally` reads as a conditional branch and a release written there
 		// post-dominates nothing, so `lock(); try { … } finally { unlock(); }` reports a
 		// lock that is never released.
+		l.unwind++
 		l.block(st.Finally, sc)
+		l.unwind--
 		sc.clearIter()
 	}
 }
@@ -4198,8 +4283,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		return l.eval(ex.Value, sc)
 	case nir.Lambda:
 		l.promoteCapturedJSBindings(ex.Body, ex.Params, sc, ex.Loc)
-		saveRegion := l.region
+		saveRegion, saveRoot, saveCond := l.region, l.funcRoot, l.branchCond
 		l.region = l.functionRegion()
+		l.funcRoot = l.region
+		l.branchCond = "" // a body of its own: the enclosing branch's condition is not its
 		l.functionContextAnalysisEvent(ex.Loc, ex.ContextTokens)
 		// closure capture: the lambda body sees the enclosing scope (free vars carry taint);
 		// params are reseeded fresh, shadowing. A sink inside an inline callback (res.format
@@ -4231,7 +4318,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		}
 		l.block(ex.Body, inner)
 		sc.undoFunc(fm)
-		l.region = saveRegion
+		l.region, l.funcRoot, l.branchCond = saveRegion, saveRoot, saveCond
 		fn := l.node("Func", ex.Loc, nil)
 		l.lambdaParams[fn] = paramNodes // for higher-order callback dispatch
 		return fn

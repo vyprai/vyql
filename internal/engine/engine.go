@@ -40,6 +40,7 @@ type Engine struct {
 	globalGuards           map[string]bool
 	nestedScopeFns         map[string]bool
 	taintFlowCache         map[string][]solvers.TaintFlow
+	exits                  *solvers.ExitIndex
 }
 
 func New(onto *ontology.Ontology, store usg.Store) *Engine {
@@ -1785,13 +1786,19 @@ func (e *Engine) preflightLoopGuarded(guardID, sinkID string) bool {
 	return solvers.Reaches(e.Store, guardID, sinkID)
 }
 
-// postDominatesCovered reports whether a concrete check runs on every path from
-// the candidate to function exit. Frontends without CFG metadata retain the
-// v2-authored conservative fallback: a concrete postDominates check covers.
+// postDominatesCovered reports whether the concrete checks run on every path from the
+// candidate to function exit. Frontends without CFG metadata retain the v2-authored
+// conservative fallback: a concrete postDominates check covers.
+//
+// The checks are handed to the solver as a SET rather than one at a time: whether a path
+// that leaves the function early is covered is a question about all of them — the trailing
+// release covers the path that falls through the branch, and the release inside an error
+// block covers the path that bails out of it. Asked one release at a time, neither can
+// answer it, and the pair used to be read as the first one covering everything.
 func (e *Engine) postDominatesCovered(candidateID, control string) bool {
 	candidateCFG := e.hasCFG(candidateID)
-	checks := e.nodesWithConcept(control)
-	for _, checkID := range checks {
+	var cfgChecks []string
+	for _, checkID := range e.nodesWithConcept(control) {
 		if !nodeHasConcreteCoverage(e.labels(checkID), control, "postDominates") {
 			continue
 		}
@@ -1799,14 +1806,24 @@ func (e *Engine) postDominatesCovered(candidateID, control string) bool {
 			continue
 		}
 		if candidateCFG && e.hasCFG(checkID) {
-			if solvers.PostDominates(e.Store, checkID, candidateID) {
-				return true
-			}
+			cfgChecks = append(cfgChecks, checkID)
 			continue
 		}
 		return true
 	}
-	return false
+	if len(cfgChecks) == 0 {
+		return false
+	}
+	return solvers.PostDominatesCovered(e.Store, e.exitIndex(), cfgChecks, candidateID)
+}
+
+// exitIndex builds the graph's conditional-exit markers once and reuses them: every
+// postDominates clause in every rule asks about the same set.
+func (e *Engine) exitIndex() *solvers.ExitIndex {
+	if e.exits == nil {
+		e.exits = solvers.NewExitIndex(e.Store)
+	}
+	return e.exits
 }
 
 func nearestLoopParent(region string) (string, bool) {

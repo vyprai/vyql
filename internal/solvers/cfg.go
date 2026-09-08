@@ -1,6 +1,7 @@
 package solvers
 
 import (
+	"math"
 	"strconv"
 	"strings"
 
@@ -66,10 +67,14 @@ func locFile(loc string) string {
 	return loc[:idx]
 }
 
-// PostDominates reports whether `release` runs on EVERY path from `alloc` to function
-// exit — the test for "the resource is always released" (leak detection is its negation).
-// For structured control flow: release is in an ancestor-or-equal region of alloc (so it
-// is not skipped by leaving a branch alloc sits in) and comes after it in order.
+// PostDominates reports the structural post-dominance of one release site over one
+// acquisition: release is in an ancestor-or-equal region of alloc (so it is not skipped by
+// leaving a branch alloc sits in) and comes after it in order.
+//
+// That is a necessary condition for "the resource is always released", not a sufficient
+// one — a branch between the two can end the function without reaching the release. Ask
+// PostDominatesCovered, which weighs the whole release set against the function's exits,
+// for the question a leak rule is really asking.
 func PostDominates(store usg.Store, releaseID, allocID string) bool {
 	if releaseID == "" || allocID == "" {
 		return false
@@ -83,21 +88,27 @@ func PostDominates(store usg.Store, releaseID, allocID string) bool {
 }
 
 func postDominatesRegion(rRel, oRel, rAlloc, oAlloc string) bool {
-	if rRel == "" || rAlloc == "" {
-		return false
-	}
-	// alloc must be in the release's region or NESTED under it: then exiting the alloc's
-	// scope still reaches the release. (release nested deeper than alloc → conditionally
-	// skipped → does NOT post-dominate → leak.)
-	if !(rAlloc == rRel || strings.HasPrefix(rAlloc, rRel+"/")) {
-		return false
-	}
 	r, err1 := strconv.Atoi(oRel)
 	a, err2 := strconv.Atoi(oAlloc)
 	if err1 != nil || err2 != nil {
 		return false
 	}
-	return r > a
+	return postDominatesOrder(rRel, r, rAlloc, a)
+}
+
+// postDominatesOrder is the structural half of post-dominance: the release is written after
+// the acquisition, in the acquisition's own region or one enclosing it, so leaving the
+// acquisition's branch still reaches it. (release nested deeper than alloc → conditionally
+// skipped → does NOT post-dominate → leak.) It says nothing about a branch that ENDS the
+// function before reaching the release; PostDominatesCovered adds that.
+func postDominatesOrder(rRel string, oRel int, rAlloc string, oAlloc int) bool {
+	if rRel == "" || rAlloc == "" {
+		return false
+	}
+	if !(rAlloc == rRel || strings.HasPrefix(rAlloc, rRel+"/")) {
+		return false
+	}
+	return oRel > oAlloc
 }
 
 func reachesRegion(rA, oA, rB, oB string) bool {
@@ -163,4 +174,253 @@ func dominatesRegion(gRegion, gOrder, sRegion, sOrder string) bool {
 		return false
 	}
 	return go_ < so_
+}
+
+// ExitIndex holds the conditional-exit markers of a graph (usg.ExitNodeType), grouped by
+// the function-root region they sit under so answering a question about one function never
+// walks another's. Build it once per store and reuse it: the markers do not change while a
+// rule set is evaluated.
+type ExitIndex struct {
+	byRoot map[string][]exitPoint
+}
+
+// exitPoint is one `return`/`raise` written inside a control region.
+type exitPoint struct {
+	region string
+	order  int
+	guard  string // the node the condition of the branch it sits in evaluated to, "" if none
+}
+
+// NewExitIndex reads the exit markers out of store. A graph lowered without them (an
+// unconverted frontend, a store built by hand) yields an empty index, under which
+// PostDominatesCovered answers exactly as the region/order approximation always did.
+func NewExitIndex(store usg.Store) *ExitIndex {
+	x := &ExitIndex{byRoot: map[string][]exitPoint{}}
+	if store == nil {
+		return x
+	}
+	ids, err := store.NodesOfType(usg.ExitNodeType)
+	if err != nil {
+		return x
+	}
+	for _, id := range ids {
+		n, ok, _ := store.GetNode(id)
+		if !ok {
+			continue
+		}
+		region := n.Prop("region")
+		order, err := strconv.Atoi(n.Prop("order"))
+		if region == "" || err != nil {
+			continue
+		}
+		root := regionRoot(region)
+		x.byRoot[root] = append(x.byRoot[root],
+			exitPoint{region: region, order: order, guard: n.Prop(usg.ExitGuardProp)})
+	}
+	return x
+}
+
+// release is one candidate release site, resolved once per PostDominatesCovered call.
+type release struct {
+	region string
+	order  int
+	unwind bool // finally / defer: the language runs it however its region is left
+}
+
+// PostDominatesCovered reports whether the releases cover EVERY path from alloc to the
+// function's exit — the question `unless postDominates coveredBy` asks, and the one a single
+// release site cannot answer alone.
+//
+// The region/order encoding says a release written after the acquisition in an enclosing-or-
+// equal region is not skipped by leaving the branch the acquisition sits in. What it does not
+// say is that a branch can END the function: an early `return` between the two leaves without
+// ever reaching the release, and the trailing release was credited with covering that path
+// anyway. Exit markers make those paths visible, and a path is still covered when one of the
+// releases runs on it before it leaves — the error block that releases what it owns before
+// bailing out is the common form, and it is genuinely covered. So is the path taken by the
+// guard that follows the acquisition and asks whether it SUCCEEDED, which holds nothing
+// because the acquisition returned nothing; see acq for the two shapes that guard is
+// written in.
+func PostDominatesCovered(store usg.Store, exits *ExitIndex, releaseIDs []string, allocID string) bool {
+	if allocID == "" || len(releaseIDs) == 0 {
+		return false
+	}
+	an, ok, _ := store.GetNode(allocID)
+	if !ok {
+		return false
+	}
+	allocRegion := an.Prop("region")
+	allocOrder, err := strconv.Atoi(an.Prop("order"))
+	if err != nil {
+		return false
+	}
+	releases := make([]release, 0, len(releaseIDs))
+	var covering []release // those that post-dominate structurally: candidates to unseat
+	for _, id := range releaseIDs {
+		if id == "" || id == allocID {
+			continue
+		}
+		rn, ok, _ := store.GetNode(id)
+		if !ok {
+			continue
+		}
+		order, err := strconv.Atoi(rn.Prop("order"))
+		if rn.Prop("region") == "" || err != nil {
+			continue
+		}
+		r := release{region: rn.Prop("region"), order: order, unwind: rn.Prop(usg.UnwindProp) != ""}
+		releases = append(releases, r)
+		if postDominatesOrder(r.region, r.order, allocRegion, allocOrder) {
+			if r.unwind {
+				return true // no exit of the region it covers can skip it
+			}
+			covering = append(covering, r)
+		}
+	}
+	if len(covering) == 0 {
+		return false
+	}
+	acquisition := resolveAcq(store, allocID, allocRegion, allocOrder, releaseIDs)
+	for _, r := range covering {
+		if !exits.skipped(r, acquisition, releases) {
+			return true
+		}
+	}
+	return false
+}
+
+// acq is the acquisition side of one coverage question, resolved once.
+type acq struct {
+	region string
+	order  int
+	// established is the point from which a path that leaves the function is a path that
+	// abandons the resource; exits at or before it belong to the acquisition's own failure
+	// path. See establishedOrder.
+	established int
+	// tested holds the nodes the acquisition's result flows into. A branch whose condition
+	// is one of them is the acquisition's own success check, so the exit it takes leaves
+	// with nothing acquired. See skipped.
+	tested map[string]bool
+}
+
+func resolveAcq(store usg.Store, allocID, allocRegion string, allocOrder int, releaseIDs []string) acq {
+	a := acq{region: allocRegion, order: allocOrder, established: allocOrder}
+	edges, err := store.OutEdges(allocID, "FLOWS")
+	if err != nil || len(edges) == 0 {
+		return a // no handle to check: nothing can guard on it
+	}
+	a.tested = make(map[string]bool, len(edges))
+	for _, e := range edges {
+		a.tested[e.Dst] = true
+	}
+	a.established = establishedOrder(store, edges, allocOrder, releaseIDs)
+	return a
+}
+
+// establishedOrder is the point from which a path that leaves the function is a path that
+// abandons the resource: exits before it are not read as skipping the release.
+//
+// An acquisition that hands back a handle is followed, in every language, by the guard that
+// checks whether it succeeded — `if (U_FAILURE(errorCode)) return;`, `if err != nil { return }`.
+// That branch releases nothing because there is nothing to release, and reading it as a leak
+// path reports every careful acquisition in the corpus. The resource is established once
+// something OTHER than a release consumes the handle; until then the early exits belong to
+// the acquisition's own failure path. An acquisition with no value at all — `mu.Lock()` —
+// has no such guard, so it is established where it is written.
+//
+// This reads the guard by what it comes BEFORE, which is what an acquisition whose status
+// arrives through an out-parameter gives: the handle is the returned value and the guard
+// tests something else. The other spelling — the returned value IS the status, and the
+// handle is the out-parameter — is read by acq.tested instead, because there the guard is
+// the only thing the returned value ever reaches.
+func establishedOrder(store usg.Store, edges []usg.Edge, allocOrder int, releaseIDs []string) int {
+	isRelease := make(map[string]bool, len(releaseIDs))
+	for _, id := range releaseIDs {
+		isRelease[id] = true
+	}
+	established := math.MaxInt
+	for _, e := range edges {
+		if isRelease[e.Dst] {
+			continue
+		}
+		n, ok, _ := store.GetNode(e.Dst)
+		if !ok {
+			continue
+		}
+		o, err := strconv.Atoi(n.Prop("order"))
+		if err != nil || o <= allocOrder || o >= established {
+			continue
+		}
+		established = o
+	}
+	return established
+}
+
+// skipped reports whether some path leaves the function between the acquisition and rel
+// without any release running on it first.
+func (x *ExitIndex) skipped(rel release, a acq, releases []release) bool {
+	if x == nil {
+		return false
+	}
+	for _, e := range x.byRoot[regionRoot(rel.region)] {
+		if e.order <= a.order || e.order >= rel.order {
+			continue // not between the acquisition and the release
+		}
+		if e.order <= a.established {
+			continue // the acquisition's own failure guard, not an abandoned resource
+		}
+		if e.guard != "" && a.tested[e.guard] {
+			continue // the branch tests what the acquisition returned: it failed, so nothing is held
+		}
+		if !regionNestedIn(e.region, rel.region) {
+			continue // not inside a branch of the region the release runs in
+		}
+		if !regionNestedIn(e.region, a.region) && !regionNestedIn(a.region, e.region) {
+			continue // a sibling branch of the acquisition's — the exit is not reached after it
+		}
+		if !releasedBefore(e, a.order, releases) {
+			return true
+		}
+	}
+	return false
+}
+
+// releasedBefore reports whether one of the releases runs on the path to e after the
+// acquisition — a release written in e's own region or in one enclosing it, before it.
+func releasedBefore(e exitPoint, allocOrder int, releases []release) bool {
+	for _, r := range releases {
+		if r.order <= allocOrder || r.order >= e.order {
+			continue
+		}
+		if regionNestedIn(e.region, r.region) {
+			return true
+		}
+	}
+	return false
+}
+
+// regionNestedIn reports whether inner is outer or a control region nested inside it,
+// within ONE function: an inline function body ("#") is a separate flow, so a `return`
+// written in a callback exits the callback and not the function that passes it.
+func regionNestedIn(inner, outer string) bool {
+	if outer == "" || inner == "" {
+		return false
+	}
+	if inner == outer {
+		return true
+	}
+	return strings.HasPrefix(inner, outer+"/") && !strings.Contains(inner[len(outer):], "#")
+}
+
+// regionRoot returns the function-root prefix of a region: the namespace plus the "/fnN"
+// segment that opens the outermost function body it belongs to.
+func regionRoot(region string) string {
+	i := strings.IndexByte(region, '/')
+	if i < 0 {
+		return region
+	}
+	if j := strings.IndexAny(region[i+1:], "/#"); j >= 0 {
+		return region[:i+1+j]
+	}
+	return region
 }
