@@ -5023,6 +5023,17 @@ func collectValTokens(e nir.Expr, key string, out *[]string) {
 		collectValTokens(ex.Base, key, out)
 	case nir.Thru:
 		collectValTokens(ex.Inner, key, out)
+	case nir.Lambda:
+		// A callback that only returns a constant IS a value: `setHostnameVerifier((h, s) ->
+		// true)` is matched on `true`, not on the callback. Only a body that is one return
+		// counts — which is exactly how an expression-bodied lambda lowers; a body that does
+		// work is code, and folding its literals into the call's value tokens would make
+		// every `val` match on a callback argument read the whole body.
+		if len(ex.Body) == 1 {
+			if ret, ok := ex.Body[0].(nir.Return); ok {
+				collectValTokens(ret.Value, key, out)
+			}
+		}
 	}
 }
 
@@ -5591,6 +5602,16 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 	}
+	// higher-order call: a lambda handed to a call is invoked BY THE CALLEE, and what it is
+	// invoked with comes from the same call's other arguments — `apply(v -> sink(v), input)`,
+	// `each(items, x -> …)`, `sorted(data, key=lambda x: …)`. Route those values into the
+	// lambda's parameters. Without this the lambda's body is reachable only through what it
+	// captured, so a value handed to the call is followed only where the call's own return
+	// carries it and every sink inside the body is dark. The receiver-anchored dispatch above
+	// is the same move for `recv.forEach(cb)`; this is its argument side, and it needs no
+	// method list because the lambda argument itself is the evidence that the call is
+	// higher-order. FN-safe over-approximation.
+	l.flowArgsIntoCallbackParams(argVals)
 	l.applyTargetArgsCallback(call, argVals, sc)
 	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that
 	// function's body (arg → param → … → ret → result), so an in-body transform is
@@ -5740,6 +5761,32 @@ func (l *lowerer) captureTryExceptionTaint(result string, args []string, recvNod
 		}
 		if result != "" {
 			l.flow(result, exn)
+		}
+	}
+}
+
+// flowArgsIntoCallbackParams routes a higher-order call's ordinary argument values into the
+// parameters of the lambdas passed alongside them. Which parameter receives which value is the
+// callee's business and is not visible here (a resolved callee may forward them in any order, an
+// unresolved library one is opaque), so every non-callback value reaches every parameter of every
+// callback argument. A callback passed as data to another callback is not a value it is invoked
+// with, so lambda arguments are skipped as sources.
+func (l *lowerer) flowArgsIntoCallbackParams(argVals []string) {
+	if len(l.lambdaParams) == 0 {
+		return // nothing lowered a callback yet, so no call can be higher-order
+	}
+	for i, av := range argVals {
+		params := l.lambdaParams[av]
+		if len(params) == 0 {
+			continue
+		}
+		for j, val := range argVals {
+			if j == i || val == "" || len(l.lambdaParams[val]) > 0 {
+				continue
+			}
+			for _, p := range params {
+				l.flow(val, p)
+			}
 		}
 	}
 }

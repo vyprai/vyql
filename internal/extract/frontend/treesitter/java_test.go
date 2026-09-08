@@ -1338,3 +1338,70 @@ class Report {
 		t.Fatalf("taint on field remoteAddr leaked into the sibling field safe")
 	}
 }
+
+// A Java lambda is a lambda: its parameter is a parameter and its body is a body, so the
+// value `apply(v -> { sink(v); }, input)` is handed reaches the sink inside the lambda.
+// A lambda lowered as a generic Seq leaves the name `v` resolving to whatever the enclosing
+// scope binds, so nothing the call was handed reaches the sink — the shape CVE-2024-4536's
+// own credential flow is written in.
+func TestJavaHigherOrderCallCarriesArgumentIntoLambdaBody(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "TransferCallback.java")
+	src := []byte(`import java.sql.Statement;
+import javax.servlet.http.HttpServletRequest;
+
+public class TransferCallback {
+  private final Applier applier = new Applier();
+  private final Statement statement;
+
+  public void record(HttpServletRequest request) {
+    String input = request.getParameter("name");
+    applier.apply(value -> {
+      try {
+        statement.execute("SELECT * FROM users WHERE name = '" + value + "'");
+      } catch (Exception e) {
+        throw new IllegalStateException(e);
+      }
+    }, input);
+  }
+
+  static class Applier {
+    interface Fn { void apply(String value); }
+    void apply(Fn fn, String value) { fn.apply(value); }
+  }
+}`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var source, sink string
+	for _, n := range nodes {
+		switch n.Prop("callee_path") {
+		case "request.getParameter":
+			source = n.ID
+		case "statement.execute":
+			sink = n.Prop("arg0")
+		}
+	}
+	if source == "" || sink == "" {
+		t.Fatalf("missing source or sink arg; source=%q sink=%q", source, sink)
+	}
+	reachable, err := usg.BFS(g, source, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[sink] {
+		t.Fatal("the request parameter did not reach the sink inside the lambda's body")
+	}
+}
