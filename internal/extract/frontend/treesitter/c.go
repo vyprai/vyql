@@ -93,12 +93,13 @@ func ExtractObjC(files []string, root string) (nir.Program, error) {
 
 func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) (nir.Program, error) {
 	// the *Language is immutable grammar data; each worker gets its own parser referencing it.
-	mods := parseModules(files, root,
+	mods := parseModulesPreprocess(files, root,
 		func() *tree_sitter.Parser {
 			p := tree_sitter.NewParser()
 			_ = p.SetLanguage(lang)
 			return p
 		},
+		ccStripSAL,
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext), lang: ccLang(ext)}
 			body := []nir.Stmt{c.ccModuleContext(tree.RootNode())}
