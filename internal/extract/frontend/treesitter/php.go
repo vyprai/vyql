@@ -81,6 +81,52 @@ func (c *phConv) phpClassMembers(body *tree_sitter.Node) []string {
 	return out
 }
 
+// phpStaticPropName canonicalises a class static property access — `self::$p`, `static::$p`,
+// `parent::$p`, `Foo::$p` — to the single name "Class::$prop" that stands for its storage.
+// A static property lives on the class, so a write in one method and a read in another (or in
+// another file) are the same location; naming them alike is what lets lowering give them one
+// node. `self`/`static` name the enclosing class, the same substitution `dotted` already makes
+// for scoped CALLS, and `parent` names the base clause's first type. Returns "" for a scope
+// this cannot resolve to a class name (`$obj::$p`, `(expr)::$p`); those keep the generic walk.
+func (c *phConv) phpStaticPropName(n *tree_sitter.Node) string {
+	scope, name := c.field(n, "scope"), c.field(n, "name")
+	if scope == nil || name == nil {
+		return ""
+	}
+	switch c.kind(scope) {
+	case "name", "qualified_name", "relative_name", "relative_scope": // relative_scope is self/static/parent
+	default:
+		return ""
+	}
+	prop := c.text(name)
+	if !strings.HasPrefix(prop, "$") {
+		return "" // dynamic_variable_name (`self::$$p`) names no fixed property
+	}
+	cls := phpShortClassName(c.text(scope))
+	switch cls {
+	case "self", "static":
+		cls = c.className
+	case "parent":
+		if len(c.classBases) > 0 {
+			cls = phpShortClassName(c.classBases[0])
+		}
+	}
+	if cls == "" || cls == "self" || cls == "static" || cls == "parent" {
+		return "" // no enclosing class to name: nothing stable to key the storage on
+	}
+	return cls + "::" + prop
+}
+
+// phpShortClassName drops the namespace qualifier, so `\PHPFusion\Search\Search_Model` and
+// `Search_Model` name the same class — the short name is what a class declaration records.
+func phpShortClassName(t string) string {
+	t = strings.TrimSpace(t)
+	if i := strings.LastIndex(t, `\`); i >= 0 {
+		t = t[i+1:]
+	}
+	return t
+}
+
 // ExtractPHP parses PHP files into one NIR Program (all modules keyed "").
 func ExtractPHP(files []string, root string) (nir.Program, error) {
 	mods := parseModulesPreprocess(files, root,
@@ -374,6 +420,16 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 				return []nir.Stmt{nir.AugAssign{Target: c.text(left), Value: right, Loc: c.loc(inner)}}
 			}
 			return []nir.Stmt{nir.Assign{Targets: []string{c.text(left)}, Value: right}}
+		}
+		// class static property write (self::$p = v, Foo::$p = v) — assign to the canonical
+		// storage name, which lowering resolves to one node per property for the whole program.
+		if left != nil && c.kind(left) == "scoped_property_access_expression" {
+			if name := c.phpStaticPropName(left); name != "" {
+				if c.kind(inner) == "augmented_assignment_expression" {
+					return []nir.Stmt{nir.AugAssign{Target: name, Value: right, Loc: c.loc(inner)}}
+				}
+				return []nir.Stmt{nir.Assign{Targets: []string{name}, Value: right}}
+			}
 		}
 		// member-property write ($obj->field = v) — model as a PATH-sink Call (Method empty so
 		// it never collides with method-name mappings) so path mappings can match writes.
@@ -2133,6 +2189,13 @@ func (c *phConv) expr(n *tree_sitter.Node) nir.Expr {
 		return nir.Const{Loc: L, Value: c.text(n)} // non-interpolated → literal value
 	case "member_access_expression":
 		return nir.Attr{Base: c.expr(c.field(n, "object")), Attr: c.text(c.field(n, "name")), Path: c.dotted(n), Loc: L}
+	case "scoped_property_access_expression":
+		// class static property read (self::$p, Foo::$p) — one canonical storage name, so the
+		// read meets whatever any method of the class wrote. A scope this cannot name (`$obj::$p`,
+		// an expression) falls through to the generic walk below.
+		if name := c.phpStaticPropName(n); name != "" {
+			return nir.Name{ID: name, Loc: L}
+		}
 	case "subscript_expression":
 		kids := c.namedChildren(n)
 		var base, key nir.Expr = nir.Const{Loc: L}, nil

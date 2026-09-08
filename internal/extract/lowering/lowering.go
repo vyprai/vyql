@@ -67,17 +67,19 @@ type lowerer struct {
 	storeErr error
 	modCtr   map[string]int // per-module node-id counter (stable, module-local ids)
 
-	funcQual      map[string]*funcInfo         // "modkey::qual" -> info (last declaration wins)
-	funcOverloads map[string][]*funcInfo       // "modkey::qual" -> EVERY declaration, in source order
-	funcShort     map[string][]*funcInfo       // short name -> infos
-	globalTypes   map[string]string            // "modkey::global" -> declared type name
-	classQual     map[string]bool              // "modkey::Class"
-	classDefs     map[string]map[string]bool   // bare class name -> SET of modules that define it
-	classFields   map[string]map[string]string // "modkey::Class" -> field -> declared class type
-	importTables  map[string]map[string]importEntry
-	aliasTables   map[string]map[string]calleeAlias // module key -> name bound by a declaration to a callable
-	moduleTech    map[string]string
-	moduleGlobals map[string]map[string]string // JS/TS module-level binding name -> stable slot node
+	funcQual       map[string]*funcInfo         // "modkey::qual" -> info (last declaration wins)
+	funcOverloads  map[string][]*funcInfo       // "modkey::qual" -> EVERY declaration, in source order
+	funcShort      map[string][]*funcInfo       // short name -> infos
+	globalTypes    map[string]string            // "modkey::global" -> declared type name
+	classQual      map[string]bool              // "modkey::Class"
+	classDefs      map[string]map[string]bool   // bare class name -> SET of modules that define it
+	classFields    map[string]map[string]string // "modkey::Class" -> field -> declared class type
+	importTables   map[string]map[string]importEntry
+	aliasTables    map[string]map[string]calleeAlias // module key -> name bound by a declaration to a callable
+	moduleTech     map[string]string
+	moduleGlobals  map[string]map[string]string // JS/TS module-level binding name -> stable slot node
+	classStatics   map[string]string            // "Class::$prop" -> the one node standing for that static property
+	staticDeclMemo map[string]string            // memoized "class-as-written\x00$prop" -> declaring class
 
 	// inheritance-aware dispatch and implicit-`this` member resolution (populated by frontends
 	// that set ClassDef.Bases/Members). directMembers: "modkey::Class" -> declared member set;
@@ -2712,6 +2714,8 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		aliasTables:     map[string]map[string]calleeAlias{},
 		moduleTech:      map[string]string{},
 		moduleGlobals:   map[string]map[string]string{},
+		classStatics:    map[string]string{},
+		staticDeclMemo:  map[string]string{},
 		containers:      map[string]*containerInfo{},
 		templates:       map[string]templateInfo{},
 		modStr:          map[string]string{},
@@ -3136,6 +3140,60 @@ func (l *lowerer) moduleGlobalSlot(name string) string {
 		return globals[name]
 	}
 	return ""
+}
+
+// staticPropSep separates the class from the property in the canonical name the PHP frontend
+// gives a class static property access (`Search_Model::$search_text`). No ordinary identifier
+// contains it, so a name carrying it is always a static property and never a variable.
+const staticPropSep = "::$"
+
+// classStaticSlot returns the one node standing for a class static property, allocating it on
+// first use, or "" for a name that is not one. A static property is storage on the CLASS: a
+// write in one method and a read in another — or in another file — are the same location, and
+// unlike an instance field there is no receiver to carry the taint between them. Every access
+// therefore resolves to a single node, keyed by the DECLARING class so a subclass's `self::$p`
+// meets the parent's write on the parent's slot.
+func (l *lowerer) classStaticSlot(name string) string {
+	i := strings.Index(name, staticPropSep)
+	if i <= 0 {
+		return ""
+	}
+	prop := name[i+len("::"):] // keeps the '$'
+	key := l.staticDeclaringClass(name[:i], prop) + "::" + prop
+	if slot := l.classStatics[key]; slot != "" {
+		return slot
+	}
+	slot := l.nodeInlineWithID(sigID("", "__static", "var", key), "Name", l.curFile,
+		map[string]string{"class_static": "true"}, key, key, "", "")
+	l.classStatics[key] = slot
+	return slot
+}
+
+// staticDeclaringClass answers which class a static property is declared on. PHP does not
+// redeclare an inherited static — `self::$p` in a subclass names the parent's storage and the
+// subclass body says nothing about it — so the class named at the access is often not the one
+// that owns the property. Prefer that class when it declares the property; otherwise take the
+// one class in the program that does. Two classes declaring the same property name is an
+// ambiguity, and the name as written stands, so unrelated statics never merge.
+func (l *lowerer) staticDeclaringClass(cls, prop string) string {
+	key := cls + "\x00" + prop
+	if decl, ok := l.staticDeclMemo[key]; ok {
+		return decl
+	}
+	decl := cls
+	if !l.membersOfShort[cls][prop] {
+		found, n := "", 0
+		for c, members := range l.membersOfShort {
+			if members[prop] {
+				found, n = c, n+1
+			}
+		}
+		if n == 1 {
+			decl = found
+		}
+	}
+	l.staticDeclMemo[key] = decl
+	return decl
 }
 
 func (l *lowerer) importNode(m nir.Module, imp nir.Import) {
@@ -3622,6 +3680,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		for _, t := range st.Targets {
+			// a class static property write stores into the class's slot, which is where every
+			// other method's read of the same property looks. Nothing else below applies: the
+			// name is a class-qualified property, not a variable a scope can hold.
+			if slot := l.classStaticSlot(t); slot != "" {
+				l.flow(val, slot)
+				continue
+			}
 			// Hardcoded secret (CWE-798): a secret-named target assigned a NON-TRIVIAL string literal,
 			// directly, as an os.getenv(...,"default") fallback, or as the default argument of a
 			// constructor/config call — all baked into source. Skip test/seed files.
@@ -3755,6 +3820,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	case nir.AugAssign:
 		n := l.node("Concat", st.Loc, nil)
 		l.flow(l.eval(st.Value, sc), n)
+		// `Cls::$p .= v` reads the class's slot and writes it back.
+		if slot := l.classStaticSlot(st.Target); slot != "" {
+			l.flow(slot, n)
+			l.flow(n, slot)
+			return
+		}
 		l.flow(sc.node[st.Target], n)
 		if sc.lex[st.Target] {
 			l.flow(n, sc.node[st.Target])
@@ -4068,6 +4139,11 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nil:
 		return ""
 	case nir.Name:
+		// a class static property is storage on the class, not a binding in any scope, so it
+		// resolves to the class's slot from every method and every file that reads it.
+		if slot := l.classStaticSlot(ex.ID); slot != "" {
+			return slot
+		}
 		if v, ok := sc.node[ex.ID]; ok && v != "" {
 			return v
 		}

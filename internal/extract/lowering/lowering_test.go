@@ -2525,3 +2525,44 @@ func TestLowerSequentialGuardedBlocksReachEachOther(t *testing.T) {
 		t.Error("a release inside a guarded block must not post-dominate the allocation")
 	}
 }
+
+// A class static property is one location for the whole program, not one per file. The write
+// and the read below are in different modules, so the slot only joins them if it is keyed on
+// the property rather than on anything module-local.
+func TestClassStaticPropertySlotIsSharedAcrossModules(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{
+		{Key: "", File: "Model.php", Body: []nir.Stmt{
+			nir.ClassDef{Name: "Model", Loc: "Model.php:2", Members: []string{"$held"}, Body: []nir.Stmt{
+				nir.FuncDef{Name: "keep", Loc: "Model.php:3", Params: []string{"v"}, Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"Model::$held"}, Value: nir.Name{ID: "v", Loc: "Model.php:4"}},
+				}},
+			}},
+		}},
+		{Key: "", File: "Engine.php", Body: []nir.Stmt{
+			nir.ClassDef{Name: "Engine", Loc: "Engine.php:2", Body: []nir.Stmt{
+				nir.FuncDef{Name: "emit", Loc: "Engine.php:3", Body: []nir.Stmt{
+					// `self::$held` inside Engine: the property is declared on Model, and that is
+					// the class whose slot both accesses have to land on.
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "sink", Loc: "Engine.php:4"},
+						Args:   []nir.Expr{nir.Name{ID: "Engine::$held", Loc: "Engine.php:4"}},
+						Path:   "sink", Method: "sink", Loc: "Engine.php:4",
+					}},
+				}},
+			}},
+		}},
+	}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	param := findNodeID(t, g, "code.Param", "name", "v")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "Engine.php:4")
+	reachable, err := usg.BFS(g, param, "FLOWS", 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("the static property write in Model.php does not reach the read in Engine.php")
+	}
+}
