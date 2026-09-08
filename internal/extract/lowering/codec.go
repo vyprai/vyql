@@ -268,6 +268,7 @@ func encodePass1(d *pass1Delta) []byte {
 		w.paramEntries(f.ParamEntries)
 		w.resultEntries(f.ResultEntries)
 		w.boolean(f.Abstract)
+		w.boolean(f.Static)
 	}
 	w.strs(d.ClassQual)
 	w.strs(d.ClassDefs)
@@ -321,6 +322,7 @@ func decodePass1(raw []byte) (d *pass1Delta, err error) {
 				Params: r.smap(), ParamTypes: r.smap(),
 				Ret: r.str(), RetType: r.str(), Module: r.str(), Cls: r.str(), Name: r.str(),
 				ParamEntries: r.paramEntries(), ResultEntries: r.resultEntries(), Abstract: r.boolean(),
+				Static: r.boolean(),
 			}
 		}
 	}

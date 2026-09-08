@@ -25,6 +25,9 @@ type rbConv struct {
 	root       string
 	file       string
 	visibility string
+	// singletonSelf is set while converting the body of a `class << self` block, whose `def`s
+	// declare CLASS-level methods rather than instance methods of the enclosing class.
+	singletonSelf bool
 }
 
 // ExtractRuby parses Ruby files into one NIR Program (all modules keyed "").
@@ -302,6 +305,9 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		name := c.text(c.field(n, "name"))
 		params := c.params(c.field(n, "parameters"))
 		out := c.rubyFunctionContext(n)
+		// `def self.x` is a class-level method, and so is every `def` inside `class << self`.
+		// A class is free to declare an instance method of the same name; the two are
+		// different methods, and the flag is what keeps them apart downstream.
 		out = append(out, nir.FuncDef{
 			Name:         name,
 			Params:       params,
@@ -309,6 +315,7 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			Body:         c.rbMethodBody(body),
 			Loc:          L,
 			Exported:     c.rubyExportedMethod(name),
+			Static:       c.kind(n) == "singleton_method" || c.singletonSelf,
 		})
 		return out
 	case "class", "module":
@@ -316,14 +323,23 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		out := c.rubyClassContext(n, bases)
 		oldVisibility := c.visibility
 		c.visibility = "public"
+		// a class nested inside `class << self` declares ordinary instance methods of its own
+		oldSingleton := c.singletonSelf
+		c.singletonSelf = false
 		body := c.body(c.field(n, "body"))
+		c.singletonSelf = oldSingleton
 		c.visibility = oldVisibility
 		out = append(out, nir.ClassDef{Name: c.text(c.field(n, "name")), Bases: bases, Body: body, Loc: L})
 		return out
 	case "singleton_class":
 		oldVisibility := c.visibility
 		c.visibility = "public"
+		oldSingleton := c.singletonSelf
+		// `class << self` reopens the enclosing class's singleton class; `class << obj` reopens
+		// some other object's, which says nothing about the enclosing class's methods.
+		c.singletonSelf = c.kind(c.field(n, "value")) == "self"
 		body := c.body(c.field(n, "body"))
+		c.singletonSelf = oldSingleton
 		c.visibility = oldVisibility
 		return body
 	case "assignment":

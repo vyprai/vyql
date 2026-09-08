@@ -2743,3 +2743,112 @@ func TestBareMemberWriteReachesBareMemberReadInAnotherMethod(t *testing.T) {
 		t.Fatalf("taint on member v leaked into the sibling member safe")
 	}
 }
+
+// A class may declare a CLASS-LEVEL method and an INSTANCE method of the same name — Ruby's
+// `class << self` (or `def self.x`) beside a plain `def x`. Both register under "Class.name",
+// so a name-keyed table holds only the last, and two declarations of the same arity are
+// invisible to the argument count. The receiver is what names one: `Repo.checkout(...)` calls
+// the class-level declaration, and its body has to be the one the argument reaches.
+func TestStaticAndInstanceMethodOfTheSameNameAreToldApartByTheReceiver(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "repo.rb",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Repo", Loc: "repo.rb:1", Body: []nir.Stmt{
+				nir.FuncDef{Name: "checkout", Static: true, Params: []string{"url"}, Loc: "repo.rb:3", Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "system", Loc: "repo.rb:4"},
+						Args:   []nir.Expr{nir.Name{ID: "url", Loc: "repo.rb:4"}},
+						Path:   "system", Method: "system", Loc: "repo.rb:4",
+					}},
+				}},
+				// the instance method, declared last so it is the one a name-keyed table keeps
+				nir.FuncDef{Name: "checkout", Params: []string{"name"}, Loc: "repo.rb:8", Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "log", Loc: "repo.rb:9"},
+						Args:   []nir.Expr{nir.Name{ID: "name", Loc: "repo.rb:9"}},
+						Path:   "log", Method: "log", Loc: "repo.rb:9",
+					}},
+				}},
+			}},
+			nir.FuncDef{Name: "handle", Params: []string{"params"}, Loc: "repo.rb:13", Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "Repo", Loc: "repo.rb:14"},
+						Attr: "checkout", Path: "Repo.checkout", Loc: "repo.rb:14"},
+					Args: []nir.Expr{nir.Name{ID: "params", Loc: "repo.rb:14"}},
+					Path: "Repo.checkout", Method: "checkout", Loc: "repo.rb:14",
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "params", "func", "handle")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[findNodeID(t, g, "code.Arg", "loc", "repo.rb:4")] {
+		t.Fatalf("Repo.checkout's argument did not reach the class-level declaration's body: " +
+			"the call landed on the instance method of the same name and the class-level body has no edge from any call site")
+	}
+}
+
+// The other half of the same choice: an INSTANCE receiver names the instance declaration,
+// so the class-level body must stay out of that call's reach.
+func TestInstanceReceiverKeepsTheInstanceMethodOfAStaticInstancePair(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "repo.rb",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Repo", Loc: "repo.rb:1", Body: []nir.Stmt{
+				// the class-level declaration, declared last so it is the one a name-keyed table keeps
+				nir.FuncDef{Name: "checkout", Params: []string{"name"}, Loc: "repo.rb:3", Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "log", Loc: "repo.rb:4"},
+						Args:   []nir.Expr{nir.Name{ID: "name", Loc: "repo.rb:4"}},
+						Path:   "log", Method: "log", Loc: "repo.rb:4",
+					}},
+				}},
+				nir.FuncDef{Name: "checkout", Static: true, Params: []string{"url"}, Loc: "repo.rb:8", Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "system", Loc: "repo.rb:9"},
+						Args:   []nir.Expr{nir.Name{ID: "url", Loc: "repo.rb:9"}},
+						Path:   "system", Method: "system", Loc: "repo.rb:9",
+					}},
+				}},
+			}},
+			nir.FuncDef{Name: "handle", Params: []string{"params"}, Loc: "repo.rb:13", Body: []nir.Stmt{
+				nir.Assign{Targets: []string{"repo"}, Type: "Repo", Decl: true, Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "Repo", Loc: "repo.rb:14"},
+						Attr: "new", Path: "Repo.new", Loc: "repo.rb:14"},
+					Path: "Repo.new", Method: "new", Loc: "repo.rb:14",
+				}, Loc: "repo.rb:14"},
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "repo", Loc: "repo.rb:15"},
+						Attr: "checkout", Path: "repo.checkout", Loc: "repo.rb:15"},
+					Args: []nir.Expr{nir.Name{ID: "params", Loc: "repo.rb:15"}},
+					Path: "repo.checkout", Method: "checkout", Loc: "repo.rb:15",
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "params", "func", "handle")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[findNodeID(t, g, "code.Arg", "loc", "repo.rb:4")] {
+		t.Errorf("repo.checkout's argument did not reach the instance declaration's body: the call " +
+			"landed on the class-level method of the same name, which no instance receiver can invoke")
+	}
+	if reachable[findNodeID(t, g, "code.Arg", "loc", "repo.rb:9")] {
+		t.Errorf("repo.checkout's argument reached the class-level declaration's body")
+	}
+}

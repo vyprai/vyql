@@ -305,6 +305,7 @@ type fiGob struct {
 	ResultEntries      []nir.ResultEntry
 	Abstract           bool
 	SelfNode           string
+	Static             bool
 }
 type cfGob struct{ Key, Field, Type string }
 type cbGob struct {
@@ -353,18 +354,8 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 			paramNames: f.ParamNames, params: f.Params, paramTypes: f.ParamTypes, ret: f.Ret,
 			retType: f.RetType,
 			module:  f.Module, cls: f.Cls, name: f.Name, paramEntries: f.ParamEntries,
-			resultEntries: f.ResultEntries, abstract: f.Abstract, selfNode: f.SelfNode,
+			resultEntries: f.ResultEntries, abstract: f.Abstract, selfNode: f.SelfNode, static: f.Static,
 			ctor: isConstructorName(f.Name, f.Cls),
-		}
-		for _, pn := range fi.params {
-			l.paramObjects[pn] = true
-		}
-		if fi.selfNode != "" {
-			l.paramObjects[fi.selfNode] = true
-			l.classSelf[ns+"\x1f"+f.Cls] = fi.selfNode
-		}
-		if fi.ctor {
-			l.classCtors[f.Module+"::"+f.Cls] = f.Qual
 		}
 		l.funcQual[f.Qual] = fi
 		l.funcOverloads[f.Qual] = append(l.funcOverloads[f.Qual], fi)
@@ -470,7 +461,7 @@ func (l *lowerer) sigFingerprint() string {
 	}
 	for _, q := range sortedFuncKeys(l.funcQual) {
 		fi := l.funcQual[q]
-		fmt.Fprintf(h, "F %s ret=%s rettype=%s abstract=%v cls=%s\n", q, fi.ret, fi.retType, fi.abstract, fi.cls)
+		fmt.Fprintf(h, "F %s ret=%s rettype=%s abstract=%v static=%v cls=%s\n", q, fi.ret, fi.retType, fi.abstract, fi.static, fi.cls)
 		for _, entry := range fi.resultEntries {
 			fmt.Fprintf(h, "  r %s\n", strings.Join(entry.Tokens, "\x00"))
 		}

@@ -38,6 +38,7 @@ type funcInfo struct {
 	paramEntries  []nir.ParamEntry
 	resultEntries []nir.ResultEntry
 	abstract      bool   // an interface/abstract method (empty body) — dispatch to concrete impls
+	static        bool   // a class-level method (Ruby `def self.x` / `class << self`), not an instance one
 	selfNode      string // stable `this` node for the DECLARING CLASS (alias target for the receiver); "" if none
 	ctor          bool   // the class's constructor: a call naming the class runs this body on a new object
 }
@@ -49,8 +50,11 @@ type importEntry struct {
 }
 
 type lowerer struct {
-	prog           nir.Program
-	selfName       string
+	prog     nir.Program
+	selfName string
+	// curStatic is set while lowering the body of a CLASS-LEVEL declaration, where a call with no
+	// receiver names the class's own class-level method. See callNamesClassLevel.
+	curStatic      bool
 	resolveImports bool
 	ctorTypes      map[string]string // constructor callee-path -> returned type name
 	// phiOperands holds, per control-flow merge node, the values that merge joins.
@@ -3405,6 +3409,7 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		// an empty body marks an interface/abstract method: a call typed to it must dispatch
 		// to the concrete implementations (whose bodies carry the taint).
 		abstract: len(st.Body) == 0,
+		static:   st.Static,
 	}
 	// A method (no explicit self param[0]) gets a STABLE `this` node, so the receiver at every
 	// call site can be ALIASED to it (field mutations via this reach the receiver object —
@@ -3651,7 +3656,7 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 					Qual: qual, Short: st.Name, ParamNames: info.paramNames, Params: info.params,
 					ParamTypes: info.paramTypes, Ret: info.ret, RetType: info.retType, Module: info.module, Cls: info.cls,
 					Name: info.name, ParamEntries: info.paramEntries, ResultEntries: info.resultEntries, Abstract: info.abstract,
-					SelfNode: info.selfNode,
+					SelfNode: info.selfNode, Static: info.static,
 				})
 			}
 			// recurse into the body to register NESTED LOCAL FUNCTIONS (C# local functions, JS
@@ -3796,10 +3801,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		saveDecorators := l.curDecorators
 		l.curDecorators = append(append([]string{}, st.ContextTokens...), st.Decorators...)
 		l.functionContextAnalysisEvent(st.Loc, l.curDecorators)
+		saveStatic := l.curStatic
+		l.curStatic = st.Static // a nested `def` is an instance method again, so this is not inherited
 		l.deferred = append(l.deferred, nil)
 		l.block(st.Body, inner)
 		l.flushDeferred() // deferred bodies belong to THIS function, so flush inside the frame
 		sc.undoFunc(fm)
+		l.curStatic = saveStatic
 		l.curDecorators = saveDecorators
 		l.region, l.funcRoot, l.branchCond = saveRegion, saveRoot, saveCond
 	case nir.Assign:
@@ -5577,6 +5585,9 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// resolution keys a call by name, which cannot tell two declarations of the same name
 	// apart; the call site's own argument count can. See selectOverloads.
 	targets = l.selectOverloads(targets, len(args), recvForTargets)
+	// ... and when a class declares a static and an instance method of the same name, the
+	// argument count cannot tell them apart either, but the receiver can. See selectStaticOverloads.
+	targets = l.selectStaticOverloads(targets, call.Callee, len(args), recvForTargets)
 	dynamicCallback := len(targets) == 0 && l.dynamicFunctionParamCall(call.Callee, sc)
 	if dynamicCallback {
 		targets = l.dynamicCallbackTargets()
@@ -6329,6 +6340,113 @@ func (l *lowerer) selectOverloads(targets []*funcInfo, argc int, recvNode string
 		targets[i] = match
 	}
 	return targets
+}
+
+// receiverName returns the dotted name the call's RECEIVER was written as — "Repo" in
+// `Repo.checkout(x)`, "Foo.Repo" in `Foo::Repo.checkout(x)`, which the Ruby frontend flattens to
+// a dotted path. It reports false for a call with no receiver, and for a receiver that is not a
+// name at all (a call result, a literal), which is never the class.
+func receiverName(callee nir.Expr) (string, bool) {
+	attr, ok := callee.(nir.Attr)
+	if !ok {
+		return "", false
+	}
+	var recv string
+	switch base := attr.Base.(type) {
+	case nir.Name:
+		recv = base.ID
+	case nir.Attr:
+		recv = base.Path
+		if recv == "" {
+			recv = base.Attr
+		}
+	default:
+		return "", false
+	}
+	if recv == "" {
+		return "", false
+	}
+	return recv, true
+}
+
+// callNamesClassLevel reports whether this call site names the CLASS-LEVEL declaration of the
+// method rather than the instance one. A receiver that is the class itself — the class constant,
+// possibly namespaced (`Repo.checkout(x)`, `Foo::Repo.checkout(x)`) — names the class-level
+// declaration. A call with NO receiver is the same question one level up: written inside a
+// class-level body it names the class-level method, written inside an instance body the instance
+// one. Every other receiver is an instance.
+func callNamesClassLevel(callee nir.Expr, cls string, inStatic bool) bool {
+	recv, ok := receiverName(callee)
+	if !ok {
+		return inStatic // bare call — the enclosing declaration's own kind decides
+	}
+	if i := strings.LastIndexByte(recv, '.'); i >= 0 {
+		recv = recv[i+1:]
+	}
+	return recv == cls
+}
+
+// selectStaticOverloads re-points a resolved target at the declaration of its own name that
+// this call site's RECEIVER names. A class may declare a class-level method and an instance
+// method with the same name (Ruby's `class << self` / `def self.x` beside a plain `def x`),
+// and those are two different methods with two different bodies. Resolution keys both on
+// "Class.name" and keeps the last, and selectOverloads only tells declarations apart by
+// argument count, so a same-arity pair leaves the earlier body with no edge from any call
+// site at all — the taint into it is dropped.
+//
+// `Repo.checkout(url)` names the class-level one, anything else the instance one; see
+// callNamesClassLevel, which also answers it for a call with no receiver. The move is made only
+// when it is forced: exactly one declaration of the wanted kind, or — if several — exactly one of
+// those at this call's arity. An overload set that is all one kind, which is every set in every
+// language whose frontend does not set the flag, is left exactly as it was.
+func (l *lowerer) selectStaticOverloads(targets []*funcInfo, callee nir.Expr, argc int, recvNode string) []*funcInfo {
+	cloned := false
+	for i, t := range targets {
+		if t == nil || t.cls == "" {
+			continue
+		}
+		cands := l.funcOverloads[funcQualKey(t)]
+		if len(cands) < 2 {
+			continue
+		}
+		wantStatic := callNamesClassLevel(callee, t.cls, l.curStatic)
+		if t.static == wantStatic {
+			continue // resolution already landed on a declaration of the right kind
+		}
+		var kind []*funcInfo
+		for _, c := range cands {
+			if c != nil && c.static == wantStatic {
+				kind = append(kind, c)
+			}
+		}
+		match := soleFuncInfo(kind)
+		if match == nil {
+			var byArity []*funcInfo
+			for _, c := range kind {
+				if l.callArity(c, recvNode) == argc {
+					byArity = append(byArity, c)
+				}
+			}
+			match = soleFuncInfo(byArity)
+		}
+		if match == nil {
+			continue
+		}
+		if !cloned { // resolveTargets can hand back a slice the lowerer keeps (funcShort)
+			targets = append([]*funcInfo(nil), targets...)
+			cloned = true
+		}
+		targets[i] = match
+	}
+	return targets
+}
+
+// soleFuncInfo returns the only element of `in`, or nil when there is not exactly one.
+func soleFuncInfo(in []*funcInfo) *funcInfo {
+	if len(in) == 1 {
+		return in[0]
+	}
+	return nil
 }
 
 // uniqueTechFuncInfo returns the single tech-compatible info in `in`, if exactly
