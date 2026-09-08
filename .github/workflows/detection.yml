@@ -68,3 +68,62 @@ jobs:
         run: |
           VYQL_BENCH=1 BENCH_DIR=~/benchmark-corpora/${{ matrix.suite }} \
             go test -count=1 -timeout 60m -v ./cmd/vyql/ -run TestOWASPBenchmark
+
+  # Every language port of the OWASP Benchmark, scored against its own
+  # expectedresults ground truth. The Java and Python suites above cover two
+  # languages; this covers 22 more, so a change to shared lowering, NIR or a
+  # tree-sitter grammar cannot quietly move a score in a language nobody scans.
+  # The whole suite scores in well under a minute because the ports are small.
+  owasp-ports:
+    runs-on: ubuntu-latest
+    env:
+      CGO_ENABLED: "1"
+      OWASP_PORTS_TOKEN: ${{ secrets.OWASP_PORTS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The ports live in a private repository, so a fork and an external pull
+      # request cannot read them. Report that and stop rather than fail, because
+      # a contributor cannot supply the token.
+      - name: Check for corpus access
+        id: access
+        run: |
+          if [ -n "$OWASP_PORTS_TOKEN" ]; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::OWASP_PORTS_TOKEN is not set, so the language ports are not scored."
+          fi
+
+      - name: Fetch definitions
+        if: steps.access.outputs.available == 'true'
+        run: |
+          chmod +x scripts/ci-setup-definitions.sh
+          eval "$(./scripts/ci-setup-definitions.sh)"
+
+      - name: Cache the ports
+        if: steps.access.outputs.available == 'true'
+        id: ports
+        uses: actions/cache@v6
+        with:
+          path: ~/owasp-ports
+          key: owasp-ports-v1
+
+      - name: Fetch the ports
+        if: steps.access.outputs.available == 'true' && steps.ports.outputs.cache-hit != 'true'
+        run: |
+          git clone --depth 1 --quiet \
+            "https://x-access-token:${OWASP_PORTS_TOKEN}@github.com/vyprai/vypr-owasp-ports.git" \
+            ~/owasp-ports
+
+      # The harness enforces each port's checked-in parity target, so a language
+      # that starts scoring worse fails here.
+      - name: Score every port
+        if: steps.access.outputs.available == 'true'
+        run: |
+          VYQL_BENCH_ALL_OWASP=1 VYQL_OWASP_PORTS_DIR="$HOME/owasp-ports" \
+            go test -count=1 -timeout 60m -v ./cmd/vyql/ -run TestLocalOWASPPortBenchmarks
