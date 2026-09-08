@@ -1099,6 +1099,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccNarrowDeclaredBoundsCheckObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowingCastBoundsCheckObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccBufferRelocationOriginObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccCountedPopulationObservations(n)...)
 		}
 		return []nir.Stmt{nir.FuncDef{
 			Name:          name,
@@ -10038,4 +10039,367 @@ func ccDefAsgnClip(s string) string {
 		cut--
 	}
 	return s[:cut]
+}
+
+// ccElementPopulation is one write that populates an element of a container:
+// the containers the element belongs to, the member the write sets, the write
+// as written, where it sits, and the branch it sits in. The branch is what the
+// counter is judged against -- a population a branch performs states its own
+// bookkeeping there, and the counter either moves with it or is left behind.
+type ccElementPopulation struct {
+	containers []string
+	member     string
+	text       string
+	loc        string
+	// anchor marks a write whose element the code names by subscript, so the
+	// write itself says which container the element belongs to.
+	anchor    bool
+	scopeFrom uint
+	scopeTo   uint
+}
+
+// ccContainerCounterWrite is one write to a field: the field as written, where
+// it sits, and whether the write moves it as a count. Only a counting write --
+// an increment, a decrement, a `+=` or `-=`, or an assignment of a literal or
+// of arithmetic on the field itself -- states that the field is a counter; any
+// write at all keeps it in step within the branch that performs it.
+type ccContainerCounterWrite struct {
+	name   string
+	at     uint
+	counts bool
+}
+
+// ccCountedPopulationObservations pairs a container's element population with
+// the counter that bounds its indexing, and reports a population the counter
+// does not follow.
+//
+// The routine states the pairing itself. A branch that writes an element of a
+// container by subscript and moves a counter field of the same object in that
+// same branch says that the counter counts those elements: `t->glyphs[lead].mark
+// = 1` beside `t->n++`. A second branch that writes the same member of the same
+// container's elements and moves nothing leaves the counter claiming a
+// population that is no longer there, and whatever later indexes by that
+// counter reads an element this routine never wrote.
+//
+// Whether the drift is a defect stays the rule's question. What the frontend
+// can see and nothing downstream can reconstruct is the pairing -- which
+// counter counts which container's elements -- because no single statement
+// says it: it is stated by the co-occurrence of two writes in one branch, and
+// a binding predicate tests one token at a time.
+//
+// The counted and the uncounted form are both reported, on separate paths, so
+// a counter kept in step is distinguishable from one left stale rather than
+// merely absent from the graph.
+//
+// Narrowing: the pairing is anchored only by a subscripted element write, so a
+// plain field store never establishes a counter; the counter must be a field
+// of the same object as the container, so an unrelated count in the same
+// branch does not pair; both writes must sit under a conditional, because a
+// branch is what performs a population and what can forget to charge it; and
+// an element reached through a pointer pairs only when the routine's own
+// assignments walk that pointer back to the container the anchor named.
+//
+// Residuals, all false-negative: the pairing is intra-function, so a counter
+// maintained in a helper is invisible; a container held in a local array or a
+// bare pointer states no object for the counter to belong to and does not
+// pair; and a population written through a pointer the routine receives rather
+// than walks resolves to no container.
+func (c *ccConv) ccCountedPopulationObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	writes, counters, aliases := c.ccPopulationSites(body)
+	if len(writes) == 0 || len(counters) == 0 {
+		return nil
+	}
+	for i := range writes {
+		writes[i].containers = ccResolveContainers(aliases, writes[i].containers)
+	}
+
+	// A subscripted write beside a counting write of the same object states
+	// the pairing: this counter counts this container's elements.
+	type ccPopulationPairing struct{ counter, counted string }
+	pairs := map[string]ccPopulationPairing{}
+	for _, w := range writes {
+		if !w.anchor {
+			continue
+		}
+		for _, cw := range counters {
+			if !cw.counts || cw.at < w.scopeFrom || cw.at >= w.scopeTo {
+				continue
+			}
+			for _, container := range w.containers {
+				parent := ccFieldParent(container)
+				if parent == "" || parent != ccFieldParent(cw.name) {
+					continue
+				}
+				key := container + "|" + w.member
+				if _, ok := pairs[key]; !ok {
+					pairs[key] = ccPopulationPairing{counter: cw.name, counted: w.text}
+				}
+			}
+		}
+	}
+	if len(pairs) == 0 {
+		return nil
+	}
+
+	seen := map[string]bool{}
+	var out []nir.Stmt
+	for _, w := range writes {
+		for _, container := range w.containers {
+			pair, ok := pairs[container+"|"+w.member]
+			if !ok {
+				continue
+			}
+			key := strconv.FormatUint(uint64(w.scopeFrom), 10) + "|" + container + "|" + w.member + "|" + pair.counter
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			path, method, sync := "analysis.element_count.uncounted_population", "uncounted_population", "sync=stale"
+			if ccCounterWrittenIn(counters, pair.counter, w.scopeFrom, w.scopeTo) {
+				path, method, sync = "analysis.element_count.counted_population", "counted_population", "sync=in_step"
+			}
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: path, Loc: w.loc},
+				Args: []nir.Expr{
+					nir.Const{Loc: w.loc, Value: "counter=" + pair.counter},
+					nir.Const{Loc: w.loc, Value: "container=" + container},
+					nir.Const{Loc: w.loc, Value: "element=" + w.member},
+					nir.Const{Loc: w.loc, Value: sync},
+					nir.Const{Loc: w.loc, Value: "write=" + w.text},
+					nir.Const{Loc: w.loc, Value: "counted=" + pair.counted},
+				},
+				Path:   path,
+				Method: method,
+				Loc:    w.loc,
+			}})
+		}
+	}
+	return out
+}
+
+// ccCounterWrittenIn reports whether a branch writes a counter at all. Any
+// write keeps it in step there -- the branch that populates has charged the
+// count, whichever way it spells the charge -- while the strict counting form
+// is what identifies the field as a counter in the first place.
+func ccCounterWrittenIn(counters []ccContainerCounterWrite, name string, from, to uint) bool {
+	for _, cw := range counters {
+		if cw.name == name && cw.at >= from && cw.at < to {
+			return true
+		}
+	}
+	return false
+}
+
+// ccPopulationSites walks a routine once for the three parts of the fact:
+// every write that populates an element of a container, every write to a
+// field that could be the counter of one, and the plain pointer copies that
+// say which container a walked pointer came from.
+//
+// The branch a write sits in is the outermost conditional statement enclosing
+// it, not the innermost: a repair that charges the count in a sibling arm of
+// the same branch -- `if (w->mark) t->n--;` beside the write -- keeps the
+// count in step, and reading only the innermost arm would call it stale.
+func (c *ccConv) ccPopulationSites(body *tree_sitter.Node) ([]ccElementPopulation, []ccContainerCounterWrite, map[string][]string) {
+	var writes []ccElementPopulation
+	var counters []ccContainerCounterWrite
+	aliases := map[string][]string{}
+	var scope *tree_sitter.Node
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		entered := false
+		switch c.kind(n) {
+		case "if_statement", "switch_statement":
+			if scope == nil {
+				scope, entered = n, true
+			}
+		case "init_declarator":
+			if name := c.declName(c.field(n, "declarator")); name != "" {
+				if root := c.ccElementBase(c.field(n, "value")); root != "" {
+					aliases[name] = append(aliases[name], root)
+				}
+			}
+		case "update_expression", "assignment_expression":
+			if name, counts := c.ccContainerCounterWrite(n); name != "" {
+				counters = append(counters, ccContainerCounterWrite{name: name, at: n.StartByte(), counts: counts})
+			}
+			if c.kind(n) == "assignment_expression" && c.assignmentOp(n) == "=" {
+				if name := ccIdentifierText(c, c.field(n, "left")); name != "" {
+					if root := c.ccElementBase(c.field(n, "right")); root != "" {
+						aliases[name] = append(aliases[name], root)
+					}
+				}
+				if w, ok := c.ccElementPopulationWrite(n); ok && scope != nil {
+					w.scopeFrom, w.scopeTo = scope.StartByte(), scope.EndByte()
+					writes = append(writes, w)
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+		if entered {
+			scope = nil
+		}
+	}
+	walk(body)
+	return writes, counters, aliases
+}
+
+// ccElementPopulationWrite reads an assignment as a write to one element of a
+// container. `k[i].m = v` and `k[i]->m = v` name the container themselves and
+// anchor a pairing; `p->m = v` writes an element only as far as the routine's
+// own assignments walk p back to a container, so it carries the pointer as its
+// container and is resolved afterwards. A store straight into a field of a
+// named object -- `t->n_lines = 1` -- reaches no element and is not a
+// population.
+//
+// The member the write sets is what a second population has to write for the
+// two to be the same population, so the element has to be a structured one. A
+// container of scalars states no member, and a whole-element store into one --
+// `hashtbl[h] = id` -- is how every open-addressed table, scratch map and
+// character buffer is written, none of which is a population a counter follows.
+func (c *ccConv) ccElementPopulationWrite(n *tree_sitter.Node) (ccElementPopulation, bool) {
+	left := ccUnwrapCExpr(c.field(n, "left"))
+	if left == nil || c.kind(left) != "field_expression" {
+		return ccElementPopulation{}, false
+	}
+	member := c.text(c.field(left, "field"))
+	loc := c.loc(n)
+	if member == "" || loc == "" {
+		return ccElementPopulation{}, false
+	}
+	w := ccElementPopulation{member: member, text: compactCExprText(c.text(n)), loc: loc}
+	arg := ccUnwrapCExpr(c.field(left, "argument"))
+	switch {
+	case arg == nil:
+		return ccElementPopulation{}, false
+	case c.kind(arg) == "subscript_expression":
+		base := c.ccElementBase(c.field(arg, "argument"))
+		if base == "" {
+			return ccElementPopulation{}, false
+		}
+		w.containers, w.anchor = []string{base}, true
+	case c.kind(arg) == "identifier":
+		w.containers = []string{c.text(arg)}
+	default:
+		return ccElementPopulation{}, false
+	}
+	return w, true
+}
+
+// ccContainerCounterWrite reads a write to a field and says whether it moves
+// the field as a count. `t->n++`, `--t->n`, `t->n += k` and `t->n = 0` all
+// count; `t->lines = realloc(...)` replaces a pointer and `t->max *= 2` grows a
+// capacity, and neither states a population. A write that does not count is
+// still returned, because within the branch that populates, any write to the
+// counter has charged it.
+func (c *ccConv) ccContainerCounterWrite(n *tree_sitter.Node) (string, bool) {
+	switch c.kind(n) {
+	case "update_expression":
+		arg := ccUnwrapCExpr(c.field(n, "argument"))
+		if arg == nil || c.kind(arg) != "field_expression" {
+			return "", false
+		}
+		return compactCExprText(c.text(arg)), true
+	case "assignment_expression":
+		left := ccUnwrapCExpr(c.field(n, "left"))
+		if left == nil || c.kind(left) != "field_expression" {
+			return "", false
+		}
+		name := compactCExprText(c.text(left))
+		switch c.assignmentOp(n) {
+		case "+=", "-=":
+			return name, true
+		case "=":
+			return name, c.ccCountValueExpr(c.field(n, "right"), name)
+		}
+		return name, false
+	}
+	return "", false
+}
+
+// ccCountValueExpr reports whether an assignment's value keeps a count: an
+// integer literal, or arithmetic that reads the counter itself. Anything a
+// call produces is excluded -- a field assigned a call's result is being
+// replaced, not maintained.
+func (c *ccConv) ccCountValueExpr(value *tree_sitter.Node, name string) bool {
+	value = ccUnwrapCExpr(value)
+	if value == nil {
+		return false
+	}
+	text := compactCExprText(c.text(value))
+	if strings.ContainsAny(text, "()") {
+		return false
+	}
+	if c.kind(value) == "number_literal" {
+		return true
+	}
+	return strings.Contains(text, name)
+}
+
+// ccElementBase reads the container an expression reaches: the array a
+// subscript indexes, the pointer arithmetic's pointer operand, and the field or
+// name underneath. `t->glyphs + i` and `t->glyphs[lead]` both reach
+// `t->glyphs`.
+func (c *ccConv) ccElementBase(n *tree_sitter.Node) string {
+	n = ccUnwrapCExpr(n)
+	if n == nil {
+		return ""
+	}
+	switch c.kind(n) {
+	case "identifier":
+		return c.text(n)
+	case "field_expression":
+		return compactCExprText(c.text(n))
+	case "subscript_expression":
+		return c.ccElementBase(c.field(n, "argument"))
+	case "binary_expression":
+		switch c.text(c.field(n, "operator")) {
+		case "+", "-":
+			if base := c.ccElementBase(c.field(n, "left")); base != "" {
+				return base
+			}
+			return c.ccElementBase(c.field(n, "right"))
+		}
+	case "update_expression", "unary_expression", "pointer_expression":
+		return c.ccElementBase(c.field(n, "argument"))
+	case "assignment_expression":
+		return c.ccElementBase(c.field(n, "right"))
+	}
+	return ""
+}
+
+// ccResolveContainers follows a walked pointer back to the containers the
+// routine wrote it from: `w = s2`, `s2 = s3`, `s3 = cur`, `cur = t->glyphs + i`
+// resolves w to `t->glyphs`. A name the routine never writes stands for itself,
+// so a container named directly is unaffected.
+func ccResolveContainers(aliases map[string][]string, bases []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	added := map[string]bool{}
+	queue := append([]string(nil), bases...)
+	for i := 0; i < len(queue); i++ {
+		cur := queue[i]
+		if cur == "" || seen[cur] {
+			continue
+		}
+		seen[cur] = true
+		sources, ok := aliases[cur]
+		if !ok {
+			if !added[cur] {
+				added[cur] = true
+				out = append(out, cur)
+			}
+			continue
+		}
+		queue = append(queue, sources...)
+	}
+	return out
 }
