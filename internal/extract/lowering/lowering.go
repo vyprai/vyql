@@ -106,6 +106,15 @@ type lowerer struct {
 	classNest     []string // the enclosing class names, outermost first; last element is curClass
 	curDecorators []string // syntax annotations/decorators on the enclosing function
 
+	// curFunc is the resolution key of the function whose body is being lowered ("" at
+	// module level), and recursion the module-local call graph keyed by it. A call that
+	// re-enters a function already on the stack is what recursion IS, and nothing else in
+	// the lowering relates a call site to the function it was written in. A closure body is
+	// attributed to the function it was written in, like curDecorators: a call written
+	// inside one still runs where the enclosing function runs. See recursion.go.
+	curFunc   string
+	recursion *recursionScan
+
 	// B1 structured-CFG metadata. `region` is the current control-region path, namespaced by
 	// module key (e.g. "app/utils.go/fn3/loop5"); every node is stamped with it plus a
 	// per-module monotonic `order`. For goto-free structured control flow this encodes the
@@ -3187,9 +3196,18 @@ func (l *lowerer) run() error {
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS, l.curFile = m.Key, "", ModuleNS(m), m.File
 		body := l.bodyOf(m)
-		l.block(body.Body, l.moduleScope(body))
+		l.lowerModuleBody(body)
 	}
 	return nil
+}
+
+// lowerModuleBody lowers one module's statements and closes the facts that are only decidable
+// once the whole module has been seen. A module is the unit those facts are keyed to: the
+// incremental lowerer caches a module's nodes against that module's own content, so anything
+// derived from another file would go stale with nothing to invalidate it.
+func (l *lowerer) lowerModuleBody(body nir.Module) {
+	l.block(body.Body, l.moduleScope(body))
+	l.emitRecursionCycles()
 }
 
 func (l *lowerer) moduleScope(m nir.Module) *scope {
@@ -3803,11 +3821,14 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.functionContextAnalysisEvent(st.Loc, l.curDecorators)
 		saveStatic := l.curStatic
 		l.curStatic = st.Static // a nested `def` is an instance method again, so this is not inherited
+		saveFunc := l.curFunc
+		l.curFunc = funcQualKey(info)
 		l.deferred = append(l.deferred, nil)
 		l.block(st.Body, inner)
 		l.flushDeferred() // deferred bodies belong to THIS function, so flush inside the frame
 		sc.undoFunc(fm)
 		l.curStatic = saveStatic
+		l.curFunc = saveFunc
 		l.curDecorators = saveDecorators
 		l.region, l.funcRoot, l.branchCond = saveRegion, saveRoot, saveCond
 	case nir.Assign:
@@ -4116,6 +4137,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 	// condition (python evaluated it) stays byte-identical, and one that did NOT (go) sets
 	// Cond=nil and the eval is a no-op — each frontend keeps its exact prior node set.
 	case nir.If:
+		// A guard is where a depth budget is spent: the counter is compared here and the
+		// branch that follows is what stops the descent (see recursion.go).
+		l.noteDepthBudgetCondition(st.Cond)
 		condNode := l.eval(st.Cond, sc)
 		if pat, name, ok := unsoundContainmentGuard(st.Cond); ok && condNode != "" {
 			observed := condNode
@@ -4531,6 +4555,7 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 	case nir.Ternary:
 		// `cond ? then : else` — prune the dead arm when the condition is a compile-time
 		// constant; otherwise both arms flow (over-approximation).
+		l.noteDepthBudgetCondition(ex.Cond) // a guard written in value position is still a guard
 		cond := l.eval(ex.Cond, sc)
 		if live, ok := l.constBool(ex.Cond, sc); ok {
 			if live {
@@ -5588,6 +5613,16 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// ... and when a class declares a static and an instance method of the same name, the
 	// argument count cannot tell them apart either, but the receiver can. See selectStaticOverloads.
 	targets = l.selectStaticOverloads(targets, call.Callee, len(args), recvForTargets)
+	// The resolved edge of the module's own call graph, recorded where it is known: a cycle
+	// through it is what a recursive descent is (see recursion.go).
+	if !reachOnly {
+		for _, target := range targets {
+			l.noteRecursionCall(target, result, call.Loc)
+		}
+	}
+	if len(targets) == 0 {
+		l.noteModuleLocalRecursionCall(call.Callee, result, call.Loc)
+	}
 	dynamicCallback := len(targets) == 0 && l.dynamicFunctionParamCall(call.Callee, sc)
 	if dynamicCallback {
 		targets = l.dynamicCallbackTargets()
