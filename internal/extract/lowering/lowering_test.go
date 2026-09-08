@@ -2227,6 +2227,53 @@ func TestLowerReturnInsideCallbackDoesNotSkipTheEnclosingRelease(t *testing.T) {
 	}
 }
 
+// A callback opened inside a branch carries that branch in its region path, so the region
+// of a `return` written in the callback does start with the enclosing function body's own
+// region followed by "/". The callback marker "#" is what separates the callback's exits
+// from the function's: read without it, the return leaves the enclosing function and the
+// release written after the branch is reported as a resource the function abandons.
+func TestLowerReturnInsideCallbackOpenedInABranchDoesNotSkipTheEnclosingRelease(t *testing.T) {
+	g, err := Lower(funcProgram("app.go",
+		callStmt("res.Acquire", "app.go:2"),
+		nir.If{Cond: nir.Name{ID: "ok", Loc: "app.go:3"}, Then: []nir.Stmt{
+			nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Attr{Base: nir.Name{ID: "list", Loc: "app.go:4"}, Attr: "each", Path: "list.each", Loc: "app.go:4"},
+				Path:   "list.each", Method: "each", Loc: "app.go:4",
+				Args: []nir.Expr{nir.Lambda{Body: []nir.Stmt{
+					nir.If{Cond: nir.Name{ID: "skip", Loc: "app.go:5"}, Then: []nir.Stmt{nir.Return{}}, Loc: "app.go:5"},
+				}, Loc: "app.go:4"}},
+			}},
+		}, Loc: "app.go:3"},
+		callStmt("res.Release", "app.go:8"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	acquire := callNodeByPath(t, g, "res.Acquire")
+	release := callNodeByPath(t, g, "res.Release")
+
+	exits := exitNodes(t, g)
+	if len(exits) != 1 {
+		t.Fatalf("want one exit marker for the return inside the callback, got %d", len(exits))
+	}
+	// Both halves of the shape this test exists for: the region passes the plain prefix
+	// test against the function body, and only the callback marker tells them apart.
+	region, body := exits[0].Prop("region"), acquire.Prop("region")
+	if !strings.HasPrefix(region, body+"/") {
+		t.Fatalf("exit marker region = %q, want a callback opened inside a branch of the body's %q", region, body)
+	}
+	if !strings.Contains(region[len(body):], "#") {
+		t.Fatalf("exit marker region = %q, want the callback marker under the body's %q", region, body)
+	}
+
+	if !solvers.PostDominates(g, release.ID, acquire.ID) {
+		t.Fatal("the structural relation still holds: the release follows in the enclosing region")
+	}
+	if !solvers.PostDominatesCovered(g, solvers.NewExitIndex(g), []string{release.ID}, acquire.ID) {
+		t.Error("a return inside a callback leaves the callback, so the release after the branch still runs")
+	}
+}
+
 // A deferred release runs on every path out of the function, early returns included, so
 // the lowering marks it as unwind cleanup and the exit markers do not unseat it.
 func TestLowerDeferredReleaseCoversAnEarlyReturn(t *testing.T) {
@@ -2406,6 +2453,37 @@ func TestLowerExitMarkerCarriesTheConditionOfItsOwnBranch(t *testing.T) {
 	}
 	if got := exits[1].Prop(usg.ExitGuardProp); got != "" {
 		t.Errorf("a return inside a loop body is not taken on any branch condition, got guard %q", got)
+	}
+}
+
+// Every control region opened inside a branch starts a scope of its own, so it carries no
+// condition from the branch that encloses it. A `return` written in a loop that sits inside
+// an `if` arm is reached by iterating the loop, not because the `if` condition held, and its
+// exit marker records no guard at all. The guard is what marks an exit as the acquisition's
+// own failure check, and an exit wrongly marked that way hides a resource the function
+// really does abandon.
+func TestLowerExitMarkerInALoopInsideABranchCarriesNoCondition(t *testing.T) {
+	g, err := Lower(funcProgram("app.go",
+		callStmt("res.Acquire", "app.go:2"),
+		nir.If{Cond: nir.Name{ID: "status", Loc: "app.go:3"}, Then: []nir.Stmt{
+			nir.Loop{Body: []nir.Stmt{nir.Return{}}, Loc: "app.go:4"},
+		}, Loc: "app.go:3"},
+		callStmt("res.Release", "app.go:7"),
+	), true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	exits := exitNodes(t, g)
+	if len(exits) != 1 {
+		t.Fatalf("want one exit marker for the return inside the loop, got %d", len(exits))
+	}
+	// The shape this test exists for: the loop region is opened inside the branch arm, so
+	// the enclosing condition is live at the point the loop body is lowered.
+	if region := exits[0].Prop("region"); !strings.Contains(region, ".t/loop") {
+		t.Fatalf("exit marker region = %q, want a loop opened inside an if arm", region)
+	}
+	if got := exits[0].Prop(usg.ExitGuardProp); got != "" {
+		t.Errorf("exit marker guard = %q, want none: the loop body is not entered on the enclosing branch's condition", got)
 	}
 }
 
