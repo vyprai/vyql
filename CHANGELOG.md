@@ -41,6 +41,17 @@ behaviour change, even if no code moved.
 
 ### Fixed
 
+- **An index the allocation reserves a slot for is in bounds.**
+  `VYQL-MEM-010` (`code.FieldDerivedIndexAccess`) reports an index derived from
+  a field or a length call only when nothing bounds it. The C and C++ frontends
+  read the allocation that sizes the subscripted array: when it counts
+  `idx + K` elements for a constant K of at least one, the index names a slot
+  the allocation reserved and the access is in bounds. This covers the
+  terminator idiom, `p = malloc((n + 1) * sizeof(*p))` followed by
+  `p[n] = NULL`, in both languages and for `malloc`, `calloc`, `realloc`,
+  `reallocarray`, `alloca` and `new T[n + 1]`. An allocation of exactly `idx`
+  elements, an allocation of a different array and an index with no allocation
+  to relate it to all still report.
 - **A scoped call-argument predicate reads the value part of the token again.**
   A predicate value written as `<prefix>:<want>` names a token prefix and what
   the rest of that token must satisfy, so `call_arg:startswith:__` matches a

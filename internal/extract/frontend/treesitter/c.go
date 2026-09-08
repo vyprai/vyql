@@ -1889,6 +1889,15 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 	// loops is the stack of enclosing for-loops whose induction variable a
 	// field read bounds; innermost last.
 	var loops []ccLoopFieldBound
+	// allocations maps each array to the element counts allocated for it, read
+	// on the first structured index because most functions have none.
+	var allocations map[string][]string
+	allocationCounts := func() map[string][]string {
+		if allocations == nil {
+			allocations = c.ccArrayAllocationCounts(body)
+		}
+		return allocations
+	}
 	var out []nir.Stmt
 	var walk func(*tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
@@ -1920,7 +1929,8 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 				if !seen[loc] {
 					seen[loc] = true
 					guard := "guard=missing_upper_bound"
-					if ccHasUpperBoundGuard(bodyText, compactCExprText(c.textBefore(body, n)), compactIdx) {
+					if ccHasUpperBoundGuard(bodyText, compactCExprText(c.textBefore(body, n)), compactIdx) ||
+						c.ccIndexWithinAllocation(n, compactIdx, allocationCounts()) {
 						guard = "guard=upper_bound"
 					}
 					path := "analysis.index.access"
@@ -8797,6 +8807,196 @@ func ccHasUpperBoundGuard(bodyText, prefixText, idx string) bool {
 	// A zero or sign literal on the right is a nonzero/sign test (`s->len > 0`,
 	// `s->len >= 0`, `s->len > -1`), not a bound, and does not count either.
 	return ccComparisonAfter(prefixText, idx, '>', true)
+}
+
+// ccIndexWithinAllocation reports whether the allocation that sizes the
+// subscripted array leaves room for this index. The allocation counts
+// `idx + K` elements for a constant K of at least one, so the index names an
+// element the allocation reserved and needs no comparison to be in bounds.
+// This is the terminator idiom: `p = malloc((n + 1) * sizeof(*p)); p[n] = 0;`.
+// An allocation of exactly `idx` elements leaves the index one past the end
+// and is not in bounds, which is why the constant must be strictly larger.
+func (c *ccConv) ccIndexWithinAllocation(sub *tree_sitter.Node, compactIdx string, counts map[string][]string) bool {
+	array := compactCExprText(c.text(c.field(sub, "argument")))
+	if array == "" || compactIdx == "" {
+		return false
+	}
+	idxBase, idxOffset := ccConstantOffset(compactIdx)
+	for _, count := range counts[array] {
+		base, offset := ccConstantOffset(count)
+		if base == idxBase && offset > idxOffset {
+			return true
+		}
+	}
+	return false
+}
+
+// ccConstantOffset splits a compacted expression into the part before a
+// trailing addition of an integer literal and that literal's value. `n+1`
+// reads as ("n", 1) and `n` as ("n", 0). Outer parentheses are removed on both
+// halves, so `(n+1)` and `n+1` read alike.
+func ccConstantOffset(s string) (string, int) {
+	s = ccStripOuterParens(s)
+	if i := strings.LastIndexByte(s, '+'); i > 0 && s[i-1] != '+' {
+		if n, ok := ccDecimalLiteral(s[i+1:]); ok {
+			return ccStripOuterParens(s[:i]), n
+		}
+	}
+	return s, 0
+}
+
+// ccStripOuterParens removes the parentheses that wrap a whole expression. A
+// leading `(` that closes before the end wraps only part of it and stays.
+func ccStripOuterParens(s string) string {
+	for len(s) > 1 && s[0] == '(' && s[len(s)-1] == ')' {
+		depth := 0
+		for i := 0; i < len(s); i++ {
+			switch s[i] {
+			case '(':
+				depth++
+			case ')':
+				depth--
+			}
+			if depth == 0 && i < len(s)-1 {
+				return s
+			}
+		}
+		s = s[1 : len(s)-1]
+	}
+	return s
+}
+
+// ccDecimalLiteral reads s as a whole non-negative decimal literal.
+func ccDecimalLiteral(s string) (int, bool) {
+	if s == "" || len(s) > 9 {
+		return 0, false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return 0, false
+		}
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// ccAllocatorSizeArg names, for each allocator, the argument that states the
+// size and whether that argument counts elements instead of bytes. An
+// allocator this does not name sizes nothing that is read here.
+var ccAllocatorSizeArg = map[string]struct {
+	pos      int
+	elements bool
+}{
+	"malloc":       {pos: 0},
+	"alloca":       {pos: 0},
+	"realloc":      {pos: 1},
+	"calloc":       {pos: 0, elements: true},
+	"reallocarray": {pos: 1, elements: true},
+}
+
+// ccArrayAllocationCounts maps each array, spelled as the source writes it, to
+// the element counts of the allocations stored into it. The whole body is read
+// because an allocation can stand after a subscript of the array it sizes.
+func (c *ccConv) ccArrayAllocationCounts(body *tree_sitter.Node) map[string][]string {
+	out := map[string][]string{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		var name string
+		var value *tree_sitter.Node
+		switch c.kind(n) {
+		case "assignment_expression":
+			if c.assignmentOp(n) == "=" {
+				name = compactCExprText(c.text(c.field(n, "left")))
+				value = c.field(n, "right")
+			}
+		case "init_declarator":
+			name = c.declName(c.field(n, "declarator"))
+			value = c.field(n, "value")
+		}
+		if name != "" && value != nil {
+			if count := c.ccAllocationElementCount(value); count != "" {
+				out[name] = append(out[name], count)
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// ccAllocationElementCount reads how many elements an expression allocates,
+// spelled as the source writes the count. The search descends, so a cast
+// around the allocator call -- the C `(T*)malloc(...)` and the C++
+// `static_cast<T*>(malloc(...))`, which the grammar shapes differently -- is
+// walked through. An empty result means the expression allocates nothing whose
+// element count is readable.
+func (c *ccConv) ccAllocationElementCount(n *tree_sitter.Node) string {
+	if n == nil {
+		return ""
+	}
+	switch c.kind(n) {
+	case "call_expression":
+		if shape, ok := ccAllocatorSizeArg[compactCExprText(c.text(c.field(n, "function")))]; ok {
+			args := c.namedChildren(c.field(n, "arguments"))
+			if shape.pos >= len(args) {
+				return ""
+			}
+			if shape.elements {
+				return compactCExprText(c.text(args[shape.pos]))
+			}
+			return c.ccElementCountOfByteSize(args[shape.pos])
+		}
+	case "new_expression":
+		return compactCExprText(c.text(c.field(c.field(n, "declarator"), "length")))
+	}
+	for _, ch := range c.namedChildren(n) {
+		if count := c.ccAllocationElementCount(ch); count != "" {
+			return count
+		}
+	}
+	return ""
+}
+
+// ccElementCountOfByteSize reads the element count out of an allocation's byte
+// size. `(n + 1) * sizeof(T)` reserves n+1 elements. A size with no sizeof
+// factor counts bytes, and a byte is the element of a byte buffer, so such a
+// size states itself. A size that multiplies two sizeof factors, or that names
+// sizeof outside a product, states no element count.
+func (c *ccConv) ccElementCountOfByteSize(n *tree_sitter.Node) string {
+	for c.kind(n) == "parenthesized_expression" {
+		kids := c.namedChildren(n)
+		if len(kids) != 1 {
+			return ""
+		}
+		n = kids[0]
+	}
+	if c.kind(n) == "binary_expression" && c.text(c.field(n, "operator")) == "*" {
+		left, right := c.field(n, "left"), c.field(n, "right")
+		leftSizeof, rightSizeof := ccNamesSizeof(c.text(left)), ccNamesSizeof(c.text(right))
+		switch {
+		case rightSizeof && !leftSizeof:
+			return compactCExprText(c.text(left))
+		case leftSizeof && !rightSizeof:
+			return compactCExprText(c.text(right))
+		}
+		return ""
+	}
+	if ccNamesSizeof(c.text(n)) {
+		return ""
+	}
+	return compactCExprText(c.text(n))
+}
+
+func ccNamesSizeof(s string) bool {
+	return strings.Contains(s, "sizeof")
 }
 
 // ccComparisonAfter reports whether bodyText contains `idx` immediately
