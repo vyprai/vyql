@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"bytes"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -16,6 +17,10 @@ type rsConv struct {
 	file          string
 	key           string
 	matchSubjects int // per-file counter for the synthetic locals match scrutinees bind to
+	// refcountDrops maps a type's base name to the reference-release call its
+	// Drop impl makes, for the types declared in this file.
+	refcountDrops map[string]string
+	implSelfType  string // base type name of the impl block being walked
 }
 
 // rsFormatMacros build a string from their arguments (taint-propagating).
@@ -34,6 +39,7 @@ func ExtractRust(files []string, root string) (nir.Program, error) {
 		},
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &rsConv{src: src, file: rel, key: moduleKey(root, abs, ".rs")}
+			c.rsCollectRefcountDrops(tree.RootNode())
 			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
 		})
 	return nir.Program{SelfName: "self", Modules: mods}, nil
@@ -117,6 +123,7 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 		body := c.block(c.field(n, "body"))
 		body = append(body, c.rsFunctionContext(n)...)
 		body = append(body, c.rsTypeErasureMetadata(n)...)
+		body = append(body, c.rsRefcountedConversionMetadata(n)...)
 		exported := false
 		for _, ch := range children(n) {
 			if c.kind(ch) == "visibility_modifier" {
@@ -128,8 +135,14 @@ func (c *rsConv) stmtH(n *tree_sitter.Node, attrs []string) []nir.Stmt {
 	case "impl_item":
 		out := c.rsUnsafeImplMetadata(n)
 		out = append(out, c.rsUnpinImplMetadata(n)...)
+		out = append(out, c.rsManualRefcountDropMetadata(n)...)
 		out = append(out, c.rsRunTestsAutoApprovalMetadata(n)...)
+		// A method's self receiver is typed by the impl it sits in, and the
+		// function_item case has no other way to reach that type.
+		outerSelf := c.implSelfType
+		c.implSelfType = lastSeg(c.dotted(c.field(n, "type")))
 		out = append(out, c.decls(c.field(n, "body"))...)
+		c.implSelfType = outerSelf
 		return out
 	case "mod_item", "trait_item":
 		return c.decls(c.field(n, "body"))
@@ -571,6 +584,461 @@ func (c *rsConv) rsUnpinImplMetadata(n *tree_sitter.Node) []nir.Stmt {
 	loc := c.loc(n)
 	return []nir.Stmt{c.rsAnalysisCall("analysis.rust.unpin_impl_missing_bound", "unpin_impl_missing_bound", loc,
 		"lang=rust", "trait:Unpin", "missing_bound:Unpin")}
+}
+
+// rsReferenceReleaseNames are the spellings a hand-rolled reference count uses
+// to give a reference back: the C-API decrements, the GObject-style unref, and
+// the strong-count decrements an Arc-shaped type writes itself. A count kept
+// this way is arithmetic, not ownership, so nothing in the language stops a
+// second release -- which is exactly why the release has to be named before
+// anything can reason about how many times it runs.
+var rsReferenceReleaseNames = []string{
+	"decref", "dec_ref", "unref", "release_ref", "dec_strong", "dec_refcount", "refcount_dec",
+}
+
+func rsIsReferenceRelease(path string) bool {
+	name := strings.ToLower(lastSeg(path))
+	for _, want := range rsReferenceReleaseNames {
+		if strings.Contains(name, want) {
+			return true
+		}
+	}
+	return false
+}
+
+// rsItemContainers are the node kinds that hold Rust items: the file itself,
+// the body of a module, trait or impl, a function body, and a nested block. An
+// `impl` is an item, so descending through these reaches every impl in the file
+// while leaving expression subtrees, which hold no items, untouched.
+var rsItemContainers = map[string]bool{
+	"source_file": true, "declaration_list": true, "block": true,
+	"mod_item": true, "trait_item": true, "impl_item": true, "function_item": true,
+}
+
+// rsCollectRefcountDrops records, for this file, every type whose Drop impl
+// performs a manual reference release, keyed by the type's base name. The pass
+// runs before the module is walked because the conversion that mishandles such
+// a value is usually written above the Drop impl that gives it its meaning.
+func (c *rsConv) rsCollectRefcountDrops(root *tree_sitter.Node) {
+	if !bytes.Contains(c.src, []byte("Drop")) {
+		return
+	}
+	var walk func(n *tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		kind := c.kind(n)
+		if kind == "impl_item" {
+			if typ, release := c.rsRefcountDropImpl(n); typ != "" {
+				if c.refcountDrops == nil {
+					c.refcountDrops = map[string]string{}
+				}
+				c.refcountDrops[typ] = release
+			}
+		}
+		if !rsItemContainers[kind] {
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(root)
+}
+
+// rsRefcountDropImpl reports the base type name an `impl Drop` block is for and
+// the release call its drop body makes on the value's own state, or "" when the
+// impl is not a Drop impl or its drop releases something other than a count it
+// maintains itself. The release has to mention self: a Drop body that calls a
+// decrement on some unrelated value is not releasing this type's reference.
+func (c *rsConv) rsRefcountDropImpl(n *tree_sitter.Node) (string, string) {
+	tr := c.field(n, "trait")
+	if tr == nil || lastSeg(c.dotted(tr)) != "Drop" {
+		return "", ""
+	}
+	typ := lastSeg(c.dotted(c.field(n, "type")))
+	if typ == "" || typ == "?" {
+		return "", ""
+	}
+	for _, decl := range c.namedChildren(c.field(n, "body")) {
+		if c.kind(decl) != "function_item" || c.text(c.field(decl, "name")) != "drop" {
+			continue
+		}
+		if release := c.rsReferenceReleaseCall(c.field(decl, "body")); release != "" {
+			return typ, release
+		}
+	}
+	return "", ""
+}
+
+// rsReferenceReleaseCall returns the dotted path of the first reference-release
+// call in the subtree whose callee or arguments mention self.
+func (c *rsConv) rsReferenceReleaseCall(n *tree_sitter.Node) string {
+	found := ""
+	var walk func(m *tree_sitter.Node)
+	walk = func(m *tree_sitter.Node) {
+		if m == nil || found != "" {
+			return
+		}
+		if c.kind(m) == "call_expression" {
+			path := c.dotted(c.field(m, "function"))
+			if path != "" && path != "?" && rsIsReferenceRelease(path) && c.rsMentionsValue(m, "self") {
+				found = path
+				return
+			}
+		}
+		for _, ch := range c.namedChildren(m) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return found
+}
+
+// rsOwnedValue is a value the function owns outright: a by-value parameter or a
+// by-value self receiver, whose type releases a reference when it is dropped.
+type rsOwnedValue struct {
+	name    string
+	typ     string
+	release string
+}
+
+// rsRefcountedConversionMetadata reports a function that takes ownership of a
+// value whose Drop releases a manually kept reference count, copies a field out
+// of it, lets that copy escape through the function's result, and never
+// suppresses the drop with mem::forget or ManuallyDrop. The owned value is
+// dropped when the function returns, so the count falls by one while the copy
+// that outlives it still stands for a live reference: every later release of
+// that copy is one release too many, which is the hand-rolled smart pointer's
+// use-after-free (pyo3 CVE-2020-35917).
+//
+// Only a Copy field can be read out of a value that implements Drop -- moving a
+// field out is E0509 -- so any field a compiling program reads here leaves the
+// source value whole and droppable. That is what makes the field read, rather
+// than a move, the thing worth recording: a move hands the release on to the
+// receiver, and a copy duplicates it.
+//
+// The two suppressed forms are the two ways the language has of saying "this
+// value's Drop must not run": mem::forget on the value, or rebinding it through
+// ManuallyDrop. A borrowed receiver (&self) is not reported at all, because a
+// borrow drops nothing.
+func (c *rsConv) rsRefcountedConversionMetadata(fn *tree_sitter.Node) []nir.Stmt {
+	if len(c.refcountDrops) == 0 {
+		return nil
+	}
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, owned := range c.rsOwnedRefcountedValues(fn) {
+		if c.rsSuppressesDrop(body, owned.name) {
+			continue
+		}
+		carriers, fields := c.rsCopiedOutFields(body, owned.name)
+		if len(fields) == 0 || !c.rsCopyEscapesResult(body, owned.name, carriers) {
+			continue
+		}
+		tokens := []string{
+			"lang=rust",
+			"kind:refcounted_conversion",
+			"type:" + owned.typ,
+			"value:" + owned.name,
+			"release:" + owned.release,
+			"missing_call:mem::forget",
+		}
+		for _, f := range fields {
+			tokens = append(tokens, "field:"+f)
+		}
+		out = append(out, c.rsAnalysisCall("analysis.rust.refcounted_conversion_missing_forget",
+			"refcounted_conversion_missing_forget", c.loc(fn), dedupeStrings(tokens)...))
+	}
+	return out
+}
+
+// rsOwnedRefcountedValues names the values a function takes ownership of whose
+// type releases a reference on drop: a parameter declared with the type itself
+// rather than a reference to it, and a self receiver spelled without &.
+func (c *rsConv) rsOwnedRefcountedValues(fn *tree_sitter.Node) []rsOwnedValue {
+	var out []rsOwnedValue
+	add := func(name, typ string) {
+		if release, ok := c.refcountDrops[typ]; ok && name != "" {
+			out = append(out, rsOwnedValue{name: name, typ: typ, release: release})
+		}
+	}
+	for _, ch := range c.namedChildren(c.field(fn, "parameters")) {
+		switch c.kind(ch) {
+		case "self_parameter":
+			if c.rsSelfParameterBorrows(ch) {
+				continue
+			}
+			add("self", c.implSelfType)
+		case "parameter":
+			typ := c.field(ch, "type")
+			if typ == nil || c.kind(typ) == "reference_type" {
+				continue
+			}
+			add(c.patName(c.field(ch, "pattern")), lastSeg(c.dotted(typ)))
+		}
+	}
+	return out
+}
+
+// rsSelfParameterBorrows reports whether a self receiver is a borrow (&self or
+// &mut self), which drops nothing when the function returns.
+func (c *rsConv) rsSelfParameterBorrows(n *tree_sitter.Node) bool {
+	for _, ch := range c.children(n) {
+		if c.kind(ch) == "&" {
+			return true
+		}
+	}
+	return false
+}
+
+// rsSuppressesDrop reports whether the body keeps the owned value's Drop from
+// running: mem::forget on it, or rebinding it through ManuallyDrop.
+func (c *rsConv) rsSuppressesDrop(body *tree_sitter.Node, name string) bool {
+	found := false
+	var walk func(n *tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || found {
+			return
+		}
+		if c.kind(n) == "call_expression" {
+			path := c.dotted(c.field(n, "function"))
+			suppresses := lastSeg(path) == "forget" || strings.Contains(path, "ManuallyDrop")
+			if suppresses && c.rsMentionsValue(c.field(n, "arguments"), name) {
+				found = true
+				return
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return found
+}
+
+// rsCopiedOutFields returns the names a destructuring of the owned value binds
+// (its carriers) and a label per field the body reads out of it.
+func (c *rsConv) rsCopiedOutFields(body *tree_sitter.Node, name string) (map[string]bool, []string) {
+	carriers := map[string]bool{}
+	var fields []string
+	var walk func(n *tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "let_declaration" {
+			pattern := c.field(n, "pattern")
+			value := c.field(n, "value")
+			switch {
+			case c.rsIsValueRef(value, name):
+				// `let Ptr(raw, _) = owned;` -- destructuring binds the
+				// Copy fields the pattern names and leaves owned intact.
+				for _, bound := range c.rsPatternBindings(pattern) {
+					carriers[bound] = true
+					fields = append(fields, bound)
+				}
+			case c.rsReadsFieldOf(value, name):
+				// `let raw = owned.0;` -- the same copy, spelled as a
+				// field read, carried by the name it is bound to.
+				if bound := c.patName(pattern); bound != "" {
+					carriers[bound] = true
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	c.rsWalkFieldReads(body, false, func(read *tree_sitter.Node) {
+		if !c.rsIsValueRef(c.field(read, "value"), name) {
+			return
+		}
+		if label := c.text(c.field(read, "field")); label != "" {
+			fields = append(fields, label)
+		}
+	})
+	return carriers, dedupeStrings(fields)
+}
+
+// rsWalkFieldReads visits every field_expression in the subtree that reads a
+// field out of a value, skipping the selector of a method call: `owned.into_x()`
+// moves the value into the method rather than copying a field out of it, and
+// the move carries the release with it.
+func (c *rsConv) rsWalkFieldReads(n *tree_sitter.Node, callee bool, visit func(*tree_sitter.Node)) {
+	if n == nil {
+		return
+	}
+	if c.kind(n) == "call_expression" {
+		c.rsWalkFieldReads(c.field(n, "function"), true, visit)
+		c.rsWalkFieldReads(c.field(n, "arguments"), false, visit)
+		return
+	}
+	if c.kind(n) == "field_expression" && !callee {
+		visit(n)
+	}
+	for _, ch := range c.namedChildren(n) {
+		c.rsWalkFieldReads(ch, false, visit)
+	}
+}
+
+// rsPatternBindings names the identifiers a destructuring pattern binds,
+// skipping the type path the pattern matches on.
+func (c *rsConv) rsPatternBindings(p *tree_sitter.Node) []string {
+	if p == nil {
+		return nil
+	}
+	var out []string
+	skip := c.field(p, "type")
+	var walk func(n *tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || (skip != nil && n.Id() == skip.Id()) {
+			return
+		}
+		switch c.kind(n) {
+		case "identifier", "shorthand_field_identifier":
+			out = append(out, c.text(n))
+			return
+		case "type_identifier", "scoped_identifier", "scoped_type_identifier":
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(p)
+	return out
+}
+
+// rsCopyEscapesResult reports whether a field copied out of the owned value
+// reaches what the function returns -- its tail expression or an explicit
+// return. A copy that stays inside the body dies with it and releases nothing.
+func (c *rsConv) rsCopyEscapesResult(body *tree_sitter.Node, name string, carriers map[string]bool) bool {
+	for _, result := range c.rsResultExprs(body) {
+		if c.rsReadsFieldOf(result, name) || c.rsExprMentions(result, carriers, nil) {
+			return true
+		}
+	}
+	return false
+}
+
+// rsResultExprs returns the expressions a function's value can come from: the
+// block's tail expression, unwrapped through unsafe and nested blocks, and the
+// operand of every return in the body.
+func (c *rsConv) rsResultExprs(body *tree_sitter.Node) []*tree_sitter.Node {
+	var out []*tree_sitter.Node
+	if tail := c.rsBlockTailExpr(body); tail != nil {
+		out = append(out, tail)
+	}
+	var walk func(n *tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "return_expression" {
+			out = append(out, n)
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// rsBlockTailExpr returns a block's tail expression. A block-valued tail (an
+// unsafe block, a bare block) is parsed as an expression_statement without a
+// semicolon, so it is unwrapped to the expression it carries.
+func (c *rsConv) rsBlockTailExpr(block *tree_sitter.Node) *tree_sitter.Node {
+	if block == nil {
+		return nil
+	}
+	kids := c.namedChildren(block)
+	for i := len(kids) - 1; i >= 0; i-- {
+		last := kids[i]
+		switch c.kind(last) {
+		case "line_comment", "block_comment":
+			continue
+		case "let_declaration", "empty_statement":
+			return nil
+		case "expression_statement":
+			if strings.HasSuffix(strings.TrimSpace(c.text(last)), ";") {
+				return nil
+			}
+			inner := c.namedChildren(last)
+			if len(inner) == 0 {
+				return nil
+			}
+			last = inner[0]
+		}
+		switch c.kind(last) {
+		case "unsafe_block":
+			return c.rsBlockTailExpr(lastChildKind(last, "block"))
+		case "block":
+			return c.rsBlockTailExpr(last)
+		}
+		return last
+	}
+	return nil
+}
+
+// rsIsValueRef reports whether an expression is a bare reference to the named
+// owned value; `self` is a node kind of its own rather than an identifier.
+func (c *rsConv) rsIsValueRef(n *tree_sitter.Node, name string) bool {
+	if n == nil {
+		return false
+	}
+	switch c.kind(n) {
+	case "identifier", "self":
+		return c.text(n) == name
+	}
+	return false
+}
+
+// rsReadsFieldOf reports whether the subtree copies a field out of the named
+// value.
+func (c *rsConv) rsReadsFieldOf(n *tree_sitter.Node, name string) bool {
+	found := false
+	c.rsWalkFieldReads(n, false, func(read *tree_sitter.Node) {
+		if c.rsIsValueRef(c.field(read, "value"), name) {
+			found = true
+		}
+	})
+	return found
+}
+
+// rsMentionsValue reports whether the subtree names the value anywhere.
+func (c *rsConv) rsMentionsValue(n *tree_sitter.Node, name string) bool {
+	if n == nil {
+		return false
+	}
+	if c.rsIsValueRef(n, name) {
+		return true
+	}
+	for _, ch := range c.namedChildren(n) {
+		if c.rsMentionsValue(ch, name) {
+			return true
+		}
+	}
+	return false
+}
+
+// rsManualRefcountDropMetadata reports the Drop impl that releases a manually
+// kept reference count, naming the type and the release call it makes.
+func (c *rsConv) rsManualRefcountDropMetadata(n *tree_sitter.Node) []nir.Stmt {
+	typ, release := c.rsRefcountDropImpl(n)
+	if typ == "" {
+		return nil
+	}
+	loc := c.loc(n)
+	return []nir.Stmt{c.rsAnalysisCall("analysis.rust.manual_refcount_drop", "manual_refcount_drop", loc,
+		"lang=rust", "kind:drop_impl", "type:"+typ, "release:"+release)}
 }
 
 func (c *rsConv) rsAnalysisCall(path, method, loc string, tokens ...string) nir.Stmt {
