@@ -57,6 +57,9 @@ type ccConv struct {
 	// declarations outside any function body, which every function in it asks
 	// for; nil until the first ask.
 	constSizedArrays map[string][]string
+	// inFunc counts the function bodies the walk is currently inside, so a
+	// declaration can tell a local from a file-scope one.
+	inFunc int
 }
 
 // cPropagators write their source arguments into destination arg0.
@@ -913,6 +916,23 @@ func sameCNode(a, b *tree_sitter.Node) bool {
 	return a != nil && b != nil && a.StartByte() == b.StartByte() && a.EndByte() == b.EndByte()
 }
 
+// plainDeclName is declName restricted to declarators that introduce a variable: it
+// returns "" for anything that reaches a function_declarator, so a prototype nested in a
+// function body (`char *helper(int);`) does not bind its own name to a local.
+func (c *ccConv) plainDeclName(d *tree_sitter.Node) string {
+	for d != nil {
+		switch c.kind(d) {
+		case "identifier", "field_identifier":
+			return c.text(d)
+		case "pointer_declarator", "array_declarator", "parenthesized_declarator":
+			d = c.field(d, "declarator")
+		default:
+			return ""
+		}
+	}
+	return ""
+}
+
 // declName unwraps pointer/array/function/parenthesized declarators to the
 // underlying identifier name.
 func (c *ccConv) declName(d *tree_sitter.Node) string {
@@ -1002,7 +1022,9 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			params, paramTypes = c.paramsFromSignatureText(c.text(n))
 		}
 		name := c.declName(decl)
+		c.inFunc++
 		bodyStmts := c.block(c.field(n, "body"))
+		c.inFunc--
 		if !ccOWASPBenchmarkFastPath() {
 			bodyStmts = append(bodyStmts, c.ccIndexAccessObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccPostCopyMissingBoundsObservations(n)...)
@@ -1104,7 +1126,10 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "method_definition", "method_declaration": // ObjC method
 		name, params, body := c.objcMethod(n)
 		paramTypes := c.objcParamTypes(n, params)
-		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.block(body), Loc: L, ContextTokens: c.ccFunctionContext(name, body, paramTypes)}}
+		c.inFunc++
+		methodBody := c.block(body)
+		c.inFunc--
+		return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: methodBody, Loc: L, ContextTokens: c.ccFunctionContext(name, body, paramTypes)}}
 	case "namespace_definition", "linkage_specification", "declaration_list": // C++
 		if b := c.field(n, "body"); b != nil {
 			return c.decls(b)
@@ -1143,6 +1168,20 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 						Callee: nir.Name{ID: typeName, Loc: L}, Args: args,
 						Path: typeName, Method: typeName, Loc: L,
 					}})
+				}
+			default:
+				// `render_details render;` — a local declared with no initialiser, the
+				// ordinary way C introduces an aggregate before filling it in. Without a
+				// statement binding the name, every later mention of it evaluates to a
+				// fresh node, so a store into one of its members and a read of that member
+				// land on two unrelated objects and no taint crosses between them. Bind it
+				// the way Java binds `Foo f;`: a declaration whose value is an empty
+				// constant, which names the storage without claiming anything about it.
+				if c.inFunc == 0 {
+					continue // a file-scope declaration is not a local
+				}
+				if name := c.plainDeclName(d); name != "" {
+					out = append(out, nir.Assign{Targets: []string{name}, Value: nir.Const{Loc: L}, Decl: true})
 				}
 			}
 		}
@@ -1461,6 +1500,9 @@ func (c *ccConv) assignmentFallback(left *tree_sitter.Node, right nir.Expr) []ni
 	if st, ok := c.fieldStoreStmt(left, right); ok {
 		return []nir.Stmt{st}
 	}
+	if st, ok := c.elementStoreStmt(left, right); ok {
+		return []nir.Stmt{st}
+	}
 	if left != nil {
 		return []nir.Stmt{nir.ExprStmt{Value: c.expr(left)}, nir.ExprStmt{Value: right}}
 	}
@@ -1486,6 +1528,33 @@ func (c *ccConv) fieldStoreStmt(left *tree_sitter.Node, right nir.Expr) (nir.Stm
 		Args:   []nir.Expr{right},
 		Path:   path,
 		Loc:    L,
+	}}, true
+}
+
+// elementStoreStmt models `base[key] = value` as the synthetic __setitem__ call the Python
+// and PHP frontends emit for a subscript store. The store needs one node that joins the
+// value to the element slot, or a later `base[key]` read carries none of it.
+func (c *ccConv) elementStoreStmt(left *tree_sitter.Node, right nir.Expr) (nir.Stmt, bool) {
+	if left == nil || c.kind(left) != "subscript_expression" {
+		return nil, false
+	}
+	base := c.field(left, "argument")
+	if base == nil {
+		return nil, false
+	}
+	L := c.loc(left)
+	args := []nir.Expr{right}
+	if idx := c.ccSubscriptIndex(left); idx != nil {
+		args = append(args, c.expr(idx)) // the key, so a constant index keeps its own slot
+	}
+	path := c.dotted(base)
+	if path != "" {
+		path += ".__setitem__"
+	}
+	return nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Attr{Base: c.expr(base), Attr: "__setitem__", Loc: L},
+		Args:   args,
+		Path:   path, Method: "__setitem__", Loc: L,
 	}}, true
 }
 
