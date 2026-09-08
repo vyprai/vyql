@@ -187,7 +187,58 @@ type conv struct {
 	// HTTP handlers / goroutines / callbacks). They are flushed into the module body so
 	// their bodies and parameter-entry facts are analyzed instead of dropped.
 	hoisted []nir.Stmt
-	anonSeq int
+	// pending holds synthetic FuncDefs for the func literals that are lowered IN PLACE:
+	// the ones a declaration binds to a name, and the ones invoked where they are
+	// written. Unlike hoisted, they are emitted into the statement list that is being
+	// built, immediately before the statement that wrote the literal, so the body lowers
+	// INSIDE the function enclosing it — it captures that function's bindings and its
+	// region nests under that function's.
+	pending []nir.Stmt
+	// funcLocals maps a local name to the synthetic FuncDef name of the func literal the
+	// frontend saw bound to it, so a call written through that name resolves to the
+	// literal's body. Copied per function body (a closure sees the enclosing locals) and
+	// restored on the way out.
+	funcLocals map[string]string
+	// litFuncs names each in-place literal by its source position: some right-hand sides
+	// are converted twice (see the AssignStmt out-parameter path), and one literal must
+	// still mean one function body.
+	litFuncs map[token.Pos]string
+	anonSeq  int
+}
+
+// inPlaceFuncLit converts a func literal to a synthetic FuncDef emitted where the literal
+// is written, and returns the name that FuncDef is registered under. The name carries a
+// '#', which no Go identifier can, so it can never collide with a declaration this module
+// (or any other) makes.
+func (c *conv) inPlaceFuncLit(lit *ast.FuncLit) string {
+	if name, ok := c.litFuncs[lit.Pos()]; ok {
+		return name
+	}
+	c.anonSeq++
+	name := "func#" + strconv.Itoa(c.anonSeq)
+	if c.litFuncs == nil {
+		c.litFuncs = map[token.Pos]string{}
+	}
+	c.litFuncs[lit.Pos()] = name
+	c.pending = append(c.pending, c.funcDef(name, "", lit.Type, lit.Body, false, c.loc(lit.Pos())))
+	return name
+}
+
+// bindFuncLit lowers a func literal that a declaration binds to name, recording the
+// binding so a later call through name names the literal's body. The bound value itself
+// stays the opaque constant it was: what the closure VALUE flows into is unchanged, only
+// what a call through the name resolves to.
+func (c *conv) bindFuncLit(name string, e ast.Expr) (nir.Expr, bool) {
+	lit, ok := e.(*ast.FuncLit)
+	if !ok || name == "" || name == "_" {
+		return nil, false
+	}
+	syn := c.inPlaceFuncLit(lit)
+	if c.funcLocals == nil {
+		c.funcLocals = map[string]string{}
+	}
+	c.funcLocals[name] = syn
+	return nir.Const{Loc: c.loc(lit.Pos())}, true
 }
 
 func (c *conv) loc(p token.Pos) string {
@@ -671,6 +722,17 @@ func (c *conv) funcDef(name, recv string, typ *ast.FuncType, bodyNode *ast.Block
 			}
 		}
 	}
+	// A body has its own locals, and a closure written in it sees the ones already in
+	// scope, so the map it converts against is a COPY of the enclosing function's — minus
+	// this function's own parameters, which SHADOW an enclosing name of the same spelling
+	// (a callback parameter called `handler` is whatever the caller passed, not the
+	// `handler` literal written outside).
+	savedLocals := c.funcLocals
+	c.funcLocals = copyFuncLocals(savedLocals)
+	for _, p := range params {
+		delete(c.funcLocals, p)
+	}
+	pendingMark := len(c.pending)
 	var body []nir.Stmt
 	if bodyNode != nil {
 		body = c.stmts(bodyNode.List)
@@ -678,6 +740,14 @@ func (c *conv) funcDef(name, recv string, typ *ast.FuncType, bodyNode *ast.Block
 		body = append(body, c.goDecodeOverwritesPresetObservations(name, bodyNode)...)
 		body = append(body, c.goUnboundedAppendAccumulationObservations(name, bodyNode)...)
 	}
+	// An in-place literal written outside any statement list this body built (a function
+	// type with no body cannot happen here, but a future caller could) still belongs to
+	// this body rather than to whatever converts next.
+	if len(c.pending) > pendingMark {
+		body = append(body, c.pending[pendingMark:]...)
+		c.pending = c.pending[:pendingMark]
+	}
+	c.funcLocals = savedLocals
 	if cache := parsecache.Shared(); cache != nil {
 		body = cache.DeferFunctionBody(body)
 	}
@@ -1972,7 +2042,18 @@ func (c *conv) typeName(e ast.Expr) string {
 func (c *conv) stmts(list []ast.Stmt) []nir.Stmt {
 	var out []nir.Stmt
 	for _, s := range list {
-		if st := c.stmt(s); st != nil {
+		// A func literal lowered in place belongs to THIS list, at the statement that
+		// wrote it: emitting it before that statement is what puts its body inside the
+		// enclosing function, with everything assigned above it already in scope. Only
+		// this statement's own literals are taken — an outer statement mid-conversion
+		// (an `if` whose condition wrote one) keeps its entries for its own list.
+		mark := len(c.pending)
+		st := c.stmt(s)
+		if len(c.pending) > mark {
+			out = append(out, c.pending[mark:]...)
+			c.pending = c.pending[:mark]
+		}
+		if st != nil {
 			out = append(out, st)
 		}
 	}
@@ -1988,6 +2069,16 @@ func (c *conv) stmt(s ast.Stmt) nir.Stmt {
 		if st.Tok == token.ADD_ASSIGN && len(st.Lhs) == 1 && len(st.Rhs) == 1 {
 			if id, ok := st.Lhs[0].(*ast.Ident); ok {
 				return nir.AugAssign{Target: id.Name, Value: c.expr(st.Rhs[0]), Loc: c.loc(st.Pos())}
+			}
+		}
+		// `f := func(…) {…}` / `f = func(…) {…}`: the literal is lowered in place and the
+		// name records which body it holds, so a later `f(x)` resolves to that body
+		// instead of calling an opaque constant.
+		if len(st.Lhs) == 1 && len(st.Rhs) == 1 {
+			if id, ok := st.Lhs[0].(*ast.Ident); ok {
+				if val, ok := c.bindFuncLit(id.Name, st.Rhs[0]); ok {
+					return nir.Assign{Targets: []string{id.Name}, Value: val, Loc: c.loc(st.Pos())}
+				}
 			}
 		}
 		// subscript write `m[k] = v` / `a[i] = v`: model as a container taint-join
@@ -2149,7 +2240,15 @@ func (c *conv) declStmt(st *ast.DeclStmt) nir.Stmt {
 			targets = append(targets, n.Name)
 		}
 		if len(vs.Values) == 1 {
-			blk.Stmts = append(blk.Stmts, nir.Assign{Targets: targets, Value: c.expr(vs.Values[0]), Loc: c.loc(vs.Pos())})
+			// `var f = func(…) {…}`: same in-place binding as the `:=` form.
+			value, bound := nir.Expr(nil), false
+			if len(targets) == 1 {
+				value, bound = c.bindFuncLit(targets[0], vs.Values[0])
+			}
+			if !bound {
+				value = c.expr(vs.Values[0])
+			}
+			blk.Stmts = append(blk.Stmts, nir.Assign{Targets: targets, Value: value, Loc: c.loc(vs.Pos())})
 		}
 	}
 	return blk
@@ -2258,7 +2357,36 @@ func (c *conv) call(ex *ast.CallExpr) nir.Call {
 	if i := strings.LastIndex(p, "."); i >= 0 {
 		method = p[i+1:]
 	}
-	return nir.Call{Callee: c.expr(ex.Fun), Args: args, Path: p, Method: method, Loc: c.loc(ex.Pos())}
+	return nir.Call{Callee: c.callee(ex.Fun), Args: args, Path: p, Method: method, Loc: c.loc(ex.Pos())}
+}
+
+// callee lowers a call's callee. Two spellings name a body written in this file rather
+// than a value: a func literal invoked where it stands (`func() T { … }()`), and a name a
+// func literal was bound to. Both become the literal's synthetic FuncDef name, which is
+// what resolution keys on, so the call's arguments reach that body's parameters and its
+// result comes from that body's return. The call's PATH is untouched — binding matching
+// keeps seeing exactly the callee text the source wrote.
+func (c *conv) callee(fun ast.Expr) nir.Expr {
+	switch f := fun.(type) {
+	case *ast.FuncLit:
+		return nir.Name{ID: c.inPlaceFuncLit(f), Loc: c.loc(f.Pos())}
+	case *ast.Ident:
+		if syn := c.funcLocals[f.Name]; syn != "" {
+			return nir.Name{ID: syn, Loc: c.loc(f.Pos())}
+		}
+	}
+	return c.expr(fun)
+}
+
+func copyFuncLocals(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		out[k] = v
+	}
+	return out
 }
 
 // path builds a dotted callee path for binding matching, e.g. r.URL.Query().Get
