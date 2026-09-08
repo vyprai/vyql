@@ -10,20 +10,23 @@ import (
 	"github.com/vyprai/vyql/internal/usg"
 )
 
-// phpLowerFiles extracts and lowers several PHP source files as one program, so a class
-// declared in one file and used from another resolves the way a real tree does.
-func phpLowerFiles(t *testing.T, srcs map[string]string) usg.Store {
+// phpLowerFiles lowers several PHP files as one program, so a call that crosses from one
+// file into another is resolved the way a scan of the repository resolves it.
+func phpLowerFiles(t *testing.T, files map[string]string) usg.Store {
 	t.Helper()
 	dir := t.TempDir()
-	var files []string
-	for name, src := range srcs {
+	var paths []string
+	for name, src := range files {
 		file := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(file), 0o750); err != nil {
+			t.Fatal(err)
+		}
 		if err := os.WriteFile(file, []byte(src), 0o600); err != nil {
 			t.Fatal(err)
 		}
-		files = append(files, file)
+		paths = append(paths, file)
 	}
-	prog, err := treesitter.ExtractPHP(files, dir)
+	prog, err := treesitter.ExtractPHP(paths, dir)
 	if err != nil {
 		t.Fatal(err)
 	}

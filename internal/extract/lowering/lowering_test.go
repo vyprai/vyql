@@ -2150,6 +2150,127 @@ func TestImportRootedPropertyReceiverDoesNotBorrowASameNamedHelper(t *testing.T)
 	}
 }
 
+// The single-hierarchy case the veto above is the counterpart to: a base class's method and
+// the subclasses that override it are ONE method, so an untyped property receiver routes the
+// call into every member of that family — args in, nothing back (reach-only), the same
+// treatment an interface-typed receiver's implementors already get.
+func TestUntypedPropertyReceiverReachesTheOverrideFamily(t *testing.T) {
+	sink := func(loc, name string) []nir.Stmt {
+		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: name, Loc: loc},
+			Args:   []nir.Expr{nir.Name{ID: "value", Loc: loc}},
+			Path:   name, Method: name, Loc: loc,
+		}}}
+	}
+	prog := nir.Program{SelfName: "this", Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.php",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "BaseModel", Loc: "app.php:1", Body: []nir.Stmt{
+				nir.FuncDef{Name: "list_items", Loc: "app.php:2", Params: []string{"value"}, Body: sink("app.php:2", "base_sink")},
+			}},
+			nir.ClassDef{Name: "BlocksModel", Loc: "app.php:4", Bases: []string{"BaseModel"}, Body: []nir.Stmt{
+				nir.FuncDef{Name: "list_items", Loc: "app.php:5", Params: []string{"value"}, Body: sink("app.php:5", "blocks_sink")},
+			}},
+			nir.ClassDef{Name: "Controller", Loc: "app.php:7", Members: []string{"model"}, Body: []nir.Stmt{
+				nir.FuncDef{Name: "index", Loc: "app.php:8", Params: []string{"payload"}, Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"rows"}, Decl: true, Loc: "app.php:9", Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Attr{
+							Base: nir.Name{ID: "$this", Loc: "app.php:9"},
+							Attr: "model", Path: "$this.model", Loc: "app.php:9",
+						}, Attr: "list_items", Path: "$this.model.list_items", Loc: "app.php:9"},
+						Args: []nir.Expr{nir.Name{ID: "payload", Loc: "app.php:9"}},
+						Path: "$this.model.list_items", Method: "list_items", Loc: "app.php:9",
+					}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "render", Loc: "app.php:10"},
+						Args:   []nir.Expr{nir.Name{ID: "rows", Loc: "app.php:10"}},
+						Path:   "render", Method: "render", Loc: "app.php:10",
+					}},
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "payload")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, loc := range []string{"app.php:2", "app.php:5"} {
+		if !reachable[findNodeID(t, g, "code.Arg", "loc", loc)] {
+			t.Fatalf("taint did not reach the family member at %s", loc)
+		}
+	}
+	// reach-only: the family's shared return nodes are not routed back into this call's
+	// result, but the call keeps the conservative argument-to-result edge, so the value the
+	// caller goes on to use is still tainted.
+	if !reachable[findNodeID(t, g, "code.Arg", "loc", "app.php:10")] {
+		t.Fatalf("the call lost its conservative argument-to-result edge")
+	}
+}
+
+// An untyped property receiver whose method name is declared by TWO unrelated hierarchies
+// dispatches two ways, and the engine will not pick one: the call stays unresolved and keeps
+// its conservative argument-to-result edge. The single-hierarchy case (the models' shared
+// `list_items`) is the one that routes; this pins the other side of that line.
+func TestUntypedPropertyReceiverDoesNotPickBetweenTwoHierarchies(t *testing.T) {
+	body := func(loc, sinkName, param string) []nir.Stmt {
+		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: sinkName, Loc: loc},
+			Args:   []nir.Expr{nir.Name{ID: param, Loc: loc}},
+			Path:   sinkName, Method: sinkName, Loc: loc,
+		}}}
+	}
+	prog := nir.Program{SelfName: "this", Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.php",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "BaseReader", Loc: "app.php:1", Body: []nir.Stmt{
+				nir.FuncDef{Name: "run", Loc: "app.php:2", Params: []string{"value"}, Body: body("app.php:2", "reader_sink", "value")},
+			}},
+			nir.ClassDef{Name: "FileReader", Loc: "app.php:4", Bases: []string{"BaseReader"}, Body: []nir.Stmt{
+				nir.FuncDef{Name: "run", Loc: "app.php:5", Params: []string{"value"}, Body: body("app.php:5", "file_sink", "value")},
+			}},
+			nir.ClassDef{Name: "BaseJob", Loc: "app.php:7", Body: []nir.Stmt{
+				nir.FuncDef{Name: "run", Loc: "app.php:8", Params: []string{"value"}, Body: body("app.php:8", "job_sink", "value")},
+			}},
+			nir.ClassDef{Name: "MailJob", Loc: "app.php:10", Bases: []string{"BaseJob"}, Body: []nir.Stmt{
+				nir.FuncDef{Name: "run", Loc: "app.php:11", Params: []string{"value"}, Body: body("app.php:11", "mail_sink", "value")},
+			}},
+			nir.ClassDef{Name: "Controller", Loc: "app.php:13", Members: []string{"worker"}, Body: []nir.Stmt{
+				nir.FuncDef{Name: "index", Loc: "app.php:14", Params: []string{"payload"}, Body: []nir.Stmt{
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Attr{
+							Base: nir.Name{ID: "$this", Loc: "app.php:15"},
+							Attr: "worker", Path: "$this.worker", Loc: "app.php:15",
+						}, Attr: "run", Path: "$this.worker.run", Loc: "app.php:15"},
+						Args: []nir.Expr{nir.Name{ID: "payload", Loc: "app.php:15"}},
+						Path: "$this.worker.run", Method: "run", Loc: "app.php:15",
+					}},
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "payload")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, loc := range []string{"app.php:2", "app.php:5", "app.php:8", "app.php:11"} {
+		if reachable[findNodeID(t, g, "code.Arg", "loc", loc)] {
+			t.Fatalf("taint reached a body at %s: the call picked between two hierarchies", loc)
+		}
+	}
+}
+
 // The service-registry indirection, with every name it dispatches on ambiguous: the entry
 // point carries the same short name as the method it calls, so the unique-method-name
 // fallback is starved and only the receiver TYPES can carry the dispatch — the interface a
