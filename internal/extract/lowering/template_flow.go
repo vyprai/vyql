@@ -41,7 +41,7 @@ func (l *lowerer) flowTemplateRender(call nir.Call, argVals []string, recv, resu
 	if len(argVals) > 0 {
 		if info.static {
 			handled[0] = true
-			if ci := l.containers[argVals[0]]; ci != nil && !ci.dirty {
+			if ci := l.containers[argVals[0]]; ci != nil && ci.modelsWrites && !ci.dirty {
 				for key := range info.vars {
 					if elem := ci.elems[key]; elem != "" {
 						l.flow(elem, result)
