@@ -345,6 +345,15 @@ var elementCallbackMethods = map[string]bool{
 	"DistinctBy": true, "MaxBy": true, "MinBy": true, "ToDictionary": true, "ToLookup": true,
 }
 
+// callbackResultMethods are the elementCallbackMethods whose RESULT is built from what the
+// callback returns rather than from the receiver's own elements: `arr.map(f)` is the array of
+// `f(x)`, `p.then(f)` resolves to `f(v)`. `filter`/`forEach`/`find` are not here — their result
+// (or lack of one) still comes from the receiver, so the receiver keeps its direct edge.
+var callbackResultMethods = map[string]bool{
+	"map": true, "flatMap": true, "then": true,
+	"Select": true, "SelectMany": true,
+}
+
 // selfPassingMethods invoke their lambda WITH THE RECEIVER as the argument (C# fluent helpers
 // `obj.With/Also/Tap(x => …)`, Kotlin scope functions `apply/also/let/run`), so the lambda's
 // first parameter aliases the receiver.
@@ -5544,10 +5553,27 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 	}
 	if recvNode != "" { // receiver taint (chained calls)
+		// higher-order callback dispatch for a callback passed BY NAME (`args.map(escapeCmdArgs)`):
+		// the receiver's elements reach the named function's parameter and, for a transforming
+		// method, the result is built from what that function RETURNS. Routing it through the
+		// body is what puts a control written inside the body (an escape helper's `replace`) on
+		// the flow — see namedCallbackTargets.
+		var cbResultRouted bool
+		if len(call.Args) > 0 && elementCallbackMethods[call.Method] {
+			for _, target := range l.namedCallbackTargets(call, argVals, sc) {
+				if pnode := l.firstValueParam(target); pnode != "" {
+					l.flow(recvNode, pnode)
+					if callbackResultMethods[call.Method] && target.ret != "" {
+						l.flow(target.ret, result)
+						cbResultRouted = true
+					}
+				}
+			}
+		}
 		// a container get with a CONSTANT key reads only that slot (element-sensitive), so
 		// `m.put("kB", p); m.get("kA")` stays clean. Anything else flows the whole receiver
 		// (chained-call taint / dynamic key — over-approximation).
-		if !l.keyedContainerGet(call, recvNode, result, sc) {
+		if !l.keyedContainerGet(call, recvNode, result, sc) && !cbResultRouted {
 			l.flow(recvNode, result)
 		}
 		// a collection/builder MUTATOR taints its receiver from the added value, so a
@@ -6018,6 +6044,52 @@ func staticLiteralExpr(e nir.Expr) bool {
 	default:
 		return false
 	}
+}
+
+// namedCallbackTargets returns the declarations a higher-order call receives as first-class
+// function REFERENCES — `args.map(escapeCmdArgs)`, where the callback is a name bound to a
+// function rather than a lambda written at the call site. lambdaParams only knows the inline
+// form (it is keyed on the Func node an inline Lambda lowers to), so a callback passed by name
+// needs its own route into the body: the receiver's elements reach the named function's
+// parameter, and everything the callback does to the value — an escape helper's `replace` —
+// becomes a node the taint passes through, so a repository that escapes in a named helper is
+// no longer indistinguishable from one that does not.
+//
+// Only an argument that is a bare name resolving to exactly ONE declaration counts. A name that
+// already lowered to an inline lambda is left to lambdaParams, and an ambiguous name keeps the
+// conservative receiver→result edge rather than betting the flow on a guessed body.
+func (l *lowerer) namedCallbackTargets(call nir.Call, argVals []string, sc *scope) []*funcInfo {
+	var out []*funcInfo
+	for i, arg := range call.Args {
+		expr := arg
+		if thru, ok := expr.(nir.Thru); ok {
+			expr = thru.Inner
+		}
+		if _, ok := expr.(nir.Name); !ok {
+			continue
+		}
+		if i < len(argVals) && len(l.lambdaParams[argVals[i]]) > 0 {
+			continue // an inline lambda held in a local — lambdaParams already routes it
+		}
+		targets, reachOnly := l.resolveTargets(expr, sc)
+		if reachOnly || len(targets) != 1 || targets[0] == nil {
+			continue
+		}
+		out = append(out, targets[0])
+	}
+	return out
+}
+
+// firstValueParam is the node of a function's first parameter that carries a VALUE — the
+// position a callback's element/resolved value arrives at — skipping an explicit self/this.
+func (l *lowerer) firstValueParam(target *funcInfo) string {
+	for _, pname := range target.paramNames {
+		if pname == l.selfName {
+			continue
+		}
+		return target.params[pname]
+	}
+	return ""
 }
 
 func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
