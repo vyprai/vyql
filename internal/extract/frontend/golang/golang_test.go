@@ -1277,3 +1277,91 @@ func goFindNode(t *testing.T, g usg.Store, typ string, props map[string]string) 
 	}
 	return found[0]
 }
+
+// goFieldFlowProgram is the shape a Go library uses to build a record in pieces: one function
+// stores a value into a field of the *T it is handed, and a METHOD on T reads that field back
+// and hands it to a command. Nothing aliases the two — the setter's parameter and the method's
+// receiver are the same object only at run time, and the caller that makes them so is written
+// last. `Detail` is a sibling field nothing writes, and Other.Spec is the same field name on a
+// different type; neither may pick the value up.
+const goFieldFlowProgram = `package fw
+
+import "os/exec"
+
+type Rule struct {
+	Spec   string
+	Detail string
+}
+
+type Other struct {
+	Spec string
+}
+
+func setSpec(r *Rule, spec string) {
+	r.Spec = spec
+}
+
+func (r *Rule) Apply() {
+	exec.Command("/bin/sh", "-c", r.Spec)
+}
+
+func (r *Rule) Describe() {
+	exec.Command("/bin/sh", "-c", r.Detail)
+}
+
+func (o *Other) Apply() {
+	exec.Command("/bin/sh", "-c", o.Spec)
+}
+
+func Handle(input string) {
+	r := &Rule{}
+	setSpec(r, input)
+	r.Apply()
+}
+`
+
+// A field stored through a pointer-to-struct parameter is read back by a method on that type.
+// The two ends only ever meet through the struct field: there is no call from the setter to
+// the method and no expression either can see the other through, so a value that reaches the
+// store reaches the sink or it dead-ends at the store.
+func TestGoStructFieldCarriesTaintFromASetterIntoAMethodThatReadsIt(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "fw.go"), []byte(goFieldFlowProgram), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := gofrontend.ExtractDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reachable, err := usg.BFS(g, goFindNode(t, g, "code.Param", map[string]string{"name": "input"}), "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[goCommandArg(t, g, "fw.go:19")] {
+		t.Fatal("the stored field did not reach the method that reads it")
+	}
+	if reachable[goCommandArg(t, g, "fw.go:23")] {
+		t.Fatal("a sibling field nothing wrote picked the value up")
+	}
+	if reachable[goCommandArg(t, g, "fw.go:27")] {
+		t.Fatal("the same field name on a different struct type picked the value up")
+	}
+}
+
+// goCommandArg returns the node holding exec.Command's command argument at loc.
+func goCommandArg(t *testing.T, g usg.Store, loc string) string {
+	t.Helper()
+	call, ok, err := g.GetNode(goFindNode(t, g, "code.Call", map[string]string{"loc": loc, "lit0": "/bin/sh"}))
+	if err != nil || !ok {
+		t.Fatalf("exec.Command node at %s: ok=%v err=%v", loc, ok, err)
+	}
+	arg := call.Prop("arg2")
+	if arg == "" {
+		t.Fatalf("exec.Command at %s has no third argument node: %#v", loc, call)
+	}
+	return arg
+}
