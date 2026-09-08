@@ -6239,6 +6239,16 @@ func (c *ccConv) ccFieldAliasStaleAfterReallocObservations(fn *tree_sitter.Node)
 			if cp.field != r.field || cp.at > r.start {
 				continue
 			}
+			// Members are matched by name, because the whole point is
+			// that the capture and the reallocation may reach the same
+			// block through two different objects. The one base that
+			// cannot is the alias itself: `map = fvs->map` followed by
+			// `map->map = realloc(map->map, ...)` reallocates a member
+			// of the object the alias points at, and an object is never
+			// the block its own member names.
+			if firstSeg(r.target) == cp.alias {
+				continue
+			}
 			if ccAliasReboundBefore(writes, cp, r) {
 				continue
 			}

@@ -204,6 +204,10 @@ func TestCFieldAliasStaleAfterReallocQuiet(t *testing.T) {
   v->data = realloc(v->data, n);
   tail = v->data;
   memcpy(dst, tail, n);`},
+		{"the alias holds the container of the reallocated member", `
+  struct enc *map = v->map;
+  map->map = realloc(map->map, n);
+  memset(map->backmap, 0, n);`},
 		{"the capture is a count, not a pointer", `
   size_t held = v->len;
   v->len = realloc(v->len, n);
@@ -220,7 +224,8 @@ func TestCFieldAliasStaleAfterReallocQuiet(t *testing.T) {
 	} {
 		src := `#include <stdlib.h>
 #include <string.h>
-struct vec { char *data, *scratch; size_t len, cap; };
+struct enc { int *map, *backmap; };
+struct vec { char *data, *scratch; size_t len, cap; struct enc *map; };
 void grow(struct vec *v, char *dst, size_t n) {` + tc.body + `
 }
 `
