@@ -262,6 +262,13 @@ type FuncDef struct {
 	// the consumer that treats exported parameters as an external entry point, but that is the
 	// archetype's decision to change, not a property of the IR.)
 	Exported bool
+	// Static marks a CLASS-LEVEL declaration: one invoked on the class itself rather than on an
+	// instance of it (Ruby `def self.x` and the bodies of `class << self`). A class may declare a
+	// static and an instance method of the same name, and they are different methods with
+	// different bodies; without this the two collapse onto one qualified name and a call to
+	// either reaches only whichever was declared last. Frontends that have no such distinction
+	// leave it false, which is exactly the behaviour they had before it existed.
+	Static bool
 }
 
 type ParamEntry struct {

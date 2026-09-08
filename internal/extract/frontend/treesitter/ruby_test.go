@@ -9,6 +9,7 @@ import (
 	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/extract/nir"
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 func TestRubySingletonClassMethodsAreExtracted(t *testing.T) {
@@ -32,6 +33,115 @@ end
 	}
 	if !rubyHasFuncWithParam(prog.Modules, "open", "path") {
 		t.Fatalf("singleton class method open(path) was not extracted; program=%#v", prog)
+	}
+}
+
+// `class << self` declares CLASS-level methods. A class is free to declare an instance method
+// of the same name, and the two are different methods with different bodies. Both used to
+// register under "Repo.checkout", so the later declaration took the name and the call
+// `Repo.checkout(tainted)` landed on it — the singleton body was left with no edge from any
+// call site and the taint into it was dropped.
+func TestRubySingletonClassMethodIsNotShadowedBySameNamedInstanceMethod(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "repo.rb")
+	src := []byte(`class Repo
+  class << self
+    def checkout(url)
+      system("git clone " + url)
+    end
+  end
+
+  def checkout(name)
+    log(name)
+  end
+end
+
+def handle(params)
+  Repo.checkout(params)
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src4 := rubyNodeID(t, g, "code.Param", "name", "params", "func", "handle")
+	reachable, err := usg.BFS(g, src4, "FLOWS", 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[rubyNodeID(t, g, "code.Call", "callee_path", "system")] {
+		t.Fatalf("handle's tainted parameter did not reach system() in the `class << self` body of " +
+			"Repo.checkout; the call resolved to the instance method of the same name")
+	}
+}
+
+// The singleton-vs-instance distinction is a fact about the DECLARATION, so the frontend has to
+// record it: `def self.x` and every `def` inside `class << self` are class-level, a `def` in the
+// class body is not, and a class nested inside `class << self` declares instance methods again.
+func TestRubyMarksClassLevelMethodDeclarations(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "kinds.rb")
+	src := []byte(`class Kinds
+  class << self
+    def from_singleton_class
+    end
+
+    class Nested
+      def nested_instance
+      end
+    end
+  end
+
+  def self.from_self_def
+  end
+
+  def plain_instance
+  end
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{
+		"from_singleton_class": true,
+		"from_self_def":        true,
+		"nested_instance":      false,
+		"plain_instance":       false,
+	}
+	got := map[string]bool{}
+	var walk func([]nir.Stmt)
+	walk = func(stmts []nir.Stmt) {
+		for _, st := range stmts {
+			switch x := st.(type) {
+			case nir.FuncDef:
+				got[x.Name] = x.Static
+				walk(x.Body)
+			case nir.ClassDef:
+				walk(x.Body)
+			}
+		}
+	}
+	for _, m := range prog.Modules {
+		walk(m.Body)
+	}
+	for name, static := range want {
+		if _, ok := got[name]; !ok {
+			t.Fatalf("%s was not extracted; got=%v", name, got)
+		}
+		if got[name] != static {
+			t.Errorf("%s: Static=%v, want %v", name, got[name], static)
+		}
 	}
 }
 
@@ -589,4 +699,34 @@ func rubyHasFuncWithParam(mods []nir.Module, name, param string) bool {
 		}
 	}
 	return false
+}
+
+// rubyNodeID returns the id of the single node of `typ` whose props all match.
+func rubyNodeID(t *testing.T, g usg.Store, typ string, props ...string) string {
+	t.Helper()
+	ids, err := g.NodesOfType(typ)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, id := range ids {
+		n, ok, err := g.GetNode(id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !ok {
+			continue
+		}
+		match := true
+		for i := 0; i < len(props); i += 2 {
+			if n.Prop(props[i]) != props[i+1] {
+				match = false
+				break
+			}
+		}
+		if match {
+			return id
+		}
+	}
+	t.Fatalf("no %s node with %v", typ, props)
+	return ""
 }
