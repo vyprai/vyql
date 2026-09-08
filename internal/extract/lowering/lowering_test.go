@@ -2566,3 +2566,180 @@ func TestClassStaticPropertySlotIsSharedAcrossModules(t *testing.T) {
 		t.Fatalf("the static property write in Model.php does not reach the read in Engine.php")
 	}
 }
+
+// fieldWriteStmt spells the member write `base.attr = v` the way the C#/JS/Kotlin/Java
+// frontends do: a path call with no method, whose single argument is the assigned value.
+func fieldWriteStmt(base nir.Expr, attr string, val nir.Expr, loc string) nir.Stmt {
+	return nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Attr{Base: base, Attr: attr, Path: "this." + attr, Loc: loc},
+		Args:   []nir.Expr{val},
+		Path:   "this." + attr,
+		Method: "",
+		Loc:    loc,
+	}}
+}
+
+// A setter parks a value on a field and a getter hands it back: the write and the read sit in
+// two different method bodies, and only the receiver at the two call sites ties them together.
+// The getter's body is lowered before either call site here (source order), so at the moment
+// `this.v` is read no slot for `v` exists on the getter's `this` — the read has to be RECORDED,
+// not merely looked up, or aliasing the receiver later has nothing to connect it to.
+func TestStoredFieldReachesGetterAcrossCallBoundary(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.cs",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Holder", Members: []string{"v", "safe"}, Loc: "app.cs:1", Body: []nir.Stmt{
+				nir.FuncDef{Name: "getV", Loc: "app.cs:2", Body: []nir.Stmt{
+					nir.Return{Value: nir.Attr{Base: nir.Name{ID: "this", Loc: "app.cs:2"}, Attr: "v", Path: "this.v", Loc: "app.cs:2"}},
+				}},
+				nir.FuncDef{Name: "getSafe", Loc: "app.cs:3", Body: []nir.Stmt{
+					nir.Return{Value: nir.Attr{Base: nir.Name{ID: "this", Loc: "app.cs:3"}, Attr: "safe", Path: "this.safe", Loc: "app.cs:3"}},
+				}},
+				nir.FuncDef{Name: "setV", Params: []string{"x"}, Loc: "app.cs:4", Body: []nir.Stmt{
+					fieldWriteStmt(nir.Name{ID: "this", Loc: "app.cs:4"}, "v", nir.Name{ID: "x", Loc: "app.cs:4"}, "app.cs:4"),
+				}},
+			}},
+			nir.FuncDef{Name: "handler", Params: []string{"taint", "h"}, ParamTypes: map[string]string{"h": "Holder"}, Loc: "app.cs:5", Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Name{ID: "h", Loc: "app.cs:6"}, Attr: "setV", Path: "h.setV", Loc: "app.cs:6"},
+					Args:   []nir.Expr{nir.Name{ID: "taint", Loc: "app.cs:6"}},
+					Path:   "h.setV", Method: "setV", Loc: "app.cs:6",
+				}},
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "sink", Loc: "app.cs:7"}, Path: "sink", Method: "sink", Loc: "app.cs:7",
+					Args: []nir.Expr{nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "h", Loc: "app.cs:7"}, Attr: "getV", Path: "h.getV", Loc: "app.cs:7"},
+						Path:   "h.getV", Method: "getV", Loc: "app.cs:7",
+					}},
+				}},
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "other", Loc: "app.cs:8"}, Path: "other", Method: "other", Loc: "app.cs:8",
+					Args: []nir.Expr{nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "h", Loc: "app.cs:8"}, Attr: "getSafe", Path: "h.getSafe", Loc: "app.cs:8"},
+						Path:   "h.getSafe", Method: "getSafe", Loc: "app.cs:8",
+					}},
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	source := findNodeID(t, g, "code.Param", "name", "taint")
+	stored := findNodeID(t, g, "code.Arg", "loc", "app.cs:7")
+	sibling := findNodeID(t, g, "code.Arg", "loc", "app.cs:8")
+	reachable, err := usg.BFS(g, source, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[stored] {
+		t.Fatalf("the value setV stored on the field did not reach the getV that reads it back")
+	}
+	if reachable[sibling] {
+		t.Fatalf("taint on field v leaked into the sibling field safe")
+	}
+}
+
+// A stable per-method `this` node is what lets a field written through one `this` spelling and
+// a field read through the next land on one slot. The member list behind the inheritance-aware
+// bare-identifier path comes from ClassDef.Members, which only the C# frontend populates, so an
+// explicitly spelled `this` must not depend on it — it needs no member list.
+func TestThisQualifiedFieldConnectsWithoutDeclaredMembers(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "App.java",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Holder", Loc: "App.java:1", Body: []nir.Stmt{
+				nir.FuncDef{Name: "handle", Params: []string{"taint"}, Loc: "App.java:2", Body: []nir.Stmt{
+					fieldWriteStmt(nir.Name{ID: "this", Loc: "App.java:3"}, "v", nir.Name{ID: "taint", Loc: "App.java:3"}, "App.java:3"),
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "sink", Loc: "App.java:4"}, Path: "sink", Method: "sink", Loc: "App.java:4",
+						Args: []nir.Expr{nir.Attr{Base: nir.Name{ID: "this", Loc: "App.java:4"}, Attr: "v", Path: "this.v", Loc: "App.java:4"}},
+					}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "other", Loc: "App.java:5"}, Path: "other", Method: "other", Loc: "App.java:5",
+						Args: []nir.Expr{nir.Attr{Base: nir.Name{ID: "this", Loc: "App.java:5"}, Attr: "safe", Path: "this.safe", Loc: "App.java:5"}},
+					}},
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	source := findNodeID(t, g, "code.Param", "name", "taint")
+	stored := findNodeID(t, g, "code.Arg", "loc", "App.java:4")
+	sibling := findNodeID(t, g, "code.Arg", "loc", "App.java:5")
+	reachable, err := usg.BFS(g, source, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[stored] {
+		t.Fatalf("a this-qualified field written and read in one method did not connect")
+	}
+	if reachable[sibling] {
+		t.Fatalf("taint on this.v leaked into the sibling field this.safe")
+	}
+}
+
+// A member written by its BARE name in one method and read by its bare name in another. Java
+// spells a field this way (and C# may), so the write must land on whatever a read of that
+// member resolves to; a write that only rebinds the name inside the method that makes it
+// leaves the two methods' accesses unrelated.
+func TestBareMemberWriteReachesBareMemberReadInAnotherMethod(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "App.java",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Holder", Members: []string{"v", "safe"}, Loc: "App.java:1", Body: []nir.Stmt{
+				nir.Assign{Targets: []string{"v"}, Value: nir.Const{Loc: "App.java:2"}, Decl: true, Loc: "App.java:2"},
+				nir.Assign{Targets: []string{"safe"}, Value: nir.Const{Loc: "App.java:3"}, Decl: true, Loc: "App.java:3"},
+				nir.FuncDef{Name: "getV", Loc: "App.java:4", Body: []nir.Stmt{
+					nir.Return{Value: nir.Name{ID: "v", Loc: "App.java:4"}},
+				}},
+				nir.FuncDef{Name: "getSafe", Loc: "App.java:5", Body: []nir.Stmt{
+					nir.Return{Value: nir.Name{ID: "safe", Loc: "App.java:5"}},
+				}},
+				nir.FuncDef{Name: "Holder", Params: []string{"taint"}, Loc: "App.java:6", Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"v"}, Value: nir.Name{ID: "taint", Loc: "App.java:7"}, Loc: "App.java:7"},
+				}},
+			}},
+			nir.FuncDef{Name: "handler", Params: []string{"h"}, ParamTypes: map[string]string{"h": "Holder"}, Loc: "App.java:9", Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "sink", Loc: "App.java:10"}, Path: "sink", Method: "sink", Loc: "App.java:10",
+					Args: []nir.Expr{nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "h", Loc: "App.java:10"}, Attr: "getV", Path: "h.getV", Loc: "App.java:10"},
+						Path:   "h.getV", Method: "getV", Loc: "App.java:10",
+					}},
+				}},
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "other", Loc: "App.java:11"}, Path: "other", Method: "other", Loc: "App.java:11",
+					Args: []nir.Expr{nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "h", Loc: "App.java:11"}, Attr: "getSafe", Path: "h.getSafe", Loc: "App.java:11"},
+						Path:   "h.getSafe", Method: "getSafe", Loc: "App.java:11",
+					}},
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	source := findNodeID(t, g, "code.Param", "name", "taint")
+	stored := findNodeID(t, g, "code.Arg", "loc", "App.java:10")
+	sibling := findNodeID(t, g, "code.Arg", "loc", "App.java:11")
+	reachable, err := usg.BFS(g, source, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[stored] {
+		t.Fatalf("a bare member write did not reach the bare read of that member in another method")
+	}
+	if reachable[sibling] {
+		t.Fatalf("taint on member v leaked into the sibling member safe")
+	}
+}

@@ -144,7 +144,14 @@ type lowerer struct {
 	// keys/indices, so `m.put("kB", tainted); m.get("kA")` reads a clean element rather
 	// than the whole (over-approximated) container. Keyed by container node id.
 	containers map[string]*containerInfo
-	templates  map[string]templateInfo
+	// pendingReads holds field reads made on a node that is not (yet) a tracked container, keyed
+	// by node then by key. A read does not itself create the container — `l.containers[x] != nil`
+	// is what marks x as one everywhere else — so a getter's `this.X`, lowered before any call
+	// site puts a value in that slot, has nothing to attach to without a record.
+	// Recording it keeps it live: cinfo folds these into the containerInfo the moment one
+	// exists, and elemNode wires the slot to them when the slot appears.
+	pendingReads map[string]map[string][]string
+	templates    map[string]templateInfo
 
 	// modStr maps a module-level (top-level) variable name to its string-constant value, so a
 	// regex call `re.match(PATTERN, x)` referring to a `PATTERN = r"..."` module constant can be
@@ -180,9 +187,14 @@ type lowerer struct {
 }
 
 type containerInfo struct {
-	elems   map[string]string // constant key/index -> element node id holding that slot's taint
-	dirty   bool              // a write with a NON-constant key happened (any key may be tainted)
-	nextIdx int               // append counter for add()/append()/push()
+	elems map[string]string // constant key/index -> element node id holding that slot's taint
+	// reads are the nodes that READ each key — the other half of elems. A read can be lowered
+	// long before the write it must see (they sit in two method bodies, and only a call site
+	// ties the two objects together), so the read is recorded rather than resolved on the spot;
+	// elemNode and aliasReceiverSelf connect it to the slot whenever the slot turns up.
+	reads   map[string][]string
+	dirty   bool // a write with a NON-constant key happened (any key may be tainted)
+	nextIdx int  // append counter for add()/append()/push()
 	// composite marks a two-part-key container — `cfg.set(section, key, val)` /
 	// `cfg.get(section, key)` (configparser and friends). Only a 3-arg keyed write sets
 	// it, which a dict/list never performs, so plain `d.get(key, default)` is unaffected.
@@ -386,14 +398,66 @@ func modeledContainerMethod(m string) bool {
 	return m == "get" || m == "__setitem__" || keyedMutators[m] || appendMutators[m]
 }
 
-// cinfo returns (creating if needed) the element-taint record for a container node.
+// cinfo returns (creating if needed) the element-taint record for a container node, adopting
+// any reads of that node recorded before it became a tracked container.
 func (l *lowerer) cinfo(node string) *containerInfo {
 	ci := l.containers[node]
 	if ci == nil {
-		ci = &containerInfo{elems: map[string]string{}}
+		ci = &containerInfo{elems: map[string]string{}, reads: map[string][]string{}}
 		l.containers[node] = ci
 	}
+	l.adoptPendingReads(ci, node)
 	return ci
+}
+
+// adoptPendingReads moves the reads recorded against a bare node into the containerInfo that
+// now stands for it, wiring each to its slot where one already exists.
+func (l *lowerer) adoptPendingReads(ci *containerInfo, node string) {
+	pending := l.pendingReads[node]
+	if pending == nil {
+		return
+	}
+	delete(l.pendingReads, node)
+	for key, readers := range pending {
+		for _, reader := range readers {
+			l.addFieldReader(ci, key, reader)
+		}
+	}
+}
+
+// addFieldReader records reader as a read of ci[key] and connects it to the slot when one
+// exists. Deduplicated: aliasing runs once per call site, and the same pair of objects can be
+// aliased at several of them.
+func (l *lowerer) addFieldReader(ci *containerInfo, key, reader string) {
+	if containsString(ci.reads[key], reader) {
+		return
+	}
+	ci.reads[key] = append(ci.reads[key], reader)
+	if slot := ci.elems[key]; slot != "" {
+		l.flow(slot, reader)
+	}
+}
+
+// noteFieldRead records that `reader` is the value of base.key and connects it to that key's
+// slot when the slot exists. Deliberately does NOT make base a tracked container: a bare
+// attribute read is not evidence of one, and `l.containers[x] != nil` is what drives
+// invalidation and receiver/argument aliasing elsewhere.
+func (l *lowerer) noteFieldRead(base, key, reader string) {
+	if base == "" || key == "" || reader == "" {
+		return
+	}
+	if ci := l.containers[base]; ci != nil {
+		l.addFieldReader(ci, key, reader)
+		return
+	}
+	pending := l.pendingReads[base]
+	if pending == nil {
+		pending = map[string][]string{}
+		l.pendingReads[base] = pending
+	}
+	if !containsString(pending[key], reader) {
+		pending[key] = append(pending[key], reader)
+	}
 }
 
 // elemNode returns the synthetic node holding container[key]'s taint (created on first use).
@@ -404,6 +468,12 @@ func (l *lowerer) elemNode(container, key, loc string) string {
 	}
 	id := l.node("Elem", loc, nil)
 	ci.elems[key] = id
+	// a read of this key registered before the slot existed still wants it. Slots are
+	// order-independent already — every write to a key routes into the ONE slot node, so a read
+	// edge drawn now carries every write, whenever it was lowered.
+	for _, reader := range ci.reads[key] {
+		l.flow(id, reader)
+	}
 	return id
 }
 
@@ -2717,6 +2787,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		classStatics:    map[string]string{},
 		staticDeclMemo:  map[string]string{},
 		containers:      map[string]*containerInfo{},
+		pendingReads:    map[string]map[string][]string{},
 		templates:       map[string]templateInfo{},
 		modStr:          map[string]string{},
 		dynSQLVar:       map[string]bool{},
@@ -3328,8 +3399,18 @@ func (l *lowerer) aliasReceiverSelf(recv, self string) {
 		if sc.dirty {
 			rc.dirty = true
 		}
+		// the callee's own reads of `this.X` become reads of the receiver object: connect each
+		// to the merged slot. This is the half that carries a stored value across two calls —
+		// the setter's write and the getter's read are in different bodies, and the receiver at
+		// the call site is the only thing that says they are the same object.
+		for k, readers := range sc.reads {
+			for _, reader := range readers {
+				l.addFieldReader(rc, k, reader)
+			}
+		}
 	}
 	l.containers[self] = rc // future this.X / recv.X accesses share the same slots
+	l.adoptPendingReads(rc, self)
 }
 
 // classMemberSet returns the transitive data-member names of "modkey::Class": its declared
@@ -3586,15 +3667,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		if l.curClass != "" && len(st.Params) > 0 && st.Params[0] == l.selfName {
 			inner.setTyp(l.selfName, [2]string{l.curModule, l.curClass})
 		}
-		// languages with no explicit self param (C#) still need a STABLE `this` node per method
-		// so `this.Field` writes/reads — and inheritance-aware implicit-`this` member refs —
-		// connect within the method and escape via `return this`. Synthesize one when the class
-		// has known members (i.e. the frontend opted into member resolution).
-		// implicit-this is C#-gated (only C# populates ClassDef.Members); C#'s self keyword is
-		// "this" (the merged multi-language Program loses per-language SelfName), so key on "this".
+		// languages with no explicit self param (C#, Java, …) still need a STABLE `this` node per
+		// method so `this.Field` writes/reads connect within the method and escape via
+		// `return this` — and so a call site can alias its receiver to it, which is what carries
+		// a value a setter parked on a field to the getter that reads it back.
+		// C#'s self keyword is "this" (the merged multi-language Program loses per-language
+		// SelfName), so key on "this".
+		// Not gated on the class having declared members: that set comes from ClassDef.Members,
+		// which only the C# frontend populates, and it is what the INHERITANCE-AWARE bare
+		// identifier path below needs — an explicitly spelled `this` needs nothing but the node.
 		// Use the STABLE funcInfo.selfNode so call sites can alias the receiver to it.
-		if l.curClass != "" && inner.node["this"] == "" && info != nil && info.selfNode != "" &&
-			len(l.classMemberSet(l.curModule, l.curClass)) > 0 {
+		if l.curClass != "" && inner.node["this"] == "" && info != nil && info.selfNode != "" {
 			inner.setNode("this", info.selfNode)
 			inner.setTyp("this", [2]string{l.curModule, l.curClass})
 		}
@@ -3777,6 +3860,24 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 						"target:" + t,
 					})
 					l.flow(targetVal, slot)
+				}
+			}
+			// bare member write `remoteAddr = value` — the spelling Java uses for what C# may
+			// also write `this.remoteAddr = value`. A bare READ of a member already resolves to
+			// ONE node for the whole class (the field's declaration, or the receiver's field slot
+			// where the declaration produced no node), but a write that only rebinds the name
+			// inside the method that makes it leaves a constructor storing a value and a getter
+			// returning it as unrelated nodes. Route the value into the node a read of that member resolves
+			// to — the same thing the lexical-binding case just below does for a write that
+			// rebinds a captured name. A declaration introduces a local, which is not the field.
+			if !st.Decl && !sc.lex[t] && !strings.Contains(t, ".") && l.curClass != "" &&
+				l.classMemberSet(l.curModule, l.curClass)[t] {
+				if d := sc.node[t]; d != "" {
+					if d != targetVal {
+						l.flow(targetVal, d)
+					}
+				} else if self := sc.node["this"]; self != "" {
+					l.flow(targetVal, l.elemNode(self, t, st.Loc))
 				}
 			}
 			if sc.lex[t] && !st.Decl {
@@ -4190,10 +4291,10 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		n := l.nodeInline("Attr", ex.Loc, props, ex.Attr, ex.Path, "", "")
 		l.flow(base, n)
 		// field-sensitive read: if obj.field was written element-sensitively (directly or via
-		// an alias sharing this base node), pull that slot's taint too.
-		if ci := l.containers[base]; ci != nil && ci.elems[ex.Attr] != "" {
-			l.flow(ci.elems[ex.Attr], n)
-		}
+		// an alias sharing this base node), pull that slot's taint too. Recorded rather than
+		// merely looked up, so a write that only becomes visible later — the receiver of THIS
+		// call being aliased with a setter's `this` at some other call site — reaches it.
+		l.noteFieldRead(base, ex.Attr, n)
 		return n
 	case nir.Index:
 		base := l.eval(ex.Base, sc)
