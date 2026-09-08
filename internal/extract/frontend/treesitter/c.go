@@ -670,7 +670,7 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 						add("call_arg:" + path + ":" + a)
 						add(fmt.Sprintf("call_arg_at:%s:%d:%s", path, i, a))
 					}
-					if shape := c.ccExprShape(arg); shape != "" {
+					for _, shape := range c.ccShapeSpellings(arg) {
 						add("call_arg_shape:" + path + ":" + shape)
 						add(fmt.Sprintf("call_arg_shape_at:%s:%d:%s", path, i, shape))
 					}
@@ -684,7 +684,7 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 			if idx := c.dotted(n); idx != "" && idx != "?" {
 				add("index:" + idx)
 			}
-			if shape := c.ccExprShape(n); shape != "" {
+			for _, shape := range c.ccShapeSpellings(n) {
 				add("index_shape:" + shape)
 				add("subscript_shape:" + shape)
 			}
@@ -700,13 +700,22 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 			if left != "" && right != "" {
 				add("assign:" + left + "=" + right)
 			}
+			addAssignShape := func(l, r string) {
+				if l == "" || r == "" {
+					return
+				}
+				add("assign_shape:" + l + "=" + r)
+				if op := c.assignmentOp(n); op != "" && op != "=" {
+					add("assign_op_shape:" + l + op + r)
+				}
+			}
 			leftShape := c.ccExprShape(c.field(n, "left"))
 			rightShape := c.ccExprShape(c.field(n, "right"))
-			if leftShape != "" && rightShape != "" {
-				add("assign_shape:" + leftShape + "=" + rightShape)
-				if op := c.assignmentOp(n); op != "" && op != "=" {
-					add("assign_op_shape:" + leftShape + op + rightShape)
-				}
+			addAssignShape(leftShape, rightShape)
+			leftUncast := c.ccExprShapeUncast(c.field(n, "left"))
+			rightUncast := c.ccExprShapeUncast(c.field(n, "right"))
+			if leftUncast != leftShape || rightUncast != rightShape {
+				addAssignShape(leftUncast, rightUncast)
 			}
 		case "init_declarator":
 			left := c.declName(c.field(n, "declarator"))
@@ -714,15 +723,21 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 			if left != "" && right != "" {
 				add("assign:" + left + "=" + right)
 			}
-			if rightShape := c.ccExprShape(c.field(n, "value")); rightShape != "" {
+			for _, rightShape := range c.ccShapeSpellings(c.field(n, "value")) {
 				add("assign_shape:ID=" + rightShape)
 			}
 		case "binary_expression":
 			if expr := compactCExprText(c.text(n)); expr != "" {
 				add("binary:" + expr)
 			}
-			if shape := c.ccExprShape(n); shape != "" {
+			for _, shape := range c.ccShapeSpellings(n) {
 				add("binary_shape:" + shape)
+			}
+		case "cast_expression":
+			// Only the spelling that keeps the cast: a cast_shape token that
+			// has erased the cast names nothing this token exists to say.
+			if shape := c.ccExprShape(n); shape != "" {
+				add("cast_shape:" + shape)
 			}
 		case "string_literal", "concatenated_string", "raw_string_literal":
 			if lit := strings.Trim(cStringText(c.text(n)), "\""); lit != "" {
@@ -9283,7 +9298,69 @@ func (c *ccConv) assignmentOp(n *tree_sitter.Node) string {
 	return ""
 }
 
+// ccShapeSpellings returns the shapes to emit for one expression: the shape
+// that keeps its casts, and, when the expression casts anything, the cast-free
+// spelling beside it so a binding written before casts were kept still matches.
+func (c *ccConv) ccShapeSpellings(n *tree_sitter.Node) []string {
+	kept := c.ccExprShape(n)
+	var out []string
+	if kept == "" {
+		return nil
+	}
+	out = append(out, kept)
+	// The cast-free spelling differs from the kept one only when a cast is
+	// present, so the second walk runs only for expressions that have one.
+	if strings.Contains(kept, "CAST(") {
+		if uncast := c.ccExprShapeUncast(n); uncast != "" && uncast != kept {
+			out = append(out, uncast)
+		}
+	}
+	return out
+}
+
+// ccCastTypeShape spells a cast's target type for a shape: the qualifiers a
+// type may carry are dropped and whitespace is collapsed, with a star, a
+// bracket or a paren joined to whatever precedes it, so `unsigned char *`,
+// `const unsigned char*` and `unsigned  char  *` all read as `unsigned char*`.
+// The pointer depth is kept, because a cast to `void **` addresses something
+// different from a cast to `void *`.
+func ccCastTypeShape(raw string) string {
+	spaced := raw
+	for _, glue := range []string{"*", "&", "(", ")", "[", "]"} {
+		spaced = strings.ReplaceAll(spaced, glue, " "+glue+" ")
+	}
+	var b strings.Builder
+	for _, f := range strings.Fields(spaced) {
+		switch f {
+		case "const", "volatile", "restrict", "__restrict", "__restrict__", "register", "_Atomic":
+			continue
+		}
+		if b.Len() > 0 && ccIdentByte(b.String()[b.Len()-1]) && ccIdentByte(f[0]) {
+			b.WriteByte(' ')
+		}
+		b.WriteString(f)
+	}
+	return b.String()
+}
+
+// ccExprShape spells the structure of an expression with names and literals
+// abstracted away, which is what a binding matches on when the identifier does
+// not matter. A cast keeps its target type -- CAST(unsigned char*,&ID) -- so a
+// pointer converted before it is read is not the same shape as the pointer
+// itself.
 func (c *ccConv) ccExprShape(n *tree_sitter.Node) string {
+	return c.ccExprShapeKeepingCasts(n, true)
+}
+
+// ccExprShapeUncast spells the same expression with every cast erased, which is
+// the spelling ccExprShape returned before it kept them. Every shape token is
+// emitted in both spellings, so a binding written against the cast-free one
+// still matches code that casts.
+func (c *ccConv) ccExprShapeUncast(n *tree_sitter.Node) string {
+	return c.ccExprShapeKeepingCasts(n, false)
+}
+
+func (c *ccConv) ccExprShapeKeepingCasts(n *tree_sitter.Node, keepCasts bool) string {
 	if n == nil {
 		return ""
 	}
@@ -9297,14 +9374,14 @@ func (c *ccConv) ccExprShape(n *tree_sitter.Node) string {
 	case "true", "false", "null", "nullptr":
 		return strings.ToUpper(c.text(n))
 	case "field_expression":
-		base := c.ccExprShape(c.field(n, "argument"))
+		base := c.ccExprShapeKeepingCasts(c.field(n, "argument"), keepCasts)
 		if base == "" {
 			return ""
 		}
 		return base + ".FIELD"
 	case "subscript_expression":
-		base := c.ccExprShape(c.field(n, "argument"))
-		key := c.ccExprShape(c.field(n, "index"))
+		base := c.ccExprShapeKeepingCasts(c.field(n, "argument"), keepCasts)
+		key := c.ccExprShapeKeepingCasts(c.field(n, "index"), keepCasts)
 		if base == "" {
 			return ""
 		}
@@ -9319,43 +9396,53 @@ func (c *ccConv) ccExprShape(n *tree_sitter.Node) string {
 		}
 		var args []string
 		for _, arg := range c.namedChildren(c.field(n, "arguments")) {
-			if shape := c.ccExprShape(arg); shape != "" {
+			if shape := c.ccExprShapeKeepingCasts(arg, keepCasts); shape != "" {
 				args = append(args, shape)
 			}
 		}
 		return path + "(" + strings.Join(args, ",") + ")"
 	case "binary_expression":
-		left := c.ccExprShape(c.field(n, "left"))
-		right := c.ccExprShape(c.field(n, "right"))
+		left := c.ccExprShapeKeepingCasts(c.field(n, "left"), keepCasts)
+		right := c.ccExprShapeKeepingCasts(c.field(n, "right"), keepCasts)
 		op := c.text(c.field(n, "operator"))
 		if left == "" || right == "" || op == "" {
 			return ""
 		}
 		return left + op + right
 	case "assignment_expression":
-		left := c.ccExprShape(c.field(n, "left"))
-		right := c.ccExprShape(c.field(n, "right"))
+		left := c.ccExprShapeKeepingCasts(c.field(n, "left"), keepCasts)
+		right := c.ccExprShapeKeepingCasts(c.field(n, "right"), keepCasts)
 		op := c.assignmentOp(n)
 		if left == "" || right == "" || op == "" {
 			return ""
 		}
 		return left + op + right
-	case "parenthesized_expression", "cast_expression":
+	case "parenthesized_expression":
 		if kids := c.namedChildren(n); len(kids) > 0 {
-			return c.ccExprShape(kids[len(kids)-1])
+			return c.ccExprShapeKeepingCasts(kids[len(kids)-1], keepCasts)
 		}
+	case "cast_expression":
+		inner := c.ccExprShapeKeepingCasts(c.ccCastValue(n), keepCasts)
+		if !keepCasts || inner == "" {
+			return inner
+		}
+		typ := ccCastTypeShape(c.text(c.field(n, "type")))
+		if typ == "" {
+			return inner
+		}
+		return "CAST(" + typ + "," + inner + ")"
 	case "pointer_expression", "unary_expression":
 		if arg := c.field(n, "argument"); arg != nil {
 			op := c.unaryOp(n)
 			if op == "" {
-				return c.ccExprShape(arg)
+				return c.ccExprShapeKeepingCasts(arg, keepCasts)
 			}
-			return op + c.ccExprShape(arg)
+			return op + c.ccExprShapeKeepingCasts(arg, keepCasts)
 		}
 	case "conditional_expression":
-		cond := c.ccExprShape(c.field(n, "condition"))
-		thenShape := c.ccExprShape(c.field(n, "consequence"))
-		elseShape := c.ccExprShape(c.field(n, "alternative"))
+		cond := c.ccExprShapeKeepingCasts(c.field(n, "condition"), keepCasts)
+		thenShape := c.ccExprShapeKeepingCasts(c.field(n, "consequence"), keepCasts)
+		elseShape := c.ccExprShapeKeepingCasts(c.field(n, "alternative"), keepCasts)
 		if cond == "" || thenShape == "" || elseShape == "" {
 			return ""
 		}
