@@ -2852,3 +2852,90 @@ func TestInstanceReceiverKeepsTheInstanceMethodOfAStaticInstancePair(t *testing.
 		t.Errorf("repo.checkout's argument reached the class-level declaration's body")
 	}
 }
+
+// The revealing-module pattern: an immediately-invoked function expression whose result is
+// ASSIGNED — `var M = (function () { … })();` and `Namespace.mod = (function () { … })();`.
+// The functions declared in that body are siblings in one lexical scope, and JavaScript
+// hoists a declaration to the top of its scope, so `handler` calling a `helper` written
+// BELOW it is the ordinary spelling. Pass 1 has to see those declarations, or the call
+// resolves to nothing and the argument never reaches the helper's parameter — taint stops at
+// the call. Registering the invocation is what puts the assigned form's declarations in
+// front of pass 1; the frontend splices only the bare-statement form into the module on its
+// own.
+func TestSiblingCallInsideAssignedInvokedFunctionResolves(t *testing.T) {
+	siblings := []nir.Stmt{
+		nir.FuncDef{Name: "handler", Params: []string{"p"}, Loc: "app.js:2", Body: []nir.Stmt{
+			nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "helper", Loc: "app.js:3"},
+				Args:   []nir.Expr{nir.Name{ID: "p", Loc: "app.js:3"}},
+				Path:   "helper", Method: "helper", Loc: "app.js:3",
+			}},
+		}},
+		nir.FuncDef{Name: "helper", Params: []string{"x"}, Loc: "app.js:4", Body: []nir.Stmt{
+			nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "sink", Loc: "app.js:5"},
+				Args:   []nir.Expr{nir.Name{ID: "x", Loc: "app.js:5"}},
+				Path:   "sink", Method: "sink", Loc: "app.js:5",
+			}},
+		}},
+		// declared in the same body and never called: nothing may reach it.
+		nir.FuncDef{Name: "unused", Params: []string{"y"}, Loc: "app.js:6", Body: []nir.Stmt{
+			nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: "other", Loc: "app.js:7"},
+				Args:   []nir.Expr{nir.Name{ID: "y", Loc: "app.js:7"}},
+				Path:   "other", Method: "other", Loc: "app.js:7",
+			}},
+		}},
+	}
+	iife := func(body []nir.Stmt) nir.Expr {
+		return nir.Call{
+			Callee: nir.Thru{Inner: nir.Lambda{
+				Loc:           "app.js:1",
+				ContextTokens: []string{"lang=javascript\x00name=<lambda>"},
+				Body:          body,
+			}},
+			Path: "?", Loc: "app.js:1",
+		}
+	}
+	// the siblings one level further in, which is how the module object that motivated this
+	// is written: the IIFE declares one function and the siblings are declared inside it.
+	nested := []nir.Stmt{nir.FuncDef{Name: "start", Loc: "app.js:1", Body: siblings}}
+	for _, tc := range []struct {
+		name string
+		stmt nir.Stmt
+	}{
+		{"variable", nir.Assign{Targets: []string{"M"}, Value: iife(siblings), Decl: true, Loc: "app.js:1"}},
+		// a member target lowers to a write call carrying the invocation as its argument
+		{"member", nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Attr{Base: nir.Name{ID: "Namespace", Loc: "app.js:1"}, Attr: "mod", Path: "Namespace.mod", Loc: "app.js:1"},
+			Args:   []nir.Expr{iife(siblings)},
+			Path:   "Namespace.mod", Loc: "app.js:1",
+		}}},
+		{"nested", nir.Assign{Targets: []string{"M"}, Value: iife(nested), Decl: true, Loc: "app.js:1"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prog := nir.Program{Modules: []nir.Module{{Key: "app", File: "app.js", Body: []nir.Stmt{tc.stmt}}}}
+			g, err := Lower(prog, true)
+			if err != nil {
+				t.Fatalf("lower: %v", err)
+			}
+			source := findNodeID(t, g, "code.Param", "name", "p")
+			helperParam := findNodeID(t, g, "code.Param", "name", "x")
+			sunk := findNodeID(t, g, "code.Arg", "loc", "app.js:5")
+			unrelated := findNodeID(t, g, "code.Param", "name", "y")
+			reachable, err := usg.BFS(g, source, "FLOWS", 40)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if !reachable[helperParam] {
+				t.Fatalf("the argument of the sibling call did not reach the helper's parameter")
+			}
+			if !reachable[sunk] {
+				t.Fatalf("taint did not follow the call to the sibling function into its body")
+			}
+			if reachable[unrelated] {
+				t.Fatalf("taint reached a function in the same body that is never called")
+			}
+		})
+	}
+}

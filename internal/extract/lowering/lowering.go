@@ -3664,9 +3664,41 @@ func (l *lowerer) globalClass(modkey, name string) ([2]string, bool) {
 	return [2]string{}, false
 }
 
+// registerInvokedBodies registers the declarations of every immediately-invoked function
+// expression reachable from e. The body of `(function () { … })()` is the lexical scope of
+// the functions declared in it, and JavaScript hoists a function declaration to the top of
+// its scope, so a call to a SIBLING declared LATER in the same body resolves — the
+// revealing-module pattern `var M = (function () { function handler(p) { helper(p); }
+// function helper(x) { … } return { handler: handler }; })();` is written that way as a
+// matter of course. The frontend splices an IIFE written as a bare STATEMENT into the module,
+// which is what put those declarations in front of pass 1; the assigned and argument forms
+// stay expressions, so registering them here is what puts their declarations in front of
+// pass 1 too, and a forward reference to a sibling resolves instead of dead-ending the call.
+// Pass 2 lowers the body either way, so this
+// only adds what hoisting already means: the declaration is known before the body runs.
+func (l *lowerer) registerInvokedBodies(modkey string, e nir.Expr, cls string) {
+	switch ex := e.(type) {
+	case nir.Thru:
+		l.registerInvokedBodies(modkey, ex.Inner, cls)
+	case nir.Call:
+		if lam, ok := calleeLambda(ex.Callee); ok {
+			l.register(modkey, lam.Body, cls)
+		}
+		// `Namespace.mod = (function () { … })()` lowers the assignment to a write call whose
+		// argument is the invocation, so the IIFE reaches pass 1 in argument position.
+		for _, a := range ex.Args {
+			l.registerInvokedBodies(modkey, a, cls)
+		}
+	}
+}
+
 func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 	for _, s := range stmts {
 		switch st := s.(type) {
+		case nir.Assign:
+			l.registerInvokedBodies(modkey, st.Value, cls)
+		case nir.ExprStmt:
+			l.registerInvokedBodies(modkey, st.Value, cls)
 		case nir.BodyRef:
 			if st.Summarized {
 				l.register(modkey, st.Summary.Declarations, cls)
