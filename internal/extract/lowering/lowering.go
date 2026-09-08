@@ -31,6 +31,7 @@ type funcInfo struct {
 	params        map[string]string // name -> param node id
 	paramTypes    map[string]string // name -> declared/inferred receiver type
 	ret           string            // return node id
+	retType       string            // declared result type name ("" when the language/declaration says nothing)
 	module        string
 	cls           string
 	name          string
@@ -69,6 +70,7 @@ type lowerer struct {
 	funcQual      map[string]*funcInfo         // "modkey::qual" -> info (last declaration wins)
 	funcOverloads map[string][]*funcInfo       // "modkey::qual" -> EVERY declaration, in source order
 	funcShort     map[string][]*funcInfo       // short name -> infos
+	globalTypes   map[string]string            // "modkey::global" -> declared type name
 	classQual     map[string]bool              // "modkey::Class"
 	classDefs     map[string]map[string]bool   // bare class name -> SET of modules that define it
 	classFields   map[string]map[string]string // "modkey::Class" -> field -> declared class type
@@ -2641,6 +2643,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		funcQual:        map[string]*funcInfo{},
 		funcOverloads:   map[string][]*funcInfo{},
 		funcShort:       map[string][]*funcInfo{},
+		globalTypes:     map[string]string{},
 		classQual:       map[string]bool{},
 		classDefs:       map[string]map[string]bool{},
 		classFields:     map[string]map[string]string{},
@@ -2986,6 +2989,7 @@ func (l *lowerer) run() error {
 			l.importNode(body, imp)
 		}
 		l.register(m.Key, body.Body, "")
+		l.registerGlobals(m.Key, body.Body)
 	}
 	l.collectAddressTaken()
 	for _, m := range l.prog.Modules {
@@ -3110,6 +3114,15 @@ func importPackageRoot(module string) string {
 	return module
 }
 
+// declClass is the class a declaration belongs to: the one that lexically encloses it, or —
+// for a language that writes a method apart from its type — the receiver type it names.
+func declClass(enclosing string, st nir.FuncDef) string {
+	if enclosing != "" {
+		return enclosing
+	}
+	return st.Recv
+}
+
 // makeFuncInfo creates a function's signature nodes (Param/Return) with stable, name-derived
 // ids and returns its funcInfo. Shared by pass-1 registration and the pass-2 nested-function
 // fallback so both mint identical, body-independent signature ids — the anchor cross-module
@@ -3142,6 +3155,7 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		params:     params,
 		paramTypes: st.ParamTypes,
 		ret:        l.nodeWithID(sigID(ns, rel, "ret", ""), "Return", st.Loc, map[string]string{"func": st.Name}),
+		retType:    st.Returns,
 		module:     modkey, cls: cls, name: st.Name,
 		paramEntries:  st.ParamEntries,
 		resultEntries: st.ResultEntries,
@@ -3222,6 +3236,55 @@ func (l *lowerer) classMemberSet(modkey, class string) map[string]bool {
 	return out
 }
 
+// registerGlobals records the declared type of each MODULE-LEVEL variable. A module's own
+// statements type its globals as they are lowered, but only in declaration order and only
+// for its own scope: a package whose registry variable is declared in one file and used in
+// another, or read from a different package entirely, has nothing to dispatch on. The
+// declaration is a fact about the program, not about the order its files were walked, so it
+// belongs to pass 1 with the other signatures. Only the top level counts — a local of the
+// same shape inside a function is that function's, and register() recurses into bodies.
+func (l *lowerer) registerGlobals(modkey string, stmts []nir.Stmt) {
+	for _, s := range stmts {
+		switch st := s.(type) {
+		case nir.BodyRef:
+			if st.Summarized {
+				l.registerGlobals(modkey, st.Summary.Declarations)
+			} else {
+				l.eachDeferred(st, func(chunk []nir.Stmt) { l.registerGlobals(modkey, chunk) })
+			}
+		case nir.Assign:
+			if st.Type == "" || len(st.Targets) != 1 {
+				continue
+			}
+			name := st.Targets[0]
+			if name == "" || strings.ContainsAny(name, ".[") {
+				continue
+			}
+			l.globalTypes[modkey+"::"+name] = st.Type
+			if l.p1 != nil {
+				l.p1.Globals = append(l.p1.Globals, cfGob{modkey, name, st.Type})
+			}
+		}
+	}
+}
+
+// globalClass is the class a module-level variable was declared to hold.
+func (l *lowerer) globalClass(modkey, name string) ([2]string, bool) {
+	typ := l.globalTypes[modkey+"::"+name]
+	if typ == "" {
+		return [2]string{}, false
+	}
+	if l.classQual[modkey+"::"+typ] {
+		return [2]string{modkey, typ}, true
+	}
+	if mods := l.classDefs[typ]; len(mods) == 1 {
+		for m := range mods {
+			return [2]string{m, typ}, true
+		}
+	}
+	return [2]string{}, false
+}
+
 func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 	for _, s := range stmts {
 		switch st := s.(type) {
@@ -3262,6 +3325,9 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				for _, base := range st.Bases {
 					l.derivedChildren[shortClassName(base)] = append(l.derivedChildren[shortClassName(base)], qual)
 				}
+				if l.p1 != nil {
+					l.p1.ClassBases = append(l.p1.ClassBases, cbGob{qual, st.Bases})
+				}
 			}
 			// record field -> declared class type (for cross-file method resolution
 			// on field receivers, e.g. Spring `@Autowired UserService svc; svc.m()`).
@@ -3278,6 +3344,7 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 			}
 			l.register(modkey, st.Body, st.Name)
 		case nir.FuncDef:
+			cls := declClass(cls, st)
 			prefix := ""
 			if cls != "" {
 				prefix = cls + "."
@@ -3290,7 +3357,7 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 			if l.p1 != nil {
 				l.p1.Funcs = append(l.p1.Funcs, fiGob{
 					Qual: qual, Short: st.Name, ParamNames: info.paramNames, Params: info.params,
-					ParamTypes: info.paramTypes, Ret: info.ret, Module: info.module, Cls: info.cls,
+					ParamTypes: info.paramTypes, Ret: info.ret, RetType: info.retType, Module: info.module, Cls: info.cls,
 					Name: info.name, ParamEntries: info.paramEntries, ResultEntries: info.resultEntries, Abstract: info.abstract,
 				})
 			}
@@ -3323,6 +3390,14 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		l.classNest = l.classNest[:len(l.classNest)-1]
 		l.curClass = prev
 	case nir.FuncDef:
+		// a method declared outside its type (Go's `func (c *T) M()`) belongs to that type
+		// for the whole of its body: it registers, resolves and mints signature ids under
+		// "module::T.M", exactly as a method nested in T's declaration would.
+		if cls := declClass(l.curClass, st); cls != l.curClass {
+			prev := l.curClass
+			l.curClass = cls
+			defer func() { l.curClass = prev }()
+		}
 		prefix := ""
 		if l.curClass != "" {
 			prefix = l.curClass + "."
@@ -3433,9 +3508,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		val := l.eval(st.Value, sc)
 		var typ [2]string
 		hasTyp := false
+		// the type a call RETURNS, when the call is not a constructor. It types the target
+		// for RESOLUTION only (below), never for binding: `svc := registry.Service()` binds
+		// the value the call produced, and calling that value a value of the declared result
+		// type is an inference, not something the assignment says.
+		var callTyp [2]string
+		hasCallTyp := false
 		if call, ok := st.Value.(nir.Call); ok {
 			if t, ok := l.resolveCtor(call.Callee); ok {
 				typ, hasTyp = t, true
+			} else if len(st.Targets) == 1 { // a multi-value call types none of its targets
+				callTyp, hasCallTyp = l.callResultClass(call, sc)
 			}
 		}
 		if !hasTyp && st.Type != "" { // declared type (no/foreign RHS), e.g. Spring DI field
@@ -3545,6 +3628,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			targetVal := val
 			if targetHasTyp && targetTyp[1] != "" {
 				targetVal = l.typedBindingNode(val, targetTyp[1])
+			}
+			if !targetHasTyp && hasCallTyp {
+				targetTyp, targetHasTyp = callTyp, true
 			}
 			if base, field, ok := splitFieldTarget(t); ok && !localDecl {
 				if slot := l.moduleGlobalSlot(base); slot != "" {
@@ -5583,9 +5669,37 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 			baseExpr = thru.Inner
 		}
 		if call, ok := baseExpr.(nir.Call); ok {
-			if t, ok := l.resolveCtor(call.Callee); ok {
-				if m := l.funcQual[t[0]+"::"+t[1]+"."+c.Attr]; m != nil {
-					return []*funcInfo{m}, false
+			// The receiver is a call result: `new T().method()`, and equally
+			// `registry.Service().method()` — the type it dispatches on is the type the
+			// inner call evaluates to, resolved through exactly the routes a receiver held
+			// in a local goes through. Only the constructor spelling used to be followed
+			// here, so every other call-result receiver — the service-registry indirection
+			// every Go web application writes — reached no route at all, not even the
+			// unique-method-name fallback below.
+			if t, ok := l.callResultClass(call, sc); ok {
+				if targets, reachOnly, settled := l.resolveOnType(t, c.Attr); settled {
+					return targets, reachOnly
+				}
+			}
+			// and no further: a receiver whose type is unknown does NOT reach the
+			// unique-method-name fallback the routes below give a receiver held in a local.
+			// A name-keyed guess needs the receiver to be a project value to be worth making,
+			// and a call result is most often a library's — `ESAPI.encoder().encodeForHTML(x)`
+			// would resolve to the project's own encodeForHTML helper and route a library
+			// call through a body that never runs. Measured: doing that costs four true
+			// positives in the Java benchmark's trustbound category and gains none.
+			return nil, false
+		}
+		if qual, ok := baseExpr.(nir.Attr); ok {
+			// `pkg.Registry.method()` — the receiver is another package's variable, and what
+			// it holds is that package's declaration to state.
+			if mod, ok := qual.Base.(nir.Name); ok {
+				if imp, ok := imports[mod.ID]; ok && imp.kind == "mod" {
+					if t, ok := l.globalClass(imp.module, qual.Attr); ok {
+						if targets, reachOnly, settled := l.resolveOnType(t, c.Attr); settled {
+							return targets, reachOnly
+						}
+					}
 				}
 			}
 			return nil, false
@@ -5608,31 +5722,13 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 				return []*funcInfo{m}, false
 			}
 		}
-		if typ, ok := sc.typ[obj]; ok { // instance/self method
-			var out []*funcInfo
-			if m := l.funcQual[typ[0]+"::"+typ[1]+"."+attr]; m != nil {
-				if m.abstract {
-					// interface/abstract method — never route through this empty body (which
-					// would sink the taint). A receiver of an interface type holds some
-					// implementing class, so the implementors' bodies are possible runtime
-					// continuations: report them as reach-only targets (args flow in, the
-					// call result keeps the unresolved conservative semantics below) so a
-					// sink inside an implementor body is coverable without merging the
-					// implementors' shared return taint across call sites. With no
-					// implementor in the scan, stay fully unresolved.
-					if derived := l.resolveDerivedMethods(typ[1], attr); len(derived) > 0 {
-						return derived, true
-					}
-					return nil, false
-				}
-				out = append(out, m)
-			}
-			out = append(out, l.resolveDerivedMethods(typ[1], attr)...)
-			if len(out) > 0 {
-				return dedupeFuncInfos(out), false
-			}
-			if bases := l.resolveBaseMethods(typ[0], typ[1], attr); len(bases) > 0 {
-				return bases, false
+		typ, hasReceiverType := sc.typ[obj]
+		if !hasReceiverType { // a global of this module declared in another file, or later in this one
+			typ, hasReceiverType = l.globalClass(l.curModule, obj)
+		}
+		if hasReceiverType { // instance/self method
+			if targets, reachOnly, settled := l.resolveOnType(typ, attr); settled {
+				return targets, reachOnly
 			}
 		}
 		// Cross-file fallback: the receiver type is unresolved (common with dynamically-typed
@@ -5645,6 +5741,67 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 		}
 	}
 	return nil, false
+}
+
+// resolveOnType returns the targets of `attr` called on a receiver of the given type, and
+// whether that type SETTLES the call — an unsettled call carries on to the name-keyed routes
+// below, because a type that declares no such method says nothing about where it goes.
+func (l *lowerer) resolveOnType(typ [2]string, attr string) (targets []*funcInfo, reachOnly, settled bool) {
+	var out []*funcInfo
+	if m := l.funcQual[typ[0]+"::"+typ[1]+"."+attr]; m != nil {
+		if m.abstract {
+			// interface/abstract method — never route through this empty body (which
+			// would sink the taint). A receiver of an interface type holds some
+			// implementing class, so the implementors' bodies are possible runtime
+			// continuations: report them as reach-only targets (args flow in, the
+			// call result keeps the unresolved conservative semantics at the call site)
+			// so a sink inside an implementor body is coverable without merging the
+			// implementors' shared return taint across call sites. With no
+			// implementor in the scan, stay fully unresolved.
+			if derived := l.resolveDerivedMethods(typ[1], attr); len(derived) > 0 {
+				return derived, true, true
+			}
+			return nil, false, true
+		}
+		out = append(out, m)
+	}
+	out = append(out, l.resolveDerivedMethods(typ[1], attr)...)
+	if len(out) > 0 {
+		return dedupeFuncInfos(out), false, true
+	}
+	if bases := l.resolveBaseMethods(typ[0], typ[1], attr); len(bases) > 0 {
+		return bases, false, true
+	}
+	return nil, false, false
+}
+
+// callResultClass is the class a call evaluates to: the constructed type when the callee is
+// a constructor, otherwise the declared result type its targets agree on, resolved against
+// the classes the scan defines. A declaration that states no result type, targets that
+// disagree, and a type no module declares all leave the call untyped — the caller falls back
+// to its name-keyed routes rather than guessing.
+func (l *lowerer) callResultClass(call nir.Call, sc *scope) ([2]string, bool) {
+	if t, ok := l.resolveCtor(call.Callee); ok {
+		return t, true
+	}
+	name := ""
+	targets, _ := l.resolveTargets(call.Callee, sc)
+	for _, fi := range targets {
+		if fi == nil || fi.retType == "" {
+			continue
+		}
+		if name != "" && name != fi.retType {
+			return [2]string{}, false
+		}
+		name = fi.retType
+	}
+	if name == "" {
+		return [2]string{}, false
+	}
+	if cm, ok := l.classModule(name, l.importTables[l.curModule]); ok {
+		return [2]string{cm, name}, true
+	}
+	return [2]string{}, false
 }
 
 func dedupeFuncInfos(in []*funcInfo) []*funcInfo {

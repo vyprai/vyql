@@ -2007,3 +2007,113 @@ func TestLowerClassContextNestedAnnotationsAreTheNestedClassesOwn(t *testing.T) 
 		}
 	}
 }
+
+// A method call whose receiver is a call result of UNKNOWN type resolves to nothing: the
+// unique-method-name fallback a receiver held in a local reaches is not extended to it. The
+// receiver of `ESAPI.encoder().encodeForHTML(x)` is a library value, and routing that call
+// into the project's own same-named helper would run a body the program never runs — the
+// call stays unresolved and keeps its conservative argument-to-result edge instead.
+func TestUntypedCallResultReceiverDoesNotBorrowASameNamedHelper(t *testing.T) {
+	prog := nir.Program{SelfName: "self", Modules: []nir.Module{{
+		Key:  "app.py",
+		File: "app.py",
+		Body: []nir.Stmt{
+			nir.FuncDef{Name: "encodeForHTML", Loc: "app.py:1", Params: []string{"value"}, Body: []nir.Stmt{
+				nir.Return{Value: nir.Const{Loc: "app.py:2", Value: "safe"}},
+			}},
+			nir.FuncDef{Name: "entry", Loc: "app.py:5", Params: []string{"payload"}, Body: []nir.Stmt{
+				nir.Assign{Targets: []string{"bar"}, Decl: true, Loc: "app.py:6", Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "ESAPI", Loc: "app.py:6"}, Attr: "encoder", Path: "ESAPI.encoder", Loc: "app.py:6"},
+						Path:   "ESAPI.encoder", Method: "encoder", Loc: "app.py:6",
+					}, Attr: "encodeForHTML", Path: "ESAPI.encoder.encodeForHTML", Loc: "app.py:6"},
+					Args: []nir.Expr{nir.Name{ID: "payload", Loc: "app.py:6"}},
+					Path: "ESAPI.encoder.encodeForHTML", Method: "encodeForHTML", Loc: "app.py:6",
+				}},
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "sink", Loc: "app.py:7"},
+					Args:   []nir.Expr{nir.Name{ID: "bar", Loc: "app.py:7"}},
+					Path:   "sink", Method: "sink", Loc: "app.py:7",
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "payload")
+	helperParam := findNodeID(t, g, "code.Param", "func", "encodeForHTML", "name", "value")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "app.py:7")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[helperParam] {
+		t.Fatalf("an untyped call-result receiver resolved to a same-named project helper")
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("the unresolved call lost its conservative argument-to-result edge")
+	}
+}
+
+// The service-registry indirection, with every name it dispatches on ambiguous: the entry
+// point carries the same short name as the method it calls, so the unique-method-name
+// fallback is starved and only the receiver TYPES can carry the dispatch — the interface a
+// call's declared result type names, and the implementation registered under the receiver
+// type its declaration names.
+func TestCallResultReceiverDispatchesOnDeclaredResultType(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "app.go",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Runner", Loc: "app.go:1", Body: []nir.Stmt{
+				nir.FuncDef{Name: "Run", Loc: "app.go:2", Params: []string{"value"}},
+			}},
+			nir.ClassDef{Name: "runnerImpl", Loc: "app.go:4", Bases: []string{"Runner"}},
+			nir.FuncDef{Name: "Run", Recv: "runnerImpl", Loc: "app.go:6", Params: []string{"value"}, Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "sink", Loc: "app.go:7"},
+					Args:   []nir.Expr{nir.Name{ID: "value", Loc: "app.go:7"}},
+					Path:   "sink", Method: "sink", Loc: "app.go:7",
+				}},
+			}},
+			nir.ClassDef{Name: "Registry", Loc: "app.go:10", Body: []nir.Stmt{
+				nir.FuncDef{Name: "Runner", Loc: "app.go:11", Returns: "Runner"},
+			}},
+			nir.ClassDef{Name: "store", Loc: "app.go:13", Bases: []string{"Registry"}},
+			nir.FuncDef{Name: "Runner", Recv: "store", Returns: "Runner", Loc: "app.go:15", Body: []nir.Stmt{
+				nir.Return{Value: nir.Const{Loc: "app.go:15", Value: "impl"}},
+			}},
+			nir.Assign{Targets: []string{"MyRegistry"}, Type: "Registry", Decl: true,
+				Value: nir.Const{Loc: "app.go:18"}, Loc: "app.go:18"},
+			nir.FuncDef{Name: "Run", Loc: "app.go:20", Params: []string{"payload"}, Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Attr{Base: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "MyRegistry", Loc: "app.go:21"}, Attr: "Runner", Path: "MyRegistry.Runner", Loc: "app.go:21"},
+						Path:   "MyRegistry.Runner", Method: "Runner", Loc: "app.go:21",
+					}, Attr: "Run", Path: "MyRegistry.Runner.Run", Loc: "app.go:21"},
+					Args: []nir.Expr{nir.Name{ID: "payload", Loc: "app.go:21"}},
+					Path: "MyRegistry.Runner.Run", Method: "Run", Loc: "app.go:21",
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	src := findNodeID(t, g, "code.Param", "name", "payload")
+	implParam := findNodeID(t, g, "code.Param", "func", "Run", "name", "value", "loc", "app.go:6")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "app.go:7")
+	reachable, err := usg.BFS(g, src, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[implParam] {
+		t.Fatalf("payload did not reach the implementation method the call result's declared type dispatches to")
+	}
+	if !reachable[sinkArg] {
+		t.Fatalf("payload did not reach the sink arg inside the implementation body")
+	}
+}
