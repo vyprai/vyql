@@ -117,6 +117,7 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 				body = append(body, c.ccReallocFailureInputFreeObservations(tree.RootNode())...)
 				body = append(body, c.ccMysqlConnectErrorUseAfterFreeObservations(tree.RootNode())...)
 				body = append(body, c.ccDestCapacityMemberArrayObservations(tree.RootNode())...)
+				body = append(body, c.ccDefiniteAssignmentLoopObservations(tree.RootNode())...)
 			}
 			return nir.Module{Key: c.key, File: rel, Body: body}, true
 		})
@@ -9608,4 +9609,433 @@ func (c *ccConv) dotted(n *tree_sitter.Node) string {
 		}
 	}
 	return "?"
+}
+
+// ccDefiniteAssignmentPath is the fact a loop emits when its body reads a
+// local the loop itself never established.
+const ccDefiniteAssignmentPath = "analysis.definite_assignment.loop_read_not_established_by_init"
+
+// ccDefAsgnWrite is one write to a local, and where in the routine's control
+// flow it sits. A write inside a loop's body, condition or update leaves a
+// value that says how many iterations that loop made (carried); a `for` loop's
+// init clause runs exactly once when control reaches it, and is where a routine
+// establishes a loop's own state (init); anything else runs on the way past
+// (plain).
+type ccDefAsgnWrite struct {
+	pos     uint
+	carried bool
+	init    bool
+	loc     string
+}
+
+// ccDefAsgnScope is what one routine body says about its own locals: which it
+// declares without a value, which an inner block redeclares, where each is
+// written, where each has its address taken, and which of its `for` loops sit
+// outside every other loop.
+type ccDefAsgnScope struct {
+	decls  map[string]bool
+	shadow map[string]bool
+	writes map[string][]ccDefAsgnWrite
+	addrOf map[string][]uint
+	loops  []*tree_sitter.Node
+}
+
+// ccDefiniteAssignmentLoopObservations reports a `for` loop whose body reads a
+// local that the loop's own init clause does not establish, and whose value on
+// entry was left behind by an earlier loop.
+//
+// C has no definite-assignment rule, so nothing in the syntax distinguishes the
+// two loops of a size-then-copy pair: both spell the same read of the same
+// local, and the init clause that establishes it in one and not the other is a
+// clause, not a token. A binding predicate sees an unordered bag of context
+// tokens -- `assign:v='\0'` stands as soon as *any* clause in the file assigns
+// v -- so it cannot ask which loop established what the body reads. That
+// ordering is the frontend's to know.
+//
+// Whether the leftover value is a bug stays the rule's question: the fact says
+// only that the loop reads what a previous loop left, not that it is wrong to.
+// Five conditions keep it to that shape.
+//
+//   - The local is declared without an initializer, so its value is per-run
+//     state rather than a preset.
+//   - The loop's init clause establishes something. It is a loop that sets up
+//     its own state and left this name out, not one with no init clause at all.
+//   - The body reads the name and then assigns it outright, which makes it a
+//     carry register: only the first iteration consumes a value from outside
+//     the loop. An accumulator reads what came before on purpose, every
+//     iteration, and is not this.
+//   - Every write above the loop that reaches it is either in a loop's body or
+//     in a `for` init clause, and at least one is an init clause. That is the
+//     routine saying where this name gets established -- and this loop's init
+//     clause is not one of the places. A plain assignment on the way past
+//     settles the value whatever the data does, and silences the fact.
+//   - The last of those writes is the carried one, so what the loop inherits
+//     is what an earlier loop's body left, not what its init clause set.
+func (c *ccConv) ccDefiniteAssignmentLoopObservations(root *tree_sitter.Node) []nir.Stmt {
+	var bodies []*tree_sitter.Node
+	c.ccRoutineBodies(root, &bodies)
+	var out []nir.Stmt
+	for _, body := range bodies {
+		out = append(out, c.ccDefAsgnBodyObservations(body)...)
+	}
+	return out
+}
+
+// ccRoutineBodies collects the outermost compound statements: a lifted
+// function's body, and equally the body of a definition the frontend lifts no
+// function for. K&R definitions with a pointer return type reach the tree as a
+// declaration followed by a bare block, and the loops this fact reads sit in
+// exactly such a block in the routine that motivated it.
+func (c *ccConv) ccRoutineBodies(n *tree_sitter.Node, out *[]*tree_sitter.Node) {
+	if n == nil {
+		return
+	}
+	if c.kind(n) == "compound_statement" {
+		*out = append(*out, n)
+		return
+	}
+	for _, ch := range c.namedChildren(n) {
+		c.ccRoutineBodies(ch, out)
+	}
+}
+
+func (c *ccConv) ccDefAsgnBodyObservations(body *tree_sitter.Node) []nir.Stmt {
+	decls := c.ccDefAsgnDeclaredLocals(body)
+	if len(decls) == 0 {
+		return nil
+	}
+	sc := &ccDefAsgnScope{
+		decls:  decls,
+		shadow: map[string]bool{},
+		writes: map[string][]ccDefAsgnWrite{},
+		addrOf: map[string][]uint{},
+	}
+	c.ccDefAsgnWalk(body, body, 0, false, sc)
+	if len(sc.loops) == 0 {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, loop := range sc.loops {
+		out = append(out, c.ccDefAsgnLoopObservations(loop, sc)...)
+	}
+	return out
+}
+
+// ccDefAsgnDeclaredLocals names the locals a routine body declares without a
+// value: plain and pointer declarators only, since an array's name is its
+// address and is established by the declaration itself.
+func (c *ccConv) ccDefAsgnDeclaredLocals(body *tree_sitter.Node) map[string]bool {
+	out := map[string]bool{}
+	for _, ch := range c.namedChildren(body) {
+		if c.kind(ch) != "declaration" {
+			continue
+		}
+		for _, d := range c.ccFieldChildren(ch, "declarator") {
+			switch c.kind(d) {
+			case "identifier", "pointer_declarator":
+				if name := c.declName(d); name != "" {
+					out[name] = true
+				}
+			}
+		}
+	}
+	return out
+}
+
+// ccFieldChildren returns every child of n carrying the named field, which one
+// declaration has one of per name it declares.
+func (c *ccConv) ccFieldChildren(n *tree_sitter.Node, field string) []*tree_sitter.Node {
+	if n == nil {
+		return nil
+	}
+	var out []*tree_sitter.Node
+	for i := uint(0); i < n.ChildCount(); i++ {
+		if n.FieldNameForChild(uint32(i)) == field {
+			out = append(out, n.Child(i))
+		}
+	}
+	return out
+}
+
+// ccDefAsgnWalk records what the routine body does to its locals. depth counts
+// the loops a node sits inside, and a `for` loop's init clause keeps its
+// parent's depth: it runs once when control reaches the loop, so a value it
+// leaves is as definite as one assigned above the loop.
+func (c *ccConv) ccDefAsgnWalk(n, body *tree_sitter.Node, depth int, inInit bool, sc *ccDefAsgnScope) {
+	switch c.kind(n) {
+	case "declaration":
+		if !sameCNode(n.Parent(), body) {
+			for _, d := range c.ccFieldChildren(n, "declarator") {
+				if name := c.declName(d); name != "" {
+					sc.shadow[name] = true
+				}
+			}
+		}
+	case "assignment_expression":
+		if left := c.field(n, "left"); c.kind(left) == "identifier" {
+			c.ccDefAsgnRecordWrite(sc, c.text(left), n, depth, inInit)
+		}
+	case "update_expression":
+		if arg := c.field(n, "argument"); c.kind(arg) == "identifier" {
+			c.ccDefAsgnRecordWrite(sc, c.text(arg), n, depth, inInit)
+		}
+	case "pointer_expression":
+		// &v hands the local to something that may establish it, and nothing
+		// here can order that call against the loop.
+		if arg := c.field(n, "argument"); c.unaryOp(n) == "&" && c.kind(arg) == "identifier" {
+			name := c.text(arg)
+			sc.addrOf[name] = append(sc.addrOf[name], n.StartByte())
+		}
+	case "for_statement":
+		if depth == 0 {
+			sc.loops = append(sc.loops, n)
+		}
+		init := c.field(n, "initializer")
+		for _, ch := range c.children(n) {
+			if sameCNode(ch, init) {
+				c.ccDefAsgnWalk(ch, body, depth, true, sc)
+				continue
+			}
+			c.ccDefAsgnWalk(ch, body, depth+1, inInit, sc)
+		}
+		return
+	case "while_statement", "do_statement":
+		for _, ch := range c.children(n) {
+			c.ccDefAsgnWalk(ch, body, depth+1, inInit, sc)
+		}
+		return
+	}
+	for _, ch := range c.children(n) {
+		c.ccDefAsgnWalk(ch, body, depth, inInit, sc)
+	}
+}
+
+func (c *ccConv) ccDefAsgnRecordWrite(sc *ccDefAsgnScope, name string, at *tree_sitter.Node, depth int, inInit bool) {
+	sc.writes[name] = append(sc.writes[name], ccDefAsgnWrite{
+		pos: at.StartByte(), carried: depth > 0, init: depth == 0 && inInit, loc: c.loc(at),
+	})
+}
+
+func (c *ccConv) ccDefAsgnLoopObservations(loop *tree_sitter.Node, sc *ccDefAsgnScope) []nir.Stmt {
+	init := c.field(loop, "initializer")
+	body := c.field(loop, "body")
+	if init == nil || body == nil {
+		return nil
+	}
+	established := c.ccDefAsgnEstablishedBy(init)
+	if len(established) == 0 {
+		// A loop with no init clause establishes nothing of its own, so
+		// there is no clause the read could have belonged to.
+		return nil
+	}
+	// The condition runs before the first iteration, so an assignment there
+	// establishes the value the body reads just as the init clause does.
+	for name := range c.ccDefAsgnEstablishedBy(c.field(loop, "condition")) {
+		established[name] = true
+	}
+	loc := c.loc(loop)
+	var out []nir.Stmt
+	for _, read := range c.ccDefAsgnFirstReads(body) {
+		name := c.text(read)
+		if !sc.decls[name] || sc.shadow[name] || established[name] {
+			continue
+		}
+		if ccDefAsgnPosBefore(sc.addrOf[name], loop.StartByte()) {
+			continue
+		}
+		if !c.ccDefAsgnOverwrittenAfter(body, name, read.EndByte()) {
+			continue
+		}
+		last, ok := c.ccDefAsgnIncoming(loop, sc.writes[name])
+		if !ok {
+			continue
+		}
+		out = append(out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: ccDefiniteAssignmentPath, Loc: loc},
+			Args: []nir.Expr{
+				nir.Const{Loc: loc, Value: "variable=" + name},
+				nir.Const{Loc: loc, Value: "init=" + ccDefAsgnClip(compactCExprText(c.text(init)))},
+				nir.Const{Loc: loc, Value: "read=" + ccDefAsgnClip(compactCExprText(c.text(ccDefAsgnReadContext(read))))},
+				nir.Const{Loc: loc, Value: "carried_from=" + last.loc},
+			},
+			Path:   ccDefiniteAssignmentPath,
+			Method: "loop_read_not_established_by_init",
+			Loc:    loc,
+		}})
+	}
+	return out
+}
+
+// ccDefAsgnOverwrittenAfter reports whether the loop body assigns the name
+// outright below the read, which makes it a carry register: what the body
+// reads is what the previous iteration put there, so only the first iteration
+// consumes a value from outside the loop, and the clause that exists to supply
+// that value is the loop's init clause. An accumulator is the other shape --
+// `total += n` continues a running value every iteration rather than replacing
+// it, and a loop that continues one deliberately reads what came before.
+func (c *ccConv) ccDefAsgnOverwrittenAfter(body *tree_sitter.Node, name string, after uint) bool {
+	found := false
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if found || n.EndByte() <= after {
+			return
+		}
+		if c.kind(n) == "assignment_expression" {
+			left := c.field(n, "left")
+			if c.kind(left) == "identifier" && c.text(left) == name &&
+				left.StartByte() >= after && c.text(c.field(n, "operator")) == "=" {
+				found = true
+				return
+			}
+		}
+		for _, ch := range c.children(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return found
+}
+
+// ccDefAsgnEstablishedBy names what a `for` clause assigns, in either spelling:
+// the comma list of assignments, and the declaration form that declares its own
+// cursor.
+func (c *ccConv) ccDefAsgnEstablishedBy(n *tree_sitter.Node) map[string]bool {
+	out := map[string]bool{}
+	if n == nil {
+		return out
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		switch c.kind(n) {
+		case "assignment_expression":
+			if left := c.field(n, "left"); c.kind(left) == "identifier" {
+				out[c.text(left)] = true
+			}
+		case "init_declarator":
+			if name := c.declName(c.field(n, "declarator")); name != "" {
+				out[name] = true
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
+}
+
+// ccDefAsgnFirstReads returns, for each name the loop body mentions, its first
+// occurrence -- but only where that occurrence reads the name. A body that
+// writes a name before mentioning it depends on nothing it inherited, so its
+// first occurrence is dropped. A compound assignment and an increment both
+// read, and both count.
+func (c *ccConv) ccDefAsgnFirstReads(body *tree_sitter.Node) []*tree_sitter.Node {
+	seen := map[string]bool{}
+	var out []*tree_sitter.Node
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if c.kind(n) == "identifier" {
+			name := c.text(n)
+			if !seen[name] {
+				seen[name] = true
+				if !c.ccDefAsgnIsPureWriteTarget(n) {
+					out = append(out, n)
+				}
+			}
+			return
+		}
+		for _, ch := range c.children(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// ccDefAsgnIsPureWriteTarget reports whether this occurrence of an identifier
+// only writes it: the left side of a plain `=`. Every other position, `v += n`
+// and `v++` included, reads what was there.
+func (c *ccConv) ccDefAsgnIsPureWriteTarget(n *tree_sitter.Node) bool {
+	parent := n.Parent()
+	if c.kind(parent) != "assignment_expression" || !sameCNode(c.field(parent, "left"), n) {
+		return false
+	}
+	return c.text(c.field(parent, "operator")) == "="
+}
+
+// ccDefAsgnReadContext widens a read to the expression it is read in, so the
+// fact carries the test the loop makes rather than a bare name.
+func ccDefAsgnReadContext(n *tree_sitter.Node) *tree_sitter.Node {
+	if p := n.Parent(); p != nil {
+		return p
+	}
+	return n
+}
+
+// ccDefAsgnReaches reports whether a write above the loop is on the way to it.
+// Position alone does not say so: two loops in the arms of one if/else are
+// written one after the other and never run in the same call, and the second's
+// read inherits nothing from the first. The write reaches the loop when the
+// deepest node holding both is a block, which makes them consecutive
+// statements; when it is the if or the switch that chose between them, it does
+// not.
+func (c *ccConv) ccDefAsgnReaches(loop *tree_sitter.Node, write uint) bool {
+	for n := loop.Parent(); n != nil; n = n.Parent() {
+		if n.StartByte() > write || n.EndByte() <= write {
+			continue
+		}
+		return c.kind(n) == "compound_statement"
+	}
+	return false
+}
+
+func ccDefAsgnPosBefore(positions []uint, limit uint) bool {
+	for _, p := range positions {
+		if p < limit {
+			return true
+		}
+	}
+	return false
+}
+
+// ccDefAsgnIncoming returns the write that leaves the value the loop's first
+// iteration reads, and reports whether that value came from an earlier loop
+// rather than from a clause that establishes it.
+//
+// Only writes that reach the loop count. Of those, a single plain assignment
+// anywhere above -- `v = 0;` on the way past -- settles the value whatever the
+// data does, and the loop inherits something the routine stated. What is left
+// is the shape this fact is for: the routine establishes the name in `for` init
+// clauses, this loop's init clause is not one of them, and the last thing to
+// write it was an earlier loop's body.
+func (c *ccConv) ccDefAsgnIncoming(loop *tree_sitter.Node, writes []ccDefAsgnWrite) (ccDefAsgnWrite, bool) {
+	var last ccDefAsgnWrite
+	ok, established := false, false
+	for _, w := range writes {
+		if w.pos >= loop.StartByte() || !c.ccDefAsgnReaches(loop, w.pos) {
+			continue
+		}
+		if !w.carried && !w.init {
+			return ccDefAsgnWrite{}, false
+		}
+		established = established || w.init
+		if !ok || w.pos > last.pos {
+			last, ok = w, true
+		}
+	}
+	return last, ok && established && last.carried
+}
+
+// ccDefAsgnClip keeps a clause short enough to read, without cutting a literal
+// mid-rune.
+func ccDefAsgnClip(s string) string {
+	const limit = 96
+	if len(s) <= limit {
+		return s
+	}
+	cut := limit
+	for cut > 0 && s[cut]&0xc0 == 0x80 {
+		cut--
+	}
+	return s[:cut]
 }
