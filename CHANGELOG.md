@@ -8,7 +8,80 @@ New rules and bindings change what a scan reports, so they get listed here like
 any other user-visible change. A finding that suddenly appears in your CI is a
 behaviour change, even if no code moved.
 
-## [Unreleased]
+## [0.5.0] - 2026-09-09
+
+### Added
+
+- **A scan partitions a target too large for one graph.** Under an explicit
+  `--max-ram`, a target holding more source than one graph may cover is scanned
+  as a sequence of graphs: the tree's files are grouped in path order into sets
+  small enough to build one at a time, and the findings and coverage counts are
+  merged across the sequence. Lowering costs on the order of two hundred times
+  the source it reads, so under `-max-ram 4GB` a 42 MB JavaScript clone reached
+  the resident watch's threshold before a rule had run and ended with no
+  findings and no report. A flow whose source and sink land in different
+  partitions has no graph holding both, so it is not reported; the scan prints
+  that cost once on stderr.
+- **ActionScript parses.** A Flash `.as` file yields labelable calls instead of
+  being invisible to every frontend.
+- **A release in one function and a use in another join on the published
+  allocation.** Field stores are indexed by the field name and the function
+  that writes them, so a destructor that frees a caller-visible field and a
+  caller that releases its own alias join without a region-order path between
+  them. The join index is built lazily, so a scan whose order rules all decide
+  by region order pays nothing for it, and the pairwise join no longer costs
+  super-quadratic time (17.6 ms at 128 field stores before indexing).
+- **C and C++ analysis states the local facts a memory-safety check needs.** A
+  buffer relocation records the pointer it copied from, a pointer cursor
+  records the loop that last defined it, a container is not read as the block
+  its own member names, an element population is paired with its counter, a
+  field alias is ordered against the reallocation that invalidates it, a stack
+  array sized by a value the function never computes is reported, a guard that
+  excludes null on the path to a dereference is recorded, SAL annotations are
+  neutralised before the parse, a cast keeps its target type and width where a
+  bounds check reads them, a loop's own init clause is told from an earlier
+  loop's leftovers, two guarded blocks that both run are sequenced, a release
+  an early return skips covers nothing, taint crosses from an aggregate member
+  store to a later member read, C++ subscript indices are read at all, and an
+  array a loop bounded by a field indexes is examined.
+- **Taint crosses the field, property and callback boundaries the CVE corpus
+  turns on.** A Go struct field two functions share, a PHP class static
+  property, an object field one call writes and another reads, a property
+  connected by its bare name, and a value stored on an object field carry
+  taint from the write to the read. Taint follows into a callback passed by
+  name, into the body of a callback a higher-order call receives together with
+  the call's argument, into a Go func literal a call names, into a method
+  invoked on an untyped property -- dispatched over the method's override
+  family -- and into a sibling function declared inside an invoked function.
+  Taint stays alive past a call that is its own rule's sink, and a
+  receiver-anchored sink fires only on the receiver's taint.
+- **Call resolution names the callee the call site means.** A Java call
+  resolves to the overload its argument count names, and a nested class's
+  receiver is typed from the enclosing class's fields. A Go method call
+  dispatches through the type its receiver is. A callee bound by a declaration
+  resolves to the imported callable it names, and a call that dispatches on a
+  registered string key resolves. A receiverless call names the class-level
+  method of the body it is in, and a Ruby class-level method is told from an
+  instance method of the same name. A recursive call cycle is recorded with
+  the depth budget that bounds it, a TypeScript class field whose value is an
+  arrow function lowers as the function it holds, a JavaScript sibling
+  helper's facts are attributed to the function that calls it, a nested
+  class's own annotations reach the enclosing class's context, and the
+  callee-alias table is allocated lazily per module.
+- **A Rust Drop names the release of a manually kept reference count.** The
+  pre-pass that collects refcount drops descends only through item-bearing
+  node kinds and stops at expression subtrees, so a 297 KB Rust file no longer
+  pays +23.4% allocated bytes and +10.8% time for walking every node in the
+  file.
+- **PHP conditions bind the variable they assign, and a match expression
+  lowers to its arm values** rather than its scrutinee, so the result is not
+  treated as tainted by the expression it dispatches on.
+- **A presence predicate compares two fields of one node**, so a binding can
+  state a relation between two facts the same node carries. An
+  account-enumeration oracle that is a flashed form value is recognised as
+  one, a self-checked construction reports only as a witness of last resort,
+  and a check applied on every incoming branch of a join is recognised on
+  every branch.
 
 ### Changed
 
@@ -38,6 +111,21 @@ behaviour change, even if no code moved.
   during comparison instead of retaining a second lowercase copy. On the same
   generated template, three-run median retained heap fell from 229.8 MiB to
   151.2 MiB.
+- **The C frontend finds void declarations with a literal search.** The probe
+  that decides whether a source file is worth a full C parse ran a regular
+  expression over the whole file -- about 300 ms and 20 MB of allocations on a
+  20 MB file. A literal `bytes.Index` scan replaces it, and equivalence is
+  proven over 2,781 real files.
+- **Sequencing two guarded blocks walks the region paths in place.** The two
+  `strings.Split` slices allocated per call inside the pairwise loop cost
+  41,600 B/op against 13,152 after, and three RealVuln false positives
+  disappear with the corrected sequencing (pooled FP 2249 -> 2246).
+- **The detection workflow scores every OWASP language port.** The 22 ports in
+  vyprai/vypr-owasp-ports each carry their own ground truth, and a change to
+  shared lowering, NIR or a tree-sitter grammar can move a score in C, Go,
+  PHP, Rust or Kotlin without any job noticing. The new `owasp-ports` job runs
+  the suite -- about 20 seconds -- and enforces the checked-in parity target
+  per port.
 
 ### Fixed
 
@@ -68,6 +156,21 @@ behaviour change, even if no code moved.
   Signal and memory-limit exits now flush requested CPU and heap profiles. On
   the 166-file generated stress corpus, a 4 GB scan that previously reached
   7.6 GB stopped cleanly at 3.65 GB peak RSS.
+- **A check discharges a later read of the variable it neutralises.** In C the
+  neutraliser often returns nothing and rewrites the bytes its argument points
+  at, and every read of the variable had its own edge off the definition they
+  share, so the check's own argument and the sink's later read were siblings
+  and the path to the sink never met the check. The frontend types callees
+  from the declarations in the translation unit and marks a bare-identifier
+  pointer argument of a void callee as mutated in place, so a later read is a
+  successor of the slot the call mutated through.
+- **A function-scope check covers only the function whose value reaches the
+  sink.** `unless <sink>.endpoint coveredBy X` with X on the synthetic
+  function-context node covered every sink sharing the function, with no
+  dominance or ordering, and a call written inside a closure was credited to
+  the function that encloses it -- so one labelled parent silenced every file
+  path sink in it, at the vulnerable revision and the fixed one alike. The arm
+  now asks for the value when the function has a function inside it.
 
 ## [0.4.1] - 2026-09-04
 
