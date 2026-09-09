@@ -86,6 +86,10 @@ type lowerer struct {
 	classStatics   map[string]string            // "Class::$prop" -> the one node standing for that static property
 	staticDeclMemo map[string]string            // memoized "class-as-written\x00$prop" -> declaring class
 
+	// mutGlobals holds the module-level variables the module currently being lowered assigns
+	// from inside one of its own function bodies. Rebuilt per module by lowerModuleBody.
+	mutGlobals map[string]bool
+
 	// inheritance-aware dispatch and implicit-`this` member resolution (populated by frontends
 	// that set ClassDef.Bases/Members). directMembers: "modkey::Class" -> declared member set;
 	// classBaseNames: "modkey::Class" -> base SHORT names; membersOfShort: short class name ->
@@ -3320,8 +3324,110 @@ func (l *lowerer) run() error {
 // incremental lowerer caches a module's nodes against that module's own content, so anything
 // derived from another file would go stale with nothing to invalidate it.
 func (l *lowerer) lowerModuleBody(body nir.Module) {
+	l.mutGlobals = l.moduleMutatedGlobals(body.Body)
 	l.block(body.Body, l.moduleScope(body))
 	l.emitRecursionCycles()
+}
+
+// moduleMutatedGlobals reports the module-level variables this module assigns from
+// somewhere other than the top level -- a function body, a method, a class body.
+//
+// Const-propagation seeds a module scope from each top-level initializer and every
+// function body lowered afterwards inherits it, so `static int debug = 0;` makes
+// `if (debug)` fold to false in every function of the file. Folding a branch does not
+// merely lose precision: the arm that disagrees is never lowered, so its calls and
+// statements are absent from the graph, and a branch a second function in the same file
+// enables by writing the flag is invisible to every binding and rule. A variable the
+// module itself overwrites is not a compile-time constant, so its declaration-site value
+// is refused as one (assignCnst).
+//
+// Only assignments the frontend did not mark as declarations count: a declaration
+// introduces a new binding, and shadowing a global is not writing it. Frontends that do
+// not distinguish the two (C, Python) lose the fold for a shadowing local as well, which
+// keeps a branch rather than deleting one. A write from inside a LAMBDA body is not
+// collected -- C, the language this was written for, has none.
+func (l *lowerer) moduleMutatedGlobals(stmts []nir.Stmt) map[string]bool {
+	top, inner := map[string]bool{}, map[string]bool{}
+	l.collectModuleAssigned(stmts, false, top, inner)
+	var out map[string]bool
+	for name := range inner {
+		if !top[name] {
+			continue
+		}
+		if out == nil {
+			out = map[string]bool{}
+		}
+		out[name] = true
+	}
+	return out
+}
+
+// collectModuleAssigned records the names assigned at a module's top level in top, and the
+// names assigned below a function or class declaration in inner. Control flow at the top
+// level stays top level; entering a body switches to inner and never switches back.
+func (l *lowerer) collectModuleAssigned(stmts []nir.Stmt, nested bool, top, inner map[string]bool) {
+	mark := func(name string) {
+		if name == "" || strings.ContainsAny(name, ".[") {
+			return
+		}
+		if nested {
+			inner[name] = true
+		} else {
+			top[name] = true
+		}
+	}
+	for _, s := range stmts {
+		switch st := s.(type) {
+		case nir.BodyRef:
+			// A chunked body's summary does not carry its assignments, so read the chunks
+			// themselves -- the same statements l.block decodes a moment later.
+			l.eachDeferred(st, func(chunk []nir.Stmt) { l.collectModuleAssigned(chunk, nested, top, inner) })
+		case nir.Assign:
+			if st.Decl && nested {
+				continue // a declaration in a body is that body's own binding
+			}
+			for _, t := range st.Targets {
+				mark(t)
+			}
+		case nir.AugAssign:
+			mark(st.Target)
+		case nir.FuncDef:
+			l.collectModuleAssigned(st.Body, true, top, inner)
+		case nir.ClassDef:
+			l.collectModuleAssigned(st.Body, true, top, inner)
+		case nir.Block:
+			l.collectModuleAssigned(st.Stmts, nested, top, inner)
+		case nir.If:
+			l.collectModuleAssigned(st.Then, nested, top, inner)
+			l.collectModuleAssigned(st.Else, nested, top, inner)
+		case nir.Loop:
+			l.collectModuleAssigned(st.Body, nested, top, inner)
+		case nir.Switch:
+			for _, c := range st.Cases {
+				l.collectModuleAssigned(c, nested, top, inner)
+			}
+			l.collectModuleAssigned(st.Default, nested, top, inner)
+		case nir.Try:
+			l.collectModuleAssigned(st.Body, nested, top, inner)
+			for _, h := range st.Handlers {
+				l.collectModuleAssigned(h, nested, top, inner)
+			}
+			l.collectModuleAssigned(st.Finally, nested, top, inner)
+		case nir.Defer:
+			l.collectModuleAssigned(st.Body, nested, top, inner)
+		}
+	}
+}
+
+// assignCnst records t's new constant value, or forgets the one it had when the value is
+// not a compile-time constant. At module scope a value the module overwrites from one of
+// its own bodies is refused, so no branch folds on it -- see moduleMutatedGlobals.
+func (l *lowerer) assignCnst(sc *scope, t, cv string) {
+	if cv == "" || (sc.funcDepth == 0 && l.mutGlobals[t]) {
+		sc.delCnst(t)
+		return
+	}
+	sc.setCnst(t, cv)
 }
 
 func (l *lowerer) moduleScope(m nir.Module) *scope {
@@ -4162,11 +4268,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				if targetHasTyp {
 					sc.setTyp(t, targetTyp)
 				}
-				if cv != "" {
-					sc.setCnst(t, cv) // x = "literal"
-				} else {
-					sc.delCnst(t) // reassigned to a non-constant -> value unknown
-				}
+				l.assignCnst(sc, t, cv)
 				continue
 			}
 			if slot := l.moduleGlobalSlot(t); slot != "" && !localDecl {
@@ -4175,11 +4277,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 				if targetHasTyp {
 					sc.setTyp(t, targetTyp)
 				}
-				if cv != "" {
-					sc.setCnst(t, cv) // x = "literal"
-				} else {
-					sc.delCnst(t) // reassigned to a non-constant → value unknown
-				}
+				l.assignCnst(sc, t, cv)
 				continue
 			}
 			if st.Decl {
@@ -4189,11 +4287,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			if targetHasTyp {
 				sc.setTyp(t, targetTyp)
 			}
-			if cv != "" {
-				sc.setCnst(t, cv) // x = "literal"
-			} else {
-				sc.delCnst(t) // reassigned to a non-constant → value unknown
-			}
+			l.assignCnst(sc, t, cv)
 		}
 	case nir.AugAssign:
 		n := l.node("Concat", st.Loc, nil)
