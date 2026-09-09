@@ -329,7 +329,8 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		body := c.body(c.field(n, "body"))
 		c.singletonSelf = oldSingleton
 		c.visibility = oldVisibility
-		out = append(out, nir.ClassDef{Name: c.text(c.field(n, "name")), Bases: bases, Body: body, Loc: L})
+		out = append(out, nir.ClassDef{Name: c.text(c.field(n, "name")), Bases: bases, Body: body,
+			Members: c.rbInstanceVariables(c.field(n, "body")), Loc: L})
 		return out
 	case "singleton_class":
 		oldVisibility := c.visibility
@@ -555,6 +556,53 @@ func rubyClassTokenString(name string, bases []string) string {
 		tokens = append(tokens, "class_bases="+strings.Join(bases, ","))
 	}
 	return strings.Join(tokens, "\x00")
+}
+
+// rbInstanceVariables names the instance variables the class's own body assigns, sigil kept.
+// Ruby declares no fields: an instance variable comes into being the first time it is
+// assigned, which is inside whichever method does it — so the declaration set is the set of
+// assignment targets. Naming them lets the shared lowering resolve a bare `@x` to the class's
+// implicit-self field slot, which is the one node a write in one method and a read in a sibling
+// method share; without it each method's `@x` is a private name and the taint stops at the
+// method boundary. `@@cvar` and `$global` are class- and program-level storage, not instance
+// state, and a nested class's `@x` is that class's, so none of those are collected here.
+func (c *rbConv) rbInstanceVariables(body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []string
+	add := func(n *tree_sitter.Node) {
+		if n == nil || c.kind(n) != "instance_variable" {
+			return
+		}
+		name := c.text(n)
+		if name == "" || strings.HasPrefix(name, "@@") || seen[name] {
+			return
+		}
+		seen[name] = true
+		out = append(out, name)
+	}
+	var walk func(n *tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "class" || c.kind(n) == "module" {
+			return // a nested class's instance variables are its own
+		}
+		// `@x = v` and `@x ||= v`; the left side may be a left_assignment_list carrying several.
+		if c.kind(n) == "assignment" || c.kind(n) == "operator_assignment" {
+			add(c.field(n, "left"))
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	for _, ch := range c.namedChildren(body) {
+		walk(ch)
+	}
+	return out
 }
 
 func (c *rbConv) rubyClassBases(cls *tree_sitter.Node) []string {

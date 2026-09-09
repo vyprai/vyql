@@ -4391,6 +4391,20 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			sc.delCnst(st.Target)
 			return
 		}
+		// A bare member written with an operator — Ruby's `@x ||= v`, the memoization idiom, or
+		// C#'s `field += v` — is the same member write the plain assignment arm above routes
+		// into the node a read of that member resolves to. Merged value only: the read half is
+		// the `sc.node` flow above, and the slot this adds is empty until some method writes it.
+		if l.curClass != "" && !strings.Contains(st.Target, ".") && !sc.lex[st.Target] &&
+			l.classMemberSet(l.curModule, l.curClass)[st.Target] {
+			if d := sc.node[st.Target]; d != "" {
+				if d != n {
+					l.flow(n, d)
+				}
+			} else if self := sc.node["this"]; self != "" {
+				l.flow(n, l.elemNode(self, st.Target, st.Loc))
+			}
+		}
 		sc.setNode(st.Target, n)
 	case nir.Return:
 		rv := l.eval(st.Value, sc)
