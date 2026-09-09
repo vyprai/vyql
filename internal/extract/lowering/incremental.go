@@ -360,6 +360,14 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 		l.funcQual[f.Qual] = fi
 		l.funcOverloads[f.Qual] = append(l.funcOverloads[f.Qual], fi)
 		l.funcShort[f.Short] = append(l.funcShort[f.Short], fi)
+		// A body re-lowered because some OTHER module's signature moved still resolves its own
+		// receivers against this table, so the replay has to contribute it exactly as register
+		// would (see paramDeclType).
+		for p, node := range f.Params {
+			if typ := f.ParamTypes[p]; typ != "" {
+				l.paramDeclType[node] = typ
+			}
+		}
 	}
 	for _, k := range d.ClassQual {
 		l.classQual[k] = true

@@ -177,6 +177,14 @@ type lowerer struct {
 	// shared by every value of that type. See structFieldSlot for why the object-sensitive
 	// slots above cannot serve a Go struct field.
 	structFields map[string]string
+	// importStoreSlots holds one taint slot per IMPORTED type's keyed store —
+	// "pkg::Type\x00key" — the setter/getter pair a request-scoped library object carries.
+	// See importStoreSlot for why the object-sensitive slots above cannot serve it.
+	importStoreSlots map[string]string
+	// paramDeclType maps a parameter node to the type that declaration annotated it with, so a
+	// container call on a parameter can ask for it without reading the node back off the graph
+	// (a real decode on a disk-backed store, and the lowering already knows the fact).
+	paramDeclType map[string]string
 	// goRecv is the receiver binding of the Go method being lowered: {variable name, type}.
 	// Go declares the receiver outside the parameter list, so nothing in scope types it, and
 	// structFieldOwner is the only thing that reads this.
@@ -595,6 +603,59 @@ func (l *lowerer) structFieldOwner(base string, sc *scope) (mod, typ string, ok 
 // languages this does not need to change.
 func goStructFields(file string) bool { return strings.HasSuffix(file, ".go") }
 
+// importStoreOwner resolves the library type a keyed store's receiver was declared with, so a
+// write and a read of the same key can be joined on it.
+//
+// The object-sensitive slots (elemNode) join `c.set(k, v)` to `c.get(k)` only when both run
+// through the SAME object node, which needs a call site aliasing the two. A request-scoped
+// context object has none anywhere in the scanned code: the framework — not the program —
+// hands the same object to the middleware that stores and the handler that reads, so the two
+// receivers are unrelated parameter nodes and the value dead-ends at the setter.
+//
+// What the two functions DO share is the type each annotated its parameter with, and that type
+// names a library: the declaration is `c: Context` over `import { Context } from "hono"`. The
+// join key is therefore the IMPORT (package plus symbol), which is why it is resolved from the
+// import table rather than from classModule — the latter only answers for a class the scan
+// itself declares, and a library class is precisely the case here. Restricting the receiver to
+// a parameter node is what keeps the join off objects the function built itself, which stay on
+// the object-sensitive slots a call site can alias.
+//
+// The cost is the one structFieldSlot already accepts for keying on a type instead of an
+// object: distinct values of that type merge. Here the values are the requests the framework
+// threaded through both functions, which is the merge being asked for; a request whose store
+// was never written by this code reads the slot the other request filled, so the join is an
+// over-approximation and not a claim about one runtime object.
+func (l *lowerer) importStoreOwner(recv string) (string, bool) {
+	name := l.paramDeclType[recv]
+	if name == "" {
+		return "", false
+	}
+	if _, ok := l.classModule(name, l.importTables[l.curModule]); ok {
+		return "", false // declared by the scan: its own methods resolve, keep object-sensitivity
+	}
+	imp, ok := l.importTables[l.curModule][name]
+	if !ok || imp.kind != "sym" || imp.module == "" || imp.symbol == "" {
+		return "", false
+	}
+	return imp.module + "::" + imp.symbol, true
+}
+
+// importStoreSlot returns the stable node holding the taint stored under one key of one
+// imported library type — `c.set("input", v)` in one function, `c.get("input")` in another —
+// created on first use from either side, so a read lowered before the write that fills it
+// still sees it. The id is derived from the key, not minted from the node counter, so the slot
+// is the same node whichever module reaches it first and an incremental scan that re-lowers
+// only some of them still agrees on it.
+func (l *lowerer) importStoreSlot(owner, key, loc string) string {
+	k := owner + "\x00" + key
+	if id := l.importStoreSlots[k]; id != "" {
+		return id
+	}
+	id := l.nodeWithID("importstore#"+k, "Elem", loc, nil)
+	l.importStoreSlots[k] = id
+	return id
+}
+
 // elemNode returns the synthetic node holding container[key]'s taint (created on first use).
 // The caller is a WRITE, so the record is marked as modelling this object's writes.
 func (l *lowerer) elemNode(container, key, loc string) string {
@@ -884,6 +945,16 @@ func (l *lowerer) keyedContainerGet(call nir.Call, recv, result string, sc *scop
 	}
 	switch len(call.Args) {
 	case 1:
+		// the other half of the import-store write in containerWrite: a read through the
+		// matching getter of a library context object draws on the slot the storing function
+		// filled, whether or not THIS receiver was ever written as a container (it never is —
+		// the write happened in another function, against another parameter node). Additive:
+		// the object-sensitive read below still runs and decides its own answer.
+		if owner, ok := l.importStoreOwner(recv); ok {
+			if key, ok := l.constKey(call.Args[0], sc); ok {
+				l.flow(l.importStoreSlot(owner, key, call.Loc), result)
+			}
+		}
 		return l.containerRead(recv, result, call.Args[0], sc)
 	case 2:
 		// Only for a composite container: on a plain dict this is `get(key, default)`,
@@ -908,6 +979,11 @@ func (l *lowerer) containerWrite(call nir.Call, args []string, recv string, sc *
 		l.flow(args[1], recv)
 		if key, ok := l.constKey(call.Args[0], sc); ok {
 			l.flow(args[1], l.elemNode(recv, key, call.Loc))
+			// a store on a library context object a DIFFERENT function reads back: the call
+			// site that would alias the two receivers is inside the framework, not the scan.
+			if owner, ok := l.importStoreOwner(recv); ok {
+				l.flow(args[1], l.importStoreSlot(owner, key, call.Loc))
+			}
 		} else {
 			l.cinfo(recv).dirty = true
 		}
@@ -2958,6 +3034,8 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		containers:       map[string]*containerInfo{},
 		pendingReads:     map[string]map[string][]string{},
 		structFields:     map[string]string{},
+		importStoreSlots: map[string]string{},
+		paramDeclType:    map[string]string{},
 		templates:        map[string]templateInfo{},
 		modStr:           map[string]string{},
 		dynSQLVar:        map[string]bool{},
@@ -3633,6 +3711,9 @@ func (l *lowerer) makeFuncInfo(modkey, cls string, st nir.FuncDef) *funcInfo {
 		}
 		params[p] = l.nodeWithID(sigID(ns, rel, "param", p), "Param", st.Loc, props)
 		l.paramObjects[params[p]] = true
+		if typ := st.ParamTypes[p]; typ != "" {
+			l.paramDeclType[params[p]] = typ
+		}
 		order = append(order, p)
 	}
 	fi := &funcInfo{
@@ -4877,6 +4958,9 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 				props["decl_type"] = typ
 			}
 			pn := l.node("Param", ex.Loc, props)
+			if typ := ex.ParamTypes[p]; typ != "" {
+				l.paramDeclType[pn] = typ
+			}
 			paramByName[p] = pn
 			inner.setNode(p, pn)
 			if typ := ex.ParamTypes[p]; typ != "" {
