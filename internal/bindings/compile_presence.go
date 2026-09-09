@@ -585,6 +585,14 @@ func v2PresenceValuePrefix(field string) string {
 		return "zero_step_sequence_risk="
 	case "loopRestartWithoutProgress":
 		return "loop_restart_without_progress="
+	// One loop's cursor: where the definition reaching the loop's header came from
+	// (`def=straight` / `def=loop_carried`) and whether the loop advances the cursor
+	// itself (`step=yes` / `step=no`). Both facts in one token, so a function-scope
+	// context that dedups two identical resets still separates the loops seeing them.
+	case "loopCursor":
+		return "loop_cursor:"
+	case "loopUpdate":
+		return "loop_update:"
 	case "loopProgressHiddenInCall":
 		return "loop_progress_hidden_in_call="
 	case "convertSvgMultiSvgSanitizerBypass":

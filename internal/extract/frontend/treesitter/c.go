@@ -610,6 +610,7 @@ func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node, paramTyp
 		}
 	}
 	tokens = append(tokens, c.ccStructuredContextTokens(body)...)
+	tokens = append(tokens, c.ccLoopCursorTokens(body)...)
 	return tokens
 }
 
