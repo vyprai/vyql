@@ -22,6 +22,12 @@ type phConv struct {
 	funcName   string
 	className  string
 	classBases []string
+	// lineMap remaps a parsed row (0-based) onto the line of c.file it came from.
+	// It is set only for a source synthesized out of fragments of the real file —
+	// the expressions inside a Blade template's echo tags, which are re-parsed as
+	// PHP away from the markup they are embedded in — so their statements still
+	// carry the location of the tag they were written at. nil for a whole file.
+	lineMap []int
 	// hoisted collects statements extracted out of an expression position —
 	// the body of an anonymous class (`new class extends B { ... }`). They are
 	// appended after the statement containing the expression by stmt, so the
@@ -139,6 +145,7 @@ func ExtractPHP(files []string, root string) (nir.Program, error) {
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &phConv{src: src, root: root, file: rel}
 			body := c.block(tree.RootNode())
+			body = append(body, c.phpBladeEchoStmts()...)
 			body = append(body, c.phpModuleContext(tree.RootNode())...)
 			body = append(body, c.phpSimplexmlLoaderObservations()...)
 			return nir.Module{Key: "", File: rel, Body: body}, true
@@ -193,7 +200,14 @@ func phpNormalizeLegacyScriptTags(src []byte) []byte {
 }
 
 func (c *phConv) loc(n *tree_sitter.Node) string {
-	return c.file + ":" + itoa(int(n.StartPosition().Row)+1)
+	row := int(n.StartPosition().Row)
+	if c.lineMap != nil {
+		if row >= 0 && row < len(c.lineMap) && c.lineMap[row] > 0 {
+			return c.file + ":" + itoa(c.lineMap[row])
+		}
+		return c.file + ":1"
+	}
+	return c.file + ":" + itoa(row+1)
 }
 
 func (c *phConv) locAtByte(offset int) string {
