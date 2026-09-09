@@ -1106,6 +1106,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccNarrowingCastBoundsCheckObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccBufferRelocationOriginObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccCountedPopulationObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccFieldAliasStaleAfterReallocObservations(n)...)
 		}
 		return []nir.Stmt{nir.FuncDef{
 			Name:          name,
@@ -6143,6 +6144,342 @@ func ccPointerAtomKey(c *ccConv, n *tree_sitter.Node) string {
 		}
 	}
 	return ""
+}
+
+// ccMoveCapableReallocCallee reports whether a callee reallocates a block in a
+// way that may hand back a different address. Both spellings a reallocating
+// allocator has count: the `realloc` family (realloc, reallocarray, xrealloc,
+// g_realloc, av_realloc, ...) and the `renew` family wrappers grow a block in
+// place when they can and copy it elsewhere when they cannot, so every pointer
+// into the old block stops naming it the moment one of them returns.
+func ccMoveCapableReallocCallee(callee string) bool {
+	lc := strings.ToLower(callee)
+	return strings.Contains(lc, "realloc") || strings.Contains(lc, "renew")
+}
+
+// ccFieldAliasCapture is one read of a pointer out of a field into a local:
+// `src_items = src_slice->items`. owner is the field as a comparable key
+// (`src_slice.items`), field the member alone, and at the byte the write ends
+// at, so that a later reallocation of the same member can be ordered after it.
+type ccFieldAliasCapture struct {
+	alias string
+	owner string
+	field string
+	at    uint
+}
+
+// ccAliasWrite is one plain write to a local. field names the member a field
+// read captured and is empty for every other write, which is what tells a
+// rebinding (the local now holds something else) from a re-capture (it holds
+// the same member again). blockStart/blockEnd bound the innermost block the
+// write sits in, so that a write in a branch is not read as one every path
+// takes.
+type ccAliasWrite struct {
+	alias      string
+	field      string
+	at         uint
+	blockStart uint
+	blockEnd   uint
+}
+
+// ccFieldRealloc is one reassignment of a field from a reallocation of that
+// same field's block: `o->items = m_renew(byte, o->items, ...)`. The old value
+// has to be what the allocator was handed, because that is what makes the
+// block the field used to name the one that may have been moved and released.
+type ccFieldRealloc struct {
+	target string
+	field  string
+	callee string
+	start  uint
+	end    uint
+}
+
+// ccAliasUse is one read of a local's pointer value -- passed to a call,
+// dereferenced or subscripted -- with where it is written.
+type ccAliasUse struct {
+	alias string
+	via   string
+	at    uint
+	loc   string
+}
+
+// ccFieldAliasStaleAfterReallocObservations reports the one ordering a
+// use-after-free through a reallocated field turns on: a pointer was read out
+// of a field, the same field was then reassigned from a reallocation that may
+// move the block, and the local captured before the move is read afterwards
+// without being taken from the field again.
+//
+// The three sites are ordered by construction -- capture before reallocation,
+// reallocation before use -- and that order is the whole fact. A release, a
+// use and an alias observed separately state that a block was freed, that a
+// pointer was read and that two names met, none of which says the read came
+// after the free: `dest_items = o->items` and `src_items = src_slice->items`
+// are the same alias fact, and only the write between the reallocation and the
+// read tells the refreshed one from the stale one.
+//
+// Whether the two objects really are one -- micropython's `bytearray +=
+// itself`, where the value being assigned is the array being grown -- stays
+// the rule's question. What the frontend can see, and what nothing downstream
+// could reconstruct from per-node labels, is which member the local was read
+// from, which member the allocator overwrote, and that no write to the local
+// stands between the two.
+func (c *ccConv) ccFieldAliasStaleAfterReallocObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	captures, writes, reallocs, uses := c.ccFieldAliasSites(fn, body)
+	if len(captures) == 0 || len(reallocs) == 0 || len(uses) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []nir.Stmt
+	for _, r := range reallocs {
+		for _, cp := range captures {
+			if cp.field != r.field || cp.at > r.start {
+				continue
+			}
+			// Members are matched by name, because the whole point is
+			// that the capture and the reallocation may reach the same
+			// block through two different objects. The one base that
+			// cannot is the alias itself: `map = fvs->map` followed by
+			// `map->map = realloc(map->map, ...)` reallocates a member
+			// of the object the alias points at, and an object is never
+			// the block its own member names.
+			if firstSeg(r.target) == cp.alias {
+				continue
+			}
+			if ccAliasReboundBefore(writes, cp, r) {
+				continue
+			}
+			use, ok := ccFirstStaleAliasUse(uses, writes, cp.alias, r.end)
+			if !ok {
+				continue
+			}
+			key := use.loc + "|" + cp.alias + "|" + r.target
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			path := "analysis.lifetime.field_alias_stale_after_realloc"
+			out = append(out, nir.ExprStmt{Value: nir.Call{
+				Callee: nir.Name{ID: path, Loc: use.loc},
+				Args: []nir.Expr{
+					nir.Const{Loc: use.loc, Value: "alias=" + cp.alias},
+					nir.Const{Loc: use.loc, Value: "field=" + cp.field},
+					nir.Const{Loc: use.loc, Value: "capture=" + cp.owner},
+					nir.Const{Loc: use.loc, Value: "reallocated=" + r.target},
+					nir.Const{Loc: use.loc, Value: "allocator=" + r.callee},
+					nir.Const{Loc: use.loc, Value: "use=" + use.via},
+				},
+				Path:   path,
+				Method: "field_alias_stale_after_realloc",
+				Loc:    use.loc,
+			}})
+		}
+	}
+	return out
+}
+
+// ccAliasReboundBefore reports whether the local stopped holding the captured
+// member before the reallocation. Only a write that every path to the
+// reallocation takes counts -- one whose block encloses it -- because a
+// routine that captures the member in one branch and something else in
+// another has still captured the member on the branch that reaches the
+// allocator. A write that reads the same member again rebinds nothing.
+func ccAliasReboundBefore(writes []ccAliasWrite, cp ccFieldAliasCapture, r ccFieldRealloc) bool {
+	for _, w := range writes {
+		if w.alias != cp.alias || w.field == cp.field {
+			continue
+		}
+		if w.at <= cp.at || w.at >= r.start {
+			continue
+		}
+		if w.blockStart <= r.start && w.blockEnd >= r.end {
+			return true
+		}
+	}
+	return false
+}
+
+// ccFirstStaleAliasUse returns the first read of the local after the
+// reallocation, and reports false when any write to it comes first. Every
+// write clears the fact here, conditional or not: a routine that puts anything
+// back in the local before reading it has answered the move, and the
+// alternative is naming the form the fix takes.
+//
+// Only the first read is returned. It is the one that carries the ordering,
+// and the reads behind it are either the same fact restated or -- when they
+// sit in a branch the reallocation is not on -- not stale at all.
+func ccFirstStaleAliasUse(uses []ccAliasUse, writes []ccAliasWrite, alias string, after uint) (ccAliasUse, bool) {
+	var first ccAliasUse
+	found := false
+	for _, u := range uses {
+		if u.alias != alias || u.at < after {
+			continue
+		}
+		if !found || u.at < first.at {
+			first, found = u, true
+		}
+	}
+	if !found {
+		return ccAliasUse{}, false
+	}
+	for _, w := range writes {
+		if w.alias == alias && w.at >= after && w.at < first.at {
+			return ccAliasUse{}, false
+		}
+	}
+	return first, true
+}
+
+// ccFieldAliasSites walks a routine once for the four parts of the fact: the
+// field reads that put a pointer in a local, every other write to those
+// locals, the reallocations that overwrite a field with a block that may have
+// moved, and the reads of a local's pointer value.
+func (c *ccConv) ccFieldAliasSites(fn, body *tree_sitter.Node) ([]ccFieldAliasCapture, []ccAliasWrite, []ccFieldRealloc, []ccAliasUse) {
+	scalars := c.ccNonPointerDeclaredNames(fn)
+	var captures []ccFieldAliasCapture
+	var writes []ccAliasWrite
+	var reallocs []ccFieldRealloc
+	var uses []ccAliasUse
+
+	local := func(name string, target, value *tree_sitter.Node, end uint, block *tree_sitter.Node) {
+		if name == "" {
+			return
+		}
+		w := ccAliasWrite{alias: name, at: target.StartByte(), blockStart: block.StartByte(), blockEnd: block.EndByte()}
+		if src := ccUnwrapCExpr(value); !scalars[name] && src != nil && c.kind(src) == "field_expression" {
+			if key := ccPointerAtomKey(c, src); key != "" {
+				w.field = lastSeg(key)
+				captures = append(captures, ccFieldAliasCapture{alias: name, owner: key, field: w.field, at: end})
+			}
+		}
+		writes = append(writes, w)
+	}
+
+	// a write whose target is a member is a reallocation of that member or
+	// nothing; one whose target is a bare local is a capture or a rebinding.
+	assign := func(target, value *tree_sitter.Node, end uint, block *tree_sitter.Node) {
+		if target == nil || value == nil {
+			return
+		}
+		if key := ccPointerAtomKey(c, target); strings.Contains(key, ".") {
+			if callee, ok := c.ccReallocationOf(value, key); ok {
+				reallocs = append(reallocs, ccFieldRealloc{
+					target: key,
+					field:  lastSeg(key),
+					callee: callee,
+					start:  target.StartByte(),
+					end:    end,
+				})
+			}
+			return
+		}
+		local(ccIdentifierText(c, target), target, value, end, block)
+	}
+
+	var walk func(n, block *tree_sitter.Node)
+	walk = func(n, block *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "compound_statement":
+			block = n
+		case "init_declarator":
+			if decl, value := c.field(n, "declarator"), c.field(n, "value"); decl != nil && value != nil {
+				local(c.declName(decl), decl, value, n.EndByte(), block)
+			}
+		case "assignment_expression":
+			if c.assignmentOp(n) == "=" {
+				assign(c.field(n, "left"), c.field(n, "right"), n.EndByte(), block)
+			}
+		case "call_expression":
+			callee := lastSeg(c.dotted(c.field(n, "function")))
+			for _, a := range c.namedChildren(c.field(n, "arguments")) {
+				if c.kind(a) == "unary_expression" || c.kind(a) == "pointer_expression" {
+					if c.unaryOp(a) == "&" {
+						continue // the slot is handed over, not the pointer in it
+					}
+				}
+				for name, at := range c.ccPointerReadNames(a) {
+					uses = append(uses, ccAliasUse{alias: name, via: callee, at: at, loc: c.loc(n)})
+				}
+			}
+		case "pointer_expression":
+			if c.unaryOp(n) == "*" {
+				if name := ccIdentifierText(c, c.field(n, "argument")); name != "" {
+					uses = append(uses, ccAliasUse{alias: name, via: "dereference", at: n.StartByte(), loc: c.loc(n)})
+				}
+			}
+		case "subscript_expression":
+			if name := ccIdentifierText(c, c.field(n, "argument")); name != "" {
+				uses = append(uses, ccAliasUse{alias: name, via: "subscript", at: n.StartByte(), loc: c.loc(n)})
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch, block)
+		}
+	}
+	walk(body, body)
+	return captures, writes, reallocs, uses
+}
+
+// ccReallocationOf reports the allocator a field was reassigned from, when the
+// call may move the block and was handed the field's own old value. An
+// allocation that does not read the field it overwrites -- `o->items =
+// malloc(n)` -- leaks the old block rather than releasing it, so pointers into
+// it stay valid and nothing about them is stale.
+func (c *ccConv) ccReallocationOf(value *tree_sitter.Node, target string) (string, bool) {
+	call := ccUnwrapCExpr(value)
+	if call == nil || c.kind(call) != "call_expression" {
+		return "", false
+	}
+	callee := lastSeg(c.dotted(c.field(call, "function")))
+	if callee == "" || !ccMoveCapableReallocCallee(callee) {
+		return "", false
+	}
+	for _, a := range c.namedChildren(c.field(call, "arguments")) {
+		if ccPointerAtomKey(c, a) == target {
+			return callee, true
+		}
+	}
+	return "", false
+}
+
+// ccPointerReadNames collects the bare locals an expression reads, with where
+// each is written. A member's name is not one of them, and neither is a
+// callee: `f(p + n)` reads p, `f(o->items)` reads no local, and `f(g(p))`
+// reads p and not g.
+func (c *ccConv) ccPointerReadNames(n *tree_sitter.Node) map[string]uint {
+	out := map[string]uint{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "identifier":
+			if name := c.text(n); name != "" {
+				if at, seen := out[name]; !seen || n.StartByte() < at {
+					out[name] = n.StartByte()
+				}
+			}
+			return
+		case "field_expression":
+			walk(c.field(n, "argument"))
+			return
+		case "call_expression":
+			walk(c.field(n, "arguments"))
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return out
 }
 
 func (c *ccConv) ccPostCopyMissingBoundsObservations(fn *tree_sitter.Node) []nir.Stmt {
