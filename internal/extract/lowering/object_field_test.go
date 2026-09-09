@@ -218,6 +218,40 @@ func TestConstructorArgumentsStillTaintTheConstructedObject(t *testing.T) {
 	}
 }
 
+// A bare member written with an operator — Ruby's `@x ||= v`, the memoization idiom — is the
+// same member write `x = v` is. The plain spelling stores into the node a read of the member
+// resolves to; the operator spelling has to store there too, or a memoizing writer in one
+// method and a reader in a sibling stay two unrelated bindings.
+func TestAMemberWrittenThroughAnOperatorReachesTheMethodThatReadsIt(t *testing.T) {
+	prog := nir.Program{Modules: []nir.Module{{
+		Key: "h", File: "h.rb",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Holder", Members: []string{"@p"}, Loc: "h.rb:1", Body: []nir.Stmt{
+				nir.FuncDef{Name: "store", Params: []string{"v"}, Loc: "h.rb:2", Body: []nir.Stmt{
+					nir.AugAssign{Target: "@p", Value: nir.Name{ID: "v", Loc: "h.rb:3"}, Loc: "h.rb:3"},
+				}},
+				nir.FuncDef{Name: "render", Loc: "h.rb:4", Body: []nir.Stmt{
+					sinkCall(nir.Name{ID: "@p", Loc: "h.rb:5"}, "h.rb:5"),
+				}},
+			}},
+			nir.FuncDef{Name: "go", Params: []string{"q"}, Loc: "h.rb:6", Body: []nir.Stmt{
+				nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "store", Loc: "h.rb:7"},
+					Args:   []nir.Expr{nir.Name{ID: "q", Loc: "h.rb:7"}},
+					Path:   "store", Method: "store", Loc: "h.rb:7",
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	if !reachesArg(t, g, findNodeID(t, g, "code.Param", "name", "q"), "h.rb:5") {
+		t.Fatal("a member one method wrote through an operator did not reach the sibling method that reads it")
+	}
+}
+
 // Materializing a slot for a field READ must not make the record claim it models the object's
 // writes: an element-sensitive subscript read concludes an unlisted key is CLEAN, and that
 // holds only for a container every write to which was seen.

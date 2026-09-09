@@ -204,6 +204,170 @@ end
 	}
 }
 
+// An instance variable is storage on the object, not on the method: one method parks a value
+// on `@order` and a sibling reads it back, and the only thing tying the two together is that
+// both bodies belong to the same class. Each method lowering `@order` as a private name leaves
+// the write and the read as unrelated nodes, so the taint stops at the method boundary.
+func TestRubyInstanceVariableWrittenByOneMethodReachesTheMethodThatReadsIt(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "report.rb")
+	src := []byte(`class Report
+  def store(order)
+    @order = order
+  end
+
+  def render
+    Model.reorder(@order)
+  end
+end
+
+def handle(params)
+  r = Report.new
+  r.store(params)
+  r.render
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reachable, err := usg.BFS(g, rubyNodeID(t, g, "code.Param", "name", "params", "func", "handle"), "FLOWS", 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[rubyNodeID(t, g, "code.Arg", "loc", "report.rb:7")] {
+		t.Fatal("a value one method stored on @order did not reach the sibling method that reads it back")
+	}
+}
+
+// Ruby memoizes through the operator-assignment spelling — `@keys ||= build` stores on first
+// call and returns the stored value after — so the write has to reach the class's slot the
+// same way the plain spelling's does, or a memoizing writer and a reading sibling stay apart.
+func TestRubyMemoizedInstanceVariableReachesTheMethodThatReadsIt(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "report.rb")
+	src := []byte(`class Report
+  def store(order)
+    @order ||= order
+  end
+
+  def render
+    Model.reorder(@order)
+  end
+end
+
+def handle(params)
+  r = Report.new
+  r.store(params)
+  r.render
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reachable, err := usg.BFS(g, rubyNodeID(t, g, "code.Param", "name", "params", "func", "handle"), "FLOWS", 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[rubyNodeID(t, g, "code.Arg", "loc", "report.rb:7")] {
+		t.Fatal("a value one method memoized onto @order did not reach the sibling method that reads it back")
+	}
+}
+
+// The precision half of the same mechanism: the class's instance variables are separate slots,
+// so a write to @order must not surface on a read of @scope.
+func TestRubySiblingInstanceVariableStaysCleanAcrossMethods(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "report.rb")
+	src := []byte(`class Report
+  def store(order)
+    @order = order
+    @scope = "name"
+  end
+
+  def render
+    Model.reorder(@scope)
+  end
+end
+
+def handle(params)
+  r = Report.new
+  r.store(params)
+  r.render
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reachable, err := usg.BFS(g, rubyNodeID(t, g, "code.Param", "name", "params", "func", "handle"), "FLOWS", 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reachable[rubyNodeID(t, g, "code.Arg", "loc", "report.rb:8")] {
+		t.Fatal("a read of @scope saw the taint stored on the sibling instance variable @order")
+	}
+}
+
+// The write and the read sharing one body must keep working: the slot the class-level mechanism
+// routes through is an addition to that flow, not a replacement of it.
+func TestRubyInstanceVariableWrittenAndReadInTheSameMethodStillFlows(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "report.rb")
+	src := []byte(`class Report
+  def store(order)
+    @order = order
+    Model.reorder(@order)
+  end
+end
+
+def handle(params)
+  r = Report.new
+  r.store(params)
+end
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractRuby([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reachable, err := usg.BFS(g, rubyNodeID(t, g, "code.Param", "name", "params", "func", "handle"), "FLOWS", 60)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reachable[rubyNodeID(t, g, "code.Arg", "loc", "report.rb:4")] {
+		t.Fatal("an @order written and read in the same method stopped flowing")
+	}
+}
+
 func TestRubyModuleContextIncludesStructuredTokens(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "secret_token.rb")
