@@ -58,10 +58,11 @@ func parseModulesPreprocess(
 	if workers < 1 {
 		workers = 1
 	}
-	cache := parsecache.Shared() // nil unless an explicit cache owner is wired in; all methods are nil-safe
-	if preprocess != nil {
-		cache = nil
-	}
+	// nil unless an explicit cache owner is wired in; all methods are nil-safe. A preprocess pass
+	// stays cacheable: the content key below is taken over the preprocessed bytes -- exactly what
+	// was parsed -- and the cache's salt folds in the scanner binary, so a changed preprocess
+	// function ships with a salt that retires the entries it would have invalidated.
+	cache := parsecache.Shared()
 	// Prefetch stubs for unchanged files (one batched transaction): an unchanged module resolves
 	// to a STUB (identity only, no body) without being read or decoded — the lowerer decodes the
 	// body on demand only if it actually needs it. This skips the dominant cost of a warm re-scan
