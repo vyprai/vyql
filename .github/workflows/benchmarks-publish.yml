@@ -177,7 +177,7 @@ jobs:
           service_account: vypr-ci-benchmarks@valid-perigee-471809-r0.iam.gserviceaccount.com
           project_id: valid-perigee-471809-r0
 
-      - uses: google-github-actions/setup-gcloud@v2
+      - uses: google-github-actions/setup-gcloud@v3
 
       - name: Patch and upload latest.json
         run: |
