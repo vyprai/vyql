@@ -55,7 +55,7 @@ VyQL:
 
 ```sh
 # platforms: linux_amd64, linux_arm64, darwin_arm64, darwin_amd64
-V=v0.2.5; P=darwin_arm64
+V=v0.5.0; P=darwin_arm64
 curl -fsSLO https://github.com/vyprai/vyql/releases/download/$V/vyql_${V}_${P}.tar.gz
 curl -fsSLO https://github.com/vyprai/vyql/releases/download/$V/vyql_${V}_${P}.tar.gz.sha256
 shasum -a 256 -c vyql_${V}_${P}.tar.gz.sha256
@@ -141,11 +141,11 @@ vyql version
 ```
 
 ```
-vyql v0.2.4
-commit: 6906231d71f36f0f7f93f6301870efff4ae333ad
-built:  2026-08-07T01:43:38Z
-go:     go1.26.4
-platform: darwin/arm64
+vyql v0.5.0
+commit: ddf4075fa04504942dab87fdecd053f0feaf6768
+built:  2026-09-09T05:10:28Z
+go:     go1.26.6
+platform: linux/amd64
 ```
 
 Quote this in a bug report, because findings depend on the version of the security
