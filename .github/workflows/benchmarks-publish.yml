@@ -50,7 +50,7 @@ jobs:
       - name: Unit tests for the publisher
         run: python3 -m unittest discover -s benchmarks -p 'test_*.py'
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         id: owasp
         with:
           path: |
@@ -58,13 +58,13 @@ jobs:
             ~/benchmark-corpora/BenchmarkPython
           key: owasp-corpora-v1
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         id: realvuln
         with:
           path: ~/benchmark-corpora/Real-Vuln-Benchmark
           key: realvuln-corpora-v1
 
-      - uses: actions/cache/restore@v4
+      - uses: actions/cache/restore@v6
         id: xbow
         with:
           path: ~/validation-benchmarks
@@ -94,7 +94,7 @@ jobs:
             git -C "$XBOW" sparse-checkout set benchmarks rules
           fi
 
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v6
         if: steps.owasp.outputs.cache-hit != 'true'
         with:
           path: |
@@ -102,13 +102,13 @@ jobs:
             ~/benchmark-corpora/BenchmarkPython
           key: owasp-corpora-v1
 
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v6
         if: steps.realvuln.outputs.cache-hit != 'true'
         with:
           path: ~/benchmark-corpora/Real-Vuln-Benchmark
           key: realvuln-corpora-v1
 
-      - uses: actions/cache/save@v4
+      - uses: actions/cache/save@v6
         if: steps.xbow.outputs.cache-hit != 'true'
         with:
           path: ~/validation-benchmarks
