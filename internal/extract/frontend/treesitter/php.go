@@ -63,6 +63,25 @@ func (c *phConv) phpBaseClauseTokens(n *tree_sitter.Node) []string {
 	return out
 }
 
+// phpShortBaseNames reduces base-clause tokens to the base class names the lowering resolves
+// against: one entry per base, namespace qualifier dropped, because a base is looked up by
+// its short name. The tokens themselves carry both spellings for `class_base` matching.
+func phpShortBaseNames(tokens []string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, t := range tokens {
+		if i := strings.LastIndex(t, `\`); i >= 0 && i+1 < len(t) {
+			t = t[i+1:]
+		}
+		if t == "" || seen[t] {
+			continue
+		}
+		seen[t] = true
+		out = append(out, t)
+	}
+	return out
+}
+
 // phpClassMembers returns the property names declared directly in a class body, so a member
 // reference on the implicit self receiver inside a method resolves to that receiver's field
 // slot instead of a fresh node per occurrence.
@@ -324,11 +343,12 @@ func (c *phConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		prevBases := c.classBases
 		c.className = name
 		c.classBases = c.phpBaseClauseTokens(n)
+		bases := phpShortBaseNames(c.classBases)
 		body := c.block(c.field(n, "body"))
 		body = append(body, c.phpClassContext(n, name)...)
 		c.className = prevClass
 		c.classBases = prevBases
-		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Members: c.phpClassMembers(c.field(n, "body")), Loc: L}}
+		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Bases: bases, Members: c.phpClassMembers(c.field(n, "body")), Loc: L}}
 	case "expression_statement":
 		kids := c.namedChildren(n)
 		if len(kids) == 0 {

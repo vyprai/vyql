@@ -93,11 +93,13 @@ type lowerer struct {
 	directMembers   map[string]map[string]bool
 	classBaseNames  map[string][]string
 	derivedChildren map[string][]string // base short name -> child class quals
-	membersOfShort  map[string]map[string]bool
-	allMembersMemo  map[string]map[string]bool // memoized transitive member set per "modkey::Class"
-	dynCallbackMemo map[string][]*funcInfo     // memoized dynamic-callback target set, keyed by current module tech
-	addrTaken       map[string]bool            // short names referenced as a VALUE anywhere (candidate dynamic-callback targets)
-	addrTakenReady  bool                       // true once addrTaken has been collected for the whole program
+	// overrideFamilies memoizes overrideFamily by "<tech>\x00<method name>".
+	overrideFamilies map[string][]*funcInfo
+	membersOfShort   map[string]map[string]bool
+	allMembersMemo   map[string]map[string]bool // memoized transitive member set per "modkey::Class"
+	dynCallbackMemo  map[string][]*funcInfo     // memoized dynamic-callback target set, keyed by current module tech
+	addrTaken        map[string]bool            // short names referenced as a VALUE anywhere (candidate dynamic-callback targets)
+	addrTakenReady   bool                       // true once addrTaken has been collected for the whole program
 
 	curModule     string   // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
 	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
@@ -2927,44 +2929,45 @@ func (l *lowerer) noteStoreErr(err error) {
 // incremental lowerer.
 func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]string) *lowerer {
 	return &lowerer{
-		prog:            prog,
-		selfName:        prog.Self(),
-		resolveImports:  resolveImports,
-		ctorTypes:       ctorTypes,
-		phiOperands:     map[string][]string{},
-		g:               newGraphStore(estimateGraphNodeHint(prog)),
-		modCtr:          map[string]int{},
-		modOrder:        map[string]int{},
-		modBranch:       map[string]int{},
-		funcQual:        map[string]*funcInfo{},
-		funcOverloads:   map[string][]*funcInfo{},
-		funcShort:       map[string][]*funcInfo{},
-		globalTypes:     map[string]string{},
-		classQual:       map[string]bool{},
-		classDefs:       map[string]map[string]bool{},
-		classFields:     map[string]map[string]string{},
-		importTables:    map[string]map[string]importEntry{},
-		aliasTables:     map[string]map[string]calleeAlias{},
-		moduleTech:      map[string]string{},
-		moduleGlobals:   map[string]map[string]string{},
-		classStatics:    map[string]string{},
-		staticDeclMemo:  map[string]string{},
-		containers:      map[string]*containerInfo{},
-		pendingReads:    map[string]map[string][]string{},
-		structFields:    map[string]string{},
-		templates:       map[string]templateInfo{},
-		modStr:          map[string]string{},
-		dynSQLVar:       map[string]bool{},
-		debugPayloadVar: map[string]bool{},
-		lambdaParams:    map[string][]string{},
-		classSelf:       map[string]string{},
-		classCtors:      map[string]string{},
-		paramObjects:    map[string]bool{},
-		directMembers:   map[string]map[string]bool{},
-		classBaseNames:  map[string][]string{},
-		derivedChildren: map[string][]string{},
-		membersOfShort:  map[string]map[string]bool{},
-		allMembersMemo:  map[string]map[string]bool{},
+		prog:             prog,
+		selfName:         prog.Self(),
+		resolveImports:   resolveImports,
+		ctorTypes:        ctorTypes,
+		phiOperands:      map[string][]string{},
+		g:                newGraphStore(estimateGraphNodeHint(prog)),
+		modCtr:           map[string]int{},
+		modOrder:         map[string]int{},
+		modBranch:        map[string]int{},
+		funcQual:         map[string]*funcInfo{},
+		funcOverloads:    map[string][]*funcInfo{},
+		funcShort:        map[string][]*funcInfo{},
+		globalTypes:      map[string]string{},
+		classQual:        map[string]bool{},
+		classDefs:        map[string]map[string]bool{},
+		classFields:      map[string]map[string]string{},
+		importTables:     map[string]map[string]importEntry{},
+		aliasTables:      map[string]map[string]calleeAlias{},
+		moduleTech:       map[string]string{},
+		moduleGlobals:    map[string]map[string]string{},
+		classStatics:     map[string]string{},
+		staticDeclMemo:   map[string]string{},
+		containers:       map[string]*containerInfo{},
+		pendingReads:     map[string]map[string][]string{},
+		structFields:     map[string]string{},
+		templates:        map[string]templateInfo{},
+		modStr:           map[string]string{},
+		dynSQLVar:        map[string]bool{},
+		debugPayloadVar:  map[string]bool{},
+		lambdaParams:     map[string][]string{},
+		classSelf:        map[string]string{},
+		classCtors:       map[string]string{},
+		paramObjects:     map[string]bool{},
+		directMembers:    map[string]map[string]bool{},
+		classBaseNames:   map[string][]string{},
+		derivedChildren:  map[string][]string{},
+		overrideFamilies: map[string][]*funcInfo{},
+		membersOfShort:   map[string]map[string]bool{},
+		allMembersMemo:   map[string]map[string]bool{},
 	}
 }
 
@@ -6430,6 +6433,34 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 					}
 				}
 			}
+			// `$this->model->list_items()` — a method invoked on a PROPERTY of a project
+			// value. Nothing declares what the property holds (an untyped property is the
+			// norm in PHP, and a framework that assigns the property from a loader declares
+			// nothing anywhere), so no type route exists and the unique-method-name guess
+			// is what puts a controller's call into its model on the flow — without it a
+			// sink written in the model's own body is unreachable from the controller's
+			// parameter. The receiver is the project's own
+			// object, which is exactly the condition the receiver-in-a-local route below
+			// takes its unique-method-name guess under, so take the same guess here.
+			// Restricted to a chain rooted at a project value: a root that is an import or
+			// a name nothing in scope holds names a library, and there the guess would run
+			// a project body the program never runs (see the call-result case above).
+			if l.receiverRootIsProjectValue(baseExpr, sc, imports) {
+				if f, ok := l.uniqueTechFuncInfo(l.funcShort[c.Attr]); ok {
+					return []*funcInfo{f}, false
+				}
+				// The name is declared more than once, so no single body is THE callee. When
+				// those declarations are a method and its overrides, though, they are one
+				// method dispatched over a hierarchy — a model base class and the models that
+				// override it — and each is a possible runtime continuation. Report the family
+				// reach-only, exactly as an interface-typed receiver's implementors are
+				// reported: the args reach every body, so a sink written in any of them is
+				// coverable, and nothing flows back, so bodies shared across call sites do not
+				// merge their return taint into this one.
+				if family := l.overrideFamily(c.Attr); len(family) > 0 {
+					return family, true
+				}
+			}
 			return nil, false
 		}
 		base, isName := baseExpr.(nir.Name)
@@ -6469,6 +6500,98 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 		}
 	}
 	return nil, false
+}
+
+// maxNameKeyedCandidates bounds the work overrideFamily does for one call site. A short name
+// shared by more declarations than this (`read`, `init`, `probe` across a kernel tree) names
+// no dispatch family in any useful sense, and walking every declaration's subclasses at every
+// call site is the dominant cost of lowering a large single-language tree.
+const maxNameKeyedCandidates = 64
+
+// overrideFamily returns the declarations of `attr` when they are ONE method dispatched over a
+// class hierarchy: the declaration whose own overrides account for every other declaration of
+// the name that has overrides. A same-named declaration with no overrides of its own is
+// coincidence rather than dispatch — a library class's `list_items` beside a model base
+// class's — so it neither joins the family nor vetoes it. Two unrelated hierarchies do veto:
+// there the name genuinely dispatches two ways and the call is left unresolved.
+func (l *lowerer) overrideFamily(attr string) []*funcInfo {
+	// The answer depends only on the name and the technology asking, and every declaration
+	// is registered before any body lowers, so it is computed once per pair rather than at
+	// each call site.
+	memoKey := l.moduleTech[l.curModule] + "\x00" + attr
+	if fam, ok := l.overrideFamilies[memoKey]; ok {
+		return fam
+	}
+	fam := l.computeOverrideFamily(attr)
+	l.overrideFamilies[memoKey] = fam
+	return fam
+}
+
+func (l *lowerer) computeOverrideFamily(attr string) []*funcInfo {
+	cands := l.sameTechFuncInfos(l.funcShort[attr])
+	if len(cands) < 2 || len(cands) > maxNameKeyedCandidates {
+		return nil
+	}
+	var best []*funcInfo
+	for _, c := range cands {
+		if c == nil || c.cls == "" {
+			continue
+		}
+		derived := l.resolveDerivedMethods(c.cls, attr)
+		if len(derived) == 0 {
+			continue // nothing overrides it: this declaration dispatches nowhere
+		}
+		if fam := dedupeFuncInfos(append([]*funcInfo{c}, derived...)); len(fam) > len(best) {
+			best = fam
+		}
+	}
+	if len(best) == 0 {
+		return nil
+	}
+	inBest := map[*funcInfo]bool{}
+	for _, f := range best {
+		inBest[f] = true
+	}
+	for _, c := range cands {
+		if c == nil || c.cls == "" || inBest[c] {
+			continue
+		}
+		if len(l.resolveDerivedMethods(c.cls, attr)) > 0 {
+			return nil // a second hierarchy the winner does not contain
+		}
+	}
+	return best
+}
+
+// receiverRootIsProjectValue reports whether a property-access receiver chain roots at a
+// value this project owns — the enclosing method's `this`, or a local or parameter the
+// scope holds. `$this->model`, `$conn->handle` and `$rows[0]->row` all qualify; `pkg.Cfg`
+// and a bare unknown global do not, because what they name is declared elsewhere.
+func (l *lowerer) receiverRootIsProjectValue(e nir.Expr, sc *scope, imports map[string]importEntry) bool {
+	for {
+		switch v := e.(type) {
+		case nir.Thru:
+			e = v.Inner
+		case nir.Attr:
+			e = v.Base
+		case nir.Index:
+			e = v.Base
+		case nir.Name:
+			if _, isImport := imports[v.ID]; isImport {
+				return false
+			}
+			if sc.node[v.ID] != "" { // a local or parameter holds it
+				return true
+			}
+			// the implicit receiver, in the spellings `eval` maps onto the stable self node:
+			// a scan's merged Program drops the per-language SelfName (see the FuncDef arm),
+			// so `this` and PHP's `$this` are recognised by name rather than through it.
+			return l.curClass != "" &&
+				(v.ID == "this" || v.ID == "$this" || v.ID == l.selfName || v.ID == "$"+l.selfName)
+		default:
+			return false
+		}
+	}
 }
 
 // resolveOnType returns the targets of `attr` called on a receiver of the given type, and
