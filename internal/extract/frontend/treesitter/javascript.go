@@ -2748,6 +2748,21 @@ func (c *jsConv) exprStmt(inner *tree_sitter.Node, L string) []nir.Stmt {
 				return out
 			}
 		}
+		// A plain name bound to a function value by an assignment statement rather than
+		// by the name's own declaring initialiser: `let load; load = (id) => …` inside the
+		// setter that wires it. Every other spelling of "this name names a function" above
+		// and in the declarator case lowers to a FuncDef, and a call through the name
+		// resolves to that body; this spelling left the call carrying only the local name,
+		// so its arguments' taint stopped at the call site.
+		if left != nil && c.kind(left) == "identifier" && c.isJsFuncNode(rhs) {
+			name := c.text(left)
+			params := c.funcParams(rhs)
+			paramTypes := c.funcParamTypes(rhs)
+			if len(params) == 0 {
+				params = c.paramsFromFunctionText(inner)
+			}
+			return []nir.Stmt{nir.FuncDef{Name: name, Params: params, ParamTypes: paramTypes, Body: c.funcBody(rhs), Loc: L, ContextTokens: c.jsFunctionContext(name, rhs), ParamEntries: c.jsParamEntries(name, params, nil)}}
+		}
 		var prefix []nir.Stmt
 		if rhs != nil && c.kind(rhs) == "assignment_expression" {
 			prefix = append(prefix, c.exprStmt(rhs, L)...)
