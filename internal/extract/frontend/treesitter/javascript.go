@@ -2142,23 +2142,6 @@ func splitTopLevelRegexBranches(pat string) []string {
 	return out
 }
 
-func regexGroupBodies(pat string) []string {
-	var out []string
-	for i := 0; i < len(pat); i++ {
-		if pat[i] != '(' || isEscaped(pat, i) {
-			continue
-		}
-		end := regexGroupEnd(pat, i)
-		if end <= i {
-			continue
-		}
-		body, _ := jsRegexGroupBody(pat[i+1 : end])
-		out = append(out, body)
-		i = end
-	}
-	return out
-}
-
 // jsRegexGroupBody strips a group's leading construct marker, reporting whether the
 // group is a lookaround — one that matches without consuming input.
 func jsRegexGroupBody(inner string) (string, bool) {
