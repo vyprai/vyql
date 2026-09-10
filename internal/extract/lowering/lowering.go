@@ -57,6 +57,12 @@ type lowerer struct {
 	curStatic      bool
 	resolveImports bool
 	ctorTypes      map[string]string // constructor callee-path -> returned type name
+	// fieldCtorWrites holds the class-field writes collectFieldCtorTypes walked past, and
+	// fieldCtorTypes the one constructor type each field's writes agree on
+	// ("modkey::Class\x1ffield" -> type, or fieldCtorConflict when they do not agree).
+	// See receiver_field_type.go.
+	fieldCtorWrites []fieldCtorWrite
+	fieldCtorTypes  map[string]string
 	// phiOperands holds, per control-flow merge node, the values that merge joins.
 	// A merge's FLOWS in-edges are not the same set: a later mutator call or an
 	// alias can add an edge into the same node, so the operands are captured where
@@ -3013,6 +3019,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		selfName:         prog.Self(),
 		resolveImports:   resolveImports,
 		ctorTypes:        ctorTypes,
+		fieldCtorTypes:   map[string]string{},
 		phiOperands:      map[string][]string{},
 		g:                newGraphStore(estimateGraphNodeHint(prog)),
 		modCtr:           map[string]int{},
@@ -3389,6 +3396,7 @@ func (l *lowerer) run() error {
 		l.registerGlobals(m.Key, body.Body)
 	}
 	l.collectAddressTaken()
+	l.collectFieldCtorTypes()
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS, l.curFile = m.Key, "", ModuleNS(m), m.File
 		body := l.bodyOf(m)
@@ -5637,6 +5645,12 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		}
 		recvNode = l.eval(attr.Base, sc)
 		recvType = l.recvType(recvNode)
+		if recvType == "" {
+			// a receiver read off a class field is typed by what every write of that field
+			// built it from, not by anything the read's own node carries (see
+			// receiver_field_type.go).
+			recvType = l.receiverFieldCtorType(attr.Base, sc)
+		}
 		if recvType == "" {
 			recvMayType = l.recvMergeCtorType(recvNode)
 		}
