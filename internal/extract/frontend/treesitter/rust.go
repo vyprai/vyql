@@ -1651,6 +1651,27 @@ func (c *rsConv) block(block *tree_sitter.Node) []nir.Stmt {
 	return out
 }
 
+// closureParams lists the names a closure_parameters node binds. A typed parameter is a
+// `parameter` node, an untyped one a bare identifier (`|x: i32, y|`); the function form
+// handled by params only ever sees the first.
+func (c *rsConv) closureParams(params *tree_sitter.Node) []string {
+	if params == nil {
+		return nil
+	}
+	var out []string
+	for _, ch := range c.namedChildren(params) {
+		switch c.kind(ch) {
+		case "parameter":
+			if nm := c.patName(c.field(ch, "pattern")); nm != "" {
+				out = append(out, nm)
+			}
+		case "identifier":
+			out = append(out, c.text(ch))
+		}
+	}
+	return out
+}
+
 func (c *rsConv) params(params *tree_sitter.Node) []string {
 	if params == nil {
 		return nil
@@ -1800,6 +1821,24 @@ func (c *rsConv) expr(n *tree_sitter.Node) nir.Expr {
 			return nir.Ternary{Cond: c.expr(c.field(n, "condition")), Then: then, Else: els, Loc: L}
 		}
 		return nir.Seq{Parts: c.blockValues(n), Loc: L}
+	case "closure_expression":
+		// `|evt| { let payload = decode(evt); run(payload); }` — a closure passed as an argument
+		// is lowered as the value of that argument, but it is still a body. As a Lambda its
+		// statements are lowered as statements, so a local bound inside the callback carries an
+		// edge to its uses; the Seq fallback below expr'd them instead, which lost the binding
+		// and with it every source-to-sink path inside the callback. Captured variables are free
+		// names resolved from the enclosing scope by the lambda closure-capture in lowering, so
+		// they need not be params.
+		body := c.field(n, "body")
+		if c.kind(body) == "block" {
+			return nir.Lambda{Params: c.closureParams(c.field(n, "parameters")),
+				ParamTypes: c.paramTypes(c.field(n, "parameters")),
+				Body:       c.block(body), Loc: L}
+		}
+		// `|| decode(x)` — single-expression closure; model the body as a return.
+		return nir.Lambda{Params: c.closureParams(c.field(n, "parameters")),
+			ParamTypes: c.paramTypes(c.field(n, "parameters")),
+			Body:       []nir.Stmt{nir.Return{Value: c.expr(body)}}, Loc: L}
 	case "match_expression", "block":
 		return nir.Seq{Parts: c.blockValues(n), Loc: L}
 	}
