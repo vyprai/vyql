@@ -1,6 +1,7 @@
 package treesitter_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -1261,5 +1262,127 @@ func TestPythonFunctionLocalEndDoesNotTreatLambdaCaptureAsSameScopeUse(t *testin
 `, "guarded_document")
 	if tokenWithPrefix(tokens, "terminal_guard_blocks_call:operation=register;") != "" {
 		t.Fatalf("lambda capture was classified as a same-scope later use: %q", strings.Join(tokens, " | "))
+	}
+}
+
+// Both revisions of the handler are the shape the desktop-windows authorization gate
+// turns on: the only guard consulting is_admin sits over the whole handler, and the fix
+// adds a second one inside the branch that builds the credential. The facts have to say
+// which of the two dominates the credential construction, or the gate on one branch
+// reads exactly like the one over it.
+func TestPythonFunctionLocalEndTruthinessGateIsStatedForTheBranchItDominates(t *testing.T) {
+	shared := `    user_id = request.args.get("user")
+    password = request.args.get("password")
+    service = request.args.get("service")
+
+    if user_id and not password and not is_admin():
+        abort(403)
+
+    if service == "desktop":
+        service_param = "~".join(("desktop", str(user.id), container_password(container, "desktop")))
+        iframe_src = url_for("pwncollege_workspace.forward_workspace", service=service_param)
+    elif service == "desktop-windows":
+%s
+        service_param = "~".join(("desktop-windows", str(user.id), container_password(container, "desktop-windows")))
+        iframe_src = url_for("pwncollege_workspace.forward_workspace", service=service_param)
+    else:
+        iframe_src = f"/workspace/{service}/"
+
+    return {"success": True, "iframe_src": iframe_src}
+`
+	vulnerable := pythonFunctionLocalEndTokens(t, "def get(self):\n"+fmt.Sprintf(shared, ""), "get")
+	fixed := pythonFunctionLocalEndTokens(t, "def get(self):\n"+fmt.Sprintf(shared, "        if user_id and not is_admin():\n            abort(403)\n"), "get")
+
+	gateBlocksCredential := "terminal_guard_blocks_call:operation=container_password;args=container,\"desktop-windows\";guard_kind=falsy;guard_target=is_admin();terminal=abort;callee=container_password;guard_scope=block"
+	if tokenWithPrefix(fixed, gateBlocksCredential) == "" {
+		t.Fatalf("branch gate was not stated as dominating the credential construction: %q", strings.Join(fixed, " | "))
+	}
+	if tokenWithPrefix(vulnerable, gateBlocksCredential) != "" {
+		t.Fatalf("ungated credential construction was stated as gated: %q", strings.Join(vulnerable, " | "))
+	}
+	// The handler-level gate still speaks for the same call, but only as an ancestor of
+	// the branch it lives on. Losing that fact would mean the scope field says nothing.
+	ancestor := "terminal_guard_blocks_call:operation=container_password;args=container,\"desktop-windows\";guard_kind=falsy;guard_target=is_admin();terminal=abort;callee=container_password;guard_scope=branch"
+	if tokenWithPrefix(vulnerable, ancestor) == "" {
+		t.Fatalf("handler-level gate lost its correlation to the branch it precedes: %q", strings.Join(vulnerable, " | "))
+	}
+	// A truthiness gate carries the operand it requires, with the polarity the `not`
+	// gives it, and no counterpart, because it is compared against nothing.
+	identity := "terminal_guard_blocks_call:operation=container_password;args=container,\"desktop-windows\";guard_kind=truthy;guard_target=user_id;terminal=abort;callee=container_password;guard_scope=block"
+	if tokenWithPrefix(fixed, identity) == "" {
+		t.Fatalf("truthiness operand of the branch gate was not recorded: %q", strings.Join(fixed, " | "))
+	}
+	if tokenWithPrefix(fixed, "guard_kind=truthy;guard_target=user_id;counterpart_source=") != "" {
+		t.Fatalf("truthiness test invented a counterpart: %q", strings.Join(fixed, " | "))
+	}
+}
+
+func TestPythonFunctionLocalEndTruthinessGuardsCoverTheShapesGatesAreWrittenIn(t *testing.T) {
+	src := `def negated_call(user_id):
+    if not is_admin():
+        abort(403)
+    return build(user_id)
+
+def negated_attribute(user):
+    if not user.is_admin:
+        abort(403)
+    return build(user)
+
+def plain_value(user_id):
+    if user_id:
+        return ""
+    return build(user_id)
+
+def either_way(user_id, forced):
+    if forced or not is_admin():
+        abort(403)
+    return build(user_id)
+`
+	for name, want := range map[string]string{
+		"negated_call":      "terminal_guard_blocks_return:use=user_id;guard_kind=falsy;guard_target=is_admin();terminal=abort;guard_scope=block",
+		"negated_attribute": "terminal_guard_blocks_return:use=user;guard_kind=falsy;guard_target=user.is_admin;terminal=abort;guard_scope=block",
+		"plain_value":       "terminal_guard_blocks_return:use=user_id;guard_kind=truthy;guard_target=user_id;terminal=return;guard_scope=block",
+		"either_way":        "terminal_guard_blocks_return:use=user_id;guard_kind=falsy;guard_target=is_admin();terminal=abort;guard_scope=block",
+	} {
+		tokens := pythonFunctionLocalEndTokens(t, src, name)
+		if tokenWithPrefix(tokens, want) == "" {
+			t.Fatalf("%s did not record its truthiness guard: %q", name, strings.Join(tokens, " | "))
+		}
+	}
+}
+
+func TestPythonFunctionLocalEndGuardScopeSeparatesDominatingGuardFromBranchGuard(t *testing.T) {
+	src := `def handler(document_id):
+    if not is_admin():
+        abort(403)
+    document = Document.query.get(document_id)
+    if document.shared:
+        if not document.owner:
+            abort(403)
+        publish(document)
+    return document
+`
+	tokens := pythonFunctionLocalEndTokens(t, src, "handler")
+	if tokenWithPrefix(tokens, "terminal_guard_blocks_call:operation=query.get;args=document_id;guard_kind=falsy;guard_target=is_admin();terminal=abort;callee=Document.query.get;guard_scope=block") == "" {
+		t.Fatalf("handler-level gate was not stated as dominating the operation that follows it: %q", strings.Join(tokens, " | "))
+	}
+	if tokenWithPrefix(tokens, "terminal_guard_blocks_call:operation=publish;guard_kind=falsy;guard_target=is_admin();terminal=abort;callee=publish;guard_scope=block") != "" {
+		t.Fatalf("handler-level gate was stated as the last check on a branch it does not cover: %q", strings.Join(tokens, " | "))
+	}
+	if tokenWithPrefix(tokens, "terminal_guard_blocks_call:operation=publish;args=document;guard_kind=falsy;guard_target=document.owner;terminal=abort;callee=publish;guard_scope=block") == "" {
+		t.Fatalf("branch gate was not stated as dominating its own branch: %q", strings.Join(tokens, " | "))
+	}
+}
+
+func TestPythonFunctionLocalEndComparisonGuardCarriesScopeWithItsCounterpart(t *testing.T) {
+	tokens := pythonFunctionLocalEndTokens(t, `def guarded_document(document_id):
+    principal_id = session.get("user_id")
+    document = Document.query.get(document_id)
+    if document.owner_id != principal_id:
+        abort(403)
+    return document
+`, "guarded_document")
+	if tokenWithPrefix(tokens, "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner_id;counterpart_source=session;guard_counterpart=principal_id;terminal=abort;guard_scope=block") == "" {
+		t.Fatalf("comparison guard lost its correlation when the scope was added: %q", strings.Join(tokens, " | "))
 	}
 }
