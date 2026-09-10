@@ -49,6 +49,10 @@ type pyProtectedOperation struct {
 	callee    string
 	args      string
 	uses      []string
+	// branched records that the operation sits inside a conditional branch further
+	// down the statement list, so the guard is only an ancestor of it and not the
+	// last check on the path that reaches it.
+	branched bool
 }
 
 type pyControlContextAnalyzer struct {
@@ -481,7 +485,15 @@ func pyIsStableContextLiteral(expression *tree_sitter.Node) bool {
 
 func (a *pyControlContextAnalyzer) recordGuardCorrelations(condition *tree_sitter.Node, terminalKind string, laterStatements []*tree_sitter.Node, provenance map[string]pyContextProvenance) {
 	comparisons := a.c.pyGuardComparisons(condition, pyContextComparisonsPerGuardLimit)
-	if len(comparisons) == 0 {
+	tests := comparisons
+	if len(tests) == 0 {
+		// A guard whose condition is a pure truthiness test holds no comparison
+		// operator, and it still ends every path past it. Its operands are recorded
+		// the way a comparison's are: `if user_id and not is_admin(): abort(403)`
+		// names the truthiness of `user_id` and the falsiness of `is_admin()`.
+		tests = a.c.pyGuardTruthinessTests(condition, pyContextComparisonsPerGuardLimit)
+	}
+	if len(tests) == 0 {
 		return
 	}
 	operations := a.c.pyBoundedLaterOperations(laterStatements, pyContextOperationsPerGuardLimit)
@@ -489,20 +501,28 @@ func (a *pyControlContextAnalyzer) recordGuardCorrelations(condition *tree_sitte
 		if len(a.terminalFacts) >= pyContextTerminalFactLimit {
 			return
 		}
-		for _, comparison := range comparisons {
-			for _, relation := range pyGuardRelations(comparison, provenance) {
+		for _, test := range tests {
+			for _, relation := range pyGuardRelations(test, provenance) {
+				// A truthiness test compares against nothing, so pyGuardRelations
+				// names no counterpart and the fact carries no counterpart fields.
+				counterpart := ""
+				if relation.counterpartSource != "" {
+					counterpart = ";counterpart_source=" + relation.counterpartSource +
+						";guard_counterpart=" + relation.counterpart
+				}
+				scope := ";guard_scope=" + pyGuardScope(operation.branched)
 				if operation.kind == "call" {
 					if len(operation.uses) == 0 {
 						continue
 					}
 					fact := "terminal_guard_blocks_call:operation=" + operation.operation +
 						";args=" + operation.args +
-						";guard_kind=" + comparison.kind +
+						";guard_kind=" + test.kind +
 						";guard_target=" + relation.target +
-						";counterpart_source=" + relation.counterpartSource +
-						";guard_counterpart=" + relation.counterpart +
+						counterpart +
 						";terminal=" + terminalKind +
-						";callee=" + operation.callee
+						";callee=" + operation.callee +
+						scope
 					if !a.addTerminalFact(fact) {
 						return
 					}
@@ -510,11 +530,11 @@ func (a *pyControlContextAnalyzer) recordGuardCorrelations(condition *tree_sitte
 				}
 				for _, use := range operation.uses {
 					fact := "terminal_guard_blocks_return:use=" + use +
-						";guard_kind=" + comparison.kind +
+						";guard_kind=" + test.kind +
 						";guard_target=" + relation.target +
-						";counterpart_source=" + relation.counterpartSource +
-						";guard_counterpart=" + relation.counterpart +
-						";terminal=" + terminalKind
+						counterpart +
+						";terminal=" + terminalKind +
+						scope
 					if !a.addTerminalFact(fact) {
 						return
 					}
@@ -525,8 +545,11 @@ func (a *pyControlContextAnalyzer) recordGuardCorrelations(condition *tree_sitte
 }
 
 func pyGuardRelations(comparison pyGuardComparison, provenance map[string]pyContextProvenance) []pyGuardRelation {
-	if comparison.kind == "non_null" {
+	switch comparison.kind {
+	case "non_null":
 		return []pyGuardRelation{{target: comparison.left, counterpart: "None", counterpartSource: "literal"}}
+	case "truthy", "falsy":
+		return []pyGuardRelation{{target: comparison.left}}
 	}
 	return []pyGuardRelation{
 		{target: comparison.left, counterpart: comparison.right, counterpartSource: pyCounterpartSource(provenance, comparison.right)},
@@ -596,6 +619,71 @@ func (c *pyConv) pyGuardComparisons(condition *tree_sitter.Node, limit int) []py
 	return out
 }
 
+// pyGuardTruthinessTests names the operands a guard condition requires to hold when it
+// holds no comparison operator: an operand read for truth (`user_id`) or, under a `not`,
+// for falsity (`not is_admin()`). Both `and` and `or` links descend — a conjunct is
+// required on every path past the guard and a disjunct on the path it selects — so
+// `if user_id and not is_admin(): abort(403)` names both. A condition mixing a
+// comparison with a truthiness operand names nothing here: the comparison collector
+// already spoke for it, and neither half stands for the condition.
+func (c *pyConv) pyGuardTruthinessTests(condition *tree_sitter.Node, limit int) []pyGuardComparison {
+	var out []pyGuardComparison
+	var collect func(*tree_sitter.Node)
+	collect = func(node *tree_sitter.Node) {
+		if node == nil || len(out) >= limit {
+			return
+		}
+		switch node.Kind() {
+		case "parenthesized_expression":
+			children := namedChildren(node)
+			if len(children) == 1 {
+				collect(children[0])
+			}
+		case "boolean_operator":
+			collect(field(node, "left"))
+			collect(field(node, "right"))
+		case "not_operator":
+			if operand := pyGuardTruthinessOperand(field(node, "argument"), pyContextCompactUnbounded(c.text(field(node, "argument")))); operand != "" {
+				out = append(out, pyGuardComparison{kind: "falsy", left: operand})
+			}
+		default:
+			if operand := pyGuardTruthinessOperand(node, pyContextCompactUnbounded(c.text(node))); operand != "" {
+				out = append(out, pyGuardComparison{kind: "truthy", left: operand})
+			}
+		}
+	}
+	collect(condition)
+	return out
+}
+
+// pyGuardTruthinessOperand renders the value a truthiness test reads: a name, an
+// attribute or subscript chain, or a call, which is the shape an authorization gate
+// consults. A literal or an operator reads as a constant rather than as a value the
+// path had to carry, so it names nothing.
+func pyGuardTruthinessOperand(node *tree_sitter.Node, compact string) string {
+	if node == nil || compact == "" {
+		return ""
+	}
+	switch node.Kind() {
+	case "identifier", "attribute", "subscript", "call":
+		return pyContextEvidenceCompact(compact)
+	default:
+		return ""
+	}
+}
+
+// pyGuardScope states where an operation sits relative to the guard that blocks it:
+// `block` when it follows the guard in the same statement list, so the guard's terminal
+// branch is the last check on the path that reaches it, and `branch` when it sits inside
+// a conditional further down, so the operation is reached only on a branch of its own
+// and a guard written there is not interchangeable with this one.
+func pyGuardScope(branched bool) string {
+	if branched {
+		return "branch"
+	}
+	return "block"
+}
+
 func (c *pyConv) pyBoundedLaterOperations(statements []*tree_sitter.Node, limit int) []pyProtectedOperation {
 	seen := map[string]bool{}
 	var out []pyProtectedOperation
@@ -623,26 +711,26 @@ func (c *pyConv) pyBoundedLaterOperations(statements []*tree_sitter.Node, limit 
 
 func (c *pyConv) pyBoundedOperations(node *tree_sitter.Node, limit int) []pyProtectedOperation {
 	var out []pyProtectedOperation
-	var walk func(*tree_sitter.Node)
-	walk = func(current *tree_sitter.Node) {
+	var walk func(*tree_sitter.Node, bool)
+	walk = func(current *tree_sitter.Node, branched bool) {
 		if current == nil || len(out) >= limit || pyIsNestedContextScope(current) {
 			return
 		}
 		if current.Kind() == "if_statement" && c.pyConditionAlwaysTrue(field(current, "condition")) {
 			for _, child := range namedChildren(current) {
 				if child.Kind() == "block" {
-					walk(child)
+					walk(child, branched)
 					break
 				}
 				if child != field(current, "alternative") {
-					walk(child)
+					walk(child, branched)
 				}
 			}
 			return
 		}
 		switch current.Kind() {
 		case "return_statement":
-			out = append(out, pyProtectedOperation{kind: "return", uses: c.pyBoundedContextIdentifiers(current, pyContextUsesPerOperationLimit)})
+			out = append(out, pyProtectedOperation{kind: "return", uses: c.pyBoundedContextIdentifiers(current, pyContextUsesPerOperationLimit), branched: branched})
 		case "call":
 			path := pyContextEvidenceCompact(c.dotted(field(current, "function")))
 			arguments := pyCallArgumentsText(c, current)
@@ -652,14 +740,30 @@ func (c *pyConv) pyBoundedOperations(node *tree_sitter.Node, limit int) []pyProt
 				callee:    path,
 				args:      arguments,
 				uses:      c.pyBoundedContextIdentifiers(field(current, "arguments"), pyContextUsesPerOperationLimit),
+				branched:  branched,
 			})
 		}
 		for _, child := range namedChildren(current) {
-			walk(child)
+			walk(child, branched || pyConditionalBlock(current, child))
 		}
 	}
-	walk(node)
+	walk(node, false)
 	return out
+}
+
+// pyConditionalBlock reports whether a child is the body of a conditional branch, so
+// everything below it is reached only on the path that branch selects. The body of a
+// `for`, `while`, `with` or `try` is left out: it runs without a further condition, and
+// the guard still stands between it and every path that reaches it.
+func pyConditionalBlock(parent, child *tree_sitter.Node) bool {
+	if child == nil || child.Kind() != "block" {
+		return false
+	}
+	switch parent.Kind() {
+	case "if_statement", "elif_clause", "else_clause", "except_clause", "case_clause":
+		return true
+	}
+	return false
 }
 
 func (c *pyConv) pyBoundedContextIdentifiers(node *tree_sitter.Node, limit int) []string {
