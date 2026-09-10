@@ -56,7 +56,8 @@ func TestAmbiguous(t *testing.T) {
 		// one grouping beside an optional dot run that starts the next.
 		{true, "whitespace run beside a dot run", `^\s*form-data\s*(?:;\s*(.+))?$`},
 		{true, "class run ending a grouping beside an optional dot run", `^([^\/\s]+\/[^\s;]+)(.*)?$`},
-		{true, "digit run divided around an optional decimal point", `(?:[0-9]*\.?[0-9]*)`},
+		{true, "digit run divided around an optional decimal point", `^(?:[0-9]*\.?[0-9]*)$`},
+		{false, "a bare pair the sequence ends on stays linear", `\w+\s*\w+`},
 		{true, "cookie pair regex splits a space run between repeats", `^(([^=;]+))\s*=\s*([^\n\r\0]*)`},
 		{false, "bounding the space run keeps the parse linear", `^(([^=;]+))\s{0,256}=\s{0,256}([^\n\r\0]*)`},
 		{false, "the attribute delimiter idiom stays ordinary", `class\s*=\s*['"]`},

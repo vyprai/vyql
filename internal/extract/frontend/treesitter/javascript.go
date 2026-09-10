@@ -1878,17 +1878,39 @@ type jsRegexAtom struct {
 }
 
 func hasAmbiguousAdjacentRegexQuantifiers(pat string) bool {
+	return hasAmbiguousAdjacentRegexQuantifiersStrand(pat, false)
+}
+
+// hasAmbiguousAdjacentRegexQuantifiersStrand carries whether a division a pair
+// in this sequence divides can be stranded by what follows the sequence: false
+// for a top-level branch that ends on the pair itself, and for a group body
+// whatever the outer sequence puts after the group.
+func hasAmbiguousAdjacentRegexQuantifiersStrand(pat string, strandAfter bool) bool {
 	for _, branch := range splitTopLevelRegexBranches(pat) {
-		if hasAmbiguousAdjacentRegexQuantifiersInSeq(branch) {
+		if hasAmbiguousAdjacentRegexQuantifiersInSeq(branch, strandAfter || jsRegexEndsInDollarAnchor(branch)) {
 			return true
 		}
-	}
-	for _, inner := range regexGroupBodies(pat) {
-		if hasAmbiguousAdjacentRegexQuantifiers(inner) {
-			return true
+		atoms := jsRegexAtoms(branch)
+		for k, a := range atoms {
+			if !a.group {
+				continue
+			}
+			strand := jsRegexSeqHasMandatoryFollower(atoms, k+1) ||
+				k == len(atoms)-1 && jsRegexEndsInDollarAnchor(branch)
+			if hasAmbiguousAdjacentRegexQuantifiersStrand(a.body, strand) {
+				return true
+			}
 		}
 	}
 	return false
+}
+
+// jsRegexEndsInDollarAnchor reports a branch whose last character is an
+// unescaped `$`. The atom parser carries the anchor as a plain mandatory atom,
+// so a pair at the top level already sees it; this covers the body-level call,
+// where the anchor sits outside the body the pair lives in.
+func jsRegexEndsInDollarAnchor(branch string) bool {
+	return strings.HasSuffix(branch, "$") && !isEscaped(branch, len(branch)-1)
 }
 
 // jsRegexRun is the run of input one atom hands its neighbour: the alphabet it
@@ -1911,7 +1933,7 @@ type jsRegexRun struct {
 // run to divide — `X*.*` is every ordinary regex's tail — and the run-split report
 // draws the same line; a ceilinged repeat can only give back so much, so
 // `\d{4}\d{2}` divides its digits one way however the match fails.
-func hasAmbiguousAdjacentRegexQuantifiersInSeq(pat string) bool {
+func hasAmbiguousAdjacentRegexQuantifiersInSeq(pat string, strandAfter bool) bool {
 	atoms := jsRegexAtoms(pat)
 	for i, a := range atoms {
 		run, ok := jsRegexTailRun(a, 0)
@@ -1921,11 +1943,37 @@ func hasAmbiguousAdjacentRegexQuantifiersInSeq(pat string) bool {
 		for j := i + 1; j < len(atoms); j++ {
 			b := atoms[j]
 			if next, ok := jsRegexHeadRun(b, 0); ok && !next.bounded && regexAtomsOverlap(run.key, next.key) {
-				return true
+				// The division is only worth retrying when the match can fail
+				// after it: a mandatory atom after the neighbour strands every
+				// division the engine tries. A pair the sequence ends on always
+				// has a division that completes the match, so `\w+\s*\w+` alone
+				// stays linear and only `\w+\s*\w+;` divides under failure.
+				// The enclosing sequence can strand the division too: a group
+				// body whose group is followed by a mandatory atom divides
+				// under failure even though the body itself ends on the pair.
+				if strandAfter || jsRegexSeqHasMandatoryFollower(atoms, j+1) {
+					return true
+				}
 			}
 			if b.group || b.look || !(b.quant == '*' || b.quant == '?') {
 				break // a group boundary, or mandatory material, pins the division
 			}
+		}
+	}
+	return false
+}
+
+// jsRegexSeqHasMandatoryFollower reports a mandatory atom at or after index i: one
+// the match cannot skip. It is what makes a divided run strand — with nothing
+// mandatory after the second repeat, some division always completes the match
+// and the retry cost stays linear.
+func jsRegexSeqHasMandatoryFollower(atoms []jsRegexAtom, from int) bool {
+	for _, b := range atoms[from:] {
+		if b.look {
+			return true // a lookaround can fail without consuming, stranding the division
+		}
+		if b.quant != '*' && b.quant != '?' {
+			return true
 		}
 	}
 	return false

@@ -27,6 +27,7 @@ func TestHasAmbiguousAdjacentRegexQuantifiers(t *testing.T) {
 		{"whitespace run beside a dot run", `^\s*form-data\s*(?:;\s*(.+))?$`, true},
 		{"class run ending a grouping beside an optional dot run", `^([^\/\s]+\/[^\s;]+)(.*)?$`, true},
 		{"digit run divided around an optional decimal point", `^(?:[0-9]*\.?[0-9]*){1}$`, true},
+		{"a bare pair the sequence ends on stays linear", `\w+\s*\w+`, false},
 		{"a grouping's run beside the whitespace run overlaps", `^(\s+)\s*=`, true},
 		{"bounding the space run keeps the parse linear", `^(([^=;]+))\s{0,256}=\s{0,256}([^\n\r\0]*)`, false},
 		{"the fixed disposition excludes the separator", `^\s*form-data\s*(?:;\s*(\S.*))?$`, false},

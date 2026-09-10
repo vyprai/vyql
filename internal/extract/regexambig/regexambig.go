@@ -323,6 +323,16 @@ func Ambiguous(pat string) bool {
 }
 
 func regexAltHasAmbiguousRepeat(alt string, depth int) bool {
+	return regexAltHasAmbiguousRepeatStrand(alt, depth, false)
+}
+
+// regexAltHasAmbiguousRepeatStrand carries whether a division inside this
+// sequence can be stranded by what follows it: false for a top-level branch
+// that ends on the pair itself, and for a group body whatever the outer
+// sequence puts after the group — a mandatory atom there, or the end anchor
+// the atom parser does not carry, strands every division the body's pairs
+// divide.
+func regexAltHasAmbiguousRepeatStrand(alt string, depth int, strandAfter bool) bool {
 	if depth > regexAnalysisMaxDepth {
 		return false
 	}
@@ -331,10 +341,11 @@ func regexAltHasAmbiguousRepeat(alt string, depth int) bool {
 		if regexSplitsOneCharRun(atoms) {
 			return true
 		}
-		if regexAdjacentOverlap(atoms, depth) {
+		endsAnchored := regexEndsInDollarAnchor(branch)
+		if regexAdjacentOverlap(atoms, depth, strandAfter || endsAnchored) {
 			return true
 		}
-		for _, a := range atoms {
+		for k, a := range atoms {
 			if !a.group {
 				continue
 			}
@@ -342,12 +353,22 @@ func regexAltHasAmbiguousRepeat(alt string, depth int) bool {
 				!regexLoopBodyDisambiguated(a.body, depth+1) {
 				return true
 			}
-			if regexAltHasAmbiguousRepeat(a.body, depth+1) {
+			strand := regexSeqHasMandatoryFollower(atoms, k+1) ||
+				(k == len(atoms)-1 && endsAnchored)
+			if regexAltHasAmbiguousRepeatStrand(a.body, depth+1, strand) {
 				return true
 			}
 		}
 	}
 	return false
+}
+
+// regexEndsInDollarAnchor reports a branch whose last character is an unescaped
+// `$`. The atom parser drops the anchor — it consumes no input — but it is what
+// strands a division the sequence's own pairs divide: a match that reaches the
+// anchor past the end fails, and the engine retries every division.
+func regexEndsInDollarAnchor(branch string) bool {
+	return strings.HasSuffix(branch, "$") && !isEscaped(branch, len(branch)-1)
 }
 
 // regexBodyHasRepeat is the original trigger: a `*` or `+` anywhere inside the
@@ -731,7 +752,7 @@ func isUniversalCharSet(s regexCharSet) bool {
 // to itself, because which branch runs is the run-split report's business and it
 // already declines to read one out of a group head (`\s*(?:\s+|x\d+)` stays
 // ordinary). A lookaround consumes nothing, so it is neither a run nor a separator.
-func regexAdjacentOverlap(atoms []regexAtom, depth int) bool {
+func regexAdjacentOverlap(atoms []regexAtom, depth int, strandAfter bool) bool {
 	for i, a := range atoms {
 		if a.look != 0 {
 			continue
@@ -746,11 +767,37 @@ func regexAdjacentOverlap(atoms []regexAtom, depth int) bool {
 				continue
 			}
 			if next, ok := regexHeadRepeatSet(b, depth); ok && !next.bounded && next.set.intersects(run.set) {
-				return true
+				// The division is only worth retrying when the match can fail
+				// after it: a mandatory atom after the neighbour strands every
+				// division the engine tries. A pair the sequence ends on always
+				// has a division that completes the match, so `\w+\s*\w+` alone
+				// stays linear and only `\w+\s*\w+;` divides under failure.
+				// The enclosing sequence can strand the division too: a group
+				// body whose group is followed by a mandatory atom divides
+				// under failure even though the body itself ends on the pair.
+				if strandAfter || regexSeqHasMandatoryFollower(atoms, j+1) {
+					return true
+				}
 			}
 			if b.group || !b.nullable {
 				break // a group boundary, or mandatory material, pins the division
 			}
+		}
+	}
+	return false
+}
+
+// regexSeqMandatoryFollower reports a mandatory atom at or after index i: one the
+// match cannot skip. It is what makes a divided run strand — with nothing
+// mandatory after the second repeat, some division always completes the match
+// and the retry cost stays linear.
+func regexSeqHasMandatoryFollower(atoms []regexAtom, from int) bool {
+	for _, b := range atoms[from:] {
+		if b.look != 0 {
+			return true // a lookaround can fail without consuming, stranding the division
+		}
+		if !b.nullable {
+			return true
 		}
 	}
 	return false
