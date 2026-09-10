@@ -283,16 +283,47 @@ func (c *rbConv) body(n *tree_sitter.Node) []nir.Stmt {
 }
 
 func (c *rbConv) rbMethodBody(n *tree_sitter.Node) []nir.Stmt {
-	stmts := c.body(n)
+	// Ruby returns the last expression evaluated, so a body's trailing value is what the
+	// caller receives whether it is a bare expression, an assignment, or an `if`/`case`/
+	// `begin` whose arms each produce one.
+	return rbBranchReturn(c.body(n))
+}
+
+// rbBranchReturn rewrites a statement list so the value it produces leaves the enclosing
+// method. Only the LAST statement counts: an `if` followed by more statements is a plain
+// conditional, and its value is discarded. An arm ending in its own `if`/`case`/`begin`
+// carries its value out through the same rule, recursively. An arm that produces no value
+// — the `if` with no `else` — returns nothing, which is Ruby's nil.
+func rbBranchReturn(stmts []nir.Stmt) []nir.Stmt {
 	if len(stmts) == 0 {
 		return stmts
 	}
-	if last, ok := stmts[len(stmts)-1].(nir.ExprStmt); ok {
+	switch last := stmts[len(stmts)-1].(type) {
+	case nir.ExprStmt:
 		// Named field rather than a nir.Return(last) conversion: the two structs
 		// happen to share a layout today, and a conversion would silently follow
 		// them apart if either gains a field.
 		//nolint:staticcheck // S1016
 		stmts[len(stmts)-1] = nir.Return{Value: last.Value}
+	case nir.If:
+		last.Then = rbBranchReturn(last.Then)
+		last.Else = rbBranchReturn(last.Else)
+		stmts[len(stmts)-1] = last
+	case nir.Switch:
+		for i := range last.Cases {
+			last.Cases[i] = rbBranchReturn(last.Cases[i])
+		}
+		last.Default = rbBranchReturn(last.Default)
+		stmts[len(stmts)-1] = last
+	case nir.Try:
+		last.Body = rbBranchReturn(last.Body)
+		stmts[len(stmts)-1] = last
+	case nir.Assign:
+		// `x = expr` returns x, so the assignment stays and the name it bound is what
+		// leaves the method.
+		if len(last.Targets) == 1 {
+			stmts = append(stmts, nir.Return{Value: nir.Name{ID: last.Targets[0], Loc: last.Loc}})
+		}
 	}
 	return stmts
 }
@@ -440,6 +471,15 @@ func (c *rbConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		name := c.text(n)
 		return []nir.Stmt{nir.ExprStmt{Value: nir.Call{Callee: nir.Name{ID: name, Loc: L}, Path: name, Method: name, Loc: L}}}
 	case "call", "method_call", "command", "command_call":
+		// A reflective dispatch (`obj.send(:m, a)`) both performs the reflection — which a
+		// binding may judge in its own right, the method name arriving from outside — and
+		// calls `obj.m(a)`, which is what sources, sinks and resolution match. Emit the
+		// dispatch as written, then let expr() carry the call it names (see call).
+		if d := c.rbReflectiveDispatchStmt(n); d != nil {
+			out := []nir.Stmt{d}
+			out = append(out, nir.ExprStmt{Value: c.expr(n)})
+			return append(out, c.callBlockStmts(n)...)
+		}
 		// A call may carry a trailing block (`coll.each { |x| sink(x) }`, `lambda { |v| … }`).
 		// The block body was previously dropped, hiding sources/sinks inside it. Emit the call,
 		// then the block body inline (see callBlockStmts).
@@ -1336,6 +1376,19 @@ func (c *rbConv) string(n *tree_sitter.Node, L string) nir.Expr {
 }
 
 func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
+	// `obj.send(:m, a)` runs `obj.m(a)`, and that is the call everything downstream
+	// keys on: resolution looks the method up by name, and a source or sink binding
+	// matches the API the code reaches, which is `m` and not `send`. The dispatch as
+	// written is still lowered — as a statement beside this one, see
+	// rbReflectiveDispatchStmt — so the reflection stays judgeable too.
+	if d, ok := c.rbDirectDispatch(n, L); ok {
+		return d
+	}
+	return c.callAsWritten(n, L)
+}
+
+// callAsWritten lowers the call exactly as the source spells it.
+func (c *rbConv) callAsWritten(n *tree_sitter.Node, L string) nir.Expr {
 	recv := c.field(n, "receiver")
 	method := c.text(c.field(n, "method"))
 	path := c.dotted(n)
@@ -1360,6 +1413,89 @@ func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
 		}
 	}
 	return nir.Call{Callee: callee, Args: args, Path: path, Method: m, Loc: L}
+}
+
+// rbDispatchNames are the spellings of Object#send: the method every Ruby object
+// answers to, its original name `__send__`, and the public-only `public_send`.
+var rbDispatchNames = map[string]bool{"send": true, "__send__": true, "public_send": true}
+
+// rbDispatchMethod returns the method a reflective dispatch runs, or "" when the call is
+// not a dispatch whose first argument is a literal naming one. A name read out of a
+// variable or interpolated at run time is left alone: nothing in the file says which
+// method that is.
+func (c *rbConv) rbDispatchMethod(n *tree_sitter.Node) string {
+	if !c.isRbCallNode(n) || !rbDispatchNames[c.text(c.field(n, "method"))] {
+		return ""
+	}
+	al := c.field(n, "arguments")
+	if al == nil {
+		return ""
+	}
+	kids := c.namedChildren(al)
+	if len(kids) == 0 {
+		return ""
+	}
+	switch first := kids[0]; c.kind(first) {
+	case "simple_symbol", "hash_key_symbol":
+		return strings.TrimSuffix(strings.TrimPrefix(c.text(first), ":"), ":")
+	case "string":
+		return c.rbStringLiteral(first)
+	}
+	return ""
+}
+
+// rbStringLiteral returns the text of a string literal with its quotes stripped, or ""
+// when the node interpolates — an interpolated string is not a fixed value.
+func (c *rbConv) rbStringLiteral(n *tree_sitter.Node) string {
+	t := c.text(n)
+	if strings.Contains(t, "#{") || len(t) < 2 {
+		return ""
+	}
+	if q := t[0]; (q == '"' || q == '\'') && t[len(t)-1] == q {
+		return t[1 : len(t)-1]
+	}
+	return ""
+}
+
+// rbDirectDispatch builds the call a reflective dispatch performs — `obj.send(:m, a)` as
+// `obj.m(a)`. The name the dispatch carries is not an argument of the call it names, so
+// the remaining arguments shift up one place. Ok is false when the call is not a dispatch
+// with a name.
+func (c *rbConv) rbDirectDispatch(n *tree_sitter.Node, L string) (nir.Call, bool) {
+	name := c.rbDispatchMethod(n)
+	if name == "" {
+		return nir.Call{}, false
+	}
+	var callee nir.Expr
+	path := name
+	if recv := c.field(n, "receiver"); recv != nil {
+		path = c.dotted(recv) + "." + name
+		callee = nir.Attr{Base: c.expr(recv), Attr: name, Path: path, Loc: L}
+	} else {
+		callee = nir.Name{ID: name, Loc: L}
+	}
+	var args []nir.Expr
+	if al := c.field(n, "arguments"); al != nil {
+		for i, a := range c.namedChildren(al) {
+			if i == 0 {
+				continue
+			}
+			args = append(args, c.expr(a))
+		}
+	}
+	return nir.Call{Callee: callee, Args: args, Path: path, Method: name, Loc: L}, true
+}
+
+// rbReflectiveDispatchStmt lowers a reflective dispatch as the `send` it is written as,
+// so a binding can label the reflection itself: this node's method is still `send` and
+// its first argument is still the name the dispatch carries. The call it performs is
+// lowered beside it, so this costs one node and takes nothing away. Nil when the call is
+// not a dispatch.
+func (c *rbConv) rbReflectiveDispatchStmt(n *tree_sitter.Node) nir.Stmt {
+	if c.rbDispatchMethod(n) == "" {
+		return nil
+	}
+	return nir.ExprStmt{Value: c.callAsWritten(n, c.loc(n))}
 }
 
 func (c *rbConv) callStmtWithExtraArg(n *tree_sitter.Node, extra nir.Expr) []nir.Stmt {
