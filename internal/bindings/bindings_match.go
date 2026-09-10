@@ -1600,13 +1600,26 @@ func nodeLexicalScope(n usg.Node) string {
 	return n.Prop("region")
 }
 
-func sameOrNestedNormalizedScope(candidate, anchor string) bool {
+// scopeCovers reports whether a candidate node's lexical scope sits inside an anchor's:
+// the anchor's own scope, a region nested under it with '/', or a callback region hung
+// off it with '#'. The '#' form is what the lowering gives a function written inside
+// another one (see lowering.functionRegion), and such a body is still written inside the
+// anchor's: a Rust closure handed to and_then/use_effect/map is an expression of the fn
+// item that contains it, so the context tokens that fn emits cover the calls in its body
+// and a scope predicate over those tokens has to read them as inside the function too.
+// A sibling function's scope is not covered -- only what descends from the anchor.
+func scopeCovers(candidate, anchor string) bool {
 	if candidate == anchor {
 		return true
 	}
-	return len(candidate) > len(anchor) &&
-		strings.HasPrefix(candidate, anchor) &&
-		candidate[len(anchor)] == '/'
+	if len(candidate) <= len(anchor) || !strings.HasPrefix(candidate, anchor) {
+		return false
+	}
+	return candidate[len(anchor)] == '/' || candidate[len(anchor)] == '#'
+}
+
+func sameOrNestedNormalizedScope(candidate, anchor string) bool {
+	return scopeCovers(candidate, anchor)
 }
 
 func scopeWithoutOrder(scope string) string {
