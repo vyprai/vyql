@@ -102,13 +102,13 @@ func TestReachesFallsBackToSameFileSourceOrderWithoutRegions(t *testing.T) {
 	s.AddNode(usg.Node{ID: "second", Type: "code.Call", Loc: "app.swift:20", Order: 20, HasOrder: true})
 	s.AddNode(usg.Node{ID: "other", Type: "code.Call", Loc: "other.swift:30", Order: 30, HasOrder: true})
 
-	if !Reaches(s, "first", "second") {
+	if !Reaches(s, nil, "first", "second") {
 		t.Fatalf("same-file source-order fallback should reach later node")
 	}
-	if Reaches(s, "second", "first") {
+	if Reaches(s, nil, "second", "first") {
 		t.Fatalf("same-file source-order fallback must preserve ordering")
 	}
-	if Reaches(s, "first", "other") {
+	if Reaches(s, nil, "first", "other") {
 		t.Fatalf("source-order fallback must not cross files without structured regions")
 	}
 }
@@ -356,5 +356,82 @@ func TestReachesSequencesSeparateSiblingConstructs(t *testing.T) {
 			t.Errorf("%s: reachesRegion(%q@%s -> %q@%s) = %v, want %v: %s",
 				c.name, c.rA, c.oA, c.rB, c.oB, got, c.want, c.because)
 		}
+	}
+}
+
+// A release written in a branch whose next statement is `return` cannot reach a release or
+// a use written after that branch: leaving the branch is leaving the function. Region and
+// order say the two are sequenced — the branches are separate constructs, written one after
+// the other — so the exit markers the lowering records are what decide it. This is the shape
+// a `return` added between two releases changes: without it the pair is a double free to
+// report, with it there is no path from the first release to the second.
+func TestReachesStopsWhenTheBranchItRunsInReturns(t *testing.T) {
+	const fn = "ares.c/fn2"
+	// release(); if (c) { release(); return; } if (d) { release(); } else { release(); }
+	build := func(withReturn bool) *usg.InMemStore {
+		s := usg.NewInMemStore()
+		add := func(id, typ, region string, order int32, props map[string]string) {
+			if err := s.AddNode(usg.Node{ID: id, Type: typ, Loc: "ares.c:1", Region: region,
+				Order: order, HasOrder: true, Props: props}); err != nil {
+				t.Fatalf("add %s: %v", id, err)
+			}
+		}
+		add("destroyed", "code.Call", fn+"/if3.e/if4.t", 170, nil)
+		if withReturn {
+			add("exit", usg.ExitNodeType, fn+"/if3.e/if4.t", 171, nil)
+		}
+		add("last", "code.Call", fn+"/if5.t/if6.t", 183, nil)
+		add("success", "code.Call", fn+"/if5.t/if6.e/if7.t", 188, nil)
+		return s
+	}
+
+	returned := build(true)
+	exits := NewExitIndex(returned)
+	for _, b := range []string{"last", "success"} {
+		if Reaches(returned, exits, "destroyed", b) {
+			t.Errorf("a release whose branch returns must not reach the later release %s", b)
+		}
+	}
+
+	// The same function without the `return`: the branch falls through and the pair is a
+	// double free again. An empty index — a graph lowered without exit markers — answers
+	// the same way.
+	for _, fallen := range []*ExitIndex{nil, NewExitIndex(build(false))} {
+		guardless := build(false)
+		if !Reaches(guardless, fallen, "destroyed", "last") {
+			t.Error("the same two releases with the return taken out are a double free again")
+		}
+	}
+
+	// Three shapes the cut must leave alone. A return in a branch NESTED inside the
+	// release's own region is conditional, so the region still falls through to the code
+	// after it: release(); if (c) return; release();
+	conditional := usg.NewInMemStore()
+	direct := func(s *usg.InMemStore, id, typ, region string, order int32, props map[string]string) {
+		if err := s.AddNode(usg.Node{ID: id, Type: typ, Loc: "ares.c:1", Region: region,
+			Order: order, HasOrder: true, Props: props}); err != nil {
+			t.Fatalf("add %s: %v", id, err)
+		}
+	}
+	direct(conditional, "first", "code.Call", fn, 10, nil)
+	direct(conditional, "condExit", usg.ExitNodeType, fn+"/if11.t", 12, nil)
+	direct(conditional, "second", "code.Call", fn, 14, nil)
+	if !Reaches(conditional, NewExitIndex(conditional), "first", "second") {
+		t.Error("a conditional return nested below the release does not stop the region falling through")
+	}
+
+	// A release the language runs on the way out (a `finally`, a flushed `defer`) is
+	// reached by the return itself, and a body written inline in the release's own region
+	// runs however that region is left.
+	more := func(id, typ, region string, order int32, props map[string]string) {
+		direct(returned, id, typ, region, order, props)
+	}
+	more("unwind", "code.Call", fn, 206, map[string]string{usg.UnwindProp: "1"})
+	more("callback", "code.Call", fn+"/if3.e/if4.t#fn11", 207, nil)
+	if !Reaches(returned, exits, "destroyed", "unwind") {
+		t.Error("a release the language runs on the way out of a returning region is reached by the return")
+	}
+	if !Reaches(returned, exits, "destroyed", "callback") {
+		t.Error("a body written inline in the release's own region is reached however that region is left")
 	}
 }

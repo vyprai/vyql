@@ -180,7 +180,7 @@ func (e *Engine) evalOrder(cr *CompiledRule) ([]*findings.Finding, error) {
 	var out []*findings.Finding
 	for _, a := range firsts {
 		for _, b := range seconds {
-			if !solvers.Reaches(e.Store, a, b) && !e.storageJoin().Joins(a, b) {
+			if !solvers.Reaches(e.Store, e.exitIndex(), a, b) && !e.storageJoin().Joins(a, b) {
 				continue
 			}
 			out = append(out, &findings.Finding{
@@ -1795,7 +1795,7 @@ func (e *Engine) preflightLoopGuarded(guardID, sinkID string) bool {
 	if sinkRegion != parent && !strings.HasPrefix(sinkRegion, parent+"/") {
 		return false
 	}
-	return solvers.Reaches(e.Store, guardID, sinkID)
+	return solvers.Reaches(e.Store, e.exitIndex(), guardID, sinkID)
 }
 
 // postDominatesCovered reports whether the concrete checks run on every path from the
