@@ -1869,9 +1869,12 @@ func jsRegexPattern(raw string) string {
 }
 
 type jsRegexAtom struct {
-	key   string
-	quant byte
-	group bool
+	key     string
+	quant   byte
+	bounded bool
+	group   bool
+	body    string
+	look    bool
 }
 
 func hasAmbiguousAdjacentRegexQuantifiers(pat string) bool {
@@ -1888,26 +1891,110 @@ func hasAmbiguousAdjacentRegexQuantifiers(pat string) bool {
 	return false
 }
 
+// jsRegexRun is the run of input one atom hands its neighbour: the alphabet it
+// consumes, named the way regexAtomKey names alphabets, how often it may consume
+// it, and whether that repeat carries a finite ceiling.
+type jsRegexRun struct {
+	key     string
+	quant   byte
+	bounded bool
+}
+
+// hasAmbiguousAdjacentRegexQuantifiersInSeq reports two unbounded repeats over an
+// intersecting alphabet sitting next to each other with nothing mandatory between
+// them. The pair is read off the runs the atoms start and end with, so a repeat
+// one grouping over is still a neighbour: `(.*)?` next to `[^\s;]+` competes with
+// it for the same characters even though the `*` sits inside the group.
+//
+// The left run has to name a bounded alphabet, and neither repeat may carry a
+// finite ceiling. A `.` matches everything, so a repeat that ends in one is not a
+// run to divide — `X*.*` is every ordinary regex's tail — and the run-split report
+// draws the same line; a ceilinged repeat can only give back so much, so
+// `\d{4}\d{2}` divides its digits one way however the match fails.
 func hasAmbiguousAdjacentRegexQuantifiersInSeq(pat string) bool {
 	atoms := jsRegexAtoms(pat)
-	for i := 0; i+1 < len(atoms); i++ {
-		if isBacktrackingRepeat(atoms[i].quant) &&
-			isBacktrackingRepeat(atoms[i+1].quant) &&
-			regexAtomsOverlap(atoms[i].key, atoms[i+1].key) {
-			return true
+	for i, a := range atoms {
+		run, ok := jsRegexTailRun(a, 0)
+		if !ok || run.bounded || run.key == regexAtomKey(".") {
+			continue
 		}
-	}
-	for i := 0; i+2 < len(atoms); i++ {
-		if isBacktrackingRepeat(atoms[i].quant) &&
-			atoms[i+1].quant == '?' &&
-			!atoms[i+1].group &&
-			isBacktrackingRepeat(atoms[i+2].quant) &&
-			regexAtomsOverlap(atoms[i].key, atoms[i+2].key) {
-			return true
+		for j := i + 1; j < len(atoms); j++ {
+			b := atoms[j]
+			if next, ok := jsRegexHeadRun(b, 0); ok && !next.bounded && regexAtomsOverlap(run.key, next.key) {
+				return true
+			}
+			if b.group || b.look || !(b.quant == '*' || b.quant == '?') {
+				break // a group boundary, or mandatory material, pins the division
+			}
 		}
 	}
 	return false
 }
+
+// jsRegexHeadRun returns the run an atom starts with, reading through a plain
+// grouping the way the shared analysis does. A branch-selecting group keeps its
+// runs to itself.
+func jsRegexHeadRun(a jsRegexAtom, depth int) (jsRegexRun, bool) {
+	if !a.group {
+		return jsRegexRun{key: a.key, quant: a.quant, bounded: a.bounded}, isBacktrackingRepeat(a.quant)
+	}
+	if a.look || depth > jsRegexAtomDepth {
+		return jsRegexRun{}, false
+	}
+	atoms, ok := jsRegexSingleBranchAtoms(a.body)
+	if !ok {
+		return jsRegexRun{}, false
+	}
+	for _, b := range atoms {
+		if run, ok := jsRegexHeadRun(b, depth+1); ok {
+			return run, true
+		}
+		if b.quant != '*' && b.quant != '?' {
+			return jsRegexRun{}, false
+		}
+	}
+	return jsRegexRun{}, false
+}
+
+// jsRegexTailRun is jsRegexHeadRun read from the other end: the run an atom ends
+// with. It is what lets `[^\s;]+` inside `([^\/\s]+\/[^\s;]+)` be seen as the run
+// the following `(.*)?` competes with.
+func jsRegexTailRun(a jsRegexAtom, depth int) (jsRegexRun, bool) {
+	if !a.group {
+		return jsRegexRun{key: a.key, quant: a.quant, bounded: a.bounded}, isBacktrackingRepeat(a.quant)
+	}
+	if a.look || depth > jsRegexAtomDepth {
+		return jsRegexRun{}, false
+	}
+	atoms, ok := jsRegexSingleBranchAtoms(a.body)
+	if !ok {
+		return jsRegexRun{}, false
+	}
+	for i := len(atoms) - 1; i >= 0; i-- {
+		if run, ok := jsRegexTailRun(atoms[i], depth+1); ok {
+			return run, true
+		}
+		if atoms[i].quant != '*' && atoms[i].quant != '?' {
+			return jsRegexRun{}, false
+		}
+	}
+	return jsRegexRun{}, false
+}
+
+// jsRegexSingleBranchAtoms returns the atoms of a group body that is one
+// alternation branch. A body that selects between branches reports false: which
+// branch runs is the run-split report's business, and it already declines to read
+// a run out of a group head.
+func jsRegexSingleBranchAtoms(body string) ([]jsRegexAtom, bool) {
+	branches := splitTopLevelRegexBranches(body)
+	if len(branches) != 1 {
+		return nil, false
+	}
+	return jsRegexAtoms(branches[0]), true
+}
+
+// jsRegexAtomDepth bounds how far a run is read through nestings of plain groups.
+const jsRegexAtomDepth = 8
 
 func jsRegexAtoms(pat string) []jsRegexAtom {
 	var out []jsRegexAtom
@@ -1930,8 +2017,8 @@ func jsRegexAtoms(pat string) []jsRegexAtom {
 				continue
 			}
 			key := regexAtomKey(pat[i : end+1])
-			quant, next := jsRegexQuantifier(pat, end+1)
-			out = append(out, jsRegexAtom{key: key, quant: quant})
+			quant, next, bounded := jsRegexQuantifier(pat, end+1)
+			out = append(out, jsRegexAtom{key: key, quant: quant, bounded: bounded})
 			i = next
 			continue
 		case '(':
@@ -1940,8 +2027,9 @@ func jsRegexAtoms(pat string) []jsRegexAtom {
 				i++
 				continue
 			}
-			quant, next := jsRegexQuantifier(pat, end+1)
-			out = append(out, jsRegexAtom{key: "group", quant: quant, group: true})
+			quant, next, bounded := jsRegexQuantifier(pat, end+1)
+			body, look := jsRegexGroupBody(pat[i+1 : end])
+			out = append(out, jsRegexAtom{key: "group", quant: quant, bounded: bounded, group: true, body: body, look: look})
 			i = next
 			continue
 		case '\\':
@@ -1950,18 +2038,21 @@ func jsRegexAtoms(pat string) []jsRegexAtom {
 				continue
 			}
 			key := regexAtomKey(pat[i : i+2])
-			quant, next := jsRegexQuantifier(pat, i+2)
-			out = append(out, jsRegexAtom{key: key, quant: quant})
+			quant, next, bounded := jsRegexQuantifier(pat, i+2)
+			out = append(out, jsRegexAtom{key: key, quant: quant, bounded: bounded})
 			i = next
 			continue
 		default:
-			if strings.ContainsRune(".*+?{}]", rune(pat[i])) {
+			// A `.` stays an atom: it is the alphabet every other run intersects,
+			// and an adjacency that turns on it (`[^\s;]+` beside `(.*)?`) is
+			// invisible if the any-character key never reaches the pair.
+			if pat[i] != '.' && strings.ContainsRune("*+?{}]", rune(pat[i])) {
 				i++
 				continue
 			}
 			key := regexAtomKey(pat[i : i+1])
-			quant, next := jsRegexQuantifier(pat, i+1)
-			out = append(out, jsRegexAtom{key: key, quant: quant})
+			quant, next, bounded := jsRegexQuantifier(pat, i+1)
+			out = append(out, jsRegexAtom{key: key, quant: quant, bounded: bounded})
 			i = next
 		}
 	}
@@ -2013,20 +2104,29 @@ func regexGroupBodies(pat string) []string {
 		if end <= i {
 			continue
 		}
-		body := pat[i+1 : end]
-		if strings.HasPrefix(body, "?:") || strings.HasPrefix(body, "?=") || strings.HasPrefix(body, "?!") {
-			body = body[2:]
-		} else if strings.HasPrefix(body, "?<=") || strings.HasPrefix(body, "?<!") {
-			body = body[3:]
-		} else if strings.HasPrefix(body, "?<") {
-			if close := strings.IndexByte(body, '>'); close >= 0 {
-				body = body[close+1:]
-			}
-		}
+		body, _ := jsRegexGroupBody(pat[i+1 : end])
 		out = append(out, body)
 		i = end
 	}
 	return out
+}
+
+// jsRegexGroupBody strips a group's leading construct marker, reporting whether the
+// group is a lookaround — one that matches without consuming input.
+func jsRegexGroupBody(inner string) (string, bool) {
+	switch {
+	case strings.HasPrefix(inner, "?:"):
+		return inner[2:], false
+	case strings.HasPrefix(inner, "?="), strings.HasPrefix(inner, "?!"):
+		return inner[2:], true
+	case strings.HasPrefix(inner, "?<="), strings.HasPrefix(inner, "?<!"):
+		return inner[3:], true
+	case strings.HasPrefix(inner, "?<"):
+		if close := strings.IndexByte(inner, '>'); close >= 0 {
+			return inner[close+1:], false
+		}
+	}
+	return inner, false
 }
 
 func regexCharClassEnd(pat string, start int) int {
@@ -2068,30 +2168,31 @@ func regexGroupEnd(pat string, start int) int {
 	return -1
 }
 
-func jsRegexQuantifier(pat string, start int) (byte, int) {
+func jsRegexQuantifier(pat string, start int) (byte, int, bool) {
 	if start >= len(pat) {
-		return 0, start
+		return 0, start, false
 	}
 	switch pat[start] {
 	case '*', '+', '?':
-		return pat[start], start + 1
+		return pat[start], start + 1, false
 	case '{':
 		end := strings.IndexByte(pat[start:], '}')
 		if end < 0 {
-			return 0, start
+			return 0, start, false
 		}
 		body := strings.ReplaceAll(strings.TrimSpace(pat[start+1:start+end]), " ", "")
 		next := start + end + 1
 		switch body {
 		case "1":
-			return 0, next
+			return 0, next, false
 		case "0,1":
-			return '?', next
+			return '?', next, false
 		default:
-			return '*', next
+			// `{3}` and `{2,5}` can only give back so much; `{2,}` has no ceiling.
+			return '*', next, !strings.HasSuffix(body, ",")
 		}
 	default:
-		return 0, start
+		return 0, start, false
 	}
 }
 

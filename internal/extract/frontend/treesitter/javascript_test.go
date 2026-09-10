@@ -1266,6 +1266,41 @@ func TestJavaScriptRegexMayBacktrackAmbiguousAdjacentQuantifiers(t *testing.T) {
 			src:  `const nested = /^(a+)+$/;`,
 			want: true,
 		},
+		{
+			name: "hapi content-type: a class run beside an optional dot run",
+			src:  `const typeRx = /^([^\/\s]+\/[^\s;]+)(.*)?$/;`,
+			want: true,
+		},
+		{
+			name: "hapi content-type with the params bounded",
+			src:  `const typeRx = /^([^\/\s]+\/[^\s;]+)([ \t;][^\r\n]*)?$/;`,
+			want: false,
+		},
+		{
+			name: "hapi disposition: a whitespace run beside a dot run",
+			src:  `const dispRx = /^\s*form-data\s*(?:;\s*(.+))?$/i;`,
+			want: true,
+		},
+		{
+			name: "hapi disposition with the ext-value excluding whitespace",
+			src:  `const dispRx = /^\s*form-data\s*(?:;\s*(\S.*))?$/i;`,
+			want: false,
+		},
+		{
+			name: "dot run before a whitespace run stays ordinary",
+			src:  `const tail = /.*\s*$/;`,
+			want: false,
+		},
+		{
+			name: "tough-cookie pair regex: a wide class run beside the whitespace run",
+			src:  `var COOKIE_PAIR = /^(([^=;]+))\s*=\s*([^\n\r\0]*)/;`,
+			want: true,
+		},
+		{
+			name: "the same literal with the space run bounded",
+			src:  `var COOKIE_PAIR = /^(([^=;]+))\s{0,256}=\s{0,256}([^\n\r\0]*)/;`,
+			want: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

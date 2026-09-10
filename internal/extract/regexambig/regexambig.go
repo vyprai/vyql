@@ -180,10 +180,20 @@ func regexClassSet(body string) regexCharSet {
 type regexAtom struct {
 	set      regexCharSet
 	quant    byte // 0, '?', '*' or '+'
+	bounded  bool // the quantifier carries a finite ceiling, as `{3}` or `{2,5}` do
 	group    bool
 	body     string
 	look     byte // 0, '=' for a positive lookaround, '!' for a negative one
 	nullable bool
+}
+
+// regexRun is the run of input one atom hands its neighbour: the alphabet it
+// consumes, and whether the repeat over it has a finite ceiling. A ceilinged
+// repeat can only give back so much, so a run it takes part in is divided a fixed
+// number of ways and the retry cost stays linear.
+type regexRun struct {
+	set     regexCharSet
+	bounded bool
 }
 
 // regexGroupInner strips a group's leading construct marker and reports whether
@@ -253,7 +263,7 @@ func regexAtomsOf(seq string, depth int) []regexAtom {
 			a.set = regexSingleSet(seq[i])
 			i++
 		}
-		quant, next := jsRegexQuantifier(seq, i)
+		quant, next, bounded := jsRegexQuantifier(seq, i)
 		if quant != 0 && next < len(seq) {
 			switch seq[next] {
 			case '?': // lazy: still backtracks, just from the other end
@@ -262,7 +272,7 @@ func regexAtomsOf(seq string, depth int) []regexAtom {
 				quant, next = 0, next+1
 			}
 		}
-		a.quant, i = quant, next
+		a.quant, a.bounded, i = quant, bounded, next
 		a.nullable = quant == '*' || quant == '?'
 		if a.group {
 			var bodyNullable bool
@@ -319,6 +329,9 @@ func regexAltHasAmbiguousRepeat(alt string, depth int) bool {
 	for _, branch := range splitTopLevelRegexBranches(alt) {
 		atoms := regexAtomsOf(branch, depth+1)
 		if regexSplitsOneCharRun(atoms) {
+			return true
+		}
+		if regexAdjacentOverlap(atoms, depth) {
 			return true
 		}
 		for _, a := range atoms {
@@ -550,30 +563,31 @@ func regexGroupEnd(pat string, start int) int {
 	return -1
 }
 
-func jsRegexQuantifier(pat string, start int) (byte, int) {
+func jsRegexQuantifier(pat string, start int) (byte, int, bool) {
 	if start >= len(pat) {
-		return 0, start
+		return 0, start, false
 	}
 	switch pat[start] {
 	case '*', '+', '?':
-		return pat[start], start + 1
+		return pat[start], start + 1, false
 	case '{':
 		end := strings.IndexByte(pat[start:], '}')
 		if end < 0 {
-			return 0, start
+			return 0, start, false
 		}
 		body := strings.ReplaceAll(strings.TrimSpace(pat[start+1:start+end]), " ", "")
 		next := start + end + 1
 		switch body {
 		case "1":
-			return 0, next
+			return 0, next, false
 		case "0,1":
-			return '?', next
+			return '?', next, false
 		default:
-			return '*', next
+			// `{3}` and `{2,5}` can only give back so much; `{2,}` has no ceiling.
+			return '*', next, !strings.HasSuffix(body, ",")
 		}
 	default:
-		return 0, start
+		return 0, start, false
 	}
 }
 
@@ -695,4 +709,124 @@ func regexAtomsStartWithRepeat(atoms []regexAtom, c regexCharSet, depth int) boo
 // consumer.
 func isUniversalCharSet(s regexCharSet) bool {
 	return s.complement().empty()
+}
+
+// regexAdjacentOverlap reports two backtracking repeats with no ceiling over
+// intersecting alphabets sitting next to each other with nothing mandatory between
+// them. A run of a character both can match can then be divided between them at any
+// point, and on failure the engine retries every division — the quadratic shape
+// behind the hapi/content header literals, `\s*(.+)` and `[^\s;]+(.*)?`, where the
+// terminator (a `$` past a trailing newline, a `;`) is matched by neither repeat,
+// so every division has to be tried.
+//
+// Two things withdraw the report. The run being divided has to come from a bounded
+// alphabet: a repeat that matches everything is not a run worth re-dividing, and
+// `X*.*` is every ordinary regex's tail — the same line the run-split analysis
+// draws with isUniversalCharSet. And a repeat carrying a finite ceiling, `{3}` or
+// `{2,5}`, can only give back so much, so `\d{4}\d{2}` divides its digits one way
+// however the match fails.
+//
+// Where the run hides inside a group, the group has to be a plain grouping: one
+// whose body is a single alternation branch. A branch-selecting group keeps its run
+// to itself, because which branch runs is the run-split report's business and it
+// already declines to read one out of a group head (`\s*(?:\s+|x\d+)` stays
+// ordinary). A lookaround consumes nothing, so it is neither a run nor a separator.
+func regexAdjacentOverlap(atoms []regexAtom, depth int) bool {
+	for i, a := range atoms {
+		if a.look != 0 {
+			continue
+		}
+		run, ok := regexTailRepeatSet(a, depth)
+		if !ok || run.bounded || isUniversalCharSet(run.set) {
+			continue
+		}
+		for j := i + 1; j < len(atoms); j++ {
+			b := atoms[j]
+			if b.look != 0 {
+				continue
+			}
+			if next, ok := regexHeadRepeatSet(b, depth); ok && !next.bounded && next.set.intersects(run.set) {
+				return true
+			}
+			if b.group || !b.nullable {
+				break // a group boundary, or mandatory material, pins the division
+			}
+		}
+	}
+	return false
+}
+
+// regexHeadRepeatSet returns the run an atom starts with when that first consumer
+// is a backtracking repeat, and whether it has one. A plain atom is its own run; a
+// plain grouping is read through.
+func regexHeadRepeatSet(a regexAtom, depth int) (regexRun, bool) {
+	if !a.group {
+		if isBacktrackingRepeat(a.quant) {
+			return regexRun{set: a.set, bounded: a.bounded}, true
+		}
+		return regexRun{}, false
+	}
+	return regexSeqHeadRepeat(regexGroupBranchAtoms(a.body, depth), depth+1)
+}
+
+// regexTailRepeatSet is regexHeadRepeatSet read from the other end: the run an atom
+// finishes with, when that last consumer is a backtracking repeat. It is what lets
+// `[^\s;]+` inside `([^\/\s]+\/[^\s;]+)` be seen as the run the following `(.*)?`
+// competes with.
+func regexTailRepeatSet(a regexAtom, depth int) (regexRun, bool) {
+	if !a.group {
+		if isBacktrackingRepeat(a.quant) {
+			return regexRun{set: a.set, bounded: a.bounded}, true
+		}
+		return regexRun{}, false
+	}
+	return regexSeqTailRepeat(regexGroupBranchAtoms(a.body, depth), depth+1)
+}
+
+// regexGroupBranchAtoms returns the atoms of a group's body when the body is a
+// single alternation branch, and nothing when it selects between branches.
+func regexGroupBranchAtoms(body string, depth int) []regexAtom {
+	if depth > regexAnalysisMaxDepth {
+		return nil
+	}
+	branches := splitTopLevelRegexBranches(body)
+	if len(branches) != 1 {
+		return nil
+	}
+	return regexAtomsOf(branches[0], depth+1)
+}
+
+// regexSeqHeadRepeat walks a branch from the left for the first backtracking
+// repeat, past material that can match nothing. Mandatory material ends the walk:
+// whatever comes after it cannot consume the same character.
+func regexSeqHeadRepeat(atoms []regexAtom, depth int) (regexRun, bool) {
+	for _, a := range atoms {
+		if a.look != 0 {
+			continue
+		}
+		if run, ok := regexHeadRepeatSet(a, depth); ok {
+			return run, true
+		}
+		if !a.nullable {
+			return regexRun{}, false
+		}
+	}
+	return regexRun{}, false
+}
+
+// regexSeqTailRepeat is regexSeqHeadRepeat walked from the right.
+func regexSeqTailRepeat(atoms []regexAtom, depth int) (regexRun, bool) {
+	for i := len(atoms) - 1; i >= 0; i-- {
+		a := atoms[i]
+		if a.look != 0 {
+			continue
+		}
+		if run, ok := regexTailRepeatSet(a, depth); ok {
+			return run, true
+		}
+		if !a.nullable {
+			return regexRun{}, false
+		}
+	}
+	return regexRun{}, false
 }
