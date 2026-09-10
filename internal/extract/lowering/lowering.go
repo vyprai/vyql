@@ -110,6 +110,7 @@ type lowerer struct {
 	dynCallbackMemo  map[string][]*funcInfo     // memoized dynamic-callback target set, keyed by current module tech
 	addrTaken        map[string]bool            // short names referenced as a VALUE anywhere (candidate dynamic-callback targets)
 	addrTakenReady   bool                       // true once addrTaken has been collected for the whole program
+	lexSrc           map[string]string          // lexical-binding slot -> the binding it was promoted from (see ensureLexicalBinding)
 
 	curModule     string   // resolution key (may be "" for languages with a flat namespace, e.g. PHP)
 	curNS         string   // per-FILE node-id namespace (unique even when curModule is "") — see ModuleNS
@@ -1534,8 +1535,19 @@ func (l *lowerer) ensureLexicalBinding(sc *scope, name, loc string) {
 	if loc == "" {
 		loc = "?:0"
 	}
+	// A slot promoted from another slot stands for the same binding that one did, so the
+	// source is resolved here rather than at the read: a parameter captured through two levels
+	// of nesting is still recognised as one. See dynamicFunctionParamCall.
+	src := sc.node[name]
+	if under, ok := l.lexSrc[src]; ok {
+		src = under
+	}
 	slot := l.nodeInline("Name", loc, map[string]string{"lexical_binding": "true"}, name, name, "", "")
 	l.flow(sc.node[name], slot)
+	if l.lexSrc == nil {
+		l.lexSrc = make(map[string]string)
+	}
+	l.lexSrc[slot] = src
 	sc.setNode(name, slot)
 	sc.setLex(name, true)
 
@@ -6250,6 +6262,13 @@ func (l *lowerer) dynamicFunctionParamCall(callee nir.Expr, sc *scope) bool {
 	id := sc.node[name.ID]
 	if id == "" {
 		return false
+	}
+	// A JS/TS closure reads an enclosing parameter through the lexical slot the capture was
+	// promoted into, not the parameter node itself, so the slot's source is what decides
+	// whether this call is of a parameter. Without this the dispatch below never fires for a
+	// callback invoked inside a nested closure.
+	if under, ok := l.lexSrc[id]; ok {
+		id = under
 	}
 	n, ok, _ := l.g.GetNode(id)
 	return ok && n.Type == "code.Param"
