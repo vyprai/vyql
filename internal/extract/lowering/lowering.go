@@ -5550,10 +5550,19 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	for argIndex, a := range call.Args {
 		av := l.eval(a, sc)
 		argVals = append(argVals, av)
+		// A keyword argument (`Delta(delta_path=p)`, `run(timeout=30)`) reaches the
+		// slot as a key/value pair whose VALUE carries the taint. Name the slot after
+		// the keyword so a binding can target the argument by the name the callee
+		// documents rather than by a position that only exists when the caller passes
+		// positionally.
+		var slotProps map[string]string
+		if pr, ok := a.(nir.Pair); ok && pr.Key != "" && !pr.DynamicKey {
+			slotProps = map[string]string{"kwarg": pr.Key}
+		}
 		// Record the argument's NIR kind on the slot, so sink binding applicators can
 		// distinguish a string-building position (Format/Const/Name/...) from a
 		// collection literal (Seq).
-		an := l.nodeInline("Arg", call.Loc, nil, "", "", "", nirKind(a))
+		an := l.nodeInline("Arg", call.Loc, slotProps, "", "", "", nirKind(a))
 		l.flow(av, an)
 		args = append(args, an)
 		tokStart := len(valToks)

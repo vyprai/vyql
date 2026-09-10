@@ -30,6 +30,8 @@ type pyConv struct {
 	moduleTokens  []string
 	classContext  []string
 	decorators    []string
+	siblings      map[string]*tree_sitter.Node // module-level function bodies, by name
+	calleeFacts   map[string][]string          // per-helper `callee:` facts, computed once per file
 }
 
 // ExtractPython parses Python files into one NIR Program (one module per file,
@@ -46,6 +48,8 @@ func ExtractPython(files []string, root string) (nir.Program, error) {
 			c := &pyConv{src: src, root: root, file: rel, key: moduleKey(root, abs, ".py")}
 			c.moduleContext = c.pyModuleLiteralContext(root0)
 			c.moduleTokens = c.pyStructuredContextTokens(root0, "module")
+			c.siblings = c.pySiblingFunctionBodies(root0)
+			c.calleeFacts = map[string][]string{}
 			body := append(c.pyModuleContext(root0), c.blockChildren(root0)...)
 			return nir.Module{Key: c.key, File: rel, Imports: c.imports(root0), Body: body}, true
 		})
@@ -572,6 +576,9 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 	for _, tok := range c.pyStructuredContextTokensScoped(fn, name, false, "", controlFacts) {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
+	for _, tok := range c.pyDelegatedContextTokens(fn, name) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	for _, tok := range c.pyStructuredContextTokensScoped(fn, name, true, localBodyText, controlFacts) {
 		localEndArgs = append(localEndArgs, nir.Const{Loc: loc, Value: tok})
 	}
@@ -622,6 +629,180 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 			Loc:    endLoc,
 		}},
 	}
+}
+
+// Bounds on delegated attribution. One hop, a handful of helpers, a handful of
+// facts each: a function that calls twenty helpers gets the first few, not a
+// transitive summary of the module.
+const (
+	pyDelegatedCalleeLimit    = 8
+	pyDelegatedCalleeFacts    = 24
+	pyDelegatedTokenLimit     = 64
+	pyDelegatedCalleeBodyMaxB = 8192
+)
+
+// pySiblingFunctionBodies indexes the file's module-level function definitions by
+// the name a call site would spell, so a check delegated to a sibling helper can
+// be attributed back to the caller (pyDelegatedContextTokens). Only module scope
+// counts, because that is what a bare call inside a function resolves to: a bare
+// name never reads a class body, and a nested `def` is not in scope outside the
+// function that encloses it. A name defined more than once at module level is
+// dropped -- the hop has to resolve to exactly one body.
+func (c *pyConv) pySiblingFunctionBodies(root *tree_sitter.Node) map[string]*tree_sitter.Node {
+	if root == nil {
+		return nil
+	}
+	out := map[string]*tree_sitter.Node{}
+	ambiguous := map[string]bool{}
+	record := func(name string, fn *tree_sitter.Node) {
+		if name == "" || ambiguous[name] {
+			return
+		}
+		if c.field(fn, "body") == nil {
+			return
+		}
+		if _, dup := out[name]; dup {
+			delete(out, name)
+			ambiguous[name] = true
+			return
+		}
+		out[name] = fn
+	}
+	var walk func(n *tree_sitter.Node, moduleLevel bool)
+	walk = func(n *tree_sitter.Node, moduleLevel bool) {
+		if n == nil {
+			return
+		}
+		next := moduleLevel
+		switch c.kind(n) {
+		case "function_definition":
+			if moduleLevel {
+				record(c.text(c.field(n, "name")), n)
+			}
+			next = false
+		case "class_definition":
+			next = false
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch, next)
+		}
+	}
+	walk(root, true)
+	return out
+}
+
+// pyDelegatedContextTokens attributes what the sibling helpers a function calls
+// by name do to that function's own presence context, one hop deep.
+//
+// A check a function delegates -- `if not check_elem(elem): continue` -- leaves
+// nothing behind in the caller's context but the helper's name, because the
+// context is collected from the caller's own body subtree. Nothing can then
+// require that the helper is the one performing the validation the weakness
+// turns on, and the caller of a helper that checks reads identically to the
+// caller of a helper that does not.
+//
+// Only what the helper does crosses the hop: the calls it makes and the literals
+// it names. Its identifiers and expressions stay behind, because a helper's
+// local variable names describe the incident it was written for rather than the
+// behaviour anything can require of it.
+//
+// Delegated facts are re-keyed under one `callee:` prefix (`callee:call=test`),
+// never merged into the caller's own families, so nothing that asks what this
+// function does can be satisfied by what a helper it calls does instead.
+func (c *pyConv) pyDelegatedContextTokens(fn *tree_sitter.Node, self string) []string {
+	if fn == nil || len(c.siblings) == 0 {
+		return nil
+	}
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	// The index is keyed by name over module scope, so a callee this function
+	// received as a parameter is not the sibling that name happens to hold there.
+	// Neither is the function itself.
+	seenCallee := map[string]bool{self: true}
+	for _, p := range c.params(c.field(fn, "parameters")) {
+		seenCallee[p] = true
+	}
+	seenTok := map[string]bool{}
+	callees := 0
+	var out []string
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= pyDelegatedTokenLimit || callees >= pyDelegatedCalleeLimit {
+			return
+		}
+		if c.kind(n) == "call" {
+			// A bare identifier callee is the sibling-helper form; a member call
+			// (`self.check(x)`) needs a receiver resolved, which this does not do.
+			if callee := c.field(n, "function"); callee != nil && c.kind(callee) == "identifier" {
+				name := c.text(callee)
+				if !seenCallee[name] {
+					seenCallee[name] = true
+					// A name that resolves to nothing -- a builtin, a parameter, a
+					// callee defined in another file -- spends no budget: only a
+					// helper whose body was actually read counts against it.
+					if facts := c.pyCalleeFacts(name); len(facts) > 0 {
+						callees++
+						for _, tok := range facts {
+							if len(out) >= pyDelegatedTokenLimit {
+								break
+							}
+							if seenTok[tok] {
+								continue
+							}
+							seenTok[tok] = true
+							out = append(out, tok)
+						}
+					}
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// pyCalleeFacts is the `callee:`-keyed view of one sibling helper's own facts,
+// computed once per file. The helper's facts are its body subtree's alone: the
+// hop never recurses, so a chain of helpers contributes only its first link.
+func (c *pyConv) pyCalleeFacts(name string) []string {
+	if facts, ok := c.calleeFacts[name]; ok {
+		return facts
+	}
+	facts := c.pyCalleeFactsUncached(name)
+	if c.calleeFacts == nil {
+		c.calleeFacts = map[string][]string{}
+	}
+	c.calleeFacts[name] = facts
+	return facts
+}
+
+func (c *pyConv) pyCalleeFactsUncached(name string) []string {
+	fn := c.siblings[name]
+	if fn == nil || fn.EndByte()-fn.StartByte() > pyDelegatedCalleeBodyMaxB {
+		return nil
+	}
+	var facts []string
+	for _, tok := range c.pyStructuredContextTokens(fn, name) {
+		key, value, ok := strings.Cut(tok, ":")
+		if !ok || value == "" {
+			continue
+		}
+		switch key {
+		case "call", "call_path", "literal":
+		default:
+			continue
+		}
+		facts = append(facts, "callee:"+key+"="+value)
+		if len(facts) >= pyDelegatedCalleeFacts {
+			break
+		}
+	}
+	return facts
 }
 
 func pyIsNestedContextScope(node *tree_sitter.Node) bool {

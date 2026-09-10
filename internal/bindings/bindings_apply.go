@@ -449,6 +449,16 @@ func (spec bindingSpec) sinkApplicator() Applicator {
 					if hit && sk.ByMethod && !receiverScopeSatisfied(n.Prop("recv_package"), path, sk.Packages, scopePolicy) {
 						hit = false
 					}
+					// keyword-argument target: the slot is found by the NAME the caller
+					// spells, not by a position, so a call that passes everything by
+					// keyword is addressed the same way a positional one is.
+					kwargIdx := -1
+					if hit && sk.Kwarg != "" {
+						kwargIdx, _ = kwargSlot(s, n, sk.Kwarg)
+						if kwargIdx < 0 {
+							hit = false
+						}
+					}
 					if sinkTimingOn {
 						sinkStats[i].MatchDuration += time.Since(statStart)
 					}
@@ -458,7 +468,9 @@ func (spec bindingSpec) sinkApplicator() Applicator {
 						if sinkTimingOn {
 							statStart = time.Now()
 						}
-						if !valCondsForSinkCached(s, flowIdx, valCache, n, sk, valMatchesLower[i], valAbsentsLower[i]) {
+						valSk := sk
+						valSk.ArgIndex = kwargArgIndex(sk, kwargIdx)
+						if !valCondsForSinkCached(s, flowIdx, valCache, n, valSk, valMatchesLower[i], valAbsentsLower[i]) {
 							hit = false
 						}
 						if sinkTimingOn {
@@ -610,6 +622,9 @@ func (spec bindingSpec) sinkApplicator() Applicator {
 						continue
 					}
 					arg := n.Prop(usg.ArgPropKey(sk.ArgIndex))
+					if sk.Kwarg != "" {
+						_, arg = kwargSlot(s, n, sk.Kwarg)
+					}
 					if arg == "" {
 						continue
 					}
@@ -623,12 +638,17 @@ func (spec bindingSpec) sinkApplicator() Applicator {
 					}
 					if a, ok, _ := s.GetNode(arg); ok {
 						vkind := a.Prop("vkind")
-						if sk.Collection && !foundCollectionTarget && vkind != "Seq" &&
-							(!collectionArgKindAllowsFlow(vkind) || !collectionArgument(s, &collectionIdx, arg)) {
-							continue
-						}
-						if !sk.Collection && !sk.CollectionFirst && a.Prop("vkind") == "Seq" {
-							continue
+						// A keyword slot is a key/value pair, so its kind is Seq by
+						// construction: the name chose it, and the pair's value is what
+						// the caller handed over, not a collection the callee iterates.
+						if sk.Kwarg == "" {
+							if sk.Collection && !foundCollectionTarget && vkind != "Seq" &&
+								(!collectionArgKindAllowsFlow(vkind) || !collectionArgument(s, &collectionIdx, arg)) {
+								continue
+							}
+							if !sk.Collection && !sk.CollectionFirst && a.Prop("vkind") == "Seq" {
+								continue
+							}
 						}
 					} else if sk.Collection {
 						continue
@@ -736,9 +756,35 @@ func printSinkSpecTiming(name string, sinks []sinkSpec, stats []sinkSpecTiming) 
 func sinkBestKey(sk sinkSpec) string {
 	return sk.Concept + "\x00" +
 		strconv.Itoa(sk.ArgIndex) + "\x00" +
+		sk.Kwarg + "\x00" +
 		strconv.FormatBool(sk.Collection) + "\x00" +
 		strconv.FormatBool(sk.CollectionFirst) + "\x00" +
 		strconv.Itoa(sk.CollectionIndex)
+}
+
+// kwargArgIndex is the argument index whose literal tokens value-matching reads:
+// the slot the keyword names once resolved, else the compiled position.
+func kwargArgIndex(sk sinkSpec, kwargIdx int) int {
+	if kwargIdx >= 0 {
+		return kwargIdx
+	}
+	return sk.ArgIndex
+}
+
+// kwargSlot returns the positional index and the slot node of the argument the
+// call spells as the keyword kw. A keyword argument reaches its slot as a
+// key/value pair, so the name lives on the slot rather than on the call; a call
+// that never passes that keyword has no such slot and returns -1, "".
+func kwargSlot(s usg.Store, call usg.Node, kw string) (int, string) {
+	for i := 0; ; i++ {
+		arg := call.Prop(usg.ArgPropKey(i))
+		if arg == "" {
+			return -1, ""
+		}
+		if a, ok, _ := s.GetNode(arg); ok && a.Prop("kwarg") == kw {
+			return i, arg
+		}
+	}
 }
 
 func (spec bindingSpec) checkApplicator() Applicator {
