@@ -2724,13 +2724,13 @@ func TestLowerSequentialGuardedBlocksReachEachOther(t *testing.T) {
 	if first.Prop("region") == second.Prop("region") {
 		t.Fatalf("the two guarded blocks must lower to distinct regions, both are %q", first.Prop("region"))
 	}
-	if !solvers.Reaches(g, first.ID, second.ID) {
+	if !solvers.Reaches(g, solvers.NewExitIndex(g), first.ID, second.ID) {
 		t.Errorf("release in %q must reach the release in %q", first.Prop("region"), second.Prop("region"))
 	}
-	if !solvers.Reaches(g, first.ID, use.ID) {
+	if !solvers.Reaches(g, solvers.NewExitIndex(g), first.ID, use.ID) {
 		t.Errorf("release in %q must reach the use in %q", first.Prop("region"), use.Prop("region"))
 	}
-	if solvers.Reaches(g, use.ID, otherArm.ID) {
+	if solvers.Reaches(g, solvers.NewExitIndex(g), use.ID, otherArm.ID) {
 		t.Error("the then arm of one if must not reach its own else arm")
 	}
 	// The widening must not reach into dominance: a release inside a guarded block

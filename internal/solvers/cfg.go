@@ -33,7 +33,16 @@ func Dominates(store usg.Store, gID, sID string) bool {
 // execute after it. For structured control flow that is: order(a) < order(b) AND their
 // regions are COMPARABLE (one is an ancestor of the other, i.e. not in disjoint sibling
 // branches). Used by order-rules (reentrancy: external_call before state_write).
-func Reaches(store usg.Store, aID, bID string) bool {
+//
+// Sequencing by region and order reads two branches written one after the other as one
+// path, which they are — unless the first of them RETURNS. A release written before the
+// `return` that ends its branch is then ordered before every later release or use exactly
+// as if the return were absent. The exit markers the lowering records for a return written
+// inside a branch say otherwise, so Reaches takes an ExitIndex and drops a pair the
+// function leaves between the two. A graph lowered without them (an unconverted frontend,
+// a store built by hand) yields an empty index and answers as the region/order relation
+// always did.
+func Reaches(store usg.Store, exits *ExitIndex, aID, bID string) bool {
 	if aID == "" || bID == "" || aID == bID {
 		return false
 	}
@@ -47,7 +56,10 @@ func Reaches(store usg.Store, aID, bID string) bool {
 		b, err2 := strconv.Atoi(bn.Prop("order"))
 		return err1 == nil && err2 == nil && a < b
 	}
-	return reachesRegion(an.Prop("region"), an.Prop("order"), bn.Prop("region"), bn.Prop("order"))
+	if !reachesRegion(an.Prop("region"), an.Prop("order"), bn.Prop("region"), bn.Prop("order")) {
+		return false
+	}
+	return !exits.cut(an.Prop("region"), an.Prop("order"), bn.Prop("region"), bn.Prop(usg.UnwindProp))
 }
 
 func sameLocFile(aLoc, bLoc string) bool {
@@ -467,6 +479,40 @@ func (x *ExitIndex) skipped(rel release, a acq, releases []release) bool {
 			continue // a sibling branch of the acquisition's — the exit is not reached after it
 		}
 		if !releasedBefore(e, a.order, releases) {
+			return true
+		}
+	}
+	return false
+}
+
+// cut reports whether the function leaves the region a runs in after a has run, so that b
+// — written outside that region — never runs afterwards: a `return` in the same region a
+// runs in, after a, is one nothing else in that region can skip, and leaving the region is
+// leaving the function. That is what the exit markers the lowering records are for, and it
+// is the one thing region and order cannot say: the branch b sits in is a separate
+// construct, written after the branch that returned, and so already counts as sequenced.
+//
+// Three shapes are not cut. b inside the region a runs in runs before that region is left —
+// a `return` written in a branch nested below it is conditional, and the region still falls
+// through. b in a body written inline ("#") in that region hangs off it, and a callback
+// runs however the region it was passed from is left. And a node the language runs on the
+// way out (a `finally`, a flushed `defer`, usg.UnwindProp) is reached by the return itself.
+func (x *ExitIndex) cut(aRegion, aOrder, bRegion, bUnwind string) bool {
+	if x == nil || aRegion == "" || bRegion == "" || bUnwind != "" {
+		return false
+	}
+	if i := strings.IndexByte(bRegion, '#'); i >= 0 {
+		bRegion = bRegion[:i]
+	}
+	if regionNestedIn(bRegion, aRegion) {
+		return false
+	}
+	a, err := strconv.Atoi(aOrder)
+	if err != nil {
+		return false
+	}
+	for _, e := range x.byRoot[regionRoot(aRegion)] {
+		if e.region == aRegion && e.order > a {
 			return true
 		}
 	}

@@ -80,7 +80,7 @@ func storageFixture(t *testing.T, releasedFrom string) usg.Store {
 // handed the same object.
 func TestStorageJoinJoinsTwoReleasesOfOnePublishedAllocation(t *testing.T) {
 	g := storageFixture(t, "alloc")
-	if Reaches(g, "free1", "free2") {
+	if Reaches(g, nil, "free1", "free2") {
 		t.Fatal("region order must not already sequence two releases in two functions")
 	}
 	if !NewStorageJoin(g).Joins("free1", "free2") {

@@ -61,7 +61,7 @@ static DWORD RunOpenvpn(LPVOID p)
 `)
 	rel := releases(t, g)
 	local, field := rel[0], rel[1] // free(data) in GetStartupData, free(sud->directory) in FreeStartupData
-	if solvers.Reaches(g, local, field) {
+	if solvers.Reaches(g, solvers.NewExitIndex(g), local, field) {
 		t.Fatal("two releases in two functions must not be sequenced by region order")
 	}
 	if !solvers.NewStorageJoin(g).Joins(local, field) {
