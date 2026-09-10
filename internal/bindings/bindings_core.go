@@ -831,6 +831,21 @@ func markTargets(s usg.Store, idx *collectionFlowIndex, n usg.Node, m controlSpe
 		}
 		return out
 	}
+	if m.Kwarg != "" {
+		// The keyword names the slot, and the pair's value is what the caller
+		// handed over, so it is labelled whatever its shape -- which is a key/value
+		// pair by construction.
+		for ai := 0; ; ai++ {
+			arg := n.Prop(usg.ArgPropKey(ai))
+			if arg == "" {
+				break
+			}
+			if a, ok, _ := s.GetNode(arg); ok && a.Prop("kwarg") == m.Kwarg {
+				out = append(out, arg)
+			}
+		}
+		return out
+	}
 	addArgTarget(n.Prop(usg.ArgPropKey(m.ArgIndex)))
 	return out
 }

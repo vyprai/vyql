@@ -228,6 +228,7 @@ func lowerV2Binding(b *parser.V2BindingDecl, names parser.V2Names, patterns v2Pa
 					Concept:         action.Concept,
 					Constraint:      shape.Constraint,
 					ArgIndex:        loc.ArgIndex,
+					Kwarg:           loc.Kwarg,
 					ValMatches:      shape.ValMatches,
 					ValAbsents:      shape.ValAbsents,
 					Collection:      loc.Collection,
@@ -311,6 +312,7 @@ func lowerV2Binding(b *parser.V2BindingDecl, names parser.V2Names, patterns v2Pa
 						m.Kind = "check_arg"
 					}
 					m.ArgIndex = loc.ArgIndex
+					m.Kwarg = loc.Kwarg
 					m.Collection = loc.Collection
 					m.CollectionFirst = loc.CollectionFirst
 					m.CollectionIndex = loc.CollectionIndex
@@ -501,6 +503,7 @@ func lowerV2FactEmit(binding string, shape v2CallShape, action parser.V2BindingO
 		Exact:           shape.Exact,
 		Concept:         action.Concept,
 		ArgIndex:        loc.ArgIndex,
+		Kwarg:           loc.Kwarg,
 		ValMatches:      shape.ValMatches,
 		ValAbsents:      shape.ValAbsents,
 		Collection:      loc.Collection,
@@ -563,6 +566,7 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action parser.V2Bindi
 			out.Kind = "check_arg"
 		}
 		out.ArgIndex = loc.ArgIndex
+		out.Kwarg = loc.Kwarg
 		out.Collection = loc.Collection
 		out.CollectionFirst = loc.CollectionFirst
 		out.CollectionIndex = loc.CollectionIndex
@@ -600,6 +604,7 @@ func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action parser.V2Bin
 			out.Kind = "check_arg"
 		}
 		out.ArgIndex = loc.ArgIndex
+		out.Kwarg = loc.Kwarg
 		out.Collection = loc.Collection
 		out.CollectionFirst = loc.CollectionFirst
 		out.CollectionIndex = loc.CollectionIndex
@@ -1207,6 +1212,7 @@ func v2RequirementPackageHints(req Requirement) []string {
 
 type v2SinkLocationInfo struct {
 	ArgIndex        int
+	Kwarg           string // non-empty: the argument is addressed by keyword name, not position
 	Collection      bool
 	CollectionFirst bool
 	CollectionIndex int
@@ -1239,12 +1245,21 @@ func v2SinkLocationParts(location string) (v2SinkLocationInfo, error) {
 		return out, nil
 	}
 	if !strings.HasPrefix(base, "args[") || !strings.HasSuffix(base, "]") {
-		return v2SinkLocationInfo{}, fmt.Errorf("sink/check location %q is not an args[N], args.any, or collection location", location)
+		return v2SinkLocationInfo{}, fmt.Errorf("sink/check location %q is not an args[N], args.any, args[NAME], or collection location", location)
 	}
-	n, err := strconv.Atoi(strings.TrimSuffix(strings.TrimPrefix(base, "args["), "]"))
-	if err != nil {
+	inner := strings.TrimSuffix(strings.TrimPrefix(base, "args["), "]")
+	if n, err := strconv.Atoi(inner); err == nil {
+		out.ArgIndex = n
+	} else if inner != "" {
+		// a keyword argument: the argument the callee documents, addressed by the
+		// name the caller spells rather than by a position that only exists when a
+		// caller happens to pass it positionally.
+		out.Kwarg = inner
+	} else {
 		return v2SinkLocationInfo{}, fmt.Errorf("invalid argument index in %q", location)
 	}
-	out.ArgIndex = n
+	if out.Kwarg != "" && (out.Collection || out.CollectionFirst) {
+		return v2SinkLocationInfo{}, fmt.Errorf("sink/check location %q: a keyword argument target cannot also be a collection target", location)
+	}
 	return out, nil
 }

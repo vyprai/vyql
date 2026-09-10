@@ -23,6 +23,7 @@ type Action struct {
 	Concept          string   // the concept it maps to (qualified); for "type", the type name
 	Constraint       string   // optional `on <type>` receiver-type constraint for sinks
 	ArgIndex         int      // which argument position is targeted (default 0; `arg N`)
+	Kwarg            string   // keyword-argument target (`args[NAME]`): the slot named NAME, not a position
 	ArgCountSet      bool     // true when ArgCountMin/ArgCountMax constrain call arity
 	ArgCountMin      int      // minimum call arity when ArgCountSet is true; -1 = none
 	ArgCountMax      int      // maximum call arity when ArgCountSet is true; -1 = none
