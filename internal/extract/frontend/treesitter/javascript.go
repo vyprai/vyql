@@ -3641,7 +3641,11 @@ func (c *jsConv) patternSlot(pat *tree_sitter.Node) (string, []string) {
 }
 
 // paramPattern returns the binding pattern a parameter node declares, unwrapping
-// the TypeScript and default-value forms that carry it in a field.
+// the TypeScript and default-value forms that carry it in a field. A rest
+// parameter (`...args`) carries the pattern it spreads into as its one child —
+// an identifier, or an object/array pattern — directly under formal_parameters
+// in JS and inside a required_parameter in TS, so both spellings unwrap here
+// and the trailing arguments a call passes reach the name the pattern binds.
 func (c *jsConv) paramPattern(ch *tree_sitter.Node) *tree_sitter.Node {
 	pat := ch
 	switch c.kind(ch) {
@@ -3649,6 +3653,11 @@ func (c *jsConv) paramPattern(ch *tree_sitter.Node) *tree_sitter.Node {
 		pat = c.field(ch, "pattern")
 	case "assignment_pattern":
 		pat = c.field(ch, "left")
+	}
+	if c.kind(pat) == "rest_pattern" {
+		if kids := c.namedChildren(pat); len(kids) > 0 {
+			pat = kids[0]
+		}
 	}
 	return pat
 }
