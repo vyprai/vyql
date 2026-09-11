@@ -4,7 +4,7 @@ What VyQL currently scores on `main`, and on which corpus. Every number here cam
 out of `TestOWASPBenchmark`. Older figures live in git history rather than on this
 page, so you never have to read past a stale number to find the current one.
 
-Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-08-30.
+Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-09-11.
 
 > **Check the corpus column before comparing anything.** Scores from our synthetic
 > ports get mistaken for scores from the public OWASP suites more than any other
@@ -81,11 +81,7 @@ Every fetched corpus, measured in one sweep:
 | BenchmarkJava (2,740) | **+1.00** |
 | BenchmarkPython (1,230) | **+0.8959** |
 | owasp-go (2,740) | **+1.00** |
-| owasp-bash, -c, -cpp, -csharp, -dart, -elixir, -groovy, -js, -lua, -objc, -perl, -php, -powershell, -python, -ruby, -rust, -scala, -solidity, -swift, -typescript | **+1.00** each |
-| owasp-kotlin (2,740) | **+0.909** |
-
-`owasp-kotlin` is the only port below +1.00, at **+0.909**: 20 false positives,
-all in `xpathi` and none elsewhere.
+| owasp-bash, -c, -cpp, -csharp, -dart, -elixir, -go, -groovy, -js, -kotlin, -lua, -objc, -perl, -php, -powershell, -python, -ruby, -rust, -scala, -solidity, -swift, -typescript | **+1.00** each |
 
 #### 3.1.1 Python: every point below +1.00 is a false positive
 
@@ -186,14 +182,14 @@ Real-world applications rather than generated test cases. 66 repos, 1,896 real f
 plus **280 false-positive traps**, Apache-2.0, ground truth as JSON per repo with
 file / line-range / CWE. Matching is `file` + `cwe ∈ acceptable_cwes` + line within ±10.
 
-Measured 2026-08-13 on `e1f2a0472` over **62 of 66 repos**. Four
+Measured 2026-09-11 on `d52d2ccb0` over **62 of 66 repos**. Four
 (`owasp-web-playground`, `pygoat`, `python-app`, `vulnerable-api`) are 404 upstream and
 clone for nobody. Scored by RealVuln's own `scorer.matcher` / `scorer.metrics`, the same
 code that produces their published numbers, via a SARIF adapter for VyQL.
 
 | TP | FP | FN | TN | Precision | Recall | Youden |
 |---|---|---|---|---|---|---|
-| **976** | 2316 | 758 | 234 | **0.2965** | **0.5629** | −0.3454 |
+| **979** | 2314 | 755 | 233 | **0.2973** | **0.5646** | −0.3439 |
 
 > One verdict per emitted finding: `score_realvuln.py` calls `collapse_fanout()`, so a
 > rule listing four CWEs is charged one false positive rather than four.
