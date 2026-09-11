@@ -1351,7 +1351,7 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 		// through the call rather than beside it, off the definition they share.
 		if eff := c.ccInPlaceMutationEffects(name, args); len(eff) > 0 {
 			if call, ok := c.expr(inner).(nir.Call); ok {
-				call.Effects = eff
+				call.Effects = append(call.Effects, eff...)
 				return []nir.Stmt{nir.ExprStmt{Value: call}}
 			}
 		}
@@ -1959,6 +1959,10 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 		args := c.field(n, "arguments")
 		call := nir.Call{Callee: c.expr(fn), Args: c.callArgs(args), Path: path, Method: lastSeg(path), Loc: L}
 		call.Effects = c.readerDestinationEffects(lastSeg(path), args)
+		// A binding may declare a flow this file's own text cannot spell -- the callee
+		// is declared in a header, so nothing here types its parameters. It carries the
+		// same effect the reader table records by hand.
+		call.Effects = append(call.Effects, declaredCallEffects(c.lang, path, call.Method)...)
 		return call
 	case "message_expression": // ObjC [receiver method:arg ...]
 		recv := c.field(n, "receiver")

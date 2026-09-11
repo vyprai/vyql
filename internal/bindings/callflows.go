@@ -4,10 +4,13 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/nir"
 )
 
+// callFlowSpec is one binding-declared call dataflow, resolved to the argument
+// positions the lowering re-binds: `propagate value from args[0] to args[1].pointee`
+// on a callee means "the variable the caller passed at argument 1 is filled from
+// argument 0".
 type callFlowSpec struct {
 	Pattern string
 	Method  bool
@@ -15,15 +18,31 @@ type callFlowSpec struct {
 	Effect  nir.CallEffect
 }
 
-var (
-	callFlowOnce     sync.Once
-	callFlowProfiles map[string][]callFlowSpec
-)
+// Flow tables per technology. They are built from the compiled set the label
+// applicators already load (loadBindingSet caches per technology), so a technology
+// that declares no call flow costs one cache read and no second parse of the corpus.
+var callFlowTable sync.Map // tech -> []callFlowSpec
 
+// CallEffectsFor reports the out-parameter flows bindings declare for a call in
+// technology tech. Extraction asks it for every call it builds, so the lookup is
+// a cache read plus a scan over the -- usually empty -- declared set.
 func CallEffectsFor(tech, path, method string) []nir.CallEffect {
-	callFlowOnce.Do(loadCallFlowProfiles)
+	var specs []callFlowSpec
+	if cached, ok := callFlowTable.Load(tech); ok {
+		specs = cached.([]callFlowSpec)
+	} else {
+		specs = callFlowSpecsFor(tech)
+		loaded, _ := callFlowTable.LoadOrStore(tech, specs)
+		specs = loaded.([]callFlowSpec)
+	}
+	return matchCallFlowSpecs(specs, path, method)
+}
+
+// matchCallFlowSpecs reports which of the declared flows a call answers to, by the
+// path or the method token the binding named.
+func matchCallFlowSpecs(specs []callFlowSpec, path, method string) []nir.CallEffect {
 	var out []nir.CallEffect
-	for _, spec := range callFlowProfiles[tech] {
+	for _, spec := range specs {
 		if spec.Prefix {
 			name := method
 			if name == "" {
@@ -47,35 +66,35 @@ func CallEffectsFor(tech, path, method string) []nir.CallEffect {
 	return out
 }
 
-func loadCallFlowProfiles() {
-	callFlowProfiles = map[string][]callFlowSpec{}
-	files, err := datadir.ReadVYQLDirExcept("bindings", "packages")
-	if err != nil {
-		panic("frontend: read bindings: " + err.Error())
-	}
-	sets, err := compileV2BindingSources(files)
-	if err != nil {
-		panic("frontend: parse binding call-flow corpus: " + err.Error())
-	}
-	for _, ad := range sets {
-		for _, mp := range ad.Mappings {
-			if mp.Kind != "flow_path" && mp.Kind != "flow_method" && mp.Kind != "flow_prefix" {
-				continue
-			}
-			callFlowProfiles[ad.Name] = append(callFlowProfiles[ad.Name], callFlowSpec{
-				Pattern: mp.Pattern,
-				Method:  mp.Kind == "flow_method",
-				Prefix:  mp.Kind == "flow_prefix",
-				Effect: nir.CallEffect{
-					DestArg:      mp.FlowDestArg,
-					SourceArg:    mp.FlowSourceArg,
-					SourceResult: mp.FlowSourceResult,
-					Identity:     mp.FlowIdentity,
-					Receiver:     mp.FlowReceiver,
-				},
-			})
+// callFlowSpecsFor resolves one technology's binding set and keeps its flow
+// mappings. A technology whose bindings directory does not exist yet resolves to
+// an empty set, which is the correct reading -- nothing in it is labelled yet.
+func callFlowSpecsFor(tech string) []callFlowSpec {
+	return callFlowSpecsOf(loadBindingSet(tech))
+}
+
+// callFlowSpecsOf lifts a compiled set's flow mappings into the effects lowering
+// applies.
+func callFlowSpecsOf(set *Set) []callFlowSpec {
+	var out []callFlowSpec
+	for _, mp := range set.Mappings {
+		if mp.Kind != "flow_path" && mp.Kind != "flow_method" && mp.Kind != "flow_prefix" {
+			continue
 		}
+		out = append(out, callFlowSpec{
+			Pattern: mp.Pattern,
+			Method:  mp.Kind == "flow_method",
+			Prefix:  mp.Kind == "flow_prefix",
+			Effect: nir.CallEffect{
+				DestArg:      mp.FlowDestArg,
+				SourceArg:    mp.FlowSourceArg,
+				SourceResult: mp.FlowSourceResult,
+				Identity:     mp.FlowIdentity,
+				Receiver:     mp.FlowReceiver,
+			},
+		})
 	}
+	return out
 }
 
 func lastSeg(path string) string {
