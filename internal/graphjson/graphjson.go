@@ -149,6 +149,119 @@ func Build(g usg.Store, all []*findings.Finding, ruleMeta map[string]map[string]
 	return doc
 }
 
+// Merge combines per-partition documents into one. A target too large for one
+// resident graph under the ceiling in force is scanned partition by partition,
+// and each partition carries its own graph; the export is one document, so the
+// partitions' documents are merged rather than printed in sequence.
+//
+// Function ids are regions and the partitions are disjoint file sets, so they
+// cannot collide; call edges and findings are deduplicated by the caller→callee
+// pair and the fingerprint respectively, which also drops the per-partition
+// repeats of manifest-read dependency findings — the same dedup the findings
+// merge applies.
+func Merge(docs []Document) Document {
+	if len(docs) == 0 {
+		return Document{SchemaVersion: SchemaVersion, Concepts: ConceptLegend(),
+			Functions: []Function{}, CallEdges: []CallEdge{}, Findings: []Finding{}}
+	}
+	out := Document{
+		SchemaVersion: docs[0].SchemaVersion,
+		Tool:          docs[0].Tool,
+		CodeMap:       CodeMap{Root: docs[0].CodeMap.Root},
+		Concepts:      docs[0].Concepts,
+		Functions:     []Function{},
+		CallEdges:     []CallEdge{},
+		Findings:      []Finding{},
+	}
+	seenFn := map[string]bool{}
+	seenEdge := map[string]bool{}
+	seenFP := map[string]bool{}
+	for _, d := range docs {
+		for _, fn := range d.Functions {
+			if seenFn[fn.ID] {
+				continue
+			}
+			seenFn[fn.ID] = true
+			out.Functions = append(out.Functions, fn)
+		}
+		for _, e := range d.CallEdges {
+			key := e.FromFunction + "\x00" + e.ToFunction
+			if seenEdge[key] {
+				continue
+			}
+			seenEdge[key] = true
+			out.CallEdges = append(out.CallEdges, e)
+		}
+		for _, f := range d.Findings {
+			if seenFP[f.FP] {
+				continue
+			}
+			seenFP[f.FP] = true
+			out.Findings = append(out.Findings, f)
+		}
+	}
+	sort.Slice(out.Functions, func(i, j int) bool {
+		if out.Functions[i].File != out.Functions[j].File {
+			return out.Functions[i].File < out.Functions[j].File
+		}
+		if out.Functions[i].LineStart != out.Functions[j].LineStart {
+			return out.Functions[i].LineStart < out.Functions[j].LineStart
+		}
+		return out.Functions[i].ID < out.Functions[j].ID
+	})
+	sort.Slice(out.CallEdges, func(i, j int) bool {
+		if out.CallEdges[i].FromFunction != out.CallEdges[j].FromFunction {
+			return out.CallEdges[i].FromFunction < out.CallEdges[j].FromFunction
+		}
+		return out.CallEdges[i].ToFunction < out.CallEdges[j].ToFunction
+	})
+	sort.Slice(out.Findings, func(i, j int) bool { return out.Findings[i].FP < out.Findings[j].FP })
+	out.CodeMap.Languages = mergeLanguages(docs)
+	out.CodeMap.FunctionCount = len(out.Functions)
+	out.CodeMap.FindingCount = len(out.Findings)
+	return out
+}
+
+// mergeLanguages unions each partition's language list. The languages are file
+// extensions the partitions cannot share — the file sets are disjoint — so a
+// sorted union is the one-graph document's list.
+func mergeLanguages(docs []Document) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, d := range docs {
+		for _, lg := range d.CodeMap.Languages {
+			if !seen[lg] {
+				seen[lg] = true
+				out = append(out, lg)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// FilterFindings drops every finding whose fingerprint is not in kept, and
+// recounts the codemap. A partitioned graph-json run builds its document per
+// partition, before a baseline is applied; the baseline decides at output time
+// which findings the printed document still reports, exactly as it does for the
+// one-graph document.
+func (d Document) FilterFindings(kept map[string]bool) Document {
+	if len(kept) == 0 && len(d.Findings) > 0 {
+		d.Findings = []Finding{}
+		d.CodeMap.FindingCount = 0
+		return d
+	}
+	out := d
+	out.Findings = make([]Finding, 0, len(d.Findings))
+	for _, f := range d.Findings {
+		if kept[f.FP] {
+			out.Findings = append(out.Findings, f)
+		}
+	}
+	out.CodeMap.FindingCount = len(out.Findings)
+	return out
+}
+
 // boundary is what lowering records about a function beyond its region: the
 // declaration line and the authored name.
 //
