@@ -156,6 +156,87 @@ func TestCSharpFunctionContextExpressionShapeTokens(t *testing.T) {
 	t.Fatal("analysis.function.context for Decode not found")
 }
 
+// A `ref` written before `partial` is the spelling `ref partial struct`/`ref partial
+// class` declarations use, and the grammar cannot read it: the declaration recovered as
+// an ERROR node plus a global_statement block, and neither was lowered, so the type's
+// methods reached the graph with no function node, no context tokens and no calls.
+func TestCSharpExtractsRefPartialTypeMembers(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "Tokens.cs")
+	src := `using System;
+
+namespace Clients
+{
+    public ref partial struct TokenBuffer
+    {
+        private string buffer;
+
+        public string Render(string input)
+        {
+            return input.Trim();
+        }
+    }
+
+    public ref partial class TokenValidator
+    {
+        public bool Check(string token)
+        {
+            return token.Length > 0;
+        }
+    }
+}`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractCSharp([]string{path}, dir)
+	if err != nil {
+		t.Fatalf("ExtractCSharp: %v", err)
+	}
+	g, err := lowering.Lower(prog, false)
+	if err != nil {
+		t.Fatalf("Lower: %v", err)
+	}
+	// The calls the frontend plants in and around each method prove the member reached the
+	// graph as a function of its type: the context call names the function, its parameter
+	// and the body's own calls, and the parameter-entry call carries the enclosing type's
+	// context tokens.
+	for _, m := range []struct{ class, method, param, bodyToken string }{
+		{"TokenBuffer", "Render", "input", "call:Trim"},
+		{"TokenValidator", "Check", "token", "selector:token.Length"},
+	} {
+		calls, _ := g.NodesOfType("code.Call")
+		var context, entry bool
+		for _, id := range calls {
+			n, _, _ := g.GetNode(id)
+			tokens := n.Prop("str_args")
+			if !strings.Contains(tokens, "function_name:"+m.method) {
+				continue
+			}
+			switch n.Prop("callee_path") {
+			case "analysis.function.context":
+				context = strings.Contains(tokens, "name="+m.method) &&
+					strings.Contains(tokens, "param_name:"+m.param) &&
+					strings.Contains(tokens, m.bodyToken)
+			case "analysis.parameter.entry":
+				entry = strings.Contains(tokens, "class_name:"+m.class) &&
+					strings.Contains(tokens, "param_name:"+m.param)
+			}
+		}
+		if !context || !entry {
+			t.Fatalf("%s.%s: function context = %v, typed parameter entry = %v — the %s declaration was not lowered", m.class, m.method, context, entry, m.class)
+		}
+	}
+	// and the body of a member is analysed, not just its signature
+	calls, _ := g.NodesOfType("code.Call")
+	for _, id := range calls {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") == "input.Trim" {
+			return
+		}
+	}
+	t.Fatal("call inside TokenBuffer.Render was not extracted")
+}
+
 func TestCSharpJwtTokenValidationParametersObservations(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "Sample.cs")

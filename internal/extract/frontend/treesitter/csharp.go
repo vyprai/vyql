@@ -1,6 +1,7 @@
 package treesitter
 
 import (
+	"bytes"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -26,18 +27,203 @@ type csPropertyEntry struct {
 
 // ExtractCSharp parses C# files into one NIR Program (one module per file).
 func ExtractCSharp(files []string, root string) (nir.Program, error) {
-	mods := parseModules(files, root,
+	mods := parseModulesPreprocess(files, root,
 		func() *tree_sitter.Parser {
 			p := tree_sitter.NewParser()
 			_ = p.SetLanguage(tree_sitter.NewLanguage(tscs.Language()))
 			return p
 		},
+		csBlankRefPartialKeyword,
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &csConv{src: src, file: rel, key: moduleKey(root, abs, ".cs")}
 			r := tree.RootNode()
 			return nir.Module{Key: c.key, File: rel, Imports: c.imports(r), Body: c.decls(r)}, true
 		})
 	return nir.Program{SelfName: "this", Modules: mods}, nil
+}
+
+// csBlankRefPartialKeyword blanks the `ref` keyword of a `ref partial struct` or
+// `ref partial class` declaration. The grammar reads `ref` on a type declaration only
+// after every other modifier (`repeat(modifier) optional('ref')`), so the spelling the
+// standard library and its imitators use — `public ref partial struct Buffer` — cannot
+// parse: it recovers as an ERROR node holding just the modifiers, followed by a
+// global_statement block holding the body. csConv.stmt lowers neither, so every member
+// of the type was dropped — no function node, no context tokens, no calls. Blanked, the
+// declaration is the `partial`-only spelling the grammar does accept, so it parses as
+// the struct/class declaration it is wherever it stands: at top level, in a namespace,
+// or nested in another type.
+// Blanking keeps the byte length and every newline, so node offsets still address the
+// file on disk and the raw-text observations that scan c.src see the original layout.
+// Comments and string/character literals are left alone: a literal's value is what
+// `val` matching reads, and a comment is not a declaration.
+//
+// The copy is deferred until a header is actually found: a file that carries the words
+// `ref` and `partial` only in prose pays the scan and nothing else, which is nearly all
+// of them.
+func csBlankRefPartialKeyword(src []byte) []byte {
+	if !bytes.Contains(src, []byte("ref")) || !bytes.Contains(src, []byte("partial")) {
+		return src
+	}
+	var blanks []int // start offsets of the `ref` spells to blank, each 3 bytes wide
+	for i := 0; i < len(src); {
+		switch {
+		case src[i] == '/' && i+1 < len(src) && src[i+1] == '/':
+			for i < len(src) && src[i] != '\n' {
+				i++
+			}
+		case src[i] == '/' && i+1 < len(src) && src[i+1] == '*':
+			i += 2
+			for i+1 < len(src) && !(src[i] == '*' && src[i+1] == '/') {
+				i++
+			}
+			i += 2
+		case src[i] == '"' || src[i] == '\'' || src[i] == '@' || src[i] == '$':
+			if end := csLiteralEnd(src, i); end > i {
+				i = end
+				continue
+			}
+			i++
+		case csIsWordAt(src, i, "ref"):
+			if end := csRefPartialDeclEnd(src, i); end > i {
+				blanks = append(blanks, i)
+				i = end
+				continue
+			}
+			i += len("ref")
+		default:
+			i++
+		}
+	}
+	if len(blanks) == 0 {
+		return src
+	}
+	out := make([]byte, len(src))
+	copy(out, src)
+	for _, i := range blanks {
+		for j := i; j < i+len("ref"); j++ {
+			out[j] = ' '
+		}
+	}
+	return out
+}
+
+// csRefPartialDeclEnd returns the offset just past `ref <ws> partial <ws> struct|class`
+// opening at the `ref` at src[i], or -1 when that is not a type-declaration header.
+// `struct` and `class` are the only kinds a `ref` header carries here.
+func csRefPartialDeclEnd(src []byte, i int) int {
+	j := csSkipSpace(src, i+len("ref"))
+	if !csIsWordAt(src, j, "partial") {
+		return -1
+	}
+	j = csSkipSpace(src, j+len("partial"))
+	for _, kind := range [...]string{"struct", "class"} {
+		if csIsWordAt(src, j, kind) {
+			return j + len(kind)
+		}
+	}
+	return -1
+}
+
+// csSkipSpace returns the offset of the first byte at or after i that is not
+// whitespace (including the line breaks a declaration header may carry).
+func csSkipSpace(src []byte, i int) int {
+	for i < len(src) {
+		switch src[i] {
+		case ' ', '\t', '\r', '\n':
+			i++
+		default:
+			return i
+		}
+	}
+	return i
+}
+
+// csIsWordAt reports whether the word w stands alone at src[i]: delimited by bytes
+// that cannot continue it, so `ref` does not match `reference` or `pref`.
+func csIsWordAt(src []byte, i int, w string) bool {
+	if i > 0 && csWordByte(src[i-1]) {
+		return false
+	}
+	if !bytes.HasPrefix(src[i:], []byte(w)) {
+		return false
+	}
+	end := i + len(w)
+	return end == len(src) || !csWordByte(src[end])
+}
+
+func csWordByte(b byte) bool {
+	return b == '_' || (b >= '0' && b <= '9') || (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+// csLiteralEnd returns the offset just past the string or character literal starting at
+// src[i] (`"…"`, `"""…"""` raw, `@"…"` verbatim, `$"…"` interpolated, `'…'`), or i when
+// src[i] does not open one (`@`/`$` also prefix identifiers and non-literal tokens).
+//
+// Interpolation holes are not tracked, so a hole holding a quoted string ends the scan
+// early. That can only leave the tail of one literal un-skipped — the tail is still
+// literal text, never code, so no declaration is blanked by mistake.
+func csLiteralEnd(src []byte, i int) int {
+	switch src[i] {
+	case '\'':
+		return csSkipQuoted(src, i)
+	case '"':
+		if bytes.HasPrefix(src[i:], []byte(`"""`)) {
+			if end := bytes.Index(src[i+3:], []byte(`"""`)); end >= 0 {
+				return i + 3 + end + 3
+			}
+			return len(src)
+		}
+		return csSkipQuoted(src, i)
+	case '@':
+		if bytes.HasPrefix(src[i+1:], []byte(`"`)) {
+			return csSkipVerbatim(src, i+1)
+		}
+		if bytes.HasPrefix(src[i+1:], []byte(`$"`)) {
+			return csSkipVerbatim(src, i+2) // @$"…" quotes are doubled, not backslashed
+		}
+	case '$':
+		if bytes.HasPrefix(src[i+1:], []byte(`"`)) {
+			return csSkipQuoted(src, i+1)
+		}
+		if bytes.HasPrefix(src[i+1:], []byte(`@"`)) {
+			return csSkipVerbatim(src, i+2)
+		}
+	}
+	return i
+}
+
+// csSkipQuoted returns the offset just past the double-quoted single-line span opening
+// at src[i]. An unterminated one ends at the line break, so one broken string cannot
+// blank the rest of the file; the spans that do run past a line break (`@"…"`,
+// `"""…"""`) are handled by csSkipVerbatim and the raw-string branch above.
+func csSkipQuoted(src []byte, i int) int {
+	for j := i + 1; j < len(src); j++ {
+		switch src[j] {
+		case '\\':
+			j++ // the escaped byte cannot close the span
+		case '"':
+			return j + 1
+		case '\n':
+			return j
+		}
+	}
+	return len(src)
+}
+
+// csSkipVerbatim returns the offset just past the `@"…"` span opening at src[i]; `""`
+// inside it is an escaped quote, not the close.
+func csSkipVerbatim(src []byte, i int) int {
+	for j := i + 1; j < len(src); j++ {
+		if src[j] != '"' {
+			continue
+		}
+		if j+1 < len(src) && src[j+1] == '"' {
+			j++
+			continue
+		}
+		return j + 1
+	}
+	return len(src)
 }
 
 func (c *csConv) loc(n *tree_sitter.Node) string {
