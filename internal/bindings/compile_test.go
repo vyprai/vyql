@@ -1852,6 +1852,52 @@ binding contextFields {
 	}
 }
 
+// The C/C++ index observation reports the bound its guard was credited from,
+// which side of the access that comparison stands on, and the field access a
+// locally held index was computed from. A rule separating a guarded access
+// from an unguarded one reads those rather than taking the guard token's word
+// for it, so the three have to be nameable context fields.
+func TestV2PresenceNodeIndexBoundContextFields(t *testing.T) {
+	sets, err := compileV2BindingsForTest(`
+module bindings.c.native;
+binding indexBound {
+  query pattern presenceNode where node.analysis ~= "index.access" and node.context.indexKind == "field_derived" and node.context.origin contains "cursor." and node.context.boundSide == "before"
+  emit issue code.FieldDerivedIndexAccess at node
+}
+binding indexOrigin {
+  query pattern presenceNode where node.analysis ~= "index.access" and containsAny(node.context.bound, ["segment_.size()", "kBucketNum"])
+  emit issue code.IndexBoundReview at node
+}
+`)
+	if err != nil {
+		t.Fatalf("parser.ParseV2Definitions: %v", err)
+	}
+	var bound, review *Presence
+	for _, set := range sets {
+		for _, m := range set.Mappings {
+			switch m.Concept {
+			case "code.FieldDerivedIndexAccess":
+				bound = m.Flag
+			case "code.IndexBoundReview":
+				review = m.Flag
+			}
+		}
+	}
+	if bound == nil || review == nil {
+		t.Fatalf("bindings did not compile: %+v", sets)
+	}
+	if got := bound.Predicates[len(bound.Predicates)-2]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "origin=cursor." {
+		t.Fatalf("origin predicate wrong: %+v", got)
+	}
+	if got := bound.Predicates[len(bound.Predicates)-1]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "bound_side=before" {
+		t.Fatalf("bound side predicate wrong: %+v", got)
+	}
+	if got := review.Predicates[len(review.Predicates)-1]; got.Property != "tokens" || got.Op != "contains_any" ||
+		got.Values[0] != "bound=segment_.size()" || got.Values[1] != "bound=kBucketNum" {
+		t.Fatalf("bound predicate wrong: %+v", got)
+	}
+}
+
 // A binding has to be able to require that the sibling helper a function
 // delegates to is the one performing the check or the escape, which is what
 // the frontend's one-hop `callee:` facts carry.
