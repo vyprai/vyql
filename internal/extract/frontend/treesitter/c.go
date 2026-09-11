@@ -1179,18 +1179,29 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					}})
 				}
 			default:
-				// `render_details render;` — a local declared with no initialiser, the
-				// ordinary way C introduces an aggregate before filling it in. Without a
-				// statement binding the name, every later mention of it evaluates to a
-				// fresh node, so a store into one of its members and a read of that member
-				// land on two unrelated objects and no taint crosses between them. Bind it
-				// the way Java binds `Foo f;`: a declaration whose value is an empty
-				// constant, which names the storage without claiming anything about it.
-				if c.inFunc == 0 {
-					continue // a file-scope declaration is not a local
-				}
+				// `render_details render;` — a declaration with no initialiser, the ordinary
+				// way C introduces an aggregate before filling it in. Without a statement
+				// binding the name, every later mention of it evaluates to a fresh node, so
+				// a store into one of its members and a read of that member land on two
+				// unrelated objects and no taint crosses between them. Bind it the way Java
+				// binds `Foo f;`: a declaration whose value is an empty constant, which
+				// names the storage without claiming anything about it.
+				//
+				// At file scope the same statement is what makes a global ONE object for the
+				// translation unit: the binding lives in the module scope every function body
+				// reads, so a field one function stores into and a field another reads back
+				// run through the same node instead of through two mentions that share
+				// nothing. Skipping it here is what left a global struct field unable to
+				// carry a value out of the function that stored it. That binding is also
+				// what a mention of the global in another function RESOLVES to, so it has to
+				// carry the name — an anonymous placeholder there would strip every
+				// identifier a binding matches a global's operand on.
 				if name := c.plainDeclName(d); name != "" {
-					out = append(out, nir.Assign{Targets: []string{name}, Value: nir.Const{Loc: L}, Decl: true})
+					value := nir.Expr(nir.Const{Loc: L})
+					if c.inFunc == 0 {
+						value = nir.Name{ID: name, Loc: L}
+					}
+					out = append(out, nir.Assign{Targets: []string{name}, Value: value, Decl: true})
 				}
 			}
 		}
