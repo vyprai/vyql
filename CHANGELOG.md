@@ -8,6 +8,30 @@ New rules and bindings change what a scan reports, so they get listed here like
 any other user-visible change. A finding that suddenly appears in your CI is a
 behaviour change, even if no code moved.
 
+## [Unreleased]
+
+### Fixed
+
+- **A bounded scan of a dense-language target completes.** A byte of Python
+  lowers to about five JavaScript bytes of graph, and the `-max-ram` partition
+  planner weighed every byte alike, so a Python-heavy target overflowed the
+  ceiling on its first partition and the scan died with no report at all —
+  graph-json and text alike. Each language is now weighed by how much graph a
+  byte of it lowers to (measured per language over the OWASP port corpora),
+  with the weights rounding up and unmeasured languages taking the heaviest
+  measured weight: over-weighting costs partitions, under-weighting costs the
+  scan. A 10MB mixed Go/Python/TypeScript monorepo that needed 24GB unbounded
+  now completes at `-max-ram 3GB` in under two minutes at a 1.1GB peak, in
+  both text and graph-json. JavaScript-only targets plan exactly as before.
+- **A partitioned scan holds each partition in RAM instead of routing it
+  through the disk-backed graph store.** The disk store's write path — memtable
+  arenas, SST builders, block cache — costs as much again as a partition's
+  whole graph, in memory the Go heap ceiling cannot see, and a partition is
+  sized to fit the ceiling in RAM by construction. Each finished partition is
+  also returned to the OS before the next is built, so fifteen partitions'
+  peaks do not sum into the ceiling the way one graph would. Partitioned scans
+  print one progress line per partition.
+
 ## [0.6.0] - 2026-09-11
 
 ### Added

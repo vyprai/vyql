@@ -20,6 +20,14 @@ import (
 // the graph alone passes a fixed per-scan ceiling, and the run ends with no report at all —
 // the memory watch stops it before the first rule runs.
 //
+// Weights are GRAPH weights, not byte weights: a file is weighed by its size times its
+// language's GraphWeight — how much graph a byte of that language lowers to, in JavaScript
+// bytes, the corpus the memory constants are calibrated on. A byte of Python lowers to about
+// five JavaScript bytes of graph, so a megabyte of Python is weighed as five: without that,
+// a partition sized for the JavaScript corpus overflows the ceiling on dense languages and
+// the scan dies on its first partition. limit and budget are in the same JavaScript-equivalent
+// bytes, so a JavaScript-only target plans exactly as it did before the weights existed.
+//
 // The cost is stated where it is paid: a flow whose source and sink land in different groups is
 // not reported. Grouping walks the tree in path order so a directory's files stay together and
 // the boundary falls between directories wherever it can, which is where cross-file flow is
@@ -57,18 +65,25 @@ func PlanPartitions(paths []string, excludes Excludes, limit, budget int64) []ma
 		// frontend claims still has to belong to a group — it is what the coverage report
 		// counts as unanalysed, and counting it in two groups would double it — but it
 		// costs no graph, so it must not shrink the group it lands in.
-		claimed := map[string]bool{}
+		//
+		// A file several frontends claim (a .php is both PHP source and config input)
+		// is weighed by the heaviest claimant: what it lowers to is the densest graph
+		// any of them will build from it.
+		claimWeight := map[string]int64{}
 		class := frontend.ClassifyEntries(entries)
 		for _, lg := range frontend.Languages() {
+			w := frontend.GraphWeight(lg.Name)
 			for _, f := range lg.FilesFor(entries, class) {
-				claimed[f] = true
+				if w > claimWeight[f] {
+					claimWeight[f] = w
+				}
 			}
 		}
 		for _, e := range entries {
 			w := int64(0)
-			if claimed[e.Path] {
+			if cw := claimWeight[e.Path]; cw > 0 {
 				if fi, err := os.Stat(e.Path); err == nil {
-					w = fi.Size()
+					w = fi.Size() * cw / 100
 				}
 			}
 			files = append(files, weighted{e.Path, w})
