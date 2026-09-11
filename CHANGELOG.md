@@ -8,7 +8,31 @@ New rules and bindings change what a scan reports, so they get listed here like
 any other user-visible change. A finding that suddenly appears in your CI is a
 behaviour change, even if no code moved.
 
-## [Unreleased]
+## [0.6.0] - 2026-09-11
+
+### Added
+
+- **Haskell parses.** A `.hs` file yields labelable calls instead of being
+  claimed by no language and invisible to every frontend.
+- **Adjacent-quantifier regex overlap is classified.** Polynomial (quadratic)
+  backtracking from a quantifier beside another over an intersecting alphabet
+  — a dot-run or whitespace-run pair, the shape the hapi/content
+  Content-Type and Content-Disposition literals ship — was invisible: the
+  ambiguity finder only reported a repeat whose own body repeats, the
+  JavaScript frontend skipped `.` outright and lowered a group to one opaque
+  atom, and no binding read `String.prototype.match` on a receiver route. The
+  pair is now classified, the dot atom is live, group bodies are transparent,
+  and `match`/`exec`/`test` are regex sinks.
+- **A Python call's keyword arguments are sink targets, and a function's
+  context carries facts about the functions it calls.** `kwargs`-shaped sinks
+  (`Delta(delta_path=…)`) were unreachable because sink targets addressed
+  positional arguments only, and a function-scoped binding could not see what
+  a helper called on its behalf — so the deepdiff remediation and its fixed
+  parent read identically and an untrusted delta application scanned clean.
+- **A truthiness guard can state what it dominates.** Guard correlations were
+  function-scoped and emitted only for a comparison operator, so a
+  truthiness-only authorization gate on one branch of a handler was
+  indistinguishable from one dominating the operation itself.
 
 ### Fixed
 
@@ -25,6 +49,54 @@ behaviour change, even if no code moved.
   and `-stats` still need the single store, so those combinations do not
   partition. A flow whose source and sink land in different partitions is not
   reported, as with findings mode; the scan prints that cost once on stderr.
+- **Taint crosses a request-scoped context store.** A value one function
+  stores with a library setter and another reads back with the matching getter
+  now connects, instead of the flow ending at the setter.
+- **A call resolves through a name an assignment bound to a function.** The
+  callee name was bound by an assignment statement rather than the callee's
+  own declaring initialiser, so the call carried a callee path but resolved to
+  no body and its arguments' taint terminated there.
+- **Taint follows a Ruby instance variable across methods.** A variable
+  written by one method and read back by another of the same class was a
+  dead end; so was a method's return value, and a reflective `Object#send`
+  resolved to nothing — a credential a helper assembles now reaches the sink
+  its caller hands it to.
+- **A JavaScript rest parameter is a parameter node.** Taint in a call's
+  trailing arguments never entered the callee, because the parameter
+  collector read required, optional and assignment patterns but skipped rest
+  patterns.
+- **A JavaScript callback held in a parameter is dispatched inside a nested
+  closure.** The closure's captured binding was a lexical name node rather
+  than the callee's parameter node, so the dynamic-callback dispatch never
+  fired.
+- **Taint is followed within a Rust closure body.** A closure passed as an
+  argument was lowered as the value of that argument, so a local bound inside
+  it carried no edge to its uses and a source and a sink in the same callback
+  never connected.
+- **The order relation reads a return written inside a branch.** It sequenced
+  nodes by program order and region nesting only, so a release followed by a
+  conditional early return was ordered before every later release or use
+  exactly as if the return were absent.
+- **PHP lowers an alternative-syntax block's statements.** `if (): … endif;`
+  and `foreach (): … endforeach;` bodies contributed no nodes, so nothing
+  inside them was labelled, traced or reported; and a receiver reached through
+  a property access is now type-constrained, instead of a sink binding
+  matching the bare method name.
+- **The C frontend observes an index held in a local.** The unbounded-index
+  observation fired only when the subscript's index text was itself a field
+  access, so an index computed into a local was never seen with or without a
+  bound.
+- **Taint crosses a C file-scope variable store and an address-taken
+  destination argument.** A write to a global lowered to a callee-less call
+  with no outgoing flow, and a read such as `fread(buf, …)` propagated only
+  while the call's result was discarded — a value held in a global now
+  reaches the sink that reads it back, and the buffer a call fills is
+  tainted.
+- **The C# frontend keeps `ref partial struct` and `ref partial class`
+  members.** tree-sitter-c-sharp cannot parse `ref` before `partial`, and the
+  declaration recovered as an error node plus a top-level statement block the
+  converter handled neither of — such a type's methods reached the graph with
+  no function node, no context tokens and no calls.
 
 ## [0.5.0] - 2026-09-09
 
