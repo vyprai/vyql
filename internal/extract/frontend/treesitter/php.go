@@ -349,6 +349,14 @@ func (c *phConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		c.className = prevClass
 		c.classBases = prevBases
 		return []nir.Stmt{nir.ClassDef{Name: name, Body: body, Bases: bases, Members: c.phpClassMembers(c.field(n, "body")), Loc: L}}
+	case "namespace_definition":
+		// `namespace X\Y { … }` holds the file's statements in this node's body, which the
+		// switch had no case for: everything inside the braces lowered to nothing. The
+		// semicolon form (`namespace X\Y;`) has no body — its statements are siblings of the
+		// declaration and were always lowered. PHP namespace braces are a lexical grouping,
+		// not a runtime scope, so the body flattens into the enclosing statement list the way
+		// the semicolon form's siblings do.
+		return c.block(c.field(n, "body"))
 	case "expression_statement":
 		kids := c.namedChildren(n)
 		if len(kids) == 0 {
