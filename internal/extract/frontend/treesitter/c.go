@@ -72,6 +72,10 @@ type ccConv struct {
 	// the narrow integer type one of the macro's call arguments is converted to
 	// by the macro's own body; nil until the first ask.
 	narrowForwardingMacros map[string][]string
+	// structFieldTypes caches, per struct or union type name this file declares
+	// with a body, the type spelling each field is declared at, which every
+	// member selection in it asks for; nil until the first ask.
+	structFieldTypes map[string]map[string]string
 	// root is the translation unit the conv is walking, so a file-level table
 	// can be read from inside one function body's conversion. The tree is alive
 	// for as long as the conv is.
@@ -1117,6 +1121,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccNarrowDeclaredBoundsCheckObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowingCastBoundsCheckObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowCallArgObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccNarrowWidthSizeProductObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccBufferRelocationOriginObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccCountedPopulationObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccFieldAliasStaleAfterReallocObservations(n)...)
@@ -5643,6 +5648,383 @@ func (c *ccConv) ccWideReturningFunctions() map[string]bool {
 	}
 	c.wideReturnFuncs = names
 	return names
+}
+
+// ccInt32Spellings are the integer spellings that declare a value at exactly
+// 32 bits on the targets this weakness is reported on: the widths at which a
+// product of two values can wrap beneath the allocation the product sizes.
+// Anything narrower is promoted to int before the multiply and a promoted pair
+// cannot overflow the int the product is computed in, and anything wider does
+// not wrap within a 32-bit pair at all.
+var ccInt32Spellings = map[string]bool{
+	"int": true, "signed": true, "signed int": true,
+	"unsigned": true, "unsigned int": true,
+	"int32_t": true, "uint32_t": true, "u_int32_t": true,
+}
+
+// ccAggregateTypeKey names the struct or union a declaration's type spells, or
+// "" when it spells none: the tag a `struct` or `union` prefix carries. The
+// type tables are keyed by that name, so a member selection resolves against
+// the same body the declaration points at.
+func ccAggregateTypeKey(typ string) string {
+	for _, prefix := range []string{"struct ", "union "} {
+		if strings.HasPrefix(typ, prefix) {
+			return strings.TrimSpace(typ[len(prefix):])
+		}
+	}
+	return ""
+}
+
+// ccStructFieldTypes collects, per struct or union type name this translation
+// unit declares with a body, the type spelling each field is declared at. A
+// type name is the body's own tag, or the alias a typedef gives it -- both
+// spell the same body at a declaration, so both key the same table. The first
+// body a name carries wins; a declaration that names a body this file does not
+// carry, or a typedef of a non-aggregate type, records nothing. A field
+// declared through a pointer, an array or a function declarator holds an
+// address, a run of them, or a callable rather than the integer its type
+// spells, so none of the three is recorded.
+func (c *ccConv) ccStructFieldTypes() map[string]map[string]string {
+	if c.structFieldTypes != nil {
+		return c.structFieldTypes
+	}
+	tables := map[string]map[string]string{}
+	record := func(key string, body *tree_sitter.Node) {
+		if key == "" || body == nil {
+			return
+		}
+		if _, ok := tables[key]; !ok {
+			tables[key] = c.ccFieldTypes(body)
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "struct_specifier", "union_specifier":
+			name := c.field(n, "name")
+			if name != nil {
+				record(c.text(name), c.field(n, "body"))
+			}
+		case "type_definition":
+			agg := c.field(n, "type")
+			if agg != nil && (c.kind(agg) == "struct_specifier" || c.kind(agg) == "union_specifier") {
+				record(c.declName(c.field(n, "declarator")), c.field(agg, "body"))
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(c.root)
+	c.structFieldTypes = tables
+	return tables
+}
+
+// ccFieldTypes reads one field_declaration_list into a field-name -> type
+// spelling table. A declarator that is not a bare field name -- a pointer, an
+// array, a bitfield's neighbours -- is not the integer its type spells and is
+// left out.
+func (c *ccConv) ccFieldTypes(body *tree_sitter.Node) map[string]string {
+	fields := map[string]string{}
+	for _, ch := range c.namedChildren(body) {
+		if c.kind(ch) != "field_declaration" {
+			continue
+		}
+		typ := ccTypeSpelling(c.text(c.field(ch, "type")))
+		if typ == "" {
+			continue
+		}
+		for _, d := range c.namedChildren(ch) {
+			if c.kind(d) != "field_identifier" {
+				continue
+			}
+			if name := c.text(d); name != "" {
+				if _, ok := fields[name]; !ok {
+					fields[name] = typ
+				}
+			}
+		}
+	}
+	return fields
+}
+
+// ccFuncDeclaredWidths reads, off one function's own declarations, the type
+// each name is declared at: the integer spelling for a name declared at one of
+// the narrow or wide integer spellings, and the struct or union type for a
+// name declared as one, which a member selection reads through. A pointer
+// declarator carries an address, so it stays out of the integer table -- but a
+// member selection reads through exactly that address, so it stays in the
+// struct table. A type the function does not declare -- a name whose
+// declaration the file does not carry -- reads in neither table.
+func (c *ccConv) ccFuncDeclaredWidths(fn *tree_sitter.Node) (ints, structs map[string]string) {
+	ints, structs = map[string]string{}, map[string]string{}
+	tables := c.ccStructFieldTypes()
+	record := func(typText string, d *tree_sitter.Node) {
+		if d == nil || typText == "" {
+			return
+		}
+		name := c.declName(d)
+		if name == "" {
+			return
+		}
+		key := ccAggregateTypeKey(typText)
+		if key == "" && tables[typText] != nil {
+			key = typText // a typedef the file gives an aggregate body
+		}
+		if key != "" {
+			if _, ok := structs[name]; !ok {
+				structs[name] = key
+			}
+			return
+		}
+		switch c.kind(d) {
+		case "pointer_declarator", "array_declarator", "function_declarator":
+			return
+		}
+		if ccInt32Spellings[typText] || ccWideIntTypes[typText] {
+			if _, ok := ints[name]; !ok {
+				ints[name] = typText
+			}
+		}
+	}
+	if pl := c.paramList(c.field(fn, "declarator")); pl != nil {
+		for _, ch := range c.namedChildren(pl) {
+			if !isCParamDecl(c.kind(ch)) {
+				continue
+			}
+			record(ccTypeSpelling(paramTypeFromField(c, ch)), c.field(ch, "declarator"))
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "declaration" {
+			typ := ccTypeSpelling(c.text(c.field(n, "type")))
+			for _, ch := range c.namedChildren(n) {
+				d := ch
+				if c.kind(d) == "init_declarator" {
+					d = c.field(d, "declarator")
+				}
+				record(typ, d)
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(c.field(fn, "body"))
+	return ints, structs
+}
+
+// ccProductFactors flattens a multiplication into the operands it multiplies:
+// a chain of `*` binary expressions, read through the parentheses that only
+// group it. Any other operand -- a sum, a subscript, a plain name -- is one
+// factor, so a size that adds to or subtracts from a product reads as the one
+// factor it is and not as the product inside it.
+func (c *ccConv) ccProductFactors(n *tree_sitter.Node) []*tree_sitter.Node {
+	for n != nil && c.kind(n) == "parenthesized_expression" {
+		kids := c.namedChildren(n)
+		if len(kids) != 1 {
+			break
+		}
+		n = kids[0]
+	}
+	if n == nil || c.kind(n) != "binary_expression" || c.text(c.field(n, "operator")) != "*" {
+		return []*tree_sitter.Node{n}
+	}
+	return append(c.ccProductFactors(c.field(n, "left")), c.ccProductFactors(c.field(n, "right"))...)
+}
+
+// ccFactorWidth reads the width one factor of a product is declared at, and
+// whether that width is a struct field's. A member selection resolves through
+// the name it selects from -- a parameter or a local declared as the struct or
+// union whose field table this file carries -- to the field's own declaration,
+// which is what names the width; a bare name reads its own declaration, and a
+// call reads the return type this file declares for it. A factor written as a
+// cast names the width the product is computed at: the usual arithmetic
+// conversions promote every factor beside a wide one, which is the widening
+// the fix spells as `(size_t)w * h`, so a cast to a wide integer reads wide and
+// a cast to a 32-bit spelling reads narrow. A sizeof factor is a size_t in
+// every product it multiplies, so it reads wide. Everything else -- a literal,
+// an operand whose type the file does not state -- carries no width here and
+// reads as unknown.
+func (c *ccConv) ccFactorWidth(n *tree_sitter.Node, ints, structs map[string]string, tables map[string]map[string]string, wideResults map[string]bool) (width string, field bool) {
+	if n == nil {
+		return "", false
+	}
+	switch c.kind(n) {
+	case "field_expression":
+		base, name := c.field(n, "argument"), c.field(n, "field")
+		if base == nil || c.kind(base) != "identifier" || name == nil {
+			return "", false
+		}
+		table := tables[structs[c.text(base)]]
+		if table == nil {
+			return "", false
+		}
+		typ, ok := table[c.text(name)]
+		if !ok {
+			return "", false
+		}
+		switch {
+		case ccInt32Spellings[typ]:
+			return "narrow", true
+		case ccWideIntTypes[typ]:
+			return "wide", true
+		}
+		return "", false
+	case "identifier":
+		typ, ok := ints[c.text(n)]
+		if !ok {
+			return "", false
+		}
+		switch {
+		case ccInt32Spellings[typ]:
+			return "narrow", false
+		case ccWideIntTypes[typ]:
+			return "wide", false
+		}
+		return "", false
+	case "call_expression":
+		if fn := c.field(n, "function"); fn != nil && wideResults[compactCExprText(c.text(fn))] {
+			return "wide", false
+		}
+		return "", false
+	case "cast_expression":
+		switch target := ccTypeSpelling(c.text(c.field(n, "type"))); {
+		case ccWideIntTypes[target]:
+			return "wide", false
+		case ccInt32Spellings[target]:
+			return "narrow", false
+		}
+		return "", false
+	}
+	if ccNamesSizeof(c.text(n)) {
+		return "wide", false
+	}
+	return "", false
+}
+
+// ccNarrowWidthSizeProductObservations reports an allocation whose size
+// argument holds a product computed at a declared 32-bit width: at least two
+// of its factors are operands the function declares at a 32-bit integer
+// spelling, and at least one of those is a struct field the file's own
+// declaration of that struct carries at that width. The multiply is where the
+// wrap happens -- a pair large enough multiplies to a small product, and the
+// allocation reserves the small one -- and the width it happens at is the
+// widest width any factor carries, so the same product spelled over size_t
+// fields or over a sizeof factor wraps nowhere. That is the separation this
+// observation exists to make, and the additive bounds check beside it
+// (ccNarrowDeclaredBoundsCheckObservations) cannot: its operands are
+// function-local names read at a comparison, and a member selection never
+// matches one.
+//
+// The width comes from the file being read and nowhere else, so a factor whose
+// type the file does not state -- a member selection off a base the function
+// does not declare, a call whose return type only a header carries, a name
+// declared in another translation unit -- is unknown rather than narrow, and a
+// product of two unknowns is not reported. A factor the file states wide
+// discharges the product: the multiply is computed at its width and cannot
+// wrap beneath the allocation. Only allocations this file's own size table
+// names are read, and only the size argument -- the count for the element
+// counting allocators, the byte size for the rest -- because a checked
+// allocator catches the wrap itself. A size that wraps a product inside a cast
+// to a wider type -- `(size_t)(w * h)`, the widening written one level too deep
+// -- hides the multiply from this walk, which reads the factors the size
+// argument multiplies and not the conversion written around them. Whether the
+// factors are attacker-chosen, and whether a guard above the allocation bounds
+// them, are the rule's questions.
+func (c *ccConv) ccNarrowWidthSizeProductObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	text := compactCExprText(c.text(body))
+	hasAllocator := false
+	for _, alloc := range []string{"malloc", "alloca", "realloc", "calloc", "reallocarray"} {
+		if strings.Contains(text, alloc+"(") {
+			hasAllocator = true
+			break
+		}
+	}
+	if !hasAllocator {
+		return nil
+	}
+	ints, structs := c.ccFuncDeclaredWidths(fn)
+	tables := c.ccStructFieldTypes()
+	wideResults := c.ccWideReturningFunctions()
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "call_expression" {
+			c.ccNarrowWidthSizeProductSite(n, ints, structs, tables, wideResults, seen, &out)
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// ccNarrowWidthSizeProductSite reads one call the size table names and
+// appends the observation when its size argument is the product described
+// above, once per call site.
+func (c *ccConv) ccNarrowWidthSizeProductSite(call *tree_sitter.Node, ints, structs map[string]string, tables map[string]map[string]string, wideResults map[string]bool, seen map[string]bool, out *[]nir.Stmt) {
+	alloc := compactCExprText(c.text(c.field(call, "function")))
+	shape, ok := ccAllocatorSizeArg[alloc]
+	if !ok {
+		return
+	}
+	args := c.namedChildren(c.field(call, "arguments"))
+	if shape.pos >= len(args) {
+		return
+	}
+	size := args[shape.pos]
+	fields := []string{}
+	narrow := 0
+	for _, factor := range c.ccProductFactors(size) {
+		width, fromField := c.ccFactorWidth(factor, ints, structs, tables, wideResults)
+		switch width {
+		case "wide":
+			return // the multiply is computed at the factor's width and cannot wrap
+		case "narrow":
+			narrow++
+			if fromField {
+				fields = append(fields, ccTruncateToken(compactCExprText(c.text(factor))))
+			}
+		}
+	}
+	if len(fields) == 0 || narrow < 2 {
+		return
+	}
+	loc := c.loc(call)
+	if seen[loc] {
+		return
+	}
+	seen[loc] = true
+	path := "analysis.narrow_width.size_product"
+	*out = append(*out, nir.ExprStmt{Value: nir.Call{
+		Callee: nir.Name{ID: path, Loc: loc},
+		Args: []nir.Expr{
+			nir.Const{Loc: loc, Value: "alloc=" + alloc},
+			nir.Const{Loc: loc, Value: "size=" + ccTruncateToken(compactCExprText(c.text(size)))},
+			nir.Const{Loc: loc, Value: "fields=" + strings.Join(fields, ",")},
+			nir.Const{Loc: loc, Value: "width=32bit_declared"},
+		},
+		Path:   path,
+		Method: "size_product",
+		Loc:    loc,
+	}})
 }
 
 // ccNarrowingCast is one cast that discards a wide value's high half, with the
