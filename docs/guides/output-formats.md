@@ -78,6 +78,11 @@ Sinks carry an `operation` from `vyql/exports/sink_operations.tsv`, mapping the
 concept to a downstream operation vocabulary. That file currently covers 22 of
 the 62 sink concepts the bindings emit; the rest export a null operation.
 
+Under an explicit `--max-ram`, a target too large for one graph is scanned as
+partitions and the printed document is the merge of the partitions' documents
+— same schema, one document. The review flags and `-stats` still need the
+single graph, so a run with either of those does not partition.
+
 ## Caching
 
 Scan results are cached by default (`--cache auto`). The cache keys on the source

@@ -8,6 +8,24 @@ New rules and bindings change what a scan reports, so they get listed here like
 any other user-visible change. A finding that suddenly appears in your CI is a
 behaviour change, even if no code moved.
 
+## [Unreleased]
+
+### Fixed
+
+- **`-format graph-json` can complete under a memory ceiling.** The bounded
+  partitioning a `-max-ram` scan uses was disabled for graph-json, because the
+  format serialises one graph and partitions have no one store to serialise —
+  so a target whose single graph exceeds the ceiling could never complete in
+  that mode, at any ceiling the host could offer. The document is a projection
+  of the graph (functions, call edges, findings), and projections of partitions
+  merge: a graph-json run without the review flags or `-stats` now scans as one
+  document per partition and prints one merged document, schema
+  `vyql.codemap/v1` unchanged. A baseline filters the printed document's
+  findings, exactly as it filters the one-graph document's. The flag reports
+  and `-stats` still need the single store, so those combinations do not
+  partition. A flow whose source and sink land in different partitions is not
+  reported, as with findings mode; the scan prints that cost once on stderr.
+
 ## [0.5.0] - 2026-09-09
 
 ### Added
