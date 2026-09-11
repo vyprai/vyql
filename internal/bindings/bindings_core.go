@@ -165,6 +165,14 @@ func (set scopedPredicateHitSet) matches(scope, anchorID string, allowUnscoped b
 	i := sort.Search(len(set.scopes), func(i int) bool {
 		return set.scopes[i] >= prefix
 	})
+	if i < len(set.scopes) && strings.HasPrefix(set.scopes[i], prefix) {
+		return true
+	}
+	// a callback region hung off the anchor's function ('#') is inside it too -- see scopeCovers
+	prefix = scope + "#"
+	i = sort.Search(len(set.scopes), func(i int) bool {
+		return set.scopes[i] >= prefix
+	})
 	return i < len(set.scopes) && strings.HasPrefix(set.scopes[i], prefix)
 }
 
