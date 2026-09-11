@@ -52,17 +52,19 @@ func ExtractCSharp(files []string, root string) (nir.Program, error) {
 // declaration is the `partial`-only spelling the grammar does accept, so it parses as
 // the struct/class declaration it is wherever it stands: at top level, in a namespace,
 // or nested in another type.
-//
 // Blanking keeps the byte length and every newline, so node offsets still address the
 // file on disk and the raw-text observations that scan c.src see the original layout.
 // Comments and string/character literals are left alone: a literal's value is what
 // `val` matching reads, and a comment is not a declaration.
+//
+// The copy is deferred until a header is actually found: a file that carries the words
+// `ref` and `partial` only in prose pays the scan and nothing else, which is nearly all
+// of them.
 func csBlankRefPartialKeyword(src []byte) []byte {
 	if !bytes.Contains(src, []byte("ref")) || !bytes.Contains(src, []byte("partial")) {
 		return src
 	}
-	out := make([]byte, len(src))
-	copy(out, src)
+	var blanks []int // start offsets of the `ref` spells to blank, each 3 bytes wide
 	for i := 0; i < len(src); {
 		switch {
 		case src[i] == '/' && i+1 < len(src) && src[i+1] == '/':
@@ -83,15 +85,23 @@ func csBlankRefPartialKeyword(src []byte) []byte {
 			i++
 		case csIsWordAt(src, i, "ref"):
 			if end := csRefPartialDeclEnd(src, i); end > i {
-				for j := i; j < i+len("ref"); j++ {
-					out[j] = ' '
-				}
+				blanks = append(blanks, i)
 				i = end
 				continue
 			}
 			i += len("ref")
 		default:
 			i++
+		}
+	}
+	if len(blanks) == 0 {
+		return src
+	}
+	out := make([]byte, len(src))
+	copy(out, src)
+	for _, i := range blanks {
+		for j := i; j < i+len("ref"); j++ {
+			out[j] = ' '
 		}
 	}
 	return out
