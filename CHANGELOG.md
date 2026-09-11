@@ -8,7 +8,7 @@ New rules and bindings change what a scan reports, so they get listed here like
 any other user-visible change. A finding that suddenly appears in your CI is a
 behaviour change, even if no code moved.
 
-## [Unreleased]
+## [0.6.1] - 2026-09-11
 
 ### Fixed
 
