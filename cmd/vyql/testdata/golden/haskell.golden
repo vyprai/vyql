@@ -1,0 +1,4 @@
+call T.pack
+call analysis.function.return
+call run
+call value

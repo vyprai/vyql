@@ -21,6 +21,7 @@ require (
 	github.com/tree-sitter/tree-sitter-c v0.24.2
 	github.com/tree-sitter/tree-sitter-c-sharp v0.23.5
 	github.com/tree-sitter/tree-sitter-cpp v0.23.4
+	github.com/tree-sitter/tree-sitter-haskell v0.23.1
 	github.com/tree-sitter/tree-sitter-java v0.23.5
 	github.com/tree-sitter/tree-sitter-javascript v0.25.0
 	github.com/tree-sitter/tree-sitter-php v0.24.2
@@ -47,3 +48,13 @@ require (
 	golang.org/x/sys v0.41.0 // indirect
 	google.golang.org/protobuf v1.36.7 // indirect
 )
+
+// Upstream renamed the repository to tree-sitter-grammars/tree-sitter-haskell
+// without renaming the module, and has tagged nothing since v0.23.1. That tag
+// carries a parser generated for language ABI 14, and its external scanner
+// corrupts the heap (a malloc abort, which takes the scan with it) under the
+// ABI 15 runtime go-tree-sitter v0.25.0 ships. The rename's HEAD is generated
+// for ABI 15 and parses broken source without it, so the replacement follows
+// the rename to that commit. When upstream tags again, replace the version on
+// both sides and drop this comment.
+replace github.com/tree-sitter/tree-sitter-haskell => github.com/tree-sitter-grammars/tree-sitter-haskell v0.0.0-20260612044253-98aedbd2d694

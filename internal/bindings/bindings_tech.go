@@ -18,6 +18,7 @@ var extTech = map[string]string{
 	".ex": "elixir", ".exs": "elixir",
 	".dart":   "dart",
 	".groovy": "groovy", ".gradle": "groovy",
+	".hs": "haskell",
 	".as": "actionscript",
 }
 

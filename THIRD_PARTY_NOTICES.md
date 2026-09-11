@@ -74,6 +74,7 @@ file is build and test input; it is not loaded at scan time.
 | github.com/tree-sitter/tree-sitter-c-sharp/bindings/go | MIT |
 | github.com/tree-sitter/tree-sitter-c/bindings/go | MIT |
 | github.com/tree-sitter/tree-sitter-cpp/bindings/go | MIT |
+| github.com/tree-sitter/tree-sitter-haskell/bindings/go | MIT |
 | github.com/tree-sitter/tree-sitter-java/bindings/go | MIT |
 | github.com/tree-sitter/tree-sitter-javascript/bindings/go | MIT |
 | github.com/tree-sitter/tree-sitter-php/bindings/go | MIT |

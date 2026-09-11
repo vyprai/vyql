@@ -1251,6 +1251,8 @@ func ScalaBindings() []Applicator { return BindingsFor("scala") }
 
 func LuaBindings() []Applicator { return BindingsFor("lua") }
 
+func HaskellBindings() []Applicator { return BindingsFor("haskell") }
+
 func KotlinBindings() []Applicator { return BindingsFor("kotlin") }
 
 func PowerShellBindings() []Applicator { return BindingsFor("powershell") }

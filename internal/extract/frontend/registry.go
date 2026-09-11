@@ -64,6 +64,7 @@ var languages = sync.OnceValue(func() []Language {
 		{"elixir", map[string]bool{".ex": true, ".exs": true}, treesitter.ExtractElixir, bindings.ElixirBindings},
 		{"dart", map[string]bool{".dart": true}, treesitter.ExtractDart, bindings.DartBindings},
 		{"groovy", map[string]bool{".groovy": true, ".gradle": true}, treesitter.ExtractGroovy, bindings.GroovyBindings},
+		{"haskell", map[string]bool{".hs": true}, treesitter.ExtractHaskell, bindings.HaskellBindings},
 		// ActionScript (Flash/AIR). Its own hand-written frontend: no tree-sitter grammar
 		// parses `package a.b { … }` or `private var x:String`, and the JavaScript grammar
 		// reads a whole .as file as one error.
