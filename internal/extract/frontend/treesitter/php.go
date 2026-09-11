@@ -1826,13 +1826,16 @@ func phpCompactText(s string) string {
 	}, s)
 }
 
-// phpBranch flattens one if-branch body: a `{}` compound_statement, or a brace-less
-// single statement (PHP allows `if ($c) $x = 1;`).
+// phpBranch flattens one if-branch body: a `{}` compound_statement, a `:` colon_block
+// (the alternative syntax, `if ($c): … endif;`), or a brace-less single statement (PHP
+// allows `if ($c) $x = 1;`). Without the colon_block case the whole alternative-syntax
+// body was lowered as one statement and dropped, so nothing inside it reached the graph.
 func (c *phConv) phpBranch(b *tree_sitter.Node) []nir.Stmt {
 	if b == nil {
 		return nil
 	}
-	if c.kind(b) == "compound_statement" {
+	switch c.kind(b) {
+	case "compound_statement", "colon_block":
 		var out []nir.Stmt
 		for _, st := range c.namedChildren(b) {
 			out = append(out, c.stmt(st)...)
@@ -2022,7 +2025,8 @@ func (c *phConv) collectBlocks(n *tree_sitter.Node) []nir.Stmt {
 	walk = func(m *tree_sitter.Node) {
 		for _, ch := range children(m) {
 			switch c.kind(ch) {
-			case "compound_statement":
+			case "compound_statement", "colon_block":
+				// colon_block is the alternative-syntax loop body, `while ($c): … endwhile;`
 				out = append(out, c.block(ch)...)
 			case "else_clause", "else_if_clause", "catch_clause", "finally_clause",
 				"switch_block", "case_statement", "default_statement":

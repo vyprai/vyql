@@ -1356,6 +1356,7 @@ func TestMigrationLedgerDoesNotCarryStaleV1BridgeSuggestions(t *testing.T) {
 // binding corpus that has gone missing.
 var languagesAwaitingDefinitions = map[string]bool{
 	"actionscript": true,
+	"haskell":      true,
 }
 
 func skipIfAwaitingDefinitions(t *testing.T, lang string) {

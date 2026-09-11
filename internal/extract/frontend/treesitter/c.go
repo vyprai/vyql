@@ -1179,18 +1179,29 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 					}})
 				}
 			default:
-				// `render_details render;` — a local declared with no initialiser, the
-				// ordinary way C introduces an aggregate before filling it in. Without a
-				// statement binding the name, every later mention of it evaluates to a
-				// fresh node, so a store into one of its members and a read of that member
-				// land on two unrelated objects and no taint crosses between them. Bind it
-				// the way Java binds `Foo f;`: a declaration whose value is an empty
-				// constant, which names the storage without claiming anything about it.
-				if c.inFunc == 0 {
-					continue // a file-scope declaration is not a local
-				}
+				// `render_details render;` — a declaration with no initialiser, the ordinary
+				// way C introduces an aggregate before filling it in. Without a statement
+				// binding the name, every later mention of it evaluates to a fresh node, so
+				// a store into one of its members and a read of that member land on two
+				// unrelated objects and no taint crosses between them. Bind it the way Java
+				// binds `Foo f;`: a declaration whose value is an empty constant, which
+				// names the storage without claiming anything about it.
+				//
+				// At file scope the same statement is what makes a global ONE object for the
+				// translation unit: the binding lives in the module scope every function body
+				// reads, so a field one function stores into and a field another reads back
+				// run through the same node instead of through two mentions that share
+				// nothing. Skipping it here is what left a global struct field unable to
+				// carry a value out of the function that stored it. That binding is also
+				// what a mention of the global in another function RESOLVES to, so it has to
+				// carry the name — an anonymous placeholder there would strip every
+				// identifier a binding matches a global's operand on.
 				if name := c.plainDeclName(d); name != "" {
-					out = append(out, nir.Assign{Targets: []string{name}, Value: nir.Const{Loc: L}, Decl: true})
+					value := nir.Expr(nir.Const{Loc: L})
+					if c.inFunc == 0 {
+						value = nir.Name{ID: name, Loc: L}
+					}
+					out = append(out, nir.Assign{Targets: []string{name}, Value: value, Decl: true})
 				}
 			}
 		}
@@ -1626,6 +1637,29 @@ func (c *ccConv) destName(a *tree_sitter.Node) string {
 	return ""
 }
 
+// readerDestinationEffects carries a reader's destination write on the call, so the
+// variable its destination argument names is filled whatever the enclosing statement
+// does with the result. A reader fills its buffer as a side effect of running, and
+// `len += fread(&num, 1, 4, fp)` both accumulates the count and fills num -- but the
+// write used to be spelled only by the statement that discarded the result, so a
+// source label on a read whose result was assigned, accumulated or tested sat on the
+// call and never reached the count it had read.
+//
+// The effect re-binds the destination to the call's result node, which is the same
+// binding the discarded spelling makes through its assignment; where that spelling
+// still applies it stays, and the two bind one variable to one node.
+func (c *ccConv) readerDestinationEffects(name string, args *tree_sitter.Node) []nir.CallEffect {
+	idx, ok := cReaders[name]
+	if !ok {
+		return nil
+	}
+	nodes := c.namedChildren(args)
+	if idx >= len(nodes) || c.destName(nodes[idx]) == "" {
+		return nil
+	}
+	return []nir.CallEffect{{DestArg: idx, SourceResult: true}}
+}
+
 // cBranch flattens one if-branch body: a `{}` compound_statement, an else_clause wrapper,
 // or a brace-less single statement.
 func (c *ccConv) cBranch(b *tree_sitter.Node) []nir.Stmt {
@@ -1922,8 +1956,10 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "call_expression":
 		fn := c.field(n, "function")
 		path := c.dotted(fn)
-		method := lastSeg(path)
-		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(c.field(n, "arguments")), Path: path, Method: method, Loc: L}
+		args := c.field(n, "arguments")
+		call := nir.Call{Callee: c.expr(fn), Args: c.callArgs(args), Path: path, Method: lastSeg(path), Loc: L}
+		call.Effects = c.readerDestinationEffects(lastSeg(path), args)
+		return call
 	case "message_expression": // ObjC [receiver method:arg ...]
 		recv := c.field(n, "receiver")
 		methN := c.field(n, "method")
@@ -1994,6 +2030,10 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 		return allocations
 	}
 	var out []nir.Stmt
+	// locals maps each name the body stores to the expression it was last
+	// computed from. The walk fills it as it passes each store, so a subscript
+	// only ever consults the stores that precede it.
+	locals := map[string]string{}
 	var walk func(*tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
 		if n == nil {
@@ -2019,13 +2059,50 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 					Loc:    loc,
 				}})
 			}
-			if ccStructuredIndex(idxText) && compactIdx != "" {
+			// An index computed into a local is the field-derived index it was
+			// computed from: `unsigned sid = c->segment_id` subscripts with a
+			// field read under a local's name. The store that reaches this
+			// access is the one the walk has already passed, and only a store
+			// holding a field read makes the index field-derived -- a local
+			// read off a parameter or a constant carries no field, and opening
+			// the observation to every local is what reports the ordinary
+			// counted loop everywhere.
+			origin := ""
+			if !ccStructuredIndex(idxText) && idx != nil && c.kind(idx) == "identifier" {
+				origin = locals[idxText]
+			}
+			// The index is the bare induction variable of a loop a field read
+			// bounds: the field states how far the loop runs, the array
+			// declaration states how far it may run, and nothing in the
+			// function relates the two. Asked before the direct access below so
+			// a loop-bounded local keeps the loop fact rather than the access
+			// one.
+			loopBound, loopCapacity, loopBounded := "", "", false
+			if bound, capacity, ok := c.ccLoopBoundFixedArrayIndex(n, compactIdx, loops, arrays, bodyText); ok {
+				loopBound, loopCapacity, loopBounded = bound, capacity, true
+			}
+			if !loopBounded && (ccStructuredIndex(idxText) || origin != "") && compactIdx != "" {
 				loc := c.loc(n)
 				if !seen[loc] {
 					seen[loc] = true
+					prefixText := compactCExprText(c.textBefore(body, n))
 					guard := "guard=missing_upper_bound"
-					if ccHasUpperBoundGuard(bodyText, compactCExprText(c.textBefore(body, n)), compactIdx) ||
-						c.ccIndexWithinAllocation(n, compactIdx, allocationCounts()) {
+					var bound ccIndexBound
+					// The suffix text is only compacted when the prefix searches
+					// fail: a guard written before the access is the common case,
+					// and compacting everything after every access to then rarely
+					// read it is the cost the local-index path would otherwise add
+					// to every field-derived subscript.
+					if credited, ok := ccUpperBoundGuardBefore(prefixText, compactIdx); ok {
+						guard = "guard=upper_bound"
+						bound = credited
+					} else if credited, ok := ccUpperBoundGuardAfter(compactCExprText(c.textAfter(body, n)), compactIdx); ok {
+						guard = "guard=upper_bound"
+						bound = credited
+					} else if credited, ok := ccUpperBoundGuardReject(prefixText, compactIdx); ok {
+						guard = "guard=upper_bound"
+						bound = credited
+					} else if c.ccIndexWithinAllocation(n, compactIdx, allocationCounts()) {
 						guard = "guard=upper_bound"
 					}
 					path := "analysis.index.access"
@@ -2034,24 +2111,29 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 						path = "analysis.index.field_derived_missing_upper_bound"
 						method = "field_derived_missing_upper_bound"
 					}
+					args := []nir.Expr{
+						nir.Const{Loc: loc, Value: "index_kind=field_derived"},
+						nir.Const{Loc: loc, Value: guard},
+						nir.Const{Loc: loc, Value: "index=" + compactIdx},
+					}
+					if origin != "" {
+						args = append(args, nir.Const{Loc: loc, Value: "origin=" + origin})
+					}
+					if bound.expr != "" {
+						args = append(args,
+							nir.Const{Loc: loc, Value: "bound=" + bound.expr},
+							nir.Const{Loc: loc, Value: "bound_side=" + bound.side})
+					}
 					out = append(out, nir.ExprStmt{Value: nir.Call{
 						Callee: nir.Name{ID: path, Loc: loc},
-						Args: []nir.Expr{
-							nir.Const{Loc: loc, Value: "index_kind=field_derived"},
-							nir.Const{Loc: loc, Value: guard},
-							nir.Const{Loc: loc, Value: "index=" + compactIdx},
-						},
+						Args:   args,
 						Path:   path,
 						Method: method,
 						Loc:    loc,
 					}})
 				}
 			}
-			// The index is the bare induction variable of a loop a field read
-			// bounds: the field states how far the loop runs, the array
-			// declaration states how far it may run, and nothing in the
-			// function relates the two.
-			if bound, capacity, ok := c.ccLoopBoundFixedArrayIndex(n, compactIdx, loops, arrays, bodyText); ok {
+			if loopBounded {
 				loc := c.loc(n)
 				if !seen[loc] {
 					seen[loc] = true
@@ -2062,8 +2144,8 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 							nir.Const{Loc: loc, Value: "index_kind=field_derived"},
 							nir.Const{Loc: loc, Value: "guard=missing_upper_bound"},
 							nir.Const{Loc: loc, Value: "index=" + compactIdx},
-							nir.Const{Loc: loc, Value: "bound=" + bound},
-							nir.Const{Loc: loc, Value: "capacity=" + capacity},
+							nir.Const{Loc: loc, Value: "bound=" + loopBound},
+							nir.Const{Loc: loc, Value: "capacity=" + loopCapacity},
 						},
 						Path:   path,
 						Method: "field_derived_missing_upper_bound",
@@ -2108,12 +2190,77 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
+		// Recorded on the way out, so a subscript inside the stored
+		// expression still reads the value the name held before it.
+		c.ccRecordLocalStore(n, locals)
 		if pushed {
 			loops = loops[:len(loops)-1]
 		}
 	}
 	walk(body)
 	return out
+}
+
+// ccRecordLocalStore notes a store to a plain local: `sid = expr` and
+// `unsigned sid = expr` both file expr under sid. A member or subscript target
+// is someone else's storage and files nothing, and neither do the update and
+// compound forms, which continue a value rather than replace it -- what they
+// leave behind is not what their right-hand side says.
+func (c *ccConv) ccRecordLocalStore(n *tree_sitter.Node, locals map[string]string) {
+	var name, value *tree_sitter.Node
+	switch c.kind(n) {
+	case "assignment_expression":
+		if c.assignmentOp(n) != "=" {
+			return
+		}
+		left := c.field(n, "left")
+		if left == nil || c.kind(left) != "identifier" {
+			return
+		}
+		name, value = left, c.field(n, "right")
+	case "init_declarator":
+		declarator := c.field(n, "declarator")
+		if declarator == nil || c.kind(declarator) != "identifier" {
+			return
+		}
+		name, value = declarator, c.field(n, "value")
+	default:
+		return
+	}
+	if name == nil || value == nil {
+		return
+	}
+	// A store replaces whatever the name held, so a store that is not a field
+	// read ends the name's field-derived stretch rather than leaving the last
+	// field's value standing under it -- the `i = level` of the next loop's
+	// header says nothing about what `i = zsl->level` held two loops ago.
+	if !c.ccFieldAccessValue(value) {
+		delete(locals, c.text(name))
+		return
+	}
+	locals[c.text(name)] = compactCExprText(c.text(value))
+}
+
+// ccFieldAccessValue reports whether an expression is a field read, modulo the
+// casts and parentheses that do not change what it reads: `s->n`, the
+// `curs.segment_id(depth)` call and `(unsigned)(s->n)` all are. Anything built
+// on top of one is not -- `gg->len - 22` transforms the value, and
+// `MIN(gg->len - off, GG_MAX_LEN)` bounds it, which is precisely the bound the
+// guard half of the observation exists to credit. Text alone cannot draw that
+// line: both spellings contain `->`.
+func (c *ccConv) ccFieldAccessValue(n *tree_sitter.Node) bool {
+	n = ccUnwrapCExpr(n)
+	if n == nil {
+		return false
+	}
+	switch c.kind(n) {
+	case "field_expression":
+		return true
+	case "call_expression":
+		fn := c.field(n, "function")
+		return fn != nil && c.kind(fn) == "field_expression"
+	}
+	return false
 }
 
 // ccSubscriptIndex returns a subscript's index expression. The C grammar names
@@ -10003,32 +10150,75 @@ func ccStructuredIndex(s string) bool {
 	return strings.Contains(s, "->") || strings.Contains(s, ".")
 }
 
-// ccHasUpperBoundGuard reports whether idx is bounded above somewhere the
-// access can rely on. bodyText is the whole function body; prefixText is the
-// part of it that precedes the access.
-func ccHasUpperBoundGuard(bodyText, prefixText, idx string) bool {
-	// Proceed-if-in-range spellings: `idx < BOUND` and `BOUND > idx`. Read over
-	// the whole body, as they always have been.
-	if ccComparisonAfter(bodyText, idx, '<', false) || ccComparisonBefore(bodyText, idx, '>') {
-		return true
+// ccIndexBound is the comparison an index's upper bound was credited from: the
+// expression the index is compared against, and the side of the access that
+// comparison stands on. Both travel with the observation, so a binding reads
+// the bound and where it is rather than taking the guard's word for it.
+type ccIndexBound struct {
+	expr string // the compared-against expression, compacted
+	side string // "before" the access, or "after" it
+}
+
+// The guard search runs in three stages so a caller pays for the text a stage
+// needs only when it reaches it: the proceed spellings written before the
+// access, the proceed spellings written after it, and the reject spelling
+// before it. The order below is the order the stages are asked in.
+//
+// A bare name is a substring of half the identifiers in a function, so when
+// the index is one it is only matched standing alone: `s < n` bounds `s`,
+// `st2idx[s] < n` does not.
+
+// ccUpperBoundGuardBefore reports the comparison bounding idx above among the
+// proceed spellings (`idx < BOUND`, `BOUND > idx`) written before the access.
+// prefixText is the part of the function body that precedes it.
+func ccUpperBoundGuardBefore(prefixText, idx string) (ccIndexBound, bool) {
+	boundary := ccIdentifierLike(idx)
+	if bound, ok := ccComparisonAfterBound(prefixText, idx, '<', false, boundary); ok {
+		return ccIndexBound{expr: bound, side: "before"}, true
 	}
-	// Reject-if-out-of-range spelling: `idx > BOUND` / `idx >= BOUND`, the form
-	// an early return or a clamp takes.
-	//
-	// Read only over what precedes the access. An early return bounds what
-	// comes after it and nothing else, and unlike a loop condition it carries
-	// no hint of its own scope, so crediting one from further down the function
-	// is how a guard three lines below an unguarded access gets read as
-	// protecting it.
-	//
-	// Only the index-on-the-left half is read at all. The mirrored `BOUND <
-	// idx` is not: it is indistinguishable from `for (i = 0; i < s->len; i++)`,
-	// where the field is the loop's bound rather than the bounded value, which
-	// would suppress the commonest shape this analysis exists to report.
-	//
-	// A zero or sign literal on the right is a nonzero/sign test (`s->len > 0`,
-	// `s->len >= 0`, `s->len > -1`), not a bound, and does not count either.
-	return ccComparisonAfter(prefixText, idx, '>', true)
+	if bound, ok := ccComparisonBeforeBound(prefixText, idx, '>', boundary); ok {
+		return ccIndexBound{expr: bound, side: "before"}, true
+	}
+	return ccIndexBound{}, false
+}
+
+// ccUpperBoundGuardAfter is ccUpperBoundGuardBefore over the part of the body
+// that follows the access: the same spellings, credited to a comparison that
+// stands AFTER it -- one that runs too late to protect the access, which is
+// exactly what the side records.
+func ccUpperBoundGuardAfter(suffixText, idx string) (ccIndexBound, bool) {
+	boundary := ccIdentifierLike(idx)
+	if bound, ok := ccComparisonAfterBound(suffixText, idx, '<', false, boundary); ok {
+		return ccIndexBound{expr: bound, side: "after"}, true
+	}
+	if bound, ok := ccComparisonBeforeBound(suffixText, idx, '>', boundary); ok {
+		return ccIndexBound{expr: bound, side: "after"}, true
+	}
+	return ccIndexBound{}, false
+}
+
+// ccUpperBoundGuardReject reports the reject-if-out-of-range spelling:
+// `idx > BOUND` / `idx >= BOUND`, the form an early return or a clamp takes.
+//
+// Read only over what precedes the access. An early return bounds what
+// comes after it and nothing else, and unlike a loop condition it carries
+// no hint of its own scope, so crediting one from further down the function
+// is how a guard three lines below an unguarded access gets read as
+// protecting it.
+//
+// Only the index-on-the-left half is read at all. The mirrored `BOUND <
+// idx` is not: it is indistinguishable from `for (i = 0; i < s->len; i++)`,
+// where the field is the loop's bound rather than the bounded value, which
+// would suppress the commonest shape this analysis exists to report.
+//
+// A zero or sign literal on the right is a nonzero/sign test (`s->len > 0`,
+// `s->len >= 0`, `s->len > -1`), not a bound, and does not count either.
+func ccUpperBoundGuardReject(prefixText, idx string) (ccIndexBound, bool) {
+	boundary := ccIdentifierLike(idx)
+	if bound, ok := ccComparisonAfterBound(prefixText, idx, '>', true, boundary); ok {
+		return ccIndexBound{expr: bound, side: "before"}, true
+	}
+	return ccIndexBound{}, false
 }
 
 // ccIndexWithinAllocation reports whether the allocation that sizes the
@@ -10227,15 +10417,29 @@ func ccNamesSizeof(s string) bool {
 // not count. When needBound is set, a right-hand side that is a zero or sign
 // literal does not count either.
 func ccComparisonAfter(bodyText, idx string, op byte, needBound bool) bool {
+	_, ok := ccComparisonAfterBound(bodyText, idx, op, needBound, false)
+	return ok
+}
+
+// ccComparisonAfterBound is ccComparisonAfter with the bound on the operator's
+// other side read out as well: the term the comparison compares idx against.
+// With boundary set, an occurrence of idx that continues an identifier, a
+// member access or a scope is not the index and is passed over.
+func ccComparisonAfterBound(bodyText, idx string, op byte, needBound bool, boundary bool) (string, bool) {
 	if idx == "" {
-		return false
+		return "", false
 	}
 	for off := 0; ; {
 		i := strings.Index(bodyText[off:], idx)
 		if i < 0 {
-			return false
+			return "", false
 		}
-		off += i + len(idx)
+		at := off + i
+		off = at + len(idx)
+		if boundary && at > 0 && (ccIdentByte(bodyText[at-1]) ||
+			bodyText[at-1] == '.' || bodyText[at-1] == ':' || bodyText[at-1] == '>') {
+			continue
+		}
 		tail := bodyText[off:]
 		if len(tail) == 0 || tail[0] != op {
 			continue
@@ -10247,7 +10451,7 @@ func ccComparisonAfter(bodyText, idx string, op byte, needBound bool) bool {
 		if needBound && ccZeroOrSignLiteral(rhs) {
 			continue
 		}
-		return true
+		return ccTermAfter(rhs), true
 	}
 }
 
@@ -10255,25 +10459,136 @@ func ccComparisonAfter(bodyText, idx string, op byte, needBound bool) bool {
 // operator op ("<" / ">", optionally with a trailing "=") immediately before
 // `idx`. A doubled operator is a shift and does not count.
 func ccComparisonBefore(bodyText, idx string, op byte) bool {
+	_, ok := ccComparisonBeforeBound(bodyText, idx, op, false)
+	return ok
+}
+
+// ccComparisonBeforeBound is ccComparisonBefore with the bound on the
+// operator's other side read out as well. With boundary set, an idx reached
+// through a member access -- the `s` of `x->s` -- is not the index and is
+// passed over.
+func ccComparisonBeforeBound(bodyText, idx string, op byte, boundary bool) (string, bool) {
 	if idx == "" {
-		return false
+		return "", false
 	}
 	for off := 0; ; {
 		i := strings.Index(bodyText[off:], idx)
 		if i < 0 {
-			return false
+			return "", false
 		}
 		at := off + i
+		end := at + len(idx)
 		head := bodyText[:at]
+		if boundary && (strings.HasSuffix(head, "->") ||
+			strings.HasSuffix(head, "::") || strings.HasSuffix(head, ".")) {
+			off = end
+			continue
+		}
+		// A closed template reads as a comparison -- `map<A, uint32_t> st2idx`
+		// -- and the name it declares continues the operand it is being matched
+		// against, so the occurrence is not the whole of it.
+		if boundary && end < len(bodyText) && (ccIdentByte(bodyText[end]) || bodyText[end] == '.') {
+			off = end
+			continue
+		}
 		if strings.HasSuffix(head, string(op)+"=") {
 			head = head[:len(head)-1]
 		}
 		if strings.HasSuffix(head, string(op)) &&
 			!strings.HasSuffix(head, string(op)+string(op)) {
-			return true
+			return ccTermBefore(head[:len(head)-1]), true
 		}
 		off = at + len(idx)
 	}
+}
+
+// ccTermAfter reads the term a compacted expression opens with: a name with
+// the member, scope and subscript accesses hanging off it and, where one
+// follows, a single call's argument list. `t->count`, `segment_.size()` and
+// `Policy::kBucketNum` read whole; `n+1` stops at the `+`, which is where it
+// stops being a plain bound.
+func ccTermAfter(s string) string {
+	i := 0
+	for i < len(s) {
+		switch {
+		case ccIdentByte(s[i]):
+			for i < len(s) && ccIdentByte(s[i]) {
+				i++
+			}
+		case s[i] == '(' || s[i] == '[':
+			i = ccTermSkipGroup(s, i)
+		case strings.HasPrefix(s[i:], "->"), strings.HasPrefix(s[i:], "::"):
+			i += 2
+		case s[i] == '.':
+			i++
+		default:
+			return s[:i]
+		}
+	}
+	return s[:i]
+}
+
+// ccTermBefore reads the term a compacted expression closes with, the mirror
+// of ccTermAfter: `s->len` out of `i<s->len`, `segment_.size()` out of
+// `sid>=segment_.size()`.
+func ccTermBefore(s string) string {
+	i := len(s)
+	for i > 0 {
+		switch {
+		case ccIdentByte(s[i-1]):
+			for i > 0 && ccIdentByte(s[i-1]) {
+				i--
+			}
+		case s[i-1] == ')' || s[i-1] == ']':
+			closer, opener := byte(')'), byte('(')
+			if s[i-1] == ']' {
+				closer, opener = ']', '['
+			}
+			depth := 0
+			for j := i - 1; j >= 0; j-- {
+				switch s[j] {
+				case closer:
+					depth++
+				case opener:
+					depth--
+				}
+				if depth == 0 {
+					i = j
+					break
+				}
+			}
+			if depth != 0 { // never closes: not a term this analysis reads
+				return s[i:]
+			}
+		case strings.HasSuffix(s[:i], "->") || strings.HasSuffix(s[:i], "::") || s[i-1] == '.':
+			if strings.HasSuffix(s[:i], "->") || strings.HasSuffix(s[:i], "::") {
+				i -= 2
+			} else {
+				i--
+			}
+		default:
+			return s[i:]
+		}
+	}
+	return s[i:]
+}
+
+// ccTermSkipGroup returns the offset just past the bracketed group opening at
+// i, or the end of s when the group never closes.
+func ccTermSkipGroup(s string, i int) int {
+	depth := 0
+	for ; i < len(s); i++ {
+		switch s[i] {
+		case '(', '[':
+			depth++
+		case ')', ']':
+			depth--
+		}
+		if depth == 0 {
+			return i + 1
+		}
+	}
+	return len(s)
 }
 
 // ccZeroOrSignLiteral reports whether s opens with the integer literal 0, -0
@@ -10338,6 +10653,14 @@ func (c *ccConv) textBefore(scope, n *tree_sitter.Node) string {
 		return ""
 	}
 	return string(c.src[scope.StartByte():n.StartByte()])
+}
+
+// textAfter is textBefore's mirror: the part of scope that follows n.
+func (c *ccConv) textAfter(scope, n *tree_sitter.Node) string {
+	if scope == nil || n == nil || n.EndByte() > scope.EndByte() {
+		return ""
+	}
+	return string(c.src[n.EndByte():scope.EndByte()])
 }
 
 func ccUnwrapCExpr(n *tree_sitter.Node) *tree_sitter.Node {

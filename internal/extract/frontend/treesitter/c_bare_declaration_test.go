@@ -49,9 +49,10 @@ static void run(void)
 	}
 }
 
-// Only a local is bound. A file-scope declaration is storage the whole translation unit
-// shares, and giving it a body-less binding is a separate question this does not answer.
-func TestCFileScopeDeclarationIsNotBound(t *testing.T) {
+// A file-scope declaration binds too, and its binding is the one node every other
+// function's mention of the global resolves to — so it carries the name, rather than the
+// anonymous placeholder a local gets, and it claims no value for the storage.
+func TestCFileScopeDeclarationBindsTheGlobalToItsOwnName(t *testing.T) {
 	prog := extractCSource(t, "global.c", `
 static render_details shared;
 
@@ -60,8 +61,19 @@ static void run(void)
     use(shared);
 }
 `)
-	if a, ok := cAssign(prog, "shared"); ok {
-		t.Errorf("a file-scope declaration was bound: %#v", a)
+	a, ok := cAssign(prog, "shared")
+	if !ok {
+		t.Fatalf("no declaration statement for the file-scope global: %#v", prog.Modules[0].Body)
+	}
+	if !a.Decl {
+		t.Errorf("shared: Decl = false, want true (a declaration, not a write)")
+	}
+	nm, isName := a.Value.(nir.Name)
+	if !isName {
+		t.Fatalf("shared: value = %#v, want a Name carrying the global's own name", a.Value)
+	}
+	if nm.ID != "shared" {
+		t.Errorf("shared: value names %q, want \"shared\"", nm.ID)
 	}
 }
 

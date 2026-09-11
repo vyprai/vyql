@@ -539,6 +539,16 @@ func v2PresenceValuePrefix(field string) string {
 		return "index_kind="
 	case "guard":
 		return "guard="
+	// The C/C++ index observation's bound: what the index is compared against
+	// (`bound=`), which side of the access that comparison stands on
+	// (`bound_side=`), and the field access a locally held index was computed
+	// from (`origin=`).
+	case "bound":
+		return "bound="
+	case "boundSide":
+		return "bound_side="
+	case "origin":
+		return "origin="
 	case "indexShape":
 		return "index_shape:"
 	case "lengthCheck":
