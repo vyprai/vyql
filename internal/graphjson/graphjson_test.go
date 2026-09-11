@@ -64,7 +64,7 @@ func buildTwoFunctionGraph(t *testing.T) usg.Store {
 // looked like a scan result rather than a projection that could never work.
 func TestFunctionsAreExportedFromRegions(t *testing.T) {
 	g := buildTwoFunctionGraph(t)
-	fns := exportFunctions(g)
+	fns := walkGraph(g).functions()
 	if len(fns) != 2 {
 		t.Fatalf("exported %d function(s), want 2: %+v", len(fns), fns)
 	}
@@ -93,7 +93,7 @@ func TestFunctionsAreExportedFromRegions(t *testing.T) {
 
 func TestCallEdgesAreExportedBetweenRegions(t *testing.T) {
 	g := buildTwoFunctionGraph(t)
-	edges := exportCallEdges(g)
+	edges := walkGraph(g).callEdges(g)
 	if len(edges) != 1 {
 		t.Fatalf("exported %d call edge(s), want 1: %+v", len(edges), edges)
 	}
@@ -110,7 +110,7 @@ func TestCallEdgesAreExportedBetweenRegions(t *testing.T) {
 // edge between functions. It must not invent one.
 func TestModuleLevelCallIsNotACallEdge(t *testing.T) {
 	g := buildTwoFunctionGraph(t)
-	for _, e := range exportCallEdges(g) {
+	for _, e := range walkGraph(g).callEdges(g) {
 		if e.FromFunction == "" || e.ToFunction == "" {
 			t.Errorf("call edge with an empty end: %+v", e)
 		}

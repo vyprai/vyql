@@ -360,8 +360,10 @@ func applyScanCache(v string) func() {
 
 // applyMaxRAM honors --max-ram: it partitions the budget across the pools a scan provisions,
 // applies the heap ceiling, and routes the graph through the disk-backed BadgerGraph store so
-// node detail can leave RAM. Returns a cleanup func that removes the graph db. Overrides the
-// auto-80% default; an invalid value is reported and ignored.
+// node detail can leave RAM. (A target that goes over the one-graph limit is partitioned
+// instead, and each partition is small enough to hold in RAM — see scanPartitionsCollect for
+// why the disk store is bypassed there.) Returns a cleanup func that removes the graph db.
+// Overrides the auto-80% default; an invalid value is reported and ignored.
 func applyMaxRAM(v string) func() {
 	noop := func() {}
 	if v == "" {
@@ -430,7 +432,10 @@ func applyMaxRAM(v string) func() {
 // scanSourceLimit is the most analysable source one resident program graph may be built from
 // under the ceiling in force, and scanSourceBudget is how much each partition holds once a
 // target passes it. Both zero — no ceiling was asked for — means the target is scanned as one
-// graph however large it is, which is what every scan did before partitioning existed.
+// graph however large it is, which is what every scan did before partitioning existed. Both
+// are in JavaScript-equivalent bytes: PlanPartitions weighs a file by its language's
+// frontend.GraphWeight, so a byte of Python counts as the ~five JavaScript bytes of graph it
+// lowers to, and the constants below stay calibrated on the corpus they were measured on.
 var (
 	scanSourceLimit  int64
 	scanSourceBudget int64
@@ -649,10 +654,20 @@ func scanPartitionsCollect(paths []string, ruleSources []parser.V2DefinitionSour
 	var all []*findings.Finding
 	var stats extract.Stats
 	seen := map[string]bool{}
-	for _, part := range parts {
+	// A partition is sized to hold a graph the ceiling can afford in RAM, and the
+	// badger store costs as much again as a partition's graph in write-path buffers
+	// (memtable arenas, SST builders, block cache) that the Go heap limit cannot see.
+	// The disk store exists for the one-graph scan that is genuinely too big to hold;
+	// a partitioned scan holds each partition in RAM and releases it whole instead.
+	prevIntStore := lowering.UseIntStore
+	lowering.UseIntStore = true
+	defer func() { lowering.UseIntStore = prevIntStore }()
+	for i, part := range parts {
 		opts := build
 		opts.Only = part
+		start := time.Now()
 		got, st, g, err := scanPathsWithProfileDemand(paths, ruleSources, profileName, true, opts)
+		fmt.Fprintf(os.Stderr, "vyql: partition %d/%d: %d files, %d findings (%s)\n", i+1, len(parts), len(part), len(got), time.Since(start).Round(time.Second))
 		if err != nil {
 			return nil, stats, nil, err
 		}
@@ -667,6 +682,12 @@ func scanPartitionsCollect(paths []string, ruleSources []parser.V2DefinitionSour
 			bindings.ReleaseStoreIndexes(g)
 			_ = usg.Close(g)
 		}
+		// Return the finished partition's memory before the next one is built: the
+		// runtime returns freed spans lazily by default (MADV_FREE leaves them counted
+		// in resident memory until the machine is under pressure, which a dedicated
+		// CI runner never is), and fifteen partitions' peaks must not sum into the
+		// ceiling the way one graph would.
+		debug.FreeOSMemory()
 		stats = extract.MergeStats(stats, st)
 		for _, f := range got {
 			// SCA reads the target's manifests from the paths the scan was given, not from the
