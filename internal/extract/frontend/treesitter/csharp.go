@@ -153,10 +153,10 @@ func csWordByte(b byte) bool {
 // early. That can only leave the tail of one literal un-skipped — the tail is still
 // literal text, never code, so no declaration is blanked by mistake.
 func csLiteralEnd(src []byte, i int) int {
-	switch {
-	case src[i] == '\'':
+	switch src[i] {
+	case '\'':
 		return csSkipQuoted(src, i)
-	case src[i] == '"':
+	case '"':
 		if bytes.HasPrefix(src[i:], []byte(`"""`)) {
 			if end := bytes.Index(src[i+3:], []byte(`"""`)); end >= 0 {
 				return i + 3 + end + 3
@@ -164,14 +164,14 @@ func csLiteralEnd(src []byte, i int) int {
 			return len(src)
 		}
 		return csSkipQuoted(src, i)
-	case src[i] == '@':
+	case '@':
 		if bytes.HasPrefix(src[i+1:], []byte(`"`)) {
 			return csSkipVerbatim(src, i+1)
 		}
 		if bytes.HasPrefix(src[i+1:], []byte(`$"`)) {
 			return csSkipVerbatim(src, i+2) // @$"…" quotes are doubled, not backslashed
 		}
-	case src[i] == '$':
+	case '$':
 		if bytes.HasPrefix(src[i+1:], []byte(`"`)) {
 			return csSkipQuoted(src, i+1)
 		}
