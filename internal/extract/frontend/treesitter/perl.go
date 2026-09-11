@@ -1,6 +1,8 @@
 package treesitter
 
 import (
+	"os"
+	"regexp"
 	"strings"
 
 	tree_sitter "github.com/tree-sitter/go-tree-sitter"
@@ -9,6 +11,76 @@ import (
 
 	"github.com/vyprai/vyql/internal/extract/nir"
 )
+
+// The Perl claim is the one place a file's extension commonly names documentation
+// rather than the language: README.pl is the Polish README by convention. The
+// grammar reading prose is ruinous in a way no ceiling survives — error recovery
+// over a 338KB README peaked near 6GB of resident memory, and prose the grammar
+// happens to read without an error still cost hundreds of megabytes per hundred
+// kilobytes — so a clone carrying one such file failed every bounded scan at its
+// ceiling before the first rule ran. The claim therefore asks what the file is
+// made of before any parser sees it, the way a C header is asked whether it is
+// C++: Perl's own constructs, measured rather than guessed, with the threshold
+// rounding toward claiming because declining real source costs it every binding
+// and rule that would have read it.
+//
+// The figures behind the threshold: every real Perl file on the corpora this
+// repository measures against (the OWASP Perl port and the host's installed
+// modules, 2,934 files) carries at least three of the markers below; across 592
+// README, release-note and spec texts none carried more than one.
+
+// perlMarkers are the constructs only a Perl program carries. Documentation
+// prose borrows none of them: an e-mail address is not a sigiled variable and
+// "%s" is not a format list, which is why none of the loose tokens a shape
+// check might reach for (`->`, `@x`, `%s`) appear here.
+var perlMarkers = []*regexp.Regexp{
+	regexp.MustCompile(`\bpackage\s+[A-Z]\w*(::\w+)*`),      // package Name;
+	regexp.MustCompile(`\bsub\s+\w+\s*[({]`),                // sub name( / sub name {
+	regexp.MustCompile(`\bmy\s+[$@%]`),                      // my $x
+	regexp.MustCompile(`\bmy\s*\(`),                         // my ($v) = @_;
+	regexp.MustCompile(`\bour\s+[$@%]`),                     // our $x
+	regexp.MustCompile(`\blocal\s+[$@%]`),                   // local $|
+	regexp.MustCompile(`\buse\s+[A-Za-z_]\w*\s*(;|::)`),     // use strict; use CGI::
+	regexp.MustCompile(`\brequire\s+[A-Za-z_]\w*\s*(;|::)`), // require X;
+	regexp.MustCompile(`__(END|DATA)__`),                    // the data terminators
+	regexp.MustCompile(`\bqw\s*[][(/{|]`),                   // qw(…)
+	regexp.MustCompile(`\bforeach\s+(my\s+)?[$@%]`),         // foreach my $x
+}
+
+// hasPerlShebang reports whether src opens with an interpreter line naming perl —
+// the one marker that claims a file on its own, as a Python shebang claims an
+// extensionless script.
+func hasPerlShebang(src string) bool {
+	line := src
+	if i := strings.IndexByte(line, '\n'); i >= 0 {
+		line = line[:i]
+	}
+	line = strings.ToLower(strings.TrimSpace(line))
+	return strings.HasPrefix(line, "#!") && strings.Contains(line, "perl")
+}
+
+// ReadsAsPerl reports whether path reads as Perl: a shebang naming the
+// interpreter claims a script outright, and any two of Perl's own constructs
+// claim a program. A file that cannot be read is left to the parse to judge,
+// exactly as before the check existed.
+func ReadsAsPerl(path string) bool {
+	src, err := os.ReadFile(path)
+	if err != nil {
+		return true
+	}
+	if hasPerlShebang(string(src)) {
+		return true
+	}
+	hits := 0
+	for _, m := range perlMarkers {
+		if m.Match(src) {
+			if hits++; hits >= 2 {
+				return true
+			}
+		}
+	}
+	return false
+}
 
 // plConv walks a tree-sitter Perl CST into NIR.
 type plConv struct {
