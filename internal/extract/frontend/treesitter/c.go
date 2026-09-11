@@ -1637,6 +1637,29 @@ func (c *ccConv) destName(a *tree_sitter.Node) string {
 	return ""
 }
 
+// readerDestinationEffects carries a reader's destination write on the call, so the
+// variable its destination argument names is filled whatever the enclosing statement
+// does with the result. A reader fills its buffer as a side effect of running, and
+// `len += fread(&num, 1, 4, fp)` both accumulates the count and fills num -- but the
+// write used to be spelled only by the statement that discarded the result, so a
+// source label on a read whose result was assigned, accumulated or tested sat on the
+// call and never reached the count it had read.
+//
+// The effect re-binds the destination to the call's result node, which is the same
+// binding the discarded spelling makes through its assignment; where that spelling
+// still applies it stays, and the two bind one variable to one node.
+func (c *ccConv) readerDestinationEffects(name string, args *tree_sitter.Node) []nir.CallEffect {
+	idx, ok := cReaders[name]
+	if !ok {
+		return nil
+	}
+	nodes := c.namedChildren(args)
+	if idx >= len(nodes) || c.destName(nodes[idx]) == "" {
+		return nil
+	}
+	return []nir.CallEffect{{DestArg: idx, SourceResult: true}}
+}
+
 // cBranch flattens one if-branch body: a `{}` compound_statement, an else_clause wrapper,
 // or a brace-less single statement.
 func (c *ccConv) cBranch(b *tree_sitter.Node) []nir.Stmt {
@@ -1933,8 +1956,10 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "call_expression":
 		fn := c.field(n, "function")
 		path := c.dotted(fn)
-		method := lastSeg(path)
-		return nir.Call{Callee: c.expr(fn), Args: c.callArgs(c.field(n, "arguments")), Path: path, Method: method, Loc: L}
+		args := c.field(n, "arguments")
+		call := nir.Call{Callee: c.expr(fn), Args: c.callArgs(args), Path: path, Method: lastSeg(path), Loc: L}
+		call.Effects = c.readerDestinationEffects(lastSeg(path), args)
+		return call
 	case "message_expression": // ObjC [receiver method:arg ...]
 		recv := c.field(n, "receiver")
 		methN := c.field(n, "method")
