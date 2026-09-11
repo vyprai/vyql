@@ -2052,7 +2052,18 @@ func (c *ccConv) ccIndexAccessObservations(fn *tree_sitter.Node) []nir.Stmt {
 					prefixText := compactCExprText(c.textBefore(body, n))
 					guard := "guard=missing_upper_bound"
 					var bound ccIndexBound
-					if credited, ok := ccUpperBoundGuard(prefixText, compactCExprText(c.textAfter(body, n)), compactIdx); ok {
+					// The suffix text is only compacted when the prefix searches
+					// fail: a guard written before the access is the common case,
+					// and compacting everything after every access to then rarely
+					// read it is the cost the local-index path would otherwise add
+					// to every field-derived subscript.
+					if credited, ok := ccUpperBoundGuardBefore(prefixText, compactIdx); ok {
+						guard = "guard=upper_bound"
+						bound = credited
+					} else if credited, ok := ccUpperBoundGuardAfter(compactCExprText(c.textAfter(body, n)), compactIdx); ok {
+						guard = "guard=upper_bound"
+						bound = credited
+					} else if credited, ok := ccUpperBoundGuardReject(prefixText, compactIdx); ok {
 						guard = "guard=upper_bound"
 						bound = credited
 					} else if c.ccIndexWithinAllocation(n, compactIdx, allocationCounts()) {
@@ -10112,18 +10123,19 @@ type ccIndexBound struct {
 	side string // "before" the access, or "after" it
 }
 
-// ccUpperBoundGuard reports the comparison bounding idx above somewhere the
-// access can rely on. prefixText is the part of the function body that
-// precedes the access, suffixText the part that follows it; the split is what
-// says which side of the access the credited comparison stands on.
-func ccUpperBoundGuard(prefixText, suffixText, idx string) (ccIndexBound, bool) {
-	// Proceed-if-in-range spellings: `idx < BOUND` and `BOUND > idx`. Read over
-	// the whole body, as they always have been, split at the access so the
-	// bound reports where it stands.
-	//
-	// A bare name is a substring of half the identifiers in a function, so when
-	// the index is one it is only matched standing alone: `s < n` bounds `s`,
-	// `st2idx[s] < n` does not.
+// The guard search runs in three stages so a caller pays for the text a stage
+// needs only when it reaches it: the proceed spellings written before the
+// access, the proceed spellings written after it, and the reject spelling
+// before it. The order below is the order the stages are asked in.
+//
+// A bare name is a substring of half the identifiers in a function, so when
+// the index is one it is only matched standing alone: `s < n` bounds `s`,
+// `st2idx[s] < n` does not.
+
+// ccUpperBoundGuardBefore reports the comparison bounding idx above among the
+// proceed spellings (`idx < BOUND`, `BOUND > idx`) written before the access.
+// prefixText is the part of the function body that precedes it.
+func ccUpperBoundGuardBefore(prefixText, idx string) (ccIndexBound, bool) {
 	boundary := ccIdentifierLike(idx)
 	if bound, ok := ccComparisonAfterBound(prefixText, idx, '<', false, boundary); ok {
 		return ccIndexBound{expr: bound, side: "before"}, true
@@ -10131,28 +10143,42 @@ func ccUpperBoundGuard(prefixText, suffixText, idx string) (ccIndexBound, bool) 
 	if bound, ok := ccComparisonBeforeBound(prefixText, idx, '>', boundary); ok {
 		return ccIndexBound{expr: bound, side: "before"}, true
 	}
+	return ccIndexBound{}, false
+}
+
+// ccUpperBoundGuardAfter is ccUpperBoundGuardBefore over the part of the body
+// that follows the access: the same spellings, credited to a comparison that
+// stands AFTER it -- one that runs too late to protect the access, which is
+// exactly what the side records.
+func ccUpperBoundGuardAfter(suffixText, idx string) (ccIndexBound, bool) {
+	boundary := ccIdentifierLike(idx)
 	if bound, ok := ccComparisonAfterBound(suffixText, idx, '<', false, boundary); ok {
 		return ccIndexBound{expr: bound, side: "after"}, true
 	}
 	if bound, ok := ccComparisonBeforeBound(suffixText, idx, '>', boundary); ok {
 		return ccIndexBound{expr: bound, side: "after"}, true
 	}
-	// Reject-if-out-of-range spelling: `idx > BOUND` / `idx >= BOUND`, the form
-	// an early return or a clamp takes.
-	//
-	// Read only over what precedes the access. An early return bounds what
-	// comes after it and nothing else, and unlike a loop condition it carries
-	// no hint of its own scope, so crediting one from further down the function
-	// is how a guard three lines below an unguarded access gets read as
-	// protecting it.
-	//
-	// Only the index-on-the-left half is read at all. The mirrored `BOUND <
-	// idx` is not: it is indistinguishable from `for (i = 0; i < s->len; i++)`,
-	// where the field is the loop's bound rather than the bounded value, which
-	// would suppress the commonest shape this analysis exists to report.
-	//
-	// A zero or sign literal on the right is a nonzero/sign test (`s->len > 0`,
-	// `s->len >= 0`, `s->len > -1`), not a bound, and does not count either.
+	return ccIndexBound{}, false
+}
+
+// ccUpperBoundGuardReject reports the reject-if-out-of-range spelling:
+// `idx > BOUND` / `idx >= BOUND`, the form an early return or a clamp takes.
+//
+// Read only over what precedes the access. An early return bounds what
+// comes after it and nothing else, and unlike a loop condition it carries
+// no hint of its own scope, so crediting one from further down the function
+// is how a guard three lines below an unguarded access gets read as
+// protecting it.
+//
+// Only the index-on-the-left half is read at all. The mirrored `BOUND <
+// idx` is not: it is indistinguishable from `for (i = 0; i < s->len; i++)`,
+// where the field is the loop's bound rather than the bounded value, which
+// would suppress the commonest shape this analysis exists to report.
+//
+// A zero or sign literal on the right is a nonzero/sign test (`s->len > 0`,
+// `s->len >= 0`, `s->len > -1`), not a bound, and does not count either.
+func ccUpperBoundGuardReject(prefixText, idx string) (ccIndexBound, bool) {
+	boundary := ccIdentifierLike(idx)
 	if bound, ok := ccComparisonAfterBound(prefixText, idx, '>', true, boundary); ok {
 		return ccIndexBound{expr: bound, side: "before"}, true
 	}
