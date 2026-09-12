@@ -7338,11 +7338,19 @@ func splitClassQual(qual string) (modkey, class string, ok bool) {
 	return qual[:i], qual[i+2:], true
 }
 
+// maxInheritedLookupDepth bounds how far up a base chain resolveBaseMethods walks, the same
+// bound fieldCtorType applies to an inherited field.
+const maxInheritedLookupDepth = 8
+
+// resolveBaseMethods returns the declarations of `method` that a call on `class` inherits from
+// its base classes. The walk is transitive: a method declared only on a grandparent is still
+// the body a call on the subclass runs, and stopping at the first level left those calls to
+// the name-keyed fallbacks -- which an ambiguous short name (the same method declared on the
+// base and on an unrelated class, as a framework's entity and validation classes both declare
+// setValues) does not resolve. Each branch stops at the nearest declaration: a base that
+// declares `method` shadows whatever a higher ancestor declares, so that ancestor's body is
+// not a possible runtime continuation. Cycle-safe.
 func (l *lowerer) resolveBaseMethods(modkey, class, method string) []*funcInfo {
-	bases := l.classBaseNames[modkey+"::"+class]
-	if len(bases) == 0 {
-		return nil
-	}
 	var out []*funcInfo
 	seen := map[*funcInfo]bool{}
 	add := func(fi *funcInfo) {
@@ -7352,17 +7360,33 @@ func (l *lowerer) resolveBaseMethods(modkey, class, method string) []*funcInfo {
 		seen[fi] = true
 		out = append(out, fi)
 	}
-	for _, base := range bases {
-		if f := l.funcQual[modkey+"::"+base+"."+method]; f != nil {
-			add(f)
-			continue
+	visited := map[string]bool{}
+	var walk func(modkey, class string, depth int)
+	walk = func(modkey, class string, depth int) {
+		qual := modkey + "::" + class
+		if visited[qual] || depth >= maxInheritedLookupDepth {
+			return
 		}
-		if mods := l.classDefs[base]; len(mods) == 1 {
-			for bm := range mods {
-				add(l.funcQual[bm+"::"+base+"."+method])
+		visited[qual] = true
+		for _, base := range l.classBaseNames[qual] {
+			baseMod := modkey
+			if !l.classQual[modkey+"::"+base] {
+				mods := l.classDefs[base]
+				if len(mods) != 1 {
+					continue // base unknown or ambiguous by short name: nowhere to walk
+				}
+				for bm := range mods {
+					baseMod = bm
+				}
 			}
+			if f := l.funcQual[baseMod+"::"+base+"."+method]; f != nil {
+				add(f)
+				continue // this base declares it: it shadows its own ancestors
+			}
+			walk(baseMod, base, depth+1)
 		}
 	}
+	walk(modkey, class, 0)
 	return out
 }
 
