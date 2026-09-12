@@ -353,6 +353,15 @@ func filterBindingSpecForActiveConcepts(spec bindingSpec) bindingSpec {
 // review context.
 
 func loadBindingSet(tech string) *Set {
+	if tech == "" {
+		// An empty technology is not a binding set: it is a caller that could
+		// not derive one (a synthesized node, an extension no frontend claims).
+		// Reading "bindings/" for it would walk the whole tree -- the packages/
+		// subtree twice, once on its own and once inside the walk -- and abort
+		// the corpus as duplicates. Nothing in an unnamed technology is
+		// labelled, which is true and safe.
+		return &Set{Name: tech, Meta: map[string]any{}}
+	}
 	key := bindingSetCacheKey{tech: tech}
 	if cached, ok := bindingSetCache.Load(key); ok {
 		return cached.(*Set)

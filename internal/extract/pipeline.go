@@ -46,6 +46,10 @@ func SharedDeltaCache() lowering.DeltaCache {
 // BuildGraph runs extract → lower → SCA → bindings and returns the analysis graph (the USG
 // the rule engine evaluates against), plus what the extraction pass did and did not read.
 // Returns a nil store when recognized files produced nothing to analyze.
+func init() {
+	lowering.CallEffects = bindings.CallEffectsForLoc
+}
+
 func BuildGraph(paths []string, cache lowering.DeltaCache, opts Options) (usg.Store, Stats, error) {
 	restoreConcepts := bindings.SetActiveBindingConcepts(opts.BindingConcepts)
 	defer restoreConcepts()
