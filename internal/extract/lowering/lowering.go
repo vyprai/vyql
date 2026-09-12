@@ -6534,8 +6534,14 @@ func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
 	}
 }
 
+var CallEffects func(loc, path, method string) []nir.CallEffect
+
 func (l *lowerer) applyCallEffects(call nir.Call, args, argVals []string, result, recvNode string, sc *scope) {
-	for _, effect := range call.Effects {
+	effects := call.Effects
+	if len(effects) == 0 && CallEffects != nil {
+		effects = CallEffects(call.Loc, call.Path, call.Method)
+	}
+	for _, effect := range effects {
 		if effect.Receiver {
 			l.flow(recvNode, result)
 			continue
