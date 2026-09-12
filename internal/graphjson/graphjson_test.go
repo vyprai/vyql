@@ -1,6 +1,7 @@
 package graphjson
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/internal/usg"
@@ -63,7 +64,7 @@ func buildTwoFunctionGraph(t *testing.T) usg.Store {
 // looked like a scan result rather than a projection that could never work.
 func TestFunctionsAreExportedFromRegions(t *testing.T) {
 	g := buildTwoFunctionGraph(t)
-	fns := exportFunctions(g)
+	fns := walkGraph(g).functions()
 	if len(fns) != 2 {
 		t.Fatalf("exported %d function(s), want 2: %+v", len(fns), fns)
 	}
@@ -92,7 +93,7 @@ func TestFunctionsAreExportedFromRegions(t *testing.T) {
 
 func TestCallEdgesAreExportedBetweenRegions(t *testing.T) {
 	g := buildTwoFunctionGraph(t)
-	edges := exportCallEdges(g)
+	edges := walkGraph(g).callEdges(g)
 	if len(edges) != 1 {
 		t.Fatalf("exported %d call edge(s), want 1: %+v", len(edges), edges)
 	}
@@ -109,7 +110,7 @@ func TestCallEdgesAreExportedBetweenRegions(t *testing.T) {
 // edge between functions. It must not invent one.
 func TestModuleLevelCallIsNotACallEdge(t *testing.T) {
 	g := buildTwoFunctionGraph(t)
-	for _, e := range exportCallEdges(g) {
+	for _, e := range walkGraph(g).callEdges(g) {
 		if e.FromFunction == "" || e.ToFunction == "" {
 			t.Errorf("call edge with an empty end: %+v", e)
 		}
@@ -126,5 +127,99 @@ func TestCodeMapCountsMatchTheDocument(t *testing.T) {
 	}
 	if doc.CodeMap.FunctionCount == 0 {
 		t.Error("function_count is 0 for a graph with two functions")
+	}
+}
+
+// A partitioned graph-json scan builds one document per partition and merges
+// them, so the merge has to preserve what each partition contributed — every
+// function, every finding that is not a repeat — and recompute the codemap
+// counts and the language list over the union rather than one partition.
+func TestMergeUnionsPartitionsAndDeduplicates(t *testing.T) {
+	base := Build(buildTwoFunctionGraph(t), nil, nil, ".", "test")
+
+	partA := base
+	partA.CodeMap.Languages = []string{"py"}
+
+	// partB is another partition of the same shape: the same legend and tool, a
+	// disjoint function, and — the way an SCA dependency finding repeats once per
+	// partition — the same finding fingerprint as partA carries.
+	repeated := Finding{Rule: "dep", FP: "fp-shared", PathFunctions: []PathFn{}}
+	uniqueB := Finding{Rule: "src", FP: "fp-b", PathFunctions: []PathFn{}}
+	partB := Document{
+		SchemaVersion: partA.SchemaVersion,
+		Tool:          partA.Tool,
+		CodeMap:       CodeMap{Root: partA.CodeMap.Root, Languages: []string{"js"}},
+		Functions:     append(append([]Function{}, partA.Functions...), Function{ID: "mB/fn1", Name: "other", File: "b.js", Module: "mB"}),
+		CallEdges:     append(append([]CallEdge{}, partA.CallEdges...), partA.CallEdges...),
+		Findings:      []Finding{repeated, repeated, uniqueB},
+		Concepts:      partA.Concepts,
+	}
+	partA.Findings = []Finding{repeated, {Rule: "src", FP: "fp-a", PathFunctions: []PathFn{}}}
+
+	merged := Merge([]Document{partA, partB})
+
+	if got, want := len(merged.Functions), len(partA.Functions)+1; got != want {
+		t.Errorf("merged %d function(s), want %d (each partition's, without repeats)", got, want)
+	}
+	if merged.CodeMap.FunctionCount != len(merged.Functions) {
+		t.Errorf("function_count = %d, functions = %d", merged.CodeMap.FunctionCount, len(merged.Functions))
+	}
+	if len(merged.CallEdges) != len(partA.CallEdges) {
+		t.Errorf("merged %d call edge(s), want %d: the same caller→callee pair must not repeat", len(merged.CallEdges), len(partA.CallEdges))
+	}
+	gotFPs := map[string]bool{}
+	for _, f := range merged.Findings {
+		if gotFPs[f.FP] {
+			t.Errorf("finding %s appears twice in the merged document", f.FP)
+		}
+		gotFPs[f.FP] = true
+	}
+	for _, fp := range []string{"fp-shared", "fp-a", "fp-b"} {
+		if !gotFPs[fp] {
+			t.Errorf("finding %s missing from the merged document", fp)
+		}
+	}
+	if merged.CodeMap.FindingCount != len(merged.Findings) {
+		t.Errorf("finding_count = %d, findings = %d", merged.CodeMap.FindingCount, len(merged.Findings))
+	}
+	if got := strings.Join(merged.CodeMap.Languages, ","); got != "js,py" {
+		t.Errorf("languages = %q, want the union js,py", got)
+	}
+}
+
+// Merging nothing is what a scan with no partitions would hand the merge; the
+// document still has to name its schema and carry the legend.
+func TestMergeOfNothingIsAnEmptyDocument(t *testing.T) {
+	doc := Merge(nil)
+	if doc.SchemaVersion != SchemaVersion {
+		t.Errorf("schema_version = %q, want %q", doc.SchemaVersion, SchemaVersion)
+	}
+	if len(doc.Concepts) == 0 {
+		t.Error("the concept legend is missing from an empty merged document")
+	}
+	if doc.Functions == nil || doc.Findings == nil {
+		t.Error("the merged document's arrays must be empty, not null")
+	}
+}
+
+// A partitioned document is built before a baseline is applied, so the baseline
+// filters the printed document at output time. What survives is what the
+// findings list reports, and the count says so too.
+func TestFilterFindingsKeepsTheBaselineSurvivors(t *testing.T) {
+	doc := Document{
+		CodeMap:   CodeMap{FunctionCount: 3},
+		Functions: make([]Function, 3),
+		Findings:  []Finding{{FP: "fp-a"}, {FP: "fp-b"}, {FP: "fp-c"}},
+	}
+	kept := map[string]bool{"fp-b": true}
+	got := doc.FilterFindings(kept)
+	if len(got.Findings) != 1 || got.Findings[0].FP != "fp-b" {
+		t.Fatalf("filtered findings = %+v, want only fp-b", got.Findings)
+	}
+	if got.CodeMap.FindingCount != 1 {
+		t.Errorf("finding_count = %d, want 1", got.CodeMap.FindingCount)
+	}
+	if len(doc.Findings) != 3 {
+		t.Error("FilterFindings must not mutate the document it filters")
 	}
 }
