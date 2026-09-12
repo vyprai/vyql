@@ -11,6 +11,7 @@ import (
 
 	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/extract/lowering"
+	"github.com/vyprai/vyql/internal/graphjson"
 	"github.com/vyprai/vyql/internal/resultpolicy"
 )
 
@@ -180,4 +181,73 @@ func TestApplyMaxRAMSetsAndClearsTheSourceBudget(t *testing.T) {
 		t.Errorf("source limit = %d, budget = %d after cleanup, want 0: a later scan with no ceiling must not partition",
 			scanSourceLimit, scanSourceBudget)
 	}
+}
+
+// graph-json used to disable partitioning outright: the format serialises the
+// graph, and there is no one store to serialise across partitions. The document
+// is a projection — functions, call edges, findings — and projections of
+// partitions merge, so a graph-json run under a ceiling is scanned as several
+// documents of which one is printed. For everything that does not cross a
+// partition boundary, what it reports has to be what one graph would.
+func TestPartitionedCodemapReportsWhatOneGraphWould(t *testing.T) {
+	dir := partitionFixture(t, 12)
+	parts := extract.PlanPartitions([]string{dir}, nil, 4<<10, 4<<10)
+	if len(parts) < 2 {
+		t.Fatalf("PlanPartitions returned %d partition(s), want several", len(parts))
+	}
+	rules, err := loadRules("")
+	if err != nil {
+		t.Fatalf("loadRules: %v", err)
+	}
+	ruleMeta := sarifRulesMeta(rules)
+
+	one, _, g, err := scanPathsWithProfileDemand([]string{dir}, rules, "", true, extract.Options{})
+	if err != nil {
+		t.Fatalf("one-graph scan: %v", err)
+	}
+	whole := graphjson.Build(g, one, ruleMeta, dir, "test")
+	if whole.CodeMap.FunctionCount == 0 {
+		t.Fatal("the fixture produced no functions as one graph, so there is nothing to compare")
+	}
+
+	got, _, doc, err := scanPartitionsCodemap([]string{dir}, rules, "", extract.Options{}, parts, ruleMeta, dir)
+	if err != nil {
+		t.Fatalf("partitioned codemap scan: %v", err)
+	}
+
+	if doc.CodeMap.FunctionCount != len(doc.Functions) {
+		t.Errorf("code_map.function_count = %d, functions = %d", doc.CodeMap.FunctionCount, len(doc.Functions))
+	}
+	if strings.Join(codemapIDs(doc.Functions), ",") != strings.Join(codemapIDs(whole.Functions), ",") {
+		t.Errorf("partitioned codemap listed\n  %d function(s)\none graph listed\n  %d",
+			len(doc.Functions), len(whole.Functions))
+	}
+	if len(got) != len(doc.Findings) {
+		t.Errorf("merged %d finding(s) but the document reports %d", len(got), len(doc.Findings))
+	}
+	wholeFPs := map[string]bool{}
+	for _, f := range whole.Findings {
+		wholeFPs[f.FP] = true
+	}
+	for _, f := range doc.Findings {
+		if !wholeFPs[f.FP] {
+			t.Errorf("partitioned codemap reports %s, which one graph does not", f.FP)
+		}
+	}
+	if len(doc.Findings) != len(whole.Findings) {
+		t.Errorf("partitioned codemap reports %d finding(s), one graph reports %d — every fixture flow is inside one file",
+			len(doc.Findings), len(whole.Findings))
+	}
+	if len(doc.CodeMap.Languages) == 0 {
+		t.Error("partitioned codemap lists no languages")
+	}
+}
+
+func codemapIDs(fns []graphjson.Function) []string {
+	ids := make([]string, 0, len(fns))
+	for _, f := range fns {
+		ids = append(ids, f.ID)
+	}
+	sort.Strings(ids)
+	return ids
 }

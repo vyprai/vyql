@@ -140,29 +140,29 @@ func (j *StorageJoin) fieldReads(id string) []fieldRead {
 // build indexes every field store in the graph. A field store is the Method-less call on
 // a member that the frontends emit for `base.field = value`: its callee path names the
 // field, its base flows in as the receiver and the written value as an argument.
+//
+// The index is built by streaming the store's nodes, not by materialising them: this
+// runs mid-scan on a store that may be disk-backed under a memory ceiling, and every
+// materialised node decodes its detail back into RAM beside the resident graph.
 func (j *StorageJoin) build() {
 	if j.built {
 		return
 	}
 	j.built = true
 	j.storesByField = map[string]map[string][]fieldStore{}
-	nodes, err := j.store.AllNodes()
-	if err != nil {
-		return
-	}
-	for _, n := range nodes {
+	note := func(n usg.Node) {
 		if n.Type != "code.Call" || n.Prop("method") != "" {
-			continue
+			return
 		}
 		path := n.Prop("callee_path")
 		i := strings.LastIndexByte(path, '.')
 		if i <= 0 || i == len(path)-1 {
-			continue
+			return
 		}
 		values := j.operands(n.ID, true)
 		bases := j.operands(n.ID, false)
 		if len(values) == 0 || len(bases) != 1 {
-			continue
+			return
 		}
 		field := path[i+1:]
 		byFunc := j.storesByField[field]
@@ -172,6 +172,17 @@ func (j *StorageJoin) build() {
 		}
 		fn := funcRegion(n.Prop("region"))
 		byFunc[fn] = append(byFunc[fn], fieldStore{base: bases[0], values: values})
+	}
+	if rs, ok := j.store.(interface{ RangeNodes(func(usg.Node) bool) }); ok {
+		rs.RangeNodes(func(n usg.Node) bool { note(n); return true })
+		return
+	}
+	nodes, err := j.store.AllNodes()
+	if err != nil {
+		return
+	}
+	for _, n := range nodes {
+		note(n)
 	}
 }
 

@@ -81,6 +81,76 @@ var languages = sync.OnceValue(func() []Language {
 // Languages returns the registry in extraction order.
 func Languages() []Language { return languages() }
 
+// graphWeights is how much graph a byte of each language's source lowers to,
+// in hundredths of a JavaScript byte — the corpus the scan memory constants are
+// calibrated on. 100 means "lowers like JavaScript", 500 means "a byte of this
+// language is five JavaScript bytes of graph".
+//
+// Measured as lowered nodes per KB of source, reference javascript = 298 n/KB,
+// over each language's OWASP port corpus (BenchmarkJava for java, this
+// repository for go, a large private Python monorepo as a real-world python
+// cross-check):
+//
+//	python 1405 · php 697 · ruby 494 · csharp 389 · rust 312 · c 304
+//	javascript 298 · typescript 288 · swift 246 · cpp 196 · groovy 167
+//	lua 151 · objc 136 · powershell 135 · elixir 121 · go 121 · scala 115
+//	kotlin 104 · bash 84 · dart 78 · perl 73 · solidity 54 · java 35
+//
+// Each weight is the measured ratio rounded UP, and a language that lowers
+// lighter than JavaScript still gets 100: the constants already mean
+// JavaScript, and under-weighting is the direction that overflows a ceiling —
+// over-weighting only costs partitions. A real-world Python file was seen at
+// 1179 n/KB against the port's 1405, so python carries margin rather than the
+// exact ratio. A language with no corpus behind it (haskell, actionscript)
+// takes the heaviest measured weight rather than the lightest, via GraphWeight's
+// default: a frontend nobody has measured must not plan partitions as though it
+// were the sparsest language measured.
+var graphWeights = map[string]int64{
+	"python":     500,
+	"php":        250,
+	"ruby":       175,
+	"csharp":     140,
+	"rust":       110,
+	"c":          110,
+	"javascript": 100, // the reference corpus
+	"typescript": 100,
+	"swift":      100,
+	"cpp":        100,
+	"groovy":     100,
+	"lua":        100,
+	"objc":       100,
+	"powershell": 100,
+	"elixir":     100,
+	"go":         100,
+	"scala":      100,
+	"kotlin":     100,
+	"bash":       100,
+	"dart":       100,
+	"perl":       100,
+	"solidity":   100,
+	"java":       100,
+	// Non-tree-sitter frontends: pattern and config extraction emit a handful of
+	// nodes per file regardless of its size, so the byte-for-byte reference weight
+	// already over-states them.
+	"config":      100,
+	"textpattern": 100,
+}
+
+// graphWeightDefault is what an unmeasured language weighs: the heaviest
+// measured weight, so a new frontend partitions as cautiously as the densest
+// language until someone measures it.
+const graphWeightDefault int64 = 500
+
+// GraphWeight returns the partition weight of one byte of name's source, in
+// hundredths of a JavaScript byte. See graphWeights for where the figures come
+// from and which way they round.
+func GraphWeight(name string) int64 {
+	if w, ok := graphWeights[name]; ok && w >= 100 {
+		return w
+	}
+	return graphWeightDefault
+}
+
 // BundleKinds returns the extension set of the frontend that parses bundled web
 // code — the JavaScript family, with .html for the scripts inlined in it.
 //

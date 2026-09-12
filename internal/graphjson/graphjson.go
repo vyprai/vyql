@@ -137,8 +137,9 @@ func Build(g usg.Store, all []*findings.Finding, ruleMeta map[string]map[string]
 		Tool:          Tool{Name: "VyQL", Version: toolVersion},
 		Concepts:      ConceptLegend(),
 	}
-	doc.Functions = exportFunctions(g)
-	doc.CallEdges = exportCallEdges(g)
+	walk := walkGraph(g)
+	doc.Functions = walk.functions()
+	doc.CallEdges = walk.callEdges(g)
 	doc.Findings = exportFindings(g, all, ruleMeta)
 	doc.CodeMap = CodeMap{
 		Root:          root,
@@ -147,6 +148,119 @@ func Build(g usg.Store, all []*findings.Finding, ruleMeta map[string]map[string]
 		FindingCount:  len(doc.Findings),
 	}
 	return doc
+}
+
+// Merge combines per-partition documents into one. A target too large for one
+// resident graph under the ceiling in force is scanned partition by partition,
+// and each partition carries its own graph; the export is one document, so the
+// partitions' documents are merged rather than printed in sequence.
+//
+// Function ids are regions and the partitions are disjoint file sets, so they
+// cannot collide; call edges and findings are deduplicated by the caller→callee
+// pair and the fingerprint respectively, which also drops the per-partition
+// repeats of manifest-read dependency findings — the same dedup the findings
+// merge applies.
+func Merge(docs []Document) Document {
+	if len(docs) == 0 {
+		return Document{SchemaVersion: SchemaVersion, Concepts: ConceptLegend(),
+			Functions: []Function{}, CallEdges: []CallEdge{}, Findings: []Finding{}}
+	}
+	out := Document{
+		SchemaVersion: docs[0].SchemaVersion,
+		Tool:          docs[0].Tool,
+		CodeMap:       CodeMap{Root: docs[0].CodeMap.Root},
+		Concepts:      docs[0].Concepts,
+		Functions:     []Function{},
+		CallEdges:     []CallEdge{},
+		Findings:      []Finding{},
+	}
+	seenFn := map[string]bool{}
+	seenEdge := map[string]bool{}
+	seenFP := map[string]bool{}
+	for _, d := range docs {
+		for _, fn := range d.Functions {
+			if seenFn[fn.ID] {
+				continue
+			}
+			seenFn[fn.ID] = true
+			out.Functions = append(out.Functions, fn)
+		}
+		for _, e := range d.CallEdges {
+			key := e.FromFunction + "\x00" + e.ToFunction
+			if seenEdge[key] {
+				continue
+			}
+			seenEdge[key] = true
+			out.CallEdges = append(out.CallEdges, e)
+		}
+		for _, f := range d.Findings {
+			if seenFP[f.FP] {
+				continue
+			}
+			seenFP[f.FP] = true
+			out.Findings = append(out.Findings, f)
+		}
+	}
+	sort.Slice(out.Functions, func(i, j int) bool {
+		if out.Functions[i].File != out.Functions[j].File {
+			return out.Functions[i].File < out.Functions[j].File
+		}
+		if out.Functions[i].LineStart != out.Functions[j].LineStart {
+			return out.Functions[i].LineStart < out.Functions[j].LineStart
+		}
+		return out.Functions[i].ID < out.Functions[j].ID
+	})
+	sort.Slice(out.CallEdges, func(i, j int) bool {
+		if out.CallEdges[i].FromFunction != out.CallEdges[j].FromFunction {
+			return out.CallEdges[i].FromFunction < out.CallEdges[j].FromFunction
+		}
+		return out.CallEdges[i].ToFunction < out.CallEdges[j].ToFunction
+	})
+	sort.Slice(out.Findings, func(i, j int) bool { return out.Findings[i].FP < out.Findings[j].FP })
+	out.CodeMap.Languages = mergeLanguages(docs)
+	out.CodeMap.FunctionCount = len(out.Functions)
+	out.CodeMap.FindingCount = len(out.Findings)
+	return out
+}
+
+// mergeLanguages unions each partition's language list. The languages are file
+// extensions the partitions cannot share — the file sets are disjoint — so a
+// sorted union is the one-graph document's list.
+func mergeLanguages(docs []Document) []string {
+	seen := map[string]bool{}
+	out := []string{}
+	for _, d := range docs {
+		for _, lg := range d.CodeMap.Languages {
+			if !seen[lg] {
+				seen[lg] = true
+				out = append(out, lg)
+			}
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+// FilterFindings drops every finding whose fingerprint is not in kept, and
+// recounts the codemap. A partitioned graph-json run builds its document per
+// partition, before a baseline is applied; the baseline decides at output time
+// which findings the printed document still reports, exactly as it does for the
+// one-graph document.
+func (d Document) FilterFindings(kept map[string]bool) Document {
+	if len(kept) == 0 && len(d.Findings) > 0 {
+		d.Findings = []Finding{}
+		d.CodeMap.FindingCount = 0
+		return d
+	}
+	out := d
+	out.Findings = make([]Finding, 0, len(d.Findings))
+	for _, f := range d.Findings {
+		if kept[f.FP] {
+			out.Findings = append(out.Findings, f)
+		}
+	}
+	out.CodeMap.FindingCount = len(out.Findings)
+	return out
 }
 
 // boundary is what lowering records about a function beyond its region: the
@@ -162,13 +276,34 @@ type boundary struct {
 	line int
 }
 
-// functionBoundaries returns what each function's boundary nodes say about it,
-// and which function each boundary node belongs to. Both come from the same walk:
-// the second is what lets a call edge name a region at both ends.
-func functionBoundaries(g usg.Store, nodes []usg.Node) (map[string]boundary, map[string]string) {
-	out := map[string]boundary{}
-	ownerOf := map[string]string{}
-	note := func(region, id, loc string) {
+// span is a function's footprint across the nodes inside its region: the file it
+// lives in, its module and class, and the first-to-last lines its body touches.
+type span struct {
+	file, module, class string
+	first, last         int
+	haveFirst           bool
+}
+
+// graphWalk is one streaming pass over a store's nodes, collecting everything
+// the document's graph projections need: the region spans (functions), the
+// boundary nodes' facts, and which function each boundary node belongs to. One
+// pass, rather than AllNodes, because the export is taken while the scan's store
+// is still open: on a disk-backed store (a scan under -max-ram) every
+// materialised node decodes its detail blob back into RAM, and holding the
+// whole node list beside the resident store is what a ceiling cannot afford.
+type graphWalk struct {
+	spans   map[string]*span
+	bounds  map[string]boundary
+	ownerOf map[string]string
+}
+
+func walkGraph(g usg.Store) graphWalk {
+	w := graphWalk{
+		spans:   map[string]*span{},
+		bounds:  map[string]boundary{},
+		ownerOf: map[string]string{},
+	}
+	noteBoundary := func(region, id, loc string) {
 		if region == "" {
 			return
 		}
@@ -176,35 +311,80 @@ func functionBoundaries(g usg.Store, nodes []usg.Node) (map[string]boundary, map
 		if name == "" {
 			return
 		}
-		ownerOf[id] = region
+		w.ownerOf[id] = region
 		_, line := splitLoc(loc)
 		// A Return names the function and sits on its declaration line. Prefer it
 		// over a Param, which names the same function but may be one of several.
-		if prev, ok := out[region]; ok && prev.line != 0 && line == 0 {
+		if prev, ok := w.bounds[region]; ok && prev.line != 0 && line == 0 {
 			return
 		}
-		out[region] = boundary{name: name, line: line}
+		w.bounds[region] = boundary{name: name, line: line}
 	}
+	eachNode(g, func(n usg.Node) bool {
+		region := n.Prop("region")
+		if region == "" {
+			// A boundary node, not one of a function's interior nodes: attributed
+			// to its function through a neighbour that carries the region -- what
+			// flows out of a Param, what flows into a Return.
+			switch n.Type {
+			case "code.Return":
+				for _, e := range inEdges(g, n.ID) {
+					if src, ok, _ := g.GetNode(e.Src); ok {
+						noteBoundary(src.Prop("region"), n.ID, n.Prop("loc"))
+					}
+				}
+			case "code.Param":
+				for _, e := range outEdges(g, n.ID) {
+					if dst, ok, _ := g.GetNode(e.Dst); ok {
+						noteBoundary(dst.Prop("region"), n.ID, n.Prop("loc"))
+					}
+				}
+			}
+			return true
+		}
+		sp := w.spans[region]
+		if sp == nil {
+			sp = &span{}
+			w.spans[region] = sp
+		}
+		if m := n.Prop("module"); m != "" && sp.module == "" {
+			sp.module = m
+		}
+		if c := n.Prop("class"); c != "" && sp.class == "" {
+			sp.class = c
+		}
+		file, line := splitLoc(n.Prop("loc"))
+		if file != "" && sp.file == "" {
+			sp.file = file
+		}
+		if line == 0 {
+			return true
+		}
+		if !sp.haveFirst || line < sp.first {
+			sp.first, sp.haveFirst = line, true
+		}
+		if line > sp.last {
+			sp.last = line
+		}
+		return true
+	})
+	return w
+}
+
+// eachNode streams every node without materialising the list, on a store that
+// can range (both built-in stores can); a store that cannot falls back to
+// AllNodes.
+func eachNode(g usg.Store, fn func(usg.Node) bool) {
+	if rs, ok := g.(interface{ RangeNodes(func(usg.Node) bool) }); ok {
+		rs.RangeNodes(fn)
+		return
+	}
+	nodes, _ := g.AllNodes()
 	for _, n := range nodes {
-		if n.Prop("region") != "" {
-			continue // inside a function, not one of its boundaries
-		}
-		switch n.Type {
-		case "code.Return":
-			for _, e := range inEdges(g, n.ID) {
-				if src, ok, _ := g.GetNode(e.Src); ok {
-					note(src.Prop("region"), n.ID, n.Prop("loc"))
-				}
-			}
-		case "code.Param":
-			for _, e := range outEdges(g, n.ID) {
-				if dst, ok, _ := g.GetNode(e.Dst); ok {
-					note(dst.Prop("region"), n.ID, n.Prop("loc"))
-				}
-			}
+		if !fn(n) {
+			return
 		}
 	}
-	return out, ownerOf
 }
 
 // boundaryName recovers the authored name from a boundary node id. The id is the
@@ -229,62 +409,20 @@ func boundaryName(region, id string) string {
 // idSeparator divides the module from the rest of a node id.
 const idSeparator = "\x1f"
 
-// exportFunctions derives the function inventory from the region every node
-// carries, because lowering does not emit a function node.
+// functions derives the function inventory from the walk's region spans.
 //
 // A region is "<module>/<function>" and is the only representation of a function
 // that every frontend produces: Python emits no function node at all, and the
-// JavaScript frontend emits code.Func only for a function expression. Asking for a
-// node type reported no functions for any scan, in every language.
+// JavaScript frontend emits code.Func only for a function expression. Asking for
+// a node type reported no functions for any scan, in every language.
 //
 // The line span runs from the declaration, which a boundary node carries, to the
 // last line of the body. Lowering records no end line.
-func exportFunctions(g usg.Store) []Function {
-	nodes, err := g.AllNodes()
-	if err != nil {
-		return []Function{}
-	}
-	bounds, _ := functionBoundaries(g, nodes)
-	type span struct {
-		file, module, class string
-		first, last         int
-		haveFirst           bool
-	}
-	spans := map[string]*span{}
-	for _, n := range nodes {
-		region := n.Prop("region")
-		if region == "" {
-			continue // module level, not inside a function
-		}
-		sp := spans[region]
-		if sp == nil {
-			sp = &span{}
-			spans[region] = sp
-		}
-		if m := n.Prop("module"); m != "" && sp.module == "" {
-			sp.module = m
-		}
-		if c := n.Prop("class"); c != "" && sp.class == "" {
-			sp.class = c
-		}
-		file, line := splitLoc(n.Prop("loc"))
-		if file != "" && sp.file == "" {
-			sp.file = file
-		}
-		if line == 0 {
-			continue
-		}
-		if !sp.haveFirst || line < sp.first {
-			sp.first, sp.haveFirst = line, true
-		}
-		if line > sp.last {
-			sp.last = line
-		}
-	}
-	out := make([]Function, 0, len(spans))
-	for region, sp := range spans {
+func (w graphWalk) functions() []Function {
+	out := make([]Function, 0, len(w.spans))
+	for region, sp := range w.spans {
 		name, start := functionName(region), sp.first
-		if b, ok := bounds[region]; ok {
+		if b, ok := w.bounds[region]; ok {
 			// The authored name, and the declaration line rather than the first
 			// line of the body.
 			name = b.name
@@ -342,27 +480,23 @@ func spanEnd(first, last int) *int {
 	return intPtr(last)
 }
 
-// exportCallEdges emits one edge per resolved caller→callee pair. A call is resolved
+// callEdges emits one edge per resolved caller→callee pair. A call is resolved
 // (internal) when its arguments flow into a callee's Param nodes, or the callee's Return
 // flows back into the call. External/unresolved calls (os.system, cur.execute) have
 // neither and become sink_description strings, never edges.
-func exportCallEdges(g usg.Store) []CallEdge {
+func (w graphWalk) callEdges(g usg.Store) []CallEdge {
 	ids, _ := g.NodesOfType("code.Call")
 	seen := map[string]bool{}
 	out := []CallEdge{}
 	// A boundary node carries no region of its own, so the function it belongs to
-	// is found the same way exportFunctions finds it. Both ends of an edge are
-	// then regions, which is what the function list is keyed by -- an edge naming
-	// anything else would point at a function the document does not contain.
-	regionOf := map[string]string{}
-	if nodes, err := g.AllNodes(); err == nil {
-		_, regionOf = functionBoundaries(g, nodes)
-	}
+	// is what the walk's pass recorded. Both ends of an edge are then regions,
+	// which is what the function list is keyed by -- an edge naming anything else
+	// would point at a function the document does not contain.
 	owner := func(n usg.Node) string {
 		if r := n.Prop("region"); r != "" {
 			return r
 		}
-		return regionOf[n.ID]
+		return w.ownerOf[n.ID]
 	}
 	for _, id := range ids {
 		c, ok, _ := g.GetNode(id)

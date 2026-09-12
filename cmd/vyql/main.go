@@ -360,8 +360,10 @@ func applyScanCache(v string) func() {
 
 // applyMaxRAM honors --max-ram: it partitions the budget across the pools a scan provisions,
 // applies the heap ceiling, and routes the graph through the disk-backed BadgerGraph store so
-// node detail can leave RAM. Returns a cleanup func that removes the graph db. Overrides the
-// auto-80% default; an invalid value is reported and ignored.
+// node detail can leave RAM. (A target that goes over the one-graph limit is partitioned
+// instead, and each partition is small enough to hold in RAM — see scanPartitionsCollect for
+// why the disk store is bypassed there.) Returns a cleanup func that removes the graph db.
+// Overrides the auto-80% default; an invalid value is reported and ignored.
 func applyMaxRAM(v string) func() {
 	noop := func() {}
 	if v == "" {
@@ -430,7 +432,10 @@ func applyMaxRAM(v string) func() {
 // scanSourceLimit is the most analysable source one resident program graph may be built from
 // under the ceiling in force, and scanSourceBudget is how much each partition holds once a
 // target passes it. Both zero — no ceiling was asked for — means the target is scanned as one
-// graph however large it is, which is what every scan did before partitioning existed.
+// graph however large it is, which is what every scan did before partitioning existed. Both
+// are in JavaScript-equivalent bytes: PlanPartitions weighs a file by its language's
+// frontend.GraphWeight, so a byte of Python counts as the ~five JavaScript bytes of graph it
+// lowers to, and the constants below stay calibrated on the corpus they were measured on.
 var (
 	scanSourceLimit  int64
 	scanSourceBudget int64
@@ -604,6 +609,43 @@ func scanPathsWithProfile(paths []string, ruleSources []parser.V2DefinitionSourc
 // finding that is not there: a flow whose source and sink land in different partitions has no
 // graph containing both, so it is not reported.
 func scanPartitions(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, build extract.Options, parts []map[string]bool) ([]*findings.Finding, extract.Stats, error) {
+	all, stats, _, err := scanPartitionsCollect(paths, ruleSources, profileName, build, parts, nil)
+	return all, stats, err
+}
+
+// scanPartitionsCodemap scans a target as partitions and returns the merged
+// graph-json document alongside the findings and stats. The document is a
+// projection of the graph — functions, call edges, findings — and projections of
+// partitions merge, so a run whose output serialises the graph can still be
+// bounded by the ceiling: each partition's document is built while its graph is
+// the only one resident, and no store is held past the merge.
+func scanPartitionsCodemap(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, build extract.Options, parts []map[string]bool, ruleMeta map[string]map[string]any, root string) ([]*findings.Finding, extract.Stats, graphjson.Document, error) {
+	var docs []graphjson.Document
+	all, stats, _, err := scanPartitionsCollect(paths, ruleSources, profileName, build, parts, func(g usg.Store, got []*findings.Finding) {
+		docs = append(docs, graphjson.Build(g, got, ruleMeta, root, version))
+	})
+	if err != nil {
+		return nil, stats, graphjson.Document{}, err
+	}
+	return all, stats, graphjson.Merge(docs), nil
+}
+
+// scanPartitionsCollect scans a target that holds more analysable source than one
+// graph may cover under the configured ceiling, one partition at a time. collect,
+// when non-nil, sees each partition's graph and findings while both are still
+// resident, so an output format that can be built per partition and merged
+// (graph-json) projects its document before the graph is released.
+//
+// A scan otherwise builds a single resident graph over the whole target, so its peak
+// memory tracks the clone rather than the budget, and past a few megabytes of source
+// the memory watch stops the run before the first rule has run: no findings, no
+// report, nothing to raise the ceiling on. Scanning partition by partition bounds
+// the graph by the partition instead.
+//
+// What that costs is said once, on stderr, rather than left for the reader to infer
+// from a finding that is not there: a flow whose source and sink land in different
+// partitions has no graph containing both, so it is not reported.
+func scanPartitionsCollect(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, build extract.Options, parts []map[string]bool, collect func(usg.Store, []*findings.Finding)) ([]*findings.Finding, extract.Stats, usg.Store, error) {
 	fmt.Fprintf(os.Stderr,
 		"vyql: this target carries more analysable source than one graph can hold inside the\n"+
 			"      memory ceiling; scanning it as %d partitions. A flow whose source and sink are\n"+
@@ -612,12 +654,25 @@ func scanPartitions(paths []string, ruleSources []parser.V2DefinitionSource, pro
 	var all []*findings.Finding
 	var stats extract.Stats
 	seen := map[string]bool{}
-	for _, part := range parts {
+	// A partition is sized to hold a graph the ceiling can afford in RAM, and the
+	// badger store costs as much again as a partition's graph in write-path buffers
+	// (memtable arenas, SST builders, block cache) that the Go heap limit cannot see.
+	// The disk store exists for the one-graph scan that is genuinely too big to hold;
+	// a partitioned scan holds each partition in RAM and releases it whole instead.
+	prevIntStore := lowering.UseIntStore
+	lowering.UseIntStore = true
+	defer func() { lowering.UseIntStore = prevIntStore }()
+	for i, part := range parts {
 		opts := build
 		opts.Only = part
+		start := time.Now()
 		got, st, g, err := scanPathsWithProfileDemand(paths, ruleSources, profileName, true, opts)
+		fmt.Fprintf(os.Stderr, "vyql: partition %d/%d: %d files, %d findings (%s)\n", i+1, len(parts), len(part), len(got), time.Since(start).Round(time.Second))
 		if err != nil {
-			return nil, stats, err
+			return nil, stats, nil, err
+		}
+		if collect != nil && g != nil {
+			collect(g, got)
 		}
 		// The next partition's graph is built while this one is still reachable unless it is
 		// released here: the store holds an open database and its directory, and the binding
@@ -627,6 +682,12 @@ func scanPartitions(paths []string, ruleSources []parser.V2DefinitionSource, pro
 			bindings.ReleaseStoreIndexes(g)
 			_ = usg.Close(g)
 		}
+		// Return the finished partition's memory before the next one is built: the
+		// runtime returns freed spans lazily by default (MADV_FREE leaves them counted
+		// in resident memory until the machine is under pressure, which a dedicated
+		// CI runner never is), and fifteen partitions' peaks must not sum into the
+		// ceiling the way one graph would.
+		debug.FreeOSMemory()
 		stats = extract.MergeStats(stats, st)
 		for _, f := range got {
 			// SCA reads the target's manifests from the paths the scan was given, not from the
@@ -640,7 +701,7 @@ func scanPartitions(paths []string, ruleSources []parser.V2DefinitionSource, pro
 			all = append(all, f)
 		}
 	}
-	return all, stats, nil
+	return all, stats, nil, nil
 }
 
 func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2DefinitionSource, profileName string, pruneBindings bool, build extract.Options) ([]*findings.Finding, extract.Stats, usg.Store, error) {
@@ -793,6 +854,15 @@ func (o scanRunOptions) wantsFlags() bool {
 	return o.IncludeFlags || o.FlagsOnly || o.FlagCategory != "" && o.FlagCategory != "all" || o.FlagKind != "" && o.FlagKind != "all" || o.FlagLoc != ""
 }
 
+// scanRoot is the root path a graph-json document names, or empty when the scan
+// was given none.
+func scanRoot(paths []string) string {
+	if len(paths) > 0 {
+		return paths[0]
+	}
+	return ""
+}
+
 func run(paths []string, rulesPath, format, profileName string, opts scanRunOptions) error {
 	prof := applyProfile(paths, profileName)
 	ruleSources, err := loadRules(rulesPath)
@@ -815,6 +885,10 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	var all []*findings.Finding
 	var stats extract.Stats
 	var graph usg.Store
+	// codemap holds the merged graph-json document when the scan was partitioned;
+	// nil when the run built one graph (or replayed nothing) and the document is
+	// built from that graph at output time.
+	var codemap *graphjson.Document
 	hit := false
 	wantsFlags := opts.wantsFlags()
 	// graph-json serialises the live graph, which the whole-scan findings cache
@@ -835,14 +909,24 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	if !hit {
 		build := extract.Options{BindingOverlay: opts.BindingOverlay, Excludes: opts.Excludes}
 		// A target too large to hold as one graph inside the ceiling is scanned as several.
-		// Not when the run needs the graph itself (graph-json, -stats, the flag reports):
-		// those serialise one store, and there is no one store to hand them.
+		// Not when the run needs the graph itself (the flag reports, -stats): those serialise
+		// one store, and there is no one store to hand them. graph-json is the exception: its
+		// document is a projection of the graph — functions, call edges, findings — and
+		// projections of partitions merge, so a graph-json run without the flag reports or
+		// -stats is scanned as several documents of which one is printed.
+		codemapParts := format == "graph-json" && !wantsFlags && !opts.ShowStats
 		var parts []map[string]bool
-		if !needsGraph {
+		if !needsGraph || codemapParts {
 			parts = extract.PlanPartitions(paths, opts.Excludes, scanSourceLimit, scanSourceBudget)
 		}
 		scanNow := func() {
 			if len(parts) > 1 {
+				if codemapParts {
+					var doc graphjson.Document
+					all, stats, doc, err = scanPartitionsCodemap(paths, ruleSources, prof.Name, build, parts, sarifRulesMeta(ruleSources), scanRoot(paths))
+					codemap = &doc
+					return
+				}
 				all, stats, err = scanPartitions(paths, ruleSources, prof.Name, build, parts)
 				return
 			}
@@ -906,6 +990,16 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	var staleBaseline []baselineEntry
 	if opts.BaselinePath != "" {
 		all, covered, staleBaseline = applyBaseline(all, opts.Baseline)
+		// The partitioned codemap document was built per partition, before the
+		// baseline was applied; what it reports has to be what the run reports.
+		if codemap != nil {
+			kept := make(map[string]bool, len(all))
+			for _, f := range all {
+				kept[resultpolicy.Fingerprint(f)] = true
+			}
+			filtered := codemap.FilterFindings(kept)
+			codemap = &filtered
+		}
 	}
 
 	// output
@@ -922,17 +1016,17 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
 	case "graph-json":
-		root := ""
-		if len(paths) > 0 {
-			root = paths[0]
-		}
+		root := scanRoot(paths)
 		doc := graphjson.Document{
 			SchemaVersion: graphjson.SchemaVersion,
 			Tool:          graphjson.Tool{Name: "VyQL", Version: version},
 			Concepts:      graphjson.ConceptLegend(),
 			CodeMap:       graphjson.CodeMap{Root: root},
 		}
-		if graph != nil {
+		switch {
+		case codemap != nil:
+			doc = *codemap
+		case graph != nil:
 			doc = graphjson.Build(graph, all, sarifRulesMeta(ruleSources), root, version)
 		}
 		b, _ := json.MarshalIndent(doc, "", "  ")
