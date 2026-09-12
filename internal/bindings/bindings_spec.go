@@ -558,6 +558,12 @@ func specFromBindingSet(d *Set) bindingSpec {
 		case "type":
 			// Constructor type facts are read by CtorTypesFor; they do not create
 			// graph-labeling bindings.
+		case "flow_path", "flow_method", "flow_prefix":
+			// A propagation the binding declares for a call (`propagate … to
+			// args[N].pointee`): extraction consumes it as a call effect through
+			// CallEffectsFor while the call is being built, so it labels no node here.
+			// Falling through to the default aborted the whole scan on a corpus that
+			// declared one.
 		case "source_receiver":
 			s.Inputs = append(s.Inputs, inputSpec{Concept: mp.Concept, NodeType: mp.NodeType, Match: matchMode,
 				Methods: []string{mp.Pattern}, Receiver: true, Constraint: mp.Constraint,
