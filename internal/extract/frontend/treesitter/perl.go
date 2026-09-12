@@ -47,6 +47,12 @@ var perlMarkers = []*regexp.Regexp{
 	regexp.MustCompile(`\bforeach\s+(my\s+)?[$@%]`),         // foreach my $x
 }
 
+// perlSmallFileMax is the size under which a .pl-named file is claimed without
+// the marker test: the memory amplification the test guards against needs bulk
+// prose, and a small file cannot carry it. Snippets, fixtures and config-sized
+// scripts land here; every README that motivated the check is far larger.
+const perlSmallFileMax = 64 * 1024
+
 // hasPerlShebang reports whether src opens with an interpreter line naming perl —
 // the one marker that claims a file on its own, as a Python shebang claims an
 // extensionless script.
@@ -63,7 +69,21 @@ func hasPerlShebang(src string) bool {
 // interpreter claims a script outright, and any two of Perl's own constructs
 // claim a program. A file that cannot be read is left to the parse to judge,
 // exactly as before the check existed.
+//
+// A small file is claimed outright. The check exists because prose read as
+// Perl amplifies a few hundred kilobytes into gigabytes of error-recovery
+// memory; below that size there is nothing to amplify, while the two-marker
+// threshold was measured on whole programs and snippet-sized sources — a spec
+// fixture or a six-line config — routinely carry exactly one marker and were
+// being declined their own language.
 func ReadsAsPerl(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return true
+	}
+	if info.Size() < perlSmallFileMax {
+		return true
+	}
 	src, err := os.ReadFile(path)
 	if err != nil {
 		return true

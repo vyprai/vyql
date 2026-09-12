@@ -50,10 +50,15 @@ func writeProse(t *testing.T, dir, rel string, size int) string {
 // bounded scan at its ceiling, before the first rule ran. The file must leave
 // extraction unparsed — counted in the languages that do read it, never
 // pretended into a module no frontend built.
+//
+// The fixtures are larger than perlSmallFileMax deliberately: ReadsAsPerl
+// claims a small file outright (the amplification the check guards against
+// needs bulk prose; a snippet cannot carry it), so only an above-threshold
+// file exercises the marker test that separates documentation from source.
 func TestProseNamedPlIsNeverLoweredAsPerl(t *testing.T) {
 	dir := t.TempDir()
-	writeProse(t, dir, "README.pl", 12<<10)
-	writeProse(t, dir, filepath.Join("doc", "README.pl"), 12<<10)
+	writeProse(t, dir, "README.pl", 96<<10)
+	writeProse(t, dir, filepath.Join("doc", "README.pl"), 96<<10)
 
 	prog, _, _, stats, err := AllIn([]string{dir}, nil, nil)
 	if err != nil {
