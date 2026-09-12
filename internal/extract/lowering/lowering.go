@@ -4847,8 +4847,17 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			strArgs = strings.Join(valToks, "\x00")
 		}
 		n := l.nodeInline("Format", ex.Loc, nil, "", "", strArgs, "")
-		for _, p := range ex.Parts {
-			l.flow(l.eval(p, sc), n)
+		// `"<…>%(key)s<…>" % locals()` reads the keys the template names out of the scope
+		// snapshot, the way the same format reads them out of any mapping handed to it. Tying
+		// the whole snapshot to the result instead would carry every binding in scope into the
+		// string — a template naming only an escaped slot would report the raw one beside it.
+		operand, keys := l.localsFormatOperand(ex, sc)
+		for i, p := range ex.Parts {
+			node := l.eval(p, sc)
+			if i == operand && l.flowLocalsSlots(keys, n, sc) {
+				continue
+			}
+			l.flow(node, n)
 		}
 		return n
 	case nir.Seq:
@@ -5733,6 +5742,13 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	}
 	result := l.nodeInline("Call", call.Loc, props, call.Method, calleePath, strArgs, "")
 	l.rememberTemplate(call, result, sc)
+	// Python's locals() snapshots the enclosing scope: the bindings it holds flow into the
+	// result, and the result's slots ARE those bindings, so a reader that names one — a
+	// `locals()[key]` subscript, or the mapping operand of a `%(key)s` format — reads it
+	// alone (see python_locals.go).
+	if l.isLocalsSnapshot(call, sc) {
+		l.lowerLocalsSnapshot(result, sc)
+	}
 	// Insecure HTTP response-header configuration (CWE-942/1021/16/319): `resp[hdr] = val`
 	// stores lower to __setitem__; flag permissive CORS / disabled clickjacking & XSS
 	// protections / weak CSP / disabled HSTS.
