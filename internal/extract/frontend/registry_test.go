@@ -3,6 +3,7 @@ package frontend_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/vyprai/vyql/internal/extract/frontend"
@@ -95,5 +96,87 @@ func TestActionScriptFilesAreClaimedAndParsedIntoCalls(t *testing.T) {
 		if !seen[want] {
 			t.Errorf("%s frontend did not produce %q; got %v", lang.Name, want, seen)
 		}
+	}
+}
+
+// proseDoc is documentation text of the kind a `.pl` name actually carries in the
+// wild: a Polish README, with e-mail addresses, `%s` printf placeholders and
+// `->` arrows in URLs — code-shaped tokens a loose shape check could mistake for
+// code, and which the claim's marker set deliberately does not look at.
+const proseDoc = `LMS - LAN Management System 1.11-git
+
+   LMS Developers <lms@lists.lms.org.pl>
+   Copyright (c) 2001-2013
+
+   Spis treści
+   1. Wstęp
+        1.1. Czym jest LMS
+   2. Instalacja i konfiguracja
+
+   Moduły -> daemon -> konfiguracja %s %d @l @c
+   Zobacz http://lms.org.pl/?page=module&action=info&id=%s po szczegóły.
+   Plik konfiguracyjny: lms.ini, sekcja [daemon], opcje %s i %d.
+`
+
+// A `.pl` name is shared with documentation prose — README.pl is the Polish
+// README by convention — and the Perl grammar reading prose is ruinous: the
+// parse of a 338KB README peaked near 6GB of resident memory, which is how a
+// bounded scan of a documentation-heavy clone died at its ceiling before the
+// first rule ran. The claim asks what the file is made of, so prose is left
+// unclaimed at any size and real Perl is claimed as before.
+func TestPerlClaimDeclinesProseAndKeepsSource(t *testing.T) {
+	dir := t.TempDir()
+	var prose strings.Builder
+	for prose.Len() < 64<<10 {
+		prose.WriteString(proseDoc)
+	}
+	prosePath := filepath.Join(dir, "README.pl")
+	if err := os.WriteFile(prosePath, []byte(prose.String()), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	sourcePath := filepath.Join(dir, "handler.pl")
+	if err := os.WriteFile(sourcePath, []byte(`use strict;
+use warnings;
+
+sub handle {
+  my ($self, $q) = @_;
+  my $name = $q->param('name');
+  print $q->header, $name;
+}
+1;
+`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	// A shebang claims a script on its own: the minimal program, with no other
+	// Perl construct anywhere in it, stays source exactly as a Python shebang
+	// claims an extensionless script.
+	scriptPath := filepath.Join(dir, "hello.pl")
+	if err := os.WriteFile(scriptPath, []byte("#!/usr/bin/perl\nprint \"hello\\n\";\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := treesitter.ListAllFiles(dir)
+	class := frontend.ClassifyEntries(entries)
+	claimedBy := map[string][]string{} // path -> claiming languages
+	for _, lg := range frontend.Languages() {
+		for _, f := range lg.FilesFor(entries, class) {
+			claimedBy[f] = append(claimedBy[f], lg.Name)
+		}
+	}
+	perlClaims := func(path string) bool {
+		for _, name := range claimedBy[path] {
+			if name == "perl" {
+				return true
+			}
+		}
+		return false
+	}
+	for _, p := range []string{sourcePath, scriptPath} {
+		if !perlClaims(p) {
+			t.Errorf("%s is not claimed by perl (claimed by %v); real Perl must stay source", filepath.Base(p), claimedBy[p])
+		}
+	}
+	if perlClaims(prosePath) {
+		t.Errorf("%s is claimed by perl (claimed by %v); prose is not Perl source, and parsing it as Perl is the memory failure this claim check exists for", filepath.Base(prosePath), claimedBy[prosePath])
 	}
 }

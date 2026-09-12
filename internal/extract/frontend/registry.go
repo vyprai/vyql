@@ -169,26 +169,38 @@ func BundleKinds() map[string]bool {
 }
 
 // EntryClass records the content-derived facts an extension alone cannot settle: whether a `.h` is
-// C++ rather than C, and whether an extension-less file is a Python script.
+// C++ rather than C, whether an extension-less file is a Python script, and whether a file named
+// like Perl reads as Perl — the `.pl` name is shared with documentation prose (README.pl is the
+// Polish README by convention), and the Perl grammar parsing prose costs gigabytes of resident
+// memory per few hundred kilobytes of file.
 //
-// It exists because both answers require READING the file, and the per-language filter runs once
+// It exists because these answers require READING the file, and the per-language filter runs once
 // per technology. Computing them inside that filter re-read every header 24 times per scan and
 // every extension-less file 24 times, regardless of which language was being filtered for. They
 // are now derived once per directory and consulted 24 times.
 type EntryClass struct {
 	cppHeader     map[string]bool
 	pythonShebang map[string]bool
+	perlSource    map[string]bool
 }
 
 // ClassifyEntries inspects the entries whose language cannot be decided from the extension.
 func ClassifyEntries(entries []treesitter.Entry) EntryClass {
-	c := EntryClass{cppHeader: map[string]bool{}, pythonShebang: map[string]bool{}}
+	c := EntryClass{cppHeader: map[string]bool{}, pythonShebang: map[string]bool{}, perlSource: map[string]bool{}}
+	var perlExts map[string]bool
+	for _, lg := range languages() {
+		if lg.Name == "perl" {
+			perlExts = lg.Exts
+		}
+	}
 	for _, e := range entries {
-		switch e.Ext {
-		case ".h":
+		switch {
+		case e.Ext == ".h":
 			c.cppHeader[e.Path] = headerLooksCPP(e.Path)
-		case "":
+		case e.Ext == "":
 			c.pythonShebang[e.Path] = fileHasPythonShebang(e.Path)
+		case perlExts[e.Ext]:
+			c.perlSource[e.Path] = treesitter.ReadsAsPerl(e.Path)
 		}
 	}
 	return c
@@ -211,6 +223,18 @@ func (lg Language) FilesFor(entries []treesitter.Entry, class EntryClass) []stri
 		if lg.Name == "python" && e.Ext == "" && class.pythonShebang[e.Path] {
 			out = append(out, e.Path)
 			continue
+		}
+		// The Perl claim carries a content check the other two facts do not: a
+		// file made of no Perl construct is documentation prose rather than Perl,
+		// and reading it as Perl is the several-thousand-fold memory
+		// amplification described at ReadsAsPerl. Only an affirmative rejection
+		// narrows the claim — a file that was never checked keeps the
+		// extension-only claim, so a caller that skipped classification cannot
+		// silently unclaim a language's files.
+		if lg.Name == "perl" {
+			if parses, probed := class.perlSource[e.Path]; probed && !parses {
+				continue
+			}
 		}
 		if lg.Exts[e.Ext] || lg.Exts[e.Base] {
 			out = append(out, e.Path)
