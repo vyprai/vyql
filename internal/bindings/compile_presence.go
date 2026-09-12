@@ -231,7 +231,7 @@ func lowerV2PresenceBinary(alias, defaultSubject string, x parser.V2BinaryExpr, 
 		value = prefixV2PresenceValue(field, value)
 		pred := PresencePredicate{Subject: subject, Property: prop, Values: []string{value}, Negative: neg != (x.Op == "!=")}
 		switch {
-		case prop == "path" && (x.Op == "~=" || x.Op == "==" || x.Op == "!=" || x.Op == "contains"):
+		case prop == "path" && (x.Op == "~=" || x.Op == "==" || x.Op == "!="):
 			pred.Op = "match"
 			pred.Exact = x.Op == "==" || x.Op == "!="
 		case x.Op == "contains":

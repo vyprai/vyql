@@ -1665,6 +1665,18 @@ func flagPredicateHit(pred flagPredicate, n usg.Node) bool {
 				}
 				continue
 			}
+			// contains is a plain substring test on the path. It reaches inside a
+			// segment, which neither the boundary-aware match below nor the
+			// token-level flagValuePredicate can: "session.__setitem__" has to
+			// match a subscript write on a receiver named mysession.
+			if pred.Op == "contains" || pred.Op == "contains_any" {
+				for _, v := range pred.Values {
+					if v != "" && strings.Contains(path, v) {
+						return true
+					}
+				}
+				continue
+			}
 			for _, v := range pred.Values {
 				if pred.Exact && path == v || !pred.Exact && matchSinkPath(path, v) {
 					return true

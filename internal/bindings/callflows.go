@@ -23,6 +23,14 @@ type callFlowSpec struct {
 // that declares no call flow costs one cache read and no second parse of the corpus.
 var callFlowTable sync.Map // tech -> []callFlowSpec
 
+// CallEffectsForLoc resolves call-flow effects for a call at loc, deriving the
+// technology from the file extension in loc. Lowering is language-agnostic and
+// cannot import this package, so it reaches these effects through the
+// lowering.CallEffects hook, which the extract pipeline points here.
+func CallEffectsForLoc(loc, path, method string) []nir.CallEffect {
+	return CallEffectsFor(nodeTech(loc), path, method)
+}
+
 // CallEffectsFor reports the out-parameter flows bindings declare for a call in
 // technology tech. Extraction asks it for every call it builds, so the lookup is
 // a cache read plus a scan over the -- usually empty -- declared set.
