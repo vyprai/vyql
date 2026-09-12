@@ -950,8 +950,21 @@ func (spec bindingSpec) presenceApplicator() Applicator {
 					if pred.Subject == "flow_to" {
 						continue
 					}
+					// A negated predicate names what must NOT be there. Indexing on
+					// it would restrict the candidates to exactly the nodes it
+					// excludes.
+					if pred.Negative {
+						continue
+					}
 					switch pred.Property {
 					case "path":
+						// The path index buckets a pattern by its leading dotted
+						// segment, so it can only serve patterns that start at a
+						// segment boundary. A substring pattern does not, so leave
+						// it out and let the flag be considered against every node.
+						if pred.Op == "contains" || pred.Op == "contains_any" {
+							continue
+						}
 						paths = append(paths, pred.Values...)
 					case "method":
 						methods = append(methods, pred.Values...)
