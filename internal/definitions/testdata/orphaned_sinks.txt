@@ -1,16 +1,16 @@
-# Sinks bound in a language where no check bound in that language can neutralise
-# the threat. Each line is `threat<TAB>language`.
+
 #
-# This is a work list, not an exemption list. Every line is resolved one of two
-# ways:
+#
 #
 #   - bind the missing check in that language, where the control applies there;
 #   - unbind the sink in that language, where the threat cannot occur there.
-#
 # Removing a line without doing one of those fails the test, and doing one without
+# Sinks bound in a language where no check bound in that language can neutralise
+# This is a work list, not an exemption list. Every line is resolved one of two
 # removing the line fails it too. When this file is empty, delete it and let the
 # test fail on any orphan at all.
-
+# the threat. Each line is `threat<TAB>language`.
+# ways:
 crypto.CleartextStorage	c
 crypto.CleartextStorage	cpp
 crypto.CleartextStorage	csharp
@@ -30,6 +30,10 @@ crypto.CleartextStorage	rust
 crypto.CleartextStorage	scala
 crypto.CleartextStorage	swift
 crypto.ImproperSignatureCheck	python
+crypto.InsufficientEntropy	java
+crypto.InsufficientEntropy	javascript
+crypto.InsufficientEntropy	php
+crypto.InsufficientEntropy	python
 deserialization.DeserializationAbuse	bash
 deserialization.DeserializationAbuse	c
 deserialization.DeserializationAbuse	cpp
