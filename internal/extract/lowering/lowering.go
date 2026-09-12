@@ -5978,11 +5978,11 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		// the flow — see namedCallbackTargets.
 		var cbResultRouted bool
 		if len(call.Args) > 0 && elementCallbackMethods[call.Method] {
-			for _, target := range l.namedCallbackTargets(call, argVals, sc) {
-				if pnode := l.firstValueParam(target); pnode != "" {
+			for _, cb := range l.namedCallbackTargets(call, argVals, sc) {
+				if pnode := l.firstValueParam(cb.target); pnode != "" {
 					l.flow(recvNode, pnode)
-					if callbackResultMethods[call.Method] && target.ret != "" {
-						l.flow(target.ret, result)
+					if callbackResultMethods[call.Method] && cb.target.ret != "" {
+						l.flow(cb.target.ret, result)
 						cbResultRouted = true
 					}
 				}
@@ -6046,16 +6046,16 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			}
 		}
 	}
-	// higher-order call: a lambda handed to a call is invoked BY THE CALLEE, and what it is
+	// higher-order call: a callback handed to a call is invoked BY THE CALLEE, and what it is
 	// invoked with comes from the same call's other arguments — `apply(v -> sink(v), input)`,
-	// `each(items, x -> …)`, `sorted(data, key=lambda x: …)`. Route those values into the
-	// lambda's parameters. Without this the lambda's body is reachable only through what it
-	// captured, so a value handed to the call is followed only where the call's own return
-	// carries it and every sink inside the body is dark. The receiver-anchored dispatch above
-	// is the same move for `recv.forEach(cb)`; this is its argument side, and it needs no
-	// method list because the lambda argument itself is the evidence that the call is
-	// higher-order. FN-safe over-approximation.
-	l.flowArgsIntoCallbackParams(argVals)
+	// `each(items, x -> …)`, `forIn(obj, copy, target)`. Route those values into the callback's
+	// parameters. Without this the body is reachable only through what it captured, so a value
+	// handed to the call is followed only where the call's own return carries it and every sink
+	// inside the body is dark. The receiver-anchored dispatch above is the same move for
+	// `recv.forEach(cb)`; this is its argument side, and it needs no method list because the
+	// callback argument itself is the evidence that the call is higher-order. FN-safe
+	// over-approximation.
+	l.flowArgsIntoCallbackParams(call, argVals, sc)
 	l.applyTargetArgsCallback(call, argVals, sc)
 	// Interprocedural taint. An arg routed into a RESOLVED local function flows through that
 	// function's body (arg → param → … → ret → result), so an in-body transform is
@@ -6212,26 +6212,57 @@ func (l *lowerer) captureTryExceptionTaint(result string, args []string, recvNod
 	}
 }
 
+// callbackArg is one argument of a call that is a CALLBACK — a function the callee invokes, not
+// this call site — together with the parameter nodes that invocation binds.
+type callbackArg struct {
+	arg    int
+	params []string
+}
+
 // flowArgsIntoCallbackParams routes a higher-order call's ordinary argument values into the
-// parameters of the lambdas passed alongside them. Which parameter receives which value is the
-// callee's business and is not visible here (a resolved callee may forward them in any order, an
-// unresolved library one is opaque), so every non-callback value reaches every parameter of every
-// callback argument. A callback passed as data to another callback is not a value it is invoked
-// with, so lambda arguments are skipped as sources.
-func (l *lowerer) flowArgsIntoCallbackParams(argVals []string) {
-	if len(l.lambdaParams) == 0 {
-		return // nothing lowered a callback yet, so no call can be higher-order
+// parameters of the callbacks passed alongside them. The callback is either a lambda written at
+// the call site (lambdaParams is keyed on the Func node it lowered to) or a first-class
+// reference to a declared function (namedCallbackTargets resolves it): `forIn(obj, copy, target)`
+// hands its iterated object to `copy` exactly as `each(items, x -> …)` hands it to the lambda,
+// and the bare form has no receiver the receiver-anchored dispatch could route in its place.
+// Which parameter receives which value is the callee's business and is not visible here (a
+// resolved callee may forward them in any order, an unresolved library one is opaque), so every
+// non-callback value reaches every parameter of every callback argument. A callback passed as
+// data to another callback is not a value it is invoked with, so callback arguments are skipped
+// as sources.
+func (l *lowerer) flowArgsIntoCallbackParams(call nir.Call, argVals []string, sc *scope) {
+	if len(argVals) < 2 {
+		return // a lone argument leaves no other value to route anywhere
 	}
+	var cbBuf [4]callbackArg
+	cbs := cbBuf[:0]
 	for i, av := range argVals {
-		params := l.lambdaParams[av]
-		if len(params) == 0 {
-			continue
+		if ps := l.lambdaParams[av]; len(ps) > 0 {
+			cbs = append(cbs, callbackArg{i, ps})
 		}
+	}
+	for _, nc := range l.namedCallbackTargets(call, argVals, sc) {
+		if ps := l.allValueParams(nc.target); len(ps) > 0 {
+			cbs = append(cbs, callbackArg{nc.arg, ps})
+		}
+	}
+	if len(cbs) == 0 {
+		return
+	}
+	isCallback := func(j int) bool {
+		for _, cb := range cbs {
+			if cb.arg == j {
+				return true
+			}
+		}
+		return false
+	}
+	for _, cb := range cbs {
 		for j, val := range argVals {
-			if j == i || val == "" || len(l.lambdaParams[val]) > 0 {
+			if j == cb.arg || val == "" || isCallback(j) {
 				continue
 			}
-			for _, p := range params {
+			for _, p := range cb.params {
 				l.flow(val, p)
 			}
 		}
@@ -6474,6 +6505,13 @@ func staticLiteralExpr(e nir.Expr) bool {
 	}
 }
 
+// namedCallback is an argument a call passes as a first-class function REFERENCE —
+// `args.map(escapeCmdArgs)` — together with the single declaration that reference resolves to.
+type namedCallback struct {
+	arg    int
+	target *funcInfo
+}
+
 // namedCallbackTargets returns the declarations a higher-order call receives as first-class
 // function REFERENCES — `args.map(escapeCmdArgs)`, where the callback is a name bound to a
 // function rather than a lambda written at the call site. lambdaParams only knows the inline
@@ -6486,8 +6524,8 @@ func staticLiteralExpr(e nir.Expr) bool {
 // Only an argument that is a bare name resolving to exactly ONE declaration counts. A name that
 // already lowered to an inline lambda is left to lambdaParams, and an ambiguous name keeps the
 // conservative receiver→result edge rather than betting the flow on a guessed body.
-func (l *lowerer) namedCallbackTargets(call nir.Call, argVals []string, sc *scope) []*funcInfo {
-	var out []*funcInfo
+func (l *lowerer) namedCallbackTargets(call nir.Call, argVals []string, sc *scope) []namedCallback {
+	var out []namedCallback
 	for i, arg := range call.Args {
 		expr := arg
 		if thru, ok := expr.(nir.Thru); ok {
@@ -6503,7 +6541,7 @@ func (l *lowerer) namedCallbackTargets(call nir.Call, argVals []string, sc *scop
 		if reachOnly || len(targets) != 1 || targets[0] == nil {
 			continue
 		}
-		out = append(out, targets[0])
+		out = append(out, namedCallback{i, targets[0]})
 	}
 	return out
 }
@@ -6520,17 +6558,30 @@ func (l *lowerer) firstValueParam(target *funcInfo) string {
 	return ""
 }
 
-func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
-	if value == "" || target == nil {
-		return
+// allValueParams is the node of every parameter that carries a VALUE — the positions the values
+// a higher-order call is invoked with arrive at — skipping an explicit self/this.
+func (l *lowerer) allValueParams(target *funcInfo) []string {
+	if target == nil {
+		return nil
 	}
+	var out []string
 	for _, pname := range target.paramNames {
 		if pname == l.selfName {
 			continue
 		}
 		if pnode := target.params[pname]; pnode != "" {
-			l.flow(value, pnode)
+			out = append(out, pnode)
 		}
+	}
+	return out
+}
+
+func (l *lowerer) flowValueToAllParams(value string, target *funcInfo) {
+	if value == "" || target == nil {
+		return
+	}
+	for _, pnode := range l.allValueParams(target) {
+		l.flow(value, pnode)
 	}
 }
 
