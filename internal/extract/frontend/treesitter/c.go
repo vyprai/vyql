@@ -64,6 +64,18 @@ type ccConv struct {
 	// mutable objects, which every function in it asks for; nil until the
 	// first ask.
 	fileScopeVars map[string]bool
+	// narrowParamFuncs caches, per function this file declares or defines, the
+	// type spelling each of its value parameters is declared at, for the
+	// functions that take at least one narrow integer; nil until the first ask.
+	narrowParamFuncs map[string][]string
+	// narrowForwardingMacros caches, per function-like macro this file defines,
+	// the narrow integer type one of the macro's call arguments is converted to
+	// by the macro's own body; nil until the first ask.
+	narrowForwardingMacros map[string][]string
+	// root is the translation unit the conv is walking, so a file-level table
+	// can be read from inside one function body's conversion. The tree is alive
+	// for as long as the conv is.
+	root *tree_sitter.Node
 }
 
 // cPropagators write their source arguments into destination arg0.
@@ -108,7 +120,7 @@ func extractCLike(files []string, root, ext string, lang *tree_sitter.Language) 
 		},
 		ccStripSAL,
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
-			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext), lang: ccLang(ext)}
+			c := &ccConv{src: src, file: rel, key: moduleKey(root, abs, ext), lang: ccLang(ext), root: tree.RootNode()}
 			body := []nir.Stmt{c.ccModuleContext(tree.RootNode())}
 			if !ccOWASPBenchmarkFastPath() {
 				body = append(body, c.ccSharedOtaHandlerMissingAuthObservations(tree.RootNode())...)
@@ -1104,6 +1116,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccStackFallbackStrideUnderallocObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowDeclaredBoundsCheckObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowingCastBoundsCheckObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccNarrowCallArgObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccBufferRelocationOriginObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccCountedPopulationObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccFieldAliasStaleAfterReallocObservations(n)...)
@@ -5879,6 +5892,488 @@ func (c *ccConv) ccWideValueOrigins(nodes []*tree_sitter.Node, wide, wideResults
 		}
 	}
 	return "", ""
+}
+
+// ccNarrowCallArgObservations reports a call argument the frontend can see is
+// wider than the parameter it lands in: a value declared size_t, ptrdiff_t,
+// uint64_t and their spellings -- or the result of a function this file
+// declares to return one -- handed to a callee this file declares with a
+// 32-bit-or-narrower integer at that position, and the difference of two
+// pointers handed to one, which is a ptrdiff_t and is the spelling a length is
+// written in. C performs that conversion at the argument and names it with
+// nothing at all, so the high half of the value is gone before the callee
+// runs: what the callee computes with is the truncated remainder, which on the
+// signed spellings can be negative. That is why this is its own observation
+// and not analysis.narrow_cast.bounds_check's business -- that one reads a
+// conversion the code wrote a cast for, and this one reads the one it did not.
+//
+// Both take their widths from the file being read and nowhere else, so an
+// argument whose width the file does not state -- a member selection, a value
+// read back through a pointer, a call whose parameter types only a header
+// carries -- is not reported, and neither is a callee this file does not
+// declare. A callee this file does not declare covers the function-like macro
+// whose body forwards the argument to a declared callee's narrow parameter: the
+// preprocessor leaves only the name behind at the call site, so the parameter
+// list the conversion lands in is read off the body (ccNarrowForwardingMacros),
+// one macro deep. Whether the wide value is attacker-chosen, and whether the
+// caller capped it before handing it over, are the rule's questions.
+func (c *ccConv) ccNarrowCallArgObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	params := c.ccNarrowParamFuncs()
+	if len(params) == 0 {
+		return nil
+	}
+	wide := c.ccWideDeclaredNames(fn)
+	wideResults := c.ccWideReturningFunctions()
+	pointers := c.ccPointerDeclaredNames(fn)
+	if len(wide) == 0 && len(wideResults) == 0 && len(pointers) == 0 {
+		return nil
+	}
+	var out []nir.Stmt
+	seen := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "call_expression" {
+			c.ccNarrowCallArgSites(n, wide, wideResults, pointers, params, seen, &out)
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// ccNarrowCallArgSites reports each argument of one call that the parameter
+// list narrows, as its own observation on the argument's own line. An argument
+// already written as a cast to a narrow integer is left out: that conversion is
+// explicit, and analysis.narrow_cast.bounds_check is the observation that reads
+// it. An argument read at no declared position -- more arguments than the
+// declaration has parameters -- has nothing to be converted into.
+func (c *ccConv) ccNarrowCallArgSites(call *tree_sitter.Node, wide, wideResults, pointers map[string]bool, params map[string][]string, seen map[string]bool, out *[]nir.Stmt) {
+	callee := lastSeg(c.dotted(c.field(call, "function")))
+	spellings := params[callee]
+	if len(spellings) == 0 {
+		spellings = c.ccNarrowForwardingMacros()[callee]
+	}
+	if len(spellings) == 0 {
+		return
+	}
+	args := c.namedChildren(c.field(call, "arguments"))
+	path := "analysis.narrow_call_arg.wide_to_narrow"
+	for i, arg := range args {
+		if i >= len(spellings) {
+			break
+		}
+		target := spellings[i]
+		if !ccNarrowIntTypes[target] || c.ccExplicitNarrowCast(arg) {
+			continue
+		}
+		source, origin := c.ccWideValueOrigin(arg, wide, wideResults)
+		if source == "" {
+			if ptrOrigin, ok := c.ccPointerDifference(arg, pointers); ok {
+				source, origin = "pointer_difference", ptrOrigin
+			}
+		}
+		if source == "" {
+			continue
+		}
+		loc := c.loc(arg)
+		key := itoa(i) + "\x1f" + loc
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		*out = append(*out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: path, Loc: loc},
+			Args: []nir.Expr{
+				nir.Const{Loc: loc, Value: "callee=" + callee},
+				nir.Const{Loc: loc, Value: "position=" + itoa(i)},
+				nir.Const{Loc: loc, Value: "target=" + target},
+				nir.Const{Loc: loc, Value: "source=" + source},
+				nir.Const{Loc: loc, Value: "origin=" + origin},
+				nir.Const{Loc: loc, Value: "operand=" + ccTruncateToken(compactCExprText(c.text(arg)))},
+			},
+			Path:   path,
+			Method: "wide_to_narrow",
+			Loc:    loc,
+		}})
+	}
+}
+
+// ccExplicitNarrowCast reports whether the expression is itself a cast to a
+// narrow integer, which is the conversion written out rather than performed.
+func (c *ccConv) ccExplicitNarrowCast(n *tree_sitter.Node) bool {
+	if n == nil || c.kind(n) != "cast_expression" {
+		return false
+	}
+	return ccNarrowIntTypes[ccTypeSpelling(c.text(c.field(n, "type")))]
+}
+
+// ccPointerDifference reports the difference of two pointers as the
+// pointer-width value it is: a ptrdiff_t, which is as wide as the size_t
+// beside it and is what an offset or a length over a region reads as. Both
+// operands have to be names this function declares as a pointer or an array --
+// one pointer and one integer is pointer arithmetic, whose width is the
+// integer's, and the difference of two values of unknown type could be
+// anything.
+func (c *ccConv) ccPointerDifference(n *tree_sitter.Node, pointers map[string]bool) (string, bool) {
+	if n == nil || c.kind(n) != "binary_expression" || c.text(c.field(n, "operator")) != "-" {
+		return "", false
+	}
+	if !c.ccPointerOperand(c.field(n, "left"), pointers) || !c.ccPointerOperand(c.field(n, "right"), pointers) {
+		return "", false
+	}
+	return "ptrdiff_t", true
+}
+
+// ccPointerOperand reports whether the expression reads a name this function
+// declares as a pointer or an array, past the parentheses and the casts to a
+// pointer type that only re-spell it.
+func (c *ccConv) ccPointerOperand(n *tree_sitter.Node, pointers map[string]bool) bool {
+	for n != nil {
+		switch c.kind(n) {
+		case "identifier":
+			return pointers[c.text(n)]
+		case "parenthesized_expression":
+			kids := c.namedChildren(n)
+			if len(kids) == 0 {
+				return false
+			}
+			n = kids[len(kids)-1]
+		case "cast_expression":
+			if !strings.Contains(c.text(c.field(n, "type")), "*") {
+				return false
+			}
+			n = c.ccCastValue(n)
+		default:
+			return false
+		}
+	}
+	return false
+}
+
+// ccPointerDeclaredNames collects the parameters and locals a function
+// declares as a pointer or an array, which is what a difference of two of them
+// is typed from. The declarator carries the pointer, not the type spelling: a
+// `char *` and a `char[]` both hold an address, and a `char` holds neither.
+func (c *ccConv) ccPointerDeclaredNames(fn *tree_sitter.Node) map[string]bool {
+	names := map[string]bool{}
+	if pl := c.paramList(c.field(fn, "declarator")); pl != nil {
+		for _, ch := range c.namedChildren(pl) {
+			if !isCParamDecl(c.kind(ch)) {
+				continue
+			}
+			c.ccAddPointerDeclarator(names, c.field(ch, "declarator"))
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "declaration" {
+			for _, ch := range c.namedChildren(n) {
+				d := ch
+				if c.kind(d) == "init_declarator" {
+					d = c.field(d, "declarator")
+				}
+				c.ccAddPointerDeclarator(names, d)
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(c.field(fn, "body"))
+	return names
+}
+
+func (c *ccConv) ccAddPointerDeclarator(names map[string]bool, decl *tree_sitter.Node) {
+	if decl == nil {
+		return
+	}
+	switch c.kind(decl) {
+	case "pointer_declarator", "array_declarator":
+		if name := c.declName(decl); name != "" {
+			names[name] = true
+		}
+	}
+}
+
+// ccNarrowParamFuncs names the functions this file declares or defines, each
+// with the type spelling its value parameters are declared at, position by
+// position, for the functions that take at least one narrow integer. A
+// position that holds an address -- a pointer, an array, a function declarator
+// -- or whose type the grammar exposed no spelling for, reads as an empty
+// spelling, so a position either names a value type or names nothing. The
+// typing comes from the same translation unit the call is read in: a callee
+// only a header this file includes declares is not typed here, and its calls
+// convert nothing this observation can see.
+func (c *ccConv) ccNarrowParamFuncs() map[string][]string {
+	if c.narrowParamFuncs != nil {
+		return c.narrowParamFuncs
+	}
+	out := map[string][]string{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "function_declarator" {
+			c.ccAddNarrowParams(out, n)
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(c.root)
+	c.narrowParamFuncs = out
+	return out
+}
+
+// ccAddNarrowParams records one declared parameter list under the name its
+// declarator resolves to, a call through a function pointer included: the
+// declarator names the function either way. Two spellings of the same name
+// that disagree on a position type nothing there, rather than the analysis
+// picking one of them.
+func (c *ccConv) ccAddNarrowParams(out map[string][]string, fd *tree_sitter.Node) {
+	name := c.declName(c.field(fd, "declarator"))
+	pl := c.paramList(fd)
+	if name == "" || pl == nil {
+		return
+	}
+	spellings := make([]string, 0, 8)
+	for _, ch := range c.namedChildren(pl) {
+		if !isCParamDecl(c.kind(ch)) {
+			continue
+		}
+		spellings = append(spellings, c.ccParamValueSpelling(ch))
+	}
+	if !ccHasNarrowSpelling(spellings) {
+		return
+	}
+	if prev, seen := out[name]; seen {
+		out[name] = ccIntersectSpellings(prev, spellings)
+		return
+	}
+	out[name] = spellings
+}
+
+// ccParamValueSpelling normalizes the type one parameter is declared at. The
+// declarator is what says whether the parameter holds a value at all, because
+// the type spelling beside a pointer declarator is the type it points at: an
+// `int *` is an address and not a 32-bit integer, whatever the `int` says.
+func (c *ccConv) ccParamValueSpelling(param *tree_sitter.Node) string {
+	switch c.kind(c.field(param, "declarator")) {
+	case "pointer_declarator", "array_declarator", "function_declarator",
+		"abstract_pointer_declarator", "abstract_array_declarator", "abstract_function_declarator":
+		return ""
+	}
+	return ccTypeSpelling(paramTypeFromField(c, param))
+}
+
+// ccHasNarrowSpelling reports whether a declared parameter list names a narrow
+// integer anywhere, so a function that takes none is not recorded at all.
+func ccHasNarrowSpelling(spellings []string) bool {
+	for _, s := range spellings {
+		if ccNarrowIntTypes[s] {
+			return true
+		}
+	}
+	return false
+}
+
+// ccIntersectSpellings keeps the positions two spellings of one declaration
+// agree on, truncating at the shorter list: a position either declaration
+// leaves in doubt is a position this file does not type.
+func ccIntersectSpellings(a, b []string) []string {
+	n := minInt(len(a), len(b))
+	out := make([]string, n)
+	for i := 0; i < n; i++ {
+		if a[i] == b[i] {
+			out[i] = a[i]
+		}
+	}
+	return out
+}
+
+// ccNarrowForwardingMacros names the file's function-like macros, each with the
+// narrow integer type one of the macro's call arguments is converted to by the
+// macro's own body, position by position. The preprocessor leaves only the
+// macro's name behind at the call site, so the parameter list the conversion
+// lands in is a callee the body hands the argument to: a macro whose body calls
+// a function this file declares at `int size`, passing one of its own formal
+// parameters straight through, converts that argument to int exactly as a
+// direct call to the function would. The forwarding is read one macro deep --
+// a macro whose body calls another macro that forwards is not traced further,
+// and a chain that long reads as nothing rather than as a guess.
+func (c *ccConv) ccNarrowForwardingMacros() map[string][]string {
+	if c.narrowForwardingMacros != nil {
+		return c.narrowForwardingMacros
+	}
+	out := map[string][]string{}
+	if declared := c.ccNarrowParamFuncs(); len(declared) > 0 {
+		lines := strings.Split(string(c.src), "\n")
+		for i := 0; i < len(lines); i++ {
+			raw := strings.TrimSpace(lines[i])
+			if !strings.HasPrefix(raw, "#") {
+				continue
+			}
+			for strings.HasSuffix(strings.TrimSpace(raw), "\\") && i+1 < len(lines) {
+				raw = strings.TrimSuffix(strings.TrimSpace(raw), "\\") + " " + strings.TrimSpace(lines[i+1])
+				i++
+			}
+			name, params, body := cMacroNameParamsAndBody(raw)
+			if name == "" || len(params) == 0 || body == "" {
+				continue
+			}
+			spellings := ccMacroForwardedNarrow(params, body, declared)
+			if len(spellings) == 0 {
+				continue
+			}
+			if prev, seen := out[name]; seen {
+				out[name] = ccIntersectSpellings(prev, spellings)
+				continue
+			}
+			out[name] = spellings
+		}
+	}
+	c.narrowForwardingMacros = out
+	return out
+}
+
+// ccMacroForwardedNarrow reports, per formal parameter of a function-like
+// macro, the narrow integer type the macro's body hands that parameter to at a
+// call argument. Only a parameter passed straight through counts: an argument
+// the body computes is a value of the body's own making, and what reaches the
+// callee is not the caller's argument at the caller's width.
+func ccMacroForwardedNarrow(params []string, body string, declared map[string][]string) []string {
+	out := make([]string, len(params))
+	for _, call := range ccMacroBodyCalls(body) {
+		inner := declared[call.callee]
+		if len(inner) == 0 {
+			continue
+		}
+		for i, arg := range call.args {
+			if i >= len(inner) || !ccNarrowIntTypes[inner[i]] {
+				continue
+			}
+			if at := ccMacroParamIndex(arg, params); at >= 0 {
+				out[at] = inner[i]
+			}
+		}
+	}
+	for _, s := range out {
+		if s != "" {
+			return out
+		}
+	}
+	return nil
+}
+
+// ccMacroParamIndex reports which formal parameter a macro body's argument
+// spelling is: the name itself, or that name inside the parentheses a macro
+// body writes for safety. Anything else -- a member selection, arithmetic over
+// the parameter, a literal -- is a value the body made, not the caller's.
+func ccMacroParamIndex(arg string, params []string) int {
+	for strings.HasPrefix(arg, "(") && strings.HasSuffix(arg, ")") && ccCallArgsClose(arg, 0) == len(arg)-1 {
+		arg = arg[1 : len(arg)-1]
+	}
+	for i, p := range params {
+		if arg == p {
+			return i
+		}
+	}
+	return -1
+}
+
+// ccMacroBodyCall is one call written inside a macro body: the callee's name
+// and its argument spellings, which is all the body leaves to read.
+type ccMacroBodyCall struct {
+	callee string
+	args   []string
+}
+
+// ccMacroBodyCalls reads the calls a compacted macro body makes. The body is
+// token text and not a parse tree -- the grammar stops at the directive -- so
+// the read is a literal one: an identifier directly followed by an open paren,
+// its arguments split at the commas that paren pair owns. A call inside a
+// string or a character literal is not a call, and neither is one a comment
+// mentions.
+func ccMacroBodyCalls(body string) []ccMacroBodyCall {
+	var out []ccMacroBodyCall
+	for i := 0; i < len(body); {
+		switch {
+		case body[i] == '"' || body[i] == '\'':
+			i = ccSkipQuoted([]byte(body), i)
+		case body[i] == '/' && i+1 < len(body) && body[i+1] == '*':
+			if end := strings.Index(body[i+2:], "*/"); end >= 0 {
+				i += 3 + end
+			} else {
+				i = len(body)
+			}
+		case body[i] == '/' && i+1 < len(body) && body[i+1] == '/':
+			i = len(body)
+		case ccNameStartByte(body[i]):
+			j := i
+			for j < len(body) && ccIdentByte(body[j]) {
+				j++
+			}
+			k := j
+			for k < len(body) && ccLayoutByte(body[k]) {
+				k++
+			}
+			if k < len(body) && body[k] == '(' {
+				if close := ccCallArgsClose(body, k); close >= 0 {
+					out = append(out, ccMacroBodyCall{
+						callee: body[i:j],
+						args:   ccSplitTopLevelArgs(body[k+1 : close]),
+					})
+					i = close + 1
+					continue
+				}
+			}
+			i = j
+		default:
+			i++
+		}
+	}
+	return out
+}
+
+// ccSplitTopLevelArgs splits a call's argument text at the commas the call
+// itself owns. A comma inside a nested paren, a bracket, a brace or a literal
+// belongs to an argument, not to the list.
+func ccSplitTopLevelArgs(s string) []string {
+	var out []string
+	depth := 0
+	start := 0
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '"', '\'':
+			i = ccSkipQuoted([]byte(s), i) - 1
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			depth--
+		case ',':
+			if depth == 0 {
+				out = append(out, strings.TrimSpace(s[start:i]))
+				start = i + 1
+			}
+		}
+	}
+	if last := strings.TrimSpace(s[start:]); last != "" || len(out) > 0 {
+		out = append(out, last)
+	}
+	return out
 }
 
 // ccTruncateToken bounds an operand token, which is source text and otherwise
