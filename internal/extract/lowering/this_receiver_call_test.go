@@ -128,3 +128,115 @@ func TestThisReceiverCallResolvesAnInheritedDeclaration(t *testing.T) {
 		t.Fatalf("the argument reached the unrelated Cache declaration of the same name")
 	}
 }
+
+// The resolution a self receiver wins must never take a flow the unresolved call had. `wrap`
+// is declared on the enclosing class — returning a literal, so the body contributes no taint
+// — AND on a second unrelated class, so the unique-method-name fallback refuses. The
+// unresolved call carried the conservative arg→result edge, which is what carried the
+// argument to the consumer; the resolved call must keep that edge while ADDING the body. A
+// dispatch that drops the edge when the body resolves — a full typed dispatch — silences the
+// argument the moment the receiver's own body transforms it, which is the regression this
+// rework exists to rule out.
+func TestThisReceiverCallKeepsTheUnresolvedCallResultEdge(t *testing.T) {
+	prog := nir.Program{SelfName: "this", Modules: []nir.Module{{
+		Key:  "app/Util.php",
+		File: "app/Util.php",
+		Body: []nir.Stmt{
+			// the unrelated second declaration of the name, which is what defeats the
+			// unique-method-name fallback
+			nir.ClassDef{Name: "Other", Loc: "app/Util.php:1", Body: []nir.Stmt{
+				nir.FuncDef{Name: "wrap", Loc: "app/Util.php:2", Params: []string{"v"}, Body: []nir.Stmt{
+					nir.Return{Value: nir.Name{ID: "v", Loc: "app/Util.php:2"}},
+				}},
+			}},
+			nir.ClassDef{Name: "Host", Loc: "app/Util.php:5", Body: []nir.Stmt{
+				nir.FuncDef{Name: "wrap", Loc: "app/Util.php:6", Params: []string{"v"}, Body: []nir.Stmt{
+					nir.Return{Value: nir.Const{Value: "constant", Loc: "app/Util.php:6"}},
+				}},
+				nir.FuncDef{Name: "run", Loc: "app/Util.php:9", Params: []string{"input"}, Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"out"}, Decl: true, Loc: "app/Util.php:10", Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "$this", Loc: "app/Util.php:10"}, Attr: "wrap", Path: "$this.wrap", Loc: "app/Util.php:10"},
+						Args:   []nir.Expr{nir.Name{ID: "input", Loc: "app/Util.php:10"}},
+						Path:   "$this.wrap", Method: "wrap", Loc: "app/Util.php:10",
+					}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "echo", Loc: "app/Util.php:11"},
+						Args:   []nir.Expr{nir.Name{ID: "out", Loc: "app/Util.php:11"}},
+						Path:   "echo", Method: "echo", Loc: "app/Util.php:11",
+					}},
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arg := findNodeID(t, g, "code.Arg", "loc", "app/Util.php:10")
+	ownParam := inheritedParamNode(t, g, "Host", "wrap", "v")
+	otherParam := inheritedParamNode(t, g, "Other", "wrap", "v")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "app/Util.php:11")
+
+	fromArg, err := usg.BFS(g, arg, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fromArg[ownParam] {
+		t.Fatalf("the argument never reached the receiver's own wrap body")
+	}
+	if fromArg[otherParam] {
+		t.Fatalf("the argument reached the unrelated Other declaration of the same name")
+	}
+	if !fromArg[sinkArg] {
+		t.Fatalf("resolving the call dropped the conservative arg→result edge the unresolved call carried: the argument no longer reaches the consumer")
+	}
+}
+
+// A `$this->helper()` whose name is declared exactly once must keep the resolution the
+// unique-method-name fallback has always given it — the argument reaches the one
+// declaration's parameter and that body's return reaches the call result — with no change
+// in how the call is dispatched.
+func TestThisReceiverCallStillResolvesANameUniqueDeclaration(t *testing.T) {
+	prog := nir.Program{SelfName: "this", Modules: []nir.Module{{
+		Key:  "app/Host.php",
+		File: "app/Host.php",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Helper", Loc: "app/Host.php:1", Body: []nir.Stmt{
+				nir.FuncDef{Name: "aid", Loc: "app/Host.php:2", Params: []string{"v"}, Body: []nir.Stmt{
+					nir.Return{Value: nir.Name{ID: "v", Loc: "app/Host.php:2"}},
+				}},
+			}},
+			nir.ClassDef{Name: "Host", Loc: "app/Host.php:5", Body: []nir.Stmt{
+				nir.FuncDef{Name: "run", Loc: "app/Host.php:6", Params: []string{"input"}, Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"out"}, Decl: true, Loc: "app/Host.php:7", Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "$this", Loc: "app/Host.php:7"}, Attr: "aid", Path: "$this.aid", Loc: "app/Host.php:7"},
+						Args:   []nir.Expr{nir.Name{ID: "input", Loc: "app/Host.php:7"}},
+						Path:   "$this.aid", Method: "aid", Loc: "app/Host.php:7",
+					}},
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arg := findNodeID(t, g, "code.Arg", "loc", "app/Host.php:7")
+	helperParam := inheritedParamNode(t, g, "Helper", "aid", "v")
+	callResult := findNodeID(t, g, "code.Call", "loc", "app/Host.php:7")
+
+	fromArg, err := usg.BFS(g, arg, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fromArg[helperParam] {
+		t.Fatalf("the argument never reached the one aid declaration")
+	}
+	fromHelperParam, err := usg.BFS(g, helperParam, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fromHelperParam[callResult] {
+		t.Fatalf("the unique declaration's return never reached the call result")
+	}
+}
