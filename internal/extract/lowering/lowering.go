@@ -6792,6 +6792,13 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 			}
 		}
 		typ, hasReceiverType := sc.typ[obj]
+		if !hasReceiverType && isSelfNameID(obj, l.selfName) {
+			// the implicit receiver's type is keyed under the language-independent "this"
+			// spelling (see the FuncDef arm: the merged multi-language Program drops the
+			// per-language SelfName), while the call site spells it the language's way —
+			// PHP's `$this->method()` — so look it up under the canonical key too.
+			typ, hasReceiverType = sc.typ["this"]
+		}
 		if !hasReceiverType { // a global of this module declared in another file, or later in this one
 			typ, hasReceiverType = l.globalClass(l.curModule, obj)
 		}
