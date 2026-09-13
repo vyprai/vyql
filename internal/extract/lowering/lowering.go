@@ -6068,7 +6068,15 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		// every receiver-typed route and the unique-method-name fallback found nothing; a
 		// call on the implicit receiver still has the one runtime answer — the receiver's
 		// own class — resolved so that it only ever ADDS flow to the unresolved call.
-		targets, additive = l.resolveSelfReceiverTargets(call.Callee, sc)
+		// An abstract declaration on that class is the exception: its family comes back
+		// reach-only, and keeps the reach-only discipline.
+		var selfReachOnly bool
+		targets, selfReachOnly = l.resolveSelfReceiverTargets(call.Callee, sc)
+		if selfReachOnly {
+			reachOnly = true
+		} else if len(targets) > 0 {
+			additive = true
+		}
 	}
 	// A construction has no syntactic receiver: the object the constructor runs on is the
 	// call's own result. Standing it in as the receiver is what maps the arguments past an
@@ -6847,7 +6855,10 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 // the resolved body and the return reaches the call result, but the call's own arguments
 // also keep the conservative arg→result edge, so an in-body transform is an ADDED route and
 // never a replacement — closing the resolution gap cannot take a flow, and therefore a
-// finding, away.
+// finding, away. A declaration with no body of its own (an interface or abstract method) is
+// the one exception: the typed route answers it reach-only, and so does this one — the
+// implementors' param and return nodes are shared across call sites, so routing a shared
+// return here would merge taint from other sites into this call result.
 func (l *lowerer) resolveSelfReceiverTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool) {
 	c, ok := callee.(nir.Attr)
 	if !ok {
@@ -6871,11 +6882,11 @@ func (l *lowerer) resolveSelfReceiverTargets(callee nir.Expr, sc *scope) ([]*fun
 	if _, resolvable := l.uniqueTechFuncInfo(l.funcShort[c.Attr]); resolvable {
 		return nil, false // the name-keyed fallback already resolves this call
 	}
-	targets, _, settled := l.resolveOnType(typ, c.Attr)
+	targets, reachOnly, settled := l.resolveOnType(typ, c.Attr)
 	if !settled {
 		return nil, false
 	}
-	return targets, true
+	return targets, reachOnly
 }
 
 // maxNameKeyedCandidates bounds the work overrideFamily does for one call site. A short name

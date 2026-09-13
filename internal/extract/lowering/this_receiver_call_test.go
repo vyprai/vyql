@@ -192,6 +192,79 @@ func TestThisReceiverCallKeepsTheUnresolvedCallResultEdge(t *testing.T) {
 	}
 }
 
+// A declaration with no body of its own on the receiver's class — an interface or abstract
+// method — is the one shape the self-receiver route must NOT answer additively: the
+// implementors' param and return nodes are shared across every call site of the name, so
+// routing a shared return into this call result would merge taint from other sites into it.
+// It keeps the reach-only discipline instead: the argument reaches the implementor's body
+// and the call result keeps the conservative edge the unresolved call had.
+func TestThisReceiverAbstractDeclarationStaysReachOnly(t *testing.T) {
+	prog := nir.Program{SelfName: "this", Modules: []nir.Module{{
+		Key:  "app/Dao.php",
+		File: "app/Dao.php",
+		Body: []nir.Stmt{
+			nir.ClassDef{Name: "Dao", Loc: "app/Dao.php:1", Body: []nir.Stmt{
+				// no body: the abstract declaration the self-receiver route resolves on
+				nir.FuncDef{Name: "wrap", Loc: "app/Dao.php:2", Params: []string{"v"}},
+				nir.FuncDef{Name: "run", Loc: "app/Dao.php:3", Params: []string{"input"}, Body: []nir.Stmt{
+					nir.Assign{Targets: []string{"out"}, Decl: true, Loc: "app/Dao.php:4", Value: nir.Call{
+						Callee: nir.Attr{Base: nir.Name{ID: "$this", Loc: "app/Dao.php:4"}, Attr: "wrap", Path: "$this.wrap", Loc: "app/Dao.php:4"},
+						Args:   []nir.Expr{nir.Name{ID: "input", Loc: "app/Dao.php:4"}},
+						Path:   "$this.wrap", Method: "wrap", Loc: "app/Dao.php:4",
+					}},
+					nir.ExprStmt{Value: nir.Call{
+						Callee: nir.Name{ID: "echo", Loc: "app/Dao.php:5"},
+						Args:   []nir.Expr{nir.Name{ID: "out", Loc: "app/Dao.php:5"}},
+						Path:   "echo", Method: "echo", Loc: "app/Dao.php:5",
+					}},
+				}},
+			}},
+			nir.ClassDef{Name: "UserDao", Bases: []string{"Dao"}, Loc: "app/Dao.php:8", Body: []nir.Stmt{
+				nir.FuncDef{Name: "wrap", Loc: "app/Dao.php:9", Params: []string{"v"}, Body: []nir.Stmt{
+					nir.Return{Value: nir.Name{ID: "v", Loc: "app/Dao.php:9"}},
+				}},
+			}},
+			// the unrelated second declaration of the name, which is what defeats the
+			// unique-method-name fallback
+			nir.ClassDef{Name: "Other", Loc: "app/Dao.php:12", Body: []nir.Stmt{
+				nir.FuncDef{Name: "wrap", Loc: "app/Dao.php:13", Params: []string{"v"}, Body: []nir.Stmt{
+					nir.Return{Value: nir.Name{ID: "v", Loc: "app/Dao.php:13"}},
+				}},
+			}},
+		},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	arg := findNodeID(t, g, "code.Arg", "loc", "app/Dao.php:4")
+	implParam := inheritedParamNode(t, g, "UserDao", "wrap", "v")
+	otherParam := inheritedParamNode(t, g, "Other", "wrap", "v")
+	sinkArg := findNodeID(t, g, "code.Arg", "loc", "app/Dao.php:5")
+
+	fromArg, err := usg.BFS(g, arg, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !fromArg[implParam] {
+		t.Fatalf("the argument never reached the implementor's wrap body")
+	}
+	if fromArg[otherParam] {
+		t.Fatalf("the argument reached the unrelated Other declaration of the same name")
+	}
+	if !fromArg[sinkArg] {
+		t.Fatalf("the reach-only resolution dropped the conservative arg→result edge the unresolved call carried")
+	}
+
+	fromImplParam, err := usg.BFS(g, implParam, "FLOWS", 40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fromImplParam[sinkArg] {
+		t.Fatalf("the implementor's shared return node merged into this call result — reach-only bodies must not flow back")
+	}
+}
+
 // A `$this->helper()` whose name is declared exactly once must keep the resolution the
 // unique-method-name fallback has always given it — the argument reaches the one
 // declaration's parameter and that body's return reaches the call result — with no change
