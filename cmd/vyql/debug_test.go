@@ -88,7 +88,7 @@ binding callIssue {
 }
 binding presenceIssue {
   query pattern presenceNode where node.kind == "any" and node.path ~= "Random"
-  emit issue code.WeakRandomValue at node
+  emit issue code.WeakCipher at node
 }
 `), 0o600); err != nil {
 		t.Fatal(err)
