@@ -1933,6 +1933,30 @@ binding delegatedFields {
 	}
 }
 
+func TestV2PresenceNodeDelegatedCalleeSelectorField(t *testing.T) {
+	sets, err := compileV2BindingsForTest(`
+module bindings.rust.native;
+binding delegatedSelector {
+  query pattern presenceNode where node.scope == "function" and containsAny(node.context.calleeSelector, ["config.allowed_hosts", "self.config.allowed_hosts"]) and node.context.callee exists
+  emit issue code.SecretComparisonReview at node
+}
+`)
+	if err != nil {
+		t.Fatalf("parser.ParseV2Definitions: %v", err)
+	}
+	flag := sets[0].Mappings[0].Flag
+	if flag.Scope != "function" || len(flag.Predicates) != 2 {
+		t.Fatalf("flag predicates wrong: %+v", flag)
+	}
+	if got := flag.Predicates[0]; got.Property != "tokens" || got.Op != "contains_any" ||
+		got.Values[0] != "callee:selector=config.allowed_hosts" || got.Values[1] != "callee:selector=self.config.allowed_hosts" {
+		t.Fatalf("calleeSelector predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[1]; got.Property != "tokens" || got.Op != "exists" || got.Values[0] != "callee:" {
+		t.Fatalf("callee exists predicate wrong: %+v", got)
+	}
+}
+
 func TestV2PresenceNodeBoundaryTextOperators(t *testing.T) {
 	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.native;
