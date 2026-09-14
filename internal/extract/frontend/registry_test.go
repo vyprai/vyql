@@ -180,3 +180,31 @@ sub handle {
 		t.Errorf("%s is claimed by perl (claimed by %v); prose is not Perl source, and parsing it as Perl is the memory failure this claim check exists for", filepath.Base(prosePath), claimedBy[prosePath])
 	}
 }
+
+// A Grails template carries markup writes like any JSP, and until a frontend claimed
+// the .gsp extension the file fell through every language filter: it contributed no
+// module, and a markup write inside it produced no node for any binding to label.
+func TestGSPFilesAreClaimedByTheConfigFrontend(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "_edit.gsp")
+	src := `<div class="error message">${flash.message}</div>
+<div class="jobListTitle">${params.name}</div>
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := treesitter.ListAllFiles(dir)
+	class := frontend.ClassifyEntries(entries)
+	var claimed []string
+	for _, lg := range frontend.Languages() {
+		for _, f := range lg.FilesFor(entries, class) {
+			if f == path {
+				claimed = append(claimed, lg.Name)
+			}
+		}
+	}
+	if len(claimed) != 1 || claimed[0] != "config" {
+		t.Fatalf("no single frontend claims %s (claimed by %v); a Grails template is left unparsed", filepath.Base(path), claimed)
+	}
+}
