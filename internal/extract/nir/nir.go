@@ -303,6 +303,14 @@ type ClassDef struct {
 	// only code written inside it, so an enclosing class cannot see that it declares an
 	// annotated nested class; the lowering turns these into the enclosing class's context.
 	Annotations []string
+	// Exported marks a class as part of the PUBLIC API surface, per the language's own
+	// visibility rules (`public`, `pub`, `export`, and so on) -- an observation about who
+	// can name and construct the type, and nothing more. What construing it MEANS (for
+	// instance that a value narrowed by `x instanceof T` is bounded to a type an input
+	// channel cannot construct only while T is not exported) is a question for the layers
+	// above, the same way Exported on FuncDef records the entry-point fact and leaves the
+	// library/SDK archetype to decide what it admits.
+	Exported bool
 }
 
 // NestedClassContextTokens is the evidence a nested class contributes to the class that
