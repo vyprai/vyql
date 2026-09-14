@@ -86,8 +86,8 @@ type ccConv struct {
 	// initialiser of a const table needs; nil until the first ask.
 	constStructOrder map[string][]string
 	// constLocals caches, per function body already asked about, the const
-	// bindings that body declares; nil until the first ask.
-	constLocals map[uintptr]map[string]string
+	// scope that body declares; nil until the first ask.
+	constLocals map[uintptr]*ccConstScope
 	// root is the translation unit the conv is walking, so a file-level table
 	// can be read from inside one function body's conversion. The tree is alive
 	// for as long as the conv is.
@@ -651,10 +651,10 @@ func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node, paramTyp
 }
 
 // ccStructuredContextTokens reads one root's syntax-level evidence. locals are
-// the const bindings the root's own function body declares when the root is
-// one; walking a whole translation unit replaces them with each function
+// the const scope the root's own function body declares when the root is one;
+// walking a whole translation unit replaces them with each function
 // definition's own as the walk enters it.
-func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node, locals map[string]string) []string {
+func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node, locals *ccConstScope) []string {
 	const maxCContextTokens = 8192
 	seen := map[string]bool{}
 	var out []string
@@ -674,11 +674,11 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node, locals map[st
 		}
 		return compactCExprText(c.text(n))
 	}
-	// locals are the const bindings the enclosing function body declares, so a
+	// locals are the const scope the enclosing function body declares, so a
 	// call inside that body can carry the content of a decision made a few
 	// statements earlier instead of the bare name that reads it.
-	var walk func(*tree_sitter.Node, map[string]string)
-	walk = func(n *tree_sitter.Node, locals map[string]string) {
+	var walk func(*tree_sitter.Node, *ccConstScope)
+	walk = func(n *tree_sitter.Node, locals *ccConstScope) {
 		if n == nil || len(out) >= maxCContextTokens {
 			return
 		}
@@ -815,11 +815,20 @@ const ccConstStringLimit = 256
 // first argument of a command line, say) survives; that edge is the difference
 // between the bare-name and absolute-path spellings of a launch.
 func ccConstStringContent(raw string) string {
-	// a raw string carries its content between the '(' and the last ')'
-	if i := strings.Index(raw, "R\""); i >= 0 {
-		if open := strings.IndexByte(raw[i:], '('); open >= 0 {
-			if end := strings.LastIndexByte(raw, ')'); end > i+open {
-				v := raw[i+open+1 : end]
+	// a raw string begins at the literal's own start, after at most an encoding
+	// prefix; an R" anywhere else in the text is content, not a marker, so the
+	// prefix comes off before the marker is tested and a segment that merely
+	// ends in R keeps reading as content
+	for _, prefix := range []string{"u8", "u", "U", "L"} {
+		if strings.HasPrefix(raw, prefix) {
+			raw = raw[len(prefix):]
+			break
+		}
+	}
+	if strings.HasPrefix(raw, "R\"") {
+		if open := strings.IndexByte(raw, '('); open >= 0 {
+			if end := strings.LastIndexByte(raw, ')'); end > open {
+				v := raw[open+1 : end]
 				if v != "" && len(v) <= ccConstStringLimit {
 					return v
 				}
@@ -871,6 +880,33 @@ func (c *ccConv) ccIsStringLiteral(n *tree_sitter.Node) bool {
 	return false
 }
 
+// ccConstScope is what one function body declares around a call: values are
+// the const bindings the body fixes (see ccConstLocals), and declared holds
+// every name the body or its owning signature declares in any form. A name in
+// declared shadows the file's own object of that spelling for the whole body --
+// a read of it is the body's object (a parameter, a mutable local, a local
+// table, an enumerator), never the file's -- which is what keeps the file's
+// table from answering for a name the body redeclares.
+type ccConstScope struct {
+	values   map[string]string
+	declared map[string]bool
+}
+
+// value reads one of the const bindings the scope's body fixes; a scope
+// outside a function body holds none.
+func (s *ccConstScope) value(name string) string {
+	if s == nil {
+		return ""
+	}
+	return s.values[name]
+}
+
+// shadows reports whether the scope's body declares the name in any form, which
+// is what makes a read of it the body's object rather than the file's.
+func (s *ccConstScope) shadows(name string) bool {
+	return s != nil && s.declared[name]
+}
+
 // ccArgConstString resolves the constant string content an expression evaluates
 // to when this file fixes one, so an argument can carry the content of a
 // decision made away from the call: an initialiser, a table entry, a helper's
@@ -878,7 +914,7 @@ func (c *ccConv) ccIsStringLiteral(n *tree_sitter.Node) bool {
 // outside a function body). Parentheses and casts do not change the value.
 // Anything the file does not fix resolves to "", which is what keeps the
 // call_arg_const token a fact rather than a guess.
-func (c *ccConv) ccArgConstString(n *tree_sitter.Node, locals map[string]string) string {
+func (c *ccConv) ccArgConstString(n *tree_sitter.Node, locals *ccConstScope) string {
 	for n != nil {
 		switch c.kind(n) {
 		case "parenthesized_expression":
@@ -901,16 +937,22 @@ func (c *ccConv) ccArgConstString(n *tree_sitter.Node, locals map[string]string)
 	case "string_literal", "concatenated_string", "raw_string_literal":
 		return ccConstStringContent(c.text(n))
 	case "identifier":
-		if v := locals[c.text(n)]; v != "" {
+		if v := locals.value(c.text(n)); v != "" {
 			return v
+		}
+		if locals.shadows(c.text(n)) {
+			return ""
 		}
 		return c.ccFileConstStrings()[c.text(n)]
 	case "call_expression":
 		if fn := c.field(n, "function"); fn != nil && c.kind(fn) == "identifier" {
+			if locals.shadows(c.text(fn)) {
+				return ""
+			}
 			return c.ccFileConstStrings()[c.text(fn)]
 		}
 	case "field_expression", "subscript_expression":
-		if key, ok := c.ccConstTableReadKey(n); ok {
+		if key, ok := c.ccConstTableReadKey(n, locals); ok {
 			file := c.ccFileConstStrings()
 			if v := file[key]; v != "" {
 				return v
@@ -928,8 +970,10 @@ func (c *ccConv) ccArgConstString(n *tree_sitter.Node, locals map[string]string)
 // the initialiser can pair with an entry, `rules[].cmd` when it is not, and no
 // field for a table of pointers (`rules[0]`). Only a plain base name keys an
 // initialiser, so a read through a call, a nested selection or anything but a
-// literal subscript of a name spells no key at all.
-func (c *ccConv) ccConstTableReadKey(n *tree_sitter.Node) (string, bool) {
+// literal subscript of a name spells no key at all -- and a base the enclosing
+// body declares is that body's table, not the file's, so it spells no key
+// either.
+func (c *ccConv) ccConstTableReadKey(n *tree_sitter.Node, locals *ccConstScope) (string, bool) {
 	field := ""
 	for c.kind(n) == "field_expression" {
 		if field != "" {
@@ -949,7 +993,7 @@ func (c *ccConv) ccConstTableReadKey(n *tree_sitter.Node) (string, bool) {
 	} else if field == "" {
 		return "", false
 	}
-	if n == nil || c.kind(n) != "identifier" || c.text(n) == "" {
+	if n == nil || c.kind(n) != "identifier" || c.text(n) == "" || locals.shadows(c.text(n)) {
 		return "", false
 	}
 	key := c.text(n) + "[" + index + "]"
@@ -980,19 +1024,24 @@ func ccTableAggregateKey(key string) (string, bool) {
 // parameter's name counts, because a local redeclaring it in a nested block is
 // a different object), the second keeps the content to what the language
 // freezes, and the third keeps the value the initialiser wrote rather than one
-// a later statement replaced.
-func (c *ccConv) ccConstLocals(body *tree_sitter.Node) map[string]string {
+// a later statement replaced. The scope also reports every name the body
+// declares in any form, which is what lets a reader refuse the file's table for
+// a redeclared name (see ccConstScope).
+func (c *ccConv) ccConstLocals(body *tree_sitter.Node) *ccConstScope {
 	if body == nil {
 		return nil
 	}
 	if c.constLocals == nil {
-		c.constLocals = map[uintptr]map[string]string{}
+		c.constLocals = map[uintptr]*ccConstScope{}
 	}
-	if m, ok := c.constLocals[body.Id()]; ok {
-		return m
+	if s, ok := c.constLocals[body.Id()]; ok {
+		return s
 	}
 	file := c.ccFileConstStrings()
 	values := map[string]string{}
+	// fromName holds the const bindings whose initialiser reads a bare name,
+	// resolved once the walk has seen every declaration the body makes
+	fromName := map[string]string{}
 	declared := map[string]int{}
 	assigned := map[string]bool{}
 	var visit func(*tree_sitter.Node)
@@ -1031,14 +1080,16 @@ func (c *ccConv) ccConstLocals(body *tree_sitter.Node) map[string]string {
 				// a const binding of a name this file already fixed elsewhere
 				// carries that content to the calls that read it
 				if c.kind(value) == "identifier" {
-					if v := file[c.text(value)]; v != "" {
-						values[name] = v
-					}
+					fromName[name] = c.text(value)
 				}
 			}
 		case "parameter_declaration":
 			if name := c.declName(n); name != "" {
 				declared[name]++
+			}
+		case "enumerator":
+			if name := c.field(n, "name"); name != nil {
+				declared[c.text(name)]++
 			}
 		case "assignment_expression":
 			if left := c.field(n, "left"); left != nil && c.kind(left) == "identifier" {
@@ -1072,11 +1123,22 @@ func (c *ccConv) ccConstLocals(body *tree_sitter.Node) map[string]string {
 			out[name] = v
 		}
 	}
-	if len(out) == 0 {
-		out = nil
+	for name, src := range fromName {
+		// a source the body itself declares is that body's object (a
+		// parameter, a mutable local), never the file's, so it states nothing
+		if declared[name] != 1 || assigned[name] || declared[src] > 0 {
+			continue
+		}
+		if v := file[src]; v != "" {
+			out[name] = v
+		}
 	}
-	c.constLocals[body.Id()] = out
-	return out
+	scope := &ccConstScope{values: out, declared: map[string]bool{}}
+	for name := range declared {
+		scope.declared[name] = true
+	}
+	c.constLocals[body.Id()] = scope
+	return scope
 }
 
 // ccDeclIsConst reports whether a declaration's own type qualifiers carry const
@@ -1180,8 +1242,9 @@ func (c *ccConv) ccFileConstStrings() map[string]string {
 
 // ccConstReturn reads the content a function definition fixes for its result:
 // a body whose one return statement returns a string literal. A second return,
-// a conditional, a name the file does not fix, or no return at all states
-// nothing.
+// a conditional, a call wrapping a literal, a name the file does not fix, or no
+// return at all states nothing -- the value has to be the literal itself,
+// because an expression that merely quotes one is not fixed to its content.
 func (c *ccConv) ccConstReturn(fn *tree_sitter.Node) (string, bool) {
 	body := c.field(fn, "body")
 	if body == nil || !strings.Contains(c.text(body), "return") {
@@ -1208,7 +1271,7 @@ func (c *ccConv) ccConstReturn(fn *tree_sitter.Node) (string, bool) {
 		}
 	}
 	visit(body)
-	if returns != 1 || value == nil {
+	if returns != 1 || value == nil || !c.ccIsStringLiteral(value) {
 		return "", false
 	}
 	v := ccConstStringContent(c.text(value))
@@ -1290,6 +1353,8 @@ func (c *ccConv) ccConstEntryFields(entry *tree_sitter.Node, fields []string) ma
 }
 
 // ccConstDesignated reads one `.field = value` pair of an entry's initialiser.
+// The value has to be a string literal: one built by a call quotes a string
+// without being fixed to it.
 func (c *ccConv) ccConstDesignated(pair *tree_sitter.Node) (string, string) {
 	name := ""
 	for _, ch := range c.namedChildren(pair) {
@@ -1303,7 +1368,7 @@ func (c *ccConv) ccConstDesignated(pair *tree_sitter.Node) (string, string) {
 		}
 	}
 	value := c.field(pair, "value")
-	if name == "" || value == nil {
+	if name == "" || value == nil || !c.ccIsStringLiteral(value) {
 		return "", ""
 	}
 	return name, ccConstStringContent(c.text(value))

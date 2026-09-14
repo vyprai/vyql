@@ -182,6 +182,102 @@ void launch_whole_entry(int i) { CreateProcessW(NULL, kAgree[0], NULL, NULL, FAL
 	}
 }
 
+// TestCCallArgConstShadowAndGate pins the two rules that keep a call_arg_const
+// token a fact rather than a guess. First, a name the body itself declares --
+// a parameter, a local, a local table, an enumerator -- shadows the file's own
+// object of that name for the whole body, so a read of it states nothing even
+// when the file fixes an object under the same spelling. Second, the content a
+// helper or a designated initialiser fixes is read only off a string literal:
+// one return of a conditional, or a return wrapping a call, or a designated
+// value built by a call, quotes strings without being one, and quoting is not
+// content.
+func TestCCallArgConstShadowAndGate(t *testing.T) {
+	dir := t.TempDir()
+	file := filepath.Join(dir, "shadow.c")
+	src := []byte(`
+struct editor {
+    const char *fullPath;
+    const char *openFileCmd;
+};
+
+static const char *kBareCmd = "notepad.exe \"%f\"";
+static const struct editor kEditors[] = {
+    { "notepad.exe", "notepad.exe \"%f\"" },
+    { "C:\\edit.exe", "\"C:\\edit.exe\" \"%f\"" },
+};
+static const struct editor kBuilt[] = {
+    { .fullPath = "notepad.exe", .openFileCmd = build_cmd("notepad.exe") },
+};
+
+static const char *helper_conditional(int c) {
+    return c ? "notepad.exe" : "C:\\Windows\\notepad.exe";
+}
+static const char *helper_wrapped(const char *s) { return wrap_cmd(s); }
+
+static const char *kCat = "fooR" "bar(1)";
+
+void launch_param(const char *kBareCmd) {
+    CreateProcessW(NULL, kBareCmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+}
+
+void launch_local_shadow(void) {
+    const char *kBareCmd = getenv("EDITOR");
+    CreateProcessW(NULL, kBareCmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+}
+
+void launch_table_shadow(int i) {
+    struct editor kEditors[2] = { { "a", "a" }, { "b", "b" } };
+    CreateProcessW(NULL, kEditors[0].openFileCmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+}
+
+void launch_enum_shadow(void) {
+    enum { kBareCmd = 1 };
+    CreateProcessW(NULL, pick(kBareCmd), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+}
+
+void launch_helpers(void) {
+    CreateProcessW(NULL, helper_conditional(1), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+    CreateProcessW(NULL, helper_wrapped("notepad.exe"), NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+}
+
+void launch_built(void) {
+    CreateProcessW(NULL, kBuilt[0].openFileCmd, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+}
+
+void launch_cat(void) {
+    CreateProcessW(NULL, kCat, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+}
+`)
+	if err := os.WriteFile(file, src, 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := ExtractC([]string{file}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// the shadowed and ungated spellings state nothing: a body-declared name
+	// is the body's object, and quoted text inside a non-literal is not the
+	// literal
+	for fn := range map[string]bool{
+		"launch_param":        true, // a parameter shadows the file's object
+		"launch_local_shadow": true, // a local shadows the file's object
+		"launch_table_shadow": true, // a local table shadows the file's table
+		"launch_enum_shadow":  true, // an enumerator shadows the file's object
+		"launch_helpers":      true, // a conditional and a wrapped return
+		"launch_built":        true, // a designated value built by a call
+	} {
+		if got := cFuncContextTokens(prog.Modules[0].Body, fn); strings.Contains(got, "call_arg_const:CreateProcessW:") {
+			t.Fatalf("%s should carry no constant content; context=%q", fn, got)
+		}
+	}
+	// the content of adjacent segments that merely contains R" and parens is
+	// read as content, not mistaken for a raw string marker
+	if got := cFuncContextTokens(prog.Modules[0].Body, "launch_cat"); !strings.Contains(got, "call_arg_const_at:CreateProcessW:1:fooRbar(1)") {
+		t.Fatalf("launch_cat missing context token %q; context=%q", "call_arg_const_at:CreateProcessW:1:fooRbar(1)", got)
+	}
+}
+
 // TestCCallArgConstCppTokens pins the same fact for the C++ frontend, whose
 // grammar wraps a subscript's index in a subscript_argument_list and spells the
 // null application name nullptr -- the shapes of the SumatraPDF launch the
@@ -201,6 +297,7 @@ static const TextEditor editorRules[] = {
 };
 
 static const char* DefaultCmd() { return "notepad.exe"; }
+static const char* kRaw = R"(C:\Windows\notepad.exe "%f")";
 
 static void LaunchInverseSearch(int i) {
     const char* pattern = "notepad.exe \"%f\"";
@@ -208,6 +305,7 @@ static void LaunchInverseSearch(int i) {
     CreateProcessW(nullptr, editorRules[0].openFileCmd, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
     CreateProcessW(nullptr, DefaultCmd(), nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
     CreateProcessW(nullptr, pattern, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
+    CreateProcessW(nullptr, kRaw, nullptr, nullptr, FALSE, 0, nullptr, nullptr, &si, &pi);
 }
 `)
 	if err := os.WriteFile(file, src, 0o644); err != nil {
@@ -222,6 +320,9 @@ static void LaunchInverseSearch(int i) {
 		"call_arg_const_at:CreateProcessW:1:notepad.exe \"%f\"",
 		"call_arg_const:CreateProcessW:notepad.exe",
 		"call_arg_const:CreateProcessW:notepad.exe \"%f\"",
+		// a raw string's content is what sits between its own parens, quotes
+		// inside included
+		"call_arg_const_at:CreateProcessW:1:C:\\Windows\\notepad.exe \"%f\"",
 	} {
 		if got := cFuncContextTokens(prog.Modules[0].Body, "LaunchInverseSearch"); !strings.Contains(got, token) {
 			t.Fatalf("LaunchInverseSearch missing context token %q; context=%q", token, got)
