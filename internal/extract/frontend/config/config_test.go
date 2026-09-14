@@ -315,3 +315,70 @@ pattern bindingMetadata {
 		t.Fatalf("gsp input count = %d, want 2; nodes=%#v", inputCount, nodes)
 	}
 }
+
+// Claiming the extension is not the same as speaking for it. The config frontend
+// reads every .gsp it is handed, but a template scope is data: with the metadata
+// declaring jsp and no gsp scope, a Grails template full of ${…} writes lowers to
+// no module at all, and no repository's findings move until a definition declares
+// the scope. The same markup in a .jsp still lowers, which is what says the empty
+// result is the undeclared scope and not a fixture that lowers nothing anyway.
+func TestGSPWithoutADeclaredScopeStaysUnlowered(t *testing.T) {
+	dataRoot := t.TempDir()
+	metaDir := filepath.Join(dataRoot, "bindings", "config")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	meta := `module bindings.config.test.nogsp;
+
+pattern bindingMetadata {
+  binding: {
+    name: "config"
+    meta: {
+      config_template_scopes: ["jsp"]
+      config_template_input_pattern_jsp: "\\b(params|flash)\\.[A-Za-z0-9_]+\\b"
+      config_template_input_event_jsp: "analysis.template.jsp.input"
+      config_template_render_event_jsp: "analysis.template.jsp.render"
+      cross_language: "true"
+      fidelity: "resolved"
+    }
+  }
+}
+`
+	if err := os.WriteFile(filepath.Join(metaDir, "nogsp.vyql"), []byte(meta), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	oldRoot, _ := datadir.Lookup()
+	datadir.Set(dataRoot)
+	resetConfigProfile()
+	defer func() {
+		datadir.Set(oldRoot)
+		resetConfigProfile()
+	}()
+
+	dir := t.TempDir()
+	src := `<div class="message">${flash.message}</div>
+<div class="jobListTitle">${params.name}</div>
+`
+	gsp := filepath.Join(dir, "_edit.gsp")
+	if err := os.WriteFile(gsp, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	jsp := filepath.Join(dir, "edit.jsp")
+	if err := os.WriteFile(jsp, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := Extract([]string{gsp, jsp}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range prog.Modules {
+		if strings.HasSuffix(m.File, ".gsp") {
+			t.Fatalf("%s lowered to a module under a profile that declares no gsp scope; claiming the extension moved a finding", m.File)
+		}
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("the same markup in a .jsp produced %d modules, want 1; the fixture does not show the empty gsp result is the undeclared scope", len(prog.Modules))
+	}
+}
