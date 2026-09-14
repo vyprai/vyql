@@ -34,9 +34,10 @@ type jvConv struct {
 	hoisted []nir.Stmt
 }
 
-// javaPublic reports whether a method/constructor is part of the public API surface:
+// javaPublic reports whether a method/constructor/class is part of the public API surface:
 // it carries a `public` modifier (package-private/private/protected are not the API a
-// library exposes to arbitrary callers). Used to scope the library param-source.
+// library exposes to arbitrary callers). Used to scope the library param-source and the
+// class type-visibility fact.
 func (c *jvConv) javaPublic(n *tree_sitter.Node) bool {
 	for _, ch := range c.namedChildren(n) {
 		if c.kind(ch) == "modifiers" {
@@ -174,7 +175,8 @@ func (c *jvConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		prevFieldInit := c.fieldInitTokens
 		c.fieldInitTokens = c.jvFieldInitTokens(c.field(n, "body"), c.kind(n) == "interface_declaration")
 		cd := nir.ClassDef{Name: name, Body: c.decls(c.field(n, "body")), Loc: L, Bases: bases,
-			Members: c.jvFieldNames(c.field(n, "body")), Annotations: ownAnnotations}
+			Members: c.jvFieldNames(c.field(n, "body")), Annotations: ownAnnotations,
+			Exported: c.javaPublic(n)}
 		c.classParamTokens = prevParams
 		c.classContextTokens = prevContext
 		c.fieldInitTokens = prevFieldInit
@@ -1271,6 +1273,27 @@ func (c *jvConv) javaOp(n *tree_sitter.Node) string {
 	return ""
 }
 
+// instanceofTypeName returns the bare checked-type name of an instanceof_expression --
+// `DeserializationExceptionHeader` from `h instanceof DeserializationExceptionHeader` and
+// from the pattern-variable form. Qualification and generics are stripped because the
+// class registry the narrowing is resolved against is keyed by bare names.
+func (c *jvConv) instanceofTypeName(n *tree_sitter.Node) string {
+	t := c.field(n, "right")
+	if t == nil {
+		return ""
+	}
+	if c.kind(t) == "generic_type" {
+		if kids := c.namedChildren(t); len(kids) > 0 {
+			t = kids[0]
+		}
+	}
+	name := strings.TrimSpace(c.text(t))
+	if i := strings.LastIndex(name, "."); i >= 0 {
+		name = name[i+1:]
+	}
+	return name
+}
+
 func javaIsLengthField(c *jvConv, n *tree_sitter.Node) bool {
 	if n == nil {
 		return false
@@ -1456,6 +1479,15 @@ func (c *jvConv) expr(n *tree_sitter.Node) nir.Expr {
 		// other operators (-, *, /, %, >, <, ==, &&, …) preserve the operator for constant
 		// evaluation of opaque branch conditions; BinOp also flows taint through both sides.
 		return nir.BinOp{Op: op, Left: left, Right: right, Loc: L}
+	case "instanceof_expression":
+		// `x instanceof T` exists to state a fact about x's type. Keep the checked TYPE as
+		// a Const carrying the bare name, so the lowering can pair the narrowing with the
+		// class registry's visibility fact for T (see lowering's type_narrowing.go) -- the
+		// relation a guard needs before it can be said to bound a value to what the input
+		// channel cannot construct. A pattern variable (`x instanceof T t`) stays unbound:
+		// the tested value keeps flowing under its own name.
+		return nir.BinOp{Op: "instanceof", Left: c.expr(c.field(n, "left")),
+			Right: nir.Const{Loc: L, Value: c.instanceofTypeName(n)}, Loc: L}
 	case "unary_expression":
 		return nir.Unary{Op: c.javaOp(n), Operand: c.expr(c.field(n, "operand")), Loc: L}
 	case "parenthesized_expression", "cast_expression":

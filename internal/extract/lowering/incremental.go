@@ -319,12 +319,17 @@ type cbGob struct {
 // its per-namespace node counter (so a later fresh pass-2 of the same module continues minting
 // body node ids without colliding with these signature/import ids).
 type pass1Delta struct {
-	Nodes       []usg.Node
-	Imports     []ieGob
-	Funcs       []fiGob
-	ClassQual   []string
-	ClassDefs   []string
-	ClassFields []cfGob
+	Nodes     []usg.Node
+	Imports   []ieGob
+	Funcs     []fiGob
+	ClassQual []string
+	ClassDefs []string
+	// ClassExported is the exported subset of the module's class declarations — the
+	// type-visibility fact instanceof narrowing guards are attributed against. It replays
+	// with the rest of pass 1 because a guard's tokens read it, so a cached module still
+	// has to answer for the visibility of the types it declares.
+	ClassExported []string
+	ClassFields   []cfGob
 	// ClassBases is the inheritance/implementation graph the module contributes. It replays
 	// with the rest of pass 1 because derived dispatch is resolution, not body lowering: a
 	// module read back from the cache still has to be a dispatch target for the modules that
@@ -378,6 +383,9 @@ func (d *pass1Delta) replay(l *lowerer, base usg.Store, modkey, ns string) {
 			l.classDefs[name] = map[string]bool{}
 		}
 		l.classDefs[name][modkey] = true
+	}
+	for _, q := range d.ClassExported {
+		l.classExported[q] = true
 	}
 	for _, cf := range d.ClassFields {
 		if l.classFields[cf.Key] == nil {
@@ -486,6 +494,11 @@ func (l *lowerer) sigFingerprint() string {
 	}
 	for _, c := range sortedSetKeys(l.classDefs) {
 		fmt.Fprintf(h, "D %s %v\n", c, sortedBoolKeys(l.classDefs[c]))
+	}
+	// the visibility fact is part of the resolution context a narrowing guard reads, so a
+	// flip must re-lower the modules that check the type (not only the one that declares it)
+	for _, q := range sortedBoolKeys(l.classExported) {
+		fmt.Fprintf(h, "V %s\n", q)
 	}
 	for _, c := range sortedBoolKeys(l.classQual) {
 		fmt.Fprintf(h, "Q %s\n", c)
