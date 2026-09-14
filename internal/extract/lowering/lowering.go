@@ -63,6 +63,11 @@ type lowerer struct {
 	// See receiver_field_type.go.
 	fieldCtorWrites []fieldCtorWrite
 	fieldCtorTypes  map[string]string
+	// globalCtorTypes holds the one constructor type each module-level variable's writes
+	// agree on ("ns\x1fname" -> type, or globalCtorConflict when they do not agree), for the
+	// languages whose module globals resolve to a slot node rather than to the construction
+	// that filled them. See module_global_type.go.
+	globalCtorTypes map[string]string
 	// phiOperands holds, per control-flow merge node, the values that merge joins.
 	// A merge's FLOWS in-edges are not the same set: a later mutator call or an
 	// alias can add an edge into the same node, so the operands are captured where
@@ -3033,6 +3038,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		resolveImports:   resolveImports,
 		ctorTypes:        ctorTypes,
 		fieldCtorTypes:   map[string]string{},
+		globalCtorTypes:  map[string]string{},
 		phiOperands:      map[string][]string{},
 		g:                newGraphStore(estimateGraphNodeHint(prog)),
 		modCtr:           map[string]int{},
@@ -3410,6 +3416,7 @@ func (l *lowerer) run() error {
 		l.registerGlobals(m.Key, body.Body)
 	}
 	l.collectAddressTaken()
+	l.collectGlobalCtorTypes() // before the field pass: a field write may construct through a factory-returned global
 	l.collectFieldCtorTypes()
 	for _, m := range l.prog.Modules {
 		l.curModule, l.curClass, l.curNS, l.curFile = m.Key, "", ModuleNS(m), m.File
@@ -5497,20 +5504,33 @@ func nirKind(e nir.Expr) string {
 }
 
 // recvType returns the inferred type of a receiver node if it was produced by a
-// known constructor call (its callee path is in the constructor→type table).
+// known constructor call (its callee path is in the constructor→type table), or by
+// a construction through a module global that holds a factory-returned class.
 func (l *lowerer) recvType(nodeID string) string {
 	if nodeID == "" {
 		return ""
 	}
-	if n, ok, _ := l.g.GetNode(nodeID); ok {
-		for _, key := range []string{"recv_type", "decl_type", "type"} {
-			if t := n.Prop(key); t != "" {
-				return t
-			}
+	n, ok, _ := l.g.GetNode(nodeID)
+	if !ok {
+		return ""
+	}
+	for _, key := range []string{"recv_type", "decl_type", "type"} {
+		if t := n.Prop(key); t != "" {
+			return t
 		}
-		if len(l.ctorTypes) > 0 {
-			return l.ctorTypes[n.Prop("callee_path")]
+	}
+	if len(l.ctorTypes) > 0 {
+		if t := l.ctorTypes[n.Prop("callee_path")]; t != "" {
+			return t
 		}
+	}
+	// A construction through a module global's own name -- `new Todo()` where Todo holds the
+	// class a factory returned -- is typed by that global's entry rather than by the table,
+	// which keys on the callee path a binding can name. Only a call node: a bare name reading
+	// as its own callee path is an identifier used as a value, and a shadowing local or
+	// parameter of that name is not the global at all.
+	if n.Type == "code.Call" && !strings.ContainsAny(n.Prop("callee_path"), ".[") {
+		return l.globalCtorType(l.curNS, n.Prop("callee_path"))
 	}
 	return ""
 }
@@ -5693,6 +5713,12 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 			// built it from, not by anything the read's own node carries (see
 			// receiver_field_type.go).
 			recvType = l.receiverFieldCtorType(attr.Base, sc)
+		}
+		if recvType == "" {
+			// a receiver naming one of the module's own top-level variables is typed the same
+			// way: the name resolves to the module's slot, which carries nothing the
+			// construction that filled it knew (see module_global_type.go).
+			recvType = l.receiverGlobalCtorType(attr.Base, recvNode)
 		}
 		if recvType == "" {
 			recvMayType = l.recvMergeCtorType(recvNode)
