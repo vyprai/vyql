@@ -84,6 +84,7 @@ type lowerer struct {
 	globalTypes    map[string]string            // "modkey::global" -> declared type name
 	classQual      map[string]bool              // "modkey::Class"
 	classDefs      map[string]map[string]bool   // bare class name -> SET of modules that define it
+	classExported  map[string]bool              // "modkey::Class" -> declared part of the public API surface
 	classFields    map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables   map[string]map[string]importEntry
 	aliasTables    map[string]map[string]calleeAlias // module key -> name bound by a declaration to a callable
@@ -3043,6 +3044,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		globalTypes:      map[string]string{},
 		classQual:        map[string]bool{},
 		classDefs:        map[string]map[string]bool{},
+		classExported:    map[string]bool{},
 		classFields:      map[string]map[string]string{},
 		importTables:     map[string]map[string]importEntry{},
 		aliasTables:      map[string]map[string]calleeAlias{},
@@ -3965,6 +3967,15 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				l.classDefs[st.Name] = map[string]bool{}
 			}
 			l.classDefs[st.Name][modkey] = true
+			if st.Exported {
+				// the type-visibility fact a narrowing guard is attributed against: who can
+				// construct the class (see type_narrowing.go). Only exported classes are
+				// recorded -- not-exported is the zero value.
+				l.classExported[modkey+"::"+st.Name] = true
+				if l.p1 != nil {
+					l.p1.ClassExported = append(l.p1.ClassExported, modkey+"::"+st.Name)
+				}
+			}
 			if l.p1 != nil {
 				l.p1.ClassQual = append(l.p1.ClassQual, modkey+"::"+st.Name)
 				l.p1.ClassDefs = append(l.p1.ClassDefs, st.Name)
@@ -4557,6 +4568,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					"kind": "literal_membership",
 				}))
 			}
+			// `x instanceof T` bounds x on THIS arm (the else arm when negated): route the
+			// arm's reads through the guard relation so it sits on the taint path, carrying
+			// the checked type and its visibility fact (see type_narrowing.go).
+			if name, typ, neg, ok := typeNarrowingName(st.Cond); ok && !neg && sc.node[name] != "" {
+				sc.setNode(name, l.typeNarrowingGuard(sc.node[name], typ, st.Loc))
+				sc.delCnst(name)
+			}
 			l.block(st.Then, sc)
 		})
 		thenDelta, thenBefore := sc.nodeDelta(mark)
@@ -4565,6 +4583,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		sc.undoIter(iterMark)
 		l.inRegion("if"+b+".e", func() {
 			l.branchCond = condNode
+			if name, typ, neg, ok := typeNarrowingName(st.Cond); ok && neg && sc.node[name] != "" {
+				sc.setNode(name, l.typeNarrowingGuard(sc.node[name], typ, st.Loc))
+				sc.delCnst(name)
+			}
 			l.block(st.Else, sc)
 		})
 		elseDelta, elseBefore := sc.nodeDelta(mark)
