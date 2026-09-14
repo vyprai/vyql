@@ -63,6 +63,8 @@ func Extract(files []string, root string) (nir.Program, error) {
 			body = scanJelly(src, rel)
 		case k == "jsp":
 			body = scanJSP(src, rel)
+		case k == "gsp":
+			body = scanGSP(src, rel)
 		case k == "dottemplate":
 			body = fileSignatureBody
 		case strings.HasPrefix(k, "texttemplate:"):
@@ -112,6 +114,9 @@ func kind(path string, src []byte) string {
 	}
 	if ext == ".jsp" || ext == ".tag" {
 		return "jsp"
+	}
+	if ext == ".gsp" {
+		return "gsp"
 	}
 	if ext == ".jst" || ext == ".def" {
 		return "dottemplate"
@@ -289,6 +294,24 @@ func scanJSP(src []byte, file string) []nir.Stmt {
 			continue
 		}
 		out = append(out, scopedContainsEvents(cfg, "jsp", line, file, i+1)...)
+	}
+	return out
+}
+
+// scanGSP reads a Grails Server Page the way scanJSP reads a JSP: the ${…} markup
+// write is the same shape, under the gsp template scope the binding metadata declares.
+// A scope the metadata does not declare contributes nothing, so claiming .gsp stays
+// inert for every repository until a definition speaks for it.
+func scanGSP(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	var out []nir.Stmt
+	out = append(out, scanTemplateExpressions(src, file, "gsp")...)
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "gsp", line, file, i+1)...)
 	}
 	return out
 }

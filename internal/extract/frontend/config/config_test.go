@@ -4,8 +4,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/lowering"
 )
 
@@ -218,5 +220,165 @@ func TestAttributeValueSpansSkipProseAndUnquotedAttributes(t *testing.T) {
 	}
 	if spans[0].Name != "tal:content" || spans[0].Line != 2 {
 		t.Fatalf("span = %#v, want the tal:content attribute on line 2", spans[0])
+	}
+}
+
+// resetConfigProfile drops the compiled config profile so the next loadProfile reads
+// the data root that is pinned when it runs. Only the tests below use it: the profile
+// is read once per process from whatever root is pinned at that moment.
+func resetConfigProfile() {
+	configProfileOnce = sync.Once{}
+	configProfileData = configProfile{}
+}
+
+// A Grails template is markup carrying ${…} writes, and it lowers to the render and
+// input calls the binding metadata declares for the gsp template scope. Until a
+// frontend claimed the .gsp extension the file fell out of every language filter: no
+// module, no node, nothing for a binding to label. The scope profile is data, not Go,
+// so the test pins a minimal data dir that declares one and asserts the markup write
+// inside the template comes out the other side of the lowering.
+func TestGSPTemplateScopeLowersMarkupWrite(t *testing.T) {
+	dataRoot := t.TempDir()
+	metaDir := filepath.Join(dataRoot, "bindings", "config")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	meta := `module bindings.config.test.gsp;
+
+pattern bindingMetadata {
+  binding: {
+    name: "config"
+    meta: {
+      config_template_scopes: ["gsp"]
+      config_template_input_pattern_gsp: "\\b(params|flash)\\.[A-Za-z0-9_]+\\b"
+      config_template_input_event_gsp: "analysis.template.gsp.input"
+      config_template_render_event_gsp: "analysis.template.gsp.render"
+      cross_language: "true"
+      fidelity: "resolved"
+    }
+  }
+}
+`
+	if err := os.WriteFile(filepath.Join(metaDir, "gsp.vyql"), []byte(meta), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	oldRoot, _ := datadir.Lookup()
+	datadir.Set(dataRoot)
+	resetConfigProfile()
+	defer func() {
+		datadir.Set(oldRoot)
+		resetConfigProfile()
+	}()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "_edit.gsp")
+	src := `<div class="message">${flash.message}</div>
+<div class="jobListTitle">${params.name}</div>
+<div class="safe">${job.displayName}</div>
+`
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf(".gsp file produced %d modules, want 1; the file was not lowered", len(prog.Modules))
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	renderCount := 0
+	inputCount := 0
+	for _, n := range nodes {
+		switch n.Prop("callee_path") {
+		case "analysis.template.gsp.render":
+			renderCount++
+		case "analysis.template.gsp.input":
+			inputCount++
+		}
+	}
+	// two writes the input pattern recognises; the third line names no input and must
+	// stay unlabelled rather than widen the scope to every ${…} on the page.
+	if renderCount != 2 {
+		t.Fatalf("gsp render count = %d, want 2; nodes=%#v", renderCount, nodes)
+	}
+	if inputCount != 2 {
+		t.Fatalf("gsp input count = %d, want 2; nodes=%#v", inputCount, nodes)
+	}
+}
+
+// Claiming the extension is not the same as speaking for it. The config frontend
+// reads every .gsp it is handed, but a template scope is data: with the metadata
+// declaring jsp and no gsp scope, a Grails template full of ${…} writes lowers to
+// no module at all, and no repository's findings move until a definition declares
+// the scope. The same markup in a .jsp still lowers, which is what says the empty
+// result is the undeclared scope and not a fixture that lowers nothing anyway.
+func TestGSPWithoutADeclaredScopeStaysUnlowered(t *testing.T) {
+	dataRoot := t.TempDir()
+	metaDir := filepath.Join(dataRoot, "bindings", "config")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	meta := `module bindings.config.test.nogsp;
+
+pattern bindingMetadata {
+  binding: {
+    name: "config"
+    meta: {
+      config_template_scopes: ["jsp"]
+      config_template_input_pattern_jsp: "\\b(params|flash)\\.[A-Za-z0-9_]+\\b"
+      config_template_input_event_jsp: "analysis.template.jsp.input"
+      config_template_render_event_jsp: "analysis.template.jsp.render"
+      cross_language: "true"
+      fidelity: "resolved"
+    }
+  }
+}
+`
+	if err := os.WriteFile(filepath.Join(metaDir, "nogsp.vyql"), []byte(meta), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	oldRoot, _ := datadir.Lookup()
+	datadir.Set(dataRoot)
+	resetConfigProfile()
+	defer func() {
+		datadir.Set(oldRoot)
+		resetConfigProfile()
+	}()
+
+	dir := t.TempDir()
+	src := `<div class="message">${flash.message}</div>
+<div class="jobListTitle">${params.name}</div>
+`
+	gsp := filepath.Join(dir, "_edit.gsp")
+	if err := os.WriteFile(gsp, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	jsp := filepath.Join(dir, "edit.jsp")
+	if err := os.WriteFile(jsp, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := Extract([]string{gsp, jsp}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range prog.Modules {
+		if strings.HasSuffix(m.File, ".gsp") {
+			t.Fatalf("%s lowered to a module under a profile that declares no gsp scope; claiming the extension moved a finding", m.File)
+		}
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("the same markup in a .jsp produced %d modules, want 1; the fixture does not show the empty gsp result is the undeclared scope", len(prog.Modules))
 	}
 }
