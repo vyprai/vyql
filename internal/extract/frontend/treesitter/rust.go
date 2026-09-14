@@ -21,6 +21,11 @@ type rsConv struct {
 	// Drop impl makes, for the types declared in this file.
 	refcountDrops map[string]string
 	implSelfType  string // base type name of the impl block being walked
+	// siblings indexes the file's free-function bodies by name and calleeFacts
+	// memoises each helper's `callee:` facts, both for the one-hop delegated
+	// attribution (rsDelegatedContextTokens).
+	siblings    map[string]*tree_sitter.Node
+	calleeFacts map[string][]string
 }
 
 // rsFormatMacros build a string from their arguments (taint-propagating).
@@ -40,6 +45,8 @@ func ExtractRust(files []string, root string) (nir.Program, error) {
 		func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 			c := &rsConv{src: src, file: rel, key: moduleKey(root, abs, ".rs")}
 			c.rsCollectRefcountDrops(tree.RootNode())
+			c.siblings = c.rsSiblingFunctionBodies(tree.RootNode())
+			c.calleeFacts = map[string][]string{}
 			return nir.Module{Key: c.key, File: rel, Body: c.decls(tree.RootNode())}, true
 		})
 	return nir.Program{SelfName: "self", Modules: mods}, nil
@@ -1253,6 +1260,9 @@ func (c *rsConv) rsFunctionContext(fn *tree_sitter.Node) []nir.Stmt {
 	for _, tok := range c.rsStructuredContextTokens(body) {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
+	for _, tok := range c.rsDelegatedContextTokens(fn, body) {
+		args = append(args, nir.Const{Loc: loc, Value: tok})
+	}
 	if tok := c.rustClosureUnwindStaleLength(fn, body); tok != "" {
 		args = append(args, nir.Const{Loc: loc, Value: tok})
 	}
@@ -1350,6 +1360,186 @@ func (c *rsConv) rsStructuredContextTokens(root *tree_sitter.Node) []string {
 		add(tok)
 	}
 	return out
+}
+
+// Bounds on delegated attribution. One hop, a handful of helpers, a handful of
+// facts each: a function that calls twenty helpers gets the first few, not a
+// transitive summary of the module.
+const (
+	rsDelegatedCalleeLimit    = 8
+	rsDelegatedCalleeFacts    = 24
+	rsDelegatedTokenLimit     = 64
+	rsDelegatedCalleeBodyMaxB = 8192
+)
+
+// rsSiblingFunctionBodies indexes the file's free-function bodies by the name a
+// bare call site would spell, so a check delegated to a sibling helper can be
+// attributed back to the caller (rsDelegatedContextTokens). Associated
+// functions are left out: Rust reaches them through their receiver or type path
+// (`self.helper()`, `Type::helper()`), never through a bare name, and a fn
+// nested inside another is in scope only within the fn that encloses it.
+// Functions inside a nested module stay in, because a `use` brings them to the
+// bare name -- the `mod tests` block holding the helpers its own test functions
+// call is where a real crate puts them. A name defined more than once in the
+// file is dropped: the hop has to resolve to exactly one body.
+func (c *rsConv) rsSiblingFunctionBodies(root *tree_sitter.Node) map[string]*tree_sitter.Node {
+	if root == nil {
+		return nil
+	}
+	out := map[string]*tree_sitter.Node{}
+	ambiguous := map[string]bool{}
+	record := func(name string, fn *tree_sitter.Node) {
+		if name == "" || ambiguous[name] {
+			return
+		}
+		body := c.field(fn, "body")
+		if body == nil {
+			return
+		}
+		if _, dup := out[name]; dup {
+			delete(out, name)
+			ambiguous[name] = true
+			return
+		}
+		out[name] = body
+	}
+	var walk func(n *tree_sitter.Node, free bool)
+	walk = func(n *tree_sitter.Node, free bool) {
+		if n == nil {
+			return
+		}
+		next := free
+		switch c.kind(n) {
+		case "function_item":
+			if free {
+				record(c.text(c.field(n, "name")), n)
+			}
+			next = false
+		case "impl_item", "trait_item":
+			next = false
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch, next)
+		}
+	}
+	walk(root, true)
+	return out
+}
+
+// rsDelegatedContextTokens attributes what the sibling free functions a Rust
+// function calls by name do to that function's own presence context, one hop
+// deep.
+//
+// A check a function delegates -- `if let Err(response) =
+// validate_dns_rebinding_headers(request.headers(), &self.config)` -- leaves
+// nothing behind in the caller's context but the helper's name, because the
+// context is collected from the caller's own body subtree. Nothing can then
+// require that the helper is the one performing the validation the weakness
+// turns on, and the caller of a helper that checks reads identically to the
+// caller of a helper that does not.
+//
+// Only what the helper does crosses the hop: the calls it makes and the fields
+// it reads. Its identifiers and expressions stay behind, because a helper's
+// local variable names describe the incident it was written for rather than the
+// behaviour anything can require of it.
+//
+// Delegated facts are re-keyed under one `callee:` prefix
+// (`callee:selector=config.allowed_hosts`), never merged into the caller's own
+// families, so nothing that asks what this function does can be satisfied by
+// what a helper it calls does instead.
+func (c *rsConv) rsDelegatedContextTokens(fn, body *tree_sitter.Node) []string {
+	if body == nil || len(c.siblings) == 0 {
+		return nil
+	}
+	// The index is keyed by name over the file's free functions, so an
+	// associated function, or a name this function received as a parameter, is
+	// not the sibling that name happens to spell. Neither is the function
+	// itself.
+	seenCallee := map[string]bool{"self": true, c.text(c.field(fn, "name")): true}
+	for _, p := range c.params(c.field(fn, "parameters")) {
+		seenCallee[p] = true
+	}
+	seenTok := map[string]bool{}
+	callees := 0
+	var out []string
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || len(out) >= rsDelegatedTokenLimit || callees >= rsDelegatedCalleeLimit {
+			return
+		}
+		if c.kind(n) == "call_expression" {
+			// A bare identifier callee is the sibling-helper form; a path or
+			// receiver call (`Type::helper(x)`, `self.helper(x)`) needs the
+			// type or the receiver resolved, which this does not do.
+			if callee := c.field(n, "function"); callee != nil && c.kind(callee) == "identifier" {
+				name := c.text(callee)
+				if !seenCallee[name] {
+					seenCallee[name] = true
+					// A name that resolves to nothing -- a parameter, a trait
+					// method, a callee defined in another file -- spends no
+					// budget: only a helper whose body was actually read
+					// counts against it.
+					if facts := c.rsCalleeFacts(name); len(facts) > 0 {
+						callees++
+						for _, tok := range facts {
+							if len(out) >= rsDelegatedTokenLimit {
+								break
+							}
+							if seenTok[tok] {
+								continue
+							}
+							seenTok[tok] = true
+							out = append(out, tok)
+						}
+					}
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// rsCalleeFacts is the `callee:`-keyed view of one sibling helper's own facts,
+// computed once per file. The helper's facts are its body subtree's alone: the
+// hop never recurses, so a chain of helpers contributes only its first link.
+func (c *rsConv) rsCalleeFacts(name string) []string {
+	if facts, ok := c.calleeFacts[name]; ok {
+		return facts
+	}
+	facts := c.rsCalleeFactsUncached(name)
+	if c.calleeFacts == nil {
+		c.calleeFacts = map[string][]string{}
+	}
+	c.calleeFacts[name] = facts
+	return facts
+}
+
+func (c *rsConv) rsCalleeFactsUncached(name string) []string {
+	body := c.siblings[name]
+	if body == nil || body.EndByte()-body.StartByte() > rsDelegatedCalleeBodyMaxB {
+		return nil
+	}
+	var facts []string
+	for _, tok := range c.rsStructuredContextTokens(body) {
+		key, value, ok := strings.Cut(tok, ":")
+		if !ok || value == "" {
+			continue
+		}
+		switch key {
+		case "call", "call_path", "selector":
+		default:
+			continue
+		}
+		facts = append(facts, "callee:"+key+"="+value)
+		if len(facts) >= rsDelegatedCalleeFacts {
+			break
+		}
+	}
+	return facts
 }
 
 // rustClosureUnwindStaleLength reports the shape of the retain family of

@@ -455,6 +455,8 @@ func v2PresenceValuePrefix(field string) string {
 		return "callee:literal="
 	case "calleeRegex":
 		return "callee:regex="
+	case "calleeSelector":
+		return "callee:selector="
 	case "callOrder":
 		return "call_order:"
 	case "entryKind":
