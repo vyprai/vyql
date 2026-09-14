@@ -1752,7 +1752,7 @@ matcher sensitiveName {
   containsAny: ["token", "secret"]
 }
 binding contextFields {
-  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["parseOut", "crypto.timingSafeEqual"]) and node.context.callArgAt contains "krb5_get_init_creds_password:7:NULL" and node.context.callArgShapeAt contains "krb5_get_init_creds_password:7:NULL" and node.context.selector contains "data.x-csrf-token" and node.context.identifier is sensitiveName and node.context.advisoryCwe == "CWE-444" and node.context.status == "vulnerable" and node.context.reachable == "true" and node.context.indexKind == "field_derived" and node.context.guard == "missing_upper_bound" and node.context.shellBridge == "python_triple_quote_stdin_interpolation" and node.context.startupOrder == "clearance_policy_before_adapter_start" and node.context.csrfValidation == "double_submit_missing_nonempty_guard" and node.context.redirectFlow == "checksum_error_uses_default_logout" and node.context.rsaPkcs1 == "digest_suffix_sha256" and node.context.portProtocol == "request_response_missing_correlation" and node.context.rubyReview == "tls_ca_file_without_verify_mode" and node.context.rustReview == "uninitialized_buffer_exposure" and node.context.pythonReview == "flask_hardcoded_secret_key" and node.context.template == "erb" and node.context.attr == "href" and node.context.erbValue == "url-like" and node.context.decoratorPath contains "require_POST" and containsAny(node.context.assignItem, ["viewer_scopes:CONFIG_READ", "guest_scopes:CONFIG_READ"]) and node.context.zeroStepSequenceRisk == "true" and node.context.convertSvgMultiSvgSanitizerBypass == "true" and node.context.incompleteGeneratedJsIdentifierReservedWords == "true" and node.context.ajaxBackslashProtocolRelativeUrlXss == "true"
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["parseOut", "crypto.timingSafeEqual"]) and node.context.callArgAt contains "krb5_get_init_creds_password:7:NULL" and node.context.callArgShapeAt contains "krb5_get_init_creds_password:7:NULL" and node.context.selector contains "data.x-csrf-token" and node.context.identifier is sensitiveName and node.context.advisoryCwe == "CWE-444" and node.context.status == "vulnerable" and node.context.reachable == "true" and node.context.indexKind == "field_derived" and node.context.guard == "missing_upper_bound" and node.context.shellBridge == "python_triple_quote_stdin_interpolation" and node.context.startupOrder == "clearance_policy_before_adapter_start" and node.context.csrfValidation == "double_submit_missing_nonempty_guard" and node.context.redirectFlow == "checksum_error_uses_default_logout" and node.context.rsaPkcs1 == "digest_suffix_sha256" and node.context.portProtocol == "request_response_missing_correlation" and node.context.rubyReview == "tls_ca_file_without_verify_mode" and node.context.rustReview == "uninitialized_buffer_exposure" and node.context.pythonReview == "flask_hardcoded_secret_key" and node.context.template == "erb" and node.context.attr == "href" and node.context.erbValue == "url-like" and node.context.decoratorPath contains "require_POST" and containsAny(node.context.assignItem, ["viewer_scopes:CONFIG_READ", "guest_scopes:CONFIG_READ"]) and node.context.zeroStepSequenceRisk == "true" and node.context.convertSvgMultiSvgSanitizerBypass == "true" and node.context.incompleteGeneratedJsIdentifierReservedWords == "true" and node.context.ajaxBackslashProtocolRelativeUrlXss == "true" and node.context.callArgConst contains "CreateProcessW:notepad.exe" and node.context.callArgConstAt contains "CreateProcessW:1:notepad.exe"
   emit issue code.SecretComparisonReview at node
 }
 `)
@@ -1760,7 +1760,7 @@ binding contextFields {
 		t.Fatalf("parser.ParseV2Definitions: %v", err)
 	}
 	flag := sets[0].Mappings[0].Flag
-	if flag.Scope != "function" || len(flag.Predicates) != 29 {
+	if flag.Scope != "function" || len(flag.Predicates) != 31 {
 		t.Fatalf("flag predicates wrong: %+v", flag)
 	}
 	if got := flag.Predicates[0]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "lang=javascript" {
@@ -1849,6 +1849,15 @@ binding contextFields {
 	}
 	if got := flag.Predicates[28]; got.Property != "tokens" || got.Op != "equals" || got.Values[0] != "ajax_backslash_protocol_relative_url_xss=true" {
 		t.Fatalf("AJAX backslash URL predicate wrong: %+v", got)
+	}
+	// the constant-content families carry a launch's command line, whose
+	// spelling a bare name can share with a plain call_arg token, so the
+	// prefix is what keeps the two families from answering for each other
+	if got := flag.Predicates[29]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "call_arg_const:CreateProcessW:notepad.exe" {
+		t.Fatalf("callArgConst predicate wrong: %+v", got)
+	}
+	if got := flag.Predicates[30]; got.Property != "tokens" || got.Op != "contains" || got.Values[0] != "call_arg_const_at:CreateProcessW:1:notepad.exe" {
+		t.Fatalf("callArgConstAt predicate wrong: %+v", got)
 	}
 }
 
