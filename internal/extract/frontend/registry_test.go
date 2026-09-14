@@ -181,6 +181,35 @@ sub handle {
 	}
 }
 
+// A Twig template's output positions are the writes an engine has to see: `{{ … }}`
+// is where a value reaches the page, and the filter on it (`|e`) is the escape that
+// separates a patched revision from a vulnerable one. Until a frontend claimed the
+// .twig extension the file fell through every language filter, so both were invisible.
+func TestTwigFilesAreClaimedByTheConfigFrontend(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "login.twig")
+	src := `{% extends 'layouts/layoutAuth.twig' %}
+<input type="text" name="username" value="{{ old.username }}">
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := treesitter.ListAllFiles(dir)
+	class := frontend.ClassifyEntries(entries)
+	var claimed []string
+	for _, lg := range frontend.Languages() {
+		for _, f := range lg.FilesFor(entries, class) {
+			if f == path {
+				claimed = append(claimed, lg.Name)
+			}
+		}
+	}
+	if len(claimed) != 1 || claimed[0] != "config" {
+		t.Fatalf("no single frontend claims %s (claimed by %v); a Twig template is left unparsed", filepath.Base(path), claimed)
+	}
+}
+
 // A Grails template carries markup writes like any JSP, and until a frontend claimed
 // the .gsp extension the file fell through every language filter: it contributed no
 // module, and a markup write inside it produced no node for any binding to label.

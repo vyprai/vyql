@@ -1,14 +1,17 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
 
 	"github.com/vyprai/vyql/internal/datadir"
 	"github.com/vyprai/vyql/internal/extract/lowering"
+	"github.com/vyprai/vyql/internal/extract/nir"
 )
 
 func TestJellyTemplateAliasesJSetInputVariables(t *testing.T) {
@@ -380,5 +383,250 @@ pattern bindingMetadata {
 	}
 	if len(prog.Modules) != 1 {
 		t.Fatalf("the same markup in a .jsp produced %d modules, want 1; the fixture does not show the empty gsp result is the undeclared scope", len(prog.Modules))
+	}
+}
+
+// templateCallShapes renders every expression statement of a lowered template as the
+// call shape it produced, so a test reads "render(escape(input(old.email)))" rather
+// than counting nodes and guessing at the nesting.
+func templateCallShapes(prog nir.Program) []string {
+	var shapes []string
+	var expr func(nir.Expr) string
+	expr = func(e nir.Expr) string {
+		switch x := e.(type) {
+		case nir.Call:
+			args := make([]string, 0, len(x.Args))
+			for _, a := range x.Args {
+				args = append(args, expr(a))
+			}
+			return strings.TrimPrefix(x.Path, "analysis.template.") + "(" + strings.Join(args, ", ") + ")"
+		case nir.Const:
+			return x.Value
+		case nir.Name:
+			return x.ID
+		}
+		return fmt.Sprintf("%T", e)
+	}
+	for _, m := range prog.Modules {
+		for _, st := range m.Body {
+			fn, ok := st.(nir.FuncDef)
+			if !ok {
+				continue
+			}
+			for _, s := range fn.Body {
+				if es, ok := s.(nir.ExprStmt); ok {
+					shapes = append(shapes, expr(es.Value))
+				}
+			}
+		}
+	}
+	return shapes
+}
+
+// pinDataDir installs a data root holding one config binding whose metadata
+// declares the template scopes the caller names, and returns a function that
+// puts the previous root back. The scope profile is data, not Go, so the tests
+// pin a minimal data dir rather than reach into loadProfile.
+func pinDataDir(t *testing.T, meta string) func() {
+	t.Helper()
+	dataRoot := t.TempDir()
+	metaDir := filepath.Join(dataRoot, "bindings", "config")
+	if err := os.MkdirAll(metaDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(metaDir, "scope.vyql"), []byte(meta), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	oldRoot, _ := datadir.Lookup()
+	datadir.Set(dataRoot)
+	resetConfigProfile()
+	return func() {
+		datadir.Set(oldRoot)
+		resetConfigProfile()
+	}
+}
+
+// A Twig template's `{{ … }}` is an output position: the CVE this scope exists for
+// renders a session-carried value straight into a value attribute at the vulnerable
+// revision and gains `|e` at the fixed one, so what the frontend must hand the
+// definitions is a render call per output, the input expression beneath it, and —
+// only where the template escapes — an escape call between the two. Without a
+// frontend claiming .twig, none of the three reached the graph at all.
+func TestTwigTemplateScopeLowersOutputAndEscapeFilter(t *testing.T) {
+	defer pinDataDir(t, `module bindings.config.test.twig;
+
+pattern bindingMetadata {
+  binding: {
+    name: "config"
+    meta: {
+      config_template_scopes: ["twig"]
+      config_template_expr_start_twig: "{{"
+      config_template_expr_end_twig: "}}"
+      config_template_input_pattern_twig: "\\b(old\\.[A-Za-z0-9_]+|recovertoken)\\b"
+      config_template_input_event_twig: "analysis.template.twig.input"
+      config_template_render_event_twig: "analysis.template.twig.render"
+      config_template_escape_event_twig: "analysis.template.twig.escape"
+      config_template_escape_filters_twig: ["e", "escape"]
+      cross_language: "true"
+      fidelity: "resolved"
+    }
+  }
+}
+`)()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "reset.twig")
+	src := `{% extends 'layouts/layoutAuth.twig' %}
+{% block content %}
+<form method="POST" action="{{ url_for("auth.login") }}">
+<input type="text" name="username" value="{{ old.username }}">
+<input type="hidden" name="recovertoken" value="{{recovertoken}}">
+<input type="text" name="email" value="{{ old.email|e }}">
+<span class="error">{{ errors.username|first }}</span>
+{% endblock %}
+`
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf(".twig file produced %d modules, want 1; the file was not lowered", len(prog.Modules))
+	}
+	want := []string{
+		// the vulnerable spelling: the input reaches the render with nothing between
+		"twig.render(twig.input(old.username))",
+		"twig.render(twig.input(recovertoken))",
+		// the patched spelling: the declared escape filter sits between the two
+		"twig.render(twig.escape(twig.input(old.email)))",
+	}
+	if shapes := templateCallShapes(prog); !reflect.DeepEqual(shapes, want) {
+		t.Fatalf("twig output shapes =\n  %s\nwant\n  %s\n(a filter the metadata does not name must not become an escape, and an expression the input pattern does not recognise must stay unlabelled)",
+			strings.Join(shapes, "\n  "), strings.Join(want, "\n  "))
+	}
+}
+
+// The escape filter is a spelling the metadata declares, not one the engine knows:
+// with no filter named for the scope, `|e` is just text in the input expression and
+// lowers to a plain input. This is what keeps Twig's filter names in the definitions,
+// where a binding answers for them, rather than baked into the frontend.
+func TestTwigEscapeFilterIsDeclaredNotBuiltIn(t *testing.T) {
+	defer pinDataDir(t, `module bindings.config.test.twig.nofilters;
+
+pattern bindingMetadata {
+  binding: {
+    name: "config"
+    meta: {
+      config_template_scopes: ["twig"]
+      config_template_expr_start_twig: "{{"
+      config_template_expr_end_twig: "}}"
+      config_template_input_pattern_twig: "\\bold\\.[A-Za-z0-9_]+\\b"
+      config_template_input_event_twig: "analysis.template.twig.input"
+      config_template_render_event_twig: "analysis.template.twig.render"
+      config_template_escape_event_twig: "analysis.template.twig.escape"
+      cross_language: "true"
+      fidelity: "resolved"
+    }
+  }
+}
+`)()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "login.twig")
+	src := `<input type="text" name="username" value="{{ old.username|e }}">
+`
+	if err := os.WriteFile(path, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []string{"twig.render(twig.input(old.username|e))"}
+	if shapes := templateCallShapes(prog); !reflect.DeepEqual(shapes, want) {
+		t.Fatalf("twig output shapes = %v, want %v; an undeclared filter must lower as plain input text", shapes, want)
+	}
+}
+
+// Claiming .twig is not speaking for it. The config frontend reads every .twig it is
+// handed, but a template scope is data: with the metadata declaring jsp and no twig
+// scope, a Twig template lowers to no module at all, and no repository's findings move
+// until a definition declares the scope. The same markup in a .jsp still lowers, which
+// is what says the empty result is the undeclared scope and not a fixture that lowers
+// nothing anyway.
+func TestTwigWithoutADeclaredScopeStaysUnlowered(t *testing.T) {
+	defer pinDataDir(t, `module bindings.config.test.no.twig;
+
+pattern bindingMetadata {
+  binding: {
+    name: "config"
+    meta: {
+      config_template_scopes: ["jsp"]
+      config_template_expr_start_jsp: "{{"
+      config_template_expr_end_jsp: "}}"
+      config_template_input_pattern_jsp: "\\bold\\.[A-Za-z0-9_]+\\b"
+      config_template_input_event_jsp: "analysis.template.jsp.input"
+      config_template_render_event_jsp: "analysis.template.jsp.render"
+      cross_language: "true"
+      fidelity: "resolved"
+    }
+  }
+}
+`)()
+
+	dir := t.TempDir()
+	src := `<input type="text" name="username" value="{{ old.username }}">
+`
+	twig := filepath.Join(dir, "login.twig")
+	if err := os.WriteFile(twig, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	jsp := filepath.Join(dir, "login.jsp")
+	if err := os.WriteFile(jsp, []byte(src), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := Extract([]string{twig, jsp}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, m := range prog.Modules {
+		if strings.HasSuffix(m.File, ".twig") {
+			t.Fatalf("%s lowered to a module under a profile that declares no twig scope; claiming the extension moved a finding", m.File)
+		}
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("the same markup in a .jsp produced %d modules, want 1; the fixture does not show the empty twig result is the undeclared scope", len(prog.Modules))
+	}
+}
+
+// The filter grammar the escape recognition reads: a filter is a `|` followed by the
+// declared name as a whole word, so `|escape` is not a declared `e` and `|first` is no
+// escape at all. The prefix form keeps its own branch; these pin the suffix form.
+func TestTemplateFilterArg(t *testing.T) {
+	filters := []string{"e", "escape"}
+	for _, tc := range []struct {
+		expr  string
+		inner string
+		ok    bool
+	}{
+		{"old.username|e", "old.username", true},
+		{"recovertoken|e", "recovertoken", true},
+		{"old.email|escape", "old.email", true},
+		{"old.email|escape('html')", "old.email", true},
+		{"old.email|striptags|e", "old.email|striptags", true},
+		{"errors.username|escape", "errors.username", true}, // the grammar holds; the input pattern decides the rest
+		{"errors.username|first", "", false},
+		{"errors.username|entry", "", false}, // a declared `e` is not the head of `entry`
+		{"old.username", "", false},
+	} {
+		inner, ok := templateFilterArg(tc.expr, filters)
+		if ok != tc.ok || inner != tc.inner {
+			t.Errorf("templateFilterArg(%q) = (%q, %v), want (%q, %v)", tc.expr, inner, ok, tc.inner, tc.ok)
+		}
 	}
 }
