@@ -84,6 +84,7 @@ type lowerer struct {
 	globalTypes    map[string]string            // "modkey::global" -> declared type name
 	classQual      map[string]bool              // "modkey::Class"
 	classDefs      map[string]map[string]bool   // bare class name -> SET of modules that define it
+	classExported  map[string]bool              // "modkey::Class" -> declared part of the public API surface
 	classFields    map[string]map[string]string // "modkey::Class" -> field -> declared class type
 	importTables   map[string]map[string]importEntry
 	aliasTables    map[string]map[string]calleeAlias // module key -> name bound by a declaration to a callable
@@ -3043,6 +3044,7 @@ func newLowerer(prog nir.Program, resolveImports bool, ctorTypes map[string]stri
 		globalTypes:      map[string]string{},
 		classQual:        map[string]bool{},
 		classDefs:        map[string]map[string]bool{},
+		classExported:    map[string]bool{},
 		classFields:      map[string]map[string]string{},
 		importTables:     map[string]map[string]importEntry{},
 		aliasTables:      map[string]map[string]calleeAlias{},
@@ -3965,6 +3967,15 @@ func (l *lowerer) register(modkey string, stmts []nir.Stmt, cls string) {
 				l.classDefs[st.Name] = map[string]bool{}
 			}
 			l.classDefs[st.Name][modkey] = true
+			if st.Exported {
+				// the type-visibility fact a narrowing guard is attributed against: who can
+				// construct the class (see type_narrowing.go). Only exported classes are
+				// recorded -- not-exported is the zero value.
+				l.classExported[modkey+"::"+st.Name] = true
+				if l.p1 != nil {
+					l.p1.ClassExported = append(l.p1.ClassExported, modkey+"::"+st.Name)
+				}
+			}
 			if l.p1 != nil {
 				l.p1.ClassQual = append(l.p1.ClassQual, modkey+"::"+st.Name)
 				l.p1.ClassDefs = append(l.p1.ClassDefs, st.Name)
@@ -4557,6 +4568,13 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					"kind": "literal_membership",
 				}))
 			}
+			// `x instanceof T` bounds x on THIS arm (the else arm when negated): route the
+			// arm's reads through the guard relation so it sits on the taint path, carrying
+			// the checked type and its visibility fact (see type_narrowing.go).
+			if name, typ, neg, ok := typeNarrowingName(st.Cond); ok && !neg && sc.node[name] != "" {
+				sc.setNode(name, l.typeNarrowingGuard(sc.node[name], typ, st.Loc))
+				sc.delCnst(name)
+			}
 			l.block(st.Then, sc)
 		})
 		thenDelta, thenBefore := sc.nodeDelta(mark)
@@ -4565,6 +4583,10 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		sc.undoIter(iterMark)
 		l.inRegion("if"+b+".e", func() {
 			l.branchCond = condNode
+			if name, typ, neg, ok := typeNarrowingName(st.Cond); ok && neg && sc.node[name] != "" {
+				sc.setNode(name, l.typeNarrowingGuard(sc.node[name], typ, st.Loc))
+				sc.delCnst(name)
+			}
 			l.block(st.Else, sc)
 		})
 		elseDelta, elseBefore := sc.nodeDelta(mark)
@@ -6063,6 +6085,21 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// arg NOT mapped to any resolved param keeps the conservative direct `arg → result` edge
 	// (unknown/library callee, or a vararg beyond the param list), preserving recall there.
 	targets, reachOnly := l.resolveTargets(call.Callee, sc)
+	additive := false
+	if !reachOnly && len(targets) == 0 {
+		// every receiver-typed route and the unique-method-name fallback found nothing; a
+		// call on the implicit receiver still has the one runtime answer — the receiver's
+		// own class — resolved so that it only ever ADDS flow to the unresolved call.
+		// An abstract declaration on that class is the exception: its family comes back
+		// reach-only, and keeps the reach-only discipline.
+		var selfReachOnly bool
+		targets, selfReachOnly = l.resolveSelfReceiverTargets(call.Callee, sc)
+		if selfReachOnly {
+			reachOnly = true
+		} else if len(targets) > 0 {
+			additive = true
+		}
+	}
 	// A construction has no syntactic receiver: the object the constructor runs on is the
 	// call's own result. Standing it in as the receiver is what maps the arguments past an
 	// explicit `self` parameter and aliases the new object with the class's `this`, so a
@@ -6107,6 +6144,22 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 					l.flow(a, target.params[target.paramNames[i+paramOffset]])
 				}
 			}
+			continue
+		}
+		if additive {
+			// self-receiver dispatch the name-keyed fallback could not answer: the args
+			// reach the receiver's own body and the return reaches the call result, but
+			// mapped stays unset so the call's own args keep the conservative arg→result
+			// edge below — exactly the edges the unresolved call had. The resolution is
+			// therefore pure addition: an in-body transform does not silence the call,
+			// it only adds the return route on top. See resolveSelfReceiverTargets.
+			paramOffset := l.paramOffset(target, recvNode)
+			for i, a := range args {
+				if i+paramOffset < len(target.paramNames) {
+					l.flow(a, target.params[target.paramNames[i+paramOffset]])
+				}
+			}
+			l.flow(target.ret, result)
 			continue
 		}
 		if dynamicCallback {
@@ -6810,6 +6863,52 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 		}
 	}
 	return nil, false
+}
+
+// resolveSelfReceiverTargets resolves a member call on the implicit receiver that every
+// receiver-typed route and the unique-method-name fallback above left unresolved: the call
+// site spells the receiver in the language's own spelling — PHP's `$this` — while the body
+// scopes key its type under the language-independent "this" (see the FuncDef arm: the merged
+// multi-language Program drops the per-language SelfName), so the typed route never ran; and
+// the fallback refuses when the name is declared on a second unrelated class, the shape every
+// framework's entity-plus-helper pair produces. For the implicit receiver there is still one
+// answer at runtime — the receiver's own class — so the call resolves there, and reports it
+// as ADDITIVE: the call site keeps every edge the unresolved call had. The arguments reach
+// the resolved body and the return reaches the call result, but the call's own arguments
+// also keep the conservative arg→result edge, so an in-body transform is an ADDED route and
+// never a replacement — closing the resolution gap cannot take a flow, and therefore a
+// finding, away. A declaration with no body of its own (an interface or abstract method) is
+// the one exception: the typed route answers it reach-only, and so does this one — the
+// implementors' param and return nodes are shared across call sites, so routing a shared
+// return here would merge taint from other sites into this call result.
+func (l *lowerer) resolveSelfReceiverTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool) {
+	c, ok := callee.(nir.Attr)
+	if !ok {
+		return nil, false
+	}
+	baseExpr := c.Base
+	if thru, ok := baseExpr.(nir.Thru); ok {
+		baseExpr = thru.Inner
+	}
+	base, ok := baseExpr.(nir.Name)
+	if !ok || base.ID == "super" || !isSelfNameID(base.ID, l.selfName) {
+		return nil, false
+	}
+	if _, typed := sc.typ[base.ID]; typed {
+		return nil, false // the receiver's own spelling carried its type; the typed route answered
+	}
+	typ, ok := sc.typ["this"]
+	if !ok {
+		return nil, false
+	}
+	if _, resolvable := l.uniqueTechFuncInfo(l.funcShort[c.Attr]); resolvable {
+		return nil, false // the name-keyed fallback already resolves this call
+	}
+	targets, reachOnly, settled := l.resolveOnType(typ, c.Attr)
+	if !settled {
+		return nil, false
+	}
+	return targets, reachOnly
 }
 
 // maxNameKeyedCandidates bounds the work overrideFamily does for one call site. A short name
