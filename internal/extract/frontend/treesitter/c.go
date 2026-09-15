@@ -76,6 +76,18 @@ type ccConv struct {
 	// with a body, the type spelling each field is declared at, which every
 	// member selection in it asks for; nil until the first ask.
 	structFieldTypes map[string]map[string]string
+	// constStrings caches the constant string content this file's own
+	// initialisers fix, keyed by the spelling a read of the object carries (a
+	// name, a table entry, a helper that only returns a literal); nil until the
+	// first ask.
+	constStrings map[string]string
+	// constStructOrder caches, per struct or union type name this file declares
+	// with a body, its field names in declaration order, which a positional
+	// initialiser of a const table needs; nil until the first ask.
+	constStructOrder map[string][]string
+	// constLocals caches, per function body already asked about, the const
+	// scope that body declares; nil until the first ask.
+	constLocals map[uintptr]*ccConstScope
 	// root is the translation unit the conv is walking, so a file-level table
 	// can be read from inside one function body's conversion. The tree is alive
 	// for as long as the conv is.
@@ -170,7 +182,7 @@ func (c *ccConv) ccModuleContext(root *tree_sitter.Node) nir.Stmt {
 		nir.Const{Loc: loc, Value: compactCExprText(string(c.src))},
 	}
 	if !ccOWASPBenchmarkFastPath() {
-		for _, tok := range c.ccStructuredContextTokens(root) {
+		for _, tok := range c.ccStructuredContextTokens(root, nil) {
 			tokens = append(tokens, nir.Const{Loc: loc, Value: tok})
 		}
 		for _, tok := range c.ccMacroContextTokens() {
@@ -633,12 +645,16 @@ func (c *ccConv) ccFunctionContext(name string, body *tree_sitter.Node, paramTyp
 			tokens = append(tokens, "param_type:"+typ)
 		}
 	}
-	tokens = append(tokens, c.ccStructuredContextTokens(body)...)
+	tokens = append(tokens, c.ccStructuredContextTokens(body, c.ccConstLocals(body))...)
 	tokens = append(tokens, c.ccLoopCursorTokens(body)...)
 	return tokens
 }
 
-func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
+// ccStructuredContextTokens reads one root's syntax-level evidence. locals are
+// the const scope the root's own function body declares when the root is one;
+// walking a whole translation unit replaces them with each function
+// definition's own as the walk enters it.
+func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node, locals *ccConstScope) []string {
 	const maxCContextTokens = 8192
 	seen := map[string]bool{}
 	var out []string
@@ -658,12 +674,17 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 		}
 		return compactCExprText(c.text(n))
 	}
-	var walk func(*tree_sitter.Node)
-	walk = func(n *tree_sitter.Node) {
+	// locals are the const scope the enclosing function body declares, so a
+	// call inside that body can carry the content of a decision made a few
+	// statements earlier instead of the bare name that reads it.
+	var walk func(*tree_sitter.Node, *ccConstScope)
+	walk = func(n *tree_sitter.Node, locals *ccConstScope) {
 		if n == nil || len(out) >= maxCContextTokens {
 			return
 		}
 		switch c.kind(n) {
+		case "function_definition":
+			locals = c.ccConstLocals(c.field(n, "body"))
 		case "identifier", "field_identifier", "type_identifier":
 			if name := c.text(n); name != "" {
 				add("identifier:" + name)
@@ -698,6 +719,10 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 					for _, shape := range c.ccShapeSpellings(arg) {
 						add("call_arg_shape:" + path + ":" + shape)
 						add(fmt.Sprintf("call_arg_shape_at:%s:%d:%s", path, i, shape))
+					}
+					if v := c.ccArgConstString(arg, locals); v != "" {
+						add("call_arg_const:" + path + ":" + v)
+						add(fmt.Sprintf("call_arg_const_at:%s:%d:%s", path, i, v))
 					}
 				}
 			}
@@ -770,11 +795,698 @@ func (c *ccConv) ccStructuredContextTokens(root *tree_sitter.Node) []string {
 			}
 		}
 		for _, ch := range c.namedChildren(n) {
+			walk(ch, locals)
+		}
+	}
+	walk(root, locals)
+	return out
+}
+
+// ccConstStringLimit bounds the content a call_arg_const token carries. A
+// literal the file fixes is a fact at any length, but one long format string
+// would otherwise be copied into every context that mentions it.
+const ccConstStringLimit = 256
+
+// ccConstStringContent reads the content a string literal fixes -- prefixes
+// stripped, escapes resolved, delimiters dropped, adjacent segments joined --
+// or "" when the literal states nothing worth matching. The delimiters come
+// out of the literal's own text rather than off the front and back of the
+// content, so a quote the content itself carries at either edge (a quoted
+// first argument of a command line, say) survives; that edge is the difference
+// between the bare-name and absolute-path spellings of a launch.
+func ccConstStringContent(raw string) string {
+	// a raw string begins at the literal's own start, after at most an encoding
+	// prefix; an R" anywhere else in the text is content, not a marker, so the
+	// prefix comes off before the marker is tested and a segment that merely
+	// ends in R keeps reading as content
+	for _, prefix := range []string{"u8", "u", "U", "L"} {
+		if strings.HasPrefix(raw, prefix) {
+			raw = raw[len(prefix):]
+			break
+		}
+	}
+	if strings.HasPrefix(raw, "R\"") {
+		if open := strings.IndexByte(raw, '('); open >= 0 {
+			if end := strings.LastIndexByte(raw, ')'); end > open {
+				v := raw[open+1 : end]
+				if v != "" && len(v) <= ccConstStringLimit {
+					return v
+				}
+			}
+		}
+		return ""
+	}
+	var b []byte
+	closed := false
+	for i := 0; i < len(raw); {
+		if raw[i] != '"' {
+			i++ // a prefix (L, u8, ...) or the space between adjacent literals
+			continue
+		}
+		i++
+		for i < len(raw) && raw[i] != '"' {
+			if raw[i] == '\\' && i+1 < len(raw) {
+				b = append(b, raw[i+1])
+				i += 2
+				continue
+			}
+			b = append(b, raw[i])
+			i++
+		}
+		if i < len(raw) {
+			i++ // closing delimiter
+			closed = true
+		}
+	}
+	if !closed {
+		return ""
+	}
+	v := string(b)
+	if v == "" || len(v) > ccConstStringLimit {
+		return ""
+	}
+	return v
+}
+
+// ccIsStringLiteral reports whether a node is a string literal, the one kind
+// of node whose text ccConstStringContent may read. Every other node's text --
+// an initialiser list's above all, which is full of quoted strings -- would
+// otherwise be read as one long literal.
+func (c *ccConv) ccIsStringLiteral(n *tree_sitter.Node) bool {
+	switch c.kind(n) {
+	case "string_literal", "concatenated_string", "raw_string_literal":
+		return true
+	}
+	return false
+}
+
+// ccConstScope is what one function body declares around a call: values are
+// the const bindings the body fixes (see ccConstLocals), and declared holds
+// every name the body or its owning signature declares in any form. A name in
+// declared shadows the file's own object of that spelling for the whole body --
+// a read of it is the body's object (a parameter, a mutable local, a local
+// table, an enumerator), never the file's -- which is what keeps the file's
+// table from answering for a name the body redeclares.
+type ccConstScope struct {
+	values   map[string]string
+	declared map[string]bool
+}
+
+// value reads one of the const bindings the scope's body fixes; a scope
+// outside a function body holds none.
+func (s *ccConstScope) value(name string) string {
+	if s == nil {
+		return ""
+	}
+	return s.values[name]
+}
+
+// shadows reports whether the scope's body declares the name in any form, which
+// is what makes a read of it the body's object rather than the file's.
+func (s *ccConstScope) shadows(name string) bool {
+	return s != nil && s.declared[name]
+}
+
+// ccArgConstString resolves the constant string content an expression evaluates
+// to when this file fixes one, so an argument can carry the content of a
+// decision made away from the call: an initialiser, a table entry, a helper's
+// return, or a const local bound a few statements earlier (`locals`, nil
+// outside a function body). Parentheses and casts do not change the value.
+// Anything the file does not fix resolves to "", which is what keeps the
+// call_arg_const token a fact rather than a guess.
+func (c *ccConv) ccArgConstString(n *tree_sitter.Node, locals *ccConstScope) string {
+	for n != nil {
+		switch c.kind(n) {
+		case "parenthesized_expression":
+			kids := c.namedChildren(n)
+			if len(kids) == 0 {
+				return ""
+			}
+			n = kids[0]
+			continue
+		case "cast_expression":
+			n = c.ccCastValue(n)
+			continue
+		}
+		break
+	}
+	if n == nil {
+		return ""
+	}
+	switch c.kind(n) {
+	case "string_literal", "concatenated_string", "raw_string_literal":
+		return ccConstStringContent(c.text(n))
+	case "identifier":
+		if v := locals.value(c.text(n)); v != "" {
+			return v
+		}
+		if locals.shadows(c.text(n)) {
+			return ""
+		}
+		return c.ccFileConstStrings()[c.text(n)]
+	case "call_expression":
+		if fn := c.field(n, "function"); fn != nil && c.kind(fn) == "identifier" {
+			if locals.shadows(c.text(fn)) {
+				return ""
+			}
+			return c.ccFileConstStrings()[c.text(fn)]
+		}
+	case "field_expression", "subscript_expression":
+		if key, ok := c.ccConstTableReadKey(n, locals); ok {
+			file := c.ccFileConstStrings()
+			if v := file[key]; v != "" {
+				return v
+			}
+			if all, ok := ccTableAggregateKey(key); ok {
+				return file[all]
+			}
+		}
+	}
+	return ""
+}
+
+// ccConstTableReadKey spells a read of one of the file's tables the way the
+// table's own initialiser keyed it: `rules[1].cmd` when the index is a literal
+// the initialiser can pair with an entry, `rules[].cmd` when it is not, and no
+// field for a table of pointers (`rules[0]`). Only a plain base name keys an
+// initialiser, so a read through a call, a nested selection or anything but a
+// literal subscript of a name spells no key at all -- and a base the enclosing
+// body declares is that body's table, not the file's, so it spells no key
+// either.
+func (c *ccConv) ccConstTableReadKey(n *tree_sitter.Node, locals *ccConstScope) (string, bool) {
+	field := ""
+	for c.kind(n) == "field_expression" {
+		if field != "" {
+			return "", false
+		}
+		field = c.text(c.field(n, "field"))
+		n = c.field(n, "argument")
+	}
+	index := ""
+	if c.kind(n) == "subscript_expression" {
+		if idx := c.ccSubscriptIndex(n); idx != nil && c.kind(idx) == "number_literal" {
+			if i, err := strconv.Atoi(compactCExprText(c.text(idx))); err == nil && i >= 0 {
+				index = itoa(i)
+			}
+		}
+		n = c.field(n, "argument")
+	} else if field == "" {
+		return "", false
+	}
+	if n == nil || c.kind(n) != "identifier" || c.text(n) == "" || locals.shadows(c.text(n)) {
+		return "", false
+	}
+	key := c.text(n) + "[" + index + "]"
+	if field != "" {
+		key += "." + field
+	}
+	return key, true
+}
+
+// ccTableAggregateKey drops the index from a table read's key -- `rules[1].cmd`
+// becomes `rules[].cmd` -- which is the key an initialiser fills only when
+// every entry fixes the same content, and therefore the only fact a read whose
+// index the file does not fix can carry.
+func ccTableAggregateKey(key string) (string, bool) {
+	open := strings.IndexByte(key, '[')
+	close := strings.IndexByte(key, ']')
+	if open < 0 || close < open {
+		return "", false
+	}
+	return key[:open+1] + key[close:], true
+}
+
+// ccConstLocals reads the const bindings one function body declares: a name
+// declared exactly once, at a const-qualified declaration whose initialiser the
+// file fixes to a constant string, and never the target of an assignment or an
+// increment in that body. Each of the three is what makes the binding a fact
+// rather than a guess -- the first rules out a shadowing redeclaration (a
+// parameter's name counts, because a local redeclaring it in a nested block is
+// a different object), the second keeps the content to what the language
+// freezes, and the third keeps the value the initialiser wrote rather than one
+// a later statement replaced. The scope also reports every name the body
+// declares in any form, which is what lets a reader refuse the file's table for
+// a redeclared name (see ccConstScope).
+func (c *ccConv) ccConstLocals(body *tree_sitter.Node) *ccConstScope {
+	if body == nil {
+		return nil
+	}
+	if c.constLocals == nil {
+		c.constLocals = map[uintptr]*ccConstScope{}
+	}
+	if s, ok := c.constLocals[body.Id()]; ok {
+		return s
+	}
+	file := c.ccFileConstStrings()
+	values := map[string]string{}
+	// fromName holds the const bindings whose initialiser reads a bare name,
+	// resolved once the walk has seen every declaration the body makes
+	fromName := map[string]string{}
+	declared := map[string]int{}
+	assigned := map[string]bool{}
+	var visit func(*tree_sitter.Node)
+	visit = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "declaration":
+			isConst := c.ccDeclIsConst(n)
+			for _, d := range c.namedChildren(n) {
+				name := ""
+				switch c.kind(d) {
+				case "init_declarator":
+					name = c.declName(c.field(d, "declarator"))
+				case "pointer_declarator", "array_declarator", "identifier", "parenthesized_declarator":
+					name = c.plainDeclName(d)
+				}
+				if name == "" {
+					continue
+				}
+				declared[name]++
+				if !isConst || c.kind(d) != "init_declarator" {
+					continue
+				}
+				value := c.field(d, "value")
+				if value == nil {
+					continue
+				}
+				if c.ccIsStringLiteral(value) {
+					if lit := ccConstStringContent(c.text(value)); lit != "" {
+						values[name] = lit
+					}
+					continue
+				}
+				// a const binding of a name this file already fixed elsewhere
+				// carries that content to the calls that read it
+				if c.kind(value) == "identifier" {
+					fromName[name] = c.text(value)
+				}
+			}
+		case "parameter_declaration":
+			if name := c.declName(n); name != "" {
+				declared[name]++
+			}
+		case "enumerator":
+			if name := c.field(n, "name"); name != nil {
+				declared[c.text(name)]++
+			}
+		case "assignment_expression":
+			if left := c.field(n, "left"); left != nil && c.kind(left) == "identifier" {
+				assigned[c.text(left)] = true
+			}
+		case "update_expression":
+			for _, ch := range c.namedChildren(n) {
+				if c.kind(ch) == "identifier" {
+					assigned[c.text(ch)] = true
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			visit(ch)
+		}
+	}
+	// the owning function's signature, when the body has one, contributes its
+	// parameter names; the walk starts there and stops at the body itself, so
+	// only the signature's declarations are counted twice
+	if parent := body.Parent(); parent != nil {
+		for _, ch := range c.namedChildren(parent) {
+			if c.kind(ch) != "compound_statement" {
+				visit(ch)
+			}
+		}
+	}
+	visit(body)
+	out := map[string]string{}
+	for name, v := range values {
+		if declared[name] == 1 && !assigned[name] {
+			out[name] = v
+		}
+	}
+	for name, src := range fromName {
+		// a source the body itself declares is that body's object (a
+		// parameter, a mutable local), never the file's, so it states nothing
+		if declared[name] != 1 || assigned[name] || declared[src] > 0 {
+			continue
+		}
+		if v := file[src]; v != "" {
+			out[name] = v
+		}
+	}
+	scope := &ccConstScope{values: out, declared: map[string]bool{}}
+	for name := range declared {
+		scope.declared[name] = true
+	}
+	c.constLocals[body.Id()] = scope
+	return scope
+}
+
+// ccDeclIsConst reports whether a declaration's own type qualifiers carry const
+// (or constexpr, which states it): the object, or what a pointer declarator
+// names, cannot legally be assigned through the name, which is what lets an
+// initialiser's content stand for every later read of it.
+func (c *ccConv) ccDeclIsConst(decl *tree_sitter.Node) bool {
+	for _, ch := range c.namedChildren(decl) {
+		if c.kind(ch) != "type_qualifier" {
+			continue
+		}
+		switch compactCExprText(c.text(ch)) {
+		case "const", "constexpr":
+			return true
+		}
+	}
+	return false
+}
+
+// ccFileConstStrings collects the constant string content this file's own
+// initialisers fix, keyed by the spelling a read of the object carries:
+//
+//	g_cmd          a scalar object a string literal initialises
+//	rules[1].cmd   one entry of a const table of aggregates
+//	rules[].cmd    a field every entry of such a table fixes to the same text
+//	names[0]       one entry of a const table of pointers
+//	defaultCmd     a function whose only return is a string literal
+//
+// Only what the language itself freezes contributes. A file-scope declaration
+// has to carry the const qualifier, so no later store -- in this file or, for
+// an object another translation unit can name, in that one -- can replace
+// content a key claims; a helper contributes only when its one return statement
+// is the literal. Everything else (a mutable object, an initialiser that is not
+// a literal, a table entry the initialiser leaves unset) records nothing, and
+// the argument that reads it keeps reading as it always did.
+func (c *ccConv) ccFileConstStrings() map[string]string {
+	if c.constStrings != nil {
+		return c.constStrings
+	}
+	out := map[string]string{}
+	// set records one key's content; two spellings of a key that disagree leave
+	// the key holding nothing, which is the honest answer for an overloaded
+	// helper or a table declared twice.
+	set := func(key, value string) {
+		if key == "" || value == "" {
+			return
+		}
+		if prev, ok := out[key]; ok && prev != value {
+			out[key] = ""
+			return
+		}
+		out[key] = value
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "function_definition":
+			if name := c.declName(c.field(n, "declarator")); name != "" {
+				if v, ok := c.ccConstReturn(n); ok {
+					set(name, v)
+				}
+			}
+			// a body's declarations are that function's locals, not this file's
+			// objects, and the locals of the function a context token belongs to
+			// are read by ccConstLocals instead
+			return
+		case "declaration":
+			if !c.ccDeclIsConst(n) {
+				break
+			}
+			for _, d := range c.namedChildren(n) {
+				if c.kind(d) != "init_declarator" {
+					continue
+				}
+				name := c.declName(c.field(d, "declarator"))
+				value := c.field(d, "value")
+				if name == "" || value == nil {
+					continue
+				}
+				switch {
+				case c.ccIsStringLiteral(value):
+					if lit := ccConstStringContent(c.text(value)); lit != "" {
+						set(name, lit)
+					}
+				case c.kind(value) == "initializer_list":
+					c.ccConstTableStrings(n, value, name, set)
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
 			walk(ch)
 		}
 	}
-	walk(root)
+	walk(c.root)
+	c.constStrings = out
 	return out
+}
+
+// ccConstReturn reads the content a function definition fixes for its result:
+// a body whose one return statement returns a string literal. A second return,
+// a conditional, a call wrapping a literal, a name the file does not fix, or no
+// return at all states nothing -- the value has to be the literal itself,
+// because an expression that merely quotes one is not fixed to its content.
+func (c *ccConv) ccConstReturn(fn *tree_sitter.Node) (string, bool) {
+	body := c.field(fn, "body")
+	if body == nil || !strings.Contains(c.text(body), "return") {
+		return "", false
+	}
+	var value *tree_sitter.Node
+	returns := 0
+	var visit func(*tree_sitter.Node)
+	visit = func(n *tree_sitter.Node) {
+		if n == nil || returns > 1 {
+			return
+		}
+		if c.kind(n) == "return_statement" {
+			returns++
+			if kids := c.namedChildren(n); len(kids) > 0 {
+				value = kids[0]
+			}
+			if returns > 1 {
+				return
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			visit(ch)
+		}
+	}
+	visit(body)
+	if returns != 1 || value == nil || !c.ccIsStringLiteral(value) {
+		return "", false
+	}
+	v := ccConstStringContent(c.text(value))
+	return v, v != ""
+}
+
+// ccConstTableStrings reads one const table's initialiser into the file's
+// constant strings. An entry of a table of pointers keys its own index
+// (`names[0]`); an entry of a table of aggregates keys each field its
+// initialiser fixes (`rules[1].cmd`); and the whole table keys the spelling a
+// read whose index the file does not fix carries (`rules[].cmd`, `names[]`),
+// but only when every entry fixes the same content, because that is the only
+// thing such a read is known to hold.
+func (c *ccConv) ccConstTableStrings(decl, list *tree_sitter.Node, name string, set func(string, string)) {
+	entries := c.namedChildren(list)
+	if len(entries) == 0 {
+		return
+	}
+	perField := map[string][]string{}
+	for i, e := range entries {
+		if c.kind(e) != "initializer_list" {
+			continue
+		}
+		for field, value := range c.ccConstEntryFields(e, c.ccConstTableFields(decl)) {
+			if value == "" {
+				continue
+			}
+			set(name+"["+itoa(i)+"]."+field, value)
+			perField[field] = append(perField[field], value)
+		}
+	}
+	for field, values := range perField {
+		if v := ccAllFixSame(values); v != "" && len(values) == len(entries) {
+			set(name+"[]."+field, v)
+		}
+	}
+	// a table of pointers keys each entry; an aggregate entry is not itself a
+	// string however many its initialiser quotes, so it contributes nothing
+	// here -- its fields were keyed above
+	values := make([]string, len(entries))
+	for i, e := range entries {
+		if !c.ccIsStringLiteral(e) {
+			continue
+		}
+		if v := ccConstStringContent(c.text(e)); v != "" {
+			values[i] = v
+			set(name+"["+itoa(i)+"]", v)
+		}
+	}
+	if v := ccAllFixSame(values); v != "" {
+		set(name+"[]", v)
+	}
+}
+
+// ccConstEntryFields reads one aggregate entry's initialiser as field name ->
+// constant content, pairing positional values with the fields the element type
+// declares in order and designated values with the field they name.
+func (c *ccConv) ccConstEntryFields(entry *tree_sitter.Node, fields []string) map[string]string {
+	out := map[string]string{}
+	if len(fields) == 0 {
+		return out
+	}
+	pos := 0
+	for _, ch := range c.namedChildren(entry) {
+		switch c.kind(ch) {
+		case "initializer_pair":
+			name, value := c.ccConstDesignated(ch)
+			if name != "" {
+				out[name] = value
+			}
+		default:
+			if pos < len(fields) && fields[pos] != "" && c.ccIsStringLiteral(ch) {
+				out[fields[pos]] = ccConstStringContent(c.text(ch))
+			}
+			pos++
+		}
+	}
+	return out
+}
+
+// ccConstDesignated reads one `.field = value` pair of an entry's initialiser.
+// The value has to be a string literal: one built by a call quotes a string
+// without being fixed to it.
+func (c *ccConv) ccConstDesignated(pair *tree_sitter.Node) (string, string) {
+	name := ""
+	for _, ch := range c.namedChildren(pair) {
+		if c.kind(ch) != "field_designator" {
+			continue
+		}
+		for _, g := range c.namedChildren(ch) {
+			if c.kind(g) == "field_identifier" {
+				name = c.text(g)
+			}
+		}
+	}
+	value := c.field(pair, "value")
+	if name == "" || value == nil || !c.ccIsStringLiteral(value) {
+		return "", ""
+	}
+	return name, ccConstStringContent(c.text(value))
+}
+
+// ccAllFixSame returns the one content every value in a slice carries, or ""
+// when any of them is empty or two of them differ.
+func ccAllFixSame(values []string) string {
+	first := ""
+	for _, v := range values {
+		if v == "" {
+			return ""
+		}
+		if first == "" {
+			first = v
+		} else if first != v {
+			return ""
+		}
+	}
+	return first
+}
+
+// ccConstTableFields reads the field names a table's element type declares, in
+// order: from the declaration's own struct body when it carries one, else from
+// the struct or union this file declares under the type name it spells.
+func (c *ccConv) ccConstTableFields(decl *tree_sitter.Node) []string {
+	for _, ch := range c.namedChildren(decl) {
+		switch c.kind(ch) {
+		case "struct_specifier", "union_specifier":
+			if body := c.field(ch, "body"); body != nil {
+				return c.ccFieldNames(body)
+			}
+			if name := c.field(ch, "name"); name != nil {
+				return c.ccStructFieldOrder()[c.text(name)]
+			}
+		case "type_identifier":
+			name := c.text(ch)
+			if key := ccAggregateTypeKey(name); key != "" {
+				name = key
+			}
+			if fields := c.ccStructFieldOrder()[name]; fields != nil {
+				return fields
+			}
+		}
+	}
+	return nil
+}
+
+// ccStructFieldOrder collects, per struct or union type name this translation
+// unit declares with a body, its field names in declaration order -- the
+// pairing a positional initialiser of a const table needs, because `{"a", "b"}`
+// says which field it initialises only by position. A type name is the body's
+// own tag or the alias a typedef gives it, exactly as ccStructFieldTypes keys
+// the same bodies.
+func (c *ccConv) ccStructFieldOrder() map[string][]string {
+	if c.constStructOrder != nil {
+		return c.constStructOrder
+	}
+	order := map[string][]string{}
+	record := func(key string, body *tree_sitter.Node) {
+		if key == "" || body == nil {
+			return
+		}
+		if _, ok := order[key]; !ok {
+			order[key] = c.ccFieldNames(body)
+		}
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "struct_specifier", "union_specifier":
+			if name := c.field(n, "name"); name != nil {
+				record(c.text(name), c.field(n, "body"))
+			}
+		case "type_definition":
+			agg := c.field(n, "type")
+			if agg != nil && (c.kind(agg) == "struct_specifier" || c.kind(agg) == "union_specifier") {
+				record(c.declName(c.field(n, "declarator")), c.field(agg, "body"))
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(c.root)
+	c.constStructOrder = order
+	return order
+}
+
+// ccFieldNames reads one field_declaration_list's field names in declaration
+// order. A member's name sits under its declarator (a pointer declarator for a
+// `const char *` field, an array declarator for a table field), and one
+// field_declaration can declare several members (`const char *a, *b;`), so
+// each declarator contributes one name; a member nothing resolvable names
+// contributes "" to keep the members after it at their declared positions,
+// because a positional initialiser pairs by position. Readers skip the "".
+func (c *ccConv) ccFieldNames(body *tree_sitter.Node) []string {
+	var names []string
+	for _, ch := range c.namedChildren(body) {
+		if c.kind(ch) != "field_declaration" {
+			continue
+		}
+		got := []string{}
+		for _, d := range c.namedChildren(ch) {
+			if name := c.plainDeclName(d); name != "" {
+				got = append(got, name)
+			}
+		}
+		if len(got) == 0 {
+			names = append(names, "")
+			continue
+		}
+		names = append(names, got...)
+	}
+	return names
 }
 
 func (c *ccConv) ccMacroContextTokens() []string {

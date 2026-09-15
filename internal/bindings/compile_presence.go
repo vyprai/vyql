@@ -439,6 +439,10 @@ func v2PresenceValuePrefix(field string) string {
 		return "call_arg_shape:"
 	case "callArgShapeAt":
 		return "call_arg_shape_at:"
+	case "callArgConst":
+		return "call_arg_const:"
+	case "callArgConstAt":
+		return "call_arg_const_at:"
 	case "callMethod":
 		return "call_method:"
 	// The facts of a sibling helper the function calls, attributed one hop by
