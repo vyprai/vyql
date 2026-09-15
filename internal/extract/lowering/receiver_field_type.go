@@ -176,18 +176,16 @@ func (l *lowerer) resolveFieldCtorTypes() {
 	l.fieldCtorWrites = nil
 }
 
-// ctorTypeOfExpr returns the type a construction returns: a class the scan declares, or the
-// type name a binding's ReceiverType fact records for the callee path. Anything else reports
+// ctorTypeOfExpr returns the type a construction returns: a class the scan declares, the
+// type name a binding's ReceiverType fact records for the callee path, or -- one indirection
+// on -- the type recorded for the module global the construction's callee names, which is how
+// `new Todo()` is typed when Todo holds the class a factory returned. Anything else reports
 // "", which is no evidence of a type rather than evidence of a different one.
 func (l *lowerer) ctorTypeOfExpr(e nir.Expr) string {
-	call, ok := e.(nir.Call)
-	if !ok {
-		return ""
+	if t := l.directCtorType(e); t != "" {
+		return t
 	}
-	if t, ok := l.resolveCtor(call.Callee); ok {
-		return t[1]
-	}
-	return l.ctorTypes[call.Path]
+	return l.chainedGlobalCtorType(e, l.globalCtorTypes)
 }
 
 // receiverFieldCtorType returns the type a method call's receiver was built with when the

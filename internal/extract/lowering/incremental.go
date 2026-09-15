@@ -114,8 +114,9 @@ func LowerIncremental(prog nir.Program, resolveImports bool, ctorTypes map[strin
 		l.p1 = nil
 	}
 	batchPutRaw(cache, p1writes)
-	l.collectAddressTaken()   // walks prog NIR (present for all modules, cached or not) → sound here too
-	l.collectFieldCtorTypes() // same walk, same guarantee: a cached module still contributes its field writes
+	l.collectAddressTaken()    // walks prog NIR (present for all modules, cached or not) → sound here too
+	l.collectGlobalCtorTypes() // same walk, same guarantee: a cached module still contributes its global writes; before the field pass, which may construct through one
+	l.collectFieldCtorTypes()  // same walk, same guarantee: a cached module still contributes its field writes
 	sigFP := l.sigFingerprint()
 	t1 := nowNano()
 
