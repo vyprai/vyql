@@ -65,6 +65,8 @@ func Extract(files []string, root string) (nir.Program, error) {
 			body = scanJSP(src, rel)
 		case k == "gsp":
 			body = scanGSP(src, rel)
+		case k == "twig":
+			body = scanTwig(src, rel)
 		case k == "dottemplate":
 			body = fileSignatureBody
 		case strings.HasPrefix(k, "texttemplate:"):
@@ -117,6 +119,9 @@ func kind(path string, src []byte) string {
 	}
 	if ext == ".gsp" {
 		return "gsp"
+	}
+	if ext == ".twig" {
+		return "twig"
 	}
 	if ext == ".jst" || ext == ".def" {
 		return "dottemplate"
@@ -312,6 +317,24 @@ func scanGSP(src []byte, file string) []nir.Stmt {
 			continue
 		}
 		out = append(out, scopedContainsEvents(cfg, "gsp", line, file, i+1)...)
+	}
+	return out
+}
+
+// scanTwig reads a Twig template the way scanGSP reads a Grails page: the `{{ … }}`
+// output tag is the markup write, under the twig template scope the binding metadata
+// declares. As with .gsp, a scope the metadata does not declare contributes nothing,
+// so claiming .twig stays inert for every repository until a definition speaks for it.
+func scanTwig(src []byte, file string) []nir.Stmt {
+	cfg := loadProfile()
+	var out []nir.Stmt
+	out = append(out, scanTemplateExpressions(src, file, "twig")...)
+	for i, raw := range strings.Split(string(src), "\n") {
+		line := strings.TrimSpace(raw)
+		if line == "" {
+			continue
+		}
+		out = append(out, scopedContainsEvents(cfg, "twig", line, file, i+1)...)
 	}
 	return out
 }
@@ -570,24 +593,61 @@ func templateExpressions(line, startDelim, endDelim string) []string {
 
 func templateExpr(profile templateProfile, expr, loc string, defaultEscape bool) nir.Expr {
 	if inner, ok := templateWrapperArg(expr, profile.EscapePrefix); ok {
-		return nir.Call{
-			Callee: nir.Name{ID: profile.EscapeEvent, Loc: loc},
-			Args:   []nir.Expr{templateInput(profile, inner, loc)},
-			Path:   profile.EscapeEvent,
-			Method: lastSeg(profile.EscapeEvent),
-			Loc:    loc,
-		}
+		return templateEscape(profile, inner, loc)
+	}
+	if inner, ok := templateFilterArg(expr, profile.EscapeFilters); ok {
+		return templateEscape(profile, inner, loc)
 	}
 	if defaultEscape && profile.EscapeEvent != "" {
-		return nir.Call{
-			Callee: nir.Name{ID: profile.EscapeEvent, Loc: loc},
-			Args:   []nir.Expr{templateInput(profile, expr, loc)},
-			Path:   profile.EscapeEvent,
-			Method: lastSeg(profile.EscapeEvent),
-			Loc:    loc,
-		}
+		return templateEscape(profile, expr, loc)
 	}
 	return templateInput(profile, expr, loc)
+}
+
+// templateEscape wraps an input expression in the scope's escape event, so a rule
+// that walks render -> input sees the escape on the path between them.
+func templateEscape(profile templateProfile, inner, loc string) nir.Expr {
+	return nir.Call{
+		Callee: nir.Name{ID: profile.EscapeEvent, Loc: loc},
+		Args:   []nir.Expr{templateInput(profile, inner, loc)},
+		Path:   profile.EscapeEvent,
+		Method: lastSeg(profile.EscapeEvent),
+		Loc:    loc,
+	}
+}
+
+// templateFilterArg reports the input expression beneath a declared escape filter.
+// The prefix form wraps its input — `fn:escapeXml(param.name)` — but a filter
+// language spells escaping as a suffix: `old.username|e`,
+// `recovertoken|escape('html')`. There the input is everything before the filter's
+// `|`, and the filter is a whole word, so a declared `e` does not claim the head of
+// `|entry`. Which filter names escape is the metadata's to say, and where a filter
+// sits in the expression is the template grammar's — the same split the prefix form
+// draws, read back to front.
+func templateFilterArg(expr string, filters []string) (string, bool) {
+	for _, f := range filters {
+		if f == "" {
+			continue
+		}
+		needle := "|" + f
+		for start := 0; start+len(needle) <= len(expr); start++ {
+			if expr[start:start+len(needle)] != needle {
+				continue
+			}
+			end := start + len(needle)
+			if end < len(expr) && isFilterNameChar(expr[end]) {
+				continue
+			}
+			if inner := strings.TrimSpace(expr[:start]); inner != "" {
+				return inner, true
+			}
+		}
+	}
+	return "", false
+}
+
+func isFilterNameChar(c byte) bool {
+	return c == '_' || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
 }
 
 func templateWrapperArg(expr, prefix string) (string, bool) {
@@ -658,6 +718,7 @@ type templateProfile struct {
 	InputEvent           string
 	RenderEvent          string
 	EscapePrefix         string
+	EscapeFilters        []string
 	EscapeEvent          string
 	EscapeActiveContains []string
 	EscapeLineContains   []string
@@ -819,6 +880,11 @@ func loadProfile() configProfile {
 			if scope == "" || pattern == "" || inputEvent == "" || renderEvent == "" {
 				panic("config: malformed config template profile " + scope)
 			}
+			escapeEvent := metaString(meta, "config_template_escape_event_"+scope)
+			escapeFilters := metaList(meta, "config_template_escape_filters_"+scope)
+			if len(escapeFilters) > 0 && escapeEvent == "" {
+				panic("config: template scope " + scope + " names escape filters but no escape event")
+			}
 			configProfileData.Templates[scope] = templateProfile{
 				ExprStart:            firstNonEmpty(metaString(meta, "config_template_expr_start_"+scope), globalExprStart),
 				ExprEnd:              firstNonEmpty(metaString(meta, "config_template_expr_end_"+scope), globalExprEnd),
@@ -828,7 +894,8 @@ func loadProfile() configProfile {
 				InputEvent:           inputEvent,
 				RenderEvent:          renderEvent,
 				EscapePrefix:         metaString(meta, "config_template_escape_prefix_"+scope),
-				EscapeEvent:          metaString(meta, "config_template_escape_event_"+scope),
+				EscapeFilters:        escapeFilters,
+				EscapeEvent:          escapeEvent,
 				EscapeActiveContains: metaList(meta, "config_template_escape_active_contains_"+scope),
 				EscapeLineContains:   metaList(meta, "config_template_escape_line_contains_"+scope),
 			}
