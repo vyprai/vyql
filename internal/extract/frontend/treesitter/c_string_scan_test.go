@@ -215,6 +215,51 @@ size_t parse(char *buf, size_t len) {
 		t.Fatalf("memchr establishment: got %q want none", got)
 	}
 
+	// A memchr for a delimiter byte establishes nothing about where the
+	// terminating NUL is: finding a ',' within the length does not stop a
+	// scan whose set is "\r\n\t ", so the scan still runs past the bound
+	// and the fact stands.
+	got = ccStringScanObs(t, `
+#include <string.h>
+size_t parse(char *buf, size_t len) {
+	char *p;
+	size_t k;
+	for (p = buf; p < buf + len; p++) {
+		count(*p);
+	}
+	if (!memchr(buf, ',', len)) {
+		return 0;
+	}
+	k = strcspn(buf, "\r\n\t ");
+	return k;
+}
+`)
+	wantDelim := []string{"scan=strcspn;cursor=buf;buffer=buf;length=len;termination=not_established_within_length"}
+	if strings.Join(got, "|") != strings.Join(wantDelim, "|") {
+		t.Fatalf("memchr for a delimiter byte: got %q want %q", got, wantDelim)
+	}
+
+	// A memchr whose byte is a variable is not a stated NUL either: the
+	// tree does not say what delim holds, so nothing is established.
+	got = ccStringScanObs(t, `
+#include <string.h>
+size_t parse(char *buf, size_t len, int delim) {
+	char *p;
+	size_t k;
+	for (p = buf; p < buf + len; p++) {
+		count(*p);
+	}
+	if (!memchr(buf, delim, len)) {
+		return 0;
+	}
+	k = strcspn(buf, ",");
+	return k;
+}
+`)
+	if strings.Join(got, "|") != strings.Join(wantDelim, "|") {
+		t.Fatalf("memchr for a variable byte: got %q want %q", got, wantDelim)
+	}
+
 	// The scan's own result cannot bound the buffer it measured: the guard
 	// comparing the scanned endpoint against the end reports the real
 	// length only, never the measurement.

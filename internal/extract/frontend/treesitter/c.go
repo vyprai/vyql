@@ -5736,8 +5736,10 @@ func (c *ccConv) ccRecordStringScanBoundPair(sumSide, otherSide *tree_sitter.Nod
 // establishes a terminating NUL within the bound the buffer and length name
 // before the scan needs one: a write of zero at the bound itself, in either
 // the subscript or the dereferenced-sum spelling, or a memchr asked to locate
-// a byte inside that length. Runtime-built patterns stay out of ccRe, per its
-// cache policy.
+// the NUL inside that length, which asks its byte argument and only a literal
+// zero answers -- a memchr for any other byte, or for a variable one, says
+// nothing about where the NUL is and establishes nothing. Runtime-built
+// patterns stay out of ccRe, per its cache policy.
 func ccStringScanNulEstablished(text, buffer, length string) bool {
 	zero := `(?:0|'\\0'|'\\x00')`
 	b, l := regexp.QuoteMeta(buffer), regexp.QuoteMeta(length)
@@ -5747,8 +5749,11 @@ func ccStringScanNulEstablished(text, buffer, length string) bool {
 	if regexp.MustCompile(`\*\(` + b + `\+` + l + `\)=` + zero).MatchString(text) {
 		return true
 	}
-	for _, m := range ccRe(`\bmemchr\(([^)]*)\)`).FindAllStringSubmatch(text, -1) {
-		if ccContainsWord(m[1], buffer) && ccContainsWord(m[1], length) {
+	for _, m := range ccRe(`\bmemchr\(([^,]*),([^,]*),([^)]*)\)`).FindAllStringSubmatch(text, -1) {
+		if !ccRe(`^(?:0|'\\0'|'\\x00')$`).MatchString(m[2]) {
+			continue
+		}
+		if ccContainsWord(m[1], buffer) && ccContainsWord(m[3], length) {
 			return true
 		}
 	}
