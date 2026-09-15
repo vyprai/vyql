@@ -154,6 +154,14 @@ func shouldSkipDir(root, path, name string) bool {
 	if !skipDirs[name] {
 		return false
 	}
+	// Build output is skipped because nothing in it is source, with one
+	// exception: a package's staging tree can hold the only copy of its polkit
+	// authorization rules (zincati ships dist/polkit-1/rules.d/*.rules), which
+	// are policy this walk is the only reader of. Probing one path is a stat;
+	// descending without the probe would read every build tree as source.
+	if stagesPolkitRules(path) {
+		return false
+	}
 	if name == "vendor" {
 		return false
 	}
@@ -165,6 +173,17 @@ func shouldSkipDir(root, path, name string) bool {
 		return filepath.ToSlash(rel) == "build"
 	}
 	return true
+}
+
+// stagesPolkitRules reports whether dir stages polkit authorization rules at
+// polkit-1/rules.d beneath it — the layout every polkit-bearing package ships
+// (zincati's dist/polkit-1/rules.d, and the /etc and /usr/share trees it
+// stages for). The rules files themselves are JavaScript behind a .rules name
+// (see ReadsAsPolkitRules); the directory pair is how the walk tells that
+// layout apart from any other build output before it has descended.
+func stagesPolkitRules(dir string) bool {
+	fi, err := os.Stat(filepath.Join(dir, "polkit-1", "rules.d"))
+	return err == nil && fi.IsDir()
 }
 
 func shouldSkipFile(root, path string, d os.DirEntry) bool {

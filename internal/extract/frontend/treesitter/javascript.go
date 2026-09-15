@@ -2,6 +2,7 @@ package treesitter
 
 import (
 	"github.com/vyprai/vyql/internal/extract/regexambig"
+	"os"
 	"path/filepath"
 	"strings"
 	"unsafe"
@@ -313,6 +314,26 @@ func isHTMLFile(path string) bool {
 	return strings.HasSuffix(path, ".html") || strings.HasSuffix(path, ".htm")
 }
 
+// ReadsAsPolkitRules reports whether a .rules file is a polkit authorization
+// rule — the JavaScript a polkit daemon loads from polkit-1/rules.d — rather
+// than a udev rule, which shares the extension for a key-value grammar
+// (`KERNEL=="sda", MODE="0660"`) no JavaScript parser accepts. The two are
+// told apart by what only a polkit rule contains: a polkit.addRule or
+// polkit.addAdminRule call, the API a rule exists to register. The head of the
+// file is enough — a marker past it would leave the rule unregisterable — and
+// reading a bounded head keeps the probe off a large udev rules file.
+func ReadsAsPolkitRules(path string) bool {
+	f, err := os.Open(path)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = f.Close() }() // read-only; a close error is not actionable
+	buf := make([]byte, 64<<10)
+	n, _ := f.Read(buf)
+	head := string(buf[:n])
+	return strings.Contains(head, "polkit.addRule") || strings.Contains(head, "polkit.addAdminRule")
+}
+
 func (c *jsConv) exportedNames(root *tree_sitter.Node) map[string]bool {
 	out := map[string]bool{}
 	markObjectExports := func(obj *tree_sitter.Node) {
@@ -575,6 +596,9 @@ func (c *jsConv) jsStructuredContextTokens(root *tree_sitter.Node) []string {
 			}
 			if c.jsFailOpenPolicyDeclarationGuard(n) {
 				add("fail_open_policy_declaration_guard=true")
+			}
+			if c.jsPolkitSubjectGateNotConjunctive(n) {
+				add("polkit_subject_gate_not_conjunctive=true")
 			}
 		case "for_in_statement":
 			add("for_in=true")
@@ -1554,6 +1578,108 @@ func (c *jsConv) jsDeclaredFieldRead(n *tree_sitter.Node) string {
 		return base + "." + c.text(prop)
 	}
 	return ""
+}
+
+// jsPolkitSubjectGateNotConjunctive reports a polkit authorization gate whose
+// subject test is OR-ed beside the actions it was written to guard instead of
+// conjoined with them: the condition of an if that decides an authorization
+// (returns a polkit.Result.*) has one `||` arm testing an action and the
+// subject together — `action.id == … && subject.user == …` — and another arm
+// testing an action alone, so the decision is reachable for that action with
+// no subject test on any path. That is the regression CVE-2025-27512
+// introduced in zincati's rule: adding an action to `(deploy || finalize) &&
+// subject.user == "zincati"` reflowed the `&&` onto the new arm alone —
+// `(deploy || finalize) || cleanup && subject.user == "zincati"` — so, `&&`
+// binding tighter than `||`, deploy and finalize were granted to every local
+// account with no subject test at all. The fact is the RELATION between
+// sibling arms — which disjunct the subject test binds to — not a property of
+// any one operand: the repaired spellings test the same operands with the
+// subject bound to every action (`(deploy || finalize) && subject.user == …`,
+// or the action if nesting a subject if) and carry no token, so no binding
+// keyed on the fix's own spelling can imitate it. Emitted the way
+// fail_open_policy_declaration_guard is, as a context token that states the
+// sibling relation before any binding can read it.
+func (c *jsConv) jsPolkitSubjectGateNotConjunctive(n *tree_sitter.Node) bool {
+	if n == nil || c.kind(n) != "if_statement" {
+		return false
+	}
+	if !c.jsReturnsPolkitResult(c.field(n, "consequence")) {
+		return false
+	}
+	bound, escaped := false, false
+	for _, dis := range c.jsOrOperands(c.field(n, "condition"), nil) {
+		if !c.jsPolkitGateTests(dis, "action") {
+			continue
+		}
+		if c.jsPolkitGateTests(dis, "subject") {
+			bound = true
+		} else {
+			escaped = true
+		}
+	}
+	return bound && escaped
+}
+
+// jsOrOperands flattens a condition's `||` tree into its arms while leaving
+// each arm's `&&` structure intact. Which disjunct a conjunct binds to is the
+// fact under observation, so unlike jsBooleanOperands this must not flatten
+// both operators into one list.
+func (c *jsConv) jsOrOperands(n *tree_sitter.Node, acc []*tree_sitter.Node) []*tree_sitter.Node {
+	if n == nil {
+		return acc
+	}
+	n = c.unwrapJsTransparentExpr(n)
+	if c.kind(n) == "binary_expression" && c.text(c.field(n, "operator")) == "||" {
+		acc = c.jsOrOperands(c.field(n, "left"), acc)
+		return c.jsOrOperands(c.field(n, "right"), acc)
+	}
+	return append(acc, n)
+}
+
+// jsReturnsPolkitResult reports whether a branch decides an authorization:
+// some return inside it yields a polkit.Result.* value. Any result value
+// counts — the observation is about the gate's wiring, and the polarity a
+// binding needs to pair with it is already visible to one as the branch's own
+// tokens (selector:polkit.Result.YES and kin).
+func (c *jsConv) jsReturnsPolkitResult(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	if c.kind(n) == "return_statement" {
+		// The grammar leaves the returned expression unlabelled, so its named
+		// children are the value (plus anything the expression nests).
+		for _, ch := range c.namedChildren(n) {
+			if strings.HasPrefix(c.dotted(ch), "polkit.Result.") {
+				return true
+			}
+		}
+	}
+	for _, ch := range c.namedChildren(n) {
+		if c.jsReturnsPolkitResult(ch) {
+			return true
+		}
+	}
+	return false
+}
+
+// jsPolkitGateTests reports whether an arm of a gate's condition mentions the
+// rule callback's action or subject parameter at all — as a comparison operand
+// (`action.id == "…"`), a bare guard (`subject.active`), or a call receiver
+// (`subject.isInGroup(…)`). In a polkit rule, naming the parameter is testing
+// it; the observation is which DISJUNCT the test lands in, not its operator.
+func (c *jsConv) jsPolkitGateTests(n *tree_sitter.Node, param string) bool {
+	if n == nil {
+		return false
+	}
+	if read := c.jsDeclaredFieldRead(n); read == param || strings.HasPrefix(read, param+".") {
+		return true
+	}
+	for _, ch := range c.namedChildren(n) {
+		if c.jsPolkitGateTests(ch, param) {
+			return true
+		}
+	}
+	return false
 }
 
 // jsMembershipPredicates are the call names that answer "is this element in

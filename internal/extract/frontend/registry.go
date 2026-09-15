@@ -182,11 +182,12 @@ type EntryClass struct {
 	cppHeader     map[string]bool
 	pythonShebang map[string]bool
 	perlSource    map[string]bool
+	polkitRules   map[string]bool
 }
 
 // ClassifyEntries inspects the entries whose language cannot be decided from the extension.
 func ClassifyEntries(entries []treesitter.Entry) EntryClass {
-	c := EntryClass{cppHeader: map[string]bool{}, pythonShebang: map[string]bool{}, perlSource: map[string]bool{}}
+	c := EntryClass{cppHeader: map[string]bool{}, pythonShebang: map[string]bool{}, perlSource: map[string]bool{}, polkitRules: map[string]bool{}}
 	var perlExts map[string]bool
 	for _, lg := range languages() {
 		if lg.Name == "perl" {
@@ -201,6 +202,8 @@ func ClassifyEntries(entries []treesitter.Entry) EntryClass {
 			c.pythonShebang[e.Path] = fileHasPythonShebang(e.Path)
 		case perlExts[e.Ext]:
 			c.perlSource[e.Path] = treesitter.ReadsAsPerl(e.Path)
+		case e.Ext == ".rules":
+			c.polkitRules[e.Path] = treesitter.ReadsAsPolkitRules(e.Path)
 		}
 	}
 	return c
@@ -235,6 +238,18 @@ func (lg Language) FilesFor(entries []treesitter.Entry, class EntryClass) []stri
 			if parses, probed := class.perlSource[e.Path]; probed && !parses {
 				continue
 			}
+		}
+		// The .rules name is shared: polkit authorization rules are the
+		// JavaScript a polkit daemon loads, udev rules are a key-value grammar
+		// no JavaScript parser accepts, and the extension alone cannot tell
+		// them apart. The claim keys on the classification's content probe,
+		// never on the extension — an unprobed .rules file stays unclaimed
+		// rather than reaching the JavaScript parser as udev key-value text.
+		if lg.Name == "javascript" && e.Ext == ".rules" {
+			if class.polkitRules[e.Path] {
+				out = append(out, e.Path)
+			}
+			continue
 		}
 		if lg.Exts[e.Ext] || lg.Exts[e.Base] {
 			out = append(out, e.Path)
