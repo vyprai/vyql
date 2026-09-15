@@ -581,6 +581,10 @@ func v2PresenceValuePrefix(field string) string {
 		return "own_property_key_guard="
 	case "failOpenPolicyDeclarationGuard":
 		return "fail_open_policy_declaration_guard="
+	// The polkit sibling-arm relation: which `||` disjunct of an authorization
+	// gate the subject test binds to (see jsPolkitSubjectGateNotConjunctive).
+	case "polkitSubjectGateNotConjunctive":
+		return "polkit_subject_gate_not_conjunctive="
 	case "forIn":
 		return "for_in="
 	case "objectKeysForEach":
