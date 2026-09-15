@@ -57,6 +57,11 @@ type ccConv struct {
 	// declarations outside any function body, which every function in it asks
 	// for; nil until the first ask.
 	constSizedArrays map[string][]string
+	// sizeofSizedArrays caches the dimensions of the file's array
+	// declarations whose size is a sizeof expression -- the literal-budget
+	// spelling a capacity question asks for -- which every function in it
+	// shares; nil until the first ask.
+	sizeofSizedArrays map[string][]string
 	// inFunc counts the function bodies the walk is currently inside, so a
 	// declaration can tell a local from a file-scope one.
 	inFunc int
@@ -1827,6 +1832,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccUnassignedSizedStackArrayObservations(n, params)...)
 			bodyStmts = append(bodyStmts, c.ccDestCapacityUncheckedCursorPairObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccFormatTruncationUncheckedReuseObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccFormatIntegerCapacityObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccOutParamStatusUncheckedObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccPrefixOffsetObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccCursorLoopMissingEndSentinelObservations(n, params)...)
@@ -1840,6 +1846,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccBufferRelocationOriginObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccCountedPopulationObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccFieldAliasStaleAfterReallocObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccProducerFieldRangeBoundObservations(n, params)...)
 		}
 		return []nir.Stmt{nir.FuncDef{
 			Name:          name,
@@ -4947,6 +4954,652 @@ func ccFormatLengthBoundConsulted(text, v, sizeArg string) bool {
 	}
 	castV := `(?:\([A-Za-z_][A-Za-z0-9_]*\*?\))?\*?` + q
 	return regexp.MustCompile(bound + `(>=|<=|==|!=|>|<)` + castV + `\b`).MatchString(text)
+}
+
+// ccFormatIntegerCapacityObservations pairs the integer conversions of a
+// literal format with the capacity the destination's own declaration states.
+// A printf-family conversion's width is a minimum: `%4d` pads to four digits
+// and never refuses a fifth (C11 7.21.6.1), so what bounds the write is the
+// destination, and C code states that bound in one of two places this reads.
+// A declared array dimension -- a constant, or a sizeof of the string literal
+// that spells out the widest expected output, the `u_char
+// cached_http_time[NGX_TIME_SLOTS][sizeof("Mon, 28 Sep 1970 06:00:00 GMT")]`
+// idiom, reached directly or through a pointer the function sets into the
+// array -- or an allocation whose size expression sums the same sizeof-bearing
+// literals, the pool-buffer idiom `len = sizeof(" 28-Sep-1970 12:00 ") - 1 +
+// 20 + 2; b = ngx_create_temp_buf(pool, len)`, where the destination is the
+// member a cursor writes through (`b->last`).
+//
+// The fact is the pairing, not the verdict: whether the conversions can
+// outgrow the capacity is a question about the values being formatted, and
+// that judgement belongs to the rule that reads the fact. The writer names
+// are primitive-name facts of the kind cPropagators already carries -- the
+// libc spellings beside nginx's own ngx_sprintf/ngx_snprintf, which hold the
+// same contract per src/core/ngx_string.c while never having been shippable
+// as data: a binding over the bare name labels every one of its 158 call
+// sites in a tree, where a fact over the pairing reaches only what a rule
+// asks for. A destination whose capacity this function does not state -- a
+// pointer parameter, a caller's buffer -- pairs nothing and emits nothing.
+//
+// Residuals, all false-negative: a width read from the argument list (`%*d`)
+// travels as its spelling; the alias form reads only `p = arr`, `p = arr[i]`
+// and `p = &arr[i][j]`, so `p = arr + 1` pairs nothing; and the allocation
+// size is the sum of the plain and `+=` stores to the size local before the
+// allocation, so a size handed over by a helper call travels as the call.
+func (c *ccConv) ccFormatIntegerCapacityObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	var sites []ccFormatSite
+	allocs := map[string][]ccAllocStore{}
+	aliases := map[string][]ccAliasStore{}
+	sizes := map[string][]ccSizeStore{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "call_expression":
+			callee := c.field(n, "function")
+			if c.kind(callee) != "identifier" {
+				break
+			}
+			name := c.text(callee)
+			pos, ok := ccFormatWriterArgs[name]
+			if !ok {
+				break
+			}
+			args := c.namedChildren(c.field(n, "arguments"))
+			if len(args) <= pos.fmt || len(args) == 0 || !c.ccIsStringLiteral(args[pos.fmt]) {
+				break
+			}
+			site := ccFormatSite{node: n, at: n.StartByte(), name: name, dest: compactCExprText(c.text(args[0])), literal: c.text(args[pos.fmt])}
+			if pos.size >= 0 && len(args) > pos.size {
+				site.sizeArg, site.hasSizeArg = compactCExprText(c.text(args[pos.size])), true
+			}
+			sites = append(sites, site)
+		case "assignment_expression":
+			left, right := c.field(n, "left"), c.field(n, "right")
+			if left == nil || right == nil || c.kind(left) != "identifier" {
+				break
+			}
+			op := c.assignmentOp(n)
+			if op != "=" && op != "+=" {
+				break
+			}
+			name := c.text(left)
+			if op == "=" && c.kind(right) == "call_expression" {
+				if callee := c.field(right, "function"); callee != nil && c.kind(callee) == "identifier" {
+					if sizePos, ok := ccDestAllocatorSizeArg[c.text(callee)]; ok {
+						if args := c.namedChildren(c.field(right, "arguments")); len(args) > sizePos {
+							allocs[name] = append(allocs[name], ccAllocStore{at: n.StartByte(), sizeArg: compactCExprText(c.text(args[sizePos]))})
+						}
+					}
+				}
+				break
+			}
+			if op == "=" {
+				if m := ccAliasArrayRe.FindStringSubmatch(compactCExprText(c.text(right))); m != nil {
+					aliases[name] = append(aliases[name], ccAliasStore{at: n.StartByte(), array: m[1]})
+					break
+				}
+				sizes[name] = append(sizes[name], ccSizeStore{at: n.StartByte(), rhs: compactCExprText(c.text(right))})
+			} else {
+				sizes[name] = append(sizes[name], ccSizeStore{at: n.StartByte(), rhs: compactCExprText(c.text(right)), add: true})
+			}
+		case "init_declarator":
+			declarator, value := c.field(n, "declarator"), c.field(n, "value")
+			if value != nil && declarator != nil && c.kind(declarator) == "identifier" {
+				name := c.text(declarator)
+				sizes[name] = append(sizes[name], ccSizeStore{at: n.StartByte(), rhs: compactCExprText(c.text(value))})
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	if len(sites) == 0 {
+		return nil
+	}
+	// arrays is read on the first site that needs it, because most functions
+	// format into nothing this file declares.
+	var arrays map[string][]string
+	seen := map[string]bool{}
+	var out []nir.Stmt
+	for _, s := range sites {
+		conversions := ccFormatIntegerConversions(s.literal)
+		if len(conversions) == 0 || s.dest == "" {
+			continue
+		}
+		if arrays == nil {
+			arrays = c.ccCapacityArrays(fn)
+		}
+		capacity, kind := ccFormatDestCapacity(s.dest, s.at, allocs, aliases, sizes, arrays)
+		if capacity == "" {
+			continue
+		}
+		loc := c.loc(s.node)
+		if seen[loc] {
+			continue
+		}
+		seen[loc] = true
+		path := "analysis.format_capacity.integer_conversions"
+		args := []nir.Expr{
+			nir.Const{Loc: loc, Value: "format=" + s.name},
+			nir.Const{Loc: loc, Value: "dest=" + s.dest},
+			nir.Const{Loc: loc, Value: "capacity=" + capacity},
+			nir.Const{Loc: loc, Value: "capacity_kind=" + kind},
+			nir.Const{Loc: loc, Value: "conversions=" + strings.Join(conversions, ",")},
+		}
+		if s.hasSizeArg {
+			args = append(args, nir.Const{Loc: loc, Value: "size_arg=" + s.sizeArg})
+		}
+		out = append(out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: path, Loc: loc},
+			Args:   args,
+			Path:   path,
+			Method: "integer_conversions",
+			Loc:    loc,
+		}})
+	}
+	return out
+}
+
+// ccFormatSite is one formatted-output call whose format the source states as
+// a literal: the writer's name, the destination argument as written, the
+// literal itself, and the call's own size argument when the spelling has one.
+type ccFormatSite struct {
+	node       *tree_sitter.Node
+	name       string
+	dest       string
+	literal    string
+	sizeArg    string
+	hasSizeArg bool
+	at         uint
+}
+
+// ccAllocStore is an allocation captured into a local: where the store
+// stands, and the size argument the allocator received.
+type ccAllocStore struct {
+	at      uint
+	sizeArg string
+}
+
+// ccAliasStore is a pointer set into a declared array: where the store
+// stands, and the array it points into.
+type ccAliasStore struct {
+	at    uint
+	array string
+}
+
+// ccSizeStore is one store to a local that an allocation's size argument may
+// read: the stored expression, and whether it adds to what the name held.
+type ccSizeStore struct {
+	at  uint
+	rhs string
+	add bool
+}
+
+// ccFormatWriterArgs names the formatted-output writers this observation
+// reads, and where each one's format literal and own size bound sit in the
+// argument list (-1: the spelling takes none). The nginx spellings carry the
+// same contract as their libc siblings per nginx's own src/core/ngx_string.c,
+// which is the whole of what is being asserted about them.
+var ccFormatWriterArgs = map[string]struct{ fmt, size int }{
+	"sprintf":      {fmt: 1, size: -1},
+	"vsprintf":     {fmt: 1, size: -1},
+	"ngx_sprintf":  {fmt: 1, size: -1},
+	"snprintf":     {fmt: 2, size: 1},
+	"vsnprintf":    {fmt: 2, size: 1},
+	"ngx_snprintf": {fmt: 2, size: 1},
+}
+
+// ccDestAllocatorSizeArg names the destination allocators whose size argument
+// states the destination's capacity in bytes, and where that argument sits.
+var ccDestAllocatorSizeArg = map[string]int{
+	"malloc": 0, "alloca": 0, "realloc": 1,
+	"ngx_palloc": 1, "ngx_pnalloc": 1, "ngx_create_temp_buf": 1,
+}
+
+var (
+	// ccAliasArrayRe matches a compacted expression that is a declared array
+	// reached directly or through subscripts -- `arr`, `arr[i]`,
+	// `&cached_http_time[slot][0]` -- and nothing computed from one.
+	ccAliasArrayRe = ccRe(`^&?([A-Za-z_]\w*)((?:\[[^\[\]]*\])*)$`)
+	// ccBareIdentRe matches a name standing entirely alone.
+	ccBareIdentRe = ccRe(`^[A-Za-z_]\w*$`)
+)
+
+// ccFormatDestCapacity resolves the capacity a destination's own declaration
+// states, at the position the format call stands. A member selection
+// (`b->last`) reads the allocation captured into the selected object; a whole
+// name reads its declared array's last dimension, the array a pointer was set
+// into, or the allocation it holds directly. A size argument that is a bare
+// name reads that name's accumulated stores -- the plain and `+=` spellings
+// of the summing idiom -- before the allocation took it. Both return empty
+// when this function states no capacity for the destination.
+func ccFormatDestCapacity(dest string, at uint, allocs map[string][]ccAllocStore, aliases map[string][]ccAliasStore, sizes map[string][]ccSizeStore, arrays map[string][]string) (string, string) {
+	if base, ok := ccFieldBaseName(dest); ok {
+		return ccAllocCapacity(base, at, allocs, sizes)
+	}
+	if dims, ok := arrays[dest]; ok && len(dims) > 0 && dims[len(dims)-1] != "" {
+		return dims[len(dims)-1], "declared_array"
+	}
+	array, aliasAt := "", uint(0)
+	for _, st := range aliases[dest] {
+		if st.at < at && (array == "" || st.at >= aliasAt) {
+			array, aliasAt = st.array, st.at
+		}
+	}
+	if array != "" {
+		if dims, ok := arrays[array]; ok && len(dims) > 0 && dims[len(dims)-1] != "" {
+			return dims[len(dims)-1], "declared_array"
+		}
+	}
+	return ccAllocCapacity(dest, at, allocs, sizes)
+}
+
+// ccAllocCapacity reads the capacity the latest allocation captured into
+// base before the format call states: the allocator's size argument, or the
+// accumulated stores of the size local that argument names.
+func ccAllocCapacity(base string, at uint, allocs map[string][]ccAllocStore, sizes map[string][]ccSizeStore) (string, string) {
+	sizeArg, allocAt := "", uint(0)
+	for _, st := range allocs[base] {
+		if st.at < at && st.sizeArg != "" && (sizeArg == "" || st.at >= allocAt) {
+			sizeArg, allocAt = st.sizeArg, st.at
+		}
+	}
+	if sizeArg == "" {
+		return "", ""
+	}
+	if ccBareIdentRe.MatchString(sizeArg) {
+		expr := ""
+		for _, st := range sizes[sizeArg] {
+			if st.at >= allocAt {
+				continue
+			}
+			if st.add && expr != "" {
+				expr += "+" + st.rhs
+			} else {
+				expr = st.rhs
+			}
+		}
+		if expr != "" {
+			return expr, "allocation"
+		}
+	}
+	return sizeArg, "allocation"
+}
+
+// ccFieldBaseName splits a compacted destination that selects a member --
+// `b->last`, `tm.year` -- into the object the member hangs off. A destination
+// with no member selection is not allocation-backed and reads as none.
+func ccFieldBaseName(dest string) (string, bool) {
+	i := strings.IndexByte(dest, '.')
+	if dash := strings.Index(dest, "->"); dash >= 0 && (i < 0 || dash < i) {
+		i = dash
+	}
+	if i <= 0 {
+		return "", false
+	}
+	base := dest[:i]
+	if !ccBareIdentRe.MatchString(base) {
+		return "", false
+	}
+	return base, true
+}
+
+// ccCapacityArrays merges the constant-dimension arrays the file and function
+// declare with the ones whose dimension is a sizeof expression -- the
+// literal-budget spelling ccArrayDimensions' constancy demand refuses.
+func (c *ccConv) ccCapacityArrays(fn *tree_sitter.Node) map[string][]string {
+	out := c.ccConstantSizedArrays(fn)
+	for name, dims := range c.ccSizeofSizedArrays(fn) {
+		if _, ok := out[name]; !ok {
+			out[name] = dims
+		}
+	}
+	return out
+}
+
+// ccSizeofSizedArrays maps each array the function can address to the
+// dimensions of its declaration when one of them is a sizeof expression.
+func (c *ccConv) ccSizeofSizedArrays(fn *tree_sitter.Node) map[string][]string {
+	out := map[string][]string{}
+	for name, dims := range c.ccFileSizeofSizedArrays(fn) {
+		out[name] = dims
+	}
+	var collect func(*tree_sitter.Node)
+	collect = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		c.ccAddSizeofSizedArray(out, n)
+		for _, ch := range c.namedChildren(n) {
+			collect(ch)
+		}
+	}
+	collect(c.field(fn, "body"))
+	return out
+}
+
+// ccFileSizeofSizedArrays holds the file-scope half of that map, so the walk
+// over the translation unit runs once per file.
+func (c *ccConv) ccFileSizeofSizedArrays(n *tree_sitter.Node) map[string][]string {
+	if c.sizeofSizedArrays != nil {
+		return c.sizeofSizedArrays
+	}
+	root := n
+	for parent := root.Parent(); parent != nil; parent = parent.Parent() {
+		root = parent
+	}
+	out := map[string][]string{}
+	var collect func(*tree_sitter.Node)
+	collect = func(n *tree_sitter.Node) {
+		if n == nil || c.kind(n) == "function_definition" {
+			return
+		}
+		c.ccAddSizeofSizedArray(out, n)
+		for _, ch := range c.namedChildren(n) {
+			collect(ch)
+		}
+	}
+	collect(root)
+	c.sizeofSizedArrays = out
+	return out
+}
+
+// ccAddSizeofSizedArray files one outermost array declarator whose chain
+// states a sizeof dimension, with every dimension as written.
+func (c *ccConv) ccAddSizeofSizedArray(out map[string][]string, n *tree_sitter.Node) {
+	if c.kind(n) != "array_declarator" || c.kind(n.Parent()) == "array_declarator" {
+		return
+	}
+	dims := c.ccArrayDimsAsWritten(n)
+	hasSizeof := false
+	for _, d := range dims {
+		if strings.Contains(d, "sizeof(") {
+			hasSizeof = true
+		}
+	}
+	if name := c.declName(n); hasSizeof && name != "" && len(dims) > 0 {
+		out[name] = dims
+	}
+}
+
+// ccArrayDimsAsWritten reads a declarator chain's dimensions as written,
+// outermost bracket last, without demanding that a compiler could fold them.
+func (c *ccConv) ccArrayDimsAsWritten(n *tree_sitter.Node) []string {
+	if c.kind(n) != "array_declarator" {
+		return nil
+	}
+	size := compactCExprText(c.text(c.field(n, "size")))
+	inner := c.field(n, "declarator")
+	if c.kind(inner) != "array_declarator" {
+		return []string{size}
+	}
+	dims := c.ccArrayDimsAsWritten(inner)
+	if len(dims) == 0 {
+		return nil
+	}
+	return append(dims, size)
+}
+
+// ccFormatIntegerConversions returns the distinct integer conversions a
+// format literal contains, in first-occurrence order: the flags, width,
+// precision and length modifiers a conversion carries travel with its
+// specifier. `%%` is a literal percent and consumes its pair, and a
+// conversion whose specifier is not an integer (`%s`, `%p`) is not this
+// fact's subject: its expansion is bounded by an argument the call receives,
+// not by a width the format states. nginx's `%O` (off_t) is an integer
+// conversion of the same family.
+func ccFormatIntegerConversions(literal string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for i := 0; i < len(literal); i++ {
+		if literal[i] != '%' {
+			continue
+		}
+		j := i + 1
+		if j < len(literal) && literal[j] == '%' {
+			i = j // the pair is a literal percent, not a conversion
+			continue
+		}
+		for j < len(literal) && strings.IndexByte("-+ #'", literal[j]) >= 0 {
+			j++
+		}
+		if j < len(literal) && literal[j] == '*' {
+			j++
+		} else {
+			for j < len(literal) && literal[j] >= '0' && literal[j] <= '9' {
+				j++
+			}
+		}
+		if j < len(literal) && literal[j] == '.' {
+			j++
+			if j < len(literal) && literal[j] == '*' {
+				j++
+			} else {
+				for j < len(literal) && literal[j] >= '0' && literal[j] <= '9' {
+					j++
+				}
+			}
+		}
+		end := j
+		for end < len(literal) && strings.IndexByte("hlLqzjt", literal[end]) >= 0 {
+			end++
+		}
+		if end < len(literal) && strings.IndexByte("diouxXO", literal[end]) >= 0 {
+			conv := literal[i : end+1]
+			if !seen[conv] {
+				seen[conv] = true
+				out = append(out, conv)
+			}
+			i = end
+		}
+	}
+	return out
+}
+
+// ccProducerFieldRangeBoundObservations reports the range a producer's
+// output can take. A function that hands values back through fields of a
+// caller's struct -- the out-parameter producer `ngx_gmtime(t, tp)` writing
+// `tp->ngx_tm_year = year` -- states how wide those values can get only in
+// the arithmetic that produced them, and the guard machinery this frontend
+// already walks binds subscripts, not field outputs. This pairs each store
+// into a parameter's field with the upper bound the function puts on the
+// local the stored value derives from, following plain `=` stores name by
+// name: `year = (days + 2) * 400 / ...` derives year from days, so a clamp on
+// days (`if (days > 2932896) days = 2932896;`) bounds the field year ends up
+// carrying. Three spellings credit a bound: the clamp or early reject
+// (`v > K`), the proceed comparison against a real bound (`v < K`, not the
+// sign test `v < 0`), and the modulo reduction (`sec %= 60`,
+// `wday = (4 + days) % 7`), which bounds a value by its modulus. A stored
+// value nothing bounds emits the missing polarity, which is the half a rule
+// asks for: whether a calendar-year producer is bounded to four digits is a
+// question about the bound this fact carries, answered without the fixing
+// commit's own names.
+//
+// The pairing is a relation the code states and no library is named. A store
+// of a constant-derived local that no spelling bounds pairs nothing (the
+// value cannot grow; a clamped constant later reduced by a modulus keeps the
+// modulus's bound), a
+// member-selection or subscript right-hand side is someone else's storage and
+// files no derivation, and the first store to a field speaks for the
+// function.
+//
+// Residuals, all false-negative: the derivation follows plain `=` stores
+// only, so a value recomputed by `++` or a compound assignment keeps the
+// names of its last plain store; the bound is credited from a comparison
+// anywhere before the store, so a check in a sibling branch vouches for it;
+// and a bound the arithmetic implies but no spelling states -- a division
+// that keeps a quotient small -- is not found.
+func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, params []string) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	isParam := make(map[string]bool, len(params))
+	for _, p := range params {
+		isParam[p] = true
+	}
+	if len(isParam) == 0 {
+		return nil
+	}
+	// derive maps each local to the names its current value was computed
+	// from, filled as the walk passes each plain store, so a field store only
+	// ever consults the stores that precede it. modBound holds the modulus
+	// that currently bounds a local.
+	derive := map[string][]string{}
+	modBound := map[string]string{}
+	seen := map[string]bool{}
+	var out []nir.Stmt
+	var recordStore func(name, rhs string)
+	recordStore = func(name, rhs string) {
+		derive[name] = ccIdentRe.FindAllString(rhs, -1)
+		delete(modBound, name)
+		if modulus, ok := ccTopLevelModulus(rhs); ok {
+			modBound[name] = modulus
+		}
+	}
+	// emit pairs one field store with the bound, if any, on the value it
+	// stores: the stored name first, then the names that value derives from
+	// in a fixed order, so the same function always credits the same bound.
+	emit := func(assign *tree_sitter.Node, via, fld, head string) {
+		if head == "" || seen[via+"."+fld] {
+			return
+		}
+		seen[via+"."+fld] = true
+		names := []string{head}
+		visited := map[string]bool{head: true}
+		for i := 0; i < len(names); i++ {
+			for _, name := range derive[names[i]] {
+				if !visited[name] {
+					visited[name] = true
+					names = append(names, name)
+				}
+			}
+		}
+		tail := names[1:]
+		sort.Strings(tail)
+		prefix := compactCExprText(c.textBefore(body, assign))
+		guard, bound, boundVar := "missing_upper_bound", "", ""
+		for _, name := range append([]string{head}, tail...) {
+			if modulus := modBound[name]; modulus != "" {
+				guard, bound, boundVar = "modulo", modulus, name
+				break
+			}
+			if credited, ok := ccUpperBoundGuardReject(prefix, name); ok {
+				guard, bound, boundVar = "clamp", credited.expr, name
+				break
+			}
+			if credited, ok := ccUpperBoundGuardBefore(prefix, name); ok && !ccZeroOrSignLiteral(credited.expr) {
+				guard, bound, boundVar = "clamp", credited.expr, name
+				break
+			}
+		}
+		if guard == "missing_upper_bound" {
+			if ids, ok := derive[head]; ok && len(ids) == 0 {
+				return // a constant-derived local cannot grow
+			}
+		}
+		loc := c.loc(assign)
+		path := "analysis.range.producer_field_bounded"
+		args := []nir.Expr{
+			nir.Const{Loc: loc, Value: "via=" + via},
+			nir.Const{Loc: loc, Value: "field=" + fld},
+			nir.Const{Loc: loc, Value: "value=" + head},
+			nir.Const{Loc: loc, Value: "guard=" + guard},
+		}
+		if guard == "missing_upper_bound" {
+			path = "analysis.range.producer_field_unbounded"
+		} else {
+			args = append(args,
+				nir.Const{Loc: loc, Value: "bound=" + bound},
+				nir.Const{Loc: loc, Value: "bound_var=" + boundVar})
+		}
+		out = append(out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: path, Loc: loc},
+			Args:   args,
+			Path:   path,
+			Method: strings.TrimPrefix(path, "analysis.range."),
+			Loc:    loc,
+		}})
+	}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "assignment_expression":
+			left, right := c.field(n, "left"), c.field(n, "right")
+			if left == nil || right == nil {
+				break
+			}
+			switch c.assignmentOp(n) {
+			case "=":
+				if c.kind(left) == "identifier" {
+					recordStore(c.text(left), compactCExprText(c.text(right)))
+					break
+				}
+				if base, fld, ok := c.fieldTarget(left); ok && c.kind(base) == "identifier" && isParam[c.text(base)] {
+					emit(n, c.text(base), fld, ccIdentifierText(c, right))
+				}
+			case "%=":
+				if c.kind(left) == "identifier" {
+					if modulus := ccTermAfter(compactCExprText(c.text(right))); modulus != "" {
+						modBound[c.text(left)] = modulus
+					}
+				}
+			}
+		case "init_declarator":
+			declarator, value := c.field(n, "declarator"), c.field(n, "value")
+			if value != nil && declarator != nil && c.kind(declarator) == "identifier" {
+				recordStore(c.text(declarator), compactCExprText(c.text(value)))
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return out
+}
+
+// ccTopLevelModulus reads the modulus of a compacted expression's top-level
+// remainder: the term after a `%` that stands outside any parenthesis and any
+// literal, so a percent inside a format string is text and a percent in a
+// subexpression bounds only that subexpression. `t % 86400` reads 86400; an
+// expression with no top-level remainder reads as none.
+func ccTopLevelModulus(s string) (string, bool) {
+	depth, inString := 0, false
+	for i := 0; i < len(s); i++ {
+		switch s[i] {
+		case '"':
+			if i == 0 || s[i-1] != '\\' {
+				inString = !inString
+			}
+		case '(', '[':
+			if !inString {
+				depth++
+			}
+		case ')', ']':
+			if !inString {
+				depth--
+			}
+		case '%':
+			if !inString && depth == 0 && i+1 < len(s) {
+				if modulus := ccTermAfter(s[i+1:]); modulus != "" {
+					return modulus, true
+				}
+			}
+		}
+	}
+	return "", false
 }
 
 // ccOutParamStatusUncheckedObservations reports the C out-parameter
