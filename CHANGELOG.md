@@ -8,6 +8,29 @@ New rules and bindings change what a scan reports, so they get listed here like
 any other user-visible change. A finding that suddenly appears in your CI is a
 behaviour change, even if no code moved.
 
+## [Unreleased]
+
+### Fixed
+
+- **A bounded scan of a target one graph can hold keeps that graph in RAM.**
+  `-max-ram` armed the disk-backed graph store for every scan it bounded, and
+  on a target whose graph fits in the ceiling the store cost more than the
+  graph it spared: its detail buffer, write path and caches sit resident
+  alongside a structural core that never leaves RAM in either store, so a
+  multi-package repository that lowers to a million-odd nodes peaked several
+  times its in-RAM footprint and the memory safety stop ended the scan before
+  the first rule ran — an empty report from a ceiling the scan easily
+  afforded. Measured on such a repository (90 Python files across three
+  packages): 4626MiB through the disk store against 1220MiB in RAM, so the
+  mandated 4GB ceiling stopped one and carries the other with roughly 2GB to
+  spare (peak 1341MiB against the 3328MiB stop).
+  The partition planner's own measure now decides: a target it leaves
+  unpartitioned is a target one graph holds, and that graph is built on the
+  int-indexed in-RAM store — the same store a partitioned scan already builds
+  per partition. A graph the ceiling cannot hold still spills: a target over
+  the one-graph limit is partitioned, and a run that must serialise one graph
+  (`-stats`, graph-json with review flags) keeps the disk-backed bound.
+
 ## [0.6.1] - 2026-09-11
 
 ### Fixed
