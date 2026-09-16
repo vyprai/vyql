@@ -260,3 +260,54 @@ int local_only(long t) {
 		t.Fatalf("local object field: got %q want none", got)
 	}
 }
+
+// The modulus a fact credits is read where it stood when the value was
+// computed, not where its source ends up: a copy taken before a reduction
+// keeps the bound the source carried at the copy, and the later, smaller
+// modulus does not reach back to the value already taken from the source.
+func TestCProducerFieldRangeBoundModulusSnapshot(t *testing.T) {
+	// Copy, then reduce the source: the copy is bounded by the modulus the
+	// source carried at the copy (100), and the reduction applied to the
+	// source afterwards (7) bounds only the source.
+	got := ccProducerRangeObs(t, `
+struct out { int v, sec; };
+void copy_then_reduce(long t, struct out *o) {
+	int v, sec;
+	sec = t % 100;
+	v = sec;
+	sec %= 7;
+	o->v = v;
+	o->sec = sec;
+}
+`)
+	want := "producer_field_bounded via=o;field=v;value=v;guard=modulo;bound=100;bound_var=v"
+	if !hasLine(got, want) {
+		t.Fatalf("copy before reduction: got %q want %q among them", got, want)
+	}
+	for _, l := range got {
+		if strings.HasPrefix(l, "producer_field_bounded via=o;field=v;") && strings.Contains(l, "bound=7;") {
+			t.Fatalf("the later reduction reached back to the copy: %q", l)
+		}
+	}
+	want = "producer_field_bounded via=o;field=sec;value=sec;guard=modulo;bound=7;bound_var=sec"
+	if !hasLine(got, want) {
+		t.Fatalf("reduced source itself: got %q want %q among them", got, want)
+	}
+
+	// The other order -- reduce, then copy -- carries the reduced bound with
+	// the value.
+	got = ccProducerRangeObs(t, `
+struct out { int v; };
+void reduce_then_copy(long t, struct out *o) {
+	int v, sec;
+	sec = t % 100;
+	sec %= 7;
+	v = sec;
+	o->v = v;
+}
+`)
+	want = "producer_field_bounded via=o;field=v;value=v;guard=modulo;bound=7;bound_var=v"
+	if !hasLine(got, want) {
+		t.Fatalf("copy after reduction: got %q want %q among them", got, want)
+	}
+}

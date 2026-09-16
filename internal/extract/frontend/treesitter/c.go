@@ -5417,7 +5417,11 @@ func ccFormatIntegerConversions(literal string) []string {
 // carrying. Three spellings credit a bound: the clamp or early reject
 // (`v > K`), the proceed comparison against a real bound (`v < K`, not the
 // sign test `v < 0`), and the modulo reduction (`sec %= 60`,
-// `wday = (4 + days) % 7`), which bounds a value by its modulus. A stored
+// `wday = (4 + days) % 7`), which bounds a value by its modulus. A modulus is
+// read where it stood -- the stored name's own current reduction, or the bound
+// a name carried when the value was computed from it, so a source reduced
+// after that store does not reach back to tighten the value already taken, and
+// a bare copy carries its source's bound with the value. A stored
 // value nothing bounds emits the missing polarity, which is the half a rule
 // asks for: whether a calendar-year producer is bounded to four digits is a
 // question about the bound this fact carries, answered without the fixing
@@ -5434,9 +5438,12 @@ func ccFormatIntegerConversions(literal string) []string {
 // Residuals, all false-negative: the derivation follows plain `=` stores
 // only, so a value recomputed by `++` or a compound assignment keeps the
 // names of its last plain store; the bound is credited from a comparison
-// anywhere before the store, so a check in a sibling branch vouches for it;
-// and a bound the arithmetic implies but no spelling states -- a division
-// that keeps a quotient small -- is not found.
+// anywhere before the store, so a check in a sibling branch vouches for it; a
+// modulus is credited only from the stored name's own reduction or its own
+// sources' bounds at the store, so a reduction on a name further back in the
+// derivation is left to the clamp spellings to find; and a bound the
+// arithmetic implies but no spelling states -- a division that keeps a
+// quotient small -- is not found.
 func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, params []string) []nir.Stmt {
 	body := c.field(fn, "body")
 	if body == nil {
@@ -5450,24 +5457,39 @@ func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, par
 		return nil
 	}
 	// derive maps each local to the names its current value was computed
-	// from, filled as the walk passes each plain store, so a field store only
-	// ever consults the stores that precede it. modBound holds the modulus
-	// that currently bounds a local.
-	derive := map[string][]string{}
+	// from -- each with the modulus bound that name carried at the store,
+	// because a source reduced later does not tighten the value already taken
+	// from it -- filled as the walk passes each plain store, so a field store
+	// only ever consults the stores that precede it. modBound holds the
+	// modulus that bounds a local's own current value.
+	derive := map[string][]ccDeriveName{}
 	modBound := map[string]string{}
 	seen := map[string]bool{}
 	var out []nir.Stmt
 	var recordStore func(name, rhs string)
 	recordStore = func(name, rhs string) {
-		derive[name] = ccIdentRe.FindAllString(rhs, -1)
+		ids := ccIdentRe.FindAllString(rhs, -1)
+		var sources []ccDeriveName
+		for _, id := range ids {
+			sources = append(sources, ccDeriveName{name: id, bound: modBound[id]})
+		}
+		derive[name] = sources
 		delete(modBound, name)
 		if modulus, ok := ccTopLevelModulus(rhs); ok {
 			modBound[name] = modulus
+			return
+		}
+		// a bare copy carries its source's bound with the value
+		if len(ids) == 1 && ids[0] == rhs && modBound[ids[0]] != "" {
+			modBound[name] = modBound[ids[0]]
 		}
 	}
 	// emit pairs one field store with the bound, if any, on the value it
-	// stores: the stored name first, then the names that value derives from
-	// in a fixed order, so the same function always credits the same bound.
+	// stores: a modulus is read where it stood -- the stored name's own
+	// current reduction, or the bound one of the names that value was
+	// computed from carried when it was computed -- and the clamp spellings
+	// are searched over the whole derivation in a fixed order, so the same
+	// function always credits the same bound.
 	emit := func(assign *tree_sitter.Node, via, fld, head string) {
 		if head == "" || seen[via+"."+fld] {
 			return
@@ -5476,10 +5498,10 @@ func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, par
 		names := []string{head}
 		visited := map[string]bool{head: true}
 		for i := 0; i < len(names); i++ {
-			for _, name := range derive[names[i]] {
-				if !visited[name] {
-					visited[name] = true
-					names = append(names, name)
+			for _, d := range derive[names[i]] {
+				if !visited[d.name] {
+					visited[d.name] = true
+					names = append(names, d.name)
 				}
 			}
 		}
@@ -5487,22 +5509,30 @@ func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, par
 		sort.Strings(tail)
 		prefix := compactCExprText(c.textBefore(body, assign))
 		guard, bound, boundVar := "missing_upper_bound", "", ""
-		for _, name := range append([]string{head}, tail...) {
-			if modulus := modBound[name]; modulus != "" {
-				guard, bound, boundVar = "modulo", modulus, name
-				break
-			}
-			if credited, ok := ccUpperBoundGuardReject(prefix, name); ok {
-				guard, bound, boundVar = "clamp", credited.expr, name
-				break
-			}
-			if credited, ok := ccUpperBoundGuardBefore(prefix, name); ok && !ccZeroOrSignLiteral(credited.expr) {
-				guard, bound, boundVar = "clamp", credited.expr, name
-				break
+		if modulus := modBound[head]; modulus != "" {
+			guard, bound, boundVar = "modulo", modulus, head
+		} else {
+			for _, d := range derive[head] {
+				if d.bound != "" {
+					guard, bound, boundVar = "modulo", d.bound, d.name
+					break
+				}
 			}
 		}
 		if guard == "missing_upper_bound" {
-			if ids, ok := derive[head]; ok && len(ids) == 0 {
+			for _, name := range append([]string{head}, tail...) {
+				if credited, ok := ccUpperBoundGuardReject(prefix, name); ok {
+					guard, bound, boundVar = "clamp", credited.expr, name
+					break
+				}
+				if credited, ok := ccUpperBoundGuardBefore(prefix, name); ok && !ccZeroOrSignLiteral(credited.expr) {
+					guard, bound, boundVar = "clamp", credited.expr, name
+					break
+				}
+			}
+		}
+		if guard == "missing_upper_bound" {
+			if sources, ok := derive[head]; ok && len(sources) == 0 {
 				return // a constant-derived local cannot grow
 			}
 		}
@@ -5568,6 +5598,16 @@ func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, par
 	}
 	walk(body)
 	return out
+}
+
+// ccDeriveName is one name a plain store computed a value from, together
+// with the modulus bound that name carried at the store: a reduction of the
+// source after the store does not tighten the value already taken from it,
+// so the bound travels with the edge rather than being read from the
+// source's current state when the field is stored.
+type ccDeriveName struct {
+	name  string
+	bound string
 }
 
 // ccTopLevelModulus reads the modulus of a compacted expression's top-level
