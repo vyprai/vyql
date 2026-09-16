@@ -1489,6 +1489,32 @@ func (c *ccConv) ccFieldNames(body *tree_sitter.Node) []string {
 	return names
 }
 
+// ccClassMembers reads the data-member names a class or struct body declares.
+// A method body's bare member reference — `m_frameSize = v`, the idiom C++ shares
+// with C# and Java — resolves against this set: the lowering turns each member
+// into the class's per-field slot, so a field one method writes and another (or
+// the same) method reads back meets one node instead of two method-local
+// bindings. A method declaration is a field_declaration too, but its declarator
+// is a function_declarator, which plainDeclName refuses — exactly the split
+// wanted here — and an unresolvable member contributes nothing rather than "".
+func (c *ccConv) ccClassMembers(body *tree_sitter.Node) []string {
+	if body == nil {
+		return nil
+	}
+	var out []string
+	for _, ch := range c.namedChildren(body) {
+		if c.kind(ch) != "field_declaration" {
+			continue
+		}
+		for _, d := range c.namedChildren(ch) {
+			if name := c.plainDeclName(d); name != "" {
+				out = append(out, name)
+			}
+		}
+	}
+	return out
+}
+
 func (c *ccConv) ccMacroContextTokens() []string {
 	seen := map[string]bool{}
 	var out []string
@@ -1850,7 +1876,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		}}
 	case "struct_specifier":
 		if c.lang == "cpp" {
-			return []nir.Stmt{nir.ClassDef{Name: c.text(c.field(n, "name")), Body: c.decls(c.field(n, "body")), Loc: L}}
+			return []nir.Stmt{nir.ClassDef{Name: c.text(c.field(n, "name")), Body: c.decls(c.field(n, "body")), Members: c.ccClassMembers(c.field(n, "body")), Loc: L}}
 		}
 		return nil
 	case "union_specifier", "enum_specifier":
@@ -1878,7 +1904,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "template_declaration": // C++ — process the templated decl
 		return c.decls(n)
 	case "class_specifier": // C++
-		return []nir.Stmt{nir.ClassDef{Name: c.text(c.field(n, "name")), Body: c.decls(c.field(n, "body")), Loc: L}}
+		return []nir.Stmt{nir.ClassDef{Name: c.text(c.field(n, "name")), Body: c.decls(c.field(n, "body")), Members: c.ccClassMembers(c.field(n, "body")), Loc: L}}
 	case "field_declaration_list":
 		return c.decls(n)
 	case "declaration":
@@ -2660,7 +2686,14 @@ func (c *ccConv) expr(n *tree_sitter.Node) nir.Expr {
 	}
 	L := c.loc(n)
 	switch c.kind(n) {
-	case "identifier", "field_identifier", "qualified_identifier", "namespace_identifier", "type_identifier":
+	case "identifier", "field_identifier", "qualified_identifier", "namespace_identifier", "type_identifier", "this":
+		// `this` is the implicit receiver a C++ method's member selections run
+		// through. Lowered as the self NAME the other implicit-this frontends use,
+		// it resolves to the class's one stable self node, so a field one method
+		// stores through `this->f` and a field another (or the same) method reads
+		// back meet on that node's per-field slot. It used to fall through to the
+		// Seq catch-all below, which minted a fresh empty node per occurrence and
+		// left every `this->f` a store no read could reach.
 		if v, ok := cBoolValue(c.text(n)); ok {
 			return nir.Const{Loc: L, Value: v}
 		}
@@ -12982,7 +13015,7 @@ func (c *ccConv) dotted(n *tree_sitter.Node) string {
 		return "?"
 	}
 	switch c.kind(n) {
-	case "identifier", "field_identifier", "type_identifier", "namespace_identifier":
+	case "identifier", "field_identifier", "type_identifier", "namespace_identifier", "this":
 		return c.text(n)
 	case "qualified_identifier": // C++ std::system -> std.system (dotted boundary)
 		scope := c.field(n, "scope")
