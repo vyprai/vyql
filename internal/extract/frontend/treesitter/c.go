@@ -2585,25 +2585,37 @@ func (c *ccConv) paramList(decl *tree_sitter.Node) *tree_sitter.Node {
 // that opens no list reads nothing from its tail, and keeps exactly the
 // parameter list it had.
 func (c *ccConv) ccWithVariadicTailParam(params []string, decl, fn, body *tree_sitter.Node) []string {
-	if body == nil || !c.ccBodyOpensVaList(body) {
+	if body == nil {
 		return params
 	}
+	// The parameter list decides before the body is walked: a definition that declares
+	// no `...` — nearly all of them — must not pay the full-body traversal below, which
+	// otherwise ran for every function in every file.
 	pl := c.paramList(decl)
 	if pl == nil {
 		pl = c.paramList(fn)
 	}
+	variadic := false
 	for _, ch := range c.namedChildren(pl) {
 		if c.kind(ch) == "variadic_parameter" {
-			return append(params, nir.CVarargsParam)
+			variadic = true
+			break
 		}
 	}
 	// The signature-text fallback spells the tail as a parameter literally named
 	// "..."; it stands for the same tail, so it takes the same binding.
-	if n := len(params); n > 0 && params[n-1] == "..." {
-		out := append([]string{}, params[:n-1]...)
-		return append(out, nir.CVarargsParam)
+	fallback := len(params) > 0 && params[len(params)-1] == "..."
+	if !variadic && !fallback {
+		return params
 	}
-	return params
+	if !c.ccBodyOpensVaList(body) {
+		return params
+	}
+	if variadic {
+		return append(params, nir.CVarargsParam)
+	}
+	out := append([]string{}, params[:len(params)-1]...)
+	return append(out, nir.CVarargsParam)
 }
 
 // ccVaStartNames are the spellings that open a va_list. stdarg.h macros them

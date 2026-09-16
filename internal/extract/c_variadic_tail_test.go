@@ -1,8 +1,12 @@
 package extract_test
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
+	"github.com/vyprai/vyql/internal/extract/frontend/treesitter"
+	"github.com/vyprai/vyql/internal/extract/lowering"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -158,6 +162,53 @@ static void use(char *secret)
 `)
 	if !reachesCallArg(t, g, callArgAt(t, g, "unread.c:9", 1), "unread.c:10", 0) {
 		t.Error("an unread variadic tail lost the argument-to-result edge it used to keep")
+	}
+}
+
+// The wrapper's own translation unit is not the caller's: the wrapper is defined
+// in one file, the caller sees a prototype, and the tail argument crosses the
+// cross-file call resolution on its way into the wrapper's body — the shape the
+// AIDE rank needs, where the logging wrapper lives beside the code that calls it.
+func TestCVariadicTailCrossesTranslationUnits(t *testing.T) {
+	dir := t.TempDir()
+	files := []struct{ name, src string }{
+		{"log.c", `
+void log_msg(int level, const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vfprintf(stderr, format, ap);
+    va_end(ap);
+}
+`},
+		{"report.c", `
+void log_msg(int level, const char *format, ...);
+
+static void report(char *name)
+{
+    log_msg(3, "scanned %s", name);
+}
+`},
+	}
+	var paths []string
+	for _, f := range files {
+		p := filepath.Join(dir, f.name)
+		if err := os.WriteFile(p, []byte(f.src), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		paths = append(paths, p)
+	}
+	prog, err := treesitter.ExtractC(paths, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = g.Close() })
+	if !reachesCallArg(t, g, callArgAt(t, g, "report.c:6", 2), "log.c:6", 2) {
+		t.Error("the tail argument never crossed the translation unit into the wrapper's vfprintf")
 	}
 }
 
