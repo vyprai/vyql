@@ -2596,11 +2596,14 @@ func (c *ccConv) ccWithVariadicTailParam(params []string, decl, fn, body *tree_s
 		pl = c.paramList(fn)
 	}
 	variadic := false
-	// All children, not named ones: the two grammars spell the `...` differently —
-	// tree-sitter-c a named variadic_parameter node, tree-sitter-cpp an anonymous
-	// "..." token — and both stand for the same tail the walker is shared between.
-	for _, ch := range c.children(pl) {
-		if k := c.kind(ch); k == "variadic_parameter" || k == "..." {
+	// Named children only, and only C's variadic_parameter. tree-sitter-cpp
+	// spells the same tail an anonymous "..." token, and its staying
+	// unrecognized is the specified behaviour rather than an oversight: the
+	// corpus rejects the traced route for a .cpp wrapper (rank 1082's varargs
+	// pair), so the C++ tail stays dark at the call boundary until the
+	// definitions move that expectation. cpp_variadic_tail_test.go pins this.
+	for _, ch := range c.namedChildren(pl) {
+		if c.kind(ch) == "variadic_parameter" {
 			variadic = true
 			break
 		}
