@@ -589,8 +589,20 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 	sinkArgs := append([]nir.Expr{nir.Name{ID: tmp, Loc: loc}}, args...)
 	endLoc := c.endLoc(body)
 	endArgs := append([]nir.Expr(nil), args...)
-	for _, tok := range c.moduleTokens {
-		endArgs = append(endArgs, nir.Const{Loc: endLoc, Value: "module_" + tok})
+	// The module's context tokens ride on every function's .end call as ONE joined
+	// literal (module_ prefixed, \x00 separated) rather than one literal per token.
+	// Every reader sees the same tokens either way — value matching reads the call's
+	// str_args, which is the same joined string, and the Const-walking presence
+	// predicates split what they read on the same \x00 — while one literal per token
+	// costs a Const+Arg node pair per token per FUNCTION: the module token cap is 512
+	// and a many-function module carries the re-carriage on each of them, a graph
+	// quadratic in the module that pushed dense multi-package Python past a
+	// whole-repository scan's memory safety stop.
+	if len(c.moduleTokens) > 0 {
+		endArgs = append(endArgs, nir.Const{
+			Loc:   endLoc,
+			Value: "module_" + strings.Join(c.moduleTokens, "\x00module_"),
+		})
 	}
 	return []nir.Stmt{
 		nir.Assign{Targets: []string{tmp}, Value: nir.Call{
