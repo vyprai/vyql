@@ -5653,6 +5653,7 @@ func (c *ccConv) ccCursorLoopMissingExitCheckObservations(fn *tree_sitter.Node) 
 	walkBlocks(body)
 	return out
 }
+
 // ccStringScanMissingLengthBoundObservations reports a NUL/delimiter-terminated
 // string scan -- strspn(3) or strcspn(3), whose only stop condition is a byte
 // value and never a count -- applied to a buffer this same function bounds by
@@ -5941,7 +5942,6 @@ func ccStringScanNulEstablished(text, buffer, length string) bool {
 	}
 	return false
 }
-
 
 // ccLoopExitCheckFacts reports one loop against the statements that follow it
 // in its own block.
