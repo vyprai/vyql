@@ -99,6 +99,84 @@ func TestActionScriptFilesAreClaimedAndParsedIntoCalls(t *testing.T) {
 	}
 }
 
+// A `.hh` header is where whole C++ projects keep their implementation — lepton's
+// divide-by-zero fixes land in `uncompressed_components.hh` and `model.hh` — and
+// the cpp extension set omitted it, so such a file fell through every language
+// filter, contributed no module, and nothing written inside it could be labelled
+// a source or a sink.
+func TestHHFilesAreClaimedByTheCppFrontend(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "codec.hh")
+	src := `class Codec {
+    int m_frameSize;
+public:
+    void Init(FILE *fp) {
+        m_frameSize = read_int(fp);
+        sink_int(100 / m_frameSize);
+    }
+};
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := treesitter.ListAllFiles(dir)
+	class := frontend.ClassifyEntries(entries)
+	var claimed []string
+	var lang frontend.Language
+	for _, lg := range frontend.Languages() {
+		for _, f := range lg.FilesFor(entries, class) {
+			if f == path {
+				claimed = append(claimed, lg.Name)
+				lang = lg
+			}
+		}
+	}
+	if len(claimed) != 1 || claimed[0] != "cpp" {
+		t.Fatalf("the cpp frontend alone must claim %s (claimed by %v); a .hh file is left unparsed", filepath.Base(path), claimed)
+	}
+
+	prog, err := lang.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatalf("cpp frontend: %v", err)
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("cpp frontend produced %d modules, want 1", len(prog.Modules))
+	}
+	seen := map[string]bool{}
+	var expr func(nir.Expr)
+	var body func([]nir.Stmt)
+	expr = func(e nir.Expr) {
+		switch x := e.(type) {
+		case nir.Call:
+			seen["call "+x.Path] = true
+			for _, a := range x.Args {
+				expr(a)
+			}
+		}
+	}
+	body = func(sts []nir.Stmt) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case nir.ClassDef:
+				body(s.Body)
+			case nir.FuncDef:
+				body(s.Body)
+			case nir.Assign:
+				expr(s.Value)
+			case nir.ExprStmt:
+				expr(s.Value)
+			}
+		}
+	}
+	body(prog.Modules[0].Body)
+	for _, want := range []string{"call read_int", "call sink_int"} {
+		if !seen[want] {
+			t.Errorf("cpp frontend did not produce %q from the .hh file; got %v", want, seen)
+		}
+	}
+}
+
 // proseDoc is documentation text of the kind a `.pl` name actually carries in the
 // wild: a Polish README, with e-mail addresses, `%s` printf placeholders and
 // `->` arrows in URLs — code-shaped tokens a loose shape check could mistake for

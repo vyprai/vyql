@@ -616,6 +616,28 @@ func (l *lowerer) structFieldOwner(base string, sc *scope) (mod, typ string, ok 
 // languages this does not need to change.
 func goStructFields(file string) bool { return strings.HasSuffix(file, ".go") }
 
+// ccArrayFields gates array-element field slots to the cpp frontend's files — the extension
+// set registry.go hands that frontend. A subscripted field access `arr[i].field` is lowered
+// by every frontend with an Index expression, and joining it on the array would move
+// detection for languages this change was not measured on. The c arm of the same converter
+// keeps its current behaviour until the cpp turn-on is measured, the same line goStructFields
+// draws for type-keyed slots.
+func ccArrayFields(file string) bool {
+	file = strings.ToLower(file)
+	for _, ext := range [...]string{".cpp", ".cc", ".cxx", ".c++", ".hpp", ".hh"} {
+		if strings.HasSuffix(file, ext) {
+			return true
+		}
+	}
+	return false
+}
+
+// arrayFieldKey is the container key of one FIELD of a subscripted struct element — the slot
+// `arr[i].field` stores into and reads back. It lives on the ARRAY's record beside the
+// whole-element keys, so it cannot be spelled by one: a literal element key is a source-level
+// string or integer, and no string literal contains a NUL byte.
+func arrayFieldKey(field string) string { return "\x00" + field }
+
 // importStoreOwner resolves the library type a keyed store's receiver was declared with, so a
 // write and a read of the same key can be joined on it.
 //
@@ -4828,6 +4850,26 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 		// write that only becomes visible later, when the base turns into a container or is
 		// aliased with one at a call site.
 		l.noteFieldRead(base, ex.Attr, n)
+		// field of a SUBSCRIPTED element — `cmpinfo[cmp].bch`, the array-of-structs idiom the
+		// C/C++ reader loop is written in. The base above is a fresh Subscript node per
+		// occurrence, so the slot it addresses joins nothing; the one container both a write
+		// and a read of that field are guaranteed to share is the ARRAY. Same lookup
+		// discipline as the plain field above (existing slot, param materialisation, pending
+		// read), on the array-field key.
+		if idx, isIndex := ex.Base.(nir.Index); isIndex && ccArrayFields(l.curFile) {
+			if arr := l.eval(idx.Base, sc); arr != "" {
+				key := arrayFieldKey(ex.Attr)
+				aslot := ""
+				if ci := l.containers[arr]; ci != nil {
+					aslot = ci.elems[key]
+				}
+				if aslot == "" && l.paramObjects[arr] {
+					aslot = l.readFieldSlot(arr, key, ex.Loc)
+				}
+				l.flow(aslot, n)
+				l.noteFieldRead(arr, key, n)
+			}
+		}
 		// type-sensitive read: a field of a declared struct carries whatever any function
 		// stored into that field, including one that reached the value through a pointer
 		// parameter this method's receiver never passed through.
@@ -6069,6 +6111,17 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		if call.Method == "" && len(args) > 0 {
 			if attr, ok := call.Callee.(nir.Attr); ok && attr.Attr != "" {
 				l.flow(args[0], l.elemNode(recvNode, attr.Attr, call.Loc))
+				// a field of a SUBSCRIPTED element (`arr[i].field = v`) also slots on the
+				// ARRAY, where the matching read looks — the per-occurrence element node the
+				// line above addressed joins nothing. readFieldSlot rather than elemNode: it
+				// claims nothing about modelling the array's WRITES, so a whole-element read
+				// `arr[k]` keeps the whole-base fallback it always had instead of turning
+				// element-sensitive (and clean) because a field was stored.
+				if idx, isIndex := attr.Base.(nir.Index); isIndex && ccArrayFields(l.curFile) {
+					if arr := l.eval(idx.Base, sc); arr != "" {
+						l.flow(args[0], l.readFieldSlot(arr, arrayFieldKey(attr.Attr), call.Loc))
+					}
+				}
 			}
 		}
 		// higher-order callback dispatch: `recv.forEach(cb)` / `arr.map(cb)` / `p.then(cb)`
@@ -6226,6 +6279,20 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 		if argsParam := target.params[nir.JSArgumentsParam]; argsParam != "" {
 			for _, a := range args {
 				l.flow(a, argsParam)
+			}
+		}
+		// A C/C++ variadic tail. The frontend appends the synthetic tail parameter LAST, so
+		// the positional loop above bound the first argument past the named parameters to it;
+		// every argument after that one belongs to the same tail and binds to the same node.
+		// Without this, only the conservative arg→result edge below carried a tail argument,
+		// which never enters the callee — a printf-style logging wrapper returns nothing for
+		// it to flow through, so every route into the wrapper's own body was dark. va_start
+		// binds the body's va_list onto the node (see the C frontend's exprStmt), which is
+		// what carries the tail to the v-formatted call the wrapper hands it to.
+		if varargsParam := target.params[nir.CVarargsParam]; varargsParam != "" {
+			for i := len(target.paramNames) - paramOffset; i < len(args); i++ {
+				l.flow(args[i], varargsParam)
+				mapped[i] = true
 			}
 		}
 		l.flow(target.ret, result)
@@ -7182,6 +7249,9 @@ func (l *lowerer) paramOffset(fi *funcInfo, recvNode string) int {
 func (l *lowerer) callArity(fi *funcInfo, recvNode string) int {
 	n := len(fi.paramNames) - l.paramOffset(fi, recvNode)
 	if _, ok := fi.params[nir.JSArgumentsParam]; ok {
+		n--
+	}
+	if _, ok := fi.params[nir.CVarargsParam]; ok {
 		n--
 	}
 	return n

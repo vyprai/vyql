@@ -1754,6 +1754,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if len(params) == 0 {
 			params, paramTypes = c.paramsFromSignatureText(c.text(n))
 		}
+		params = c.ccWithVariadicTailParam(params, decl, n, c.field(n, "body"))
 		name := c.declName(decl)
 		c.inFunc++
 		bodyStmts := c.block(c.field(n, "body"))
@@ -1829,6 +1830,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccOutParamStatusUncheckedObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccPrefixOffsetObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccCursorLoopMissingEndSentinelObservations(n, params)...)
+			bodyStmts = append(bodyStmts, c.ccCursorLoopMissingExitCheckObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccStringScanMissingLengthBoundObservations(n, params)...)
 			bodyStmts = append(bodyStmts, c.ccStackFallbackStrideUnderallocObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowDeclaredBoundsCheckObservations(n)...)
@@ -2073,6 +2075,34 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			if idx, ok := cReaders[name]; ok && idx < len(args) {
 				if dst := c.destName(args[idx]); dst != "" {
 					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: c.expr(inner)}}
+				}
+			}
+			// va_start opens the variadic tail into its list, and va_copy re-opens one
+			// list onto another. Both are writes the call performs on its first argument,
+			// and the value written is what the tail carries: bind the list onto the
+			// synthetic tail parameter (va_start) or onto the source list (va_copy), so a
+			// read of the list — the v-formatted call it is handed to, a va_arg — sees the
+			// tail arguments the enclosing wrapper was called with. The call itself stays,
+			// both because its own arguments are real reads and because a wrapper that
+			// opens a va_list is evidence bindings match on.
+			switch name {
+			case "va_start", "__builtin_va_start":
+				if dst := c.destName(args[0]); dst != "" {
+					return []nir.Stmt{
+						nir.Assign{Targets: []string{dst}, Value: nir.Name{ID: nir.CVarargsParam, Loc: c.loc(args[0])}},
+						nir.ExprStmt{Value: c.expr(inner)},
+					}
+				}
+			case "va_copy", "__builtin_va_copy", "__va_copy":
+				if len(args) > 1 {
+					if dst := c.destName(args[0]); dst != "" {
+						if c.kind(args[1]) == "identifier" {
+							return []nir.Stmt{
+								nir.Assign{Targets: []string{dst}, Value: nir.Name{ID: c.text(args[1]), Loc: c.loc(args[1])}},
+								nir.ExprStmt{Value: c.expr(inner)},
+							}
+						}
+					}
 				}
 			}
 		}
@@ -2545,6 +2575,83 @@ func (c *ccConv) paramList(decl *tree_sitter.Node) *tree_sitter.Node {
 		}
 	}
 	return nil
+}
+
+// ccWithVariadicTailParam appends the synthetic variadic-tail parameter to a
+// definition's parameter list when the definition declares `...` and its body
+// opens a va_list over that tail — the printf-style wrapper shape. The tail
+// arguments a call passes beyond the named parameters bind to it (see the
+// lowering's arg mapping), and va_start binds the list onto it, so what a
+// caller hands the wrapper reaches the wrapper's own body. A variadic body
+// that opens no list reads nothing from its tail, and keeps exactly the
+// parameter list it had.
+func (c *ccConv) ccWithVariadicTailParam(params []string, decl, fn, body *tree_sitter.Node) []string {
+	if body == nil {
+		return params
+	}
+	// The parameter list decides before the body is walked: a definition that declares
+	// no `...` — nearly all of them — must not pay the full-body traversal below, which
+	// otherwise ran for every function in every file.
+	pl := c.paramList(decl)
+	if pl == nil {
+		pl = c.paramList(fn)
+	}
+	variadic := false
+	// Named children only, and only C's variadic_parameter. tree-sitter-cpp
+	// spells the same tail an anonymous "..." token, and its staying
+	// unrecognized is the specified behaviour rather than an oversight: the
+	// corpus rejects the traced route for a .cpp wrapper (rank 1082's varargs
+	// pair), so the C++ tail stays dark at the call boundary until the
+	// definitions move that expectation. cpp_variadic_tail_test.go pins this.
+	for _, ch := range c.namedChildren(pl) {
+		if c.kind(ch) == "variadic_parameter" {
+			variadic = true
+			break
+		}
+	}
+	// The signature-text fallback spells the tail as a parameter literally named
+	// "..."; it stands for the same tail, so it takes the same binding.
+	fallback := len(params) > 0 && params[len(params)-1] == "..."
+	if !variadic && !fallback {
+		return params
+	}
+	if !c.ccBodyOpensVaList(body) {
+		return params
+	}
+	if variadic {
+		return append(params, nir.CVarargsParam)
+	}
+	out := append([]string{}, params[:len(params)-1]...)
+	return append(out, nir.CVarargsParam)
+}
+
+// ccVaStartNames are the spellings that open a va_list. stdarg.h macros them
+// onto the compiler builtin, and freestanding code writes the builtin itself.
+var ccVaStartNames = map[string]bool{
+	"va_start": true, "__builtin_va_start": true,
+}
+
+// ccBodyOpensVaList reports whether a function body opens a va_list, which is
+// the only way C reads a variadic tail.
+func (c *ccConv) ccBodyOpensVaList(body *tree_sitter.Node) bool {
+	found := false
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || found {
+			return
+		}
+		if c.kind(n) == "call_expression" {
+			if name := lastSeg(c.dotted(c.field(n, "function"))); ccVaStartNames[name] {
+				found = true
+				return
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return found
 }
 
 // A strings.Replacer builds a lookup trie on first use, so constructing one inside the
@@ -5480,6 +5587,72 @@ func ccAppendUnique(values []string, value string) []string {
 	return append(values, value)
 }
 
+// What the first statement after a loop does with the loop's cursor.
+const (
+	ccCleanupAdvance = 1 << iota // it steps the cursor: p++, p += k, p = p + k
+	ccCleanupWrite               // it stores through it: *p = x, p->f = x, p[0] = x
+	ccCleanupReset               // it points it somewhere new: p = base, char *p = base
+)
+
+// ccCursorLoopMissingExitCheckObservations reports the bounded cursor walk
+// whose post-loop cleanup steps or stores through the cursor without first
+// asking which of the loop's two exits it got. A loop that bounds its cursor in
+// its own condition and breaks out of its own body leaves the cursor in one of
+// two places: the break leaves it on the element that matched, the exhausted
+// bound leaves it at or past the last element the range allows. Cleanup written
+// for the first exit -- step past the match, then store through the cursor --
+// is out of bounds on the second, because there the step lands outside the
+// range and the store lands outside it again.
+//
+// Both halves are read from the tree. The loop half wants a cursor the loop
+// itself reads through (`*p`, `p->f`, `p[0]`) and steps, a relational bound on
+// it in the loop's own condition, and a `break` in the loop's own body that
+// belongs to this loop rather than to a loop or switch nested inside it; a loop
+// missing any of those has one exit or none, and where it leaves the cursor is
+// not in question. The cleanup half is the statements that follow the loop in
+// its own block, read straight-line: the first one to touch the cursor reports
+// when it steps or stores through it, and the window has already ended at any
+// statement that branches, loops or jumps, at a comparison of the cursor --
+// the exit being tested, or the cursor being asked where it is -- or at a reset
+// of the cursor to something that does not name it.
+//
+// Residuals, all false-negative: a walk whose two exits both live in its
+// condition (`while (p < end && *p)`) has the same ambiguity but names no
+// second exit with a `break`, so it is not this fact's subject; an index
+// variable a loop bounds (`for (i = 0; i < n; i++) if (a[i].t == END) break;`)
+// is the analysis.index family's spelling and not a cursor here; and the
+// pairing is intra-block, so a cleanup the function reaches through a helper
+// or from outside the loop's own block is invisible.
+func (c *ccConv) ccCursorLoopMissingExitCheckObservations(fn *tree_sitter.Node) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	seen := map[string]bool{}
+	var out []nir.Stmt
+	var walkBlocks func(*tree_sitter.Node)
+	walkBlocks = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "compound_statement" {
+			kids := c.namedChildren(n)
+			for i, ch := range kids {
+				walkBlocks(ch)
+				if !ccIsLoopKind(c.kind(ch)) {
+					continue
+				}
+				out = append(out, c.ccLoopExitCheckFacts(ch, kids[i+1:], seen)...)
+			}
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			walkBlocks(ch)
+		}
+	}
+	walkBlocks(body)
+	return out
+}
 // ccStringScanMissingLengthBoundObservations reports a NUL/delimiter-terminated
 // string scan -- strspn(3) or strcspn(3), whose only stop condition is a byte
 // value and never a count -- applied to a buffer this same function bounds by
@@ -5767,6 +5940,284 @@ func ccStringScanNulEstablished(text, buffer, length string) bool {
 		}
 	}
 	return false
+}
+
+
+// ccLoopExitCheckFacts reports one loop against the statements that follow it
+// in its own block.
+func (c *ccConv) ccLoopExitCheckFacts(loop *tree_sitter.Node, rest []*tree_sitter.Node, seen map[string]bool) []nir.Stmt {
+	cond := c.field(loop, "condition")
+	if cond == nil || !c.ccLoopHasOwnBreak(loop) {
+		return nil
+	}
+	var out []nir.Stmt
+	for _, cursor := range c.ccLoopOwnCursors(loop) {
+		if !c.ccLoopBoundsCursor(cond, cursor) {
+			continue
+		}
+		cleanup, reported := c.ccPostLoopCursorCleanup(rest, cursor)
+		if !reported {
+			continue
+		}
+		loc := c.loc(loop)
+		key := loc + "/" + cursor
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		path := "analysis.cursor_loop.missing_exit_check"
+		out = append(out, nir.ExprStmt{Value: nir.Call{
+			Callee: nir.Name{ID: path, Loc: loc},
+			Args: []nir.Expr{
+				nir.Const{Loc: loc, Value: "cursor=" + cursor},
+				nir.Const{Loc: loc, Value: "bound=" + compactCExprText(c.text(ccUnwrapCExpr(cond)))},
+				nir.Const{Loc: loc, Value: "cleanup=" + cleanup},
+				nir.Const{Loc: loc, Value: "guard=missing_exit_test"},
+			},
+			Path:   path,
+			Method: "missing_exit_check",
+			Loc:    loc,
+		}})
+	}
+	return out
+}
+
+// ccLoopOwnCursors returns, in source order, the cursors this loop itself reads
+// through (`*p`, `p->f`, `p[0]`) and steps. A loop nested inside this one is
+// not descended into: that walk's cursor belongs to that walk, and where it
+// leaves the cursor is its own question.
+func (c *ccConv) ccLoopOwnCursors(loop *tree_sitter.Node) []string {
+	var order []string
+	deref := map[string]bool{}
+	defined := map[string]bool{}
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		var reads, defines string
+		switch c.kind(n) {
+		case "pointer_expression":
+			if c.unaryOp(n) == "*" {
+				reads = c.ccCursorBaseName(c.field(n, "argument"))
+			}
+		case "field_expression":
+			if c.text(c.field(n, "operator")) == "->" {
+				reads = c.ccCursorBaseName(c.field(n, "argument"))
+			}
+		case "subscript_expression":
+			reads = c.ccCursorBaseName(c.field(n, "argument"))
+		case "update_expression":
+			defines = c.ccCursorIdentifier(c.field(n, "argument"))
+		case "assignment_expression":
+			defines = c.ccCursorIdentifier(c.field(n, "left"))
+		case "init_declarator":
+			defines = c.declName(c.field(n, "declarator"))
+		}
+		if reads != "" && !deref[reads] {
+			deref[reads] = true
+			order = append(order, reads)
+		}
+		if defines != "" {
+			defined[defines] = true
+		}
+		if ccIsLoopKind(c.kind(n)) {
+			return
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	for _, ch := range c.namedChildren(loop) {
+		walk(ch)
+	}
+	var out []string
+	for _, name := range order {
+		if defined[name] {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// ccLoopHasOwnBreak reports whether the loop's own body carries a break that
+// ends this loop: one that is not inside a loop or a switch nested within it,
+// both of which a break ends instead of this loop.
+func (c *ccConv) ccLoopHasOwnBreak(loop *tree_sitter.Node) bool {
+	var walk func(*tree_sitter.Node) bool
+	walk = func(n *tree_sitter.Node) bool {
+		if n == nil {
+			return false
+		}
+		switch c.kind(n) {
+		case "break_statement":
+			return true
+		case "for_statement", "while_statement", "do_statement", "for_range_loop", "switch_statement":
+			return false
+		}
+		for _, ch := range c.namedChildren(n) {
+			if walk(ch) {
+				return true
+			}
+		}
+		return false
+	}
+	body := c.field(loop, "body")
+	if body == nil {
+		return false
+	}
+	return walk(body)
+}
+
+// ccMaxCleanupWindowStatements bounds how far past a loop the cleanup window
+// runs: the cleanup is the code that follows the walk, not whatever the function
+// does with the cursor much later, and the bound keeps a long block from being
+// walked once per loop in it.
+const ccMaxCleanupWindowStatements = 16
+
+// ccPostLoopCursorCleanup reads the statements that follow a loop in its own
+// block, straight-line, and reports how the first one to touch the cursor uses
+// it when that use is a step or a store through it.
+func (c *ccConv) ccPostLoopCursorCleanup(rest []*tree_sitter.Node, cursor string) (string, bool) {
+	for i, s := range rest {
+		if i >= ccMaxCleanupWindowStatements {
+			return "", false
+		}
+		if ccEndsCleanupWindow(c.kind(s)) {
+			return "", false
+		}
+		if !c.ccExprNamesCursor(s, cursor) {
+			continue
+		}
+		if c.ccComparesCursor(s, cursor) {
+			return "", false
+		}
+		kind := c.ccCursorCleanupKind(s, cursor)
+		if kind&(ccCleanupAdvance|ccCleanupWrite) == 0 {
+			return "", false
+		}
+		switch {
+		case kind&ccCleanupAdvance != 0 && kind&ccCleanupWrite != 0:
+			return "advance_and_write_through", true
+		case kind&ccCleanupAdvance != 0:
+			return "advance", true
+		default:
+			return "write_through", true
+		}
+	}
+	return "", false
+}
+
+// ccEndsCleanupWindow names the statements at which the straight-line cleanup
+// after a loop ends: anything that branches, loops, returns or jumps, and a
+// nested block, whose own first statement is not this loop's cleanup.
+func ccEndsCleanupWindow(kind string) bool {
+	switch kind {
+	case "if_statement", "for_statement", "while_statement", "do_statement", "for_range_loop",
+		"switch_statement", "return_statement", "goto_statement", "break_statement",
+		"continue_statement", "compound_statement":
+		return true
+	}
+	return false
+}
+
+// ccComparesCursor reports whether the subtree compares the cursor to anything,
+// relational or equality: the code asking where the cursor is, which is the
+// question the cleanup that follows a two-exit loop has to answer first.
+func (c *ccConv) ccComparesCursor(n *tree_sitter.Node, cursor string) bool {
+	var walk func(*tree_sitter.Node) bool
+	walk = func(n *tree_sitter.Node) bool {
+		if n == nil {
+			return false
+		}
+		if c.kind(n) == "binary_expression" {
+			switch c.text(c.field(n, "operator")) {
+			case "<", ">", "<=", ">=", "==", "!=":
+				if c.ccExprNamesCursor(c.field(n, "left"), cursor) ||
+					c.ccExprNamesCursor(c.field(n, "right"), cursor) {
+					return true
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			if walk(ch) {
+				return true
+			}
+		}
+		return false
+	}
+	return walk(n)
+}
+
+// ccCursorCleanupKind classifies one statement's use of the loop's cursor: the
+// step that advances it, the store that writes through it, or the reset that
+// points it somewhere new. `*p++ = x` is a step and a store at once, and a
+// store into the cursor itself (`p->f = x`) is neither a step nor a reset.
+func (c *ccConv) ccCursorCleanupKind(n *tree_sitter.Node, cursor string) int {
+	kind := 0
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "update_expression":
+			if c.ccCursorIdentifier(c.field(n, "argument")) == cursor {
+				kind |= ccCleanupAdvance
+			}
+		case "assignment_expression":
+			if c.ccCursorIdentifier(c.field(n, "left")) == cursor {
+				if c.assignmentOp(n) != "=" || c.ccExprNamesCursor(c.field(n, "right"), cursor) {
+					kind |= ccCleanupAdvance
+				} else {
+					kind |= ccCleanupReset
+				}
+			}
+			if c.ccCursorDerefTarget(c.field(n, "left"), cursor) {
+				kind |= ccCleanupWrite
+			}
+		case "init_declarator":
+			if c.declName(c.field(n, "declarator")) == cursor {
+				kind |= ccCleanupReset
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(n)
+	return kind
+}
+
+// ccCursorDerefTarget reports whether an assignment target stores through the
+// cursor rather than into it: `*p`, `p->f` or `p[k]`.
+func (c *ccConv) ccCursorDerefTarget(n *tree_sitter.Node, cursor string) bool {
+	n = ccUnwrapCExpr(n)
+	if n == nil {
+		return false
+	}
+	switch c.kind(n) {
+	case "pointer_expression":
+		return c.unaryOp(n) == "*" && c.ccCursorBaseName(c.field(n, "argument")) == cursor
+	case "field_expression":
+		return c.text(c.field(n, "operator")) == "->" && c.ccCursorBaseName(c.field(n, "argument")) == cursor
+	case "subscript_expression":
+		return c.ccCursorBaseName(c.field(n, "argument")) == cursor
+	}
+	return false
+}
+
+// ccCursorBaseName reads the cursor a dereference works through, unwrapping the
+// update the combined idiom carries: `*p++` steps p and reads through it.
+func (c *ccConv) ccCursorBaseName(n *tree_sitter.Node) string {
+	n = ccUnwrapCExpr(n)
+	if n == nil {
+		return ""
+	}
+	if c.kind(n) == "update_expression" {
+		n = c.field(n, "argument")
+	}
+	return c.ccCursorIdentifier(n)
 }
 
 // ccGuardedBodyField names the child a construct's condition guards: an

@@ -20,6 +20,12 @@ import "encoding/gob"
 // exported functions that read the `arguments` object.
 const JSArgumentsParam = "__arguments__"
 
+// CVarargsParam is a synthetic parameter the C/C++ frontend appends for the
+// `...` tail of a variadic definition whose body opens a va_list. va_start
+// binds the list onto it, so the tail arguments a caller passes flow into the
+// wrapper's own body instead of stopping at the call boundary.
+const CVarargsParam = "__varargs__"
+
 // register every concrete Expr/Stmt so gob can (de)serialize the interface fields of Module
 // — used by the parse cache and the incremental-lowering delta cache.
 func init() {

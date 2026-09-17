@@ -50,7 +50,7 @@ var languages = sync.OnceValue(func() []Language {
 		{"php", map[string]bool{".php": true, ".phtml": true, ".inc": true, ".module": true, ".install": true, ".profile": true, ".theme": true, ".engine": true, ".test": true}, treesitter.ExtractPHP, bindings.PHPBindings},
 		{"csharp", map[string]bool{".cs": true}, treesitter.ExtractCSharp, bindings.CSharpBindings},
 		{"c", map[string]bool{".c": true, ".h": true, ".xs": true}, treesitter.ExtractC, bindings.CBindings},
-		{"cpp", map[string]bool{".cpp": true, ".cc": true, ".cxx": true, ".c++": true, ".hpp": true}, treesitter.ExtractCPP, bindings.CPPBindings},
+		{"cpp", map[string]bool{".cpp": true, ".cc": true, ".cxx": true, ".c++": true, ".hpp": true, ".hh": true}, treesitter.ExtractCPP, bindings.CPPBindings},
 		{"rust", map[string]bool{".rs": true}, treesitter.ExtractRust, bindings.RustBindings},
 		{"bash", map[string]bool{".sh": true, ".bash": true}, treesitter.ExtractBash, bindings.BashBindings},
 		{"scala", map[string]bool{".scala": true, ".sc": true}, treesitter.ExtractScala, bindings.ScalaBindings},
