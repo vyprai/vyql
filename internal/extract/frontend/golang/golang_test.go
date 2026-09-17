@@ -838,6 +838,218 @@ func putDefaultsOnly(r io.Reader) error {
 	}
 }
 
+// The monetr mass-assignment shape (CVE-2026-39901, CWE-915): a bind-style decode
+// fills a struct the handler then persists wholesale, and the fix's only change is
+// re-establishing, between the decode and the persist, the fields the payload was
+// never allowed to set. Whole-object taint cannot see that -- reassigning one field
+// leaves the object tainted -- so the fact names the fields restored from a record
+// the same body loaded, anchored at the persistence call and carrying the persisted
+// expression as its first argument, which is what lets a binding both judge the
+// restore set and report the write as the sink.
+func TestGoSecurityObservationRecordsDecodeRestoreBeforePersist(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "transactions.go")
+	src := []byte(`package controller
+
+import "encoding/json"
+
+type Transaction struct {
+	Name      string
+	Source    string
+	CreatedAt string
+}
+
+func loadTransaction(id string) (*Transaction, error) { return nil, nil }
+
+func putVulnerable(c Ctx) error {
+	transaction := Transaction{}
+	if err := c.Bind(&transaction); err != nil {
+		return err
+	}
+	existing, err := loadTransaction(transaction.Name)
+	if err != nil {
+		return err
+	}
+	transaction.Name = existing.Name
+	return c.Update("id", &transaction)
+}
+
+func putFixed(c Ctx) error {
+	transaction := Transaction{}
+	if err := c.Bind(&transaction); err != nil {
+		return err
+	}
+	existing, err := loadTransaction(transaction.Name)
+	if err != nil {
+		return err
+	}
+	transaction.Name = existing.Name
+	transaction.Source = existing.Source
+	transaction.CreatedAt = existing.CreatedAt
+	return c.Update("id", &transaction)
+}
+
+func restoreBeforeDecode(c Ctx) error {
+	transaction := Transaction{}
+	existing, _ := loadTransaction("id")
+	transaction.Source = existing.Source
+	if err := c.Bind(&transaction); err != nil {
+		return err
+	}
+	return c.Update("id", &transaction)
+}
+
+func restoreFromLiteral(c Ctx) error {
+	transaction := Transaction{}
+	if err := c.Bind(&transaction); err != nil {
+		return err
+	}
+	transaction.Source = "ach"
+	return c.Update("id", &transaction)
+}
+
+func noPersistence(c Ctx) error {
+	transaction := Transaction{}
+	if err := c.Bind(&transaction); err != nil {
+		return err
+	}
+	existing, _ := loadTransaction("id")
+	transaction.Source = existing.Source
+	return nil
+}
+
+func stdlibUnmarshal(body []byte) error {
+	transaction := Transaction{}
+	if err := json.Unmarshal(body, &transaction); err != nil {
+		return err
+	}
+	existing, _ := loadTransaction("id")
+	transaction.Source = existing.Source
+	return saveTransaction(&transaction)
+}
+
+func saveTransaction(transaction *Transaction) error { return nil }
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var facts []string
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.go.decode_restore_before_persist" {
+			continue
+		}
+		facts = append(facts, n.Prop("str_args"))
+	}
+	factFor := func(fn string) string {
+		t.Helper()
+		for _, f := range facts {
+			if strings.Contains(f, "function_name:"+fn) {
+				return f
+			}
+		}
+		t.Fatalf("no decode-restore fact for %s among %q", fn, facts)
+		return ""
+	}
+	wantFive := []string{"putVulnerable", "putFixed", "restoreBeforeDecode", "restoreFromLiteral", "stdlibUnmarshal"}
+	if len(facts) != len(wantFive) {
+		t.Fatalf("decode-restore observations = %d, want %d (one per decode-then-persist handler; none for noPersistence); got %q", len(facts), len(wantFive), facts)
+	}
+	if f := factFor("putVulnerable"); !strings.Contains(f, "field:Name") || !strings.Contains(f, "record:existing") ||
+		!strings.Contains(f, "decode:Bind") || !strings.Contains(f, "callee:Update") || strings.Contains(f, "field:Source") {
+		t.Errorf("vulnerable handler fact %q: want field:Name + record:existing + decode:Bind + callee:Update and no field:Source", f)
+	}
+	if f := factFor("putFixed"); !strings.Contains(f, "field:Name") || !strings.Contains(f, "field:Source") || !strings.Contains(f, "field:CreatedAt") {
+		t.Errorf("fixed handler fact %q: want field:Name + field:Source + field:CreatedAt", f)
+	}
+	if f := factFor("restoreBeforeDecode"); strings.Contains(f, "field:Source") {
+		t.Errorf("restore recorded even though it ran before the decode: %q", f)
+	}
+	if f := factFor("restoreFromLiteral"); strings.Contains(f, "field:Source") {
+		t.Errorf("literal assignment recorded as a restore from a loaded record: %q", f)
+	}
+	if f := factFor("stdlibUnmarshal"); !strings.Contains(f, "field:Source") || !strings.Contains(f, "decode:Unmarshal") || !strings.Contains(f, "callee:saveTransaction") {
+		t.Errorf("stdlib unmarshal fact %q: want field:Source + decode:Unmarshal + callee:saveTransaction", f)
+	}
+}
+
+// The fact must carry the persisted object's taint, not just describe it: the
+// bind call's whole-object taint has to reach the fact node itself, so a binding
+// that reports the fact as a sink judges the same flow the vulnerable handler
+// really has (code.HttpInput at Bind args[0] -> the bound object -> the write).
+func TestGoDecodeRestoreFactCarriesTheBoundObject(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "put.go")
+	src := []byte(`package controller
+
+type Transaction struct {
+	Name string
+}
+
+func put(c Ctx) error {
+	transaction := Transaction{}
+	if err := c.Bind(&transaction); err != nil {
+		return err
+	}
+	return c.Update("id", &transaction)
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fact := goFindNode(t, g, "code.Call", map[string]string{"callee_path": "analysis.go.decode_restore_before_persist"})
+	// The Bind statement's right-hand side is converted twice (the out-parameter join
+	// re-evaluates it), so the source concept a binding labels at Bind args[0] lands on
+	// every copy; the taint is live if ANY of them reaches the fact.
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	reached := false
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "c.Bind" {
+			continue
+		}
+		seeds := []string{n.ID}
+		if arg0 := n.Prop("arg0"); arg0 != "" {
+			seeds = append(seeds, arg0)
+		}
+		for _, seed := range seeds {
+			reachable, err := usg.BFS(g, seed, "FLOWS", 40)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if reachable[fact] {
+				reached = true
+			}
+		}
+	}
+	if !reached {
+		t.Fatalf("the bound object's taint (joined at the Bind call) does not reach the decode-restore fact node")
+	}
+}
+
 func TestGoSecurityObservationDetectsUnboundedAppendAccumulation(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "decode.go")
@@ -1244,6 +1456,113 @@ func JoinRoute(networkId string) {
 	}
 	if !reachable[sinkArg] {
 		t.Fatalf("the route parameter did not reach the shell argument through the service registry")
+	}
+}
+
+// The monetr layout (CVE-2026-39901): the interface names its implementation
+// nowhere, the implementation's methods are spread across the package's files,
+// and the handler receives the interface through a dotted type -- either as a
+// parameter (`repo repository.Repository`) or as the declared result of its own
+// helper (`repo := c.mustGetAuthenticatedRepository()`). A call like
+// repo.UpdateTransaction(...) then resolves to nothing and the taint stops at
+// the controller. Interface satisfaction has to be judged against the whole
+// package's method set, and a dotted declared type has to resolve through the
+// import that spells it, for the handler to reach the implementation body.
+func TestGoInterfaceReceiverDispatchesToSpreadImplementation(t *testing.T) {
+	dir := t.TempDir()
+	write := func(rel, body string) {
+		path := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("go.mod", "module monetr\n\ngo 1.21\n")
+	write("server/repository/repository.go", `package repository
+
+type BaseRepository interface {
+	UpdateTransaction(id string, transaction *Transaction) error
+}
+
+type Repository interface {
+	BaseRepository
+	UserId() string
+}
+
+type Transaction struct {
+	Name string
+}
+`)
+	write("server/repository/user.go", `package repository
+
+type repositoryBase struct{}
+
+func (r *repositoryBase) UserId() string { return "user" }
+`)
+	write("server/repository/transaction.go", `package repository
+
+func (r *repositoryBase) UpdateTransaction(id string, transaction *Transaction) error {
+	return traceSink(transaction)
+}
+
+func traceSink(transaction *Transaction) *Transaction {
+	return transaction
+}
+`)
+	write("server/controller/controller.go", `package controller
+
+import "monetr/server/repository"
+
+type Controller struct{}
+
+func (c *Controller) mustGetAuthenticatedRepository() repository.Repository {
+	return nil
+}
+
+func (c *Controller) putTransactions(payload string) error {
+	transaction := repository.Transaction{Name: payload}
+	repo := c.mustGetAuthenticatedRepository()
+	return repo.UpdateTransaction("id", &transaction)
+}
+`)
+	write("server/controller/param.go", `package controller
+
+import "monetr/server/repository"
+
+func putViaParam(repo repository.Repository, body string) error {
+	transaction := repository.Transaction{Name: body}
+	return repo.UpdateTransaction("id", &transaction)
+}
+`)
+	prog, err := gofrontend.ExtractDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	traceSink, ok, err := g.GetNode(goFindNode(t, g, "code.Call", map[string]string{"callee_path": "traceSink"}))
+	if err != nil || !ok {
+		t.Fatalf("traceSink call node: ok=%v err=%v", ok, err)
+	}
+	sinkArg := traceSink.Prop("arg0")
+	if sinkArg == "" {
+		t.Fatalf("traceSink call has no first argument node: %#v", traceSink)
+	}
+	for _, seed := range []struct{ name, via string }{
+		{"payload", "the constructor-returned repository"},
+		{"body", "the dotted parameter type"},
+	} {
+		reachable, err := usg.BFS(g, goFindNode(t, g, "code.Param", map[string]string{"name": seed.name}), "FLOWS", 40)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reachable[sinkArg] {
+			t.Fatalf("handler parameter %s did not reach the repository implementation through %s", seed.name, seed.via)
+		}
 	}
 }
 

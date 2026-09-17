@@ -77,14 +77,80 @@ func modulePath(gomod []byte) string {
 	return ""
 }
 
+// packageConverter buffers one Go package's parsed files and converts them
+// together, so the type declarations a file lowers are judged against the whole
+// package's method and interface sets: Go states interface satisfaction nowhere
+// and a type's methods are spread across the package's files, so a per-file view
+// cannot see that a type implements an interface at all (typeDeclStmts). Only
+// the buffered package's ASTs are held, and a package never spans directories,
+// so flushing on the directory change keeps that buffer one package large
+// however big the scan is.
+type packageConverter struct {
+	fset     *token.FileSet
+	byPkg    map[string]*nir.Module
+	modCache map[string]*modInfo
+
+	pkgKey   string
+	files    []*ast.File
+	displays []string
+}
+
+// add parses one file and buffers it; a file of a different package flushes the
+// buffered one first (callers hand a package's files over consecutively: the
+// directory walk by construction, an explicit list after sorting by directory).
+func (p *packageConverter) add(path, display string) error {
+	abs, aerr := filepath.Abs(path)
+	if aerr != nil {
+		abs = path
+	}
+	pkgKey := pkgKeyFor(abs, filepath.Dir(display), p.modCache)
+	f, perr := parser.ParseFile(p.fset, path, nil, 0)
+	if perr != nil {
+		return nil // skip unparseable files (robustness, docs/20)
+	}
+	if len(p.files) > 0 && pkgKey != p.pkgKey {
+		p.flush()
+	}
+	if p.byPkg[pkgKey] == nil {
+		p.byPkg[pkgKey] = &nir.Module{Key: pkgKey, File: display}
+	}
+	p.pkgKey = pkgKey
+	p.files = append(p.files, f)
+	p.displays = append(p.displays, display)
+	return nil
+}
+
+// flush converts the buffered package: the whole-package method and interface
+// sets are computed once from every buffered file's declarations and handed to
+// each file's conversion, which prefers them when judging interface satisfaction.
+func (p *packageConverter) flush() {
+	if len(p.files) == 0 {
+		return
+	}
+	scratch := &conv{fset: p.fset}
+	var allDecls []ast.Decl
+	for _, f := range p.files {
+		allDecls = append(allDecls, f.Decls...)
+	}
+	pkgMethods := scratch.methodMap(allDecls)
+	pkgIfaces := scratch.interfaceMethodSets(allDecls)
+	mod := p.byPkg[p.pkgKey]
+	for i, f := range p.files {
+		c := &conv{fset: p.fset, file: p.displays[i], pkgMethods: pkgMethods, pkgIfaces: pkgIfaces}
+		mod.Imports = append(mod.Imports, c.imports(f)...)
+		mod.Body = append(mod.Body, c.decls(f.Decls)...)
+	}
+	p.pkgKey = ""
+	p.files = nil
+	p.displays = nil
+}
+
 // ExtractDir parses every .go file under root (recursively, skipping vendor,
 // testdata, and _test.go files) and returns one NIR Program. Files are grouped
 // into modules by their Go import path (from the enclosing go.mod) so BOTH same-package and
 // cross-package (imported-helper) calls resolve interprocedurally.
 func ExtractDir(root string) (nir.Program, error) {
-	byPkg := map[string]*nir.Module{}
-	modCache := map[string]*modInfo{}
-	fset := token.NewFileSet()
+	p := &packageConverter{fset: token.NewFileSet(), byPkg: map[string]*nir.Module{}, modCache: map[string]*modInfo{}}
 
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -103,31 +169,15 @@ func ExtractDir(root string) (nir.Program, error) {
 		if rerr != nil {
 			rel = path
 		}
-		abs, aerr := filepath.Abs(path)
-		if aerr != nil {
-			abs = path
-		}
-		pkgKey := pkgKeyFor(abs, filepath.Dir(rel), modCache)
-		f, perr := parser.ParseFile(fset, path, nil, 0)
-		if perr != nil {
-			return nil // skip unparseable files (robustness, docs/20)
-		}
-		mod := byPkg[pkgKey]
-		if mod == nil {
-			mod = &nir.Module{Key: pkgKey, File: rel}
-			byPkg[pkgKey] = mod
-		}
-		c := &conv{fset: fset, file: rel}
-		mod.Imports = append(mod.Imports, c.imports(f)...)
-		mod.Body = append(mod.Body, c.decls(f.Decls)...)
-		return nil
+		return p.add(path, rel)
 	})
+	p.flush()
 	if err != nil {
 		return nir.Program{}, err
 	}
 
 	var prog nir.Program
-	for _, m := range byPkg {
+	for _, m := range p.byPkg {
 		prog.Modules = append(prog.Modules, *m)
 	}
 	return prog, nil
@@ -141,36 +191,28 @@ func ExtractFiles(files []string) (nir.Program, error) { return Extract(files, "
 // keys made relative to root (root "" = use the raw paths). This is the uniform
 // frontend signature the CLI dispatcher calls for every language.
 func Extract(files []string, root string) (nir.Program, error) {
-	byPkg := map[string]*nir.Module{}
-	modCache := map[string]*modInfo{}
-	fset := token.NewFileSet()
-	for _, path := range files {
-		f, err := parser.ParseFile(fset, path, nil, 0)
-		if err != nil {
-			continue
-		}
+	// group each package's files consecutively however the caller ordered the
+	// list, so the package-wide sets see the whole package (stable: files of one
+	// directory keep the caller's order).
+	sorted := append([]string(nil), files...)
+	sort.SliceStable(sorted, func(i, j int) bool {
+		return filepath.Dir(sorted[i]) < filepath.Dir(sorted[j])
+	})
+	p := &packageConverter{fset: token.NewFileSet(), byPkg: map[string]*nir.Module{}, modCache: map[string]*modInfo{}}
+	for _, path := range sorted {
 		display := path
 		if root != "" {
 			if rel, rerr := filepath.Rel(root, path); rerr == nil {
 				display = rel
 			}
 		}
-		abs, aerr := filepath.Abs(path)
-		if aerr != nil {
-			abs = path
+		if err := p.add(path, display); err != nil {
+			return nir.Program{}, err
 		}
-		pkgKey := pkgKeyFor(abs, filepath.Dir(display), modCache)
-		mod := byPkg[pkgKey]
-		if mod == nil {
-			mod = &nir.Module{Key: pkgKey, File: display}
-			byPkg[pkgKey] = mod
-		}
-		c := &conv{fset: fset, file: display}
-		mod.Imports = append(mod.Imports, c.imports(f)...)
-		mod.Body = append(mod.Body, c.decls(f.Decls)...)
 	}
+	p.flush()
 	var prog nir.Program
-	for _, m := range byPkg {
+	for _, m := range p.byPkg {
 		prog.Modules = append(prog.Modules, *m)
 	}
 	return prog, nil
@@ -204,6 +246,14 @@ type conv struct {
 	// still mean one function body.
 	litFuncs map[token.Pos]string
 	anonSeq  int
+	// pkgMethods/pkgIfaces are the whole package's method and interface sets (nil when
+	// this file is converted in isolation). Go declares satisfaction nowhere and a
+	// type's methods are spread across the package's files, so typeDeclStmts judges
+	// structural satisfaction against these in preference to the converting file's own
+	// declarations. typeContextStmts keeps the per-file sets: its tokens describe one
+	// file's own declarations and should not grow with the package's.
+	pkgMethods map[string]map[string]bool
+	pkgIfaces  map[string]map[string]bool
 }
 
 // inPlaceFuncLit converts a func literal to a synthetic FuncDef emitted where the literal
@@ -261,8 +311,15 @@ func (c *conv) imports(f *ast.File) []nir.Import {
 
 func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 	var out []nir.Stmt
-	methods := c.methodMap(decls)
-	ifaces := c.interfaceMethodSets(decls)
+	fileMethods := c.methodMap(decls)
+	fileIfaces := c.interfaceMethodSets(decls)
+	satisfyMethods, satisfyIfaces := fileMethods, fileIfaces
+	if c.pkgMethods != nil {
+		satisfyMethods = c.pkgMethods
+	}
+	if c.pkgIfaces != nil {
+		satisfyIfaces = c.pkgIfaces
+	}
 	c.constValues = c.collectConstValues(decls)
 	for _, d := range decls {
 		switch fn := d.(type) {
@@ -272,8 +329,8 @@ func (c *conv) decls(decls []ast.Decl) []nir.Stmt {
 			out = append(out, fd)
 		case *ast.GenDecl:
 			out = append(out, c.moduleContextStmts(fn)...)
-			out = append(out, c.typeContextStmts(fn, methods)...)
-			out = append(out, c.typeDeclStmts(fn, methods, ifaces)...)
+			out = append(out, c.typeContextStmts(fn, fileMethods)...)
+			out = append(out, c.typeDeclStmts(fn, satisfyMethods, satisfyIfaces)...)
 			out = append(out, c.valueDeclStmts(fn)...)
 		}
 	}
@@ -499,10 +556,12 @@ func (c *conv) interfaceMethodSets(decls []ast.Decl) map[string]map[string]bool 
 // leaving every method call to the unique-short-name fallback and any repository that names
 // a route handler after the service method it calls with no dispatch at all.
 //
-// Satisfaction is matched on method NAMES, and only against the interfaces declared in the
-// same file -- the over-approximation adds a dispatch target where the names line up, which
+// Satisfaction is matched on method NAMES, against the interfaces the converting file's
+// PACKAGE declares (its whole method set, when the frontend converted the package's files
+// together) -- the over-approximation adds a dispatch target where the names line up, which
 // the resolution routes already treat as one possible continuation among several, and the
-// per-file limit is where the frontend's own view of the program ends.
+// package limit is where the frontend's own view of the program ends (an interface another
+// package declares is still not checked against this package's types).
 func (c *conv) typeDeclStmts(g *ast.GenDecl, methods map[string]map[string]bool, ifaces map[string]map[string]bool) []nir.Stmt {
 	if g == nil || g.Tok != token.TYPE {
 		return nil
@@ -738,6 +797,7 @@ func (c *conv) funcDef(name, recv string, typ *ast.FuncType, bodyNode *ast.Block
 		body = c.stmts(bodyNode.List)
 		body = append(body, c.goSecurityObservations(name, params, bodyNode)...)
 		body = append(body, c.goDecodeOverwritesPresetObservations(name, bodyNode)...)
+		body = append(body, c.goDecodeRestoreObservations(name, bodyNode)...)
 		body = append(body, c.goUnboundedAppendAccumulationObservations(name, bodyNode)...)
 	}
 	// An in-place literal written outside any statement list this body built (a function
@@ -846,6 +906,147 @@ func (c *conv) goPublicUserListRouteMissingAuthObservations(name string, body *a
 		return true
 	})
 	return out
+}
+
+// goDecodeRestoreObservations records, per persistence call that writes a
+// bind-decoded object, the struct fields the same function re-established from a
+// separately loaded record between the decode and the write. This is the
+// field-level witness whole-object taint cannot express: reassigning one field
+// of a tainted object leaves the object tainted, so the handler that restored
+// the protected fields and the one that did not are identical to the solver.
+// The fact is anchored at the persistence call and carries the persisted
+// expression itself as its first argument -- an analysis call with no mapped
+// parameters flows that argument into the fact node, so one fact is both a
+// presence token set a binding can judge (the field: tokens name the restores,
+// which is what separates the fixed handler from the vulnerable one) and a
+// taint-carrying node a binding can report the write at. A restore is
+// `target.Field = record.Field` where record was assigned from a call in the
+// same body; restores that run before the decode do not count (the decode
+// overwrites them), and a decode with no persistence call after it states no
+// write and records nothing.
+func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []nir.Stmt {
+	if body == nil {
+		return nil
+	}
+	decodeVerb := map[string]string{} // decoded var -> callee of the decode that filled it
+	loaded := map[string]bool{}       // var assigned from a call: a record this body loaded
+	restored := map[string][]string{} // decoded var -> fields restored from a loaded record
+	records := map[string][]string{}  // decoded var -> the records those restores read
+	recorded := map[string]bool{}     // "var.Field" and "var\x00record" dedup keys
+	addRestore := func(target, field, record string) {
+		if target == "" || target == "_" || field == "" || record == "" || len(restored[target]) >= 32 {
+			return
+		}
+		if key := target + "." + field; !recorded[key] {
+			recorded[key] = true
+			restored[target] = append(restored[target], field)
+		}
+		if key := target + "\x00" + record; !recorded[key] && len(records[target]) < 8 {
+			recorded[key] = true
+			records[target] = append(records[target], record)
+		}
+	}
+	recordFieldOf := func(e ast.Expr) (record, field string) {
+		sel, ok := e.(*ast.SelectorExpr)
+		if !ok || sel.Sel == nil {
+			return "", ""
+		}
+		base, ok := sel.X.(*ast.Ident)
+		if !ok || !loaded[base.Name] {
+			return "", ""
+		}
+		return base.Name, sel.Sel.Name
+	}
+	var out []nir.Stmt
+	ast.Inspect(body, func(n ast.Node) bool {
+		switch x := n.(type) {
+		case *ast.FuncLit:
+			return false
+		case *ast.AssignStmt:
+			for i, lhs := range x.Lhs {
+				if i >= len(x.Rhs) {
+					break
+				}
+				switch target := lhs.(type) {
+				case *ast.Ident:
+					if _, isCall := x.Rhs[i].(*ast.CallExpr); isCall && target.Name != "" && target.Name != "_" {
+						loaded[target.Name] = true
+					}
+				case *ast.SelectorExpr:
+					if base, ok := target.X.(*ast.Ident); ok {
+						if _, decoded := decodeVerb[base.Name]; decoded {
+							if record, field := recordFieldOf(x.Rhs[i]); field != "" {
+								addRestore(base.Name, field, record)
+							}
+						}
+					}
+				}
+			}
+		case *ast.CallExpr:
+			verb := calleeName(x.Fun)
+			if isBindName(verb) {
+				for _, arg := range x.Args {
+					if u, ok := arg.(*ast.UnaryExpr); ok && u.Op == token.AND {
+						if id, ok := u.X.(*ast.Ident); ok && id.Name != "" && id.Name != "_" {
+							decodeVerb[id.Name] = verb
+						}
+					}
+				}
+			}
+			if !goPersistWriteVerb(verb) {
+				return true
+			}
+			for _, arg := range x.Args {
+				target := arg
+				if u, ok := target.(*ast.UnaryExpr); ok && u.Op == token.AND {
+					target = u.X
+				}
+				if paren, ok := target.(*ast.ParenExpr); ok {
+					target = paren.X
+				}
+				id, ok := target.(*ast.Ident)
+				if !ok {
+					continue
+				}
+				verb, decoded := decodeVerb[id.Name]
+				if !decoded {
+					continue
+				}
+				tokens := make([]string, 0, len(restored[id.Name])+len(records[id.Name])+5)
+				tokens = append(tokens, "lang=go", "function_name:"+name, "var:"+id.Name, "decode:"+verb, "callee:"+goLastSeg(c.path(x.Fun)))
+				for _, rec := range records[id.Name] {
+					tokens = append(tokens, "record:"+rec)
+				}
+				for _, f := range restored[id.Name] {
+					tokens = append(tokens, "field:"+f)
+				}
+				call := analysisCall("analysis.go.decode_restore_before_persist", "decode_restore_before_persist", c.loc(x.Pos()), tokens...)
+				call.Args = append([]nir.Expr{c.expr(arg)}, call.Args...)
+				out = append(out, nir.ExprStmt{Value: call})
+			}
+		}
+		return true
+	})
+	return out
+}
+
+// goPersistWriteVerb reports whether a callee name is a persistence verb: the
+// write side of a decode-then-persist handler. Matched case-insensitively as a
+// substring of the callee's last segment, because Go repositories spell these
+// helpers freely (UpdateTransaction, Save, upsertUser, CreateTransactions);
+// the fact only states the construct, and which writes a binding reports is the
+// definitions' judgement to make.
+func goPersistWriteVerb(callee string) bool {
+	if callee == "" {
+		return false
+	}
+	low := strings.ToLower(callee)
+	for _, v := range []string{"update", "save", "upsert", "insert", "create", "write"} {
+		if strings.Contains(low, v) {
+			return true
+		}
+	}
+	return false
 }
 
 // goDecodeOverwritesPresetObservations records one fact per decode call that
