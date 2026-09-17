@@ -147,6 +147,43 @@ func TestListFilesSkipsOnlyLargeTestResources(t *testing.T) {
 	}
 }
 
+func TestListFilesWalksSkillSourceUnderDotClaude(t *testing.T) {
+	dir := t.TempDir()
+	skillPath := filepath.Join(dir, ".claude", "skills", "ui-styling", "scripts", "tailwind_config_gen.py")
+	settingsPath := filepath.Join(dir, ".claude", "settings.local.json")
+	cachePath := filepath.Join(dir, ".cache", "tool", "worker.py")
+	for _, path := range []string{skillPath, settingsPath, cachePath} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("x = 1\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// A project ships executable source under .claude (skill scripts a fix can
+	// land in), so a whole-repository scan must read it, not just the CI dirs.
+	files, err := ListFiles(dir, map[string]bool{".py": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !hasPathSuffix(files, ".claude/skills/ui-styling/scripts/tailwind_config_gen.py") {
+		t.Fatalf("ListFiles pruned skill source under .claude: %v", files)
+	}
+
+	entries := ListAllFiles(dir)
+	if !hasEntrySuffix(entries, ".claude/skills/ui-styling/scripts/tailwind_config_gen.py") {
+		t.Fatalf("ListAllFiles pruned skill source under .claude: %v", entries)
+	}
+	if !hasEntrySuffix(entries, ".claude/settings.local.json") {
+		t.Fatalf("ListAllFiles pruned settings under .claude: %v", entries)
+	}
+	// Only the named hidden dirs are walked; the rest stay skipped.
+	if hasEntrySuffix(entries, ".cache/tool/worker.py") {
+		t.Fatalf("ListAllFiles included hidden cache directory: %v", entries)
+	}
+}
+
 func hasPathSuffix(paths []string, suffix string) bool {
 	for _, path := range paths {
 		if strings.HasSuffix(filepath.ToSlash(path), suffix) {
