@@ -2596,8 +2596,11 @@ func (c *ccConv) ccWithVariadicTailParam(params []string, decl, fn, body *tree_s
 		pl = c.paramList(fn)
 	}
 	variadic := false
-	for _, ch := range c.namedChildren(pl) {
-		if c.kind(ch) == "variadic_parameter" {
+	// All children, not named ones: the two grammars spell the `...` differently —
+	// tree-sitter-c a named variadic_parameter node, tree-sitter-cpp an anonymous
+	// "..." token — and both stand for the same tail the walker is shared between.
+	for _, ch := range c.children(pl) {
+		if k := c.kind(ch); k == "variadic_parameter" || k == "..." {
 			variadic = true
 			break
 		}
