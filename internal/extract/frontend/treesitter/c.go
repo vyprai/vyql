@@ -5601,8 +5601,7 @@ func (c *ccConv) ccStringScanMissingLengthBoundObservations(fn *tree_sitter.Node
 
 	// origins returns the identifiers a name can be holding: itself plus
 	// everything it is ever alias-assigned from, transitively.
-	var origins func(string) map[string]bool
-	origins = func(name string) map[string]bool {
+	origins := func(name string) map[string]bool {
 		out := map[string]bool{name: true}
 		var expand func(string)
 		expand = func(x string) {
