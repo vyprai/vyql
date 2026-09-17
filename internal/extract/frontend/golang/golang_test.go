@@ -1566,6 +1566,122 @@ func putViaParam(repo repository.Repository, body string) error {
 	}
 }
 
+// The explicit-list entry point the CLI dispatcher uses must see the same
+// package-wide interface satisfaction the directory walk does, however the
+// caller ordered the files: satisfaction is judged against the whole package's
+// method set, and a type's methods sit in whichever files of the package they
+// sit in. The list below interleaves the two packages so that converting in the
+// caller's order would split each package into single-file groups -- user.go
+// alone loses UpdateTransaction, transaction.go alone loses UserId, and no
+// Base edge to Repository would exist for either handler's dispatch.
+func TestGoExtractGroupsAnExplicitFileListByPackage(t *testing.T) {
+	dir := t.TempDir()
+	write := func(rel, body string) {
+		path := filepath.Join(dir, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("go.mod", "module monetr\n\ngo 1.21\n")
+	write("server/repository/repository.go", `package repository
+
+type BaseRepository interface {
+	UpdateTransaction(id string, transaction *Transaction) error
+}
+
+type Repository interface {
+	BaseRepository
+	UserId() string
+}
+
+type Transaction struct {
+	Name string
+}
+`)
+	write("server/repository/user.go", `package repository
+
+type repositoryBase struct{}
+
+func (r *repositoryBase) UserId() string { return "user" }
+`)
+	write("server/repository/transaction.go", `package repository
+
+func (r *repositoryBase) UpdateTransaction(id string, transaction *Transaction) error {
+	return traceSink(transaction)
+}
+
+func traceSink(transaction *Transaction) *Transaction {
+	return transaction
+}
+`)
+	write("server/controller/controller.go", `package controller
+
+import "monetr/server/repository"
+
+type Controller struct{}
+
+func (c *Controller) mustGetAuthenticatedRepository() repository.Repository {
+	return nil
+}
+
+func (c *Controller) putTransactions(payload string) error {
+	transaction := repository.Transaction{Name: payload}
+	repo := c.mustGetAuthenticatedRepository()
+	return repo.UpdateTransaction("id", &transaction)
+}
+`)
+	write("server/controller/param.go", `package controller
+
+import "monetr/server/repository"
+
+func putViaParam(repo repository.Repository, body string) error {
+	transaction := repository.Transaction{Name: body}
+	return repo.UpdateTransaction("id", &transaction)
+}
+`)
+	// Interleaved on purpose: without grouping by directory, each package's
+	// files convert in separate groups and neither group holds the whole
+	// method set satisfaction needs.
+	files := []string{
+		filepath.Join(dir, "server/repository/user.go"),
+		filepath.Join(dir, "server/controller/controller.go"),
+		filepath.Join(dir, "server/repository/transaction.go"),
+		filepath.Join(dir, "server/controller/param.go"),
+		filepath.Join(dir, "server/repository/repository.go"),
+	}
+	prog, err := gofrontend.Extract(files, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	traceSink, ok, err := g.GetNode(goFindNode(t, g, "code.Call", map[string]string{"callee_path": "traceSink"}))
+	if err != nil || !ok {
+		t.Fatalf("traceSink call node: ok=%v err=%v", ok, err)
+	}
+	sinkArg := traceSink.Prop("arg0")
+	if sinkArg == "" {
+		t.Fatalf("traceSink call has no first argument node: %#v", traceSink)
+	}
+	for _, seed := range []struct{ name, via string }{
+		{"payload", "the constructor-returned repository"},
+		{"body", "the dotted parameter type"},
+	} {
+		reachable, err := usg.BFS(g, goFindNode(t, g, "code.Param", map[string]string{"name": seed.name}), "FLOWS", 40)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reachable[sinkArg] {
+			t.Fatalf("handler parameter %s did not reach the repository implementation through %s when the explicit file list interleaves the packages", seed.name, seed.via)
+		}
+	}
+}
+
 func goFindNode(t *testing.T, g usg.Store, typ string, props map[string]string) string {
 	t.Helper()
 	ids, err := g.NodesOfType(typ)
