@@ -311,3 +311,91 @@ void reduce_then_copy(long t, struct out *o) {
 		t.Fatalf("copy after reduction: got %q want %q among them", got, want)
 	}
 }
+
+// The modulus a fact credits must bound the whole stored value, not one term
+// of it: a sum or scaled remainder grows past any one divisor, and a
+// difference takes its size from the minuend, so a remainder that is not the
+// expression's top-level operation bounds nothing. A whole-value remainder --
+// bare, parenthesized on the left, or cast -- still does.
+func TestCProducerFieldRangeBoundModulusScope(t *testing.T) {
+	got := ccProducerRangeObs(t, `
+struct out { int sum, scaled, diff; };
+void partial_remainders(long t, long a, long b, struct out *o) {
+	int sum, scaled, diff;
+	sum = t % 7 + t % 9;
+	scaled = t % 400 * 97;
+	diff = a - b % 60;
+	o->sum = sum;
+	o->scaled = scaled;
+	o->diff = diff;
+}
+`)
+	for _, l := range got {
+		if strings.HasPrefix(l, "producer_field_bounded") && strings.Contains(l, "guard=modulo") {
+			t.Fatalf("a partial remainder bounded the whole value: %q", l)
+		}
+	}
+
+	// The controls: the forms whose modulus is the whole expression keep
+	// their bound, with and without the parenthesized and cast spellings the
+	// arithmetic needs.
+	got = ccProducerRangeObs(t, `
+struct out { int bare, paren, casted; };
+void whole_remainders(long t, long days, struct out *o) {
+	int bare, paren, casted;
+	bare = t % 60;
+	paren = (4 + days) % 7;
+	casted = (int) t % 24;
+	o->bare = bare;
+	o->paren = paren;
+	o->casted = casted;
+}
+`)
+	for _, want := range []string{
+		"producer_field_bounded via=o;field=bare;value=bare;guard=modulo;bound=60;bound_var=bare",
+		"producer_field_bounded via=o;field=paren;value=paren;guard=modulo;bound=7;bound_var=paren",
+		"producer_field_bounded via=o;field=casted;value=casted;guard=modulo;bound=24;bound_var=casted",
+	} {
+		if !hasLine(got, want) {
+			t.Fatalf("whole-value remainder: got %q want %q among them", got, want)
+		}
+	}
+}
+
+// A bound recorded for a value does not survive that value growing past it:
+// a compound store or a step moves the value by an amount this walk cannot
+// state, so the reduction that bounded the old value no longer bounds the
+// name, and the field store reports what it can prove -- nothing.
+func TestCProducerFieldRangeBoundModulusInvalidatedByGrowth(t *testing.T) {
+	got := ccProducerRangeObs(t, `
+struct out { int v, w; };
+void grow_past_reduction(long t, struct out *o) {
+	int v, w;
+	v = t % 60;
+	v += 1000;
+	w = t % 24;
+	w++;
+	o->v = v;
+	o->w = w;
+}
+`)
+	for _, l := range got {
+		if strings.HasPrefix(l, "producer_field_bounded") && (strings.Contains(l, "bound=60;") || strings.Contains(l, "bound=24;")) {
+			t.Fatalf("a bound survived the value growing past it: %q", l)
+		}
+	}
+
+	// The control: the same reduction with no growth keeps its bound.
+	got = ccProducerRangeObs(t, `
+struct out { int v; };
+void reduced_only(long t, struct out *o) {
+	int v;
+	v = t % 60;
+	o->v = v;
+}
+`)
+	want := "producer_field_bounded via=o;field=v;value=v;guard=modulo;bound=60;bound_var=v"
+	if !hasLine(got, want) {
+		t.Fatalf("reduction without growth: got %q want %q among them", got, want)
+	}
+}

@@ -5421,7 +5421,11 @@ func ccFormatIntegerConversions(literal string) []string {
 // read where it stood -- the stored name's own current reduction, or the bound
 // a name carried when the value was computed from it, so a source reduced
 // after that store does not reach back to tighten the value already taken, and
-// a bare copy carries its source's bound with the value. A stored
+// a bare copy carries its source's bound with the value -- and it bounds the
+// value only while the value stands still: a remainder that is one term of a
+// larger expression (`t % 7 + t % 9`, `a - b % 60`) never bounds the whole,
+// and a compound store or a step that has since moved the name retires the
+// bound the reduction recorded for it. A stored
 // value nothing bounds emits the missing polarity, which is the half a rule
 // asks for: whether a calendar-year producer is bounded to four digits is a
 // question about the bound this fact carries, answered without the fixing
@@ -5437,7 +5441,8 @@ func ccFormatIntegerConversions(literal string) []string {
 //
 // Residuals, all false-negative: the derivation follows plain `=` stores
 // only, so a value recomputed by `++` or a compound assignment keeps the
-// names of its last plain store; the bound is credited from a comparison
+// names of its last plain store while losing the modulus bound that store
+// recorded; the bound is credited from a comparison
 // anywhere before the store, so a check in a sibling branch vouches for it; a
 // modulus is credited only from the stored name's own reduction or its own
 // sources' bounds at the store, so a reduction on a name further back in the
@@ -5581,10 +5586,25 @@ func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, par
 				}
 			case "%=":
 				if c.kind(left) == "identifier" {
-					if modulus := ccTermAfter(compactCExprText(c.text(right))); modulus != "" {
+					rhs := compactCExprText(c.text(right))
+					// the divisor is the whole right side, not its first
+					// term: `sec %= 60 + slack` reduces by the sum.
+					if modulus := ccTermAfter(rhs); modulus != "" && modulus == rhs {
 						modBound[c.text(left)] = modulus
 					}
 				}
+			case "+=", "-=", "*=", "/=", "<<=", ">>=", "&=", "^=", "|=":
+				// A compound store moves the value by an amount this walk
+				// cannot state, so the reduction that bounded the old value
+				// no longer bounds the name.
+				if c.kind(left) == "identifier" {
+					delete(modBound, c.text(left))
+				}
+			}
+		case "update_expression":
+			// A step moves the value the same way a compound store does.
+			if a := c.field(n, "argument"); a != nil && c.kind(a) == "identifier" {
+				delete(modBound, c.text(a))
 			}
 		case "init_declarator":
 			declarator, value := c.field(n, "declarator"), c.field(n, "value")
@@ -5611,10 +5631,14 @@ type ccDeriveName struct {
 }
 
 // ccTopLevelModulus reads the modulus of a compacted expression's top-level
-// remainder: the term after a `%` that stands outside any parenthesis and any
-// literal, so a percent inside a format string is text and a percent in a
-// subexpression bounds only that subexpression. `t % 86400` reads 86400; an
-// expression with no top-level remainder reads as none.
+// remainder: the term after a `%` that is the expression's own operation --
+// outside any parenthesis and any literal, the term after it consuming the
+// rest of the expression, and a single term before it -- so a percent inside
+// a format string is text, a percent in a subexpression bounds only that
+// subexpression, and a remainder summed, scaled or subtracted alongside
+// (`t % 7 + t % 9`, `t % 400 * 97`, `a - b % 60`) bounds only its own term
+// and reads as none. `t % 86400` and `(4 + days) % 7` read 86400 and 7; an
+// expression with no such remainder reads as none.
 func ccTopLevelModulus(s string) (string, bool) {
 	depth, inString := 0, false
 	for i := 0; i < len(s); i++ {
@@ -5633,7 +5657,8 @@ func ccTopLevelModulus(s string) (string, bool) {
 			}
 		case '%':
 			if !inString && depth == 0 && i+1 < len(s) {
-				if modulus := ccTermAfter(s[i+1:]); modulus != "" {
+				rest := s[i+1:]
+				if modulus := ccTermAfter(rest); modulus != "" && modulus == rest && ccTermBefore(s[:i]) == s[:i] {
 					return modulus, true
 				}
 			}
