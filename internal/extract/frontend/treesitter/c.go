@@ -1754,6 +1754,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if len(params) == 0 {
 			params, paramTypes = c.paramsFromSignatureText(c.text(n))
 		}
+		params = c.ccWithVariadicTailParam(params, decl, n, c.field(n, "body"))
 		name := c.declName(decl)
 		c.inFunc++
 		bodyStmts := c.block(c.field(n, "body"))
@@ -2073,6 +2074,34 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			if idx, ok := cReaders[name]; ok && idx < len(args) {
 				if dst := c.destName(args[idx]); dst != "" {
 					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: c.expr(inner)}}
+				}
+			}
+			// va_start opens the variadic tail into its list, and va_copy re-opens one
+			// list onto another. Both are writes the call performs on its first argument,
+			// and the value written is what the tail carries: bind the list onto the
+			// synthetic tail parameter (va_start) or onto the source list (va_copy), so a
+			// read of the list — the v-formatted call it is handed to, a va_arg — sees the
+			// tail arguments the enclosing wrapper was called with. The call itself stays,
+			// both because its own arguments are real reads and because a wrapper that
+			// opens a va_list is evidence bindings match on.
+			switch name {
+			case "va_start", "__builtin_va_start":
+				if dst := c.destName(args[0]); dst != "" {
+					return []nir.Stmt{
+						nir.Assign{Targets: []string{dst}, Value: nir.Name{ID: nir.CVarargsParam, Loc: c.loc(args[0])}},
+						nir.ExprStmt{Value: c.expr(inner)},
+					}
+				}
+			case "va_copy", "__builtin_va_copy", "__va_copy":
+				if len(args) > 1 {
+					if dst := c.destName(args[0]); dst != "" {
+						if c.kind(args[1]) == "identifier" {
+							return []nir.Stmt{
+								nir.Assign{Targets: []string{dst}, Value: nir.Name{ID: c.text(args[1]), Loc: c.loc(args[1])}},
+								nir.ExprStmt{Value: c.expr(inner)},
+							}
+						}
+					}
 				}
 			}
 		}
@@ -2545,6 +2574,83 @@ func (c *ccConv) paramList(decl *tree_sitter.Node) *tree_sitter.Node {
 		}
 	}
 	return nil
+}
+
+// ccWithVariadicTailParam appends the synthetic variadic-tail parameter to a
+// definition's parameter list when the definition declares `...` and its body
+// opens a va_list over that tail — the printf-style wrapper shape. The tail
+// arguments a call passes beyond the named parameters bind to it (see the
+// lowering's arg mapping), and va_start binds the list onto it, so what a
+// caller hands the wrapper reaches the wrapper's own body. A variadic body
+// that opens no list reads nothing from its tail, and keeps exactly the
+// parameter list it had.
+func (c *ccConv) ccWithVariadicTailParam(params []string, decl, fn, body *tree_sitter.Node) []string {
+	if body == nil {
+		return params
+	}
+	// The parameter list decides before the body is walked: a definition that declares
+	// no `...` — nearly all of them — must not pay the full-body traversal below, which
+	// otherwise ran for every function in every file.
+	pl := c.paramList(decl)
+	if pl == nil {
+		pl = c.paramList(fn)
+	}
+	variadic := false
+	// Named children only, and only C's variadic_parameter. tree-sitter-cpp
+	// spells the same tail an anonymous "..." token, and its staying
+	// unrecognized is the specified behaviour rather than an oversight: the
+	// corpus rejects the traced route for a .cpp wrapper (rank 1082's varargs
+	// pair), so the C++ tail stays dark at the call boundary until the
+	// definitions move that expectation. cpp_variadic_tail_test.go pins this.
+	for _, ch := range c.namedChildren(pl) {
+		if c.kind(ch) == "variadic_parameter" {
+			variadic = true
+			break
+		}
+	}
+	// The signature-text fallback spells the tail as a parameter literally named
+	// "..."; it stands for the same tail, so it takes the same binding.
+	fallback := len(params) > 0 && params[len(params)-1] == "..."
+	if !variadic && !fallback {
+		return params
+	}
+	if !c.ccBodyOpensVaList(body) {
+		return params
+	}
+	if variadic {
+		return append(params, nir.CVarargsParam)
+	}
+	out := append([]string{}, params[:len(params)-1]...)
+	return append(out, nir.CVarargsParam)
+}
+
+// ccVaStartNames are the spellings that open a va_list. stdarg.h macros them
+// onto the compiler builtin, and freestanding code writes the builtin itself.
+var ccVaStartNames = map[string]bool{
+	"va_start": true, "__builtin_va_start": true,
+}
+
+// ccBodyOpensVaList reports whether a function body opens a va_list, which is
+// the only way C reads a variadic tail.
+func (c *ccConv) ccBodyOpensVaList(body *tree_sitter.Node) bool {
+	found := false
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || found {
+			return
+		}
+		if c.kind(n) == "call_expression" {
+			if name := lastSeg(c.dotted(c.field(n, "function"))); ccVaStartNames[name] {
+				found = true
+				return
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return found
 }
 
 // A strings.Replacer builds a lookup trie on first use, so constructing one inside the
