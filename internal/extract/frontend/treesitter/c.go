@@ -5462,39 +5462,35 @@ func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, par
 		return nil
 	}
 	// derive maps each local to the names its current value was computed
-	// from -- each with the modulus bound that name carried at the store,
-	// because a source reduced later does not tighten the value already taken
-	// from it -- filled as the walk passes each plain store, so a field store
+	// from, filled as the walk passes each plain store, so a field store
 	// only ever consults the stores that precede it. modBound holds the
-	// modulus that bounds a local's own current value.
-	derive := map[string][]ccDeriveName{}
+	// modulus that bounds a local's own current value: a reduction puts it
+	// there, a copy of a bounded name carries it with the value, and any
+	// store that moves the value retires it.
+	derive := map[string][]string{}
 	modBound := map[string]string{}
 	seen := map[string]bool{}
 	var out []nir.Stmt
 	var recordStore func(name, rhs string)
 	recordStore = func(name, rhs string) {
-		ids := ccIdentRe.FindAllString(rhs, -1)
-		var sources []ccDeriveName
-		for _, id := range ids {
-			sources = append(sources, ccDeriveName{name: id, bound: modBound[id]})
-		}
-		derive[name] = sources
+		derive[name] = ccIdentRe.FindAllString(rhs, -1)
 		delete(modBound, name)
 		if modulus, ok := ccTopLevelModulus(rhs); ok {
 			modBound[name] = modulus
 			return
 		}
-		// a bare copy carries its source's bound with the value
-		if len(ids) == 1 && ids[0] == rhs && modBound[ids[0]] != "" {
-			modBound[name] = modBound[ids[0]]
+		// a copy carries its source's bound with the value, and so does a
+		// division or right shift of the copied name: each only takes
+		// magnitude away, so the source's bound still bounds the result
+		if src := ccBoundKeepingName(rhs); src != "" && modBound[src] != "" {
+			modBound[name] = modBound[src]
 		}
 	}
 	// emit pairs one field store with the bound, if any, on the value it
 	// stores: a modulus is read where it stood -- the stored name's own
-	// current reduction, or the bound one of the names that value was
-	// computed from carried when it was computed -- and the clamp spellings
-	// are searched over the whole derivation in a fixed order, so the same
-	// function always credits the same bound.
+	// current reduction, or the one the name it copied carried at the copy
+	// -- and the clamp spellings are searched over the whole derivation in
+	// a fixed order, so the same function always credits the same bound.
 	emit := func(assign *tree_sitter.Node, via, fld, head string) {
 		if head == "" || seen[via+"."+fld] {
 			return
@@ -5503,10 +5499,10 @@ func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, par
 		names := []string{head}
 		visited := map[string]bool{head: true}
 		for i := 0; i < len(names); i++ {
-			for _, d := range derive[names[i]] {
-				if !visited[d.name] {
-					visited[d.name] = true
-					names = append(names, d.name)
+			for _, dname := range derive[names[i]] {
+				if !visited[dname] {
+					visited[dname] = true
+					names = append(names, dname)
 				}
 			}
 		}
@@ -5516,13 +5512,6 @@ func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, par
 		guard, bound, boundVar := "missing_upper_bound", "", ""
 		if modulus := modBound[head]; modulus != "" {
 			guard, bound, boundVar = "modulo", modulus, head
-		} else {
-			for _, d := range derive[head] {
-				if d.bound != "" {
-					guard, bound, boundVar = "modulo", d.bound, d.name
-					break
-				}
-			}
 		}
 		if guard == "missing_upper_bound" {
 			for _, name := range append([]string{head}, tail...) {
@@ -5620,14 +5609,96 @@ func (c *ccConv) ccProducerFieldRangeBoundObservations(fn *tree_sitter.Node, par
 	return out
 }
 
-// ccDeriveName is one name a plain store computed a value from, together
-// with the modulus bound that name carried at the store: a reduction of the
-// source after the store does not tighten the value already taken from it,
-// so the bound travels with the edge rather than being read from the
-// source's current state when the field is stored.
-type ccDeriveName struct {
-	name  string
-	bound string
+// ccBoundKeepingName reports the name whose modulus bound a compacted store
+// keeps: the name copied -- bare, parenthesized or cast, as ccCopyName reads
+// it -- or the name divided or right-shifted by an integer literal, the two
+// operations that only take magnitude away (`sec / 3600`, `sec >> 4`). The
+// bound survives loose -- the divisor is not folded into it -- which a rule
+// compares against the width it is asking about. A store that can grow past
+// the source's bound -- a sum, a scale, a difference, the name on the divisor
+// side, arithmetic trailing the operator -- reads as none.
+func ccBoundKeepingName(s string) string {
+	if name := ccCopyName(s); name != "" {
+		return name
+	}
+	for _, op := range []string{"/", ">>"} {
+		if i := strings.Index(s, op); i > 0 {
+			left, right := s[:i], s[i+len(op):]
+			if name := ccCopyName(left); name != "" && ccIntLiteral(right) {
+				return name
+			}
+		}
+	}
+	return ""
+}
+
+// ccIntLiteral reports whether a compacted term is a decimal integer
+// literal, the constant a bound-keeping divisor or shift is spelled with.
+func ccIntLiteral(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+// ccCopyName reports the single name a compacted store copies, through the
+// parentheses and casts a copy is spelled with: `sec`, `(sec)` and
+// `(int) sec` all read as sec. A store that computes with the name -- sums
+// it against another, scales it, takes its remainder -- reads as none,
+// because the value it stores is no longer the value the bound bounded.
+func ccCopyName(s string) string {
+	for strings.HasPrefix(s, "(") {
+		depth, end := 0, -1
+		for i := 0; i < len(s); i++ {
+			switch s[i] {
+			case '(', '[':
+				depth++
+			case ')', ']':
+				depth--
+				if depth == 0 {
+					end = i
+				}
+			}
+			if end >= 0 {
+				break
+			}
+		}
+		if end < 0 {
+			break
+		}
+		inner, rest := s[1:end], s[end+1:]
+		if rest == "" {
+			// the parenthesis wraps the whole store: `(sec)` copies sec,
+			// `(a + b)` is stripped and judged below
+			s = inner
+			continue
+		}
+		// a parenthesized type name in front of a rest is a cast; a
+		// parenthesis that closes mid-expression, like `(a) + (b)`, is not
+		if !ccCastType(inner) {
+			break
+		}
+		s = rest
+	}
+	if ids := ccIdentRe.FindAllString(s, -1); len(ids) == 1 && ids[0] == s {
+		return s
+	}
+	return ""
+}
+
+// ccCastType reports whether a parenthesized group reads as a C type name --
+// one identifier with optional pointer stars, `int`, `ngx_uint_t *` -- the
+// head of a cast. Anything else that closes early (`a + b`, `4 + days`) is
+// arithmetic the parenthesis only groups.
+func ccCastType(s string) bool {
+	base := strings.TrimRight(s, "*")
+	ids := ccIdentRe.FindAllString(base, -1)
+	return len(ids) == 1 && ids[0] == base
 }
 
 // ccTopLevelModulus reads the modulus of a compacted expression's top-level

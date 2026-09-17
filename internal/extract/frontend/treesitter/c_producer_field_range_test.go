@@ -399,3 +399,89 @@ void reduced_only(long t, struct out *o) {
 		t.Fatalf("reduction without growth: got %q want %q among them", got, want)
 	}
 }
+
+// A modulus a value borrowed from a reduced name does not credit whatever
+// that value later becomes: a copy keeps the bound only while it stays the
+// copy, and a name that was merely one term of the store never had it. The
+// bound travels with the value, not with the names the value was computed
+// from -- the sum, the scale and the growth each overflow the divisor the
+// same way a bare reduction's own growth does above.
+func TestCProducerFieldRangeBoundCopiedModulus(t *testing.T) {
+	// A reduced name as one term of a larger store does not bound the whole:
+	// the sum takes its size from the other addend, the scale multiplies past
+	// the divisor, and the difference from the minuend.
+	got := ccProducerRangeObs(t, `
+struct out { int sum, scaled, diff; };
+void borrowed_terms(long t, long b, long a, struct out *o) {
+	int sum, scaled, diff, small;
+	small = t % 7;
+	sum = small + b;
+	scaled = small * 97;
+	diff = a - small;
+	o->sum = sum;
+	o->scaled = scaled;
+	o->diff = diff;
+}
+`)
+	for _, l := range got {
+		if strings.HasPrefix(l, "producer_field_bounded") && strings.Contains(l, "bound=7;") {
+			t.Fatalf("one term's modulus bounded the whole value: %q", l)
+		}
+	}
+
+	// A copy that has since grown keeps no bound the source carried: the
+	// compound store and the step each move the value past the divisor the
+	// same way they move it past the copy's own reduction.
+	got = ccProducerRangeObs(t, `
+struct out { int v, w; };
+void copy_then_grow(long t, struct out *o) {
+	int v, w, sec;
+	sec = t % 100;
+	v = sec;
+	v += 1000;
+	w = sec;
+	w++;
+	o->v = v;
+	o->w = w;
+}
+`)
+	for _, l := range got {
+		if strings.HasPrefix(l, "producer_field_bounded") && strings.Contains(l, "bound=100;") {
+			t.Fatalf("a copy kept its source's bound after growing: %q", l)
+		}
+	}
+
+	// The controls: a copy is still the source's value and keeps the bound
+	// the source carried at the copy, through the cast and parentheses a
+	// store needs around it -- and a division or right shift of a bounded
+	// name only takes magnitude away, so the source's bound survives loose.
+	// A copy of an unreduced name still pairs nothing.
+	got = ccProducerRangeObs(t, `
+struct out { int casted, paren, inner, hour, bits; };
+void copy_spellings(long t, struct out *o) {
+	int casted, paren, inner, hour, bits, sec;
+	sec = t % 100;
+	casted = (int) sec;
+	paren = (sec);
+	inner = ((sec));
+	hour = sec / 24;
+	bits = sec >> 2;
+	o->casted = casted;
+	o->paren = paren;
+	o->inner = inner;
+	o->hour = hour;
+	o->bits = bits;
+}
+`)
+	for _, want := range []string{
+		"producer_field_bounded via=o;field=casted;value=casted;guard=modulo;bound=100;bound_var=casted",
+		"producer_field_bounded via=o;field=paren;value=paren;guard=modulo;bound=100;bound_var=paren",
+		"producer_field_bounded via=o;field=inner;value=inner;guard=modulo;bound=100;bound_var=inner",
+		"producer_field_bounded via=o;field=hour;value=hour;guard=modulo;bound=100;bound_var=hour",
+		"producer_field_bounded via=o;field=bits;value=bits;guard=modulo;bound=100;bound_var=bits",
+	} {
+		if !hasLine(got, want) {
+			t.Fatalf("bound-keeping spelling kept its bound: got %q want %q among them", got, want)
+		}
+	}
+}
