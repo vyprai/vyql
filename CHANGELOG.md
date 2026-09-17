@@ -15,8 +15,13 @@ behaviour change, even if no code moved.
 - **`vyql triage add | remove | list`** records one verdict at a time into a
   baseline, without running a scan. `triage add -fp <fp> -from scan.graph.json`
   captures the finding's rule, location and **path signature** alongside the
-  verdict. The file is the same shape `-baseline-write` produces, and `triage`
-  does not require the data directory.
+  verdict. `triage list -from scan.graph.json` marks each entry against that
+  scan (`covered`, `drifted`, `reported`, `stale`) and suggests the cleanup;
+  `triage remove -stale -from scan.graph.json` drops every stale entry in one
+  pass — the rolled-baseline semantic on demand — and refuses to run without a
+  scan, because stale is a fact about a scan, not about the file. The file is
+  the same shape `-baseline-write` produces, and `triage` does not require the
+  data directory.
 - **Path signatures and drift-aware baselines.** A baseline entry may carry
   `sig`: a digest of the concepts and call paths along the finding's taint
   path. Such an entry suppresses only while the path still hashes to one of

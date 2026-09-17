@@ -116,12 +116,17 @@ func triageAdd(args []string) error {
 func triageRemove(args []string) error {
 	fs := newFlagSet("triage remove")
 	fp := fs.String("fp", "", "fingerprint of the entry to remove")
+	stale := fs.Bool("stale", false, "remove every entry the -from scan reports as stale (the code it excused is gone)")
+	from := fs.String("from", "", "graph-json output of a scan, to decide what is stale")
 	baselinePath := fs.String("baseline", "", "the triage list to remove from")
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+	if *stale {
+		return triageRemoveStale(*from, *baselinePath)
+	}
 	if strings.TrimSpace(*fp) == "" || *baselinePath == "" {
-		return &usageError{msg: "triage remove needs -fp and -baseline"}
+		return &usageError{msg: "triage remove needs -fp and -baseline (or -stale with -from)"}
 	}
 	entries, err := loadBaseline(*baselinePath)
 	if err != nil {
@@ -141,9 +146,52 @@ func triageRemove(args []string) error {
 	return nil
 }
 
+// triageRemoveStale drops every entry the scan says matches nothing. The same
+// semantic a rolled baseline applies on its own ("does not keep suppressions
+// for code that is gone"), on demand: point it at the scan you just ran with
+// this baseline, and the verdicts whose findings no longer fire leave the file.
+// What was removed is printed, because a cleanup that silently edits N lines of
+// a committed file is a review burden; naming them makes the diff checkable.
+func triageRemoveStale(from, baselinePath string) error {
+	if from == "" || baselinePath == "" {
+		return &usageError{msg: "triage remove -stale needs -from <scan.graph.json> and -baseline: " +
+			"stale means a finding no longer fires, and without a scan that is a guess, " +
+			"not a fact"}
+	}
+	entries, err := loadBaseline(baselinePath)
+	if err != nil {
+		return err
+	}
+	ref, err := loadScanRef(from)
+	if err != nil {
+		return err
+	}
+	removed := make([]string, 0)
+	for _, fp := range sortedEntryKeys(entries) {
+		if entryState(fp, ref) == triageStale {
+			removed = append(removed, fp)
+			delete(entries, fp)
+		}
+	}
+	if len(removed) == 0 {
+		fmt.Fprintf(os.Stderr, "no stale entries in %s (against %s); nothing removed\n", baselinePath, from)
+		return nil
+	}
+	if err := writeBaselineEntries(baselinePath, entries); err != nil {
+		return err
+	}
+	for _, fp := range removed {
+		fmt.Fprintf(os.Stderr, "removed %s from %s\n", fp, baselinePath)
+	}
+	fmt.Fprintf(os.Stderr, "removed %d stale entr%s; the code they excused is gone\n",
+		len(removed), plural(len(removed), "y", "ies"))
+	return nil
+}
+
 func triageList(args []string) error {
 	fs := newFlagSet("triage list")
 	baselinePath := fs.String("baseline", ".vyql-baseline.json", "the triage list to print")
+	from := fs.String("from", "", "graph-json output of a scan (ideally run with -baseline): marks each entry covered, drifted, reported or stale")
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
@@ -151,24 +199,42 @@ func triageList(args []string) error {
 	if err != nil {
 		return err
 	}
-	fps := make([]string, 0, len(entries))
-	for fp := range entries {
-		fps = append(fps, fp)
+	var ref *scanRef
+	if *from != "" {
+		if ref, err = loadScanRef(*from); err != nil {
+			return err
+		}
 	}
-	sort.Strings(fps)
-	for _, fp := range fps {
+	counts := map[string]int{}
+	for _, fp := range sortedEntryKeys(entries) {
 		e := entries[fp]
 		sig := ""
 		if len(e.Sig) > 0 {
 			sig = fmt.Sprintf(" sig=%d", len(e.Sig))
 		}
-		fmt.Printf("%s  %-13s %s%s\n", fp, e.Verdict, e.locLabel(), sig)
+		state := ""
+		if ref != nil {
+			state = entryState(fp, ref)
+			counts[state]++
+			state = "  [" + state + "]"
+		}
+		fmt.Printf("%s  %-13s %s%s%s\n", fp, e.Verdict, e.locLabel(), sig, state)
 		if e.Reason != "" {
 			fmt.Printf("    %s\n", e.Reason)
 		}
 	}
-	if len(fps) == 0 {
+	if len(entries) == 0 {
 		fmt.Printf("%s has no entries\n", *baselinePath)
+		return nil
+	}
+	if ref != nil {
+		fmt.Printf("%d entr%s against %s: %d covered, %d drifted, %d reported, %d stale\n",
+			len(entries), plural(len(entries), "y", "ies"), *from,
+			counts[triageCovered], counts[triageDrifted], counts[triageReported], counts[triageStale])
+		if counts[triageStale] > 0 {
+			fmt.Printf("drop the stale ones: vyql triage remove -stale -baseline %s -from %s\n",
+				*baselinePath, *from)
+		}
 	}
 	return nil
 }
@@ -186,6 +252,80 @@ func (e baselineEntry) locLabel() string {
 	}
 }
 
+// Entry states against a scan (triageStale is the one remove -stale acts on).
+const (
+	triageCovered  = "covered"  // suppressed by this scan: verdict still applies
+	triageDrifted  = "drifted"  // same fp, new path: re-reported, re-triage
+	triageStale    = "stale"    // matches nothing: the code it excused is gone
+	triageReported = "reported" // fingerprint is in the findings but this scan did not apply this entry
+)
+
+// scanRef is what a baseline entry is judged against: the fingerprints a scan
+// reported, and — when that scan ran with -baseline — vyql's own accounting of
+// what the applied file did.
+type scanRef struct {
+	findingFPs map[string]bool
+	section    *graphjson.BaselineSection
+}
+
+func loadGraphJSONDoc(path, flag string) (graphjson.Document, error) {
+	raw, err := os.ReadFile(path)
+	if err != nil {
+		return graphjson.Document{}, fmt.Errorf("triage %s: %w", flag, err)
+	}
+	var doc graphjson.Document
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		return graphjson.Document{}, fmt.Errorf("triage %s %s: not graph-json (%w)", flag, path, err)
+	}
+	return doc, nil
+}
+
+func loadScanRef(path string) (*scanRef, error) {
+	doc, err := loadGraphJSONDoc(path, "-from")
+	if err != nil {
+		return nil, err
+	}
+	ref := &scanRef{findingFPs: make(map[string]bool, len(doc.Findings)), section: doc.Baseline}
+	for _, f := range doc.Findings {
+		ref.findingFPs[f.FP] = true
+	}
+	return ref, nil
+}
+
+// entryState names what a scan says about one baseline entry.
+//
+// With a baseline section (the scan ran with -baseline) the answer is vyql's
+// own: covered, drifted or stale. An entry absent from every list was not in
+// the file that scan applied — judge it by its fingerprint: reported if the
+// finding still fires (the verdict does not cover what is there now), stale if
+// nothing fires. Without a section the same fallback decides every entry, and
+// "reported" rather than "covered" is the honest word: this scan never
+// suppressed anything, so whether the entry's signatures still match is
+// something only a -baseline run can say.
+func entryState(fp string, ref *scanRef) string {
+	if ref.section != nil {
+		for _, c := range ref.section.Covered {
+			if c == fp {
+				return triageCovered
+			}
+		}
+		for _, d := range ref.section.Drifted {
+			if d == fp {
+				return triageDrifted
+			}
+		}
+		for _, s := range ref.section.Stale {
+			if s == fp {
+				return triageStale
+			}
+		}
+	}
+	if ref.findingFPs[fp] {
+		return triageReported
+	}
+	return triageStale
+}
+
 // graphJSONFinding is the slice of graphjson a triage needs: fingerprint,
 // signature, rule and where the sink sits.
 type graphJSONFinding struct {
@@ -196,13 +336,9 @@ type graphJSONFinding struct {
 }
 
 func findingFromGraphJSON(path, fp string) (graphJSONFinding, error) {
-	raw, err := os.ReadFile(path)
+	doc, err := loadGraphJSONDoc(path, "add -from")
 	if err != nil {
-		return graphJSONFinding{}, fmt.Errorf("triage add -from: %w", err)
-	}
-	var doc graphjson.Document
-	if err := json.Unmarshal(raw, &doc); err != nil {
-		return graphJSONFinding{}, fmt.Errorf("triage add -from %s: not graph-json (%w)", path, err)
+		return graphJSONFinding{}, err
 	}
 	for _, f := range doc.Findings {
 		if f.FP != fp {
@@ -245,4 +381,13 @@ func containsString(xs []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func sortedEntryKeys(m map[string]baselineEntry) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }

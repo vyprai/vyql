@@ -183,3 +183,120 @@ func TestBaselineSectionShape(t *testing.T) {
 		}
 	}
 }
+
+// scanRefDoc builds a graph-json document carrying findings and (optionally) a
+// baseline section — the two things entryState judges against.
+func scanRefDoc(t *testing.T, dir string, fps []string, section *graphjson.BaselineSection) string {
+	t.Helper()
+	doc := graphjson.Document{SchemaVersion: graphjson.SchemaVersion}
+	for _, fp := range fps {
+		doc.Findings = append(doc.Findings, graphjson.Finding{FP: fp, Kind: "taint"})
+	}
+	doc.Baseline = section
+	p := filepath.Join(dir, "scan.graph.json")
+	if err := os.WriteFile(p, mustJSON(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return p
+}
+
+func mustJSON(v any) []byte {
+	b, err := json.Marshal(v)
+	if err != nil {
+		panic(err)
+	}
+	return b
+}
+
+// The state machine triage list reports and remove -stale acts on. With a
+// baseline section vyql's own accounting decides; an entry absent from every
+// list falls back to its fingerprint; without a section, "reported" — not
+// "covered" — is the honest word for a finding that still fires, because this
+// scan suppressed nothing.
+func TestEntryStateAgainstScan(t *testing.T) {
+	section := &graphjson.BaselineSection{
+		Applied: 3,
+		Covered: []string{"c0ffee0000000000"},
+		Drifted: []string{"baadf00d00000000"},
+		Stale:   []string{"dead000000000000"},
+	}
+	ref, err := loadScanRef(scanRefDoc(t, t.TempDir(), []string{"baadf00d00000000", "feed000000000000"}, section))
+	if err != nil {
+		t.Fatal(err)
+	}
+	cases := map[string]string{
+		"c0ffee0000000000": triageCovered,  // section says suppressed
+		"baadf00d00000000": triageDrifted,  // section says re-fired
+		"dead000000000000": triageStale,    // section says matches nothing
+		"feed000000000000": triageReported, // in findings, unknown to the section
+		"0f0f0f0f0f0f0f0f": triageStale,    // fires nowhere, unknown to the section
+	}
+	for fp, want := range cases {
+		if got := entryState(fp, ref); got != want {
+			t.Errorf("entryState(%s) = %q, want %q", fp, got, want)
+		}
+	}
+
+	// no baseline section: the scan ran without -baseline
+	plain, err := loadScanRef(scanRefDoc(t, t.TempDir(), []string{"feed000000000000"}, nil))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := entryState("feed000000000000", plain); got != triageReported {
+		t.Errorf("firing finding without a section = %q, want reported", got)
+	}
+	if got := entryState("0f0f0f0f0f0f0f0f", plain); got != triageStale {
+		t.Errorf("absent finding without a section = %q, want stale", got)
+	}
+}
+
+func TestTriageRemoveStaleDropsOnlyStale(t *testing.T) {
+	dir := t.TempDir()
+	base := filepath.Join(dir, "baseline.json")
+	// covered, drifted and two stale entries; one stale is section-listed, the
+	// other fires nowhere (the fallback must catch it too)
+	entries := baselineFile{Version: baselineVersion, Entries: []baselineEntry{
+		{FP: "c0ffee0000000000", Verdict: verdictFalsePositive},
+		{FP: "baadf00d00000000", Verdict: verdictFalsePositive},
+		{FP: "dead000000000000", Verdict: verdictFalsePositive},
+		{FP: "0f0f0f0f0f0f0f0f", Verdict: verdictFalsePositive},
+	}}
+	if err := os.WriteFile(base, mustJSON(entries), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	from := scanRefDoc(t, dir, []string{"baadf00d00000000"}, &graphjson.BaselineSection{
+		Applied: 2,
+		Covered: []string{"c0ffee0000000000"},
+		Drifted: []string{"baadf00d00000000"},
+		Stale:   []string{"dead000000000000"},
+	})
+
+	if err := triageRemove([]string{"-stale", "-baseline", base, "-from", from}); err != nil {
+		t.Fatal(err)
+	}
+	left, err := loadBaseline(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]bool{"c0ffee0000000000": true, "baadf00d00000000": true}
+	if len(left) != len(want) {
+		t.Fatalf("entries left = %v, want %v", left, want)
+	}
+	for fp := range want {
+		if _, ok := left[fp]; !ok {
+			t.Errorf("%s should have survived (not stale)", fp)
+		}
+	}
+}
+
+// Staleness without a scan is a guess, and remove must not delete verdicts on
+// vibes: -stale without -from is a usage error.
+func TestTriageRemoveStaleNeedsScan(t *testing.T) {
+	base := filepath.Join(t.TempDir(), "baseline.json")
+	if err := os.WriteFile(base, mustJSON(baselineFile{Version: baselineVersion}), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := triageRemove([]string{"-stale", "-baseline", base}); err == nil {
+		t.Fatal("-stale without -from must be refused")
+	}
+}

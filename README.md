@@ -747,8 +747,9 @@ a checkout.
 ```sh
 vyql triage add -fp <fp> -baseline .vyql-baseline.json \
   [-verdict false-positive|accepted] [-reason "…"] [-from scan.graph.json]
-vyql triage list   -baseline .vyql-baseline.json
+vyql triage list   -baseline .vyql-baseline.json [-from scan.graph.json]
 vyql triage remove -fp <fp> -baseline .vyql-baseline.json
+vyql triage remove -stale    -baseline .vyql-baseline.json -from scan.graph.json
 ```
 
 `-fp` is the fingerprint printed by reports (`fp=` in text, `fp` in JSON,
@@ -757,6 +758,14 @@ output of the same finding, from which the path signature, rule and location
 are recorded; see [Drift](#drift-a-verdict-is-anchored-to-the-taint-path-it-was-made-against)
 for what the signature does to later scans. `triage` does not need the data
 directory.
+
+With `-from`, `list` also marks each entry against that scan: `covered`
+(still suppressed), `drifted` (re-fired; re-triage it), `reported` (its
+fingerprint fires but that scan applied no baseline for it) or `stale` (the
+code it excused is gone), and suggests the cleanup. `remove -stale` drops
+every stale entry in one pass — the same thing a rolled baseline does on its
+own, on demand — and refuses to run without `-from`, because stale is a fact
+about a scan, not about the file.
 
 ### `trace`
 
