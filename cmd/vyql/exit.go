@@ -39,7 +39,11 @@ var errNoDataDirectory = errors.New(`could not locate the data directory; go ins
 
 func commandNeedsData(cmd string) bool {
 	switch cmd {
-	case "cache", "update":
+	// triage edits a baseline file and optionally reads a scan's graph-json;
+	// it never loads the ontology or packs, and demanding a data directory
+	// would block recording a verdict on a machine that has only run a scan
+	// from CI artifacts.
+	case "cache", "update", "triage":
 		return false
 	default:
 		return true

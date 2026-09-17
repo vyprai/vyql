@@ -17,6 +17,9 @@
 //	  -baseline  triaged findings to exclude from the report and the gate
 //	  -coverage  report what was parsed, excluded and left unanalysed
 //
+//	vyql triage add|remove|list     # record verdicts into a baseline, one
+//	                                 # finding at a time, without a scan
+//
 //	vyql explain | trace | query | match | resolve | graph | diff | definitions
 //
 // Exit codes are the same on every command: 0 the command run successfully, 1 vyql could
@@ -165,6 +168,7 @@ func vyqlMain() (code int) {
 // reachable without being discoverable.
 var commands = map[string]func([]string) error{
 	"scan":        cmdScan,
+	"triage":      cmdTriage,
 	"trace":       cmdTrace,
 	"explain":     cmdExplain,
 	"match":       cmdMatch,
@@ -988,8 +992,9 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	// what is new rather than on what someone already looked at.
 	var covered []*findings.Finding
 	var staleBaseline []baselineEntry
+	var driftedBaseline []string
 	if opts.BaselinePath != "" {
-		all, covered, staleBaseline = applyBaseline(all, opts.Baseline)
+		all, covered, staleBaseline, driftedBaseline = applyBaseline(all, opts.Baseline)
 		// The partitioned codemap document was built per partition, before the
 		// baseline was applied; what it reports has to be what the run reports.
 		if codemap != nil {
@@ -1029,6 +1034,12 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 		case graph != nil:
 			doc = graphjson.Build(graph, all, sarifRulesMeta(ruleSources), root, version)
 		}
+		// Attached after assembly so both document paths (partitioned codemap and
+		// whole-graph) carry what the baseline did. The platform reads this to
+		// split reported findings into first-time versus re-verify (adr/0004 §5).
+		if opts.BaselinePath != "" {
+			doc.Baseline = baselineSection(len(opts.Baseline), covered, staleBaseline, driftedBaseline)
+		}
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
 	case "json":
@@ -1053,7 +1064,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 		}
 		printSummaryWithFlags(stats, len(all), len(flags), wantsFlags)
 		if opts.BaselinePath != "" {
-			printBaselineSummary(opts.BaselinePath, covered, staleBaseline)
+			printBaselineSummary(opts.BaselinePath, covered, staleBaseline, driftedBaseline)
 		}
 	}
 	// Diagnostics go to stderr in every format. stdout carries exactly one

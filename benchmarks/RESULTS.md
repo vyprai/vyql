@@ -4,7 +4,9 @@ What VyQL currently scores on `main`, and on which corpus. Every number here cam
 out of `TestOWASPBenchmark`. Older figures live in git history rather than on this
 page, so you never have to read past a stale number to find the current one.
 
-Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-09-11.
+Machine: MBP M3 Pro, 11 cores, 18 GB. Last updated 2026-09-11. The
+2026-09-17 drift-aware-baseline run (fp-triage-suppression branch) moved
+nothing: Java +1.00, Python +0.8960 at four decimals.
 
 > **Check the corpus column before comparing anything.** Scores from our synthetic
 > ports get mistaken for scores from the public OWASP suites more than any other

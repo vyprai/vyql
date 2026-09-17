@@ -181,3 +181,59 @@ func repoRoot(t *testing.T) string {
 		dir = parent
 	}
 }
+
+// The path signature is the second half of finding identity (adr/0004), and it
+// fails the same way the fingerprint once did: a well-meaning second
+// implementation appears next to a consumer, baselines keep quiet, and
+// suppressions stop matching with no error anywhere. One implementation, in
+// this package; everything else reads findings.Finding.Sig or graph-json sig.
+func TestOnlyTheResultPolicyOwnsPathSignatures(t *testing.T) {
+	root := repoRoot(t)
+	allowed := map[string]bool{
+		"internal/resultpolicy/signature.go": true,
+	}
+	// Unrelated senses of the word, allowed the same way the fingerprint guard
+	// allows cache-key hashes: C++ overload resolution and C parameter-text
+	// parsing have nothing to do with taint-path identity.
+	nameAllowed := map[string]bool{
+		"overloadForSignature":    true,
+		"paramsFromSignatureText": true,
+		"validSignature":          true, // cmd/vyql baseline-file validation, not a digest
+	}
+	var offenders []string
+	for _, dir := range []string{"internal", "cmd"} {
+		err := filepath.Walk(filepath.Join(root, dir), func(path string, info os.FileInfo, err error) error {
+			if err != nil || info.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return err
+			}
+			rel, _ := filepath.Rel(root, path)
+			rel = filepath.ToSlash(rel)
+			if allowed[rel] {
+				return nil
+			}
+			file, perr := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+			if perr != nil {
+				t.Fatalf("parse %s: %v", path, perr)
+			}
+			for _, decl := range file.Decls {
+				fn, ok := decl.(*ast.FuncDecl)
+				if !ok || !strings.Contains(fn.Name.Name, "Signature") {
+					continue
+				}
+				if nameAllowed[fn.Name.Name] {
+					continue
+				}
+				offenders = append(offenders, rel+": "+fn.Name.Name)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(offenders) > 0 {
+		sort.Strings(offenders)
+		t.Fatalf("a second path-signature implementation exists; the digest belongs to "+
+			"internal/resultpolicy alone, everyone else reads Finding.Sig:\n  %s", strings.Join(offenders, "\n  "))
+	}
+}
