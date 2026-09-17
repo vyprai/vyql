@@ -165,6 +165,59 @@ static void use(char *secret)
 	}
 }
 
+// A tail the wrapper reads is routed into its body, and a routed argument is
+// mapped: it loses the conservative argument-to-result edge an unread tail
+// keeps. A wrapper returning a constant must not smear that constant with its
+// tail — before the tail was traced, every argument past the named parameters
+// tainted the result by default, a route with no body behind it.
+func TestCVariadicTailReadDropsTheUnearnedResultEdge(t *testing.T) {
+	g := lowerC(t, "readdrop.c", `
+static int log_rc(const char *format, ...)
+{
+    va_list ap;
+    va_start(ap, format);
+    vfprintf(stderr, format, ap);
+    va_end(ap);
+    return 0;
+}
+
+static void use(char *secret)
+{
+    int rc = log_rc("%s", secret);
+    sink(rc);
+}
+`)
+	if reachesCallArg(t, g, callArgAt(t, g, "readdrop.c:13", 1), "readdrop.c:14", 0) {
+		t.Error("a read tail still tainted the wrapper's constant return, so the routed tail kept the result edge it replaced")
+	}
+}
+
+// The other side of the same trade: a wrapper whose return IS derived from the
+// list — the count a v-formatted call reports — still carries the tail to its
+// caller, through the body rather than around it.
+func TestCVariadicTailReadReachesTheResultThroughTheBody(t *testing.T) {
+	g := lowerC(t, "readcount.c", `
+static int log_count(const char *format, ...)
+{
+    char buf[256];
+    va_list ap;
+    va_start(ap, format);
+    int n = vsnprintf(buf, sizeof(buf), format, ap);
+    va_end(ap);
+    return n;
+}
+
+static void use(char *secret)
+{
+    int rc = log_count("%s", secret);
+    sink(rc);
+}
+`)
+	if !reachesCallArg(t, g, callArgAt(t, g, "readcount.c:14", 1), "readcount.c:15", 0) {
+		t.Error("the tail never reached the caller through the count the wrapper derived from it")
+	}
+}
+
 // The wrapper's own translation unit is not the caller's: the wrapper is defined
 // in one file, the caller sees a prototype, and the tail argument crosses the
 // cross-file call resolution on its way into the wrapper's body — the shape the
