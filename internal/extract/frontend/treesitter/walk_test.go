@@ -184,6 +184,54 @@ func TestListFilesWalksSkillSourceUnderDotClaude(t *testing.T) {
 	}
 }
 
+// dropSettings is the -exclude shape a scan runs with: one file matched by
+// path, nothing skipped by name. It exists to pin that a walked .claude is
+// subject to the pruner like any other directory, not only that its files are
+// listed when no exclusions apply.
+type dropSettings struct{}
+
+func (dropSettings) SkipDir(string) bool { return false }
+func (dropSettings) Match(_, path string) bool {
+	return strings.HasSuffix(filepath.ToSlash(path), ".claude/settings.local.json")
+}
+
+func TestListAllFilesCountedWalksDotClaudeUnderTheScanPruner(t *testing.T) {
+	dir := t.TempDir()
+	skillPath := filepath.Join(dir, ".claude", "skills", "ui-styling", "scripts", "tailwind_config_gen.py")
+	settingsPath := filepath.Join(dir, ".claude", "settings.local.json")
+	for _, path := range []string{skillPath, settingsPath} {
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("x = 1\n"), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// The scan pipeline buckets languages from the counted walk (extract.All),
+	// so that walk — not just the bare helpers — has to reach .claude.
+	entries, excluded := ListAllFilesCounted(dir, nil)
+	if !hasEntrySuffix(entries, ".claude/skills/ui-styling/scripts/tailwind_config_gen.py") {
+		t.Fatalf("ListAllFilesCounted pruned skill source under .claude: %v", entries)
+	}
+	if excluded != 0 {
+		t.Fatalf("ListAllFilesCounted excluded files with no pruner: %d", excluded)
+	}
+
+	// A pruned walk keeps the skill script and drops the excluded file, so a
+	// newly walked hidden directory cannot dodge -exclude.
+	pruned, excluded := ListAllFilesCounted(dir, dropSettings{})
+	if !hasEntrySuffix(pruned, ".claude/skills/ui-styling/scripts/tailwind_config_gen.py") {
+		t.Fatalf("pruned walk lost skill source under .claude: %v", pruned)
+	}
+	if hasEntrySuffix(pruned, ".claude/settings.local.json") {
+		t.Fatalf("pruner did not apply inside .claude: %v", pruned)
+	}
+	if excluded != 1 {
+		t.Fatalf("pruned walk excluded %d files, want the one settings file", excluded)
+	}
+}
+
 func hasPathSuffix(paths []string, suffix string) bool {
 	for _, path := range paths {
 		if strings.HasSuffix(filepath.ToSlash(path), suffix) {
