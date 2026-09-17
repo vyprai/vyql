@@ -5501,8 +5501,11 @@ func ccAppendUnique(values []string, value string) []string {
 // while no terminating NUL is established within that length first: a write of
 // one at the bound (`buffer[length] = 0`) or a memchr asked to find one inside
 // the length both read as establishing the terminator the scan needs, and
-// clear the observation. A length that is itself the scan's own result cannot
-// bound the buffer it was measured from and is not treated as one.
+// clear the observation -- for a scan they precede. Each scan is judged
+// against the source up to its own call, so a terminator written or located
+// after a scan has already run stops nothing and that scan still reports. A
+// length that is itself the scan's own result cannot bound the buffer it was
+// measured from and is not treated as one.
 //
 // Residuals, all false-negative: the pairing is intra-function, so a bound a
 // helper maintains is invisible; a cursor re-expressed as `buffer+i` at the
@@ -5640,6 +5643,11 @@ func (c *ccConv) ccStringScanMissingLengthBoundObservations(fn *tree_sitter.Node
 	seen := map[string]bool{}
 	var out []nir.Stmt
 	for _, s := range scans {
+		// An establishment counts only for a scan it precedes: a terminator
+		// written or located after the call stops nothing, because the read
+		// has already run past the bound by then. The text handed to the
+		// exclusion is therefore the body up to the call, not the whole body.
+		before := compactCExprText(c.textBefore(body, s.call))
 		originSet := origins(s.cursor)
 		buffers := make([]string, 0, len(originSet))
 		for name := range originSet {
@@ -5659,7 +5667,7 @@ func (c *ccConv) ccStringScanMissingLengthBoundObservations(fn *tree_sitter.Node
 					continue
 				}
 				seen[key] = true
-				if ccStringScanNulEstablished(text, buffer, length) {
+				if ccStringScanNulEstablished(before, buffer, length) {
 					continue
 				}
 				loc := c.loc(s.call)
@@ -5732,14 +5740,16 @@ func (c *ccConv) ccRecordStringScanBoundPair(sumSide, otherSide *tree_sitter.Nod
 	}
 }
 
-// ccStringScanNulEstablished reports whether the compacted body text
-// establishes a terminating NUL within the bound the buffer and length name
-// before the scan needs one: a write of zero at the bound itself, in either
-// the subscript or the dereferenced-sum spelling, or a memchr asked to locate
-// the NUL inside that length, which asks its byte argument and only a literal
-// zero answers -- a memchr for any other byte, or for a variable one, says
-// nothing about where the NUL is and establishes nothing. Runtime-built
-// patterns stay out of ccRe, per its cache policy.
+// ccStringScanNulEstablished reports whether the compacted text preceding a
+// scan call establishes a terminating NUL within the bound the buffer and
+// length name before the scan needs one: a write of zero at the bound itself,
+// in either the subscript or the dereferenced-sum spelling, or a memchr asked
+// to locate the NUL inside that length, which asks its byte argument and only
+// a literal zero answers -- a memchr for any other byte, or for a variable
+// one, says nothing about where the NUL is and establishes nothing. The text
+// is the body up to the scan's call, so an establishment that follows the call
+// is absent from it by construction. Runtime-built patterns stay out of ccRe,
+// per its cache policy.
 func ccStringScanNulEstablished(text, buffer, length string) bool {
 	zero := `(?:0|'\\0'|'\\x00')`
 	b, l := regexp.QuoteMeta(buffer), regexp.QuoteMeta(length)

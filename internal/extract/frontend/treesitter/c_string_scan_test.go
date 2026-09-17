@@ -320,6 +320,89 @@ void parse(char *buf, size_t len) {
 		t.Fatalf("mirrored sum: got %q want %q", got, want3)
 	}
 
+	// The terminator written at the bound only after the scan has run stops
+	// nothing: the scan read past the bound before the write existed, so the
+	// fact stands. The establishment is judged against the source preceding
+	// the scan call, not against the whole body.
+	got = ccStringScanObs(t, `
+#include <string.h>
+size_t parse(char *buf, size_t len) {
+	char *p;
+	size_t k;
+	for (p = buf; p < buf + len; p++) {
+		count(*p);
+	}
+	k = strcspn(buf, ",");
+	buf[len] = '\0';
+	return k;
+}
+`)
+	wantAfter := []string{"scan=strcspn;cursor=buf;buffer=buf;length=len;termination=not_established_within_length"}
+	if strings.Join(got, "|") != strings.Join(wantAfter, "|") {
+		t.Fatalf("nul written after the scan: got %q want %q", got, wantAfter)
+	}
+
+	// The dereferenced-sum spelling of the same late establishment.
+	got = ccStringScanObs(t, `
+#include <string.h>
+size_t parse(char *buf, size_t len) {
+	char *p;
+	size_t k;
+	for (p = buf; p < buf + len; p++) {
+		count(*p);
+	}
+	k = strcspn(buf, ",");
+	*(buf + len) = 0;
+	return k;
+}
+`)
+	if strings.Join(got, "|") != strings.Join(wantAfter, "|") {
+		t.Fatalf("nul written at dereferenced sum after the scan: got %q want %q", got, wantAfter)
+	}
+
+	// A memchr that locates the terminator only after the scan has run saves
+	// nothing either: the unbounded read happened before it.
+	got = ccStringScanObs(t, `
+#include <string.h>
+size_t parse(char *buf, size_t len) {
+	char *p;
+	size_t k;
+	for (p = buf; p < buf + len; p++) {
+		count(*p);
+	}
+	k = strcspn(buf, ",");
+	if (!memchr(buf, 0, len)) {
+		return 0;
+	}
+	return k;
+}
+`)
+	if strings.Join(got, "|") != strings.Join(wantAfter, "|") {
+		t.Fatalf("memchr after the scan: got %q want %q", got, wantAfter)
+	}
+
+	// Both orders in one function: the write clears only the scan it
+	// precedes, so the pairing reports once -- for the earlier strcspn --
+	// and not for the later strspn the terminator already covers. The two
+	// callees differ so dedup cannot mask the difference.
+	got = ccStringScanObs(t, `
+#include <string.h>
+size_t parse(char *buf, size_t len) {
+	char *p;
+	size_t a;
+	for (p = buf; p < buf + len; p++) {
+		count(*p);
+	}
+	a = strcspn(buf, ":");
+	buf[len] = '\0';
+	a += strspn(buf, ",");
+	return a;
+}
+`)
+	if strings.Join(got, "|") != strings.Join(wantAfter, "|") {
+		t.Fatalf("establishment between two scans: got %q want %q", got, wantAfter)
+	}
+
 	// A bound named by a constant macro rather than a parameter or local
 	// variable is not this fact's separate length.
 	got = ccStringScanObs(t, `
