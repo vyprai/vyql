@@ -823,6 +823,7 @@ func (e *Engine) evalTaint(cr *CompiledRule) ([]*findings.Finding, error) {
 			Witness:          fl.Path,
 			PathLocs:         e.pathLocs(fl.Path),
 			WitnessKind:      "taint",
+			Sig:              e.pathSig(fl.Path),
 			NegationEvidence: ne,
 			Confidence:       conf,
 			Context:          e.crossDomainContext(fl.SinkID),
@@ -947,6 +948,36 @@ func (e *Engine) ruleID(cr *CompiledRule) string {
 // consecutive duplicates. Used to expose the files the taint path traverses
 // (a patch frequently lands on a helper on the flow, not the source or sink site),
 // so downstream localization can match the changed file.
+// pathSig reduces a witness to the hop sequence resultpolicy.PathSignature hashes:
+// per node its first concept label, plus the callee path when the node is a
+// call. The digest itself lives in resultpolicy — this only resolves hops, so
+// there is exactly one signature implementation to agree between the engine,
+// baselines and graph-json (docs/adr/0004 §1, and the surfaces guard).
+func (e *Engine) pathSig(path []string) string {
+	if len(path) == 0 {
+		return ""
+	}
+	hops := make([]resultpolicy.SigHop, 0, len(path))
+	for _, id := range path {
+		n, ok, _ := e.Store.GetNode(id)
+		if !ok {
+			continue
+		}
+		hops = append(hops, resultpolicy.SigHop{Concept: e.firstConcept(id), Callee: n.Prop("callee_path")})
+	}
+	return resultpolicy.PathSignature(hops)
+}
+
+// firstConcept mirrors graphjson's hop concept: the node's first label wins,
+// so the signature and the exported witness describe the same hop.
+func (e *Engine) firstConcept(nodeID string) string {
+	ls, _ := e.Store.Labels(nodeID)
+	if len(ls) > 0 {
+		return ls[0].Concept
+	}
+	return ""
+}
+
 func (e *Engine) pathLocs(path []string) []string {
 	if len(path) == 0 {
 		return nil

@@ -1,9 +1,11 @@
 package graphjson
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/internal/findings"
 	"github.com/vyprai/vyql/internal/usg"
 )
 
@@ -221,5 +223,43 @@ func TestFilterFindingsKeepsTheBaselineSurvivors(t *testing.T) {
 	}
 	if len(doc.Findings) != 3 {
 		t.Error("FilterFindings must not mutate the document it filters")
+	}
+}
+
+// The platform keys triage rows on fp and stores sig alongside it (adr/0004);
+// a scan that omits either would break that join silently, which is the exact
+// failure mode the fingerprint surfaces guard exists for.
+func TestFindingsExportFingerprintAndSignature(t *testing.T) {
+	g := buildTwoFunctionGraph(t)
+	f := &findings.Finding{
+		RuleID: "VYQL-INJ-001", Severity: "high", WitnessKind: "taint",
+		Sig: "aaaa1111aaaa1111",
+		Bindings: []findings.Binding{
+			{Name: "source", NodeID: "arg1", Concept: "HttpInput", Loc: "app.py:6"},
+			{Name: "sink", NodeID: "call1", Concept: "SqlExecution", Loc: "app.py:6"},
+		},
+		Witness: []string{"arg1", "mA\x1fhelper#param#x", "call1"},
+	}
+	doc := Build(g, []*findings.Finding{f}, nil, ".", "test")
+	if len(doc.Findings) != 1 {
+		t.Fatalf("findings = %d, want 1", len(doc.Findings))
+	}
+	if doc.Findings[0].FP == "" {
+		t.Error("finding exported without an fp")
+	}
+	if doc.Findings[0].Sig != "aaaa1111aaaa1111" {
+		t.Errorf("sig = %q, want the engine's path signature carried through", doc.Findings[0].Sig)
+	}
+}
+
+// Baseline is omitempty: documents from a scan without -baseline carry no
+// empty section, and consumers can rely on its presence meaning "applied".
+func TestBaselineSectionOmittedWhenAbsent(t *testing.T) {
+	b, err := json.Marshal(Document{SchemaVersion: SchemaVersion})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(b), "baseline") {
+		t.Fatalf("empty document must not carry a baseline section: %s", b)
 	}
 }

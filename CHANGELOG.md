@@ -8,6 +8,39 @@ New rules and bindings change what a scan reports, so they get listed here like
 any other user-visible change. A finding that suddenly appears in your CI is a
 behaviour change, even if no code moved.
 
+## [Unreleased]
+
+### Added
+
+- **`vyql triage add | remove | list`** records one verdict at a time into a
+  baseline, without running a scan. `triage add -fp <fp> -from scan.graph.json`
+  captures the finding's rule, location and **path signature** alongside the
+  verdict. `triage list -from scan.graph.json` marks each entry against that
+  scan (`covered`, `drifted`, `reported`, `stale`) and suggests the cleanup;
+  `triage remove -stale -from scan.graph.json` drops every stale entry in one
+  pass — the rolled-baseline semantic on demand — and refuses to run without a
+  scan, because stale is a fact about a scan, not about the file. The file is
+  the same shape `-baseline-write` produces, and `triage` does not require the
+  data directory.
+- **Path signatures and drift-aware baselines.** A baseline entry may carry
+  `sig`: a digest of the concepts and call paths along the finding's taint
+  path. Such an entry suppresses only while the path still hashes to one of
+  its signatures; the same fingerprint on a changed path is reported again as
+  **drifted** — the triaged verdict was about a path that no longer exists,
+  and it goes back to verification instead of silently excusing code it never
+  described. In `-format graph-json`, the document now carries a `baseline`
+  section (`applied`, `covered`, `drifted`, `stale`) so a consumer can keep
+  triage records alive, archive them and route re-verifications without
+  parsing stderr; findings also carry their `sig`. Entries without `sig` keep
+  the previous behaviour and never drift.
+
+### Changed
+
+- **A drifted finding fails the gate where it was previously absorbed.** With
+  a baseline whose entry carries signatures, a change under the finding (the
+  source end swapped, a hop added or removed) now re-reports and can exit 3.
+  That is the point of the record: the verdict described the old path.
+
 ## [0.6.1] - 2026-09-11
 
 ### Fixed

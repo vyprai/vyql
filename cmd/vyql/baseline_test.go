@@ -79,7 +79,7 @@ func TestApplyBaselineSplitsReportedFromCovered(t *testing.T) {
 	base := map[string]baselineEntry{
 		resultpolicy.Fingerprint(old): {FP: resultpolicy.Fingerprint(old), Verdict: verdictAccepted},
 	}
-	report, covered, stale := applyBaseline([]*findings.Finding{old, fresh}, base)
+	report, covered, stale, drifted := applyBaseline([]*findings.Finding{old, fresh}, base)
 	if len(report) != 1 || report[0].RuleID != "VYQL-INJ-002" {
 		t.Errorf("report = %v, want only the un-baselined finding", report)
 	}
@@ -88,6 +88,9 @@ func TestApplyBaselineSplitsReportedFromCovered(t *testing.T) {
 	}
 	if len(stale) != 0 {
 		t.Errorf("stale = %v, want none", stale)
+	}
+	if len(drifted) != 0 {
+		t.Errorf("drifted = %v, want none (entry carries no sigs)", drifted)
 	}
 }
 
@@ -99,7 +102,7 @@ func TestApplyBaselineReportsStaleEntries(t *testing.T) {
 		resultpolicy.Fingerprint(present): {FP: resultpolicy.Fingerprint(present), Verdict: verdictAccepted},
 		"deadbeefdeadbeef":                {FP: "deadbeefdeadbeef", Verdict: verdictFalsePositive, Rule: "VYQL-OLD-001", Loc: "gone.py:9"},
 	}
-	_, _, stale := applyBaseline([]*findings.Finding{present}, base)
+	_, _, stale, _ := applyBaseline([]*findings.Finding{present}, base)
 	if len(stale) != 1 {
 		t.Fatalf("stale = %d, want 1", len(stale))
 	}
@@ -110,7 +113,7 @@ func TestApplyBaselineReportsStaleEntries(t *testing.T) {
 
 func TestApplyBaselineWithNoEntriesChangesNothing(t *testing.T) {
 	f := fixture("VYQL-INJ-001", "a.py:1")
-	report, covered, stale := applyBaseline([]*findings.Finding{f}, map[string]baselineEntry{})
+	report, covered, stale, _ := applyBaseline([]*findings.Finding{f}, map[string]baselineEntry{})
 	if len(report) != 1 || len(covered) != 0 || len(stale) != 0 {
 		t.Errorf("empty baseline altered the result: %d/%d/%d", len(report), len(covered), len(stale))
 	}
@@ -146,7 +149,7 @@ func TestWriteBaselineRoundTrips(t *testing.T) {
 		}
 	}
 	// Applying what was just written must silence exactly those findings.
-	report, covered, stale := applyBaseline(all, loaded)
+	report, covered, stale, _ := applyBaseline(all, loaded)
 	if len(report) != 0 || len(covered) != 2 || len(stale) != 0 {
 		t.Errorf("round-trip did not cover its own findings: %d/%d/%d", len(report), len(covered), len(stale))
 	}
@@ -588,5 +591,111 @@ func TestBaselineAdoptionRecordsFindingsThatMeetTheGate(t *testing.T) {
 	}
 	if len(adopted) != len(reported) {
 		t.Errorf("adoption reported %d finding(s) but recorded %d", len(reported), len(adopted))
+	}
+}
+
+// Drift semantics (adr/0004 §3): an entry carrying path signatures suppresses
+// only a finding whose witness still hashes to one of them. Same fingerprint,
+// new path: reported again and named, so the verdict goes back to verification
+// instead of silently excusing code it never described.
+func TestApplyBaselineSigCarryingEntry(t *testing.T) {
+	stable := fixture("VYQL-INJ-001", "a.py:1")
+	stable.Sig = "aaaa1111aaaa1111"
+	moved := fixture("VYQL-INJ-001", "a.py:1") // same binding shape => same fingerprint
+	moved.Sig = "bbbb2222bbbb2222"
+	fp := resultpolicy.Fingerprint(stable)
+	base := map[string]baselineEntry{
+		fp: {FP: fp, Verdict: verdictFalsePositive, Sig: []string{"aaaa1111aaaa1111"}},
+	}
+	report, covered, stale, drifted := applyBaseline([]*findings.Finding{stable, moved}, base)
+	if len(covered) != 1 || covered[0].Sig != "aaaa1111aaaa1111" {
+		t.Errorf("covered = %v, want the finding whose path still matches", covered)
+	}
+	if len(report) != 1 || report[0].Sig != "bbbb2222bbbb2222" {
+		t.Errorf("report = %v, want the drifted finding reported", report)
+	}
+	if len(drifted) != 1 || drifted[0] != fp {
+		t.Errorf("drifted = %v, want [%s]", drifted, fp)
+	}
+	if len(stale) != 0 {
+		t.Errorf("stale = %v, want none: the entry matched a finding", stale)
+	}
+}
+
+// A sig-carrying entry never covers a finding without a signature: that is a
+// different witness under the same fingerprint (the rule changed witness kind,
+// or the entry was recorded for a taint path that no longer exists in this
+// form) — drift, not cover.
+func TestSigEntryDoesNotCoverUnsignedFinding(t *testing.T) {
+	unsigned := fixture("VYQL-INJ-001", "a.py:1")
+	fp := resultpolicy.Fingerprint(unsigned)
+	base := map[string]baselineEntry{
+		fp: {FP: fp, Verdict: verdictFalsePositive, Sig: []string{"aaaa1111aaaa1111"}},
+	}
+	report, covered, _, drifted := applyBaseline([]*findings.Finding{unsigned}, base)
+	if len(covered) != 0 {
+		t.Errorf("covered = %v, want none", covered)
+	}
+	if len(report) != 1 {
+		t.Errorf("report = %v, want the finding re-reported", report)
+	}
+	if len(drifted) != 1 || drifted[0] != fp {
+		t.Errorf("drifted = %v, want the fingerprint", drifted)
+	}
+}
+
+// An entry without sigs keeps its legacy meaning: the verdict is anchored to
+// the finding alone, and matching nothing-but-the-fingerprint is exactly what
+// a v2 file recorded before signatures existed does.
+func TestSiglessEntryCoversAnyWitness(t *testing.T) {
+	f := fixture("VYQL-INJ-001", "a.py:1")
+	f.Sig = "cccc3333cccc3333"
+	fp := resultpolicy.Fingerprint(f)
+	base := map[string]baselineEntry{fp: {FP: fp, Verdict: verdictAccepted}}
+	report, covered, _, drifted := applyBaseline([]*findings.Finding{f}, base)
+	if len(covered) != 1 || len(report) != 0 || len(drifted) != 0 {
+		t.Errorf("covered=%d report=%d drifted=%d, want 1/0/0", len(covered), len(report), len(drifted))
+	}
+}
+
+// A malformed signature would silently never match, and the wall of findings
+// that follows is worse than refusing to run — the same stance loadBaseline
+// takes on verdicts.
+func TestLoadBaselineRejectsMalformedSignature(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "b.json")
+	bad := `{"version":2,"entries":[{"fp":"aaaa1111aaaa1111","verdict":"false-positive","sig":["not-hex!"]}]}`
+	if err := os.WriteFile(p, []byte(bad), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := loadBaseline(p); err == nil {
+		t.Fatal("malformed signature must be rejected, not ignored")
+	}
+}
+
+// Rolling a baseline forward keeps a triaged entry's verdict, reason AND path
+// signatures: the triage described the path it saw, and a roll must not
+// silently broaden it back to fingerprint-only suppression.
+func TestWriteBaselineRollPreservesSigs(t *testing.T) {
+	f := fixture("VYQL-INJ-001", "a.py:1")
+	f.Sig = "aaaa1111aaaa1111"
+	fp := resultpolicy.Fingerprint(f)
+	prior := map[string]baselineEntry{
+		fp: {FP: fp, Verdict: verdictFalsePositive, Reason: "build-time constant", Sig: []string{"dddd4444dddd4444"}},
+	}
+	p := filepath.Join(t.TempDir(), "b.json")
+	if err := writeBaseline(p, []*findings.Finding{f}, prior, 0); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := loadBaseline(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	e := loaded[fp]
+	if e.Verdict != verdictFalsePositive || e.Reason != "build-time constant" {
+		t.Errorf("verdict/reason not carried: %+v", e)
+	}
+	if len(e.Sig) != 1 || e.Sig[0] != "dddd4444dddd4444" {
+		t.Errorf("sigs not carried: %+v; the roll must keep the triaged path, not the new one", e.Sig)
 	}
 }

@@ -38,6 +38,20 @@ type Document struct {
 	CallEdges     []CallEdge `json:"call_edges"`
 	Findings      []Finding  `json:"findings"`
 	Concepts      []Concept  `json:"concepts"`
+	// Baseline reports what an applied -baseline did. Drifted is the part a
+	// consumer cannot infer from findings alone: those findings' fingerprints
+	// matched a triaged entry whose path signatures did not, so they are
+	// re-verifications, not first-time findings (adr/0004 §5). Nil when no
+	// baseline was applied.
+	Baseline *BaselineSection `json:"baseline,omitempty"`
+}
+
+// BaselineSection carries fingerprint lists, sorted, in every field.
+type BaselineSection struct {
+	Applied int      `json:"applied"`
+	Covered []string `json:"covered"` // still suppressed, verdict unchanged
+	Drifted []string `json:"drifted"` // same fp, new path: reported again, re-verify
+	Stale   []string `json:"stale"`   // matched nothing; the code they excused is gone
 }
 
 type Tool struct {
@@ -82,7 +96,8 @@ type Finding struct {
 	Scope         string   `json:"scope"` // function | module | unresolved
 	Severity      string   `json:"severity"`
 	CWE           []string `json:"cwe"`
-	FP            string   `json:"fp"` // stable across runs — VyPr dedup + diff key
+	FP            string   `json:"fp"`            // stable across runs — VyPr dedup + diff key
+	Sig           string   `json:"sig,omitempty"` // path signature; what a triaged FP is conditionally suppressed on (adr/0004). Empty for non-taint kinds
 	Source        *Source  `json:"source"`
 	Sink          *Sink    `json:"sink"`
 	PathFunctions []PathFn `json:"path_functions"`
@@ -565,6 +580,7 @@ func exportFindings(g usg.Store, all []*findings.Finding, ruleMeta map[string]ma
 			Severity:   f.Severity,
 			CWE:        cweOf(ruleMeta[f.RuleID]),
 			FP:         resultpolicy.Fingerprint(f),
+			Sig:        f.Sig,
 			Confidence: f.Confidence,
 		}
 		srcB, sinkB := sourceAndSink(f)
