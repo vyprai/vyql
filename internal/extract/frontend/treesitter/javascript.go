@@ -92,29 +92,40 @@ func parseVueModules(
 		if err != nil {
 			continue
 		}
+		rel := relPath(root, f)
 		script, lang, ok := vueScriptSource(src)
-		if !ok {
-			continue
+		if ok {
+			parserFactory := jsParserFor(tsjs.Language())
+			switch lang {
+			case "ts":
+				parserFactory = jsParserFor(tstypescript.LanguageTypescript())
+			case "tsx":
+				parserFactory = jsParserFor(tstypescript.LanguageTSX())
+			}
+			parser := parserFactory()
+			tree := parser.Parse(script, nil)
+			if tree != nil {
+				m, good := build(script, f, rel, tree)
+				tree.Close()
+				parser.Close()
+				if good {
+					m.Hash = contentHash(src)
+					// The template's directives lower after the script: the
+					// methods a directive binds are defined before the markup
+					// that calls them.
+					m.Body = append(m.Body, vueTemplateStatements(src, root, f, rel, lang)...)
+					out = append(out, m)
+					continue
+				}
+			} else {
+				parser.Close()
+			}
 		}
-		parserFactory := jsParserFor(tsjs.Language())
-		switch lang {
-		case "ts":
-			parserFactory = jsParserFor(tstypescript.LanguageTypescript())
-		case "tsx":
-			parserFactory = jsParserFor(tstypescript.LanguageTSX())
-		}
-		parser := parserFactory()
-		tree := parser.Parse(script, nil)
-		if tree == nil {
-			parser.Close()
-			continue
-		}
-		m, good := build(script, f, relPath(root, f), tree)
-		tree.Close()
-		parser.Close()
-		if good {
-			m.Hash = contentHash(src)
-			out = append(out, m)
+		// No script block (or none that parsed): a template-only component is
+		// still analyzable source for the writes its directives make.
+		stmts := vueTemplateStatements(src, root, f, rel, "js")
+		if len(stmts) > 0 {
+			out = append(out, nir.Module{Key: jsModuleKey(root, f), File: rel, Body: stmts, Hash: contentHash(src)})
 		}
 	}
 	return out
@@ -156,6 +167,287 @@ func vueScriptSource(src []byte) ([]byte, string, bool) {
 	default:
 		return out, "js", true
 	}
+}
+
+// vueHTMLDirective is one v-html attribute of a .vue template: the element it
+// sits on, the attribute's own offset, and the byte range of its value.
+type vueHTMLDirective struct {
+	tag                string
+	attrStart          int
+	exprStart, exprEnd int
+}
+
+// vueHTMLDirectives finds the v-html attributes a .vue template's elements
+// carry. The scan is structural — a directive is an attribute NAME inside an
+// element's open tag — so a v-html spelled inside another attribute's value
+// (`title="v-html='evil()'"`) is text, and one inside an HTML comment or a
+// script/style block is markup the component does not render.
+func vueHTMLDirectives(src []byte) []vueHTMLDirective {
+	lower := strings.ToLower(string(src))
+	skip := htmlCommentRanges(lower)
+	skip = append(skip, vueBlockRanges(lower, "<script")...)
+	skip = append(skip, vueBlockRanges(lower, "<style")...)
+	var out []vueHTMLDirective
+	for _, r := range vueOpenTagRanges(lower) {
+		if inAnyRange(r[0], skip) {
+			continue
+		}
+		out = append(out, vueOpenTagDirectives(lower, r)...)
+	}
+	return out
+}
+
+// vueOpenTagRanges returns the [start, end) range of every element open tag,
+// from `<` through `>`, skipping quoted attribute values so a quote-borne `>`
+// (`:title="a > b"`) does not end the tag early.
+func vueOpenTagRanges(lower string) [][2]int {
+	var out [][2]int
+	for i := 0; i < len(lower); i++ {
+		if lower[i] != '<' || i+1 >= len(lower) || !isVueTagStart(lower[i+1]) {
+			continue
+		}
+		quote := byte(0)
+		for j := i + 1; j < len(lower); j++ {
+			ch := lower[j]
+			if quote != 0 {
+				if ch == quote {
+					quote = 0
+				}
+				continue
+			}
+			if ch == '"' || ch == '\'' {
+				quote = ch
+				continue
+			}
+			if ch == '>' {
+				out = append(out, [2]int{i, j + 1})
+				i = j
+				break
+			}
+		}
+	}
+	return out
+}
+
+// vueOpenTagDirectives walks one open tag's attribute list — names at
+// attribute positions, values skipped to their closing quote — and returns the
+// v-html directives it carries.
+func vueOpenTagDirectives(lower string, tagRange [2]int) []vueHTMLDirective {
+	end := tagRange[1]
+	i := tagRange[0] + 1
+	if i >= end || !isVueTagStart(lower[i]) {
+		return nil
+	}
+	for i < end && isVueNameByte(lower[i]) {
+		i++
+	}
+	name := lower[tagRange[0]+1 : i]
+	var out []vueHTMLDirective
+	for i < end {
+		for i < end && isVueSpace(lower[i]) {
+			i++
+		}
+		if i >= end {
+			break
+		}
+		attrStart := i
+		for i < end && !isVueSpace(lower[i]) && lower[i] != '=' {
+			i++
+		}
+		attr := lower[attrStart:i]
+		valStart, valEnd := -1, -1
+		if i < end && lower[i] == '=' {
+			i++
+			if i < end && (lower[i] == '"' || lower[i] == '\'') {
+				quote := lower[i]
+				i++
+				v0 := i
+				for i < end && lower[i] != quote {
+					i++
+				}
+				valStart, valEnd = v0, i
+				if i < end {
+					i++ // past the closing quote
+				}
+			} else {
+				v0 := i
+				for i < end && !isVueSpace(lower[i]) && lower[i] != '>' {
+					i++
+				}
+				valStart, valEnd = v0, i
+			}
+		}
+		if attr == "v-html" && valStart >= 0 {
+			// The bound expression is the value trimmed of the whitespace a
+			// template may carry inside its quotes.
+			for valStart < valEnd && isVueSpace(lower[valStart]) {
+				valStart++
+			}
+			for valEnd > valStart && isVueSpace(lower[valEnd-1]) {
+				valEnd--
+			}
+			if valStart < valEnd {
+				out = append(out, vueHTMLDirective{tag: name, attrStart: attrStart, exprStart: valStart, exprEnd: valEnd})
+			}
+		}
+	}
+	return out
+}
+
+// vueBlockRanges returns the [start, end) range of every element named by
+// open — its open tag through its closing tag — so directive scanning never
+// reads script code or CSS as template markup.
+func vueBlockRanges(lower, open string) [][2]int {
+	closeTag := "</" + open[1:] + ">"
+	var out [][2]int
+	searchAt := 0
+	for {
+		rel := strings.Index(lower[searchAt:], open)
+		if rel < 0 {
+			return out
+		}
+		start := searchAt + rel
+		tagEndRel := strings.IndexByte(lower[start:], '>')
+		if tagEndRel < 0 {
+			return append(out, [2]int{start, len(lower)})
+		}
+		codeStart := start + tagEndRel + 1
+		endRel := strings.Index(lower[codeStart:], closeTag)
+		if endRel < 0 {
+			return append(out, [2]int{start, len(lower)})
+		}
+		end := codeStart + endRel + len(closeTag)
+		out = append(out, [2]int{start, end})
+		searchAt = end
+	}
+}
+
+func isVueTagStart(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+func isVueNameByte(b byte) bool {
+	return b == '-' || b == '_' || b == ':' || b == '.' || b == '@' ||
+		(b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z') || (b >= '0' && b <= '9')
+}
+
+func isVueSpace(b byte) bool {
+	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f'
+}
+
+// vueTemplateSource blanks every byte of a .vue file except the v-html
+// directives' bound expressions, so parsing the buffer yields one expression
+// per directive at the offset it occupies in the file.
+func vueTemplateSource(src []byte, dirs []vueHTMLDirective) []byte {
+	out := make([]byte, len(src))
+	for i, b := range src {
+		switch b {
+		case '\n', '\r':
+			out[i] = b
+		default:
+			out[i] = ' '
+		}
+	}
+	for _, d := range dirs {
+		copy(out[d.exprStart:d.exprEnd], src[d.exprStart:d.exprEnd])
+		// Two directives on one row need a separator for automatic semicolon
+		// insertion; a newline already is one, and the blanking leaves nothing
+		// else for the guard to collide with.
+		if d.exprEnd < len(out) && out[d.exprEnd] == ' ' {
+			out[d.exprEnd] = ';'
+		}
+	}
+	return out
+}
+
+// vueTemplateStatements lowers a .vue template's v-html directives. Vue's own
+// compiler lowers each directive to the data object of a createElement call —
+// the bound expression under domProps.innerHTML — so that is the shape the
+// frontend produces for it, and a binding can anchor a sink on the directive.
+func vueTemplateStatements(src []byte, root, abs, rel, lang string) []nir.Stmt {
+	dirs := vueHTMLDirectives(src)
+	if len(dirs) == 0 {
+		return nil
+	}
+	parserFactory := jsParserFor(tsjs.Language())
+	switch lang {
+	case "ts":
+		parserFactory = jsParserFor(tstypescript.LanguageTypescript())
+	case "tsx":
+		parserFactory = jsParserFor(tstypescript.LanguageTSX())
+	}
+	parser := parserFactory()
+	tmpl := vueTemplateSource(src, dirs)
+	tree := parser.Parse(tmpl, nil)
+	if tree == nil {
+		parser.Close()
+		return nil
+	}
+	c := &jsConv{src: tmpl, root: root, file: rel, key: jsModuleKey(root, abs)}
+	root0 := tree.RootNode()
+	c.exported = c.exportedNames(root0)
+	c.siblings = c.jsSiblingFunctionBodies(root0)
+	c.calleeFacts = map[string][]string{}
+	done := make([]bool, len(dirs))
+	var out []nir.Stmt
+	for _, n := range c.namedChildren(root0) {
+		if c.kind(n) != "expression_statement" {
+			continue
+		}
+		kids := c.namedChildren(n)
+		if len(kids) == 0 {
+			continue
+		}
+		// The statement node swallows the `;` separator, so the range matched
+		// against the directive is the expression's own.
+		start, end := int(kids[0].StartByte()), int(kids[0].EndByte())
+		for di, d := range dirs {
+			if done[di] || start < d.exprStart || end > d.exprEnd {
+				continue
+			}
+			done[di] = true
+			out = append(out, nir.ExprStmt{Value: c.vueVHTMLRender(d, c.expr(kids[0]))})
+			break
+		}
+	}
+	tree.Close()
+	parser.Close()
+	return out
+}
+
+// vueVHTMLRender builds the call a v-html directive compiles to: the element's
+// own tag and a data object carrying the bound expression under
+// domProps.innerHTML, located at the directive itself.
+func (c *jsConv) vueVHTMLRender(d vueHTMLDirective, expr nir.Expr) nir.Call {
+	L := c.locAt(d.attrStart)
+	domProps := nir.Pair{Key: "domProps", Value: nir.Seq{Parts: []nir.Expr{
+		nir.Pair{Key: "innerHTML", Value: expr, Loc: L},
+	}, Loc: L}, Loc: L}
+	return nir.Call{
+		Callee: nir.Name{ID: "createElement", Loc: L},
+		Args: []nir.Expr{
+			nir.Const{Loc: L, Value: "'" + d.tag + "'"},
+			nir.Seq{Parts: []nir.Expr{domProps}, Loc: L},
+		},
+		Path:   "createElement",
+		Method: "createElement",
+		Loc:    L,
+	}
+}
+
+// locAt is the file:line of a byte offset into c.src, for NIR built from a
+// template position rather than a parse node.
+func (c *jsConv) locAt(off int) string {
+	if off > len(c.src) {
+		off = len(c.src)
+	}
+	row := 0
+	for _, b := range c.src[:off] {
+		if b == '\n' {
+			row++
+		}
+	}
+	return c.file + ":" + itoa(row+1)
 }
 
 func parseHTMLScriptModules(
