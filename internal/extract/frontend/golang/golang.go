@@ -961,10 +961,14 @@ func (c *conv) goPublicUserListRouteMissingAuthObservations(name string, body *a
 // record was assigned from a call in the same body; restores that run before
 // the decode do not count (the decode overwrites them, and so does any earlier
 // write), and a decode with no persistence call after it states no write and
-// records nothing. The field universe is the declared struct's when the type is
-// one this package declares (the fields a vulnerable handler leaves client-set
-// are precisely the ones its body never names); otherwise it is the fields the
-// body touches, which is all this file can state about another package's type.
+// records nothing. The decode destination is a pointer, taken as `&v` over a
+// value or as a bare local whose own declaration made it a pointer (`new(T)`,
+// `&T{}`, `var v *T`) -- the spelling the taint side's out-param join already
+// takes for bind verbs. The field universe is the declared struct's when the
+// type is one this package declares (the fields a vulnerable handler leaves
+// client-set are precisely the ones its body never names); otherwise it is the
+// fields the body touches, which is all this file can state about another
+// package's type.
 func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []nir.Stmt {
 	if body == nil {
 		return nil
@@ -976,6 +980,7 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 	restoreRecord := map[string]string{}    // "var.Field" -> the record that restore read
 	records := map[string][]string{}        // decoded var -> the records those restores read
 	varType := map[string]string{}          // local -> same-package struct type name it was declared as
+	pointerLocal := map[string]bool{}       // local -> its declaration made it a pointer: new(T), &T{}, var v *T
 	written := map[string]bool{}            // "var.Field" -> a write AFTER the decode re-established it
 	touched := map[string]map[string]bool{} // var -> fields its body names (the fallback universe)
 	recorded := map[string]bool{}           // "var.Field" and "var\x00record" dedup keys
@@ -1029,7 +1034,16 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 					if tn := declaredTypeName(lit.Type); tn != "" {
 						varType[v] = tn
 					}
+					pointerLocal[v] = true
 				}
+			}
+		case *ast.CallExpr:
+			// new(T) is a third spelling of a freshly declared struct pointer.
+			if fn, ok := t.Fun.(*ast.Ident); ok && fn.Name == "new" && len(t.Args) == 1 {
+				if tn := declaredTypeName(t.Args[0]); tn != "" {
+					varType[v] = tn
+				}
+				pointerLocal[v] = true
 			}
 		}
 	}
@@ -1069,6 +1083,9 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 							} else if tn := declaredTypeName(vs.Type); tn != "" {
 								varType[v.Name] = tn
 							}
+							if _, ptr := vs.Type.(*ast.StarExpr); ptr {
+								pointerLocal[v.Name] = true
+							}
 						}
 					}
 				}
@@ -1106,11 +1123,25 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 			verb := calleeName(x.Fun)
 			if isBindName(verb) {
 				for _, arg := range x.Args {
-					if u, ok := arg.(*ast.UnaryExpr); ok && u.Op == token.AND {
-						if id, ok := u.X.(*ast.Ident); ok && id.Name != "" && id.Name != "_" {
-							decodeVerb[id.Name] = verb
-							decodePos[id.Name] = x.Pos()
+					// A decode writes through a pointer: the canonical `&v` address of a
+					// value, or a local its own declaration already made a pointer (new(T),
+					// &T{}, var v *T) bound without the operator -- the spelling the taint
+					// side's out-param join already takes for bind verbs. A bare name that
+					// is not pointer-declared cannot be the destination and is left alone.
+					var id *ast.Ident
+					switch a := arg.(type) {
+					case *ast.UnaryExpr:
+						if a.Op == token.AND {
+							id, _ = a.X.(*ast.Ident)
 						}
+					case *ast.Ident:
+						if pointerLocal[a.Name] {
+							id = a
+						}
+					}
+					if id != nil && id.Name != "" && id.Name != "_" {
+						decodeVerb[id.Name] = verb
+						decodePos[id.Name] = x.Pos()
 					}
 				}
 			}

@@ -1173,6 +1173,150 @@ func putFixed(c Ctx) error {
 	}
 }
 
+// The decode destination is a pointer, and Go handlers spell that pointer two
+// more ways than the address operator: `v := new(T)` and `v := &T{}`, both then
+// bound bare (`Bind(v)`, the spelling echo's own documentation uses). The taint
+// side already joins those -- callOutParams takes every plain identifier a
+// bind verb receives -- so the fact has to take them too, or the pointer-spelt
+// handler carries the bind taint to its write with no per-field facts judging
+// it and the two revisions of it are again indistinguishable.
+func TestGoDecodeRestoreFactTracksPointerDeclaredBindTargets(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "put.go")
+	src := []byte(`package controller
+
+type Transaction struct {
+	Name      string
+	Source    string
+	CreatedAt string
+}
+
+func loadTransaction(id string) (*Transaction, error) { return nil, nil }
+
+func putNewVulnerable(c Ctx) error {
+	transaction := new(Transaction)
+	if err := c.Bind(transaction); err != nil {
+		return err
+	}
+	existing, err := loadTransaction(transaction.Name)
+	if err != nil {
+		return err
+	}
+	transaction.Name = existing.Name
+	return c.Update("id", transaction)
+}
+
+func putNewFixed(c Ctx) error {
+	transaction := new(Transaction)
+	if err := c.Bind(transaction); err != nil {
+		return err
+	}
+	existing, err := loadTransaction(transaction.Name)
+	if err != nil {
+		return err
+	}
+	transaction.Name = existing.Name
+	transaction.Source = existing.Source
+	transaction.CreatedAt = existing.CreatedAt
+	return c.Update("id", transaction)
+}
+
+func putPtrLiteral(c Ctx) error {
+	transaction := &Transaction{}
+	if err := c.Bind(transaction); err != nil {
+		return err
+	}
+	return c.Update("id", transaction)
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var facts []string
+	var factIDs []string
+	seeds := []string{}
+	for _, n := range nodes {
+		if n.Type != "code.Call" {
+			continue
+		}
+		switch n.Prop("callee_path") {
+		case "c.Bind":
+			seeds = append(seeds, n.ID)
+			if arg0 := n.Prop("arg0"); arg0 != "" {
+				seeds = append(seeds, arg0)
+			}
+		case "analysis.go.decode_restore_before_persist":
+			facts = append(facts, n.Prop("str_args"))
+			factIDs = append(factIDs, n.ID)
+		}
+	}
+	// Three fields per handler for each of the three pointer spellings.
+	if len(facts) != 9 {
+		t.Fatalf("decode-restore facts = %d, want 9 (one per field of Transaction per pointer-spelt handler); got %q", len(facts), facts)
+	}
+	factFor := func(fn, field string) string {
+		t.Helper()
+		for _, f := range facts {
+			if strings.Contains(f, "function_name:"+fn+"\x00") && strings.Contains(f, "field:"+field+"\x00") {
+				return f
+			}
+		}
+		t.Fatalf("no decode-restore fact for %s field %s among %q", fn, field, facts)
+		return ""
+	}
+	if f := factFor("putNewVulnerable", "Source"); !strings.Contains(f, "restored:0") || strings.Contains(f, "record:") {
+		t.Errorf("new-spelt vulnerable handler Source fact %q: want restored:0 and no record", f)
+	}
+	if f := factFor("putNewFixed", "Source"); !strings.Contains(f, "restored:1") || !strings.Contains(f, "record:existing") ||
+		!strings.Contains(f, "decode:Bind") || !strings.Contains(f, "callee:Update") {
+		t.Errorf("new-spelt fixed handler Source fact %q: want restored:1 + record:existing + decode:Bind + callee:Update", f)
+	}
+	if f := factFor("putPtrLiteral", "Name"); !strings.Contains(f, "restored:0") {
+		t.Errorf("pointer-literal handler Name fact %q: want restored:0", f)
+	}
+	// The field-level judgement the gap is blocked on, on the new(T) spelling: the
+	// same protected field's fact is tainted on the handler that never re-established
+	// it and clean on the handler that restored it from the loaded record.
+	reachable := map[string]bool{}
+	for _, seed := range seeds {
+		set, err := usg.BFS(g, seed, "FLOWS", 40)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for id := range set {
+			reachable[id] = true
+		}
+	}
+	factNode := func(fn, field string) string {
+		t.Helper()
+		for i, f := range facts {
+			if strings.Contains(f, "function_name:"+fn+"\x00") && strings.Contains(f, "field:"+field+"\x00") {
+				return factIDs[i]
+			}
+		}
+		t.Fatalf("no fact node for %s field %s", fn, field)
+		return ""
+	}
+	for fn, want := range map[string]bool{"putNewVulnerable": true, "putNewFixed": false} {
+		if got := reachable[factNode(fn, "Source")]; got != want {
+			t.Errorf("%s: bind taint reaches the Source fact = %v, want %v", fn, got, want)
+		}
+	}
+}
+
 func TestGoSecurityObservationDetectsUnboundedAppendAccumulation(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "decode.go")
