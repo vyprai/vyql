@@ -177,6 +177,88 @@ public:
 	}
 }
 
+// A CakePHP view template is a `.ctp` file — Croogo keeps almost all of CVE-2019-7168's
+// dataflow in them (21 of the fix's 23 changed files): node titles echoed unescaped, the
+// helper calls that wrap them. Until the php extension set claimed `.ctp`, such a file
+// fell through every language filter, contributed no module, and nothing written inside
+// it could be labelled a source or a sink.
+func TestCTPFilesAreClaimedByThePHPFrontend(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "view.ctp")
+	src := `<div class="node view-mode">
+	<h2><?php echo $node['Node']['title']; ?></h2>
+	<?php echo $this->Html->link($node['Node']['title'], ['action' => 'view', $node['Node']['slug']]); ?>
+	<?php echo h($node['Node']['title']); ?>
+</div>
+`
+	if err := os.WriteFile(path, []byte(src), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	entries := treesitter.ListAllFiles(dir)
+	class := frontend.ClassifyEntries(entries)
+	var claimed []string
+	var lang frontend.Language
+	for _, lg := range frontend.Languages() {
+		for _, f := range lg.FilesFor(entries, class) {
+			if f == path {
+				claimed = append(claimed, lg.Name)
+				lang = lg
+			}
+		}
+	}
+	if len(claimed) != 1 || claimed[0] != "php" {
+		t.Fatalf("the php frontend alone must claim %s (claimed by %v); a .ctp file is left unparsed", filepath.Base(path), claimed)
+	}
+
+	prog, err := lang.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatalf("php frontend: %v", err)
+	}
+	if len(prog.Modules) != 1 {
+		t.Fatalf("php frontend produced %d modules, want 1", len(prog.Modules))
+	}
+	seen := map[string]bool{}
+	var expr func(nir.Expr)
+	var body func([]nir.Stmt)
+	expr = func(e nir.Expr) {
+		switch x := e.(type) {
+		case nir.Call:
+			seen["call "+x.Path] = true
+			for _, a := range x.Args {
+				expr(a)
+			}
+		case nir.Attr:
+			seen["attr "+x.Path] = true
+			expr(x.Base)
+		case nir.Format:
+			for _, p := range x.Parts {
+				expr(p)
+			}
+		}
+	}
+	body = func(sts []nir.Stmt) {
+		for _, st := range sts {
+			switch s := st.(type) {
+			case nir.ClassDef:
+				body(s.Body)
+			case nir.FuncDef:
+				body(s.Body)
+			case nir.Assign:
+				expr(s.Value)
+			case nir.ExprStmt:
+				expr(s.Value)
+			}
+		}
+	}
+	body(prog.Modules[0].Body)
+	for _, want := range []string{"call echo", "call $this.Html.link", "call h"} {
+		if !seen[want] {
+			t.Errorf("php frontend did not produce %q from the .ctp file; got %v", want, seen)
+		}
+	}
+}
+
 // proseDoc is documentation text of the kind a `.pl` name actually carries in the
 // wild: a Polish README, with e-mail addresses, `%s` printf placeholders and
 // `->` arrows in URLs — code-shaped tokens a loose shape check could mistake for
