@@ -190,8 +190,7 @@ func TestVueTemplateOnlyComponentLowersTheDirective(t *testing.T) {
 
 // A commented-out element is markup the component does not render, and a
 // directive quoted inside another attribute's value is text, not a directive.
-func TestVueTemplateSkipsCommentedAndQuotedDirectives(t *testing.T) {
-	src := `<template>
+func TestVueTemplateSkipsCommentedAndQuotedDirectives(t *testing.T) {	src := `<template>
     <div title="v-html='evil()'">
         <!-- <td v-html="evil()"></td> -->
         <td v-html="keep()"></td>
@@ -233,5 +232,58 @@ func TestVueTemplateSkipsCommentedAndQuotedDirectives(t *testing.T) {
 	}
 	if len(bound) != 1 || bound[0] != "keep" {
 		t.Fatalf("directives lowered = %v, want only the live keep() one", bound)
+	}
+}
+
+// Two directives on one row are separate statements in the blanked buffer only
+// because of the separator the blanking writes between them, and a value that
+// spans rows keeps mapping to its own lines.
+func TestVueTemplateDirectivesOnOneRowAndAcrossRows(t *testing.T) {
+	src := `<template>
+    <td v-html="a()"></td><td v-html="b(row[
+        0
+    ])"></td>
+</template>
+<script>
+    export default {}
+</script>
+`
+	path := writeVueComponent(t, "table-body.vue", src)
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var bound []string
+	var locs []string
+	for _, mod := range prog.Modules {
+		for _, st := range mod.Body {
+			s, ok := st.(nir.ExprStmt)
+			if !ok {
+				continue
+			}
+			c, ok := s.Value.(nir.Call)
+			if !ok || c.Path != "createElement" {
+				continue
+			}
+			if data, ok := c.Args[1].(nir.Seq); ok {
+				if dp, ok := data.Parts[0].(nir.Pair); ok {
+					if ih, ok := dp.Value.(nir.Seq); ok {
+						if p, ok := ih.Parts[0].(nir.Pair); ok {
+							if b, ok := p.Value.(nir.Call); ok {
+								bound = append(bound, b.Path)
+								locs = append(locs, c.Loc)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	if len(bound) != 2 || bound[0] != "a" || bound[1] != "b" {
+		t.Fatalf("directives lowered = %v, want a() and b() as separate calls", bound)
+	}
+	if locs[0] != "table-body.vue:2" || locs[1] != "table-body.vue:2" {
+		t.Fatalf("directive locs = %v, want both on the row they sit on", locs)
 	}
 }
