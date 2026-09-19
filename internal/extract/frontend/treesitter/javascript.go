@@ -2641,7 +2641,10 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "switch_statement":
 		return []nir.Stmt{c.switchStmt(n)}
 	case "try_statement":
-		return []nir.Stmt{nir.Try{Body: c.collectStatementBlocks(n)}}
+		// Loc reaches the lowering as the exception node's location: a loc-less
+		// analysis.exception node is dropped by the presence matcher's same-file
+		// guard, so a binding could not pair a call with its try's containment.
+		return []nir.Stmt{nir.Try{Body: c.collectStatementBlocks(n), Loc: L}}
 	case "statement_block":
 		return []nir.Stmt{nir.Block{Stmts: c.collectStatementBlocks(n)}}
 	case "export_statement":
