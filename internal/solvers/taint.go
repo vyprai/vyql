@@ -844,6 +844,15 @@ func plainWitness(env witnessEnv, n string) []string {
 // crossing, re-anchored to a tainted argument of this call that flows into the parameter.
 // Where none exists the crossing stands — that witness is the only real one there is.
 //
+// The frames form a stack, because wrappers nest: a helper whose body calls a second
+// helper and returns its result (`get` -> `do` in quill's client) passes an inner
+// attribution between entering the outer helper and reaching its param, and a walk that
+// carried only the innermost call site would arrive at the outer param frameless and
+// report the crossing the outer repair exists to undo. A function body is entered
+// backward only through its own return attribution — FLOWS is the only edge type, and
+// taint reaches a body from its param or a source inside it — so the param the walk is
+// leaving belongs to exactly the call site on top of the stack.
+//
 // Every step of a re-anchored witness is a real FLOWS edge between nodes the fixpoint
 // marked tainted, so the path shown is still a genuine source→sink path. The repair is
 // presentation-only: findings, fingerprints and scores key on (rule, sink) and do not
@@ -852,7 +861,7 @@ func plainWitness(env witnessEnv, n string) []string {
 // than loop, leaving plainWitness as the answer.
 func siteAwareWitness(env witnessEnv, sink string, budget int) ([]string, bool) {
 	var rev []string
-	frame := "" // the call node whose callee body the walk is currently inside
+	var frames []string // call sites whose callee bodies the walk is inside, innermost last
 	for n := sink; ; {
 		if len(rev) > budget {
 			return nil, false
@@ -865,12 +874,13 @@ func siteAwareWitness(env witnessEnv, sink string, budget int) ([]string, bool) 
 		nt, pt := env.nodeType(n), env.nodeType(p)
 		switch {
 		case nt == "code.Call" && pt == "code.Return":
-			frame = n // return attribution: the callee body below belongs to this call site
-		case nt == "code.Param" && frame != "":
+			frames = append(frames, n) // return attribution: the body below belongs to this call site
+		case nt == "code.Param" && len(frames) > 0:
+			frame := frames[len(frames)-1]
 			if q := siteConsistentArg(env, frame, n, p); q != "" {
 				p = q
 			}
-			frame = "" // the callee body is left either way
+			frames = frames[:len(frames)-1] // that callee body is left either way
 		}
 		n = p
 	}

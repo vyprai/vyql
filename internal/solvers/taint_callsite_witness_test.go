@@ -150,6 +150,134 @@ func TestWitnessExitsThroughTheCallSiteItEntered(t *testing.T) {
 	}
 }
 
+// nestedCallSiteGraphs is the wrapper idiom the flat shape abstracts away: a helper
+// whose body calls a SECOND helper and returns its result (`func (s httpClient) get(e)
+// { return s.do(req) }`), invoked at two sites. The inner call sits between entering
+// the outer helper and leaving it, so a walk that carries only the innermost call site
+// loses the outer one before it reaches the outer param — and reports the other
+// invocation's value there, the same crossing the flat repair exists to undo.
+func nestedCallSiteGraphs() []callSiteGraph {
+	shape := func(name, src1, src2, wantSrc, wantArg string) callSiteGraph {
+		return callSiteGraph{
+			name: name,
+			nodes: []usg.Node{
+				{ID: src1, Type: "code.Call", Loc: "app.go:9"},
+				{ID: src2, Type: "code.Call", Loc: "http_client.go:36"},
+				{ID: "argA", Type: "code.Arg", Loc: "app.go:2", Props: map[string]string{"slot": "0"}},
+				{ID: "argB", Type: "code.Arg", Loc: "app.go:3", Props: map[string]string{"slot": "0"}},
+				{ID: "param", Type: "code.Param", Loc: "app.go:10", Props: map[string]string{"func": "outer", "name": "v"}},
+				// the inner invocation, inside outer's body: outer passes its own param on
+				{ID: "argI", Type: "code.Arg", Loc: "app.go:11", Props: map[string]string{"slot": "0"}},
+				{ID: "paramI", Type: "code.Param", Loc: "app.go:20", Props: map[string]string{"func": "inner", "name": "w"}},
+				{ID: "bodyI", Type: "code.Name", Loc: "app.go:21"},
+				{ID: "retI", Type: "code.Return", Loc: "app.go:22", Props: map[string]string{"func": "inner"}},
+				{ID: "callI", Type: "code.Call", Loc: "app.go:11", Props: map[string]string{"arg0": "argI"}},
+				{ID: "ret", Type: "code.Return", Loc: "app.go:12", Props: map[string]string{"func": "outer"}},
+				{ID: "callA", Type: "code.Call", Loc: "app.go:2", Props: map[string]string{"arg0": "argA"}},
+				{ID: "callB", Type: "code.Call", Loc: "app.go:3", Props: map[string]string{"arg0": "argB"}},
+				{ID: "sink", Type: "code.Arg", Loc: "app.go:4"},
+			},
+			labels: [][2]string{
+				{src1, "test.Source"}, {src2, "test.Source"}, {"sink", "test.Sink"},
+			},
+			edges: [][2]string{
+				{src1, "argB"}, {src2, "argA"},
+				{"argA", "param"}, {"argB", "param"},
+				{"param", "argI"},
+				{"argI", "paramI"},
+				{"paramI", "bodyI"}, {"bodyI", "retI"},
+				{"retI", "callI"}, // inner return attributed to the call inside outer
+				{"callI", "ret"},  // outer returns the inner call's result
+				{"ret", "callA"}, {"ret", "callB"},
+				{"callA", "sink"},
+			},
+			wantSrc: wantSrc, wantArg: wantArg, wantNo: []string{"argB"},
+		}
+	}
+	gs := []callSiteGraph{
+		// The second site's value tainted the outer param first and the inner call
+		// sits between the outer entry and the outer param: the walk must still
+		// re-anchor at the OUTER param to the first site's argument.
+		shape("crossing witness re-anchors at the outer level past an inner call", "src1", "src2", "src2", "argA"),
+	}
+	// The fallback twin: with no site-consistent taint at the outer level (src2 cut),
+	// the crossing witness is the only real one and must stand.
+	fb := shape("no site-consistent outer taint keeps the crossing witness", "src1", "src2-gone", "src1", "argB")
+	fb.wantNo = []string{"argA"}
+	edges := make([][2]string, 0, len(fb.edges))
+	for _, e := range fb.edges {
+		if e[0] == "src2-gone" {
+			continue
+		}
+		edges = append(edges, e)
+	}
+	fb.edges = edges
+	return append(gs, fb)
+}
+
+// The witness keeps the call site it entered a helper through even when the helper's
+// body passes through another helper call on the way to its parameter: the frames nest
+// rather than replace each other. Both solver twins, and the re-anchored path must be
+// real edges all the way.
+func TestWitnessKeepsTheOuterFrameThroughANestedCall(t *testing.T) {
+	for _, cg := range nestedCallSiteGraphs() {
+		t.Run(cg.name, func(t *testing.T) {
+			for _, build := range []struct {
+				name string
+				mk   func() usg.Store
+			}{
+				{"string path", func() usg.Store { return usg.NewInMemStore() }},
+				{"int path", func() usg.Store { return usg.NewIntStore(len(cg.nodes)) }},
+			} {
+				t.Run(build.name, func(t *testing.T) {
+					flows, err := FindTaintFlows(cg.build(t, build.mk()),
+						set("test.Source"), set("test.Sink"), set("test.Kind"), nil, "", set())
+					if err != nil {
+						t.Fatal(err)
+					}
+					if len(flows) != 1 {
+						t.Fatalf("want exactly one flow, got %d: %+v", len(flows), flows)
+					}
+					f := flows[0]
+					if f.SourceID != cg.wantSrc {
+						t.Fatalf("reported source = %q, want %q (path %v)", f.SourceID, cg.wantSrc, f.Path)
+					}
+					adj := map[string]bool{}
+					for _, e := range cg.edges {
+						adj[e[0]+"->"+e[1]] = true
+					}
+					p := f.Path
+					if len(p) < 2 || p[0] != f.SourceID || p[len(p)-1] != f.SinkID {
+						t.Fatalf("witness path is not source..sink: %v", p)
+					}
+					for i := 0; i+1 < len(p); i++ {
+						if !adj[p[i]+"->"+p[i+1]] {
+							t.Fatalf("witness step %s -> %s is not an edge in the graph", p[i], p[i+1])
+						}
+					}
+					for _, id := range cg.wantNo {
+						if containsID(p, id) {
+							t.Fatalf("witness runs through %q: %v", id, p)
+						}
+					}
+					if cg.wantArg != "" && !containsID(p, cg.wantArg) {
+						t.Fatalf("witness does not enter through %q: %v", cg.wantArg, p)
+					}
+				})
+			}
+		})
+	}
+}
+
+func containsID(ids []string, want string) bool {
+	for _, id := range ids {
+		if id == want {
+			return true
+		}
+	}
+	return false
+}
+
 // The re-anchored witness is still a path in the graph: every consecutive pair is a real
 // FLOWS edge. The repair may only choose among edges that exist; this pins that it does.
 func TestReanchoredWitnessIsARealPath(t *testing.T) {
