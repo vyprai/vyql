@@ -88,6 +88,55 @@ func TestJavaScriptCommandRegexRejectGuardObservation(t *testing.T) {
 	}
 }
 
+// A try statement lowers to an analysis.exception node whose loc is the statement's.
+// The loc is not decoration: the presence matcher's same-file guard drops a loc-less
+// node from a flow_to walk, so without it no binding could pair a call inside the try
+// with the try's exception-containment fact. The one walker serves .js and .ts alike.
+func TestJavaScriptTryStatementExceptionNodeCarriesLocation(t *testing.T) {
+	for _, file := range []string{"app.js", "app.ts"} {
+		t.Run(file, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, file)
+			src := []byte("function run(cmd) {\n" +
+				"  try {\n" +
+				"    doWork(cmd);\n" +
+				"  } catch (e) {\n" +
+				"    cleanup(e);\n" +
+				"  }\n" +
+				"  unrelated(cmd);\n" +
+				"}\n")
+			if err := os.WriteFile(path, src, 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			graph, err := lowering.Lower(prog, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodes, err := graph.AllNodes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var exceptions []string
+			for _, n := range nodes {
+				if n.Type == "code.Exception" && n.Prop("callee_path") == "analysis.exception" {
+					exceptions = append(exceptions, n.Prop("loc"))
+				}
+			}
+			if len(exceptions) != 1 {
+				t.Fatalf("expected exactly one exception node from the try, got %d (%v)", len(exceptions), exceptions)
+			}
+			if want := file + ":2"; exceptions[0] != want {
+				t.Fatalf("exception node loc = %q, want the try statement's %q", exceptions[0], want)
+			}
+		})
+	}
+}
+
 func TestTypeScriptObjectGeneratorMethodsAreExtracted(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "login.ts")
