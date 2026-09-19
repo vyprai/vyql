@@ -134,9 +134,10 @@ func (p *packageConverter) flush() {
 	}
 	pkgMethods := scratch.methodMap(allDecls)
 	pkgIfaces := scratch.interfaceMethodSets(allDecls)
+	pkgFields := scratch.structFieldMap(allDecls)
 	mod := p.byPkg[p.pkgKey]
 	for i, f := range p.files {
-		c := &conv{fset: p.fset, file: p.displays[i], pkgMethods: pkgMethods, pkgIfaces: pkgIfaces}
+		c := &conv{fset: p.fset, file: p.displays[i], pkgMethods: pkgMethods, pkgIfaces: pkgIfaces, pkgFields: pkgFields}
 		mod.Imports = append(mod.Imports, c.imports(f)...)
 		mod.Body = append(mod.Body, c.decls(f.Decls)...)
 	}
@@ -254,6 +255,15 @@ type conv struct {
 	// file's own declarations and should not grow with the package's.
 	pkgMethods map[string]map[string]bool
 	pkgIfaces  map[string]map[string]bool
+	// pkgFields is the whole package's struct field sets (type name -> sorted fields).
+	// The declared field list is the only honest universe for a field-level judgement:
+	// the fields a vulnerable handler leaves client-set are precisely the ones its body
+	// never names, so a walk that only saw the touched fields could not state them. It
+	// is package-scoped like pkgMethods because a type's declaration is visible from
+	// every file of its package; a struct another package declares (a dot-imported
+	// model, the shape large monorepos use) is not here, and the walk falls back to the
+	// fields the body touches.
+	pkgFields map[string][]string
 }
 
 // inPlaceFuncLit converts a func literal to a synthetic FuncDef emitted where the literal
@@ -540,6 +550,29 @@ func (c *conv) interfaceMethodSets(decls []ast.Decl) map[string]map[string]bool 
 			}
 			if len(set) > 0 {
 				out[ts.Name.Name] = set
+			}
+		}
+	}
+	return out
+}
+
+// structFieldMap collects, per struct type declared in these declarations, its sorted
+// field names. See conv.pkgFields for why the walk needs the declared list rather than
+// the fields a body happens to touch.
+func (c *conv) structFieldMap(decls []ast.Decl) map[string][]string {
+	out := map[string][]string{}
+	for _, d := range decls {
+		g, ok := d.(*ast.GenDecl)
+		if !ok || g.Tok != token.TYPE {
+			continue
+		}
+		for _, spec := range g.Specs {
+			ts, ok := spec.(*ast.TypeSpec)
+			if !ok || ts.Name == nil {
+				continue
+			}
+			if fields := c.structFieldNames(ts.Type); len(fields) > 0 {
+				out[ts.Name.Name] = fields
 			}
 		}
 	}
@@ -909,30 +942,43 @@ func (c *conv) goPublicUserListRouteMissingAuthObservations(name string, body *a
 }
 
 // goDecodeRestoreObservations records, per persistence call that writes a
-// bind-decoded object, the struct fields the same function re-established from a
-// separately loaded record between the decode and the write. This is the
-// field-level witness whole-object taint cannot express: reassigning one field
-// of a tainted object leaves the object tainted, so the handler that restored
-// the protected fields and the one that did not are identical to the solver.
-// The fact is anchored at the persistence call and carries the persisted
-// expression itself as its first argument -- an analysis call with no mapped
-// parameters flows that argument into the fact node, so one fact is both a
-// presence token set a binding can judge (the field: tokens name the restores,
-// which is what separates the fixed handler from the vulnerable one) and a
-// taint-carrying node a binding can report the write at. A restore is
-// `target.Field = record.Field` where record was assigned from a call in the
-// same body; restores that run before the decode do not count (the decode
-// overwrites them), and a decode with no persistence call after it states no
-// write and records nothing.
+// bind-decoded object, ONE FACT PER FIELD of that object's struct: whether the
+// same function re-established the field from a separately loaded record
+// between the decode and the write (restored:1 / restored:0), and the value the
+// field holds at the write. This is the field-level witness whole-object taint
+// cannot express: reassigning one field of a tainted object leaves the object
+// tainted, so the handler that restored the protected fields and the one that
+// did not are identical to the solver. A field the body wrote after the decode
+// is witnessed by that write's own value (a read of the field's dotted name,
+// which the assignment rebound -- the restore's right-hand side, clean when the
+// loaded record is); a field no write re-established is witnessed by the bound
+// object itself, whose whole-object taint is exactly the client control the
+// decode left on it. One fact is therefore both a presence token set a binding
+// can judge and a taint-carrying node that says tainted only for the fields the
+// client still controls -- the fixed handler's restored:1 facts are clean and
+// the vulnerable handler's restored:0 facts are not, where the whole-object
+// sink is tainted on both. A restore is `target.Field = record.Field` where
+// record was assigned from a call in the same body; restores that run before
+// the decode do not count (the decode overwrites them, and so does any earlier
+// write), and a decode with no persistence call after it states no write and
+// records nothing. The field universe is the declared struct's when the type is
+// one this package declares (the fields a vulnerable handler leaves client-set
+// are precisely the ones its body never names); otherwise it is the fields the
+// body touches, which is all this file can state about another package's type.
 func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []nir.Stmt {
 	if body == nil {
 		return nil
 	}
-	decodeVerb := map[string]string{} // decoded var -> callee of the decode that filled it
-	loaded := map[string]bool{}       // var assigned from a call: a record this body loaded
-	restored := map[string][]string{} // decoded var -> fields restored from a loaded record
-	records := map[string][]string{}  // decoded var -> the records those restores read
-	recorded := map[string]bool{}     // "var.Field" and "var\x00record" dedup keys
+	decodeVerb := map[string]string{}       // decoded var -> callee of the decode that filled it
+	decodePos := map[string]token.Pos{}     // decoded var -> position of that decode
+	loaded := map[string]bool{}             // var assigned from a call: a record this body loaded
+	restored := map[string][]string{}       // decoded var -> fields restored from a loaded record
+	restoreRecord := map[string]string{}    // "var.Field" -> the record that restore read
+	records := map[string][]string{}        // decoded var -> the records those restores read
+	varType := map[string]string{}          // local -> same-package struct type name it was declared as
+	written := map[string]bool{}            // "var.Field" -> a write AFTER the decode re-established it
+	touched := map[string]map[string]bool{} // var -> fields its body names (the fallback universe)
+	recorded := map[string]bool{}           // "var.Field" and "var\x00record" dedup keys
 	addRestore := func(target, field, record string) {
 		if target == "" || target == "_" || field == "" || record == "" || len(restored[target]) >= 32 {
 			return
@@ -940,6 +986,7 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 		if key := target + "." + field; !recorded[key] {
 			recorded[key] = true
 			restored[target] = append(restored[target], field)
+			restoreRecord[key] = record
 		}
 		if key := target + "\x00" + record; !recorded[key] && len(records[target]) < 8 {
 			recorded[key] = true
@@ -957,11 +1004,75 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 		}
 		return base.Name, sel.Sel.Name
 	}
+	// declaredTypeName is the same-package struct type of a freshly declared local: the
+	// valueless `var v T`, a `var v T = ...` with its type spelled, and the composite
+	// literal forms `v := T{}` / `v := &T{}`. A dotted name names another package's type,
+	// whose fields this file cannot state, so it stays unknown.
+	declaredTypeName := func(e ast.Expr) string {
+		if t := c.typeName(e); t != "" && !strings.Contains(t, ".") {
+			return t
+		}
+		return ""
+	}
+	noteLocal := func(v string, e ast.Expr) {
+		if v == "" || v == "_" {
+			return
+		}
+		switch t := e.(type) {
+		case *ast.CompositeLit:
+			if tn := declaredTypeName(t.Type); tn != "" {
+				varType[v] = tn
+			}
+		case *ast.UnaryExpr:
+			if t.Op == token.AND {
+				if lit, ok := t.X.(*ast.CompositeLit); ok {
+					if tn := declaredTypeName(lit.Type); tn != "" {
+						varType[v] = tn
+					}
+				}
+			}
+		}
+	}
+	noteSelector := func(sel *ast.SelectorExpr, write bool) {
+		if sel == nil || sel.Sel == nil {
+			return
+		}
+		base, ok := sel.X.(*ast.Ident)
+		if !ok || base.Name == "" || base.Name == "_" {
+			return
+		}
+		if touched[base.Name] == nil {
+			touched[base.Name] = map[string]bool{}
+		}
+		touched[base.Name][sel.Sel.Name] = true
+		if !write {
+			return
+		}
+		// Only a write AFTER the decode re-establishes the field; an earlier one is
+		// overwritten by the payload and the field stays whatever the client bound.
+		if pos, decoded := decodePos[base.Name]; decoded && sel.Pos() > pos {
+			written[base.Name+"."+sel.Sel.Name] = true
+		}
+	}
 	var out []nir.Stmt
 	ast.Inspect(body, func(n ast.Node) bool {
 		switch x := n.(type) {
 		case *ast.FuncLit:
 			return false
+		case *ast.DeclStmt:
+			if gd, ok := x.Decl.(*ast.GenDecl); ok && gd.Tok == token.VAR {
+				for _, spec := range gd.Specs {
+					if vs, ok := spec.(*ast.ValueSpec); ok {
+						for i, v := range vs.Names {
+							if len(vs.Values) > i {
+								noteLocal(v.Name, vs.Values[i])
+							} else if tn := declaredTypeName(vs.Type); tn != "" {
+								varType[v.Name] = tn
+							}
+						}
+					}
+				}
+			}
 		case *ast.AssignStmt:
 			for i, lhs := range x.Lhs {
 				if i >= len(x.Rhs) {
@@ -969,10 +1080,14 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 				}
 				switch target := lhs.(type) {
 				case *ast.Ident:
+					if x.Tok == token.DEFINE {
+						noteLocal(target.Name, x.Rhs[i])
+					}
 					if _, isCall := x.Rhs[i].(*ast.CallExpr); isCall && target.Name != "" && target.Name != "_" {
 						loaded[target.Name] = true
 					}
 				case *ast.SelectorExpr:
+					noteSelector(target, true)
 					if base, ok := target.X.(*ast.Ident); ok {
 						if _, decoded := decodeVerb[base.Name]; decoded {
 							if record, field := recordFieldOf(x.Rhs[i]); field != "" {
@@ -982,6 +1097,11 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 					}
 				}
 			}
+		case *ast.SelectorExpr:
+			// Reads count toward the fallback universe too: the fields a handler only
+			// compares are as client-controlled as the ones it writes, and the body-touched
+			// set is the only universe available for another package's type.
+			noteSelector(x, false)
 		case *ast.CallExpr:
 			verb := calleeName(x.Fun)
 			if isBindName(verb) {
@@ -989,6 +1109,7 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 					if u, ok := arg.(*ast.UnaryExpr); ok && u.Op == token.AND {
 						if id, ok := u.X.(*ast.Ident); ok && id.Name != "" && id.Name != "_" {
 							decodeVerb[id.Name] = verb
+							decodePos[id.Name] = x.Pos()
 						}
 					}
 				}
@@ -1012,21 +1133,55 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 				if !decoded {
 					continue
 				}
-				tokens := make([]string, 0, len(restored[id.Name])+len(records[id.Name])+5)
-				tokens = append(tokens, "lang=go", "function_name:"+name, "var:"+id.Name, "decode:"+verb, "callee:"+goLastSeg(c.path(x.Fun)))
-				for _, rec := range records[id.Name] {
-					tokens = append(tokens, "record:"+rec)
+				universe := c.pkgFields[varType[id.Name]]
+				if universe == nil {
+					for _, f := range sortedFields(touched[id.Name]) {
+						universe = append(universe, f)
+					}
 				}
-				for _, f := range restored[id.Name] {
-					tokens = append(tokens, "field:"+f)
+				if len(universe) > 128 {
+					universe = universe[:128]
 				}
-				call := analysisCall("analysis.go.decode_restore_before_persist", "decode_restore_before_persist", c.loc(x.Pos()), tokens...)
-				call.Args = append([]nir.Expr{c.expr(arg)}, call.Args...)
-				out = append(out, nir.ExprStmt{Value: call})
+				for _, f := range universe {
+					tokens := make([]string, 0, 8)
+					tokens = append(tokens, "lang=go", "function_name:"+name, "var:"+id.Name,
+						"decode:"+verb, "callee:"+goLastSeg(c.path(x.Fun)), "field:"+f)
+					restoredField := false
+					for _, r := range restored[id.Name] {
+						if r == f {
+							restoredField = true
+						}
+					}
+					if restoredField {
+						tokens = append(tokens, "restored:1", "record:"+restoreRecord[id.Name+"."+f])
+					} else {
+						tokens = append(tokens, "restored:0")
+					}
+					call := analysisCall("analysis.go.decode_restore_before_persist", "decode_restore_before_persist", c.loc(x.Pos()), tokens...)
+					// The field's own value when a write re-established it (the dotted name the
+					// write rebound); the bound object itself when nothing did.
+					witness := nir.Expr(c.expr(arg))
+					if written[id.Name+"."+f] {
+						witness = nir.Name{ID: id.Name + "." + f, Loc: c.loc(x.Pos())}
+					}
+					call.Args = append([]nir.Expr{witness}, call.Args...)
+					out = append(out, nir.ExprStmt{Value: call})
+				}
 			}
 		}
 		return true
 	})
+	return out
+}
+
+// sortedFields returns a selector's field names in a stable order, so the fact set of
+// one handler is comparable against another's.
+func sortedFields(set map[string]bool) []string {
+	out := make([]string, 0, len(set))
+	for f := range set {
+		out = append(out, f)
+	}
+	sort.Strings(out)
 	return out
 }
 

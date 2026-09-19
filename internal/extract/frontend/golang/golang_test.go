@@ -953,35 +953,44 @@ func saveTransaction(transaction *Transaction) error { return nil }
 		}
 		facts = append(facts, n.Prop("str_args"))
 	}
-	factFor := func(fn string) string {
+	factFor := func(fn, field string) string {
 		t.Helper()
 		for _, f := range facts {
-			if strings.Contains(f, "function_name:"+fn) {
+			if strings.Contains(f, "function_name:"+fn+"\x00") && strings.Contains(f, "field:"+field+"\x00") {
 				return f
 			}
 		}
-		t.Fatalf("no decode-restore fact for %s among %q", fn, facts)
+		t.Fatalf("no decode-restore fact for %s field %s among %q", fn, field, facts)
 		return ""
 	}
-	wantFive := []string{"putVulnerable", "putFixed", "restoreBeforeDecode", "restoreFromLiteral", "stdlibUnmarshal"}
-	if len(facts) != len(wantFive) {
-		t.Fatalf("decode-restore observations = %d, want %d (one per decode-then-persist handler; none for noPersistence); got %q", len(facts), len(wantFive), facts)
+	// One fact per field of the declared struct (three fields here), per decode-then-persist
+	// handler; none for noPersistence, which never persists.
+	if len(facts) != 15 {
+		t.Fatalf("decode-restore observations = %d, want 15 (one per field of Transaction per decode-then-persist handler); got %q", len(facts), facts)
 	}
-	if f := factFor("putVulnerable"); !strings.Contains(f, "field:Name") || !strings.Contains(f, "record:existing") ||
-		!strings.Contains(f, "decode:Bind") || !strings.Contains(f, "callee:Update") || strings.Contains(f, "field:Source") {
-		t.Errorf("vulnerable handler fact %q: want field:Name + record:existing + decode:Bind + callee:Update and no field:Source", f)
+	if f := factFor("putVulnerable", "Name"); !strings.Contains(f, "restored:1") || !strings.Contains(f, "record:existing") ||
+		!strings.Contains(f, "decode:Bind") || !strings.Contains(f, "callee:Update") {
+		t.Errorf("vulnerable handler Name fact %q: want restored:1 + record:existing + decode:Bind + callee:Update", f)
 	}
-	if f := factFor("putFixed"); !strings.Contains(f, "field:Name") || !strings.Contains(f, "field:Source") || !strings.Contains(f, "field:CreatedAt") {
-		t.Errorf("fixed handler fact %q: want field:Name + field:Source + field:CreatedAt", f)
+	if f := factFor("putVulnerable", "Source"); !strings.Contains(f, "restored:0") || strings.Contains(f, "record:") {
+		t.Errorf("vulnerable handler Source fact %q: want restored:0 and no record (the handler never re-established it)", f)
 	}
-	if f := factFor("restoreBeforeDecode"); strings.Contains(f, "field:Source") {
-		t.Errorf("restore recorded even though it ran before the decode: %q", f)
+	if f := factFor("putFixed", "Source"); !strings.Contains(f, "restored:1") || !strings.Contains(f, "record:existing") {
+		t.Errorf("fixed handler Source fact %q: want restored:1 + record:existing", f)
 	}
-	if f := factFor("restoreFromLiteral"); strings.Contains(f, "field:Source") {
+	if f := factFor("putFixed", "CreatedAt"); !strings.Contains(f, "restored:1") {
+		t.Errorf("fixed handler CreatedAt fact %q: want restored:1", f)
+	}
+	for _, field := range []string{"Name", "Source", "CreatedAt"} {
+		if f := factFor("restoreBeforeDecode", field); strings.Contains(f, "restored:1") {
+			t.Errorf("restore recorded even though it ran before the decode: %q", f)
+		}
+	}
+	if f := factFor("restoreFromLiteral", "Source"); strings.Contains(f, "restored:1") || strings.Contains(f, "record:") {
 		t.Errorf("literal assignment recorded as a restore from a loaded record: %q", f)
 	}
-	if f := factFor("stdlibUnmarshal"); !strings.Contains(f, "field:Source") || !strings.Contains(f, "decode:Unmarshal") || !strings.Contains(f, "callee:saveTransaction") {
-		t.Errorf("stdlib unmarshal fact %q: want field:Source + decode:Unmarshal + callee:saveTransaction", f)
+	if f := factFor("stdlibUnmarshal", "Source"); !strings.Contains(f, "restored:1") || !strings.Contains(f, "decode:Unmarshal") || !strings.Contains(f, "callee:saveTransaction") {
+		t.Errorf("stdlib unmarshal fact %q: want restored:1 + decode:Unmarshal + callee:saveTransaction", f)
 	}
 }
 
@@ -1047,6 +1056,120 @@ func put(c Ctx) error {
 	}
 	if !reached {
 		t.Fatalf("the bound object's taint (joined at the Bind call) does not reach the decode-restore fact node")
+	}
+}
+
+// The engine gap rank 2748 is blocked on, verbatim: "reassigning one field leaves the
+// whole struct tainted and the fixed handler reports identically to the vulnerable one."
+// A field-aware fact has to break that symmetry -- the same protected field's fact is
+// tainted on the handler that never re-established it and clean on the handler that
+// restored it from a loaded record, so a binding judging taint at the per-field facts
+// separates two revisions whose whole-object sink is indistinguishable.
+func TestGoDecodeFieldFactsSeparateRestoredFromClientControlled(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "put.go")
+	src := []byte(`package controller
+
+type Transaction struct {
+	Name      string
+	Source    string
+	CreatedAt string
+}
+
+func loadTransaction(id string) (*Transaction, error) { return nil, nil }
+
+func putVulnerable(c Ctx) error {
+	transaction := Transaction{}
+	if err := c.Bind(&transaction); err != nil {
+		return err
+	}
+	existing, err := loadTransaction(transaction.Name)
+	if err != nil {
+		return err
+	}
+	transaction.Name = existing.Name
+	return c.Update("id", &transaction)
+}
+
+func putFixed(c Ctx) error {
+	transaction := Transaction{}
+	if err := c.Bind(&transaction); err != nil {
+		return err
+	}
+	existing, err := loadTransaction(transaction.Name)
+	if err != nil {
+		return err
+	}
+	transaction.Name = existing.Name
+	transaction.Source = existing.Source
+	transaction.CreatedAt = existing.CreatedAt
+	return c.Update("id", &transaction)
+}
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := gofrontend.Extract([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The bind taint's seeds: every Bind call node and its bound-object argument.
+	var seeds []string
+	facts := map[string]string{} // "function\x00field" -> fact node ID
+	for _, n := range nodes {
+		if n.Type != "code.Call" {
+			continue
+		}
+		switch n.Prop("callee_path") {
+		case "c.Bind":
+			seeds = append(seeds, n.ID)
+			if arg0 := n.Prop("arg0"); arg0 != "" {
+				seeds = append(seeds, arg0)
+			}
+		case "analysis.go.decode_restore_before_persist":
+			args := n.Prop("str_args")
+			fn, field := "", ""
+			for _, tok := range strings.Split(args, "\x00") {
+				if strings.HasPrefix(tok, "function_name:") {
+					fn = strings.TrimPrefix(tok, "function_name:")
+				}
+				if strings.HasPrefix(tok, "field:") {
+					field = strings.TrimPrefix(tok, "field:")
+				}
+			}
+			if fn != "" && field != "" {
+				facts[fn+"\x00"+field] = n.ID
+			}
+		}
+	}
+	if len(facts) != 6 {
+		t.Fatalf("decode-restore facts = %d, want 6 (Source, CreatedAt and Name for each handler); got %v", len(facts), facts)
+	}
+	reachable := map[string]bool{}
+	for _, seed := range seeds {
+		set, err := usg.BFS(g, seed, "FLOWS", 40)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for id := range set {
+			reachable[id] = true
+		}
+	}
+	for fn, want := range map[string]bool{"putVulnerable": true, "putFixed": false} {
+		fact := facts[fn+"\x00Source"]
+		if got := reachable[fact]; got != want {
+			t.Errorf("%s: bind taint reaches the Source fact = %v, want %v -- the restore %s the field's client control",
+				fn, got, want, map[bool]string{true: "did not kill", false: "killed"}[want])
+		}
 	}
 }
 
