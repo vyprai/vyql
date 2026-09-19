@@ -5392,12 +5392,19 @@ var argMutators = map[string]bool{
 }
 
 // mutatedVar returns the variable a builder/accumulator call mutates: the
-// receiver of a recvMutator method, or arg0 of an argMutator function.
+// receiver of a recvMutator method, or arg0 of an argMutator function. A fluent
+// chain (`sb.append(c).append(t)`) takes the previous link's call result as its
+// receiver, so the mutated variable is the one at the chain's base.
 func mutatedVar(call nir.Call) string {
 	if recvMutators[call.Method] {
 		if at, ok := call.Callee.(nir.Attr); ok {
 			if nm, ok := at.Base.(nir.Name); ok {
 				return nm.ID
+			}
+			if inner, ok := at.Base.(nir.Call); ok && recvMutators[inner.Method] {
+				if v := mutatedVar(inner); v != "" {
+					return v
+				}
 			}
 		}
 	}
