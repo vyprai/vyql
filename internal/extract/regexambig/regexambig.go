@@ -182,6 +182,7 @@ type regexAtom struct {
 	quant    byte // 0, '?', '*' or '+'
 	bounded  bool // the quantifier carries a finite ceiling, as `{3}` or `{2,5}` do
 	group    bool
+	atomic   bool // an (?>…) group: the engine never re-enters it once matched
 	body     string
 	look     byte // 0, '=' for a positive lookaround, '!' for a negative one
 	nullable bool
@@ -197,31 +198,34 @@ type regexRun struct {
 }
 
 // regexGroupInner strips a group's leading construct marker and reports whether
-// the group is a lookaround, which matches without consuming input.
-func regexGroupInner(inner string) (string, byte) {
+// the group is a lookaround, which matches without consuming input, and whether
+// it is atomic, which the engine never re-enters once it has matched.
+func regexGroupInner(inner string) (string, byte, bool) {
 	switch {
+	case strings.HasPrefix(inner, "?>"): // atomic group: the fix shape of CVE-2021-32740
+		return inner[2:], 0, true
 	case strings.HasPrefix(inner, "?:"):
-		return inner[2:], 0
+		return inner[2:], 0, false
 	case strings.HasPrefix(inner, "?="):
-		return inner[2:], '='
+		return inner[2:], '=', false
 	case strings.HasPrefix(inner, "?!"):
-		return inner[2:], '!'
+		return inner[2:], '!', false
 	case strings.HasPrefix(inner, "?<="):
-		return inner[3:], '='
+		return inner[3:], '=', false
 	case strings.HasPrefix(inner, "?<!"):
-		return inner[3:], '!'
+		return inner[3:], '!', false
 	case strings.HasPrefix(inner, "?P<"): // Python named group
 		if close := strings.IndexByte(inner, '>'); close >= 0 {
-			return inner[close+1:], 0
+			return inner[close+1:], 0, false
 		}
 	case strings.HasPrefix(inner, "?P="): // Python named backreference
-		return "", 0
+		return "", 0, false
 	case strings.HasPrefix(inner, "?<"):
 		if close := strings.IndexByte(inner, '>'); close >= 0 {
-			return inner[close+1:], 0
+			return inner[close+1:], 0, false
 		}
 	}
-	return inner, 0
+	return inner, 0, false
 }
 
 // regexAtomsOf splits one alternation branch into its atoms, left to right.
@@ -251,7 +255,7 @@ func regexAtomsOf(seq string, depth int) []regexAtom {
 				continue
 			}
 			a.group = true
-			a.body, a.look = regexGroupInner(seq[i+1 : end])
+			a.body, a.look, a.atomic = regexGroupInner(seq[i+1 : end])
 			i = end + 1
 		case seq[i] == '.':
 			a.set = regexAnySet()
@@ -271,6 +275,11 @@ func regexAtomsOf(seq string, depth int) []regexAtom {
 			case '+': // possessive: cannot give back what it matched
 				quant, next = 0, next+1
 			}
+		}
+		if a.atomic && quant != 0 {
+			// An atomic group cannot give back what it matched either, so a
+			// quantifier over it iterates without ever re-splitting its content.
+			quant = 0
 		}
 		a.quant, a.bounded, i = quant, bounded, next
 		a.nullable = quant == '*' || quant == '?'
@@ -346,8 +355,8 @@ func regexAltHasAmbiguousRepeatStrand(alt string, depth int, strandAfter bool) b
 			return true
 		}
 		for k, a := range atoms {
-			if !a.group {
-				continue
+			if !a.group || a.atomic {
+				continue // an atomic group's interior is never re-entered, so it holds no ambiguity to retry
 			}
 			if isBacktrackingRepeat(a.quant) && regexBodyHasRepeat(a.body) &&
 				!regexLoopBodyDisambiguated(a.body, depth+1) {
@@ -376,11 +385,20 @@ func regexEndsInDollarAnchor(branch string) bool {
 // A quantifier character inside a [...] class is a literal member of that class,
 // not a quantifier, so class spans are skipped: `([a-z+])+` iterates over one
 // character from a fixed set — the class's own `+` does not make it explode.
+// An atomic group's span is skipped for the same reason from the outside: the
+// engine never re-enters it, so whatever repeats inside it is not a repeat the
+// enclosing loop can re-split.
 func regexBodyHasRepeat(body string) bool {
 	for i := 0; i < len(body); i++ {
 		if body[i] == '[' && !isEscaped(body, i) {
 			if end := regexCharClassEnd(body, i); end > i {
 				i = end // a class holds literals; its members cannot quantify
+			}
+			continue
+		}
+		if strings.HasPrefix(body[i:], "(?>") && !isEscaped(body, i) {
+			if end := regexGroupEnd(body, i); end > i {
+				i = end // an atomic group walls its interior off from backtracking
 			}
 			continue
 		}
@@ -617,16 +635,14 @@ func isBacktrackingRepeat(q byte) bool {
 }
 
 // regexBodyHasLiteralSeparator reports a mandatory single-character literal in the
-// body that none of its repeated atoms can match. Such a character can only come
-// from that position, so each iteration is delimited and the repeat is unambiguous.
+// body that no repeat anywhere in it can match — the repeat's own atoms or one
+// nested inside a group, which the loop re-splits just as freely. Such a
+// character can only come from that position, so each iteration is delimited and
+// the repeat is unambiguous.
 func regexBodyHasLiteralSeparator(body string, depth int) bool {
 	atoms := regexAtomsOf(body, depth+1)
 	var repeats regexCharSet
-	for _, a := range atoms {
-		if a.look == 0 && isBacktrackingRepeat(a.quant) {
-			repeats.union(a.set)
-		}
-	}
+	regexCollectRepeatAlphabet(atoms, depth+1, &repeats)
 	if repeats.empty() {
 		return false
 	}
@@ -639,6 +655,31 @@ func regexBodyHasLiteralSeparator(body string, depth int) bool {
 		}
 	}
 	return false
+}
+
+// regexCollectRepeatAlphabet accumulates the alphabet every repeat in the
+// sequence can consume, repeats nested inside group bodies included: a separator
+// none of the body's own atoms can match may still be swallowable by a repeat
+// buried in a group, and then the iteration boundary is not forced. Lookarounds
+// consume nothing, so they contribute no alphabet.
+func regexCollectRepeatAlphabet(atoms []regexAtom, depth int, into *regexCharSet) {
+	if depth > regexAnalysisMaxDepth {
+		*into = regexAnySet()
+		return
+	}
+	for _, a := range atoms {
+		if a.look != 0 {
+			continue
+		}
+		if isBacktrackingRepeat(a.quant) {
+			into.union(a.set)
+		}
+		if a.group {
+			for _, branch := range splitTopLevelRegexBranches(a.body) {
+				regexCollectRepeatAlphabet(regexAtomsOf(branch, depth+1), depth+1, into)
+			}
+		}
+	}
 }
 
 // regexSetSize counts the members of a character set.

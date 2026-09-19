@@ -70,6 +70,27 @@ func TestAmbiguous(t *testing.T) {
 		{false, "dot run beside a whitespace run stays ordinary", `.*\s*$`},
 		{false, "disjoint alphabets pin each division", `\s*[a-z]+\s*$`},
 		{false, "ceilinged repeats divide a run one way", `^(\d{4})(\d{2})(\d{2})$`},
+
+		// An atomic group (?>…) walls its interior off from backtracking: once it
+		// has matched, the engine can neither re-enter it nor accept a shorter
+		// match from it, so a repeat the loop around it could re-split in the
+		// plain spelling cannot be re-split at all. The rank2203 pair is the
+		// addressable VARNAME constant — a run of name characters the outer loop
+		// divides exponentially in the plain spelling and only ever consumes
+		// whole once the run is atomic.
+		{true, "rank2203 plain nested name run", `^(?:(?:(?:[a-zA-Z0-9_]|%[a-fA-F0-9][a-fA-F0-9])+)(?:\.?(?:(?:[a-zA-Z0-9_]|%[a-fA-F0-9][a-fA-F0-9])+))*)$`},
+		{false, "rank2203 atomic nested name run", `^(?:(?>(?:[a-zA-Z0-9_]|%[a-fA-F0-9][a-fA-F0-9])+)(?:\.?(?>(?:[a-zA-Z0-9_]|%[a-fA-F0-9][a-fA-F0-9])+))*)$`},
+		{false, "atomic group over a repeat", `(?>a+)+$`},
+		{false, "atomic group over an alternation of repeats", `(?>a+|b+)+$`},
+		{false, "nested repeat behind an atomic group", `(?>(?:a+)+)+$`},
+
+		// The separator that delimits a loop's iterations pins them even when
+		// the loop's own atoms carry no repeat: the rank2203 varspec list wraps
+		// its digit repeat inside an optional group, and the comma that leads
+		// each iteration is still the only place a comma can come from. A
+		// nested repeat that CAN match the separator leaves the boundary free.
+		{false, "separator delimits iterations, the repeat nested in a group", `^(?:,x(\*|:\d+)?)+$`},
+		{true, "nested repeat that matches the separator keeps the report", `^(?:,(\d,+))+$`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

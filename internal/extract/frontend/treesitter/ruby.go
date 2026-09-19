@@ -25,6 +25,10 @@ type rbConv struct {
 	root       string
 	file       string
 	visibility string
+	// strEnv holds the string values this file's `#{...}` interpolations can name,
+	// gathered before the body is converted so a regex literal that interpolates
+	// can be judged on the pattern its fragments assemble.
+	strEnv *rbStrEnv
 	// singletonSelf is set while converting the body of a `class << self` block, whose `def`s
 	// declare CLASS-level methods rather than instance methods of the enclosing class.
 	singletonSelf bool
@@ -42,6 +46,7 @@ func ExtractRuby(files []string, root string) (nir.Program, error) {
 	}
 	build := func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool) {
 		c := &rbConv{src: src, root: root, file: rel}
+		c.strEnv = c.rbBuildStrEnv(tree.RootNode())
 		body := append(c.rubyModuleContext(tree.RootNode()), c.blockChildren(tree.RootNode())...)
 		body = append(body, c.regexBacktrackObservations(tree.RootNode())...)
 		return nir.Module{Key: "", File: rel, Body: body}, true
@@ -1171,10 +1176,10 @@ func (c *rbConv) expr(n *tree_sitter.Node) nir.Expr {
 	case "heredoc_body", "heredoc_content":
 		return c.string(n, L)
 	case "regex":
-		if rubyRegexMayBacktrack(c.text(n)) {
+		if raw, ok := c.rbRegexText(n); ok && rubyRegexMayBacktrack(raw) {
 			return nir.Call{
 				Callee: nir.Name{ID: "__regex.match", Loc: L},
-				Args:   []nir.Expr{nir.Const{Loc: L, Value: c.text(n)}},
+				Args:   []nir.Expr{nir.Const{Loc: L, Value: raw}},
 				Path:   "__regex.match",
 				Method: "match",
 				Loc:    L,
@@ -1255,14 +1260,300 @@ func (c *rbConv) keyName(n *tree_sitter.Node) string {
 	return strings.TrimSuffix(strings.TrimPrefix(t, ":"), ":")
 }
 
+// rbStrEnv holds the string values a file's `#{...}` interpolations can name,
+// gathered in document order before the body is converted: a local or constant
+// assigned a foldable string — a literal, or a `+` concatenation of foldables,
+// interpolations included — plus the assembled source text of every regex
+// literal whose interpolations all resolve. A name assigned two different
+// values is dropped rather than guessed at, and a fragment naming anything else
+// (a parameter, a call, a value another file defines) leaves its literal
+// unanalysed, exactly as it always was.
+type rbStrEnv struct {
+	vals  map[string]string  // bare local names, and constants by their dotted path
+	bad   map[string]bool    // names whose assignments disagree — not guessable
+	regex map[uintptr]string // a regex node's id -> its assembled source text
+}
+
+func (e *rbStrEnv) set(key, val string) {
+	if old, ok := e.vals[key]; ok {
+		if old != val {
+			delete(e.vals, key)
+			e.bad[key] = true
+		}
+		return
+	}
+	if !e.bad[key] {
+		e.vals[key] = val
+	}
+}
+
+// resolve looks a `#{...}` reference up the way Ruby looks a constant up: the
+// namespaces enclosing the reference, innermost first, then the name as
+// written. A name in the bad set resolves to nothing — which of its values the
+// interpolation takes is not in the file.
+func (e *rbStrEnv) resolve(ref, ns string) (string, bool) {
+	ref = strings.ReplaceAll(strings.TrimSpace(ref), ".", "::")
+	if ref == "" {
+		return "", false
+	}
+	var parts []string
+	if ns != "" {
+		parts = strings.Split(ns, "::")
+	}
+	for i := len(parts); i >= 0; i-- {
+		key := strings.Join(append(append([]string{}, parts[:i]...), ref), "::")
+		if v, ok := e.vals[key]; ok {
+			return v, true
+		}
+		if e.bad[key] {
+			return "", false
+		}
+	}
+	return "", false
+}
+
+// rbBuildStrEnv walks a file once, folding the assignments that pin a string
+// value to a name and splicing the regex literals whose interpolations every
+// such name covers. The namespace stack keys constants the way a reference
+// spells them: `ALPHA` inside Addressable::URI::CharacterClasses is stored under
+// its full path, so both `ALPHA` from a sibling and
+// `Addressable::URI::CharacterClasses::ALPHA` from anywhere resolve to it.
+func (c *rbConv) rbBuildStrEnv(root *tree_sitter.Node) *rbStrEnv {
+	env := &rbStrEnv{
+		vals:  map[string]string{},
+		bad:   map[string]bool{},
+		regex: map[uintptr]string{},
+	}
+	var walk func(n *tree_sitter.Node, ns string)
+	walk = func(n *tree_sitter.Node, ns string) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "class", "module":
+			if name := strings.ReplaceAll(c.text(c.field(n, "name")), ".", "::"); name != "" {
+				if ns != "" {
+					name = ns + "::" + name
+				}
+				ns = name
+			}
+		case "assignment":
+			right := c.field(n, "right")
+			if key := c.rbStrAssignKey(c.field(n, "left"), ns); key != "" && right != nil {
+				if v, ok := c.rbFoldStringExpr(right, env, ns); ok {
+					env.set(key, v)
+				}
+			}
+		case "regex":
+			if t := c.text(n); strings.Contains(t, "#{") {
+				if asm, ok := c.rbAssembleRegexText(t, env, ns); ok {
+					env.regex[n.Id()] = asm
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch, ns)
+		}
+	}
+	walk(root, "")
+	return env
+}
+
+// rbStrAssignKey names the slot an assignment writes for interpolation lookup:
+// a local by its own name, a constant by its path inside the namespace it is
+// declared in. Anything else — a subscript, an attribute — has no name an
+// interpolation can reach.
+func (c *rbConv) rbStrAssignKey(left *tree_sitter.Node, ns string) string {
+	if left == nil {
+		return ""
+	}
+	switch c.kind(left) {
+	case "identifier":
+		return c.text(left)
+	case "constant":
+		name := c.text(left)
+		if ns != "" {
+			name = ns + "::" + name
+		}
+		return name
+	case "scope_resolution":
+		if path := c.dotted(left); path != "" && path != "?" {
+			return strings.ReplaceAll(path, ".", "::")
+		}
+	}
+	return ""
+}
+
+// rbFoldStringExpr evaluates an expression to the string it must hold at
+// runtime — a literal, a `+` concatenation, a name the file pins — and reports
+// false for anything whose value is not fixed in the file: a call, a parameter,
+// a name the file never assigns.
+func (c *rbConv) rbFoldStringExpr(n *tree_sitter.Node, env *rbStrEnv, ns string) (string, bool) {
+	if n == nil {
+		return "", false
+	}
+	switch c.kind(n) {
+	case "string":
+		return c.rbFoldStringLiteral(n, env, ns)
+	case "binary":
+		if c.text(c.field(n, "operator")) == "+" {
+			left, lok := c.rbFoldStringExpr(c.field(n, "left"), env, ns)
+			right, rok := c.rbFoldStringExpr(c.field(n, "right"), env, ns)
+			if lok && rok {
+				return left + right, true
+			}
+		}
+	case "identifier", "constant":
+		return env.resolve(c.text(n), ns)
+	case "scope_resolution":
+		if path := c.dotted(n); path != "" && path != "?" {
+			return env.resolve(path, ns)
+		}
+	case "parenthesized_statements":
+		if kids := c.namedChildren(n); len(kids) == 1 {
+			return c.rbFoldStringExpr(kids[0], env, ns)
+		}
+	}
+	return "", false
+}
+
+// rbFoldStringLiteral folds a string literal's source text to its runtime value:
+// the escape sequences Ruby itself folds, and `#{name}` interpolations resolved
+// against the values gathered so far. A literal interpolating something
+// unresolvable has no fixed value, and says so.
+func (c *rbConv) rbFoldStringLiteral(n *tree_sitter.Node, env *rbStrEnv, ns string) (string, bool) {
+	t := c.text(n)
+	if len(t) < 2 {
+		return "", false
+	}
+	quote := t[0]
+	if (quote != '"' && quote != '\'') || t[len(t)-1] != quote {
+		return "", false // a heredoc or %-literal: no delimiter pair to read between
+	}
+	body := t[1 : len(t)-1]
+	var b strings.Builder
+	b.Grow(len(body))
+	if quote == '\'' {
+		// A single-quoted string does not interpolate; only \\ and \' fold.
+		for i := 0; i < len(body); i++ {
+			if body[i] == '\\' && i+1 < len(body) && (body[i+1] == '\\' || body[i+1] == '\'') {
+				b.WriteByte(body[i+1])
+				i++
+				continue
+			}
+			b.WriteByte(body[i])
+		}
+		return b.String(), true
+	}
+	for i := 0; i < len(body); i++ {
+		switch {
+		case body[i] == '\\' && i+1 < len(body):
+			i++
+			switch body[i] {
+			case 'n':
+				b.WriteByte('\n')
+			case 't':
+				b.WriteByte('\t')
+			case 'r':
+				b.WriteByte('\r')
+			case 'f':
+				b.WriteByte('\f')
+			case 'v':
+				b.WriteByte('\v')
+			case 'a':
+				b.WriteByte('\a')
+			case 'b':
+				b.WriteByte('\b')
+			case 'e':
+				b.WriteByte(27)
+			case 's':
+				b.WriteByte(' ')
+			case '0':
+				b.WriteByte(0)
+			case '#', '\\', '\'', '"':
+				b.WriteByte(body[i])
+			default:
+				// An escape Ruby does not fold stands for itself: the regex
+				// escapes \d \w \. … keep their backslash.
+				b.WriteByte('\\')
+				b.WriteByte(body[i])
+			}
+		case strings.HasPrefix(body[i:], "#{"):
+			end := strings.IndexByte(body[i+2:], '}')
+			if end < 0 {
+				return "", false
+			}
+			v, ok := env.resolve(body[i+2:i+2+end], ns)
+			if !ok {
+				return "", false
+			}
+			b.WriteString(v)
+			i += 2 + end // the loop's i++ steps onto the closing brace
+		default:
+			b.WriteByte(body[i])
+		}
+	}
+	return b.String(), true
+}
+
+// rbAssembleRegexText splices an interpolated regex literal's source text into
+// the pattern the runtime compiles: each `#{name}` replaced by the value the
+// file pins to it, everything else — delimiters, flags, the escapes the regex
+// engine itself reads — carried verbatim. False when a fragment does not
+// resolve, in which case the literal keeps the skip it has always had.
+func (c *rbConv) rbAssembleRegexText(t string, env *rbStrEnv, ns string) (string, bool) {
+	var b strings.Builder
+	b.Grow(len(t))
+	for i := 0; i < len(t); i++ {
+		switch {
+		case t[i] == '\\' && i+1 < len(t):
+			b.WriteByte(t[i])
+			b.WriteByte(t[i+1])
+			i++
+		case strings.HasPrefix(t[i:], "#{"):
+			end := strings.IndexByte(t[i+2:], '}')
+			if end < 0 {
+				return "", false
+			}
+			v, ok := env.resolve(t[i+2:i+2+end], ns)
+			if !ok {
+				return "", false
+			}
+			b.WriteString(v)
+			i += 2 + end // the loop's i++ steps onto the closing brace
+		default:
+			b.WriteByte(t[i])
+		}
+	}
+	return b.String(), true
+}
+
+// rbRegexText returns the text a regex literal is judged on: the literal's own
+// source text, or — when that text interpolates — the pattern its fragments
+// assemble. False when an interpolated fragment does not resolve: the analysis
+// reads source text, and an unresolved fragment's quantifiers are not in it.
+func (c *rbConv) rbRegexText(n *tree_sitter.Node) (string, bool) {
+	t := c.text(n)
+	if !strings.Contains(t, "#{") {
+		return t, true
+	}
+	if c.strEnv != nil {
+		if asm, ok := c.strEnv.regex[n.Id()]; ok {
+			return asm, true
+		}
+	}
+	return "", false
+}
+
 // regexBacktrackObservations reports each regex literal the shared ambiguity
 // analysis flags as an analysis fact at the literal's own location, so the
 // definition-site catastrophic-regex arm — the one java.util.regex and re.*
 // patterns already report through — can judge it wherever the literal sits:
 // inline in a method body, or hoisted into a class- or module-level constant
 // the code applies far from the definition. A literal that interpolates
-// (`#{...}`) is skipped: the analysis reads the literal's source text, and an
-// interpolated fragment's quantifiers are not in it.
+// (`#{...}`) is judged on the pattern its fragments assemble, so a pattern put
+// together from the file's own string constants is evaluated for backtracking;
+// one whose fragment names nothing the file pins is skipped.
 func (c *rbConv) regexBacktrackObservations(root *tree_sitter.Node) []nir.Stmt {
 	var out []nir.Stmt
 	var walk func(n *tree_sitter.Node)
@@ -1270,15 +1561,17 @@ func (c *rbConv) regexBacktrackObservations(root *tree_sitter.Node) []nir.Stmt {
 		if n == nil {
 			return
 		}
-		if c.kind(n) == "regex" && !strings.Contains(c.text(n), "#{") && rubyRegexMayBacktrack(c.text(n)) {
-			loc := c.loc(n)
-			out = append(out, nir.ExprStmt{Value: nir.Call{
-				Callee: nir.Name{ID: "analysis.dos.catastrophic_regex", Loc: loc},
-				Args:   []nir.Expr{nir.Const{Loc: loc, Value: c.text(n)}},
-				Path:   "analysis.dos.catastrophic_regex",
-				Method: "catastrophic_regex",
-				Loc:    loc,
-			}})
+		if c.kind(n) == "regex" {
+			if raw, ok := c.rbRegexText(n); ok && rubyRegexMayBacktrack(raw) {
+				loc := c.loc(n)
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: "analysis.dos.catastrophic_regex", Loc: loc},
+					Args:   []nir.Expr{nir.Const{Loc: loc, Value: raw}},
+					Path:   "analysis.dos.catastrophic_regex",
+					Method: "catastrophic_regex",
+					Loc:    loc,
+				}})
+			}
 		}
 		for _, ch := range c.namedChildren(n) {
 			walk(ch)
