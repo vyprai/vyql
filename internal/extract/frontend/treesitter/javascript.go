@@ -2565,8 +2565,11 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				}
 				if name != nil && c.kind(name) == "identifier" {
 					out = append(out, nir.Assign{Targets: []string{c.text(name)}, Value: v, Decl: true})
-					if val != nil && c.kind(val) == "object" {
-						out = append(out, c.objectMethodFuncDefs(val, false)...)
+					// `const handlers = {…} as/satisfies T`: the assertion wraps the
+					// literal, so unwrap before the object test or its methods are
+					// dead code.
+					if obj := c.unwrapJsTransparentExpr(val); c.kind(obj) == "object" {
+						out = append(out, c.objectMethodFuncDefs(obj, false)...)
 					}
 					if val != nil && c.kind(val) == "call_expression" {
 						out = append(out, c.callArgObjectMethodFuncDefs(val)...)
@@ -2650,8 +2653,11 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 				out = append(out, c.exprStmt(ch, L)...)
 				continue
 			}
-			if c.kind(ch) == "object" {
-				out = append(out, c.objectMethodFuncDefs(ch, true)...)
+			// `export default {…} as RouteHandlers` / `… satisfies T` wraps the
+			// literal in an assertion node, so unwrap before the object test or the
+			// handler object's methods never reach the graph.
+			if obj := c.unwrapJsTransparentExpr(ch); c.kind(obj) == "object" {
+				out = append(out, c.objectMethodFuncDefs(obj, true)...)
 				continue
 			}
 			if c.isJsFuncNode(ch) {
