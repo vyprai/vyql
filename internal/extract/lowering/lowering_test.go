@@ -778,42 +778,56 @@ func TestLowerPreservesDeclaredReceiverTypeAfterUntypedAssignment(t *testing.T) 
 	t.Fatalf("item.name call not found")
 }
 
+// A call whose callee is itself a call — `f(x)(y)`, and the immediately-invoked
+// constructor `(new Function(body))()` whose constructor call sits behind the
+// parenthesized-expression chain the function form also reaches through — still
+// contains a real call site for the inner call. The inner call and its
+// argument must be lowered in both spellings, not only the outer call.
 func TestLowerCallLowersCallCalleeInnerCall(t *testing.T) {
-	prog := nir.Program{Modules: []nir.Module{{
-		Key:  "app",
-		File: "app.js",
-		Body: []nir.Stmt{
-			nir.FuncDef{Name: "handler", Body: []nir.Stmt{
-				nir.ExprStmt{Value: nir.Call{
-					// f(x)(y): the callee is itself a call, the curried and
-					// immediate-invocation form. The inner call and its
-					// argument must be lowered, not only the outer call.
-					Callee: nir.Call{
-						Callee: nir.Name{ID: "compile", Loc: "app.js:2"},
-						Args:   []nir.Expr{nir.Name{ID: "payload", Loc: "app.js:2"}},
-						Path:   "compile", Loc: "app.js:2",
-					},
-					Path: "compile", Loc: "app.js:2",
-				}},
-			}, Loc: "app.js:1"},
-		},
-	}}}
-	g, err := Lower(prog, true)
-	if err != nil {
-		t.Fatalf("lower: %v", err)
+	for _, tc := range []struct {
+		name   string
+		path   string
+		callee nir.Expr
+	}{
+		{"direct", "compile", nir.Call{
+			Callee: nir.Name{ID: "compile", Loc: "app.js:2"},
+			Args:   []nir.Expr{nir.Name{ID: "payload", Loc: "app.js:2"}},
+			Path:   "compile", Loc: "app.js:2",
+		}},
+		{"parenthesized", "Function", nir.Thru{Inner: nir.Call{
+			Callee: nir.Name{ID: "Function", Loc: "app.js:2"},
+			Args:   []nir.Expr{nir.Name{ID: "payload", Loc: "app.js:2"}},
+			Path:   "Function", Loc: "app.js:2",
+		}}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			prog := nir.Program{Modules: []nir.Module{{
+				Key:  "app",
+				File: "app.js",
+				Body: []nir.Stmt{
+					nir.FuncDef{Name: "handler", Body: []nir.Stmt{
+						nir.ExprStmt{Value: nir.Call{Callee: tc.callee, Path: tc.path, Loc: "app.js:2"}},
+					}, Loc: "app.js:1"},
+				},
+			}}}
+			g, err := Lower(prog, true)
+			if err != nil {
+				t.Fatalf("lower: %v", err)
+			}
+			ids, _ := g.NodesOfType("code.Call")
+			for _, id := range ids {
+				n, _, _ := g.GetNode(id)
+				if n.Prop("callee_path") != tc.path {
+					continue
+				}
+				if n.Prop("arg0") == "" {
+					t.Fatalf("callee-position call missing its arg slot: %+v", n.Props)
+				}
+				return
+			}
+			t.Fatalf("call in callee position not lowered: no code.Call with callee_path %s", tc.path)
+		})
 	}
-	ids, _ := g.NodesOfType("code.Call")
-	for _, id := range ids {
-		n, _, _ := g.GetNode(id)
-		if n.Prop("callee_path") != "compile" {
-			continue
-		}
-		if n.Prop("arg0") == "" {
-			t.Fatalf("callee-position call missing its arg slot: %+v", n.Props)
-		}
-		return
-	}
-	t.Fatalf("call in callee position not lowered: no code.Call with callee_path compile")
 }
 
 // An immediately-invoked function expression is the module wrapper of browser

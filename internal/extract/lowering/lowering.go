@@ -5121,6 +5121,23 @@ func calleeLambda(e nir.Expr) (nir.Lambda, bool) {
 	}
 }
 
+// calleeCall reports whether a call's callee expression is itself a call,
+// unwrapping the parenthesized-expression chain around it: the immediately-invoked
+// constructor `(new Function(body))()` puts the constructor call behind that chain,
+// exactly where `(function () { ... })()` puts the invoked body.
+func calleeCall(e nir.Expr) (nir.Call, bool) {
+	for {
+		switch v := e.(type) {
+		case nir.Thru:
+			e = v.Inner
+		case nir.Call:
+			return v, true
+		default:
+			return nir.Call{}, false
+		}
+	}
+}
+
 func binopMethod(op string) string {
 	switch op {
 	case "+":
@@ -5770,8 +5787,10 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// immediate-invocation form — still contains a real call site for the
 	// inner call: lower it so its arguments get Arg slots like the
 	// assignment-equivalent form. Only the inner node is created; the outer
-	// call's result does not flow from it.
-	if inner, ok := call.Callee.(nir.Call); ok {
+	// call's result does not flow from it. The inner call reaches the callee
+	// slot either directly or wrapped in the parenthesized-expression chain —
+	// `(new Function(body))()` — so unwrap that first.
+	if inner, ok := calleeCall(call.Callee); ok {
 		l.evalCall(inner, sc)
 	}
 	// A call whose callee is a function expression is the immediately-invoked
