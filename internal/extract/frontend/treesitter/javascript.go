@@ -2638,7 +2638,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "switch_statement":
 		return []nir.Stmt{c.switchStmt(n)}
 	case "try_statement":
-		return []nir.Stmt{nir.Try{Body: c.collectStatementBlocks(n)}}
+		return []nir.Stmt{c.tryStmt(n)}
 	case "statement_block":
 		return []nir.Stmt{nir.Block{Stmts: c.collectStatementBlocks(n)}}
 	case "export_statement":
@@ -3208,6 +3208,30 @@ func (c *jsConv) switchStmt(n *tree_sitter.Node) nir.Stmt {
 		}
 	}
 	return nir.Switch{Subject: c.expr(c.field(n, "value")), Cases: cases, Labels: labels, Default: deflt}
+}
+
+// tryStmt lowers a try_statement into nir.Try's separate control regions: the
+// guarded body and the catch body each get their own region (either may be skipped or
+// left partway — the catch runs only when the body threw), while `finally` runs on every
+// path out of the statement and stays in the enclosing region. Flattening the clauses
+// into Body (collectStatementBlocks) would collapse try and catch into ONE region, so a
+// statement that runs only when the try body succeeded is indistinguishable from one
+// that runs on both paths, and the catch parameter never binds to the exception.
+func (c *jsConv) tryStmt(n *tree_sitter.Node) nir.Try {
+	tr := nir.Try{Loc: c.loc(n)}
+	tr.Body = c.branchBody(c.field(n, "body"))
+	if h := c.field(n, "handler"); h != nil {
+		// `catch (e)` / TS `catch (e: unknown)`: the parameter field is the identifier
+		// (a destructuring pattern has no single name to bind, so it stays unbound).
+		if p := c.field(h, "parameter"); p != nil && c.kind(p) == "identifier" {
+			tr.HandlerParams = []string{c.text(p)}
+		}
+		tr.Handlers = [][]nir.Stmt{c.branchBody(c.field(h, "body"))}
+	}
+	if f := c.field(n, "finalizer"); f != nil {
+		tr.Finally = c.branchBody(c.field(f, "body"))
+	}
+	return tr
 }
 
 // collectStatementBlocks gathers statements from nested statement_blocks and
