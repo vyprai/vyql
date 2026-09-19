@@ -544,6 +544,24 @@ func (c *conv) typeDeclStmts(g *ast.GenDecl, methods map[string]map[string]bool,
 						if base := c.typeName(f.Type); base != "" {
 							cd.Bases = append(cd.Bases, base)
 						}
+						continue
+					}
+					// A named field's declared type is the dispatch fact for a method called on
+					// it: `s.http.get(...)` inside a method of `type APIClient struct { http
+					// *httpClient }` runs httpClient.get, and the struct declaration is the only
+					// place that is written down — Go builds the value at the caller, so no
+					// constructor inference inside the scan can recover it. Recorded as the same
+					// valueless Decl assign a `var` takes, which is the shape the registration
+					// pass files under the class's declared field types.
+					typ := c.typeName(f.Type)
+					if typ == "" {
+						continue
+					}
+					for _, n := range f.Names {
+						if n == nil {
+							continue
+						}
+						cd.Body = append(cd.Body, nir.Assign{Targets: []string{n.Name}, Value: nir.Const{Loc: c.loc(n.Pos())}, Type: typ, Decl: true, Loc: c.loc(n.Pos())})
 					}
 				}
 			}

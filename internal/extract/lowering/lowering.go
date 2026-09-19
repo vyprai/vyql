@@ -4200,11 +4200,17 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// back to keying the call by callee name alone, and a name declared more than once (an
 		// interface plus its implementations) resolves to nothing. Java-only: a nested class in
 		// Python/JS/C# does NOT see the enclosing class's fields, so seeding them there would
-		// type a name the language resolves elsewhere. Outermost first, so an inner class's own
-		// field of the same name shadows — the language's own lookup order.
-		classScopes := []string{l.curClass}
-		if len(l.classNest) > 1 && moduleTech(l.curFile) == "java" {
-			classScopes = l.classNest
+		// type a name the language resolves elsewhere. Go is excluded for the same reason by a
+		// sharper edge: Go references a field through its receiver (`s.http`), never bare, and a
+		// bare name that happens to match a field is usually something else entirely — the
+		// `import "net/http"` alias inside a struct-wrapping client is the canonical `http`.
+		// Go field-receiver calls take the declared-type route in resolveTargets instead.
+		var classScopes []string
+		if moduleTech(l.curFile) != "go" {
+			classScopes = []string{l.curClass}
+			if len(l.classNest) > 1 && moduleTech(l.curFile) == "java" {
+				classScopes = l.classNest
+			}
 		}
 		for _, cls := range classScopes {
 			for fld, typ := range l.classFields[l.curModule+"::"+cls] {
@@ -6885,6 +6891,28 @@ func (l *lowerer) resolveTargets(callee nir.Expr, sc *scope) ([]*funcInfo, bool)
 					if t, ok := l.globalClass(imp.module, qual.Attr); ok {
 						if targets, reachOnly, settled := l.resolveOnType(t, c.Attr); settled {
 							return targets, reachOnly
+						}
+					}
+				}
+			}
+			// `s.field.method()` on a declared struct field — Go's client-wrapper idiom
+			// (`type APIClient struct { http *httpClient }`, then `s.http.get(...)`). The
+			// struct declaration wrote the field's type down (classFields, the same table a
+			// Java declared field fills), and structFieldOwner names the type that owns the
+			// root: the enclosing method's receiver, or a local/parameter declared to that
+			// type. That is a declaration rather than the inference the routes below guess
+			// at, so it answers first — and it answers where the unique-method-name guess
+			// cannot, because a name like `get` is declared on a second type in any program
+			// large enough to wrap its HTTP client. The callee gains the ordinary resolved
+			// edges, whose return attribution is the whole point of the wrapper: the wrapped
+			// call's result must reach the wrapper's caller.
+			if root, ok := qual.Base.(nir.Name); ok {
+				if mod, typ, ok := l.structFieldOwner(root.ID, sc); ok {
+					if ft := l.classFields[mod+"::"+typ][qual.Attr]; ft != "" {
+						if cm, ok := l.classModule(ft, imports); ok {
+							if targets, reachOnly, settled := l.resolveOnType([2]string{cm, ft}, c.Attr); settled {
+								return targets, reachOnly
+							}
 						}
 					}
 				}
