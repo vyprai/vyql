@@ -10,26 +10,36 @@ behaviour change, even if no code moved.
 
 ## [Unreleased]
 
-### Fixed
+### Added
 
-- **A bounded scan of a target one graph can hold keeps that graph in RAM.**
-  `-max-ram` armed the disk-backed graph store for every scan it bounded, and
-  on a target whose graph fits in the ceiling the store cost more than the
-  graph it spared: its detail buffer, write path and caches sit resident
-  alongside a structural core that never leaves RAM in either store, so a
-  multi-package repository that lowers to a million-odd nodes peaked several
-  times its in-RAM footprint and the memory safety stop ended the scan before
-  the first rule ran — an empty report from a ceiling the scan easily
-  afforded. Measured on such a repository (90 Python files across three
-  packages): 4626MiB through the disk store against 1220MiB in RAM, so the
-  mandated 4GB ceiling stopped one and carries the other with roughly 2GB to
-  spare (peak 1341MiB against the 3328MiB stop).
-  The partition planner's own measure now decides: a target it leaves
-  unpartitioned is a target one graph holds, and that graph is built on the
-  int-indexed in-RAM store — the same store a partitioned scan already builds
-  per partition. A graph the ceiling cannot hold still spills: a target over
-  the one-graph limit is partitioned, and a run that must serialise one graph
-  (`-stats`, graph-json with review flags) keeps the disk-backed bound.
+- **`vyql triage add | remove | list`** records one verdict at a time into a
+  baseline, without running a scan. `triage add -fp <fp> -from scan.graph.json`
+  captures the finding's rule, location and **path signature** alongside the
+  verdict. `triage list -from scan.graph.json` marks each entry against that
+  scan (`covered`, `drifted`, `reported`, `stale`) and suggests the cleanup;
+  `triage remove -stale -from scan.graph.json` drops every stale entry in one
+  pass — the rolled-baseline semantic on demand — and refuses to run without a
+  scan, because stale is a fact about a scan, not about the file. The file is
+  the same shape `-baseline-write` produces, and `triage` does not require the
+  data directory.
+- **Path signatures and drift-aware baselines.** A baseline entry may carry
+  `sig`: a digest of the concepts and call paths along the finding's taint
+  path. Such an entry suppresses only while the path still hashes to one of
+  its signatures; the same fingerprint on a changed path is reported again as
+  **drifted** — the triaged verdict was about a path that no longer exists,
+  and it goes back to verification instead of silently excusing code it never
+  described. In `-format graph-json`, the document now carries a `baseline`
+  section (`applied`, `covered`, `drifted`, `stale`) so a consumer can keep
+  triage records alive, archive them and route re-verifications without
+  parsing stderr; findings also carry their `sig`. Entries without `sig` keep
+  the previous behaviour and never drift.
+
+### Changed
+
+- **A drifted finding fails the gate where it was previously absorbed.** With
+  a baseline whose entry carries signatures, a change under the finding (the
+  source end swapped, a hop added or removed) now re-reports and can exit 3.
+  That is the point of the record: the verdict described the old path.
 
 ## [0.6.1] - 2026-09-11
 

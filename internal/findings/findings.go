@@ -49,12 +49,18 @@ type ReviewCondition struct {
 
 // Finding is a rule match with its full derivation.
 type Finding struct {
-	RuleID           string
-	Severity         string
-	Bindings         []Binding
-	Witness          []string // solver witness (node ids / hops, kind-specific)
-	PathLocs         []string // distinct file:line locs along the witness (taint path), in order
-	WitnessKind      string   // taint | reach | grant | match
+	RuleID      string
+	Severity    string
+	Bindings    []Binding
+	Witness     []string // solver witness (node ids / hops, kind-specific)
+	PathLocs    []string // distinct file:line locs along the witness (taint path), in order
+	WitnessKind string   // taint | reach | grant | match
+	// Sig is the witness's path signature (resultpolicy.PathSignature): what a
+	// triaged false positive is conditionally suppressed on, so a verdict
+	// survives benign churn but re-fires when the path's structure changes
+	// (docs/adr/0004). Empty for non-taint witnesses, which have no path to
+	// drift.
+	Sig              string
 	NegationEvidence []NegationEvidence
 	Confidence       string
 	Context          []string

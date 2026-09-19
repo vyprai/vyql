@@ -6281,6 +6281,20 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 				l.flow(a, argsParam)
 			}
 		}
+		// A C/C++ variadic tail. The frontend appends the synthetic tail parameter LAST, so
+		// the positional loop above bound the first argument past the named parameters to it;
+		// every argument after that one belongs to the same tail and binds to the same node.
+		// Without this, only the conservative arg→result edge below carried a tail argument,
+		// which never enters the callee — a printf-style logging wrapper returns nothing for
+		// it to flow through, so every route into the wrapper's own body was dark. va_start
+		// binds the body's va_list onto the node (see the C frontend's exprStmt), which is
+		// what carries the tail to the v-formatted call the wrapper hands it to.
+		if varargsParam := target.params[nir.CVarargsParam]; varargsParam != "" {
+			for i := len(target.paramNames) - paramOffset; i < len(args); i++ {
+				l.flow(args[i], varargsParam)
+				mapped[i] = true
+			}
+		}
 		l.flow(target.ret, result)
 		// object-sensitivity: alias the receiver with the callee's stable `this` node so field
 		// mutations performed via `this` inside the method reach the receiver object (and reads
@@ -7235,6 +7249,9 @@ func (l *lowerer) paramOffset(fi *funcInfo, recvNode string) int {
 func (l *lowerer) callArity(fi *funcInfo, recvNode string) int {
 	n := len(fi.paramNames) - l.paramOffset(fi, recvNode)
 	if _, ok := fi.params[nir.JSArgumentsParam]; ok {
+		n--
+	}
+	if _, ok := fi.params[nir.CVarargsParam]; ok {
 		n--
 	}
 	return n
