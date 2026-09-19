@@ -3755,6 +3755,67 @@ func (c *jsConv) markCallLambdaParams(path string, lam nir.Lambda, L string) nir
 	return lam
 }
 
+// markCallPropertyLambdaParams records parameter-entry facts for the handlers a
+// call receives as values of an object-literal argument's properties:
+// `webView.addMultipleEventsListeners({web_app_open_link: ({url}) => …})`.
+// markCallLambdaParams above sees only lambdas that are themselves direct
+// arguments, so a handler registered under a property carried no fact at all
+// and no source binding could label the message data the dispatch delivers
+// into it. Nested registry objects ({on: {event: fn}}) mark the same way.
+func (c *jsConv) markCallPropertyLambdaParams(path string, arg nir.Expr) nir.Expr {
+	seq, ok := arg.(nir.Seq)
+	if !ok {
+		return arg
+	}
+	for i, part := range seq.Parts {
+		pair, ok := part.(nir.Pair)
+		if !ok || pair.DynamicKey || pair.Key == "" {
+			continue
+		}
+		pair.Value = c.markCallPropertyLambdaParams(path, pair.Value)
+		if lam, ok := jsLambdaValue(pair.Value); ok {
+			pair.Value = c.markCallPropertyLambda(path, pair.Key, lam)
+		}
+		seq.Parts[i] = pair
+	}
+	return seq
+}
+
+func (c *jsConv) markCallPropertyLambda(path, property string, lam nir.Lambda) nir.Lambda {
+	method := lastSeg(path)
+	for i, p := range lam.Params {
+		if p == "" || p == "_" {
+			continue
+		}
+		tokens := []string{
+			"entry_kind:call_property_lambda_param",
+			"call_path:" + path,
+			"call_method:" + method,
+			"call_property:" + property,
+			"param_count:" + itoa(len(lam.Params)),
+			"param_name:" + p,
+			"param_index:" + itoa(i),
+		}
+		lam.ParamEntries = append(lam.ParamEntries, nir.ParamEntry{Param: p, Tokens: tokens})
+	}
+	return lam
+}
+
+// jsLambdaValue unwraps the transparent wrappers around an inline lambda, the
+// same chain the lowering's calleeLambda walks.
+func jsLambdaValue(e nir.Expr) (nir.Lambda, bool) {
+	for {
+		switch v := e.(type) {
+		case nir.Thru:
+			e = v.Inner
+		case nir.Lambda:
+			return v, true
+		default:
+			return nir.Lambda{}, false
+		}
+	}
+}
+
 func (c *jsConv) markBrowserGlobalAssignmentParamEntries(left *tree_sitter.Node, right nir.Expr, L string) nir.Expr {
 	lam, ok := right.(nir.Lambda)
 	if !ok {
@@ -4073,7 +4134,9 @@ func (c *jsConv) expr(n *tree_sitter.Node) nir.Expr {
 		for i, a := range arglist {
 			if lam, ok := a.(nir.Lambda); ok {
 				arglist[i] = c.markCallLambdaParams(path, lam, L)
+				continue
 			}
+			arglist[i] = c.markCallPropertyLambdaParams(path, a)
 		}
 		if c.isExpressRouteRegistration(path) {
 			for i, a := range arglist {

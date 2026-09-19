@@ -1387,6 +1387,60 @@ function addDebugLog(board: Board, value: string) {
 	t.Fatalf("global assignment parameter entry event does not flow to callback param")
 }
 
+func TestJavaScriptCallObjectPropertyLambdaParamEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "webApp.ts")
+	src := []byte(`
+telegramWebView.addMultipleEventsListeners({
+  iframe_ready: (result) => {
+    this.readyResult = result;
+  },
+  web_app_open_link: ({url}) => {
+    window.open(url, '_blank');
+  }
+});
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var eventID, paramID string
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.parameter.entry" &&
+			strings.Contains(n.Prop("str_args"), "entry_kind:call_property_lambda_param") &&
+			strings.Contains(n.Prop("str_args"), "call_path:telegramWebView.addMultipleEventsListeners") &&
+			strings.Contains(n.Prop("str_args"), "call_property:web_app_open_link") &&
+			strings.Contains(n.Prop("str_args"), "param_name:url") {
+			eventID = n.ID
+		}
+		if n.Type == "code.Param" && n.Prop("name") == "url" {
+			paramID = n.ID
+		}
+	}
+	if eventID == "" || paramID == "" {
+		t.Fatalf("missing call property lambda parameter entry event=%q param=%q nodes=%#v", eventID, paramID, nodes)
+	}
+	outs, _ := g.OutEdges(eventID, "FLOWS")
+	for _, edge := range outs {
+		if edge.Dst == paramID {
+			return
+		}
+	}
+	t.Fatalf("call property lambda parameter entry event does not flow to handler param")
+}
+
 func TestJavaScriptModuleContextIsLowered(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "table.js")
