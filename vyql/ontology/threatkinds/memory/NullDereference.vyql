@@ -1,0 +1,6 @@
+module memory;
+
+threat NullDereference {
+  cwe: [CWE_476]
+  desc: "NULL pointer dereference"
+}

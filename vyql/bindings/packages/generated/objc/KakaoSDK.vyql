@@ -1,0 +1,17 @@
+module bindings.objc.generated.maff05383;
+
+binding secretValue0 {
+  requires {
+    dependency("KakaoSDK")
+  }
+  query pattern callExpr where callee.method == "token"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("KakaoSDK")
+  }
+  query pattern callExpr where callee.method == "certToken"
+  emit source code.SecretValue at call.result
+}

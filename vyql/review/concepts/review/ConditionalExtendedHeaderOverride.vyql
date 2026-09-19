@@ -1,0 +1,8 @@
+module code;
+
+review code.ConditionalExtendedHeaderOverride {
+  category: input_validation
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review archive parsers that apply an extended-header size override only when the base header size is zero, where the format applies the override unconditionally"
+}

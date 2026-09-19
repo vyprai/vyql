@@ -1,0 +1,9 @@
+module bindings.java.generated.m30256d54;
+
+binding deserialization0 {
+  requires {
+    dependency("org.codehaus.jackson:jackson-core-asl")
+  }
+  query pattern callExpr where callee.method == "createJsonParser"
+  emit sink code.Deserialization at args[0]
+}

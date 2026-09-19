@@ -1,0 +1,67 @@
+# Rank 1072 / CVE-2024-51378: CyberPanel concatenates a JSON field from the
+# request body into a shell command and runs it as root on views reachable
+# without authentication (CWE-77, CWE-78, CWE-276).
+#
+# VYQL-INJ-004 fires on the concatenated command. An admin ACL leaves the
+# injection intact, and the rule's unless clauses ask about escaping rather than
+# who may call the view, so both snippets expect the finding.
+#
+# verify_current_expected: caught-partial
+
+test "rank1072: a status file from the request body is concatenated into a command"
+  lang python
+  file dns/views.py
+  expect VYQL-INJ-004
+  code
+  ```
+  import json
+  import subprocess
+
+  from django.http import HttpResponse
+
+
+  class ProcessUtilities:
+      @staticmethod
+      def outputExecutioner(command):
+          return subprocess.check_output(command, shell=True).decode()
+
+
+  def getresetstatus(request):
+      data = json.loads(request.body)
+      statusfile = data['statusfile']
+      installStatus = ProcessUtilities.outputExecutioner("sudo cat " + statusfile)
+
+      return HttpResponse(json.dumps({'requestStatus': installStatus}))
+  ```
+
+test "rank1072: the same view behind the admin check"
+  lang python
+  file dns/views.py
+  expect VYQL-INJ-004
+  code
+  ```
+  import json
+  import subprocess
+
+  from django.http import HttpResponse
+
+
+  class ProcessUtilities:
+      @staticmethod
+      def outputExecutioner(command):
+          return subprocess.check_output(command, shell=True).decode()
+
+
+  def getresetstatus(request):
+      userID = request.session['userID']
+      currentACL = ACLManager.loadedACL(userID)
+
+      if currentACL['admin'] != 1:
+          return ACLManager.loadErrorJson('FilemanagerAdmin', 0)
+
+      data = json.loads(request.body)
+      statusfile = data['statusfile']
+      installStatus = ProcessUtilities.outputExecutioner("sudo cat " + statusfile)
+
+      return HttpResponse(json.dumps({'requestStatus': installStatus}))
+  ```

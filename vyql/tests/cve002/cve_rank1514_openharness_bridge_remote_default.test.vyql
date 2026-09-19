@@ -1,0 +1,188 @@
+# Rank 1514 / CVE-2026-7551: OpenHarness registered its bridge command as
+# remotely invocable by default, so a gateway caller could spawn bridge
+# sessions on the victim's machine (missing function-level access control,
+# CWE-306). The SlashCommand dataclass in
+# src/openharness/commands/registry.py declares `remote_invocable: bool =
+# True`, so every command create_default_command_registry registers is
+# callable through the remote gateway unless the registration opts out, and
+# the "bridge" registration passed no exposure flags while its handler
+# inspects and spawns bridge sessions (the gateway test shipped with the fix
+# asserts a remote "/bridge spawn" message never reaches the handler). The
+# fixing commit 438e37309 ("fix: keep bridge command local-only by default")
+# adds `remote_invocable=False, remote_admin_opt_in=True` to that one
+# registration, aligning it with the four commands (plugin, reload-plugins,
+# permissions, plan) that already opted out at the parent.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over src/ (222 analysed files) report
+# **477 findings each, deterministically, identically on the vulnerable
+# parent 380bab4 and the fixed 438e373** -- 21 rule IDs, byte-identical rule
+# histograms, zero findings on the command table (registry.py:1840-1879) in
+# any run, and the string SlashCommand appears in no finding at either
+# revision. The full findings view was read, not the `-flags` only view. The
+# only auth row the commands module produces is VYQL-AUTH-105 on
+# code.RateLimitRequiredOp at registry.py:120 (CommandRegistry.lookup) and
+# :768 (_login_handler), an authentication-throttle heuristic far from the
+# registration; the file's other rows are InsecurePermission mkdirs, UrlFetch
+# and FilePathAccess pairs, likewise unrelated. The 1st pass's zero was real.
+#
+# ## Why nothing ships
+#
+# The weakness is a registration default, not a flow: no tainted value
+# reaches a sink, the handler never runs unless a remote peer asks, and the
+# whole fix is two keyword arguments on a constructor call.
+#
+# * The only shipped remote-exposure vocabulary is
+#   RemoteMethodCodeExecutionMissingAuthorization, anchored on Meteor's
+#   documented `Meteor.methods` contract ("invoked over the network by
+#   clients", javascript). OpenHarness' registry is application-internal
+#   wiring: grep of the project's docs, README and CHANGELOG finds no
+#   statement of the remote_invocable default at all, so there is no
+#   documentation for a binding to answer to.
+# * The powerful operation the exposure reaches -- `get_bridge_manager()
+#   .spawn(...)` inside the bridge handler -- is already labelled
+#   code.ResourceReview by auditreview.marks, but no rule in packs/ consumes
+#   that concept, so it produces no finding; the missing half is the
+#   registration-side exposure fact, and writing it means naming this
+#   application's own SlashCommand constructor and remote_invocable flag.
+#   That detects this application rather than the weakness, and the flag
+#   spelling is the fixing commit's own vocabulary.
+# * The generic alternative -- a registration-shaped call that omits a
+#   security flag -- fires on every register/add call in every Python tree;
+#   the no-signal-in-the-shape family was measured unshippable at 1331 and
+#   1417, and the credential-versus-decision siblings 1501, 1505, 1508, 1512
+#   and 1513 are held on the same ground. The one sibling with a documented
+#   convention to anchor on (1504, the `dangerously*` schema-override
+#   spellings over a library schema-builder API) converted; this registry has
+#   no convention and no library API.
+#
+# Recorded as a vocabulary gap of the exposure-defaults family; no
+# ENGINE-GAPS.md entry -- every construct in the file parses, resolves and
+# labels normally, so nothing engine-side blocks a future binding. No
+# definition change shipped.
+#
+# ## Recheck measurements (knowledge base tip f065d428d)
+#
+# The A/B above is at the span tip including the tool-schema-override rule;
+# an earlier 3+3 at tip 8ff93bbea reported the same 477/477 split, so the
+# later-shipped vocabulary changed nothing on this tree. Narrow spec 5/5
+# passing with -v. Rank stays ATTENTION.
+
+test "rank1514: the bridge command is registered with the table's default exposure"
+  lang python
+  file src/openharness/commands/registry.py
+  reject VYQL-AUTH-105
+  code
+  ```
+  from dataclasses import dataclass
+
+  @dataclass
+  class SlashCommand:
+      name: str
+      description: str
+      handler: CommandHandler
+      remote_invocable: bool = True
+      remote_admin_opt_in: bool = False
+      aliases: tuple[str, ...] = ()
+
+  def create_default_command_registry(plugin_commands=None):
+      registry = CommandRegistry()
+      registry.register(SlashCommand("rewind", "Remove the latest conversation turn(s)", _rewind_handler))
+      registry.register(SlashCommand("files", "List files in the current workspace", _files_handler))
+      registry.register(SlashCommand("init", "Initialize project OpenHarness files", _init_handler))
+      registry.register(SlashCommand("bridge", "Inspect bridge helpers and spawn bridge sessions", _bridge_handler))
+      registry.register(SlashCommand("login", "Show auth status or store an API key", _login_handler))
+      registry.register(
+          SlashCommand(
+              "plugin",
+              "Manage plugins",
+              _plugin_handler,
+              remote_invocable=False,
+              remote_admin_opt_in=True,
+          )
+      )
+      return registry
+  ```
+
+test "rank1514: the fixed revision keeps the bridge command local-only"
+  lang python
+  file src/openharness/commands/registry.py
+  reject VYQL-AUTH-105
+  code
+  ```
+  def create_default_command_registry(plugin_commands=None):
+      registry = CommandRegistry()
+      registry.register(SlashCommand("rewind", "Remove the latest conversation turn(s)", _rewind_handler))
+      registry.register(SlashCommand("files", "List files in the current workspace", _files_handler))
+      registry.register(SlashCommand("init", "Initialize project OpenHarness files", _init_handler))
+      registry.register(
+          SlashCommand(
+              "bridge",
+              "Inspect bridge helpers and spawn bridge sessions",
+              _bridge_handler,
+              remote_invocable=False,
+              remote_admin_opt_in=True,
+          )
+      )
+      registry.register(SlashCommand("login", "Show auth status or store an API key", _login_handler))
+      return registry
+  ```
+
+test "rank1514: the exposure is a dataclass default, not a call"
+  lang python
+  file src/openharness/commands/registry.py
+  reject VYQL-AUTH-105
+  code
+  ```
+  from dataclasses import dataclass
+
+  @dataclass
+  class SlashCommand:
+      """Definition of a slash command."""
+
+      name: str
+      description: str
+      handler: CommandHandler
+      remote_invocable: bool = True
+      remote_admin_opt_in: bool = False
+      aliases: tuple[str, ...] = ()
+  ```
+
+test "rank1514: boundary -- the file's auth row fires on the credential-storage handler instead"
+  lang python
+  file src/openharness/commands/registry.py
+  expect VYQL-AUTH-105
+  code
+  ```
+  async def _login_handler(args: str, context: CommandContext) -> CommandResult:
+      del context
+      settings = load_settings()
+      manager = AuthManager(settings)
+      profile_name, profile = settings.resolve_profile()
+      provider = detect_provider(settings)
+      api_key = args.strip()
+      if not api_key:
+          return CommandResult(message="Auth status: (usage /login API_KEY)")
+      manager.store_profile_credential(profile_name, "api_key", api_key)
+      return CommandResult(message="Stored API key in ~/.openharness/settings.json")
+  ```
+
+test "rank1514: the powerful operation the exposure reaches carries no consumer"
+  lang python
+  file src/openharness/commands/registry.py
+  reject VYQL-AUTH-105
+  code
+  ```
+  async def _bridge_handler(args: str, context: CommandContext) -> CommandResult:
+      tokens = args.split()
+      if tokens[0] == "spawn" and len(tokens) >= 2:
+          command = args[len("spawn ") :]
+          handle = await get_bridge_manager().spawn(
+              session_id=f"bridge-{datetime.now(timezone.utc).strftime('%H%M%S')}",
+              command=command,
+              cwd=context.cwd,
+          )
+          return CommandResult(message=f"Spawned bridge session {handle.session_id}")
+      return CommandResult(message="Usage: /bridge list|status|spawn")
+  ```

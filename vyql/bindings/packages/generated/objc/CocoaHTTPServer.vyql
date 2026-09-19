@@ -1,0 +1,9 @@
+module bindings.objc.generated.mee074d3e;
+
+binding urlFetch0 {
+  requires {
+    dependency("CocoaHTTPServer")
+  }
+  query pattern callExpr where callee.method == "SendMessage"
+  emit sink code.UrlFetch at args[0]
+}

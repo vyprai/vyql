@@ -1,0 +1,8 @@
+module code;
+
+review code.PointerAddOverflowAllocation {
+  category: memory
+  expected: [core.MemoryBoundsCheck]
+  kind: target
+  text: "review allocator pointer-plus-size arithmetic for wraparound checks before committing or returning the advanced pointer"
+}

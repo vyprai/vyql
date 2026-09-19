@@ -1,0 +1,8 @@
+module code;
+
+review code.EncapsulatedMiddlewarePathReprefixed {
+  category: access_control
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review how middleware is propagated into a child encapsulation scope so an already-prefixed path is handed to the middleware engine directly rather than back through the registration function that prefixes it"
+}

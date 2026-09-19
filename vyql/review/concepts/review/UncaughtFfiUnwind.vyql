@@ -1,0 +1,7 @@
+module code;
+
+review code.UncaughtFfiUnwind {
+  category: memory
+  kind: attention
+  text: "review whether a panic in this extern \"C\" body can unwind into the foreign frames that called it; contain it with std::panic::catch_unwind at the boundary"
+}

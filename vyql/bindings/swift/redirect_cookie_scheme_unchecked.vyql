@@ -1,0 +1,48 @@
+module bindings.swift.redirect_cookie_scheme_unchecked;
+
+// URLSession follows HTTP redirects itself, and the one documented point at
+// which an app sees the hop is the task delegate
+// `urlSession(_:task:willPerformHTTPRedirection:newRequest:completionHandler:)`:
+// the new request is handed to the delegate already built for the target the
+// 3xx named, and whatever the delegate returns through the completion handler
+// is what gets sent. A delegate that reattaches a credential header there --
+// `setValue(_:forHTTPHeaderField:)` with `Cookie`, `Authorization` or another
+// of the names HTTP authenticates by -- attaches that credential to a URL the
+// app did not choose, and the scheme is the part that decides whether the
+// attach is safe: the redirect target can be `http://`, and a session cookie
+// forwarded over it is transmitted in cleartext, which is what the cookie's
+// own Secure attribute forbids. The safe form of this code names the scheme
+// before attaching -- `url?.scheme?.lowercased() == "https"` is the idiom,
+// URL's documented accessor for exactly this question.
+//
+// The fact recorded here is read through the tokens the Swift frontend emits
+// for a file: one context node per file, so every clause is file-wide. The
+// redirect delegate is anchored by its parameter label, the one spelling
+// Apple's documentation gives the hook. The credential attach is anchored by
+// the header-set call's argument label -- Swift appends a call's argument
+// labels to the call node's path as dotted segments, so `forHTTPHeaderField`
+// in a call path holds exactly when a header is being set on a request --
+// together with a credential header name, the names the HTTP specifications
+// fix. The control is the absence of a scheme read anywhere in the file, the
+// accessor any independent implementation of the check has to spell.
+// Comments produce no tokens, so prose naming the scheme does not silence the
+// finding.
+//
+// Residual, false-negative direction: a scheme read anywhere in the file
+// suppresses -- including one made for an unrelated reason, such as a custom
+// URL scheme probe in a sibling method -- so a file that handles redirects and
+// credentials but reads `scheme` nowhere near them goes unreported. A redirect
+// follower built without the delegate (reading a `Location` header by hand)
+// does not anchor either. False-positive direction: the credential name is
+// matched as a substring of a literal, so a literal naming a
+// credential-adjacent string in a file that also sets request headers,
+// handles redirects and never reads the scheme reports once for the file.
+binding swRedirectReattachCredentialSchemeUnchecked {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "swift"
+    and containsAny(node.context.paramLabel, ["willPerformHTTPRedirection"])
+    and containsAny(node.context.callPath, ["forHTTPHeaderField"])
+    and containsAny(node.context.literal, ["Cookie", "Cookie2", "Authorization", "Proxy-Authorization", "WWW-Authenticate"])
+    and not containsAny(node.context.identifier, ["scheme"])
+  emit issue code.CleartextChannel at node
+}

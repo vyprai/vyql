@@ -1,0 +1,128 @@
+# CVE-2026-55414 (GHSA-xm3x-9cfw-jhx4, CWE-862 + CWE-918): nl-portal's form
+# module exposed two GraphQL queries that read any record out of the Objecten
+# API on the caller's word alone.
+#
+# form/src/main/kotlin/nl/nlportal/form/graphql/FormDefinitionQuery.kt declared
+# getFormDefinitionByObjectenApiUrl(url: String) and the deprecated
+# getFormDefinitionById(id: String). Both took the record's address straight
+# from the request -- an @Argument on an @QueryMapping of an @Controller -- and
+# handed it to ObjectsApiFormDefinitionService, which passed it on to
+# ObjectenApiService.getObjectByUrl / .getObjectById. Neither resolver had the
+# authenticated principal in scope, nothing tied the requested record to that
+# principal, and nothing constrained the record's objecttype, so any caller who
+# knew or guessed an object URL or UUID read that object -- the Objecten API
+# instance also stores submitted form data and task payloads for every other
+# citizen. ObjectenApiService.getObjectByUrl did compare the requested host
+# against the configured one, which is why the advisory's CWE-918 half is
+# bounded at the parent; the unbounded half is the missing ownership
+# constraint.
+#
+# The pool row 39ad80f338fb is the merge of PR #700 and carries the `nocommit`
+# flag. It is the right revision: the merge's combined diff is what `git show`
+# declines to print, while `git diff 46d4ab5 39ad80f338fb` reads the change in
+# full, and the parent 46d4ab5 is the fully vulnerable tree.orrection.
+#
+# The fixed revision deletes both resolvers and the by-URL service method outright. What
+# replaces them, zgw/taak/.../graphql/TaakFormQuery.kt, takes
+# authentication: CommonGroundAuthentication alongside the task id, resolves the
+# task through taakService.getTaakByIdV2(taskId, authentication) so the record
+# is the caller's own, and only then reads the form definition UUID out of that
+# task; ObjectsApiFormDefinitionService additionally rejects a record whose type
+# is not the configured formDefinitionObjectTypeUrl. The request value does not
+# names the record.
+#
+# Caught by VYQL-AUTH-002 (CWE-639), which judges a request value
+# reaching a direct object lookup that no core.OwnershipCheck covers. The gap is
+# missing is Kotlin vocabulary for the lookup: objectLookupByUserInput380/381 in
+# vyql/bindings/kotlin/m304d1620.vyql name getObjectById and getObjectByUrl, the
+# single-record reads of a store addressed by an opaque identifier, beside the
+# findById and getReferenceById the same file binds for repository-shaped
+# APIs.
+
+test "rank1450: a graphql resolver hands a request-supplied record address to an object store read"
+  lang kotlin
+  file form/src/main/kotlin/nl/nlportal/form/graphql/FormDefinitionQuery.kt
+  expect VYQL-AUTH-002
+  code
+  ```
+  package nl.nlportal.form.graphql
+
+  import nl.nlportal.form.service.ObjectsApiFormDefinitionService
+  import org.springframework.graphql.data.method.annotation.Argument
+  import org.springframework.graphql.data.method.annotation.QueryMapping
+  import org.springframework.stereotype.Controller
+
+  @Controller
+  class FormDefinitionQuery(
+      private val objectenApiFormDefinitionService: ObjectsApiFormDefinitionService,
+  ) {
+      @QueryMapping
+      suspend fun getFormDefinitionByObjectenApiUrl(
+          @Argument url: String,
+      ): FormDefinition? {
+          val objectenApiFormDefinition = objectenApiFormDefinitionService.findObjectsApiFormDefinitionByUrl(url) ?: return null
+          return FormDefinition(objectenApiFormDefinition.formDefinition)
+      }
+  }
+
+  class ObjectsApiFormDefinitionService(
+      private val objectenApiService: ObjectenApiService,
+  ) {
+      suspend fun findObjectsApiFormDefinitionByUrl(objectUrl: String): ObjectsApiFormIoFormDefinition? =
+          objectenApiService.getObjectByUrl<ObjectsApiFormIoFormDefinition>(objectUrl)?.record?.data
+  }
+  ```
+
+test "rank1450: the record address is read off a task the authenticated caller owns"
+  lang kotlin
+  file zgw/taak/src/main/kotlin/nl/nlportal/zgw/taak/graphql/TaakFormQuery.kt
+  reject VYQL-AUTH-002
+  code
+  ```
+  package nl.nlportal.zgw.taak.graphql
+
+  import nl.nlportal.commonground.authentication.CommonGroundAuthentication
+  import nl.nlportal.form.service.ObjectsApiFormDefinitionService
+  import nl.nlportal.zgw.taak.service.TaakService
+  import org.springframework.graphql.data.method.annotation.Argument
+  import org.springframework.graphql.data.method.annotation.QueryMapping
+  import org.springframework.stereotype.Controller
+  import java.util.UUID
+
+  @Controller
+  class TaakFormQuery(
+      private val taakService: TaakService,
+      private val objectsApiFormDefinitionService: ObjectsApiFormDefinitionService,
+  ) {
+      @QueryMapping
+      suspend fun getFormDefinitionByTaskId(
+          @Argument taskId: UUID,
+          authentication: CommonGroundAuthentication,
+      ): FormDefinition? {
+          val task = taakService.getTaakByIdV2(taskId, authentication)
+          val formulier = task.portaalformulier?.formulier ?: return null
+          val formDefUuid = extractUuid(formulier) ?: return null
+          return objectsApiFormDefinitionService.getObjectsApiFormDefinitionById(formDefUuid)
+      }
+
+      private fun extractUuid(formulier: TaakFormulierV2): UUID? =
+          when (formulier.soort) {
+              "id" -> runCatching { UUID.fromString(formulier.value) }.getOrNull()
+              else -> null
+          }
+  }
+
+  class ObjectsApiFormDefinitionService(
+      private val objectenApiService: ObjectenApiService,
+      private val formConfig: FormConfig,
+  ) {
+      suspend fun getObjectsApiFormDefinitionById(objectId: UUID): FormDefinition? {
+          val obj = objectenApiService.getObjectById<ObjectsApiFormIoFormDefinition>(objectId.toString()) ?: return null
+          val expected = formConfig.properties.formDefinitionObjectTypeUrl
+          if (expected != null && obj.type != expected) {
+              throw RuntimeException("Object type mismatch for form definition fetch")
+          }
+          return FormDefinition(obj.record.data.formDefinition)
+      }
+  }
+  ```

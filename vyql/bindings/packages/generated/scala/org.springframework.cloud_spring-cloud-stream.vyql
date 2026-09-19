@@ -1,0 +1,9 @@
+module bindings.scala.generated.m8666d05d;
+
+binding networkData0 {
+  requires {
+    dependency("org.springframework.cloud:spring-cloud-stream")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit source code.NetworkData at call.result
+}

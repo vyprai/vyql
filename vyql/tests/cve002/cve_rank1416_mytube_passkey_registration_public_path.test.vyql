@@ -1,0 +1,287 @@
+# Rank 1416 / CVE-2026-33890 (franklioxygen/mytube, CWE-284):
+# mytube is a self-hosted media application whose Express backend authenticates
+# with a password and, optionally, with passkeys. Two middlewares decide who may
+# reach what: `roleBasedAuthMiddleware` runs on `/api`, `roleBasedSettingsMiddleware`
+# runs on the settings router beneath it. Both are written the ordinary way --
+# a module-level list of request paths that must answer before a session exists,
+# a predicate over that list, and a rejection for everything else:
+#
+#   const PUBLIC_PREFIX_PATHS = [
+#     "/settings/passkeys/authenticate",
+#     "/settings/passkeys/register",          // <-- the defect
+#   ] as const;
+#
+#   const isPublicEndpoint = (req: Request): boolean =>
+#     matchesExactPath(req, PUBLIC_EXACT_PATHS) ||
+#     matchesPathOrSubpath(req, PUBLIC_PREFIX_PATHS);
+#
+#   if (!req.user) {
+#     const loginRequired = isLoginRequired();
+#     if (loginRequired && !isPublicEndpoint(req)) {
+#       res.status(401).json({ success: false, error: "Authentication required. ..." });
+#       return;
+#     }
+#     next();
+#   }
+#
+# `/settings/passkeys/authenticate` belongs there: it is the authentication
+# ceremony, and it has to answer to a caller who holds no session yet. The line
+# beneath it is the *registration* ceremony, and it is the opposite operation.
+# `settingsRoutes.ts` maps `POST /passkeys/register` to
+# `generateRegistrationOptions` and `POST /passkeys/register/verify` to
+# `verifyRegistration`, which stores the new credential; `matchesPathOrSubpath`
+# treats a prefix entry as covering its subpaths, so both are public. Neither
+# controller read `req.user` at all in the vulnerable revision. An anonymous
+# client therefore asks the server for registration options, completes the
+# WebAuthn ceremony with an authenticator it controls, and the server saves that
+# authenticator as a valid credential -- after which the legitimate, correctly
+# public `/settings/passkeys/authenticate` path next to it turns that credential
+# into an admin session. No password, no prior access, no session of any kind.
+#
+# That is the weakness in one sentence: an authentication-exemption path list
+# names a credential-enrollment endpoint. Enrollment binds a *new* authenticator
+# to an account, which is what every WebAuthn implementation documents as an
+# operation for the authenticated user whose account is being enrolled;
+# authentication turns an authenticator the caller holds into a session,
+# which is what genuinely has to be reachable without one. Account signup is a
+# third thing and is legitimately public -- `["/login", "/register"]` is correct
+# and ordinary -- so the enrollment vocabulary, not the `register` verb, is what
+# separates the defect from the common safe case.
+#
+# d6c1275a7ff7ffd3d51b53c333237f4d572580ac ("Fix passkey registration
+# authorization") removes the entry from both lists, adds an explicit
+# `req.user?.role === "admin"` gate in `passkeyController.ts`, and puts the
+# registration route behind `authLimiter` in `apiRoutes.ts`. The pool row is
+# accurate: single-parent commit, readable diff, the vulnerable entry is present
+# at the parent and the remediation at the fixed revision. The recorded CWE-284 is right in
+# family; CWE-306 is the sharper axis, since the reachable state is "no
+# authentication at all", and the rule carries both.
+#
+# What fires without this. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# over `backend/src/middleware` and `passkeyController.ts` reported 3 findings,
+# all VYQL-INJ-009 on `errorHandler.ts` logging, and **0 flags**; `vyql match`
+# on the middleware labels four nodes, every one of them a `req.method` read as
+# `code.HttpInput`, and nothing on either path list. Findings in the file are
+# not coverage.
+#
+# The detection keys on the allowlist entry rather than on the controller. The
+# controller half of this fix is §9's measured-unshippable shape -- "endpoint
+# with no authorization signal in its body" -- and the check it added lives in a
+# helper, `requireAdminPasskeyRegistration`, so rank 1372's delegated-check gap
+# would apply too. The allowlist half needs neither: the remediation is the
+# deletion of a string, so a binding that names the string discriminates without
+# naming anything the fixed revision introduces. Both middlewares flag at the parent and
+# neither at the fixed revision.
+#
+# Discrimination, over three --cache off runs of each revision: the whole
+# repository reports 2 VYQL-AUTH-122 rows at the parent -- one per middleware --
+# and 0 at the fixed revision, while the tree's other 239 high-or-above findings do not
+# move.
+#
+# Reach, measured rather than assumed. Across the 146 clones under
+# /tmp/cve-work/rank*/ there are 86,577 non-vendored JavaScript/TypeScript
+# files. 34 declare an authentication-exemption path list under any of the
+# ecosystem's spellings; 46 contain a credential-enrollment path literal; the
+# intersection is 2, and both are mytube's. Bounded scans of the candidate
+# subtrees behind those two sets -- nest/packages/core, n8n's cli/src/webhooks,
+# cli/src/middlewares, abstract-server.ts and controller.registry.ts, vite's
+# node/plugins, mlflow's server/js, mattermost's channels/src/utils and
+# logged_in, misskey's backend/src/server, n8n-mcp's ssrf tests -- report 0. So
+# the zero-collateral measurement is near-vacuous and is reported as such: the
+# shape is rare in this corpus, not proven precise by it.
+#
+# The reject case that is not vacuous is the third one. Adding
+# "/passkeys/register" to its `publicPaths` array makes it flag, so the
+# middleware it models satisfies both anchor clauses on its own naming --
+# `publicPaths`, `isPublicPath`, `req.path` -- and is declined only because a
+# signup route is not a credential-enrollment route. That is also what shows the
+# binding is not keyed on mytube's own constants: mytube is reached through
+# `isPublicEndpoint`, not through PUBLIC_EXACT_PATHS or PUBLIC_PREFIX_PATHS.
+#
+# Two measurements on the module-scope literal route, both reproducing rank
+# 1412's finding on this file. `containsAny(node.context.literal, ...)` at module
+# scope reaches the module's raw source: prepending
+# `// Note: /settings/passkeys/register now requires an authenticated admin
+# session.` to the *patched* middleware puts the flag back. `endsWith` on the
+# same field does not -- it compares against each code.Const node's own tokens,
+# so only a comment that is the last text in the file, with the needle at its
+# very end, satisfies it. `endsWith` takes one value where `containsAny` takes a
+# list, so the shipped clause is the list and the exposure is recorded in the
+# binding rather than hidden.
+
+test "rank1416: the authentication middleware's public-path list names the passkey registration endpoint"
+  lang javascript
+  file backend/src/middleware/roleBasedAuthMiddleware.ts
+  expect VYQL-AUTH-122
+  expect_review code.UnauthenticatedCredentialEnrollmentPath
+  code
+  ```
+  import { NextFunction, Request, Response } from "express";
+  import { isLoginRequired } from "../services/passwordService";
+  import {
+    matchesExactPath,
+    matchesPathOrSubpath,
+  } from "../utils/requestPath";
+
+  const PUBLIC_EXACT_PATHS = [
+    "/settings/verify-password",
+    "/settings/password-enabled",
+    "/settings/passkeys/exists",
+    "/settings/logout",
+  ] as const;
+
+  const PUBLIC_PREFIX_PATHS = [
+    "/settings/passkeys/authenticate",
+    "/settings/passkeys/register",
+  ] as const;
+
+  const isPublicEndpoint = (req: Request): boolean => {
+    return (
+      matchesExactPath(req, PUBLIC_EXACT_PATHS) ||
+      matchesPathOrSubpath(req, PUBLIC_PREFIX_PATHS)
+    );
+  };
+
+  export const roleBasedAuthMiddleware = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): void => {
+    if (req.user?.role === "admin") {
+      next();
+      return;
+    }
+
+    if (req.user?.role === "visitor") {
+      if (req.method === "GET") {
+        next();
+        return;
+      }
+
+      res.status(403).json({
+        success: false,
+        error: "Visitor role: Write operations are not allowed.",
+      });
+      return;
+    }
+
+    if (!req.user) {
+      const loginRequired = isLoginRequired();
+
+      if (loginRequired && !isPublicEndpoint(req)) {
+        res.status(401).json({
+          success: false,
+          error: "Authentication required. Please log in to access this resource.",
+        });
+        return;
+      }
+
+      next();
+      return;
+    }
+
+    next();
+  };
+  ```
+
+test "rank1416: the same middleware with only the authentication ceremony left on the public-path list"
+  lang javascript
+  file backend/src/middleware/roleBasedAuthMiddleware.ts
+  reject VYQL-AUTH-122
+  reject_review code.UnauthenticatedCredentialEnrollmentPath
+  code
+  ```
+  import { NextFunction, Request, Response } from "express";
+  import { isLoginRequired } from "../services/passwordService";
+  import {
+    matchesExactPath,
+    matchesPathOrSubpath,
+  } from "../utils/requestPath";
+
+  const PUBLIC_EXACT_PATHS = [
+    "/settings/verify-password",
+    "/settings/password-enabled",
+    "/settings/passkeys/exists",
+    "/settings/logout",
+  ] as const;
+
+  const PUBLIC_PREFIX_PATHS = [
+    "/settings/passkeys/authenticate",
+  ] as const;
+
+  const isPublicEndpoint = (req: Request): boolean => {
+    return (
+      matchesExactPath(req, PUBLIC_EXACT_PATHS) ||
+      matchesPathOrSubpath(req, PUBLIC_PREFIX_PATHS)
+    );
+  };
+
+  export const roleBasedAuthMiddleware = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): void => {
+    if (req.user?.role === "admin") {
+      next();
+      return;
+    }
+
+    if (req.user?.role === "visitor") {
+      if (req.method === "GET") {
+        next();
+        return;
+      }
+
+      res.status(403).json({
+        success: false,
+        error: "Visitor role: Write operations are not allowed.",
+      });
+      return;
+    }
+
+    if (!req.user) {
+      const loginRequired = isLoginRequired();
+
+      if (loginRequired && !isPublicEndpoint(req)) {
+        res.status(401).json({
+          success: false,
+          error: "Authentication required. Please log in to access this resource.",
+        });
+        return;
+      }
+
+      next();
+      return;
+    }
+
+    next();
+  };
+  ```
+
+test "rank1416: an account-signup route on the same public-path list is not an enrollment endpoint"
+  lang javascript
+  file src/middleware/auth.ts
+  reject VYQL-AUTH-122
+  reject_review code.UnauthenticatedCredentialEnrollmentPath
+  code
+  ```
+  import { NextFunction, Request, Response } from "express";
+
+  const publicPaths = ["/login", "/register", "/forgot-password"] as const;
+
+  const isPublicPath = (req: Request): boolean =>
+    publicPaths.some((allowed) => req.path === allowed);
+
+  export const authMiddleware = (
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): void => {
+    if (!req.user && !isPublicPath(req)) {
+      res.status(401).json({ error: "Authentication required." });
+      return;
+    }
+
+    next();
+  };
+  ```

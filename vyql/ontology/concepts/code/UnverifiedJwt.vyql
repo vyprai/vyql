@@ -1,0 +1,11 @@
+module code;
+
+concept UnverifiedJwt : issue {
+  cwe: [CWE_347]
+  reviewAssumption: "the token is attacker-suppliable"
+  reviewCategory: auth
+  reviewCondition: "a JWT is decoded with signature verification disabled"
+  reviewConfidence: medium
+  reviewEvidence: "jwt decode {pattern} disables signature verification"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

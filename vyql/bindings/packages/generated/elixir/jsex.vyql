@@ -1,0 +1,17 @@
+module bindings.elixir.generated.m670266e9;
+
+binding deserialization0 {
+  requires {
+    dependency("jsex")
+  }
+  query pattern callExpr where callee.method == "decode!"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("jsex")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,49 @@
+module bindings.swift.generated.m175e4063;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/orlandos-nl/NioDNS")
+  }
+  query pattern callExpr where callee.method == "initiateAQuery"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("github.com/orlandos-nl/NioDNS")
+  }
+  query pattern callExpr where callee.method == "initiateAAAAQuery"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("github.com/orlandos-nl/NioDNS")
+  }
+  query pattern callExpr where callee.method == "sendQuery"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("github.com/orlandos-nl/NioDNS")
+  }
+  query pattern callExpr where callee.method == "initiateNSQuery"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("github.com/orlandos-nl/NioDNS")
+  }
+  query pattern callExpr where callee.method == "initiateSOAQuery"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("github.com/orlandos-nl/NioDNS")
+  }
+  query pattern callExpr where callee.method == "srvConnect"
+  emit sink code.NetworkConnectSink at args[0]
+}

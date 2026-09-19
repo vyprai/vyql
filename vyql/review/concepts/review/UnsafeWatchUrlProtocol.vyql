@@ -1,0 +1,8 @@
+module code;
+
+review code.UnsafeWatchUrlProtocol {
+  category: xss
+  expected: [core.RedirectAllowlist]
+  kind: attention
+  text: "review stored watch URLs for protocol allowlist validation before rendering browser links"
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m8422f424;
+
+binding codeEval0 {
+  requires {
+    dependency("coffee-script")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.CodeEval at args[0]
+}

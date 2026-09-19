@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule McpTransportRouteMissingAuthentication {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_306]
+    id: "VYQL-AUTH-134"
+    severity: high
+  }
+  issue code.McpTransportRouteMissingAuthentication as route
+}

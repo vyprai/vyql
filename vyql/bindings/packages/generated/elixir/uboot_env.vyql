@@ -1,0 +1,41 @@
+module bindings.elixir.generated.m8b020c1c;
+
+binding userControlledData0 {
+  requires {
+    dependency("uboot_env")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("uboot_env")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("uboot_env")
+  }
+  query pattern callExpr where callee.method == "from_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("uboot_env")
+  }
+  query pattern callExpr where callee.method == "from_file!"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("uboot_env")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

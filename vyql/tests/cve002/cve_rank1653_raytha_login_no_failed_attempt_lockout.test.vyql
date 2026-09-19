@@ -1,0 +1,231 @@
+# Rank 1653 / CVE-2025-69246: a .NET CMS's email-and-password login accepted an
+# unlimited number of attempts. The credential check lives in the MediatorR
+# command's FluentValidation `Validator`: its `Custom` callback looks the user
+# up by the submitted email address, hashes the submitted password with the
+# stored salt, and compares it against the stored hash -- with nothing anywhere
+# limiting how often the check can be retried, so an HTTP caller could drive it
+# at machine speed until a password is found (CWE-307).
+#
+# The fixed revision adds a per-email failed-attempt counter: before the user lookup the
+# validator reads the counter and rejects with "Too many failed login
+# attempts" once it reaches the scheme's configured maximum inside the window,
+# and each failed validation records an attempt. The whole control is inside
+# the same `Custom` callback that does the verification, so the function's own
+# context carries the discriminator.
+#
+# The advisory (and NVD) records the fixing commit in 1.4.6, but the v1.4.6 tree -- the
+# release merge the pool row pointed at -- contains no attempt limiting at
+# all. The lockout landed two days later in the "failed login lockout feature"
+# commit, first released in v1.5.0; that commit is what this spec's pair is
+# taken from, and the row is repointed to it.
+#
+# Measured on the real repository, union of three --cache off runs per
+# revision: the vulnerable tree reports VYQL-AUTH-105 on the login validator
+# plus one same-class review row on the change-password validator; the patched
+# tree drops the login row and keeps the other. Renaming every identifier the
+# fix introduced that names its own mechanism (RecordFailedAttempt,
+# BruteForceProtection*) leaves the patched revision clean, because the
+# discriminator is the standard failed-attempt vocabulary (FailedAttemptCount,
+# LastFailedAttemptAt, FailedLoginAttempts) rather than the fixed revision's private
+# names. Across every clone in the working pool the only other C# files
+# touching a password hash are NuGetGallery's test fixtures, which produce no
+# row: their `VerifyPasswordHash` helper is a call, not a stored-hash read.
+#
+# Shipped: the C# arm of code.RateLimitRequiredOp
+# (passwordVerificationRateLimitRequired301), the concept and rule
+# VYQL-AUTH-105 carry for Python.
+
+test "rank1653: email-and-password login verifies credentials with no attempt limit"
+  lang csharp
+  file LoginWithEmailAndPassword.cs
+  expect VYQL-AUTH-105
+  code
+  ```
+  using FluentValidation;
+
+  namespace Raytha.Application.Login.Commands;
+
+  public class LoginWithEmailAndPassword
+  {
+      public record Command
+      {
+          public string EmailAddress { get; init; } = null!;
+
+          public string Password { get; init; } = null!;
+      }
+
+      public class Validator : AbstractValidator<Command>
+      {
+          public Validator(IRaythaDbContext db)
+          {
+              RuleFor(x => x.EmailAddress).NotEmpty().EmailAddress();
+              RuleFor(x => x)
+                  .Custom(
+                      (request, context) =>
+                      {
+                          var emailAddress = !string.IsNullOrWhiteSpace(request.EmailAddress)
+                              ? request.EmailAddress.ToLower().Trim()
+                              : null;
+                          var entity =
+                              emailAddress != null
+                                  ? db.Users.FirstOrDefault(p =>
+                                      p.EmailAddress.ToLower() == emailAddress
+                                  )
+                                  : null;
+
+                          if (entity == null)
+                          {
+                              context.AddFailure("Invalid email or password.");
+                              return;
+                          }
+
+                          var passwordToCheck = PasswordUtility.Hash(
+                              request.Password,
+                              entity.Salt
+                          );
+                          var passwordsMatch = PasswordUtility.IsMatch(
+                              entity.PasswordHash,
+                              passwordToCheck
+                          );
+                          if (!passwordsMatch)
+                          {
+                              context.AddFailure("Invalid email or password.");
+                              return;
+                          }
+                      }
+                  );
+          }
+      }
+  }
+  ```
+
+test "rank1653: the login validator locks out after too many failed attempts"
+  lang csharp
+  file LoginWithEmailAndPassword.cs
+  reject VYQL-AUTH-105
+  code
+  ```
+  using FluentValidation;
+
+  namespace Raytha.Application.Login.Commands;
+
+  public class LoginWithEmailAndPassword
+  {
+      public record Command
+      {
+          public string EmailAddress { get; init; } = null!;
+
+          public string Password { get; init; } = null!;
+      }
+
+      public class Validator : AbstractValidator<Command>
+      {
+          public Validator(IRaythaDbContext db)
+          {
+              RuleFor(x => x.EmailAddress).NotEmpty().EmailAddress();
+              RuleFor(x => x)
+                  .Custom(
+                      (request, context) =>
+                      {
+                          var authScheme = db.AuthenticationSchemes.First(p =>
+                              p.AuthenticationSchemeType == AuthenticationSchemeType.EmailAndPassword
+                          );
+
+                          var emailAddress = !string.IsNullOrWhiteSpace(request.EmailAddress)
+                              ? request.EmailAddress.ToLower().Trim()
+                              : null;
+
+                          // Check brute force lockout before proceeding
+                          var failedAttempt =
+                              emailAddress != null
+                                  ? db.FailedLoginAttempts.FirstOrDefault(f =>
+                                      f.EmailAddress == emailAddress
+                                  )
+                                  : null;
+                          var windowStart = DateTime.UtcNow.AddSeconds(
+                              -authScheme.BruteForceProtectionWindowInSeconds
+                          );
+
+                          if (
+                              failedAttempt != null
+                              && failedAttempt.FailedAttemptCount
+                                  >= authScheme.BruteForceProtectionMaxFailedAttempts
+                              && failedAttempt.LastFailedAttemptAt >= windowStart
+                          )
+                          {
+                              context.AddFailure(
+                                  "Too many failed login attempts. Please try again later."
+                              );
+                              return;
+                          }
+
+                          var entity =
+                              emailAddress != null
+                                  ? db.Users.FirstOrDefault(p =>
+                                      p.EmailAddress.ToLower() == emailAddress
+                                  )
+                                  : null;
+
+                          if (entity == null)
+                          {
+                              RecordFailedAttempt(db, emailAddress, failedAttempt, windowStart);
+                              context.AddFailure("Invalid email or password.");
+                              return;
+                          }
+
+                          var passwordToCheck = PasswordUtility.Hash(
+                              request.Password,
+                              entity.Salt
+                          );
+                          var passwordsMatch = PasswordUtility.IsMatch(
+                              entity.PasswordHash,
+                              passwordToCheck
+                          );
+                          if (!passwordsMatch)
+                          {
+                              RecordFailedAttempt(db, emailAddress, failedAttempt, windowStart);
+                              context.AddFailure("Invalid email or password.");
+                              return;
+                          }
+                      }
+                  );
+          }
+
+          private static void RecordFailedAttempt(
+              IRaythaDbContext db,
+              string? emailAddress,
+              FailedLoginAttempt? existing,
+              DateTime windowStart
+          )
+          {
+              if (string.IsNullOrEmpty(emailAddress))
+                  return;
+
+              if (existing == null)
+              {
+                  db.FailedLoginAttempts.Add(
+                      new FailedLoginAttempt
+                      {
+                          Id = Guid.NewGuid(),
+                          EmailAddress = emailAddress,
+                          FailedAttemptCount = 1,
+                          LastFailedAttemptAt = DateTime.UtcNow,
+                      }
+                  );
+              }
+              else if (existing.LastFailedAttemptAt < windowStart)
+              {
+                  existing.FailedAttemptCount = 1;
+                  existing.LastFailedAttemptAt = DateTime.UtcNow;
+              }
+              else
+              {
+                  existing.FailedAttemptCount++;
+                  existing.LastFailedAttemptAt = DateTime.UtcNow;
+              }
+
+              db.DbContext.SaveChanges();
+          }
+      }
+  }
+  ```

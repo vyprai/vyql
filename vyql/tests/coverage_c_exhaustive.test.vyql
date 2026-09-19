@@ -1,0 +1,166 @@
+# C language-gap narrowing: exhaustive coverage for adapter-claimed native idioms.
+
+test "c exhaustive: argv and environment input reach SQL command dynamic-load and path sinks"
+  lang c
+  expect VYQL-INJ-001
+  expect VYQL-INJ-002
+  expect VYQL-INJ-023
+  expect VYQL-PATH-001
+  code
+  ```
+  void handler(int argc, char **argv, sqlite3 *db) {
+    char *q = getenv("QUERY");
+    sqlite3_exec(db, q, 0, 0, 0);
+    mysql_query(conn, q);
+    PQexec(pg, q);
+    system(argv[1]);
+    popen(argv[1], "r");
+    dlopen(argv[2], RTLD_NOW);
+    fopen(argv[3], "r");
+    open(argv[3], O_RDONLY);
+  }
+  ```
+
+test "c exhaustive: realpath and shell escaping suppress path and command findings"
+  lang c
+  reject VYQL-INJ-002
+  reject VYQL-PATH-001
+  code
+  ```
+  void handler(int argc, char **argv) {
+    char resolved[4096];
+    system(escape_shell(argv[1]));
+    fopen(realpath(argv[2], resolved), "r");
+  }
+  ```
+
+test "c exhaustive: XSS LDAP XPath format regex SSRF and XXE sinks receive taint"
+  lang c
+  expect VYQL-INJ-004
+  expect VYQL-INJ-005
+  expect VYQL-INJ-006
+  expect VYQL-INJ-011
+  expect VYQL-DOS-001
+  expect VYQL-RF-001
+  expect VYQL-DESER-002
+  code
+  ```
+  void handler(int argc, char **argv) {
+    fputs(argv[1], stdout);
+    ldap_search_s(ld, "dc=x", LDAP_SCOPE_SUBTREE, argv[1], NULL, 0, &res);
+    xmlXPathEvalExpression(argv[1], ctx);
+    printf(argv[1]);
+    regcomp(&re, argv[1], 0);
+    curl_easy_setopt(curl, CURLOPT_URL, argv[1]);
+    xmlReadMemory(argv[1], 10, NULL, NULL, 0);
+  }
+  ```
+
+test "c exhaustive: output query controls suppress XSS LDAP XPath and regex findings"
+  lang c
+  reject VYQL-INJ-004
+  reject VYQL-INJ-005
+  reject VYQL-INJ-006
+  reject VYQL-INJ-011
+  reject VYQL-DOS-001
+  code
+  ```
+  void handler(int argc, char **argv) {
+    fputs(escape_html(argv[1]), stdout);
+    ldap_search_s(ld, "dc=x", LDAP_SCOPE_SUBTREE, encode_for_ldap(argv[1]), NULL, 0, &res);
+    xmlXPathEvalExpression(escape_xpath(argv[1]), ctx);
+    printf("%s", argv[1]);
+    regcomp(&re, "^[a-z]+$", 0);
+  }
+  ```
+
+test "c exhaustive: memory numeric race and lock lifecycle review points are reported"
+  lang c
+  expect VYQL-MEM-001
+  expect VYQL-MEM-002
+  expect VYQL-MEM-003
+  expect VYQL-MEM-004
+  expect VYQL-MEM-005
+  expect VYQL-MEM-006
+  expect VYQL-MEM-007
+  expect VYQL-MEM-008
+  expect VYQL-NUM-001
+  expect VYQL-NUM-002
+  expect VYQL-NUM-003
+  expect VYQL-RACE-001
+  expect VYQL-LIFE-001
+  code
+  ```
+  int atoi(const char *);
+  void handler(int argc, char **argv, char *src, char *p, int *arr) {
+    int n = atoi(argv[1]);
+    char dst[8];
+    strcpy(dst, argv[2]);
+    memcpy(dst, src, n);
+    alloca(n);
+    arr[n] = 1;
+    int y = 100 / n;
+    int z = n * 1024;
+    void *heap = malloc(n * 32);
+    int *maybe = 0;
+    *maybe = 1;
+    free(p);
+    *p = 'x';
+    free(p);
+    if (access(argv[3], F_OK) == 0) { fopen(argv[3], "r"); }
+    pthread_mutex_lock(&m);
+  }
+  ```
+
+test "c exhaustive: released locks are clean"
+  lang c
+  reject VYQL-LIFE-001
+  code
+  ```
+  void handler() {
+    pthread_mutex_lock(&m);
+    pthread_mutex_unlock(&m);
+  }
+  ```
+
+test "c exhaustive: insecure permissions temp files weak crypto static IV and weak RNG are reported"
+  lang c
+  expect VYQL-CFG-008
+  expect VYQL-PATH-003
+  expect VYQL-CRY-001
+  expect VYQL-CRY-002
+  expect VYQL-CRY-003
+  expect VYQL-CRY-004
+  code
+  ```
+  void handler() {
+    chmod("/tmp/x", 0777);
+    open("/tmp/x", O_CREAT, 0666);
+    mktemp(buf);
+    tmpnam(buf);
+    MD5_Init(&ctx);
+    DES_set_key(key, schedule);
+    EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL, key, "0000000000000000");
+    rand();
+  }
+  ```
+
+test "c exhaustive: restrictive permissions temp and stronger crypto are clean"
+  lang c
+  reject VYQL-CFG-008
+  reject VYQL-PATH-003
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-CRY-003
+  reject VYQL-CRY-004
+  code
+  ```
+  void handler() {
+    chmod("/tmp/x", 0600);
+    open("/tmp/x", O_CREAT, 0600);
+    mkstemp(buf);
+    SHA256_Init(&ctx);
+    EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), NULL, key, iv);
+    RAND_bytes(out, 16);
+  }
+  ```

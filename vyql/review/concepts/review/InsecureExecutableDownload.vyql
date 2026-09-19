@@ -1,0 +1,8 @@
+module code;
+
+review code.InsecureExecutableDownload {
+  category: supply_chain
+  expected: [core.CertificateValidation]
+  kind: target
+  text: "review installer/runtime downloads for HTTPS transport or integrity verification before local execution"
+}

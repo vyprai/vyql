@@ -1,0 +1,11 @@
+module code;
+
+concept LoopRestartWithoutProgressCheck : issue {
+  cwe: [CWE_835, CWE_400]
+  reviewAssumption: "a restart path that passes no progress step re-tests an unchanged exit and takes the same branch forever"
+  reviewCategory: resource
+  reviewCondition: "a while, do-while or update-less for loop can restart without advancing any variable its exit reads"
+  reviewConfidence: high
+  reviewEvidence: "loop context {pattern} carries a continue whose dominating path passes no update of, no method call on, and no resolved-call advance of the variables the loop's exit reads"
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

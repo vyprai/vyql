@@ -1,0 +1,254 @@
+# Rank 1043 / CVE-2024-5982: ChuanhuChatGPT copied an uploaded history file to a
+# path built from the upload's own name, with no check that the source sits
+# inside the history directory (CWE-22). load_chat_history in
+# modules/models/base_model.py did
+#
+#   new_history_file_path = new_history_file_path.name
+#   shutil.copyfile(
+#       new_history_file_path,
+#       os.path.join(HISTORY_DIR, self.user_name,
+#                    os.path.basename(new_history_file_path)))
+#
+# so the read side takes whatever path the upload names. The fixed revision adds
+# two realpath/startswith assertions and an auth_list membership check.
+#
+# ATTENTION, and two independent blockers sit on the path, each pinned by its
+# own case. The first case proves the chain end to end with an ordinary request
+# parameter as the source, reporting VYQL-PATH-001 at high with the taint path
+# running through the method parameter into the copy, and both `unless` clauses
+# correctly unsatisfied. The sink is labelled in the real file too,
+# code.FilePathAccess on the copyfile, as are the os.path.basename controls
+# around it.
+#
+# Blocker one is the source. The upload arrives through Gradio, wired as
+# uploadFileBtn.upload(upload_chat_history, [current_model, uploadFileBtn], ...),
+# so the tainted value is a parameter of a callback passed by reference to a
+# framework. Gradio's generated package binding labels only `.parse`, which this
+# path never calls, and making every Gradio handler parameter an input adds
+# sources across every Gradio application at once; simulating that on a second
+# Gradio application measured ~139 findings per run for one true path. The
+# second case pins the real wiring as it stands in modules/utils.py and
+# ChuanhuChatbot.py.
+#
+# Blocker two is the forwarding hop, and it is invisible in the real wiring
+# until the source exists: the callback is
+#
+#   def upload_chat_history(current_model, *args):
+#       return current_model.load_chat_history(*args)
+#
+# and taint does not cross an argument that lands in a `*args` parameter. The
+# fourth case isolates that hop with a source that does work, so it differs from
+# the first case only in the forwarding construct. pyConv.params
+# (internal/extract/frontend/treesitter/python.go) has no case for
+# list_splat_pattern or dictionary_splat_pattern, so `*args` and `**kwargs` are
+# not parameters at all. Adding the case is a one-line change and it does
+# complete the path -- measured, all four probes report -- but it also makes
+# every exported varargs parameter an ordinary parameter, which the shipped
+# `library` param-source binding then labels code.ExternalEntryInput: +20
+# findings on urllib3 and +4 on thrift, none of them true positives. The fix
+# needs the varargs parameter modelled as a collection that receives the
+# overflow rather than as a named parameter, so it is recorded as an engine gap
+# rather than shipped here.
+#
+# Worth a later rank, and separate from this CVE: the fixed revision's own guard
+# is bare prefix containment. os.path.realpath(t).startswith(os.path.realpath(HISTORY_DIR))
+# accepts a sibling directory sharing the prefix, so reporting it is correct
+# rather than a false positive. The Python core.PathAccessCheck binding declines
+# it deliberately, requiring os.sep in the argument, and
+# code.CanonicalPathStringPrefixContainment -- exactly this weakness -- does now
+# have a Python binding, but the guard is spelled `assert` and an assert
+# statement produces no node at all in the Python frontend, so the fixed
+# revision reports nothing. The fifth case holds that pair: the identical
+# startswith call under `if not` is reported, under `assert` it is not.
+#
+# verify_current_expected: attention-source-gap, attention-engine-gap
+
+test "rank1043: the chain reports when the uploaded path comes from a request"
+  lang python
+  file modules/models/base_model.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+  import shutil
+
+  HISTORY_DIR = "/data/history"
+
+
+  class Model:
+      def __init__(self, user_name):
+          self.user_name = user_name
+
+      def load_chat_history(self, new_history_file_path=None):
+          if new_history_file_path is not None:
+              if type(new_history_file_path) != str:
+                  new_history_file_path = new_history_file_path.name
+                  shutil.copyfile(
+                      new_history_file_path,
+                      os.path.join(
+                          HISTORY_DIR,
+                          self.user_name,
+                          os.path.basename(new_history_file_path),
+                      ),
+                  )
+
+
+  def handler(request):
+      uploaded = request.args.get("file")
+      Model("bob").load_chat_history(uploaded)
+  ```
+
+test "rank1043: the real wiring is silent, the callback forwarding through *args"
+  lang python
+  file modules/models/base_model.py
+  reject VYQL-PATH-001
+  code
+  ```
+  import os
+  import shutil
+
+  import gradio as gr
+
+  HISTORY_DIR = "/data/history"
+
+
+  class Model:
+      def __init__(self, user_name):
+          self.user_name = user_name
+
+      def load_chat_history(self, new_history_file_path=None):
+          if new_history_file_path is not None:
+              if type(new_history_file_path) != str:
+                  new_history_file_path = new_history_file_path.name
+                  shutil.copyfile(
+                      new_history_file_path,
+                      os.path.join(
+                          HISTORY_DIR,
+                          self.user_name,
+                          os.path.basename(new_history_file_path),
+                      ),
+                  )
+
+
+  def upload_chat_history(current_model, *args):
+      return current_model.load_chat_history(*args)
+
+
+  with gr.Blocks() as demo:
+      uploadFileBtn = gr.UploadButton(
+          interactive=True, label="", file_types=[".json"])
+      current_model = gr.State()
+      uploadFileBtn.upload(upload_chat_history, [current_model, uploadFileBtn], [])
+  ```
+
+test "rank1043: the fixed revision's prefix containment is not a control, and reporting it is right"
+  lang python
+  file modules/models/base_model.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+  import shutil
+
+  HISTORY_DIR = "/data/history"
+
+
+  class Model:
+      def __init__(self, user_name):
+          self.user_name = user_name
+
+      def load_chat_history(self, new_history_file_path=None):
+          if new_history_file_path is not None:
+              if type(new_history_file_path) != str:
+                  new_history_file_path = new_history_file_path.name
+                  target_path = os.path.join(HISTORY_DIR, self.user_name, new_history_file_path)
+                  assert os.path.realpath(new_history_file_path).startswith(os.path.realpath(HISTORY_DIR))
+                  assert os.path.realpath(target_path).startswith(os.path.realpath(HISTORY_DIR))
+                  shutil.copyfile(
+                      new_history_file_path,
+                      os.path.join(
+                          HISTORY_DIR,
+                          self.user_name,
+                          os.path.basename(new_history_file_path),
+                      ),
+                  )
+
+
+  def handler(request):
+      uploaded = request.args.get("file")
+      Model("bob").load_chat_history(uploaded)
+  ```
+
+test "rank1043: a value forwarded through *args reaches the copy in no form, source or no source"
+  lang python
+  file modules/models/base_model.py
+  reject VYQL-PATH-001
+  code
+  ```
+  import os
+  import shutil
+
+  HISTORY_DIR = "/data/history"
+
+
+  class Model:
+      def __init__(self, user_name):
+          self.user_name = user_name
+
+      def load_chat_history(self, new_history_file_path=None):
+          if new_history_file_path is not None:
+              if type(new_history_file_path) != str:
+                  new_history_file_path = new_history_file_path.name
+                  shutil.copyfile(
+                      new_history_file_path,
+                      os.path.join(
+                          HISTORY_DIR,
+                          self.user_name,
+                          os.path.basename(new_history_file_path),
+                      ),
+                  )
+
+
+  def upload_chat_history(current_model, *args):
+      return current_model.load_chat_history(*args)
+
+
+  def handler(request):
+      uploaded = request.args.get("file")
+      return upload_chat_history(Model("bob"), uploaded)
+  ```
+
+test "rank1043: the same containment guard under if is reported as the weak check it is"
+  lang python
+  file modules/models/base_model.py
+  expect VYQL-PATH-040
+  expect_review code.CanonicalPathStringPrefixContainment
+  code
+  ```
+  import os
+
+  HISTORY_DIR = "/data/history"
+
+
+  def guarded_copy(new_history_file_path):
+      if not os.path.realpath(new_history_file_path).startswith(os.path.realpath(HISTORY_DIR)):
+          return None
+      return new_history_file_path
+  ```
+
+test "rank1043: under assert the guard is invisible, an assert statement lowers to nothing"
+  lang python
+  file modules/models/base_model.py
+  reject VYQL-PATH-040
+  reject_review code.CanonicalPathStringPrefixContainment
+  code
+  ```
+  import os
+
+  HISTORY_DIR = "/data/history"
+
+
+  def asserted_copy(new_history_file_path):
+      assert os.path.realpath(new_history_file_path).startswith(os.path.realpath(HISTORY_DIR))
+      return new_history_file_path
+  ```

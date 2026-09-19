@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule InternalAssetRoutePathTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-039"
+    severity: high
+  }
+  issue code.InternalAssetRoutePathTraversal as sink
+}

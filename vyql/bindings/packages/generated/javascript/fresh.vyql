@@ -1,0 +1,9 @@
+module bindings.javascript.generated.maaed3251;
+
+binding userControlledData0 {
+  requires {
+    dependency("fresh")
+  }
+  query pattern callExpr where callee.method == "fresh"
+  emit source core.UserControlledData at call.result
+}

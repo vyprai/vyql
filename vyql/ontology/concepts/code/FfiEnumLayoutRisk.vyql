@@ -1,0 +1,11 @@
+module code;
+
+concept FfiEnumLayoutRisk : issue {
+  cwe: [CWE_119]
+  reviewAssumption: "the foreign ABI expects a fixed-width integer representation"
+  reviewCategory: memory
+  reviewCondition: "a language enum crosses an FFI boundary with ABI-sensitive representation"
+  reviewConfidence: low
+  reviewEvidence: "enum representation metadata {pattern} requires layout review"
+  vulnerableTo: [memory.OobRead, memory.OobWrite]
+}

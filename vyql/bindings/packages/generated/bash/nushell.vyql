@@ -1,0 +1,9 @@
+module bindings.bash.generated.m35050009;
+
+binding commandExecution0 {
+  requires {
+    dependency("nushell")
+  }
+  query pattern callExpr where callee.path ~= "nushell.exec"
+  emit sink code.CommandExecution at args[0]
+}

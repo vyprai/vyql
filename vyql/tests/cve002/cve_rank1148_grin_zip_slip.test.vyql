@@ -1,0 +1,158 @@
+# Rank 1148 / CVE-2019-9195: Grin's txhashset archive extractor joins each
+# ZIP entry's raw name onto the extraction directory and writes there, so a
+# malicious peer serving a crafted state-sync archive writes files anywhere
+# the process can reach through an entry named with `../` traversal (CWE-22,
+# Zip Slip). The vulnerable decompress holds, in util/src/zip.rs,
+#
+#   let mut archive = zip_rs::ZipArchive::new(src_file)?;
+#   for i in 0..archive.len() {
+#       let mut file = archive.by_index(i)?;
+#       let file_path = dest.join(file.name());
+#       if (&*file.name()).ends_with('/') {
+#           fs::create_dir_all(&file_path)?;
+#       } else {
+#           let res = fs::File::create(&file_path);
+#           ...
+#           io::copy(&mut file, &mut outfile)?;
+#       }
+#   }
+#
+# with the member name taken straight from the archive's own bytes -- the
+# zip crate's documentation for name() warns exactly this. The fix
+# (391e311f4c05) switches to the crate's sanitized_name() accessor, drops
+# any entry whose sanitized form differs from its raw name, and gates the
+# rest through an expected() allowlist callback.
+#
+# Rust now reports the loop through code.ManualZipEntryFileWrite
+# (VYQL-PATH-014): the Rust member of the manual-extraction family whose
+# Go, C++, PHP and Swift members already ship, keyed on the zip crate's
+# documented surface (the by_index/by_name member reads, the name/name_raw
+# accessors, the destination join, a by-name write) with the crate's own
+# safe-name accessors (enclosed_name, sanitized_name, mangled_name) and
+# std's containment vocabulary as the neutralising forms. The taint route
+# (VYQL-PATH-001) still cannot fire in Rust -- code.ArchiveEntryName has
+# no Rust source binding, because the engine has no Rust receiver-type
+# resolution to key a ZipFile accessor on -- so that miss stays pinned
+# below; the presence route is what carries the detection.
+#
+# Measured on the real revision pair (full-tree scans, three --cache off
+# runs each, timeout 180, --max-ram 6GB): the vulnerable revision reports
+# exactly one VYQL-PATH-014, on decompress (util/src/zip.rs:65), and the
+# fixed revision reports zero; 165 -> 164 findings with VYQL-PATH-014 the
+# only rule moving. Across the thirteen other Rust trees under
+# /tmp/cve-work that carry a by_index/by_name call, the flag fires on
+# none.
+#
+# verify_current_expected: fixed-manual-extraction-review
+
+test "rank1148: the extraction loop joins the archive-declared member name onto the destination"
+  lang rust
+  file zip.rs
+  expect VYQL-PATH-014
+  code
+  ```
+  use std::fs::{self, File};
+  use std::io;
+  use std::path::Path;
+  use zip as zip_rs;
+
+  pub fn decompress<R>(src_file: R, dest: &Path) -> zip_rs::result::ZipResult<()>
+  where
+      R: io::Read + io::Seek,
+  {
+      let mut archive = zip_rs::ZipArchive::new(src_file)?;
+
+      for i in 0..archive.len() {
+          let mut file = archive.by_index(i)?;
+          let file_path = dest.join(file.name());
+
+          if (&*file.name()).ends_with('/') {
+              fs::create_dir_all(&file_path)?;
+          } else {
+              if let Some(p) = file_path.parent() {
+                  if !p.exists() {
+                      fs::create_dir_all(&p)?;
+                  }
+              }
+              let mut outfile = File::create(&file_path)?;
+              io::copy(&mut file, &mut outfile)?;
+          }
+      }
+      Ok(())
+  }
+  ```
+
+test "rank1148: the crate's sanitized name and an allowlist gate the extraction"
+  lang rust
+  file zip.rs
+  reject VYQL-PATH-014
+  code
+  ```
+  use std::fs::{self, File};
+  use std::io;
+  use std::path::Path;
+  use zip as zip_rs;
+
+  pub fn decompress<R, F>(src_file: R, dest: &Path, expected: F) -> zip_rs::result::ZipResult<usize>
+  where
+      R: io::Read + io::Seek,
+      F: Fn(&Path) -> bool,
+  {
+      let mut decompressed = 0;
+      let mut archive = zip_rs::ZipArchive::new(src_file)?;
+
+      for i in 0..archive.len() {
+          let mut file = archive.by_index(i)?;
+          let san_name = file.sanitized_name();
+          if san_name.to_str().unwrap_or("") != file.name() || !expected(&san_name) {
+              continue;
+          }
+          let file_path = dest.join(san_name);
+
+          if (&*file.name()).ends_with('/') {
+              fs::create_dir_all(&file_path)?;
+          } else {
+              let mut outfile = File::create(&file_path)?;
+              io::copy(&mut file, &mut outfile)?;
+              decompressed += 1;
+          }
+      }
+      Ok(decompressed)
+  }
+  ```
+
+test "rank1148: the crate's enclosed_name rejects escaping entries outright"
+  lang rust
+  file zip.rs
+  reject VYQL-PATH-014
+  code
+  ```
+  use std::fs::{self, File};
+  use std::io;
+  use std::path::{Path, PathBuf};
+  use zip as zip_rs;
+
+  pub fn decompress<R>(src_file: R, dest: &Path) -> zip_rs::result::ZipResult<()>
+  where
+      R: io::Read + io::Seek,
+  {
+      let mut archive = zip_rs::ZipArchive::new(src_file)?;
+
+      for i in 0..archive.len() {
+          let mut file = archive.by_index(i)?;
+          let name: PathBuf = match file.enclosed_name() {
+            Some(n) => n.to_owned(),
+            None => continue,
+          };
+          let file_path = dest.join(&name);
+
+          if name.to_str().unwrap_or("").ends_with('/') {
+              fs::create_dir_all(&file_path)?;
+          } else {
+              let mut outfile = File::create(&file_path)?;
+              io::copy(&mut file, &mut outfile)?;
+          }
+      }
+      Ok(())
+  }
+  ```

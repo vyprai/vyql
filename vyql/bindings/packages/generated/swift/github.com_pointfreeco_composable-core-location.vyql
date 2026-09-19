@@ -1,0 +1,97 @@
+module bindings.swift.generated.mdb125fb2;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "requestAlwaysAuthorization"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "requestLocation"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "requestWhenInUseAuthorization"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "requestTemporaryFullAccuracyAuthorization"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "startMonitoringForRegion"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "startMonitoringSignificantLocationChanges"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "startMonitoringVisits"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "startUpdatingHeading"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "startUpdatingLocation"
+  emit source core.UserControlledData at call.result
+}
+
+binding authorizationCheck9 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "accuracyAuthorization"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck10 {
+  requires {
+    dependency("github.com/pointfreeco/composable-core-location")
+  }
+  query pattern callExpr where callee.method == "authorizationStatus"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

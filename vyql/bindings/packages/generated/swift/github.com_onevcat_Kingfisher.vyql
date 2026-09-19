@@ -1,0 +1,65 @@
+module bindings.swift.generated.mcb2efc93;
+
+binding fileUse0 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "store"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "storeToDisk"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse2 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "removeImage"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "retrieveImage"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse4 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "retrieveImageInDiskCache"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse5 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "clearDiskCache"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse6 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "cleanExpiredDiskCache"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("github.com/onevcat/Kingfisher")
+  }
+  query pattern callExpr where callee.method == "cachePath"
+  emit sink code.FilePathAccess at args[0]
+}

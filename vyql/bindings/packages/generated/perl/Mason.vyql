@@ -1,0 +1,9 @@
+module bindings.perl.generated.m66cf5451;
+
+binding commandExecution0 {
+  requires {
+    dependency("Mason")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

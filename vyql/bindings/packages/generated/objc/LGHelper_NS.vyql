@@ -1,0 +1,25 @@
+module bindings.objc.generated.mc2f1d3c9;
+
+binding weakHash0 {
+  requires {
+    dependency("LGHelper+NS")
+  }
+  query pattern callExpr where callee.method == "md5Hash"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("LGHelper+NS")
+  }
+  query pattern callExpr where callee.method == "sha1Hash"
+  emit issue code.WeakHash at call
+}
+
+binding weakCipher2 {
+  requires {
+    dependency("LGHelper+NS")
+  }
+  query pattern callExpr where callee.method == "xorCryptedWithKey"
+  emit issue code.WeakCipher at call
+}

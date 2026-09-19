@@ -1,0 +1,41 @@
+module bindings.dart.generated.ma4094cd0;
+
+binding filePathAccess0 {
+  requires {
+    dependency("file_picker")
+  }
+  query pattern callExpr where callee.method == "pickFiles"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("file_picker")
+  }
+  query pattern callExpr where callee.method == "pickFileAndDirectoryPaths"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("file_picker")
+  }
+  query pattern callExpr where callee.method == "getDirectoryPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("file_picker")
+  }
+  query pattern callExpr where callee.method == "saveFile"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse4 {
+  requires {
+    dependency("file_picker")
+  }
+  query pattern callExpr where callee.method == "clearTemporaryFiles"
+  emit sink code.FileUseSink at args[0]
+}

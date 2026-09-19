@@ -1,0 +1,33 @@
+module bindings.groovy.generated.m8ca7cd51;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.springframework:spring-jdbc")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.springframework:spring-jdbc")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.springframework:spring-jdbc")
+  }
+  query pattern callExpr where callee.method == "batchUpdate"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("org.springframework:spring-jdbc")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

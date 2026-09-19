@@ -1,0 +1,10 @@
+module vypr.mobile;
+
+rule ExportedComponent {
+  meta {
+    cwe: [CWE_926]
+    id: "VYQL-MOB-003"
+    severity: medium
+  }
+  issue code.ExportedComponent as e
+}

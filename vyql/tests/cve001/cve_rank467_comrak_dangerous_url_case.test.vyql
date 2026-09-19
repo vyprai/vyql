@@ -1,0 +1,23 @@
+# Rank 467 / CVE-2021-27671: comrak matched dangerous Markdown URL schemes
+# case-sensitively, allowing mixed-case data:/javascript:/vbscript:/file: XSS.
+
+test "rank467: Comrak dangerous URL grammar matches unsafe schemes case-sensitively"
+  lang config
+  file lexer.pest
+  expect VYQL-INJ-098
+  expect_review code.ComrakDangerousUrlCaseSensitiveGrammar
+  code
+  ```
+  scheme = _{ ('A'..'Z' | 'a'..'z') ~ ('A'..'Z' | 'a'..'z' | '0'..'9' | "." | "+" | "-"){1,31} }
+  dangerous_url = { "data:" ~ !("image/" ~ ("png" | "gif" | "jpeg" | "webp")) | "javascript:" | "vbscript:" | "file:" }
+  ```
+
+test "rank467: Comrak dangerous URL grammar uses case-insensitive unsafe schemes"
+  lang config
+  file lexer.pest
+  reject VYQL-INJ-098
+  code
+  ```
+  scheme = _{ ('A'..'Z' | 'a'..'z') ~ ('A'..'Z' | 'a'..'z' | '0'..'9' | "." | "+" | "-"){1,31} }
+  dangerous_url = { ^"data:" ~ !(^"image/" ~ (^"png" | ^"gif" | ^"jpeg" | ^"webp")) | ^"javascript:" | ^"vbscript:" | ^"file:" }
+  ```

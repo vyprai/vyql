@@ -1,0 +1,11 @@
+module code;
+
+concept ConcreteCmsIncompleteUploadExtensionBlacklist : issue {
+  cwe: [CWE_434]
+  reviewAssumption: "an authenticated administrator can allow uploads that later execute under common PHP or web-server configurations"
+  reviewCategory: upload
+  reviewCondition: "Concrete CMS upload extension blacklist omits executable extensions such as phar, php8, pht, shtml, cgi, and htaccess"
+  reviewConfidence: high
+  reviewEvidence: "Concrete upload config context {pattern} uses the older extensions_blacklist with only php/php2/php3/php4/php5/php7/phtml"
+  vulnerableTo: [injection.UnrestrictedUpload]
+}

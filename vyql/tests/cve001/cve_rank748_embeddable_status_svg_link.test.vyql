@@ -1,0 +1,57 @@
+# Rank 748 / CVE-2022-34178: embeddable-build-status inserted a configured
+# link into an SVG onclick window.open JavaScript string with only HTML escaping.
+
+test "rank748: SVG onclick window.open link only HTML-escaped"
+  lang java
+  expect VYQL-INJ-163
+  expect_review code.SvgOnclickWindowOpenLinkXss
+  code
+  ```
+  import java.nio.charset.Charset;
+  import org.apache.commons.lang.StringEscapeUtils;
+
+  class StatusImage {
+      private byte[] payload;
+
+      StatusImage(String subject, String status, String colorName, String animatedColorName, String style, String link) {
+          if (link != null) {
+              link = StringEscapeUtils.escapeHtml(link);
+          }
+          String linkCode = "<svg xmlns";
+          if (link != null) {
+              linkCode = "<svg onclick=\"window.open('" + link + "');\" style=\"cursor: pointer;\" xmlns";
+          }
+          payload = "<svg xmlns".replace("<svg xmlns", linkCode).getBytes(Charset.forName("UTF-8"));
+      }
+  }
+  ```
+
+test "rank748: SVG onclick window.open link with protocol check and safe quotes is clean"
+  lang java
+  reject VYQL-INJ-163
+  reject_review code.SvgOnclickWindowOpenLinkXss
+  code
+  ```
+  import java.net.URL;
+  import java.nio.charset.Charset;
+  import org.apache.commons.lang.StringEscapeUtils;
+
+  class StatusImage {
+      private byte[] payload;
+
+      StatusImage(String subject, String status, String colorName, String animatedColorName, String style, String link) throws Exception {
+          if (link != null) {
+              link = StringEscapeUtils.escapeHtml(StringEscapeUtils.escapeHtml(link));
+          }
+          String linkCode = "<svg xmlns";
+          if (link != null) {
+              URL url = new URL(link);
+              final String protocol = url.getProtocol();
+              if (protocol.equals("http") || protocol.equals("https")) {
+                  linkCode = "<svg onclick=\"window.open(&quot;" + link + "&quot;);\" style=\"cursor: pointer;\" xmlns";
+              }
+          }
+          payload = "<svg xmlns".replace("<svg xmlns", linkCode).getBytes(Charset.forName("UTF-8"));
+      }
+  }
+  ```

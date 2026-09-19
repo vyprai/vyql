@@ -1,0 +1,262 @@
+# Wire's webapp rendered chat messages through markdown-it with a custom
+# fence `highlight` callback (src/script/util/messageRenderer.ts at the
+# fix parent):
+#
+#     markdownit.set({
+#       highlight: function (code): string {
+#         const containsMentions = mentionEntities.some(mention => {
+#           const hash = createMentionHash(mention);
+#           return code.includes(hash);
+#         });
+#         if (containsMentions) {
+#           // disable code highlighting if there is a mention in there
+#           return code;                       // <-- unescaped
+#         }
+#         return hljs.highlightAuto(code).value;
+#       },
+#     });
+#
+# markdown-it embeds whatever the highlight callback returns into the
+# rendered fence HTML verbatim -- its own fence renderer wraps the string
+# without escaping it -- and the callback's `code` parameter is a slice of
+# the received chat message, so a message whose fenced block contains a
+# mention hash ships its own HTML to the victim's DOM: stored XSS (CWE-79).
+# The fix wraps the branch's return in underscore's `escape()` and, hardening
+# the same render path, passes function replacements to the two
+# `String.replace(mentionHash, ...)` calls so `$&`-style replacement patterns
+# in mention text cannot splice surrounding markup. The advisory names the
+# vector: "Insufficient escaping in markdown 'code highlighting'". The
+# vulnerable form is present at the fix parent and the remediation at the
+# fix; the row's commit is a plain single-file fix commit.
+#
+# Held. The raw passthrough the fix removes is a *return expression* fact,
+# and no binding can address either endpoint of it.
+#
+#   - `vyql graph` on the file shows the USG already knows the passthrough:
+#     `highlight#param#code --FLOWS--> Name --FLOWS--> highlight#ret#`, and
+#     the registration exists as a `markdownit.set` call node two lines
+#     above. Neither endpoint is addressable. Return statements lower to
+#     `analysis.function.return` pseudo-calls
+#     (internal/extract/lowering/lowering.go:1251) that only
+#     `functionReturnDecoratorAbsent` reads (internal/bindings/bindings_core.go:203),
+#     and there is no emission target for a function's returned value; the
+#     parameter route (`query param as param`,
+#     internal/bindings/compile_binding.go:675) forbids a `where` clause,
+#     accepts only `emit source at param`, and fires for exported params
+#     under a profile that lists the concept -- it cannot name one
+#     callback's parameter. And no edge joins the registration call to the
+#     callback:
+#
+#       markdownit.set Call#1239 (messageRenderer.ts:132) has no FLOWS edge
+#       to highlight#param#code or highlight#ret#, and highlight#ret# has no
+#       outgoing edge at all, because the caller that consumes the return is
+#       markdown-it's own fence renderer, outside the scanned tree.
+#
+#     The join is absent in both spellings. Passing the highlighter by name
+#     (`markdownit.set({highlight: highlightFence})` where `highlightFence`
+#     returns its parameter raw) reports exactly the same one label as the
+#     inline literal -- the fifth test pins that -- so this is not the
+#     by-name/inline split the tarteaucitron callback shape shows, where the
+#     named spelling resolves end to end and only the inline one dies.
+#   - `vyql match` on the file reports one markdown-it label only: the
+#     existing `code.RenderedMarkup` source at `markdownit.render`'s result
+#     (markdown_render_markup_source.vyql). It is identical at both
+#     revisions and by-design safe here, because the instance runs
+#     `html: false`: markdown-it escapes source HTML everywhere except the
+#     one place this CVE lives, the highlight callback's return, which is
+#     precisely the unaddressable endpoint. Nothing labels the callback: no
+#     source at its `code` parameter, no sink at its return, and no
+#     `core.HtmlEscape` on the underscore `escape` the fix adds (only the
+#     dotted `_.escape`/`lodash.escape` forms are bound). Binding the bare
+#     `escape` would not discriminate anything anyway: the fix parent already
+#     carries two `escape(...)` calls in sibling closures inside the same
+#     outer function, so any escape-family negation that reads text is
+#     satisfied at both revisions.
+#   - a presence-form binding is the only data-expressible route, and it is
+#     priced and rejected: a markdown-it-gated, function-scoped binding
+#     keying on "highlighter call present, no escape-family call" reports 3
+#     context hits on the vulnerable file and 0 on the patched -- and 1 hit
+#     on a file transcribed from markdown-it's own README example, the
+#     canonical safe hljs integration, because `hljs.highlight(lang,
+#     str).value` returns already-escaped markup and no token distinguishes
+#     it from `return code`. Narrowing the probe to `highlightAuto`, this
+#     repository's own spelling, escapes the README hit only by keying on the
+#     vulnerable commit's vocabulary. The discriminator that would separate
+#     them -- "the callback returns its own parameter rather than a
+#     highlighter's output or a literal" -- is an identity fact about the
+#     return expression, which is the same missing endpoint.
+#   - a `.replace` replacement-string sink for the two hardening hunks is
+#     also priced and rejected: the second-argument shape is ordinary code
+#     everywhere (`str.replace(/x/, val)`), and neither hunk is the
+#     advisory's vector.
+#
+# What is missing is a binding-language capability, not vocabulary: an
+# emission target at a function's return value, plus the join from a
+# registration call to the callback it names -- a new dataflow relation, not
+# a localized correction. The join half is on file twice for JavaScript
+# (the registered-callback entry and the no-endpoint-for-callback-parameters
+# entry), and the closure-literal half of the same callee-provenance family
+# was prototyped on its own checkout in this recheck span -- a per-lambda
+# Return node joined onto a parameter-position call result -- and measured
+# precise but insufficient, so the family is not one localized correction
+# away from reporting this. Here that prototype would not even apply: no
+# parameter-position invocation of the callback exists in the scanned code,
+# so the join it adds has nothing to join onto.
+#
+# Fresh measurement on the current knowledge base, 3 x `--cache off` runs
+# per revision, timeout 180, `--max-ram 6GB`:
+#   - src/script/util (57 files): 7 findings + 4 review flags at both
+#     revisions, byte-identical across all six runs; the only rows on this
+#     file are two pre-existing VYQL-INJ-134 prototype-pollution rows at
+#     messageRenderer.ts:98 and :120, present at both revisions.
+#   - src/script (707 javascript files + 1 config): 198 findings / 52 flags /
+#     55 at or above high at both revisions, with identical
+#     fingerprint sets across all six runs. The tree's VYQL-INJ-004 rows
+#     sit on unrelated files (newVersionHandler.ts, MessageQuote.tsx,
+#     WarningsContainer.tsx and friends) and none names this file or the
+#     markdown-it render path through it.
+#   - `vyql resolve` on the file: 87 call sites resolved, 87 unresolved.
+#     `vyql explain`: the two INJ-134 rows and nothing else.
+#
+# verify_current_expected: attention-engine-gap, all five tests rejected.
+# When a return-value emission target and the registration-to-callback join
+# land with a markdown-it highlight binding, the first and fifth tests flip
+# to expect VYQL-INJ-004 while the third and fourth must stay reject (the
+# first and third are the minimal pair: same registration, same
+# highlighter, differing only in the returned expression; the fourth is the
+# documented safe integration any presence rule must not flag).
+
+test "rank1956: the mention-aware fence highlighter returns message content unescaped"
+  lang javascript
+  file src/script/util/messageRenderer.ts
+  reject VYQL-INJ-004
+  reject_review code.RenderedMarkup
+  code
+  ```
+  import hljs from 'highlight.js';
+  import MarkdownIt from 'markdown-it';
+
+  const markdownit = new MarkdownIt('zero', {breaks: true, html: false, linkify: true});
+
+  export const renderMessage = (message, mentionTexts) => {
+    markdownit.set({
+      highlight: function (code) {
+        const containsMentions = Object.keys(mentionTexts).some(hash => code.includes(hash));
+        if (containsMentions) {
+          // disable code highlighting if there is a mention in there
+          // highlighting will be wrong anyway because this is not valid code
+          return code;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+    });
+    return markdownit.render(message);
+  };
+  ```
+
+test "rank1956: the patched highlighter escapes the branch the fixed revision touches"
+  lang javascript
+  file src/script/util/messageRenderer-fixed.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  import hljs from 'highlight.js';
+  import MarkdownIt from 'markdown-it';
+  import {escape} from 'underscore';
+
+  const markdownit = new MarkdownIt('zero', {breaks: true, html: false, linkify: true});
+
+  export const renderMessage = (message, mentionTexts) => {
+    markdownit.set({
+      highlight: function (code) {
+        const containsMentions = Object.keys(mentionTexts).some(hash => code.includes(hash));
+        if (containsMentions) {
+          // disable code highlighting if there is a mention in there
+          return escape(code);
+        }
+        return hljs.highlightAuto(code).value;
+      },
+    });
+    return markdownit.render(message);
+  };
+  ```
+
+test "rank1956: the same registration without the raw parameter return is the safe twin"
+  lang javascript
+  file src/script/util/messageRenderer-safe-twin.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  import hljs from 'highlight.js';
+  import MarkdownIt from 'markdown-it';
+
+  const markdownit = new MarkdownIt('zero', {breaks: true, html: false, linkify: true});
+
+  export const renderMessage = (message, mentionTexts) => {
+    markdownit.set({
+      highlight: function (code) {
+        const containsMentions = Object.keys(mentionTexts).some(hash => code.includes(hash));
+        if (containsMentions) {
+          // same registration, same highlighter, same mention branch --
+          // only the returned expression differs from the first test
+          return hljs.highlightAuto(code).value;
+        }
+        return hljs.highlightAuto(code).value;
+      },
+    });
+    return markdownit.render(message);
+  };
+  ```
+
+test "rank1956: markdown-it's documented hljs integration returns highlighter output, not raw text"
+  lang javascript
+  file src/script/util/readme-example.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  import hljs from 'highlight.js';
+  import MarkdownIt from 'markdown-it';
+
+  // markdown-it's own README example: every return path is either the
+  // highlighter's escaped markup or the empty string that defers escaping
+  // to the renderer. A presence rule keying on "highlight callback with
+  // no escape call" flags exactly this file and must not.
+  const md = MarkdownIt({
+    highlight: function (str, lang) {
+      if (lang && hljs.getLanguage(lang)) {
+        try {
+          return hljs.highlight(lang, str).value;
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      return '';
+    },
+  });
+
+  export const render = text => md.render(text);
+  ```
+
+test "rank1956: passing the highlighter by name reports the same nothing as the inline literal"
+  lang javascript
+  file src/script/util/messageRenderer-by-name.ts
+  reject VYQL-INJ-004
+  code
+  ```
+  import hljs from 'highlight.js';
+  import MarkdownIt from 'markdown-it';
+
+  const markdownit = new MarkdownIt('zero', {breaks: true, html: false, linkify: true});
+
+  function highlightFence(code) {
+    if (code.includes('@@')) {
+      return code;
+    }
+    return hljs.highlightAuto(code).value;
+  }
+
+  export const renderMessage = message => {
+    markdownit.set({highlight: highlightFence});
+    return markdownit.render(message);
+  };
+  ```

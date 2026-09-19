@@ -1,0 +1,7 @@
+module code;
+
+review code.UnvalidatedHostHeaderDispatch {
+  category: input_validation
+  kind: attention
+  text: "review server request dispatch points that read the Host header and execute the root handler without checking the authority value's grammar"
+}

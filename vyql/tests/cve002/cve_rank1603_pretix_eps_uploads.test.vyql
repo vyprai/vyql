@@ -1,0 +1,129 @@
+# Rank 1603 / CVE-2023-44464: pretix passed uploaded question files to
+# Pillow with format auto-detection, so a crafted EPS upload reached
+# Pillow's EPS plugin, which offloads EPS parsing to an external
+# Ghostscript process and executes the PostScript it is handed (code
+# execution through a dangerous parser, CWE-434; the extension whitelist
+# cannot stop it, because the decoder selects its plugin from the file's
+# own bytes and never consults the name). PortraitImageField.to_python in
+# src/pretix/base/forms/questions.py did
+#
+#   image = Image.open(file)
+#   image.verify()
+#   ...
+#   image = Image.open(file)
+#
+# with the upload admitted by an ext_whitelist of image extensions. The
+# fixing commit 8583bfb7d97263e9e923ad5d7f123ca1cadc8f2e ("[SECURITY] Do
+# not allow Pillow to parse EPS files") gives every Image.open a
+# formats=settings.PILLOW_FORMATS_QUESTIONS_IMAGE argument -- a format
+# allowlist that omits EPS -- and additionally monkeypatches "EPS" out of
+# Pillow's format registry as defence in depth.
+#
+# FIXED by the pythonPillowOpenWithoutFormatRestriction binding. Pillow
+# documents Image.open's `formats` argument as restricting "the set of
+# formats checked", with None -- what a call omitting the keyword does --
+# trying all supported formats, and documents EPS reading as offloading to
+# Ghostscript. The binding labels an Image.open with no `formats` keyword
+# as the upload sink the unrestricted-upload rule already judges, so the
+# taint requirement, not the binding, decides which decode reports. Both
+# Image.open and PIL.Image.open are matched; the keyword is read per call
+# site, so a restricted open and an unrestricted one in one function are
+# told apart.
+#
+# Measured on the real checkout: the vulnerable parent reports
+# VYQL-INJ-015 at questions.py:503 and questions.py:510 (three runs each,
+# identical), and the fixed revision reports none in that file, nor in
+# helpers/images.py or helpers/thumb.py, where the same commit restricts
+# the two other decodes. A whole-src scan of either revision aborts at the
+# 6GB --max-ram ceiling.
+
+test "rank1603: an upload is decoded with the format selected from its bytes"
+  lang python
+  file src/pretix/base/forms/questions.py
+  expect VYQL-INJ-015
+  code
+  ```
+  from io import BytesIO
+  from PIL import Image
+  from django import forms
+
+
+  class PortraitImageField(forms.FileField):
+      def to_python(self, data):
+          f = super().to_python(data)
+
+          if hasattr(data, 'read'):
+              file = BytesIO(data.read())
+          else:
+              file = BytesIO(data['content'])
+
+          try:
+              image = Image.open(file)
+              image.verify()
+
+              if hasattr(file, 'seek'):
+                  file.seek(0)
+              image = Image.open(file)
+
+              if image.width > 10_000 or image.height > 10_000:
+                  raise ValidationError('max_dimension')
+
+              image.load()
+          except Exception as exc:
+              raise ValidationError('invalid_image')
+          return f
+  ```
+
+test "rank1603: the decode restricts the formats it will try"
+  lang python
+  file src/pretix/base/forms/questions.py
+  reject VYQL-INJ-015
+  code
+  ```
+  from io import BytesIO
+  from django.conf import settings
+  from PIL import Image
+  from django import forms
+
+
+  class PortraitImageField(forms.FileField):
+      def to_python(self, data):
+          f = super().to_python(data)
+
+          if hasattr(data, 'read'):
+              file = BytesIO(data.read())
+          else:
+              file = BytesIO(data['content'])
+
+          try:
+              image = Image.open(file, formats=settings.PILLOW_FORMATS_QUESTIONS_IMAGE)
+              image.verify()
+
+              if hasattr(file, 'seek'):
+                  file.seek(0)
+              image = Image.open(file, formats=settings.PILLOW_FORMATS_QUESTIONS_IMAGE)
+
+              if image.width > 10_000 or image.height > 10_000:
+                  raise ValidationError('max_dimension')
+
+              image.load()
+          except Exception as exc:
+              raise ValidationError('invalid_image')
+          return f
+  ```
+
+test "rank1603: a decode of a file the code did not take from a request reports nothing"
+  lang python
+  file src/pretix/helpers/thumb.py
+  reject VYQL-INJ-015
+  code
+  ```
+  from io import BytesIO
+  from PIL import Image
+
+
+  def cached_thumbnail(sourcename, size):
+      source = default_storage.open(sourcename)
+      image = Image.open(BytesIO(source.read()))
+      return image.thumbnail(size)
+  ```

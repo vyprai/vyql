@@ -1,0 +1,11 @@
+module code;
+
+concept DestCapacityUncheckedCopy : issue {
+  cwe: [CWE_120, CWE_787]
+  reviewAssumption: "the limit that produced the copied bytes can exceed the destination's own capacity"
+  reviewCategory: memory
+  reviewCondition: "a copy writes into a destination whose capacity the code states but never consults: a separately-passed byte count the function relies on elsewhere, a remaining-count field it decrements as the destination advances, or an array bound the destination's own declaration fixes"
+  reviewConfidence: medium
+  reviewEvidence: "copy context {pattern} writes past a destination whose capacity is stated beside it, while no comparison, length bound or transfer call mentions it"
+  vulnerableTo: [memory.OobWrite]
+}

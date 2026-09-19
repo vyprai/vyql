@@ -1,0 +1,44 @@
+module bindings.swift.archive_member_write_without_containment;
+
+// A Swift package that needs archive formats beyond what the pure-Swift zip
+// libraries cover bridges libarchive through a C target. The C API documents
+// the read side as a loop -- archive_read_next_header hands out each entry in
+// turn and archive_read_data its content, with archive_entry_pathname reading
+// back the member path the archive itself declares. A member path is
+// attacker-chosen text: whatever the archive says, including leading "../"
+// components and absolute forms.
+//
+// Foundation's join has no containment semantics of its own --
+// URL.appending(path:) and appendingPathComponent keep every parent-directory
+// component the member path carries -- so a manual loop that joins the member
+// path onto a destination directory and then writes by name (Data.write(to:),
+// FileManager createDirectory, createSymbolicLink) lets the archive decide
+// where the bytes land, with the extracting process's privileges (CWE-22).
+//
+// The loop is recognised by its documented parts together: a libarchive
+// read-side call, the destination join, and a by-name write. A libarchive
+// read alone is a reader that never touches the filesystem, and a join plus
+// write alone is any file-writing code, from cache builders to download
+// savers -- the archive read is what makes it an extraction loop.
+//
+// The neutralising forms are the documented containment routes: the POSIX
+// *at descent (openat, symlinkat, mkdirat -- an extraction that walks from a
+// root descriptor instead of joining paths), Foundation's path reductions
+// (standardizedFileURL, standardizingPath, resolvingSymlinksInPath), and the
+// O_NOFOLLOW open flag. Any of these in the file means the destination was
+// reduced or anchored before use, which is what the review flag asks about.
+//
+// Swift emits one module-context node per file with no per-function facts,
+// so every clause is file-wide co-presence. Residuals, stated rather than
+// hidden: the containment test is by call name, so a hand-rolled dot-segment
+// rejection (hasPrefix, contains over components) is invisible and the flag
+// stands -- the reduction has to go through a named API to be seen; the
+// co-presence is whole-file, so an unrelated openat call anywhere in the
+// file suppresses (false-negative direction); and an extraction loop over a
+// pure-Swift archive library is not reached at all, because no libarchive
+// call appears -- those libraries' own extract APIs are bound separately
+// under their package names.
+binding archiveMemberWriteWithoutContainment {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "swift" and containsAny(node.context.call, ["archive_read_next_header", "archive_read_data", "archive_entry_pathname"]) and containsAny(node.context.call, ["appending"]) and containsAny(node.context.call, ["write", "createSymbolicLink", "createDirectory"]) and not containsAny(node.context.call, ["openat", "symlinkat", "mkdirat", "standardizedFileURL", "standardizingPath", "resolvingSymlinksInPath"]) and not containsAny(node.context.identifier, ["O_NOFOLLOW"])
+  emit issue code.ManualZipEntryFileWrite at node
+}

@@ -1,0 +1,33 @@
+module bindings.java.unqualified_posix_program_launch;
+
+// Runtime.exec(String) hands the first whitespace-delimited token of the
+// command string to the platform process launcher, which resolves it through
+// the platform search order -- on Windows the application directory, the
+// current directory, the system directories and then every %PATH% element.
+// The freedesktop and Debian opener utilities (xdg-open and its siblings)
+// exist only on POSIX desktops, so on a Windows host a launch naming one of
+// them can never resolve from a system directory: the resolution comes from
+// whichever %PATH% element is writable first. The documented remediations
+// are to route Windows through a platform-native handler or to confine the
+// POSIX utility behind a platform check, both of which leave a Windows
+// platform fact in the launching code.
+//
+// The judgement lives in the pack rule; this binding only recognises the
+// shape. The launch is matched by exact method name (exec, ProcessBuilder)
+// and the utility by the command token with its trailing space, the form a
+// command-and-argument concatenation takes. Every clause is node-level over
+// the method's own AST tokens, so prose in a comment cannot satisfy either
+// side, and a sibling method's platform check cannot silence the launch.
+// Each negation is independently sufficient: any spelling of the Windows
+// platform fact -- a WINDOWS constant, the os.name property read, or an
+// isWindows predicate -- clears the launch.
+
+binding unqualifiedPosixProgramLaunch {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.call in ["exec", "ProcessBuilder"]
+    and containsAny(node.context.literal, ["xdg-open ", "xdg-email ", "xdg-mime ", "sensible-browser ", "x-www-browser ", "gnome-open ", "kde-open "])
+    and not containsAny(node.context.selector, ["WINDOWS"])
+    and not containsAny(node.context.literal, ["os.name", "Windows"])
+    and not containsAny(node.context.call, ["isWindows"])
+  emit issue code.UnqualifiedPosixProgramLaunch at node
+}

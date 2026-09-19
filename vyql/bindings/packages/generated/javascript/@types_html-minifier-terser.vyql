@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m58f9e30a;
+
+binding deserialization0 {
+  requires {
+    dependency("@types/html-minifier-terser")
+  }
+  query pattern callExpr where callee.method == "minify"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,159 @@
+# Rank 1779 / CVE-2026-22738: SimpleVectorStore evaluated its metadata
+# filter through SpEL. doFilterPredicate converted the parsed Filter.Expression
+# into a SpEL string and handed it to SpelExpressionParser.parseExpression(...)
+# .getValue(new StandardEvaluationContext(), Boolean.class). The converter
+# escaped string *values* (emitSpelString, added eleven days earlier) but
+# interpolated filter *keys* raw -- SimpleVectorStoreFilterExpressionConverter
+# .doKey appended the identifier straight inside the '#metadata[\'...\']'
+# literal -- and the filter text language admits quoted identifiers, so a
+# caller-chosen key carries its quotes and any SpEL metacharacters into the
+# evaluated string: expression-language injection, RCE-grade with a
+# StandardEvaluationContext (CWE-917). The fixed revision deletes the SpEL path
+# wholesale: filter expressions are now judged structurally by
+# SimpleVectorStoreFilterExpressionEvaluator.evaluate(expression, metadata),
+# and no parseExpression call remains in the module.
+#
+# Two routes cover it. The generic one worked: expressionEval340
+# labels any parseExpression argument as code.ExpressionEval, and VYQL-INJ-016
+# taints it from a controller -- pinned by the third test below, which runs the
+# full application-to-library chain (RequestParam -> SearchRequest.builder ->
+# similaritySearch -> getFilterExpression -> FilterExpressionTextParser ->
+# doFilterPredicate lambda -> parseExpression) and reports critical today.
+# What that route cannot see is the library alone: inside spring-ai there is
+# no source, so the corpus clone scanned by itself reported nothing on the
+# sink. UnsafeConvertedExpressionEvaluation (VYQL-INJ-273) closes that the
+# same way UnsafeJXPathContextEvaluation covers JXPath: a presence binding
+# fires when one function hands a filter/query converter's output string to
+# an expression parser for evaluation -- convertExpression and parseExpression
+# sharing a function scope -- instead of evaluating the structured form.
+# Measured, timeout 180 / --cache off / --max-ram 6GB, three runs each, whole
+# spring-ai tree at the fixed revision's parent: VYQL-INJ-273 x10 stable (1 on
+# SimpleVectorStore.doFilterPredicate, 9 on the @Test methods of the
+# converter's own regression suite, which exists to convert-then-evaluate);
+# at the fixed revision commit: 0 x3, other findings unchanged (DESER-001/INJ-004
+# pre-existing on the module). Collateral enumerated by grep across the
+# ~100 rank clones: convertExpression appears in no clone but spring-ai, and
+# no file outside it co-occurs a parseExpression; the 16 SpEL-using files in
+# other clones (metersphere aspects, quarkus qute) never call a converter,
+# which is why the binding requires both.
+
+test "rank1779: a filter expression converted to a string and evaluated through SpEL is expression injection"
+  lang java
+  expect VYQL-INJ-273
+  code
+  ```
+  import java.util.Map;
+  import java.util.function.Predicate;
+  import org.springframework.ai.vectorstore.filter.Filter;
+  import org.springframework.ai.vectorstore.filter.FilterExpressionConverter;
+  import org.springframework.expression.ExpressionParser;
+  import org.springframework.expression.spel.standard.SpelExpressionParser;
+  import org.springframework.expression.spel.support.StandardEvaluationContext;
+
+  public class SimpleVectorStore {
+
+  	private final ExpressionParser expressionParser = new SpelExpressionParser();
+
+  	private final FilterExpressionConverter filterExpressionConverter = new SimpleVectorStoreFilterExpressionConverter();
+
+  	private Predicate<Map<String, Object>> doFilterPredicate(Filter.Expression filterExpression) {
+  		if (filterExpression == null) {
+  			return document -> true;
+  		}
+  		return document -> {
+  			StandardEvaluationContext context = new StandardEvaluationContext();
+  			context.setVariable("metadata", document);
+  			return Boolean.TRUE.equals(this.expressionParser
+  				.parseExpression(this.filterExpressionConverter.convertExpression(filterExpression))
+  				.getValue(context, Boolean.class));
+  		};
+  	}
+  }
+  ```
+
+test "rank1779: evaluating the structured filter expression directly is the patched form"
+  lang java
+  reject VYQL-INJ-273
+  code
+  ```
+  import java.util.Map;
+  import java.util.function.Predicate;
+  import org.springframework.ai.vectorstore.filter.Filter;
+
+  public class SimpleVectorStore {
+
+  	private final SimpleVectorStoreFilterExpressionEvaluator filterExpressionEvaluator = new SimpleVectorStoreFilterExpressionEvaluator();
+
+  	private Predicate<Map<String, Object>> doFilterPredicate(Filter.Expression filterExpression) {
+  		if (filterExpression == null) {
+  			return document -> true;
+  		}
+  		return document -> this.filterExpressionEvaluator.evaluate(filterExpression, document);
+  	}
+  }
+  ```
+
+test "rank1779: a request-supplied filter expression reaching the SpEL parse through the store is caught by the generic taint route"
+  lang java
+  expect VYQL-INJ-016
+  code
+  ```
+  import java.util.List;
+  import java.util.Map;
+  import java.util.function.Predicate;
+  import org.springframework.ai.vectorstore.SearchRequest;
+  import org.springframework.ai.vectorstore.filter.Filter;
+  import org.springframework.ai.vectorstore.filter.FilterExpressionConverter;
+  import org.springframework.ai.vectorstore.filter.FilterExpressionTextParser;
+  import org.springframework.expression.ExpressionParser;
+  import org.springframework.expression.spel.standard.SpelExpressionParser;
+  import org.springframework.expression.spel.support.StandardEvaluationContext;
+  import org.springframework.web.bind.annotation.GetMapping;
+  import org.springframework.web.bind.annotation.RequestParam;
+  import org.springframework.web.bind.annotation.RestController;
+
+  @RestController
+  public class SearchController {
+
+  	private final SimpleVectorStore store = new SimpleVectorStore();
+
+  	@GetMapping("/search")
+  	public List<String> search(@RequestParam("filter") String filterText) {
+  		SearchRequest request = SearchRequest.builder().filterExpression(filterText).topK(5).build();
+  		return store.similaritySearch(request).stream().map(Object::toString).toList();
+  	}
+  }
+
+  class SimpleVectorStore {
+
+  	private final ExpressionParser expressionParser = new SpelExpressionParser();
+
+  	private final FilterExpressionConverter filterExpressionConverter = new FilterExpressionConverter() {
+  		@Override
+  		public String convertExpression(Filter.Expression expression) {
+  			return "#metadata['" + expression + "']";
+  		}
+  	};
+
+  	public List<Object> similaritySearch(SearchRequest request) {
+  		String filterText = request.getFilterExpression();
+  		Filter.Expression filterExpression = filterText == null ? null
+  				: new FilterExpressionTextParser().parse(filterText);
+  		Predicate<Object> filter = doFilterPredicate(filterExpression);
+  		return List.of();
+  	}
+
+  	private Predicate<Object> doFilterPredicate(Filter.Expression filterExpression) {
+  		if (filterExpression == null) {
+  			return document -> true;
+  		}
+  		return document -> {
+  			StandardEvaluationContext context = new StandardEvaluationContext();
+  			context.setVariable("metadata", document);
+  			return Boolean.TRUE.equals(this.expressionParser
+  				.parseExpression(this.filterExpressionConverter.convertExpression(filterExpression))
+  				.getValue(context, Boolean.class));
+  		};
+  	}
+  }
+  ```

@@ -1,0 +1,217 @@
+# Rank 1852 / CVE-2016-6809 (CWE-502): Apache Tika's MatParser hands the
+# document it is given to JMatIO's MatFileReader --
+#
+#	TikaInputStream tis = TikaInputStream.get(stream, tmp);
+#	MatFileReader mfr = new MatFileReader(tis.getFile()); //input .mat file
+#
+# -- and a MAT file can embed a serialized Java object graph, which the reader
+# materializes: whoever chooses the document chooses the classes that get
+# instantiated, the textbook deserialization abuse, reported against every
+# deployment that feeds Tika submitted files (search connectors, extraction
+# services). The parser receives the document as the first parameter of
+# Parser.parse(InputStream, ContentHandler, Metadata, ParseContext), so the
+# bytes are attacker-chosen by the interface's own contract.
+#
+# The fixed revision (8a68b5d474, "clean up MatParser") moves JMatIO to the fork carrying
+# the switch and adds exactly one thing to the parser class:
+#
+#	static {
+#	    //make sure that this is set to false
+#	    MatFileReader.setAllowObjectDeserialization(false);
+#	}
+#
+# The construct is present at the parent and the remediation at the fixed revision; no
+# `vyql match` over the vulnerable file labels nothing: no
+# source, no sink, no control.
+#
+# The taint route is built and measured against this binding: a source on the
+# parser-callback parameter, a code.Deserialization sink on the reader
+# construction, and a core.SafeDeserialization control on the switch gave
+# VYQL-DESER-001 on the vulnerable file -- and identically on the patched one,
+# because the switch is a static flag set from a static initializer. A guard
+# outside every method carries no lexical scope (module-level statements lower
+# with an empty region), so no coverage mode reaches a sink inside a method:
+# `covers sameScope` never registers the guard's scope, `covers endpoint`
+# requires the guard to be a function-context node or dominate the sink, and
+# `covers global` would clear every deserialization finding in the scan, the
+# over-suppression shape rank 1402's review rejected. Moving the same call to
+# the first statement of parse() suppresses the finding (dominance route), so
+# the pair -- same call, static block vs first statement -- isolates the gap:
+# the Java-static-initializer form of the attribution-gap family (Go 1377/
+# 1389/1399, Python 1397, Rust 1364, TS 1372, PHP 1394, C 1437).
+#
+# Detection therefore models the obligation where the switch actually lives:
+# the class. JMatIO documents setAllowObjectDeserialization as a set-once
+# static flag consulted by every reader construction, so the class that builds
+# readers without ever setting it is the unit that hands every file it is
+# given to unrestricted deserialization. That is
+# code.UnrestrictedClassDeserialization (VYQL-DESER-023) on the class context,
+# declined the moment the class carries the switch -- the same shape the
+# XStream converter binding uses for framework permissions. Measured on the
+# real file: one VYQL-DESER-023 at the parent, none at the fixed revision; +1 finding on
+# the 218-file org/apache/tika/parser subtree (14 -> 15, three runs each), and
+# MatFileReader occurs in exactly one file of the whole tika tree and in no
+# other clone under /tmp/cve-work, so the binding's reachable set is the one
+# vulnerable file.
+#
+# verify_current_expected: fixed
+
+test "rank1852: a MATLAB parser handing its document stream to JMatIO's reader reports unrestricted deserialization"
+  lang java
+  expect VYQL-DESER-023
+  code
+  ```
+  package org.apache.tika.parser.mat;
+
+  import java.io.InputStream;
+  import java.io.IOException;
+  import java.util.Map;
+  import com.jmatio.io.MatFileHeader;
+  import com.jmatio.io.MatFileReader;
+  import com.jmatio.types.MLArray;
+  import org.apache.tika.exception.TikaException;
+  import org.apache.tika.io.TemporaryResources;
+  import org.apache.tika.io.TikaInputStream;
+  import org.apache.tika.metadata.Metadata;
+  import org.apache.tika.parser.AbstractParser;
+  import org.apache.tika.parser.ParseContext;
+  import org.xml.sax.SAXException;
+
+  public class MatParser extends AbstractParser {
+
+      public void parse(InputStream stream, ContentHandler handler, Metadata metadata, ParseContext context)
+              throws IOException, SAXException, TikaException {
+
+          TemporaryResources tmp =
+                  TikaInputStream.isTikaInputStream(stream) ? null : new TemporaryResources();
+          try {
+              // Use TIS so we can spool a temp file for parsing.
+              TikaInputStream tis = TikaInputStream.get(stream, tmp);
+
+              //Extract information from header file
+              MatFileReader mfr = new MatFileReader(tis.getFile()); //input .mat file
+              MatFileHeader hdr = mfr.getMatFileHeader(); //.mat header information
+              String[] parts = hdr.getDescription().split(",");
+
+              for (Map.Entry<String, MLArray> entry : mfr.getContent().entrySet()) {
+                  metadata.set("var", String.valueOf(entry.getValue()));
+              }
+          } catch (IOException e) {
+              throw new TikaException("Error parsing Matlab file with MatParser", e);
+          } finally {
+              if (tmp != null) {
+                  tmp.dispose();
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1852: the same parser with object deserialization switched off in a static initializer is hardened"
+  lang java
+  reject VYQL-DESER-023
+  code
+  ```
+  package org.apache.tika.parser.mat;
+
+  import java.io.InputStream;
+  import java.io.IOException;
+  import java.util.Map;
+  import com.jmatio.io.MatFileHeader;
+  import com.jmatio.io.MatFileReader;
+  import com.jmatio.types.MLArray;
+  import org.apache.tika.exception.TikaException;
+  import org.apache.tika.io.TemporaryResources;
+  import org.apache.tika.io.TikaInputStream;
+  import org.apache.tika.metadata.Metadata;
+  import org.apache.tika.parser.AbstractParser;
+  import org.apache.tika.parser.ParseContext;
+  import org.xml.sax.SAXException;
+
+  public class MatParser extends AbstractParser {
+
+      static {
+          //make sure that this is set to false
+          MatFileReader.setAllowObjectDeserialization(false);
+      }
+
+      public void parse(InputStream stream, ContentHandler handler, Metadata metadata, ParseContext context)
+              throws IOException, SAXException, TikaException {
+
+          TemporaryResources tmp =
+                  TikaInputStream.isTikaInputStream(stream) ? null : new TemporaryResources();
+          try {
+              // Use TIS so we can spool a temp file for parsing.
+              TikaInputStream tis = TikaInputStream.get(stream, tmp);
+
+              //Extract information from header file
+              MatFileReader mfr = new MatFileReader(tis.getFile()); //input .mat file
+              MatFileHeader hdr = mfr.getMatFileHeader(); //.mat header information
+              String[] parts = hdr.getDescription().split(",");
+
+              for (Map.Entry<String, MLArray> entry : mfr.getContent().entrySet()) {
+                  metadata.set("var", String.valueOf(entry.getValue()));
+              }
+          } catch (IOException e) {
+              throw new TikaException("Error parsing Matlab file with MatParser", e);
+          } finally {
+              if (tmp != null) {
+                  tmp.dispose();
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1852: switching object deserialization off inside the parse method is the same discharged obligation"
+  lang java
+  reject VYQL-DESER-023
+  code
+  ```
+  package org.apache.tika.parser.mat;
+
+  import java.io.InputStream;
+  import java.io.IOException;
+  import java.util.Map;
+  import com.jmatio.io.MatFileHeader;
+  import com.jmatio.io.MatFileReader;
+  import com.jmatio.types.MLArray;
+  import org.apache.tika.exception.TikaException;
+  import org.apache.tika.io.TemporaryResources;
+  import org.apache.tika.io.TikaInputStream;
+  import org.apache.tika.metadata.Metadata;
+  import org.apache.tika.parser.AbstractParser;
+  import org.apache.tika.parser.ParseContext;
+  import org.xml.sax.SAXException;
+
+  public class MatParser extends AbstractParser {
+
+      public void parse(InputStream stream, ContentHandler handler, Metadata metadata, ParseContext context)
+              throws IOException, SAXException, TikaException {
+
+          TemporaryResources tmp =
+                  TikaInputStream.isTikaInputStream(stream) ? null : new TemporaryResources();
+          try {
+              MatFileReader.setAllowObjectDeserialization(false);
+
+              // Use TIS so we can spool a temp file for parsing.
+              TikaInputStream tis = TikaInputStream.get(stream, tmp);
+
+              //Extract information from header file
+              MatFileReader mfr = new MatFileReader(tis.getFile()); //input .mat file
+              MatFileHeader hdr = mfr.getMatFileHeader(); //.mat header information
+              String[] parts = hdr.getDescription().split(",");
+
+              for (Map.Entry<String, MLArray> entry : mfr.getContent().entrySet()) {
+                  metadata.set("var", String.valueOf(entry.getValue()));
+              }
+          } catch (IOException e) {
+              throw new TikaException("Error parsing Matlab file with MatParser", e);
+          } finally {
+              if (tmp != null) {
+                  tmp.dispose();
+              }
+          }
+      }
+  }
+  ```

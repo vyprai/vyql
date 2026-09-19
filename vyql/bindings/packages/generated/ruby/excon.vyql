@@ -1,0 +1,43 @@
+module bindings.ruby.generated.m42d1a691;
+
+binding networkConnect0 {
+  requires {
+    dependency("excon")
+  }
+  query pattern callExpr where callee.method == "Excon.new"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("excon")
+  }
+  query pattern callExpr where callee.method == "Excon::Connection.request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("excon")
+  }
+  query pattern callExpr where callee.method == "Excon::Utils.escape_uri"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("excon")
+  }
+  query pattern callExpr where callee.method == "Excon::Utils.unescape_uri"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

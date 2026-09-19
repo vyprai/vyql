@@ -1,0 +1,9 @@
+module bindings.php.generated.md5b6502f;
+
+binding commandExecution0 {
+  requires {
+    dependency("codeception/codeception")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

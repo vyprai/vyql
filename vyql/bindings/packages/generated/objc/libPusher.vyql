@@ -1,0 +1,9 @@
+module bindings.objc.generated.m0a54f912;
+
+binding deserialization0 {
+  requires {
+    dependency("libPusher")
+  }
+  query pattern callExpr where callee.method == "NewBase64Decode"
+  emit sink code.Deserialization at args[0]
+}

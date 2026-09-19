@@ -1,0 +1,245 @@
+# CVE-2015-9097: the mail gem's delivery methods took the SMTP envelope
+# addresses from the message and handed them to the SMTP conversation.
+# Mail::CheckDeliveryParams#check_delivery_params asserts only that the
+# addresses are non-blank:
+#
+#   def check_delivery_params(mail)
+#     raise ArgumentError.new('An SMTP From address is required ...') if Utilities.blank?(mail.smtp_envelope_from)
+#     raise ArgumentError.new('An SMTP To address is required ...')   if Utilities.blank?(mail.smtp_envelope_to)
+#     [mail.smtp_envelope_from, mail.smtp_envelope_to, message]
+#   end
+#
+# and Mail::SMTP#deliver! passed the results on unchanged:
+#
+#   smtp_from, smtp_to, message = check_delivery_params(mail)
+#   smtp_obj.sendmail(message, smtp_from, smtp_to)
+#
+# Net::SMTP writes those addresses verbatim into the MAIL FROM: and RCPT TO:
+# command lines. SMTP is line-oriented, so an address carrying CR or LF ends the
+# command and the remainder is read by the server as the next command (CWE-93).
+# The fixed revision rejects line breaks, and over-long addresses, before the
+# address can reach the conversation.
+
+test "rank1352: an envelope address taken from the request reaches the SMTP conversation"
+  lang ruby
+  file lib/mail/network/delivery_methods/smtp.rb
+  expect VYQL-INJ-017
+  code
+  ```
+  module Mail
+    class SMTP
+      def deliver!(params, message)
+        smtp_from = params[:sender]
+        smtp_to = params[:recipient]
+
+        raise ArgumentError.new('An SMTP From address is required to send a message.') if smtp_from.nil?
+        raise ArgumentError.new('An SMTP To address is required to send a message.') if smtp_to.nil?
+
+        smtp = Net::SMTP.new(settings[:address], settings[:port])
+        smtp.start(settings[:domain], settings[:user_name], settings[:password]) do |smtp_obj|
+          smtp_obj.sendmail(message, smtp_from, smtp_to)
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1352: the MAIL FROM and RCPT TO commands carry the same addresses"
+  lang ruby
+  file lib/mail/network/delivery_methods/smtp_connection.rb
+  expect VYQL-INJ-017
+  code
+  ```
+  module Mail
+    class SMTPConnection
+      def deliver!(params, message)
+        smtp.mailfrom(params[:sender])
+        smtp.rcptto(params[:recipient])
+        smtp.data(message)
+      end
+    end
+  end
+  ```
+
+test "rank1352: a configured envelope address is not an injection site"
+  lang ruby
+  file lib/mail/network/delivery_methods/smtp.rb
+  reject VYQL-INJ-017
+  code
+  ```
+  module Mail
+    class SMTP
+      def deliver_bounce_report!(message)
+        smtp = Net::SMTP.new(settings[:address], settings[:port])
+        smtp.start(settings[:domain], settings[:user_name], settings[:password]) do |smtp_obj|
+          smtp_obj.sendmail(message, 'bounces@example.com', 'postmaster@example.com')
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1352: the DATA payload is not an envelope address"
+  lang ruby
+  file lib/mail/network/delivery_methods/smtp.rb
+  reject VYQL-INJ-017
+  code
+  ```
+  module Mail
+    class SMTP
+      def deliver!(params)
+        smtp = Net::SMTP.new(settings[:address], settings[:port])
+        smtp.start(settings[:domain], settings[:user_name], settings[:password]) do |smtp_obj|
+          smtp_obj.sendmail(params[:body], 'bounces@example.com', 'postmaster@example.com')
+        end
+      end
+    end
+  end
+  ```
+
+# The vulnerable code reaches the sink through `smtp_from, smtp_to, message =
+# check_delivery_params(mail)`. The pair below differs only in how the returned
+# array is taken apart, and both forms keep the taint: rbConv.stmt's "assignment"
+# case gives a left_assignment_list one nir.Assign target per name, the way Go's
+# `a, b := f()` and Python's tuple unpacking do.
+#
+# ATTENTION. The fix ("SMTP security: prevent command injection via To/From
+# addresses") validates rather than transforms: Mail::CheckDeliveryParams.check
+# routes each envelope address through check_from/check_to -> check_addr ->
+# validate_smtp_addr, which yields an error when `/[\r\n]/ =~ addr` matches and
+# returns the address unchanged. VYQL-INJ-017 reports the same two findings on
+# that revision as on its parent (measured three runs per revision with the
+# cache off), for three independent reasons, each pinned by a test below.
+#
+# 1. The match is a `binary` node (path __binop.=~), not a call: ruby.go lowers
+#    `=~` to nir.BinOp in either operand order, so no callExpr binding can
+#    attach a control to the guard.
+# 2. No control concept declares `neutralizes: [injection.CrlfInjection]` --
+#    the escape-control family has a member per injection threat and the CRLF
+#    member is absent -- so EmailHeaderInjection carries no `unless` clause and
+#    nothing can suppress the finding.
+# 3. Deepest, and measured on the real tree: `Mail::CheckDeliveryParams.check
+#    (mail)` never resolves. The constant-path receiver lowers to nir.Const
+#    (scope_resolution), and resolveTargets' nir.Attr case accepts only
+#    nir.Name bases, so the call keeps the conservative arg-to-result shortcut.
+#    The winning taint path is deliver!#param -> Arg -> Call -> sendmail-arg
+#    and never enters validate_smtp_addr, so a `coveredBy` guard of any
+#    qualifier (path, endpoint, dominates, sameScope) -- all of which see only
+#    nodes on the flow or the sink's own function -- can never see a guard in
+#    the bypassed helper. The vulnerable revision's mixin form
+#    (`check_delivery_params(mail)`, receiverless) does resolve arg -> param ->
+#    ... -> ret -> call site, which is why its witness runs through the helper
+#    body while the fixed revision's does not.
+#
+# Conversion needs all three together: constant-receiver call resolution in the
+# lowering shared by every frontend, the missing CRLF control concept, and `=~`
+# exposed as a node a binding can label. The first is a cross-language
+# resolution-policy change, not a localized correction, so the rank holds.
+#
+# verify_current_expected: attention-engine-gap, both revisions report.
+
+test "rank1352: a returned envelope pair taken apart by multiple assignment stays tainted"
+  lang ruby
+  expect VYQL-INJ-017
+  code
+  ```
+  class Delivery
+    def check_delivery_params(params)
+      [params[:sender], params[:recipient]]
+    end
+
+    def deliver!(params, message)
+      smtp_from, smtp_to = check_delivery_params(params)
+      smtp.sendmail(message, smtp_from, smtp_to)
+    end
+  end
+  ```
+
+test "rank1352: the same returned envelope pair read by index stays tainted"
+  lang ruby
+  expect VYQL-INJ-017
+  code
+  ```
+  class Delivery
+    def check_delivery_params(params)
+      [params[:sender], params[:recipient]]
+    end
+
+    def deliver!(params, message)
+      pair = check_delivery_params(params)
+      smtp.sendmail(message, pair[0], pair[1])
+    end
+  end
+  ```
+
+test "rank1352: the fix's delegated line-break validation does not clear the report"
+  lang ruby
+  file lib/mail/check_delivery_params.rb
+  expect VYQL-INJ-017
+  code
+  ```
+  module Mail
+    module CheckDeliveryParams
+      class << self
+        def check_from(addr)
+          check_addr 'From', addr
+        end
+
+        def check_addr(addr_name, addr)
+          validate_smtp_addr addr do |error_message|
+            raise ArgumentError, "SMTP #{addr_name} address #{error_message}"
+          end
+        end
+
+        def validate_smtp_addr(addr)
+          if /[\r\n]/ =~ addr
+            yield 'may not contain CR or LF line breaks'
+          end
+
+          addr
+        end
+      end
+    end
+  end
+
+  module Mail
+    class SMTP
+      def deliver!(params)
+        smtp_from = Mail::CheckDeliveryParams.check_from(params[:sender])
+
+        smtp = Net::SMTP.new(settings[:address], settings[:port])
+        smtp.start(settings[:domain]) do |smtp_obj|
+          smtp_obj.sendmail(params[:body], smtp_from, 'postmaster@example.com')
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1352: the same line-break validation written inline does not clear the report"
+  lang ruby
+  file lib/mail/network/delivery_methods/smtp.rb
+  expect VYQL-INJ-017
+  code
+  ```
+  module Mail
+    class SMTP
+      def deliver!(params)
+        smtp_from = params[:sender]
+
+        if smtp_from.bytesize > 2048
+          raise ArgumentError, 'SMTP From address may not exceed 2kB'
+        end
+
+        if /[\r\n]/ =~ smtp_from
+          raise ArgumentError, 'SMTP From address may not contain CR or LF line breaks'
+        end
+
+        smtp = Net::SMTP.new(settings[:address], settings[:port])
+        smtp.start(settings[:domain]) do |smtp_obj|
+          smtp_obj.sendmail(params[:body], smtp_from, 'postmaster@example.com')
+        end
+      end
+    end
+  end
+  ```

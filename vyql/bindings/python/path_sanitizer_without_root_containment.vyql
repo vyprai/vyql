@@ -1,0 +1,47 @@
+module bindings.python.path_sanitizer_without_root_containment;
+
+// A path sanitizer is the boundary a caller trusts to make a path safe: the
+// name says the value is sanitized, so the callers feed it raw components and
+// use the result directly against a filesystem or object store. When the
+// sanitizer's only transformation is a rewrite -- separators in one convention
+// replaced by another, or unsafe characters swapped out -- every `..` segment
+// and every absolute prefix survives it, and a backslash-to-slash rewrite
+// additionally turns a Windows traversal into the POSIX form remote stores
+// act on. The rewrite is not the defect; the absence of any containment is:
+// nothing compares the sanitized value, or its resolved form, against the
+// base directory it is supposed to stay under.
+//
+// The anchor is the sanitizer's declared job read from its name -- a function
+// named for sanitizing paths -- together with the observable fact that it
+// rewrites its input through a `replace` call. Both conjuncts are needed:
+// the name alone would reach helpers that validate rather than rewrite, and
+// the rewrite alone reaches the ordinary cross-platform idiom that normalises
+// a URI it has just built itself. Neither conjunct names a project or a
+// vendor, so the binding fires on any codebase whose path hygiene rests on a
+// rewrite-only sanitizer.
+//
+// A containment check anywhere in the same function neutralises the flag:
+// a prefix comparison (`startswith`), the pathlib raising and boolean forms
+// (`relative_to`, `is_relative_to`), shared-root comparison (`commonpath`,
+// `commonprefix`), canonicalization (`resolve`, `abspath`, `realpath`,
+// `normpath`) and the directory-stripping `basename`. Python context call
+// paths are function-confined, so a containment check written in a sibling
+// function is not credited -- the fix that moves the check into the
+// sanitizer itself is the shape that clears the flag, because that is where
+// the guard can actually intercept the value being handed on.
+//
+// Residuals, stated rather than hidden: the containment vocabulary is matched
+// as substrings of dotted call paths, so a receiver whose name merely
+// contains one of them (`resolved_path.replace(...)`) reads as containment,
+// and a hand-rolled segment walk that rejects `..` without going through one
+// of these APIs is not recognised, so its flag stands. Both are the cheaper
+// direction -- silence on safe code is the one that would hide a traversal.
+binding pathSanitizerWithoutRootContainment {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "python"
+    and node.context.functionName contains "sanitiz"
+    and node.context.functionName contains "path"
+    and node.context.callPath contains "replace"
+    and not containsAny(node.context.callPath, ["startswith", "relative_to", "is_relative_to", "commonpath", "commonprefix", "resolve", "abspath", "realpath", "normpath", "basename"])
+  emit issue code.PathSanitizerWithoutRootContainment at node
+}

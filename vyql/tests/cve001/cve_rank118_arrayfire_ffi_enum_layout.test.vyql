@@ -1,0 +1,8 @@
+# Rank 118 / CVE-2018-20998: ArrayFire Rust FFI enum layout risk.
+
+test "rank118: FFI enum layout risk is a CVE anchor"
+  expect VYQL-MEM-014
+  graph
+  ```
+  node ffi code.FfiEnumLayoutRisk
+  ```

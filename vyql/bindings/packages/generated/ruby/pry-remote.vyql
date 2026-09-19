@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m7daf80e6;
+
+binding commandExecution0 {
+  requires {
+    dependency("pry-remote")
+  }
+  query pattern callExpr where callee.method == "PryRemote::CLI.run"
+  emit sink code.CommandExecution at args[0]
+}

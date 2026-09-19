@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mc8d886c6;
+
+binding commandExecution0 {
+  requires {
+    dependency("core-js")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

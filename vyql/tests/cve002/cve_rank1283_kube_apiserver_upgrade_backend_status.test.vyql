@@ -1,0 +1,236 @@
+# Rank 1283 / CVE-2018-1002105: kube-apiserver's generic upgrade-aware proxy
+# handler (used by every aggregated API server and by `kubectl exec`/`attach`/
+# `port-forward` requests routed through it) hijacked the client's HTTP
+# connection and began copying bytes bidirectionally to whatever backend it
+# had just dialed, without ever checking whether that backend actually agreed
+# to upgrade the protocol. A backend that responded with an ordinary HTTP
+# error (403, 500, ...) instead of `101 Switching Protocols` still got its
+# raw TCP connection wired straight through to the client from that point on,
+# so a request that should have been rejected let the client hold a live,
+# authenticated connection directly to the backend, dispatching arbitrary
+# further requests over it with none of the API server's request handling in
+# the path (CWE-269, confirmed against the metadata report).
+#
+# staging/src/k8s.io/apimachinery/pkg/util/proxy/upgradeaware.go's tryUpgrade
+# dialed the backend, hijacked the client's ResponseWriter, wrote back
+# whatever raw bytes the dial returned, and immediately spawned the two
+# io.Copy goroutines that make up the bidirectional proxy -- nothing in
+# between inspects the backend's response line. The fixed revision adds
+# getResponseCode, which reads an *http.Response off the same reader the raw
+# bytes came from and returns its status code, calls it right after dialing,
+# and only proceeds to the hijack-and-copy when that code is exactly
+# http.StatusSwitchingProtocols; otherwise it echoes the backend's response
+# to the hijacked connection and returns without ever treating the
+# connection as upgraded.
+#
+# Detected by hijackRawWriteWithoutUpgradeCheck
+# (vyql/bindings/go/hijackedConnRawWriteWithoutUpgrade.vyql): a hijack, a
+# raw-byte push onto a connection in the same function body, and
+# http.StatusSwitchingProtocols nowhere in the function. Both halves of the
+# construct are documented net/http facts -- Hijacker.Hijack hands over the
+# raw connection, and an upgrade is only valid once the peer returns 101,
+# which a serving handler writes itself and a forwarding proxy compares
+# against, so both idioms leave the constant in the function. Measured on
+# the real revisions of the subtree, the flag is 1 on the vulnerable tree
+# (tryUpgrade's own context) and 0 on the fixed tree, with no other flag
+# anywhere in staging/src/k8s.io/apimachinery or apiserver: the four
+# ResponseWriter-delegator Hijack passthroughs write nothing, and the spdy
+# upgrade negotiators carry the constant because they write 101 themselves.
+#
+# Residuals, recorded rather than hidden: the goroutine closures carrying
+# the two io.Copy calls contribute no facts to the enclosing function, so
+# the raw-byte half is satisfied by the body-level
+# requestHijackedConn.Write(rawResponse) the real handler performs before
+# spawning them -- a variant that pushes bytes only from inside closures
+# and never writes in the body stays unreported; and a status test spelled
+# against the numeric literal 101 instead of the constant evades the
+# negation and still reports.
+#
+# verify_current_expected: fixed-presence, vulnerable expects / fixed rejects.
+
+test "rank1283: tryUpgrade proxies the hijacked connection without checking the backend's response"
+  lang go
+  file upgradeaware.go
+  expect VYQL-AUTH-082
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  package proxy
+
+  import (
+      "fmt"
+      "io"
+      "net"
+      "net/http"
+      "strings"
+  )
+
+  type UpgradeAwareHandler struct {
+      Location *http.Request
+  }
+
+  func (h *UpgradeAwareHandler) DialForUpgrade(req *http.Request) (net.Conn, []byte, error) {
+      conn, err := net.Dial("tcp", req.URL.Host)
+      return conn, nil, err
+  }
+
+  // tryUpgrade returns true if the request was handled.
+  func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Request) bool {
+      backendConn, rawResponse, err := h.DialForUpgrade(req)
+      if err != nil {
+          return true
+      }
+      defer backendConn.Close()
+
+      requestHijacker, ok := w.(http.Hijacker)
+      if !ok {
+          return true
+      }
+      requestHijackedConn, _, err := requestHijacker.Hijack()
+      if err != nil {
+          return true
+      }
+      defer requestHijackedConn.Close()
+
+      // Forward raw response bytes back to client.
+      if len(rawResponse) > 0 {
+          if _, err = requestHijackedConn.Write(rawResponse); err != nil {
+              fmt.Println(err)
+          }
+      }
+
+      // Proxy the connection bidirectionally without ever checking whether
+      // the backend actually agreed to upgrade the protocol.
+      writerComplete := make(chan struct{})
+      readerComplete := make(chan struct{})
+
+      go func() {
+          _, err := io.Copy(backendConn, requestHijackedConn)
+          if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+              fmt.Println(err)
+          }
+          close(writerComplete)
+      }()
+
+      go func() {
+          _, err := io.Copy(requestHijackedConn, backendConn)
+          if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+              fmt.Println(err)
+          }
+          close(readerComplete)
+      }()
+
+      select {
+      case <-writerComplete:
+      case <-readerComplete:
+      }
+      return true
+  }
+  ```
+
+test "rank1283: the fixed revision reads the backend's status and only proxies once it is a real upgrade"
+  lang go
+  file upgradeaware.go
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  package proxy
+
+  import (
+      "bufio"
+      "bytes"
+      "fmt"
+      "io"
+      "net"
+      "net/http"
+      "strings"
+  )
+
+  type UpgradeAwareHandler struct {
+      Location *http.Request
+  }
+
+  func (h *UpgradeAwareHandler) DialForUpgrade(req *http.Request) (net.Conn, []byte, error) {
+      conn, err := net.Dial("tcp", req.URL.Host)
+      return conn, nil, err
+  }
+
+  func getResponseCode(r io.Reader) (int, []byte, error) {
+      rawResponse := bytes.NewBuffer(make([]byte, 0, 256))
+      resp, err := http.ReadResponse(bufio.NewReader(io.TeeReader(r, rawResponse)), nil)
+      if err != nil {
+          return 0, nil, err
+      }
+      return resp.StatusCode, rawResponse.Bytes(), nil
+  }
+
+  // tryUpgrade returns true if the request was handled.
+  func (h *UpgradeAwareHandler) tryUpgrade(w http.ResponseWriter, req *http.Request) bool {
+      backendConn, rawResponse, err := h.DialForUpgrade(req)
+      if err != nil {
+          return true
+      }
+      defer backendConn.Close()
+
+      rawResponseCode, headerBytes, err := getResponseCode(io.MultiReader(bytes.NewReader(rawResponse), backendConn))
+      if err != nil {
+          return true
+      }
+      if len(headerBytes) > len(rawResponse) {
+          rawResponse = headerBytes
+      }
+
+      requestHijacker, ok := w.(http.Hijacker)
+      if !ok {
+          return true
+      }
+      requestHijackedConn, _, err := requestHijacker.Hijack()
+      if err != nil {
+          return true
+      }
+      defer requestHijackedConn.Close()
+
+      // Forward raw response bytes back to client.
+      if len(rawResponse) > 0 {
+          if _, err = requestHijackedConn.Write(rawResponse); err != nil {
+              fmt.Println(err)
+          }
+      }
+
+      if rawResponseCode != http.StatusSwitchingProtocols {
+          // The backend did not upgrade the connection: finish echoing its
+          // response to the client and stop, never entering bidirectional
+          // proxy mode over the hijacked connection.
+          _, err := io.Copy(requestHijackedConn, backendConn)
+          if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+              fmt.Println(err)
+          }
+          return true
+      }
+
+      writerComplete := make(chan struct{})
+      readerComplete := make(chan struct{})
+
+      go func() {
+          _, err := io.Copy(backendConn, requestHijackedConn)
+          if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+              fmt.Println(err)
+          }
+          close(writerComplete)
+      }()
+
+      go func() {
+          _, err := io.Copy(requestHijackedConn, backendConn)
+          if err != nil && !strings.Contains(err.Error(), "use of closed network connection") {
+              fmt.Println(err)
+          }
+          close(readerComplete)
+      }()
+
+      select {
+      case <-writerComplete:
+      case <-readerComplete:
+      }
+      return true
+  }
+  ```

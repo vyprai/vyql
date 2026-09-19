@@ -1,0 +1,47 @@
+test "rank148: pip wheel entry point script name is not confined before generation"
+  lang python
+  expect VYQL-PATH-005
+  code
+  ```
+  import pip
+  from pip._vendor.distlib.scripts import ScriptMaker
+
+  def _raise_for_invalid_entrypoint(specification: str) -> None:
+      entry = get_export_entry(specification)
+      if entry is not None and entry.suffix is None:
+          raise MissingCallableSuffix(str(entry))
+
+  class PipScriptMaker(ScriptMaker):
+      def make(self, specification: str, options=None):
+          _raise_for_invalid_entrypoint(specification)
+          return super().make(specification, options)
+  ```
+
+test "rank148: pip wheel entry point script name is checked against scripts dir"
+  lang python
+  reject VYQL-PATH-005
+  code
+  ```
+  import os
+  import pip
+  from pip._vendor.distlib.scripts import ScriptMaker
+
+  def _script_within_dir(name: str, scripts_dir: str) -> bool:
+      root = os.path.normpath(scripts_dir)
+      dest = os.path.normpath(os.path.join(scripts_dir, name))
+      return dest.startswith(root + os.sep)
+
+  def _raise_for_invalid_entrypoint(specification: str, scripts_dir: str) -> None:
+      entry = get_export_entry(specification)
+      if entry is None:
+          return
+      if entry.suffix is None:
+          raise MissingCallableSuffix(str(entry))
+      if not _script_within_dir(entry.name, scripts_dir):
+          raise InstallationError("outside scripts directory")
+
+  class PipScriptMaker(ScriptMaker):
+      def make(self, specification: str, options=None):
+          _raise_for_invalid_entrypoint(specification, self.target_dir)
+          return super().make(specification, options)
+  ```

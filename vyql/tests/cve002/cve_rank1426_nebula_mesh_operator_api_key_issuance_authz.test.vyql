@@ -1,0 +1,374 @@
+# Rank 1426 / CVE-2026-47724 (forgekeep/nebula-mesh, CWE-862, CVSS 9.6):
+# nebula-mesh is a self-hosted control plane for a Slack Nebula mesh VPN -- it
+# issues host certificates, manages hosts and networks, and distributes config,
+# with one row per tenant in a per-operator CA model. Its two front ends do not
+# agree on authorization. The web UI gates every state-changing route through
+# `loadAccessibleCA`; the `/api/v1/*` surface authenticates the bearer API key in
+# `bearerAuth` middleware, attaches the operator to the request context, and then
+# most handlers go straight to the store. The codebase says so itself in
+# `internal/api/hosts.go`: "API trusts the bearer token for authorisation;
+# per-CA ownership is enforced only in the Web layer."
+#
+# So the attacker is a *low-privilege but authenticated* control-plane operator
+# -- not a mesh peer, not a lighthouse, not an unauthenticated network sender.
+# Anyone holding any operator API key could:
+#
+#   POST /api/v1/operators/<admin-id>/api-keys      -> a fresh admin bearer
+#   POST /api/v1/hosts/<victim-host-id>/reenroll    -> an enrollment token for
+#                                                      another tenant's host,
+#                                                      then overwrite its cert
+#                                                      and signing key
+#   any /api/v1/hosts*, /networks*, /networks/{id}/firewall, mobile-bundle
+#                                                   -> cross-tenant read/write
+#
+# and read the audit log and the blocklist. The first of those is the whole
+# escalation in one request, and it is the leg this spec models:
+#
+#   func (s *Server) handleCreateOperatorAPIKey(w http.ResponseWriter, r *http.Request) {
+#       id := chi.URLParam(r, "id")                       // any operator, incl. an admin
+#       if _, err := s.store.GetOperator(r.Context(), id); err != nil { ... }
+#       keyBytes := make([]byte, 32)
+#       if _, err := rand.Read(keyBytes); err != nil { ... }
+#       plaintext := hex.EncodeToString(keyBytes)
+#       sum := sha256.Sum256([]byte(plaintext))
+#       entry := &models.OperatorAPIKey{OperatorID: id, KeyHash: hex.EncodeToString(sum[:])}
+#       ...
+#       writeJSON(w, http.StatusCreated, createAPIKeyResponse{Key: plaintext, Entry: entry})
+#   }
+#
+# There is no authorization anywhere in it. `handleCreateOperator` one screen
+# above *is* gated with `actorIsAdmin`, which is what makes the omission a
+# per-handler oversight rather than a design position, and what makes the safe
+# and unsafe forms sit side by side in one file.
+#
+# The weakness in one sentence: a request handler mints a bearer credential for
+# whichever principal the request path names, and never decides whether the
+# authenticated caller may act for that principal. The subject coming from the
+# path is the operation's purpose, not the bug; the bug is that nothing in the
+# handler can answer 403.
+#
+# 8baaace54c2a23e7c351b3efab5a31ab07b125dc ("Merge commit from fork", the GHSA
+# private-fork merge) carries the change: a new `internal/api/authz.go` with
+# `actorOwnsCA` / `canAccessHost` / `canAccessNetwork` resolving ownership
+# through the resource's CAID against `cas.owner_operator_id`, an
+# `actorIsAdmin(r.Context())` gate at the top of the seven operator-, audit- and
+# blocklist-management handlers, and a load-then-`canAccess` gate in the host,
+# network, firewall and mobile-bundle handlers. Every gate rejects with
+# `writeError(w, http.StatusForbidden, ...)` and every one of them sits inside
+# the handler it guards, so this is the opposite of the delegated-check family
+# (1377/1389/1399): the control is in the sink's own function and is visible to
+# a function-scoped fact.
+#
+# Pool-row corrections, two of them. The row's repo `forgekeep/nebula-mesh` is
+# right and the metadata `REPO_MISMATCH` against `juev/nebula-mesh` is an
+# artifact of a repository *rename*: `gh api repos/juev/nebula-mesh` redirects
+# and reports `full_name: forgekeep/nebula-mesh`, and cloning either name lands
+# the same objects with the same origin. Failure mode 12 again, third instance.
+# The row's *commit* is wrong, though: 9d8bcd7667ecd0c2975cc71fb35a02fe131f76f2
+# ("re-check operator status in admin authz gates") is a later, different fix --
+# it swaps the twelve `actorIsAdmin(ctx)` gates for a store-re-reading
+# `s.isActiveAdmin(ctx)` so that an operator disabled mid-request stops passing a
+# gate it passes. That is a stale-snapshot TOCTOU, not missing
+# authorization, and all the gates CVE-2026-47724 is about are *ready present*
+# at its parent. It is the only commit the advisory references, so this is the
+# patched-parent failure mode reached through the advisory's own
+# reference list rather than through a misrecorded SHA.
+#
+# What fires without this. `internal/api` at 8baaace^ reports one finding, a
+# VYQL-INJ-010 on a test file's response header, and zero flags -- nothing on any
+# non-test file in the package. `vyql match` on the vulnerable `operators.go`
+# labels thirteen nodes, every one of them `code.HttpInput`: seven
+# `analysis.parameter.entry` handler entries and six `chi.URLParam` reads,
+# including the one on line 119 that names the operator whose key is minted. The
+# sink half is empty, and the privileged operation is `s.store.CreateOperatorAPIKey`,
+# an application method no binding can name -- so the route here is a
+# function-scoped review fact over documented calls, not a taint path.
+#
+# Vocabulary: `code.SensitiveOperation` (VYQL-AUTH-079, CWE-862, high)
+# says exactly this -- "verify this privileged or destructive operation enforces
+# authorization" -- and Java and PHP emit it from `presenceNode`
+# bindings that pair a privileged operation with a missing permission check
+# (`sensitiveOperation251`: `doConfigure` + `save` + `not scopeCall contains
+# "checkPermission"`). This rank widens it to Go and mints nothing. Rejected on
+# the way: `code.PrivilegedEntryPointReview` is the closest name and is **inert**
+# -- no rule in `packs/` consumes it, so a binding emitting it produces nothing
+# (1385's defect, second instance); `code.IdorPolicyReview` is about a lookup's
+# ownership criteria rather than credential issuance; `code.CredentialedEndpointReview`
+# is a test-connection endpoint replaying stored credentials;
+# `code.UnauthenticatedCredentialEnrollmentPath` (1416) is the authentication
+# axis, and here the caller is authenticated and only unauthorized.
+#
+# Discrimination, over three `--cache off` runs of each revision of the whole
+# repository: 1 VYQL-AUTH-079 at `internal/api/operators.go:118` at 8baaace^ and
+# 0 at 8baaace, with the tree's other findings unmoved (41 -> 40 total, 11 -> 10
+# at or above high). Four hostile variants, each a whole-file scan:
+#
+#   - the patched file with `actorIsAdmin` renamed to `zzPermitted`         -> 0
+#     (so the binding is not keyed on the fixed revision's own vocabulary)
+#   - the vulnerable file with `// TODO: gate this with actorIsAdmin and
+#     writeError(w, http.StatusForbidden, ...)` above the handler            -> 1
+#     (Go `selector:` is AST-derived; a comment produces no node)
+#   - the patched file with a bare `403` in place of `http.StatusForbidden`   -> 0
+#     (this is why the `call_arg:` `:403` negation is there; without it the
+#     patched form reported)
+#   - the vulnerable handler given an *ownership* gate instead of an admin one,
+#     `if ActorOf(r.Context()).ID != id { writeError(w, http.StatusForbidden ...) }`
+#                                                                            -> 0
+#     (the negation is on the authorization decision, not on this fix's layout)
+#
+# Go `selector:` is function-confined, measured on this real file rather than a
+# synthetic pair: at 8baaace^ the sibling `handleCreateOperator` twenty-five
+# lines above carries `writeError(w, http.StatusForbidden, ...)`, and the flag on
+# line 118 fires anyway. That extends 1420's Go finding (`index:`, `call_path:`,
+# `identifier:` do not leak across Go functions) to `selector:`, which is also in
+# `flagASTRoutingValuePrefixes`.
+#
+# Reach, enumerated rather than sampled. Across the 160 clones under
+# /tmp/cve-work/rank*/ there are 23,584 non-vendored Go files. 246 read a router
+# path parameter and 278 generate random bytes; 14 do both in one file and 12
+# carry a digest call as well, of which 8 are this rank's own scratch copies and
+# 2 are nebula-mesh's `internal/web/operators.go`, where the `rand.Read` sits in
+# a `newAPIKeyToken()` helper with no path parameter. One independent candidate
+# remains, exposure-notifications-server's `internal/admin`. Bounded scans of it
+# plus lxd/lxd, mailpit, mattermost-server, amf and nebula-mesh's own
+# `internal/web` add zero rows; mattermost's two VYQL-AUTH-079 rows are
+# pre-existing `auditreview.marks` hits on vendored gorp, not this binding. So
+# the zero-collateral figure is honest but near-vacuous: the shape is rare in
+# this corpus rather than proven precise by it.
+#
+# The residual is stated in the binding: a project whose gate lives in a helper
+# that writes the 403 itself, or a handler mounted under a router subtree that
+# applies an authorization middleware, carries no 403 of its own and reports.
+# Both are the attribution boundary at `endpointGuarded` -- the control has to be
+# in the handler to be seen -- and here the real fix put it there.
+
+test "rank1426: an api-key mint for the operator the request path names, with no authorization gate"
+  lang go
+  file internal/api/operators.go
+  expect VYQL-AUTH-079
+  expect_review code.SensitiveOperation
+  code
+  ```
+  package api
+
+  import (
+  	"crypto/rand"
+  	"crypto/sha256"
+  	"encoding/hex"
+  	"encoding/json"
+  	"errors"
+  	"net/http"
+
+  	"github.com/go-chi/chi/v5"
+  	"github.com/google/uuid"
+  	"github.com/juev/nebula-mesh/internal/models"
+  	"github.com/juev/nebula-mesh/internal/store"
+  )
+
+  type createAPIKeyRequest struct {
+  	Name string `json:"name"`
+  }
+
+  type createAPIKeyResponse struct {
+  	Key   string                 `json:"key"`
+  	Entry *models.OperatorAPIKey `json:"entry"`
+  }
+
+  func (s *Server) handleCreateOperatorAPIKey(w http.ResponseWriter, r *http.Request) {
+  	id := chi.URLParam(r, "id")
+  	if _, err := s.store.GetOperator(r.Context(), id); err != nil {
+  		if errors.Is(err, store.ErrNotFound) {
+  			writeError(w, http.StatusNotFound, "operator not found")
+  			return
+  		}
+  		s.logger.Error("get operator", "error", err)
+  		writeError(w, http.StatusInternalServerError, "failed to load operator")
+  		return
+  	}
+  	var req createAPIKeyRequest
+  	if r.ContentLength > 0 {
+  		_ = json.NewDecoder(r.Body).Decode(&req)
+  	}
+
+  	keyBytes := make([]byte, 32)
+  	if _, err := rand.Read(keyBytes); err != nil {
+  		writeError(w, http.StatusInternalServerError, "failed to generate api key")
+  		return
+  	}
+  	plaintext := hex.EncodeToString(keyBytes)
+  	sum := sha256.Sum256([]byte(plaintext))
+
+  	entry := &models.OperatorAPIKey{
+  		ID:         uuid.New().String(),
+  		OperatorID: id,
+  		Name:       req.Name,
+  		KeyHash:    hex.EncodeToString(sum[:]),
+  	}
+  	if err := s.store.CreateOperatorAPIKey(r.Context(), entry); err != nil {
+  		s.logger.Error("create api key", "error", err)
+  		writeError(w, http.StatusInternalServerError, "failed to store api key")
+  		return
+  	}
+  	s.recordAuditAction(r.Context(), auditOperatorAPIKeyCreate, id, entry.ID)
+  	writeJSON(w, http.StatusCreated, createAPIKeyResponse{Key: plaintext, Entry: entry})
+  }
+  ```
+
+test "rank1426: the same handler with the admin gate the fixed revision adds"
+  lang go
+  file internal/api/operators.go
+  reject VYQL-AUTH-079
+  reject_review code.SensitiveOperation
+  code
+  ```
+  package api
+
+  import (
+  	"crypto/rand"
+  	"crypto/sha256"
+  	"encoding/hex"
+  	"encoding/json"
+  	"errors"
+  	"net/http"
+
+  	"github.com/go-chi/chi/v5"
+  	"github.com/google/uuid"
+  	"github.com/juev/nebula-mesh/internal/models"
+  	"github.com/juev/nebula-mesh/internal/store"
+  )
+
+  type createAPIKeyRequest struct {
+  	Name string `json:"name"`
+  }
+
+  type createAPIKeyResponse struct {
+  	Key   string                 `json:"key"`
+  	Entry *models.OperatorAPIKey `json:"entry"`
+  }
+
+  func (s *Server) handleCreateOperatorAPIKey(w http.ResponseWriter, r *http.Request) {
+  	if !actorIsAdmin(r.Context()) {
+  		writeError(w, http.StatusForbidden, "operator management requires the admin role")
+  		return
+  	}
+  	id := chi.URLParam(r, "id")
+  	if _, err := s.store.GetOperator(r.Context(), id); err != nil {
+  		if errors.Is(err, store.ErrNotFound) {
+  			writeError(w, http.StatusNotFound, "operator not found")
+  			return
+  		}
+  		s.logger.Error("get operator", "error", err)
+  		writeError(w, http.StatusInternalServerError, "failed to load operator")
+  		return
+  	}
+  	var req createAPIKeyRequest
+  	if r.ContentLength > 0 {
+  		_ = json.NewDecoder(r.Body).Decode(&req)
+  	}
+
+  	keyBytes := make([]byte, 32)
+  	if _, err := rand.Read(keyBytes); err != nil {
+  		writeError(w, http.StatusInternalServerError, "failed to generate api key")
+  		return
+  	}
+  	plaintext := hex.EncodeToString(keyBytes)
+  	sum := sha256.Sum256([]byte(plaintext))
+
+  	entry := &models.OperatorAPIKey{
+  		ID:         uuid.New().String(),
+  		OperatorID: id,
+  		Name:       req.Name,
+  		KeyHash:    hex.EncodeToString(sum[:]),
+  	}
+  	if err := s.store.CreateOperatorAPIKey(r.Context(), entry); err != nil {
+  		s.logger.Error("create api key", "error", err)
+  		writeError(w, http.StatusInternalServerError, "failed to store api key")
+  		return
+  	}
+  	s.recordAuditAction(r.Context(), auditOperatorAPIKeyCreate, id, entry.ID)
+  	writeJSON(w, http.StatusCreated, createAPIKeyResponse{Key: plaintext, Entry: entry})
+  }
+  ```
+
+test "rank1426: an ownership gate rather than an admin gate is also an authorization decision"
+  lang go
+  file internal/api/tokens.go
+  reject VYQL-AUTH-079
+  reject_review code.SensitiveOperation
+  code
+  ```
+  package api
+
+  import (
+  	"crypto/rand"
+  	"crypto/sha256"
+  	"encoding/hex"
+  	"net/http"
+
+  	"github.com/gorilla/mux"
+  )
+
+  func (s *Server) handleIssueProjectToken(w http.ResponseWriter, r *http.Request) {
+  	projectID := mux.Vars(r)["project"]
+  	project, err := s.store.GetProject(r.Context(), projectID)
+  	if err != nil {
+  		http.Error(w, "project not found", http.StatusNotFound)
+  		return
+  	}
+  	if project.OwnerID != currentUser(r.Context()).ID {
+  		http.Error(w, "forbidden", http.StatusForbidden)
+  		return
+  	}
+
+  	secret := make([]byte, 32)
+  	if _, err := rand.Read(secret); err != nil {
+  		http.Error(w, "failed to generate token", http.StatusInternalServerError)
+  		return
+  	}
+  	plaintext := hex.EncodeToString(secret)
+  	digest := sha256.Sum256([]byte(plaintext))
+  	if err := s.store.SaveProjectToken(r.Context(), projectID, hex.EncodeToString(digest[:])); err != nil {
+  		http.Error(w, "failed to store token", http.StatusInternalServerError)
+  		return
+  	}
+  	writeJSON(w, http.StatusCreated, map[string]string{"token": plaintext})
+  }
+  ```
+
+test "rank1426: a self-service token mint whose subject is the session, not the request path"
+  lang go
+  file internal/api/selftokens.go
+  reject VYQL-AUTH-079
+  reject_review code.SensitiveOperation
+  code
+  ```
+  package api
+
+  import (
+  	"crypto/rand"
+  	"crypto/sha256"
+  	"encoding/hex"
+  	"net/http"
+  )
+
+  func (s *Server) handleCreateMyToken(w http.ResponseWriter, r *http.Request) {
+  	actor := currentUser(r.Context())
+  	if actor == nil {
+  		http.Error(w, "unauthenticated", http.StatusUnauthorized)
+  		return
+  	}
+
+  	secret := make([]byte, 32)
+  	if _, err := rand.Read(secret); err != nil {
+  		http.Error(w, "failed to generate token", http.StatusInternalServerError)
+  		return
+  	}
+  	plaintext := hex.EncodeToString(secret)
+  	digest := sha256.Sum256([]byte(plaintext))
+  	if err := s.store.SaveUserToken(r.Context(), actor.ID, hex.EncodeToString(digest[:])); err != nil {
+  		http.Error(w, "failed to store token", http.StatusInternalServerError)
+  		return
+  	}
+  	writeJSON(w, http.StatusCreated, map[string]string{"token": plaintext})
+  }
+  ```

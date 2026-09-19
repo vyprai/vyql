@@ -1,0 +1,13 @@
+module bindings.php.generated.m7bbd1607;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("yiisoft/yii2-authclient")
+  }
+  query pattern callExpr where callee.method == "AuthAction::authSuccess"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,27 @@
+module bindings.objc.generated.mb50097d4;
+
+binding userControlledData0 {
+  requires {
+    dependency("TTTAttributedLabel")
+  }
+  query pattern callExpr where callee.method == "setText:"
+  emit source core.UserControlledData at call.result
+}
+
+binding redirectTarget1 {
+  requires {
+    dependency("TTTAttributedLabel")
+  }
+  query pattern callExpr where callee.method == "addLinkToURL:"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget2 {
+  requires {
+    dependency("TTTAttributedLabel")
+  }
+  query pattern callExpr where callee.method == "addLinkWithTextCheckingResult:"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

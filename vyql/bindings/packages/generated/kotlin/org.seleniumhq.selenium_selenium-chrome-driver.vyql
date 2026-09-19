@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m4eaf5667;
+
+binding codeEval0 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-chrome-driver")
+  }
+  query pattern callExpr where callee.method == "getAdditionalCommands"
+  emit sink code.CodeEval at args[0]
+}

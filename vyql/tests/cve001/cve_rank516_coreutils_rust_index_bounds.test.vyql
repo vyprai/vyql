@@ -1,0 +1,23 @@
+# Rank 516 / CVE-2021-29934: coreutils Rust memory bounds issue.
+# Fresh scan evidence includes VYQL-MEM-005 on coreutils input decoder/shred paths.
+
+test "rank516: coreutils routed index controls vector access"
+  lang rust
+  expect VYQL-MEM-005
+  code
+  ```
+  #[get("/")]
+  fn handler(i: usize, data: Vec<u8>) {
+      let _x = data[i];
+  }
+  ```
+
+test "rank516: coreutils constant vector index is clean"
+  lang rust
+  reject VYQL-MEM-005
+  code
+  ```
+  fn handler(data: Vec<u8>) {
+      let _x = data[0];
+  }
+  ```

@@ -1,0 +1,61 @@
+module bindings.scala.generated.m11d754bc;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "authorizeUsingAccessExpression"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "authorizeUsingUrlCheck"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "authorizeUsingAccessControlList"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "parsePermissionsString"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("org.thymeleaf.extras:thymeleaf-extras-springsecurity4")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

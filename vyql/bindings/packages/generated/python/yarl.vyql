@@ -1,0 +1,25 @@
+module bindings.python.generated.meb479096;
+
+binding urlFetch0 {
+  requires {
+    dependency("yarl")
+  }
+  query pattern callExpr where callee.method == "encode_url"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("yarl")
+  }
+  query pattern callExpr where callee.method == "pre_encoded_url"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("yarl")
+  }
+  query pattern callExpr where callee.method == "build_pre_encoded_url"
+  emit sink code.UrlFetch at args[0]
+}

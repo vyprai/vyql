@@ -1,0 +1,173 @@
+# CVE-2026-34178: LXD's instance backup import (lxd/api_internal.go,
+# internalImportFromBackup) reads the instance configuration twice from the same
+# attacker-supplied tarball. createFromBackup validates project restrictions --
+# restricted=true blocks security.privileged, raw.lxc and device passthrough --
+# against backup/index.yaml, the copy backup.GetInfo parsed into bInfo.Config,
+# and then unpacks the tarball onto the storage volume and calls
+# internalImportFromBackup, which re-parses backup/container/backup.yaml off that
+# volume with backup.ParseConfigYamlFile and builds the instance DB record from
+# it. The two files are independent members of one archive, so an importer with
+# only can_create_instances in a restricted project ships a clean index.yaml past
+# the restriction check and a privileged backup.yaml into instance.CreateInternal,
+# escaping the project and then the host.
+#
+# Fixed in 06637bfd3158e2457128703afcf60e286a6d6a61 (canonical/lxd#17921), whose
+# core commit 79dbba5fed73a08d0a8c0781c7ab2f9701e71f5a deletes the on-disk parse
+# and threads the validated index through instead: internalImportFromBackup
+# takes *backup.Info and assigns `backupConf := bInfo.Config`, so the config that
+# is checked is the config that creates the instance.
+#
+# Caught at the concept layer by code.RequestScopePolicyReview, which
+# covers a privileged operation whose scope-deciding metadata is used without a
+# consistency check against the metadata the request is authorized under
+# (rank91's Kubernetes CRD dispatch, rank1288's Kyverno APICall namespace). The
+# new binding goBackupConfigFromDiskCreatesInstanceRecord in
+# vyql/bindings/go/backupConfigImportScopeReview.vyql reads off LXD's own backup
+# package contract: backup.ParseConfigYamlFile decodes whatever YAML sits in the
+# instance's storage volume, which for an import is archive payload, so a function
+# that turns that parse into an instance database record via instance.CreateInternal
+# without a project-restriction check in the same body is creating an instance
+# from metadata no policy has seen.
+
+test "rank1347: instance import builds the instance record from backup.yaml re-parsed off the storage volume"
+  lang go
+  file lxd/api_internal.go
+  expect_review code.RequestScopePolicyReview
+  code
+  ```
+  package main
+
+  import (
+  	"context"
+  	"errors"
+  	"fmt"
+  	"path/filepath"
+
+  	"github.com/canonical/lxd/lxd/backup"
+  	"github.com/canonical/lxd/lxd/instance"
+  	"github.com/canonical/lxd/lxd/state"
+  	"github.com/canonical/lxd/shared"
+  )
+
+  func internalImportFromBackup(ctx context.Context, s *state.State, projectName string, instName string, allowNameOverride bool, deviceOverrides map[string]map[string]string) error {
+  	if instName == "" {
+  		return errors.New("The name of the instance is required")
+  	}
+
+  	instanceMountPoints, instancePoolName, err := instanceVolumeMountPoints(projectName, instName)
+  	if err != nil {
+  		return err
+  	}
+
+  	if len(instanceMountPoints) != 1 {
+  		return fmt.Errorf(`The instance %q does not seem to exist on any storage pool`, instName)
+  	}
+
+  	// User needs to make sure that we can access the directory where backup.yaml lives.
+  	instanceMountPoint := instanceMountPoints[0]
+  	isEmpty, err := shared.PathIsEmpty(instanceMountPoint)
+  	if err != nil {
+  		return err
+  	}
+
+  	if isEmpty {
+  		return fmt.Errorf(`The instance's directory %q appears to be empty`, instanceMountPoint)
+  	}
+
+  	// Read in the backup.yaml file.
+  	backupYamlPath := filepath.Join(instanceMountPoint, "backup.yaml")
+  	backupConf, err := backup.ParseConfigYamlFile(backupYamlPath)
+  	if err != nil {
+  		return err
+  	}
+
+  	if backupConf.Instance == nil {
+  		return errors.New("Instance definition in backup config is missing")
+  	}
+
+  	if allowNameOverride && instName != "" {
+  		backupConf.Instance.Name = instName
+  	}
+
+  	instDBArgs, err := backup.ConfigToInstanceDBArgs(s, backupConf, projectName, true)
+  	if err != nil {
+  		return err
+  	}
+
+  	_, instOp, cleanup, err := instance.CreateInternal(s, *instDBArgs, true)
+  	if err != nil {
+  		return fmt.Errorf("Failed creating instance record: %w", err)
+  	}
+
+  	defer instOp.Done(err)
+  	_ = cleanup
+  	_ = instancePoolName
+
+  	return nil
+  }
+  ```
+
+test "rank1347: instance import builds the instance record from the validated backup index"
+  lang go
+  file lxd/api_internal.go
+  reject_review code.RequestScopePolicyReview
+  code
+  ```
+  package main
+
+  import (
+  	"context"
+  	"errors"
+  	"fmt"
+
+  	"github.com/canonical/lxd/lxd/backup"
+  	"github.com/canonical/lxd/lxd/instance"
+  	"github.com/canonical/lxd/lxd/state"
+  )
+
+  func internalImportFromBackup(ctx context.Context, s *state.State, bInfo *backup.Info, allowNameOverride bool, deviceOverrides map[string]map[string]string) error {
+  	projectName := bInfo.Project
+  	instName := bInfo.Name
+
+  	if instName == "" {
+  		return errors.New("The name of the instance is required")
+  	}
+
+  	instanceMountPoints, instancePoolName, err := instanceVolumeMountPoints(projectName, instName)
+  	if err != nil {
+  		return err
+  	}
+
+  	if len(instanceMountPoints) != 1 {
+  		return fmt.Errorf(`The instance %q does not seem to exist on any storage pool`, instName)
+  	}
+
+  	// Use the information from the backup index.
+  	// The backup config later gets persisted to disk too.
+  	backupConf := bInfo.Config
+
+  	if backupConf.Instance == nil {
+  		return errors.New("Instance definition in backup config is missing")
+  	}
+
+  	if allowNameOverride && instName != "" {
+  		backupConf.Instance.Name = instName
+  	}
+
+  	instDBArgs, err := backup.ConfigToInstanceDBArgs(s, backupConf, projectName, true)
+  	if err != nil {
+  		return err
+  	}
+
+  	_, instOp, cleanup, err := instance.CreateInternal(s, *instDBArgs, true)
+  	if err != nil {
+  		return fmt.Errorf("Failed creating instance record: %w", err)
+  	}
+
+  	defer instOp.Done(err)
+  	_ = cleanup
+  	_ = instancePoolName
+
+  	return nil
+  }
+  ```

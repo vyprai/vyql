@@ -1,0 +1,41 @@
+module bindings.ruby.generated.ma147353e;
+
+binding deserialization0 {
+  requires {
+    dependency("xml-simple")
+  }
+  query pattern callExpr where callee.method == "xml_in"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("xml-simple")
+  }
+  query pattern callExpr where callee.method == "save_storable"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("xml-simple")
+  }
+  query pattern callExpr where callee.method == "restore_storable"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("xml-simple")
+  }
+  query pattern callExpr where callee.method == "save_mem_copy"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("xml-simple")
+  }
+  query pattern callExpr where callee.method == "restore_mem_copy"
+  emit sink code.Deserialization at args[0]
+}

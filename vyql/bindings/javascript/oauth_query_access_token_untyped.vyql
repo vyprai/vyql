@@ -1,0 +1,31 @@
+module bindings.javascript.oauthQueryAccessTokenUntyped;
+
+// RFC 6750 offers a bearer client three transports for the access token: the
+// Authorization header, a form-encoded body parameter, and the URI query
+// parameter -- and its own guidance recommends against the last, because URIs
+// leak through logs and referrers. A token taken from the query string has a
+// second property the header does not: its value is built by a query parser,
+// and a parser lets the requester choose the runtime type. Bracket syntax
+// (`?access_token[$ne]=null`) parses to the object `{'$ne': 'null'}`, which is
+// truthy, satisfies any `if (!token)` presence check, and reaches a NoSQL
+// equality lookup on the token as an operator rather than a literal -- so a
+// match no longer means the requester held the token. A TypeScript annotation
+// on the parameter cannot pin it: the cast that bridges the request object to
+// the annotated record type is exactly where the lie lives. What pins it is a
+// runtime scalar check where the value is extracted: `typeof x === 'string'`,
+// or an equivalent validation call.
+//
+// The function-scope shape read here uses the protocol's own vocabulary only:
+// the routine strips a `Bearer ` prefix (the RFC's header option) in the same
+// function that reads a `query.access_token` member (the RFC's query option,
+// under the parameter name it defines), and carries no `typeof` check. Both
+// conjuncts are needed: a function may legitimately parse bearer headers, and
+// a function may legitimately read query parameters; taking the documented
+// token from the documented query spelling while also doing bearer-header
+// authentication is what makes this the credential path. Nothing
+// project-specific is named, so any OAuth implementation that accepts both
+// documented transports and skips the scalar check reports the same finding.
+binding oauthQueryTokenScalarCheckMissing {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.literal contains "Bearer " and node.context.selector contains "query.access_token" and not (node.context.expr contains "typeof")
+  emit issue code.OauthQueryTokenScalarCheckMissing at node
+}

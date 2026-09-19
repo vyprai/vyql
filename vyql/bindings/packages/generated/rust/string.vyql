@@ -1,0 +1,9 @@
+module bindings.rust.generated.m1dc32d39;
+
+binding deserialization0 {
+  requires {
+    dependency("string")
+  }
+  query pattern callExpr where callee.method == "from_utf8_unchecked"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,70 @@
+test "rank699: agent command tag falls through Dyad markdown parser"
+  lang javascript
+  file DyadMarkdownParser.tsx
+  expect VYQL-INJ-153
+  expect_review code.UnfilteredAgentCommandTag
+  code
+  ```
+  import ReactMarkdown from "react-markdown";
+
+  function parseCustomTags(content: string) {
+    const customTagNames = [
+      "dyad-write",
+      "dyad-edit",
+      "dyad-execute-sql",
+      "dyad-codebase-context",
+      "think",
+    ];
+    const tagPattern = new RegExp(
+      `<(${customTagNames.join("|")})\\s*([^>]*)>(.*?)<\\/\\1>`,
+      "gs",
+    );
+    return content.split(tagPattern);
+  }
+
+  export function DyadMarkdownParser({ content }: { content: string }) {
+    const pieces = parseCustomTags(content);
+    return <ReactMarkdown>{pieces.join("")}</ReactMarkdown>;
+  }
+  ```
+
+test "rank699: agent command tag is consumed and hidden"
+  lang javascript
+  file DyadMarkdownParser.tsx
+  reject VYQL-INJ-153
+  reject_review code.UnfilteredAgentCommandTag
+  code
+  ```
+  import ReactMarkdown from "react-markdown";
+
+  function parseCustomTags(content: string) {
+    const customTagNames = [
+      "dyad-write",
+      "dyad-edit",
+      "dyad-execute-sql",
+      "dyad-codebase-context",
+      "think",
+      "dyad-command",
+    ];
+    const tagPattern = new RegExp(
+      `<(${customTagNames.join("|")})\\s*([^>]*)>(.*?)<\\/\\1>`,
+      "gs",
+    );
+    return content.split(tagPattern);
+  }
+
+  function renderCustomTag(tag: string) {
+    switch (tag) {
+      case "dyad-command":
+        return null;
+      default:
+        return null;
+    }
+  }
+
+  export function DyadMarkdownParser({ content }: { content: string }) {
+    const pieces = parseCustomTags(content);
+    renderCustomTag("dyad-command");
+    return <ReactMarkdown>{pieces.join("")}</ReactMarkdown>;
+  }
+  ```

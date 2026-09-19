@@ -1,0 +1,30 @@
+module bindings.php.generated.ma5f048d3;
+
+binding commandExecution0 {
+  requires {
+    dependency("symfony/console")
+  }
+  query pattern callExpr where callee.method == "shell_exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("symfony/console")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("symfony/console")
+  }
+  query pattern callExpr where callee.method == "parseColor"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

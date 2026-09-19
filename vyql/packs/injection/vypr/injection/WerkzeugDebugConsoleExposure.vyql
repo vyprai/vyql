@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule WerkzeugDebugConsoleExposure {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_94, CWE_77]
+    id: "VYQL-INJ-057"
+    severity: critical
+  }
+  issue code.WerkzeugDebugConsoleExposure as sink
+}

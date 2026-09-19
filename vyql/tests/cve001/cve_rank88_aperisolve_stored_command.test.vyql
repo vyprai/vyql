@@ -1,0 +1,12 @@
+# Rank 88 / CVE-2026-34977: AperiSolve stored database values reach analyzer
+# command execution.
+
+test "rank88: stored analyzer password reaches command execution"
+  expect VYQL-INJ-032
+  graph
+  ```
+  node src code.DatabaseRead
+  node sink code.CommandExecution
+  edge FLOWS src -> sink
+  ```
+

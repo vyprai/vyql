@@ -1,0 +1,7 @@
+module code;
+
+concept FileInclude : sink {
+  cwe: [CWE_98]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [path.FileInclusion]
+}

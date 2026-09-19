@@ -1,0 +1,17 @@
+module bindings.python.generated.m3f00e520;
+
+binding commandExecution0 {
+  requires {
+    dependency("webdriver-manager")
+  }
+  query pattern callExpr where callee.method == "read_version_from_cmd"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding archiveEntryWrite1 {
+  requires {
+    dependency("webdriver-manager")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

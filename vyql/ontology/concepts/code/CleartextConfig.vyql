@@ -1,0 +1,6 @@
+module code;
+
+concept CleartextConfig : issue {
+  cwe: [CWE_319]
+  vulnerableTo: [crypto.CleartextTransmission]
+}

@@ -1,0 +1,7 @@
+module code;
+
+review code.SelfSizedCopyIntoDeclaredArray {
+  category: memory
+  kind: attention
+  text: "review whether the copied object's own length can exceed the destination's declared size; bound the copy by the destination, not by the source"
+}

@@ -1,0 +1,158 @@
+# Rank 1507 / CVE-2023-37261: OpenComputers' Internet Card let in-game
+# computers open HTTP and TCP connections with a filtering system that could
+# be bypassed (CWE-918). request() and connect() in
+# src/main/scala/li/cil/oc/server/component/InternetCard.scala took the
+# address from args.checkString(0) -- a value supplied by the in-game
+# computer, i.e. the untrusted party -- and the old whitelist/blacklist
+# filtering keyed on hostnames before resolution, so DNS rebinding and
+# address-form tricks walked past it into the server's loopback and private
+# ranges. The fixing commit ("Rework
+# Internet Card filtering system."): a new InternetFilteringRule evaluates
+# allow/deny predicates on the RESOLVED java.net.InetAddress -- any-local,
+# loopback, link-local, site-local, bogon ranges -- an internetAccessAllowed
+# master switch checked before both request() and connect(), and a vendored
+# typesafe-config hook (OpenComputersConfigCommentManipulationHook) so the
+# rules cannot be edited out of application.conf via comment manipulation.
+
+#
+# ATTENTION, whole-language coverage gap. The shape is request-forgery: an
+# untrusted argument (args.checkString) reaches a socket connection with
+# hostname-time filtering only. Nothing in the scala corpus participates:
+# there is no source binding for the mod's @Callback Arguments API, no
+# socket-level UrlFetch sink (SocketChannel.open is not a bound fetch form),
+# and no control concept for post-resolution InetAddress predicates, which
+# is the exact semantics of the change. Scanning the fixed revision's scala directories
+# (server/component and util) reports only two VYQL-CRY-003 weak-random
+# findings; the fixed-revision directory scan adds config/injection families
+# on unrelated files, no VYQL-RF row at either revision. A binding on
+# OpenComputers' own checkString would detect this mod rather than the
+# weakness, and the missing pieces are three (source, sink, control) across
+# a language the corpus barely covers -- vocabulary design at scala depth,
+# not a mechanical change, and not worth one rank. No ENGINE-GAPS.md entry:
+# nothing here is localised to a file or construct; it is scala coverage as
+# a whole. No definition change shipped. Spec cve_rank1507 records the
+# pre-fix connect and the filtering-rule-guarded form, both asserting
+# reject VYQL-RF-001.
+#
+# ## Recheck measurements
+#
+# Re-probed against the knowledge base as it stands (scala corpus: two
+# binding files plus the dependency-generated packages). Fresh
+# `vyql match` on the pre-fix InternetCard.scala: `args.checkString`
+# carries no label (no source for the mod's callback Arguments API),
+# and `SocketChannel.open`, `InetSocketAddress` and `channel.connect`
+# carry none either (no fetch sink); the only source the file gets is
+# `code.HttpInput` on `getHeaderFields` at :490 -- the mod reading its
+# own response headers -- beside generic `code.ResourceReview` flags at
+# :101-103 and `core.ResourceRelease` close controls. The scala
+# vocabulary has not moved in this space since the first measurement:
+# the binding tree gained only the SecureRandom file-permission review
+# and a directory refactor, its fetch sinks remain `ws.url` and
+# `singleRequest`, and `java.nio.channels.SocketChannel` is bound by no
+# corpus at all -- the java fetch sinks are `openStream`,
+# `openConnection`, `getForObject` and `getForEntity`.
+#
+# Three `--cache off` runs per revision over the fix's scala trees
+# (server + util; 174 scala files at d13c015357^, 175 at d13c015357):
+# 5 findings at each revision, byte-identical fingerprint sets and
+# stable across every run -- four VYQL-CRY-003 (ItemUtils.scala:3/109,
+# machine/luac/LuaStateFactory.scala:21/396) and one VYQL-CFG-008
+# (machine/luac/LuaStateFactory.scala:293). No VYQL-RF row at either
+# revision and no row of any rule on InternetCard.scala, the flags view
+# included. Whole-tree scan at the parent: 181 findings over 790 scala
+# files (PATH-001 x63, CRY-003 x30, INJ-003 x27, INJ-023 x25, CFG-014
+# and INJ-004 x9 each, INJ-009 / PATH-003 / INJ-001 x5 each, CFG-008 /
+# DESER-003 / INJ-002 x1 each) -- zero request-forgery rows.
+#
+# The three missing pieces are unchanged in kind: a source for the
+# mod's `Arguments.checkString` (88 call sites across 31 files, an
+# OpenComputers API no other corpus shares), a socket-level fetch sink,
+# and a control expressing resolution-time address-category policy. The
+# only textual difference between the two revisions is the fix's own
+# helper names and the `internetAccessAllowed` switch, so any
+# discriminating binding would key on the fixing commit's own layout.
+#
+# No definition is touched, so the OWASP Java and Python numbers are
+# unaffected by this rank.
+
+test "rank1507: the in-game computer chooses the connect address"
+  lang scala
+  file src/main/scala/li/cil/oc/server/component/InternetCard.scala
+  reject VYQL-RF-001
+  code
+  ```
+  package li.cil.oc.server.component
+
+  import li.cil.oc.Settings
+  import net.minecraft.util.math.Vec3d
+
+  class InternetCard {
+    def connect(context: Context, args: Arguments): Array[AnyRef] = this.synchronized {
+      checkOwner(context)
+      val address = args.checkString(0)
+      val port = args.optInteger(1, -1)
+      if (!Settings.get.tcpEnabled) {
+        return result(Unit, "tcp connections are unavailable")
+      }
+      val uri = checkUri(address, port)
+      val resolved = java.net.InetAddress.getByName(uri.getHost)
+      checkLists(resolved, uri.getHost)
+      val channel = java.nio.channels.SocketChannel.open()
+      channel.connect(new java.net.InetSocketAddress(resolved, port))
+      result(channel)
+    }
+
+    def checkOwner(context: Context): Unit = {}
+    def checkUri(address: String, port: Int): java.net.URI = new java.net.URI("oc://" + address)
+    def checkLists(inetAddress: java.net.InetAddress, host: String): Unit = {}
+    def result(value: AnyRef*): Array[AnyRef] = value.toArray
+  }
+
+  class Context
+  class Arguments {
+    def checkString(index: Int): String = ""
+    def optInteger(index: Int, default: Int): Int = default
+  }
+  ```
+
+test "rank1507: the reworked system checks the resolved address against rules"
+  lang scala
+  file src/main/scala/li/cil/oc/server/component/InternetCard.scala
+  reject VYQL-RF-001
+  code
+  ```
+  package li.cil.oc.server.component
+
+  import li.cil.oc.Settings
+  import li.cil.oc.util.InternetFilteringRule
+
+  class InternetCard {
+    def connect(context: Context, args: Arguments): Array[AnyRef] = this.synchronized {
+      checkOwner(context)
+      val address = args.checkString(0)
+      val port = args.optInteger(1, -1)
+      if (!Settings.get.internetAccessAllowed()) {
+        return result(Unit, "internet access is unavailable")
+      }
+      if (!Settings.get.tcpEnabled) {
+        return result(Unit, "tcp connections are unavailable")
+      }
+      val resolved = java.net.InetAddress.getByName(address)
+      if (!InternetFilteringRule.checkAddress(resolved, address)) {
+        return result(Unit, "address is not allowed")
+      }
+      val channel = java.nio.channels.SocketChannel.open()
+      channel.connect(new java.net.InetSocketAddress(resolved, port))
+      result(channel)
+    }
+
+    def checkOwner(context: Context): Unit = {}
+    def result(value: AnyRef*): Array[AnyRef] = value.toArray
+  }
+
+  class Context
+  class Arguments {
+    def checkString(index: Int): String = ""
+    def optInteger(index: Int, default: Int): Int = default
+  }
+  ```

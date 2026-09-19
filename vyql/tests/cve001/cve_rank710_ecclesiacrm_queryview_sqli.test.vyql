@@ -1,0 +1,26 @@
+# Rank 710 / CVE-2026-35184: EcclesiaCRM queryview SQL injection.
+# Ledger verification: VYQL-INJ-001 catches custom/value query parameters.
+
+test "rank710: EcclesiaCRM queryview value reaches SQL"
+  lang php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+  $value = $_GET["value"];
+  $rows = $wpdb->get_results("SELECT * FROM queryview WHERE custom = '" . $value . "'");
+  ?>
+  ```
+
+test "rank710: EcclesiaCRM queryview value is parameterized"
+  lang php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  $value = $_GET["value"];
+  $stmt = $db->prepare("SELECT * FROM queryview WHERE custom = ?");
+  $stmt->bind_param("s", $value);
+  $stmt->execute();
+  ?>
+  ```

@@ -1,0 +1,49 @@
+module bindings.php.generated.m7db2c217;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("nette/security")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("nette/security")
+  }
+  query pattern callExpr where callee.method == "login"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("nette/security")
+  }
+  query pattern callExpr where callee.method == "isLoggedIn"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("nette/security")
+  }
+  query pattern callExpr where callee.method == "searchRolePrivileges"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

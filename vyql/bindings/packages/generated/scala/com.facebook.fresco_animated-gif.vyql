@@ -1,0 +1,33 @@
+module bindings.scala.generated.mdc58121e;
+
+binding deserialization0 {
+  requires {
+    dependency("com.facebook.fresco:animated-gif")
+  }
+  query pattern callExpr where callee.method == "createFromByteBuffer"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("com.facebook.fresco:animated-gif")
+  }
+  query pattern callExpr where callee.method == "createFromFileDescriptor"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("com.facebook.fresco:animated-gif")
+  }
+  query pattern callExpr where callee.method == "decodeFromNativeMemory"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("com.facebook.fresco:animated-gif")
+  }
+  query pattern callExpr where callee.method == "decodeFromByteBuffer"
+  emit sink code.Deserialization at args[0]
+}

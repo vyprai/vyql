@@ -1,0 +1,11 @@
+module code;
+
+concept SensitiveConfigInfoLog : issue {
+  cwe: [CWE_200, CWE_532]
+  reviewAssumption: "operator configuration files may contain inline credentials or target resource secrets"
+  reviewCategory: secret
+  reviewCondition: "parsed configuration content that may include credentials is logged above debug level"
+  reviewConfidence: medium
+  reviewEvidence: "configuration load context {pattern} parses a config file and writes the parsed object to an info log"
+  vulnerableTo: [secrets.SecretLeak]
+}

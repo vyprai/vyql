@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m26108cee;
+
+binding codeEval0 {
+  requires {
+    dependency("gproc")
+  }
+  query pattern callExpr where callee.method == "spawn"
+  emit sink code.CodeEval at args[0]
+}

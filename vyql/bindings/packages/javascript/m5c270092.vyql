@@ -1,0 +1,564 @@
+module bindings.javascript.generated.m5c270092;
+
+binding httpInput0 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "body" and callee.receiver.type == "express.Request"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "query" and callee.receiver.type == "express.Request"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "params" and callee.receiver.type == "express.Request"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("express")
+  }
+  query pattern callExpr where callee.method == "headers" and callee.receiver.type == "express.Request"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("koa")
+  }
+  query pattern callExpr where callee.path ~= "ctx.request.body"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  requires {
+    dependency("fastify")
+  }
+  query pattern callExpr where callee.path ~= "request.body"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput6 {
+  requires {
+    dependency("@hapi/hapi")
+  }
+  query pattern callExpr where callee.path ~= "request.payload"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput7 {
+  requires {
+    dependency("next")
+  }
+  query pattern callExpr where callee.path ~= "searchParams"
+  emit source code.HttpInput at call.result
+}
+
+binding protocolStateReview8 {
+  requires {
+    dependency("next")
+  }
+  query pattern presenceNode where node.scope == "function" and node.context.functionName contains "updateSession" and node.context.selector contains "request.headers" and node.context.callPath contains "getSessionFromCookie" and node.context.callPath contains "verifyAccessToken" and node.context.callPath contains "newRequestHeaders.set" and node.context.callPath contains "NextResponse.next" and not (node.context.callPath contains "newRequestHeaders.delete")
+  emit issue code.ProtocolStateReview at node
+}
+
+binding httpInput9 {
+  requires {
+    dependency("@nestjs/common")
+  }
+  query pattern callExpr where callee.path ~= "context.params"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue10 {
+  requires {
+    dependency("dotenv")
+  }
+  query pattern callExpr where callee.path ~= "process.env"
+  emit source code.SecretValue at call.result
+}
+
+binding domInput11 {
+  requires {
+    dependency("react")
+  }
+  query pattern callExpr where callee.path ~= "location.search"
+  emit source code.DomInput at call.result
+}
+
+binding externalApiResponse12 {
+  requires {
+    dependency("node-fetch")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch13 {
+  requires {
+    dependency("node-fetch")
+  }
+  query pattern callExpr where callee.path ~= "fetch"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding externalApiResponse14 {
+  requires {
+    dependency("axios")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch15 {
+  requires {
+    dependency("axios")
+  }
+  query pattern callExpr where callee.path ~= "axios.get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding externalApiResponse16 {
+  requires {
+    dependency("got")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch17 {
+  requires {
+    dependency("got")
+  }
+  query pattern callExpr where callee.path ~= "got"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding sqlExecution18 {
+  requires {
+    dependency("sequelize")
+  }
+  query pattern callExpr where callee.path ~= "sequelize.query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution19 {
+  requires {
+    dependency("knex")
+  }
+  query pattern callExpr where callee.path ~= "knex.raw"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution20 {
+  requires {
+    dependency("@prisma/client")
+  }
+  query pattern callExpr where callee.method == "$queryRawUnsafe"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution21 {
+  requires {
+    dependency("pg")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution22 {
+  requires {
+    dependency("mysql2")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution23 {
+  requires {
+    dependency("sqlite3")
+  }
+  query pattern callExpr where callee.method == "all"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution24 {
+  requires {
+    dependency("better-sqlite3")
+  }
+  query pattern callExpr where callee.method == "prepare"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding nosqlQuery25 {
+  requires {
+    dependency("mongoose")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery26 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "aggregate"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding commandExecution27 {
+  requires {
+    dependency("child_process")
+  }
+  query pattern callExpr where callee.path ~= "child_process.exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution28 {
+  requires {
+    dependency("execa")
+  }
+  query pattern callExpr where callee.path ~= "execa.command"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval29 {
+  requires {
+    dependency("vm")
+  }
+  query pattern callExpr where callee.path ~= "vm.runInNewContext"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval30 {
+  requires {
+    dependency("lodash")
+  }
+  query pattern callExpr where callee.path ~= "lodash.template"
+  emit sink code.CodeEval at args[0]
+}
+
+binding protoPollute31 {
+  requires {
+    dependency("lodash")
+  }
+  query pattern callExpr where callee.path ~= "merge"
+  emit sink code.ProtoPollute at args[0]
+}
+
+binding protoPollute32 {
+  requires {
+    dependency("lodash")
+  }
+  query pattern callExpr where callee.path ~= "Object.assign"
+  emit sink code.ProtoPollute at args.any.collection
+}
+
+binding htmlEscape33 {
+  requires {
+    dependency("lodash")
+  }
+  query pattern callExpr where callee.path ~= "_.escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding deserialization34 {
+  requires {
+    dependency("node-serialize")
+  }
+  query pattern callExpr where callee.path ~= "serialize.unserialize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization35 {
+  requires {
+    dependency("yaml")
+  }
+  query pattern callExpr where callee.path ~= "yaml.parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization36 {
+  requires {
+    dependency("js-yaml")
+  }
+  query pattern callExpr where callee.path ~= "js-yaml.load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess37 {
+  requires {
+    dependency("fs")
+  }
+  query pattern callExpr where callee.path ~= "fs.readFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding archiveEntryWrite38 {
+  requires {
+    dependency("adm-zip")
+  }
+  query pattern callExpr where callee.path ~= "admZip.extractAllTo"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding xmlParse39 {
+  requires {
+    dependency("xmldom")
+  }
+  query pattern callExpr where callee.path ~= "DOMParser.parseFromString"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xpathQuery40 {
+  requires {
+    dependency("xpath")
+  }
+  query pattern callExpr where callee.path ~= "xpath.select"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding xpathEscape41 {
+  requires {
+    dependency("xpath")
+  }
+  query pattern callExpr where callee.path ~= "xpath.escape"
+  emit check core.XpathEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding ldapQuery42 {
+  requires {
+    dependency("ldapjs")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.LdapQuery at args[1].collection
+}
+
+binding ldapEscape43 {
+  requires {
+    dependency("ldapjs")
+  }
+  query pattern callExpr where callee.path ~= "ldapjs.escapeFilter"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding templateRender44 {
+  requires {
+    dependency("ejs")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender45 {
+  requires {
+    dependency("handlebars")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding htmlRender46 {
+  requires {
+    dependency("jquery")
+  }
+  query pattern callExpr where callee.method == "html"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding regexCompile47 {
+  requires {
+    dependency("regexp")
+  }
+  query pattern callExpr where callee.path ~= "RegExp"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding htmlEscape48 {
+  requires {
+    dependency("dompurify")
+  }
+  query pattern callExpr where callee.path ~= "DOMPurify.sanitize"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape49 {
+  requires {
+    dependency("escape-html")
+  }
+  query pattern callExpr where callee.path ~= "escapeHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape50 {
+  requires {
+    dependency("he")
+  }
+  query pattern callExpr where callee.path ~= "he.encode"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlParameterization51 {
+  requires {
+    dependency("sqlstring")
+  }
+  query pattern callExpr where callee.path ~= "sqlstring.escape"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlParameterization52 {
+  requires {
+    dependency("pg-promise")
+  }
+  query pattern callExpr where callee.method == "parameterized"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding shellEscape53 {
+  requires {
+    dependency("shell-quote")
+  }
+  query pattern callExpr where callee.path ~= "shellQuote.quote"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization54 {
+  requires {
+    dependency("path")
+  }
+  query pattern callExpr where callee.path ~= "path.normalize" and args.any.literal contains ".."
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization55 {
+  requires {
+    dependency("sanitize-filename")
+  }
+  query pattern callExpr where callee.path ~= "sanitizeFilename"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding redirectAllowlist56 {
+  requires {
+    dependency("validator")
+  }
+  query pattern callExpr where callee.path ~= "validator.isURL"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding xmlHardening57 {
+  requires {
+    dependency("sax")
+  }
+  query pattern callExpr where callee.path ~= "sax.parser"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding authenticationCheck58 {
+  requires {
+    dependency("passport")
+  }
+  query pattern callExpr where callee.path ~= "passport.authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection59 {
+  requires {
+    dependency("csurf")
+  }
+  query pattern callExpr where callee.path ~= "csrf"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck60 {
+  requires {
+    dependency("acl")
+  }
+  query pattern callExpr where callee.path ~= "acl.isAllowed"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

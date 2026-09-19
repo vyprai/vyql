@@ -1,0 +1,30 @@
+module bindings.php.generated.md5cd8e9a;
+
+binding deserialization0 {
+  requires {
+    dependency("masterminds/html5")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("masterminds/html5")
+  }
+  query pattern callExpr where callee.method == "parseFragment"
+  emit sink code.Deserialization at args[0]
+}
+
+binding htmlEscape2 {
+  requires {
+    dependency("masterminds/html5")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

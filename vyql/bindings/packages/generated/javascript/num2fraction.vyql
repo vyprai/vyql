@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m2f06039f;
+
+binding userControlledData0 {
+  requires {
+    dependency("num2fraction")
+  }
+  query pattern callExpr where callee.method == "num2fraction"
+  emit source core.UserControlledData at call.result
+}

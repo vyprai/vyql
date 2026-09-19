@@ -1,0 +1,8 @@
+module code;
+
+review code.ContikiSicslowpanFragmentOffsetOobWrite {
+  category: memory
+  expected: [core.MemoryBoundsCheck]
+  kind: attention
+  text: "review Contiki-NG 6LoWPAN fragment offsets for offset-plus-length bounds checks before reassembly copies"
+}

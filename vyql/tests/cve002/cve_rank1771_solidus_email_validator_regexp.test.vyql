@@ -1,0 +1,47 @@
+# Solidus' Spree::EmailValidator matched user-supplied addresses with a
+# hand-rolled EMAIL_REGEXP whose `([^@\s]+\.)+` repeat nests a `+`-quantified
+# class around a mandatory dot that the class itself can also match, so a
+# failing local part with many dots retries every split of the run. The
+# constant is hoisted to the class body and applied with `match?` on the
+# receiver, so the pattern never appears at the call that consumes the input.
+# The fixed revision replaces the literal with the stdlib's URI::MailTo::EMAIL_REGEXP.
+
+test "ruby: hoisted ambiguous email regex matched against the validated value"
+  lang ruby
+  file core/lib/spree/core/validators/email.rb
+  profile library
+  expect VYQL-DOS-003
+  code
+  ```
+  module Spree
+    class EmailValidator < ActiveModel::EachValidator
+      EMAIL_REGEXP = /\A([^@\.]|[^@\.]([^@\s]*)[^@\.])@([^@\s]+\.)+[^@\s]+\z/
+
+      def validate_each(record, attribute, value)
+        unless EMAIL_REGEXP.match? value
+          record.errors.add(attribute, :invalid, value: value)
+        end
+      end
+    end
+  end
+  ```
+
+test "ruby: stdlib email regex is not static ReDoS"
+  lang ruby
+  file core/lib/spree/core/validators/email.rb
+  profile library
+  reject VYQL-DOS-003
+  code
+  ```
+  module Spree
+    class EmailValidator < ActiveModel::EachValidator
+      EMAIL_REGEXP = URI::MailTo::EMAIL_REGEXP
+
+      def validate_each(record, attribute, value)
+        unless EMAIL_REGEXP.match? value
+          record.errors.add(attribute, :invalid, value: value)
+        end
+      end
+    end
+  end
+  ```

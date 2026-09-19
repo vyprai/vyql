@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule SvgOnclickWindowOpenLinkXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-163"
+    severity: high
+  }
+  issue code.SvgOnclickWindowOpenLinkXss as sink
+}

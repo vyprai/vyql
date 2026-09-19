@@ -1,0 +1,7 @@
+module core;
+
+concept ShellEscape : check {
+  applies: path
+  covers: [path]
+  neutralizes: [injection.CommandInjection]
+}

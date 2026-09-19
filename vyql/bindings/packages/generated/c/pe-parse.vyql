@@ -1,0 +1,33 @@
+module bindings.c.generated.m6a5be51c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("pe-parse")
+  }
+  query pattern callExpr where callee.method == "readFileToFileBuffer"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("pe-parse")
+  }
+  query pattern callExpr where callee.method == "ParsePEFromFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("pe-parse")
+  }
+  query pattern callExpr where callee.method == "ParsePEFromPointer"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("pe-parse")
+  }
+  query pattern callExpr where callee.method == "ParsePEFromBuffer"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,225 @@
+module bindings.kotlin.generated.m4c477ebd;
+
+binding sqlExecution0 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andIsNull"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andIsNotNull"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andEqualTo"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andNotEqualTo"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andGreaterThan"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution5 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andGreaterThanOrEqualTo"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution6 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andLessThan"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution7 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andLessThanOrEqualTo"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution8 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andIn"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution9 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andNotIn"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution10 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andBetween"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution11 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andNotBetween"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution12 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andLike"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution13 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "andNotLike"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution14 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orIsNull"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution15 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orIsNotNull"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution16 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orEqualTo"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution17 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orNotEqualTo"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution18 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orGreaterThan"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution19 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orGreaterThanOrEqualTo"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution20 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orLessThan"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution21 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orLessThanOrEqualTo"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution22 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orIn"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution23 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orNotIn"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution24 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orBetween"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution25 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orNotBetween"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution26 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orLike"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution27 {
+  requires {
+    dependency("tk.mybatis:mapper")
+  }
+  query pattern callExpr where callee.method == "orNotLike"
+  emit sink code.SqlExecution at args[0]
+}

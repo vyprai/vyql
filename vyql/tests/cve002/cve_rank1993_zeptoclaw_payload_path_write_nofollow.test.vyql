@@ -1,0 +1,254 @@
+# An agent's filesystem write tool takes the target path out of the tool
+# arguments -- `args.get("path")` -- resolves it against a workspace root and
+# re-validates it, then creates the missing parent directories and writes the
+# file (src/tools/filesystem.rs `WriteFileTool::execute` at the parent of the
+# fix). Every one of those steps addresses the path by name: the containment
+# walk skips components that do not exist yet, `create_dir_all` materialises
+# them by following whatever appears there, and `tokio::fs::write` opens the
+# final component following whatever it points at. The validation therefore
+# binds a resolution the mutation does not use: a dangling symlink planted at a
+# component the walk skipped, a link swapped into the window between the check
+# and the open, or a hard link aliased to an inode outside the root all write
+# outside the workspace. The hard-link count is read before the open rather
+# than from the open handle, so it can be invalidated the same way.
+#
+# The fixed revision moves the mutation into a helper that walks the chain one component
+# at a time, re-inspecting with `symlink_metadata` and re-comparing after each
+# creation, opens with `libc::O_NOFOLLOW`, and reads `nlink()` off the
+# open handle. The write tool keeps no by-name creation or write call of its
+# own, which is what the reject cases model: the anchored form, and the two
+# halves of the anchor (a no-follow open, an lstat of the final component)
+# each taken alone.
+#
+# The binding keys on the documented halves of the shape and nothing else: a
+# path field read out of a parsed value (`Value::get` on a `"path"` key), a
+# by-name creation or write in the same function (`fs::write`,
+# `fs::create_dir_all`, `File::create`, `write_all`), and no link-anchored
+# primitive (`O_NOFOLLOW`, `symlink_metadata`/`lstat`, `read_link`, `nlink`,
+# `create_new`/`O_EXCL`, an `openat`/dirfd-relative open). A resolved path is
+# the ordinary way to write application-owned files -- `persist_state` in
+# providers/quota.rs and `save` in tools/reminder.rs build the same
+# create-parents-then-write sequence at a path the process chose itself -- so
+# the caller-supplied field read is the clause that separates the boundary
+# from the idiom, and it is function-confined.
+#
+# Measured on both revisions of the tree, three `--cache off` runs each: the
+# parent reports the finding at tools/filesystem.rs:186
+# (`WriteFileTool::execute`) and tools/filesystem.rs:433
+# (`EditFileTool::execute`), the fixed revision reports zero, and the rest of the tree is
+# unchanged. Across the twelve rust clones under the pool that carry
+# `create_dir_all`, an exhaustive grep finds the payload-read-plus-write
+# conjunction in three further files, and each is a read tool whose `write`
+# calls live in its test module -- no function-level match outside this
+# repository.
+
+test "rank1993: a write tool takes the path from the tool arguments and creates the chain and the file by name"
+  lang rust
+  expect VYQL-PATH-088
+  expect_review code.PayloadPathWriteWithoutNoFollow
+  code
+  ```
+  use async_trait::async_trait;
+  use serde_json::Value;
+  use std::path::Path;
+
+  use crate::error::{Result, ZeptoError};
+  use crate::security::{check_hardlink_write, revalidate_path, validate_path_in_workspace};
+
+  use super::{Tool, ToolContext, ToolOutput};
+
+  fn resolve_path(path: &str, ctx: &ToolContext) -> Result<(String, String)> {
+      let workspace = ctx.workspace.as_ref().ok_or_else(|| {
+          ZeptoError::SecurityViolation("Workspace not configured".to_string())
+      })?;
+      let safe_path = validate_path_in_workspace(path, workspace)?;
+      Ok((safe_path.as_path().to_string_lossy().to_string(), workspace.clone()))
+  }
+
+  pub struct WriteFileTool;
+
+  #[async_trait]
+  impl Tool for WriteFileTool {
+      async fn execute(&self, args: Value, ctx: &ToolContext) -> Result<ToolOutput> {
+          let path = args
+              .get("path")
+              .and_then(|v| v.as_str())
+              .ok_or_else(|| ZeptoError::Tool("Missing 'path' argument".into()))?;
+
+          let content = args
+              .get("content")
+              .and_then(|v| v.as_str())
+              .ok_or_else(|| ZeptoError::Tool("Missing 'content' argument".into()))?;
+
+          let (full_path, workspace) = resolve_path(path, ctx)?;
+          let full_path_ref = Path::new(&full_path);
+
+          // TOCTOU: re-validate BEFORE any filesystem mutation (including mkdir)
+          revalidate_path(full_path_ref, &workspace)?;
+
+          // Create parent directories if they don't exist
+          if let Some(parent) = full_path_ref.parent() {
+              if !parent.as_os_str().is_empty() {
+                  tokio::fs::create_dir_all(parent).await.map_err(|e| {
+                      ZeptoError::Tool(format!("Failed to create parent directories: {}", e))
+                  })?;
+              }
+          }
+
+          // Hardlink check: block writes to files with multiple hard links
+          check_hardlink_write(full_path_ref)?;
+
+          tokio::fs::write(&full_path, content).await.map_err(|e| {
+              ZeptoError::Tool(format!("Failed to write file '{}': {}", full_path, e))
+          })?;
+
+          Ok(ToolOutput::llm_only(format!("Successfully wrote {}", full_path)))
+      }
+  }
+  ```
+
+test "rank1993: the write opens the resolved path with a no-follow flag and reads the link count off the open handle"
+  lang rust
+  reject VYQL-PATH-088
+  reject_review code.PayloadPathWriteWithoutNoFollow
+  code
+  ```
+  use serde_json::Value;
+  use std::path::Path;
+
+  #[cfg(unix)]
+  use std::{fs::OpenOptions, io::Write as _, os::unix::fs::MetadataExt, os::unix::fs::OpenOptionsExt};
+
+  use crate::error::{Result, ZeptoError};
+  use crate::security::{ensure_directory_chain_secure, revalidate_path, validate_path_in_workspace};
+
+  fn resolve_path(path: &str, workspace: &str) -> Result<String> {
+      let safe_path = validate_path_in_workspace(path, workspace)?;
+      Ok(safe_path.as_path().to_string_lossy().to_string())
+  }
+
+  #[cfg(unix)]
+  fn write_file_secure_blocking(path: &Path, workspace: &str, content: &[u8]) -> Result<()> {
+      if let Some(parent) = path.parent() {
+          if !parent.as_os_str().is_empty() {
+              ensure_directory_chain_secure(parent, workspace)?;
+              revalidate_path(parent, workspace)?;
+          }
+      }
+
+      revalidate_path(path, workspace)?;
+
+      let mut options = OpenOptions::new();
+      options
+          .write(true)
+          .create(true)
+          .custom_flags(libc::O_NOFOLLOW);
+      let mut file = options.open(path).map_err(|e| {
+          ZeptoError::Tool(format!("Failed to securely open file '{}': {}", path.display(), e))
+      })?;
+
+      let metadata = file.metadata().map_err(|e| {
+          ZeptoError::Tool(format!("Failed to inspect opened file '{}': {}", path.display(), e))
+      })?;
+      if metadata.is_file() && metadata.nlink() > 1 {
+          return Err(ZeptoError::SecurityViolation(format!(
+              "Write blocked: '{}' has {} hard links and may alias content outside workspace",
+              path.display(),
+              metadata.nlink()
+          )));
+      }
+
+      file.set_len(0).map_err(|e| {
+          ZeptoError::Tool(format!("Failed to truncate file '{}': {}", path.display(), e))
+      })?;
+      file.write_all(content).map_err(|e| {
+          ZeptoError::Tool(format!("Failed to write file '{}': {}", path.display(), e))
+      })?;
+
+      Ok(())
+  }
+
+  pub struct WriteFileTool;
+
+  #[async_trait::async_trait]
+  impl WriteFileTool {
+      pub async fn execute(&self, args: Value, ctx: &crate::tools::ToolContext) -> Result<crate::tools::ToolOutput> {
+          let path = args
+              .get("path")
+              .and_then(|v| v.as_str())
+              .ok_or_else(|| ZeptoError::Tool("Missing 'path' argument".into()))?;
+
+          let content = args
+              .get("content")
+              .and_then(|v| v.as_str())
+              .ok_or_else(|| ZeptoError::Tool("Missing 'content' argument".into()))?;
+
+          let full_path = resolve_path(path, ctx.workspace.as_deref().ok_or_else(|| {
+              ZeptoError::SecurityViolation("Workspace not configured".to_string())
+          })?)?;
+
+          write_file_secure_blocking(Path::new(&full_path), "workspace", content.as_bytes())?;
+
+          Ok(crate::tools::ToolOutput::llm_only(format!("Successfully wrote {}", full_path)))
+      }
+  }
+  ```
+
+test "rank1993: a process-owned path written the same way is the ordinary save idiom"
+  lang rust
+  reject VYQL-PATH-088
+  reject_review code.PayloadPathWriteWithoutNoFollow
+  code
+  ```
+  use std::collections::HashMap;
+  use std::path::Path;
+
+  fn persist_state(path: &Path, state: &HashMap<String, u32>) {
+      if let Some(parent) = path.parent() {
+          if let Err(e) = std::fs::create_dir_all(parent) {
+              eprintln!("failed to create dir {}: {}", parent.display(), e);
+              return;
+          }
+      }
+      match serde_json::to_string_pretty(state) {
+          Ok(json) => {
+              if let Err(e) = std::fs::write(path, &json) {
+                  eprintln!("failed to write state to {}: {}", path.display(), e);
+              }
+          }
+          Err(e) => eprintln!("failed to serialise state: {}", e),
+      }
+  }
+  ```
+
+test "rank1993: inspecting the final component with lstat before writing leaves no link to follow blindly"
+  lang rust
+  reject VYQL-PATH-088
+  reject_review code.PayloadPathWriteWithoutNoFollow
+  code
+  ```
+  use serde_json::Value;
+  use std::path::Path;
+
+  fn write_args_file(args: &Value, workspace: &str) -> std::io::Result<()> {
+      let path = args.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
+          std::io::Error::new(std::io::ErrorKind::InvalidInput, "missing path")
+      })?;
+      let full = Path::new(workspace).join(path);
+
+      match std::fs::symlink_metadata(&full) {
+          Ok(meta) if meta.file_type().is_symlink() => {
+              return Err(std::io::Error::new(
+                  std::io::ErrorKind::PermissionDenied,
+                  "refusing to follow a link at the target",
+              ));
+          }
+          _ => {}
+      }
+
+      if let Some(parent) = full.parent() {
+          std::fs::create_dir_all(parent)?;
+      }
+      std::fs::write(&full, "data")
+  }
+  ```

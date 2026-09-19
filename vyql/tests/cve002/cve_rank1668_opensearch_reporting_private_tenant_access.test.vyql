@@ -1,0 +1,159 @@
+# CVE-2024-39900 (CWE-285 + CWE-639): the OpenSearch Reports Scheduler
+# plugin let any authenticated user of a cluster read, update and delete the
+# report definitions and jobs another user had saved in their private tenant.
+#
+# OpenSearch's security plugin addresses every user's private tenant by one
+# reserved name, `__user__`, so `User.getRequestedTenant()` returns the same
+# string for all of them. The reports-scheduler copy of UserAccessManager --
+# the class observability and simple-schema also replicate -- has two halves
+# that have to agree: getSearchAccessInfo builds the filter a search runs
+# under and returns `listOf("User:${user.name}")` for a
+# private-tenant requester with the comment "No sharing allowed in private
+# tenant", but the per-document decision doesUserHasAccess(user, tenant,
+# access), which the get/update/delete paths call on the stored document,
+# only compared `getUserTenant(user) != tenant` and then answered from the
+# RBAC flag: with RBAC off it returned true outright, and with RBAC on it
+# matched backend roles, which say nothing about which user's document this
+# is. Inside `__user__` the tenant comparison holds for everybody, so every
+# private report in the cluster is readable and writable by every user.
+#
+# The fixing commit 2403014c57e is the 2.x backport of 99f02f3 (PR #992) and reads
+# normally; its Kotlin hunk is the whole fix. .
+#
+#   +        if (isUserPrivateTenant(user)) {
+#   +            return access.contains("$USER_TAG${user.name}")
+#   +        }
+#
+# Caught by VYQL-AUTH-081 through code.IdorPolicyReview: the binding
+# kotlinTenantScopedDocumentAccessWithoutPrivateTenantConstraint in
+# vyql/bindings/kotlin/openSearchTenantScopedDocumentAccess.vyql reads the
+# security plugin's tenancy contract off the class this repository shares
+# with observability, where the same omission shipped as CVE-2024-39901. A
+# getUserTenant read whose function then decides on the document's access
+# list or the requester's roles, with no private-tenant question anywhere in
+# that function, is deciding on a tenant name every user of the cluster
+# shares. The reporting copy differs from the observability one only in the
+# shape of its fall-through -- an isRbacEnabled if/else where the
+# backendRoles.map constraint sits in the then-branch -- and the binding's
+# constraint list reads it.
+#
+# Measured, --cache off, three runs each, whole trees:
+#   opensearch-project/reporting @ 2403014c57^   VYQL-AUTH-081 on
+#     src/main/kotlin/org/opensearch/reportsscheduler/security/UserAccessManager.kt:118,
+#     every run; one unrelated VYQL-SEC-025 email-template row also present
+#   opensearch-project/reporting @ 2403014c57    no VYQL-AUTH-081 row, the
+#     unrelated row alone, every run
+# The sibling getSearchAccessInfo calls isUserPrivateTenant at both
+# revisions, so the spec pair also pins that the negation is confined to the
+# decision's own function.
+
+test "rank1668: a reports-scheduler tenant access decision that never asks whether the requester is in their private tenant"
+  lang kotlin
+  file src/main/kotlin/org/opensearch/reportsscheduler/security/UserAccessManager.kt
+  expect_review code.IdorPolicyReview
+  code
+  ```
+  internal object UserAccessManager {
+      private const val USER_TAG = "User:"
+      private const val ROLE_TAG = "Role:"
+      private const val BACKEND_ROLE_TAG = "BERole:"
+      private const val PRIVATE_TENANT = "__user__"
+      const val DEFAULT_TENANT = ""
+
+      fun getUserTenant(user: User?): String {
+          return when (val requestedTenant = user?.requestedTenant) {
+              null -> DEFAULT_TENANT
+              else -> requestedTenant
+          }
+      }
+
+      fun getSearchAccessInfo(user: User?): List<String> {
+          if (user == null) { // Security is disabled
+              return listOf()
+          }
+          if (isUserPrivateTenant(user)) {
+              return listOf("$USER_TAG${user.name}") // No sharing allowed in private tenant.
+          }
+          return if (PluginSettings.isRbacEnabled()) {
+              user.backendRoles.map { "$BACKEND_ROLE_TAG$it" }
+          } else {
+              listOf()
+          }
+      }
+
+      fun doesUserHasAccess(user: User?, tenant: String, access: List<String>): Boolean {
+          if (user == null) { // Security is disabled
+              return true
+          }
+          if (getUserTenant(user) != tenant) {
+              return false
+          }
+          return if (PluginSettings.isRbacEnabled()) {
+              user.backendRoles.map { "$BACKEND_ROLE_TAG$it" }.any { it in access }
+          } else {
+              true
+          }
+      }
+
+      private fun isUserPrivateTenant(user: User?): Boolean {
+          return getUserTenant(user) == PRIVATE_TENANT
+      }
+  }
+  ```
+
+test "rank1668: the same decision constrains a private-tenant report to the requester's own access-list entry"
+  lang kotlin
+  file src/main/kotlin/org/opensearch/reportsscheduler/security/UserAccessManager.kt
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  internal object UserAccessManager {
+      private const val USER_TAG = "User:"
+      private const val ROLE_TAG = "Role:"
+      private const val BACKEND_ROLE_TAG = "BERole:"
+      private const val PRIVATE_TENANT = "__user__"
+      const val DEFAULT_TENANT = ""
+
+      fun getUserTenant(user: User?): String {
+          return when (val requestedTenant = user?.requestedTenant) {
+              null -> DEFAULT_TENANT
+              else -> requestedTenant
+          }
+      }
+
+      fun getSearchAccessInfo(user: User?): List<String> {
+          if (user == null) { // Security is disabled
+              return listOf()
+          }
+          if (isUserPrivateTenant(user)) {
+              return listOf("$USER_TAG${user.name}") // No sharing allowed in private tenant.
+          }
+          return if (PluginSettings.isRbacEnabled()) {
+              user.backendRoles.map { "$BACKEND_ROLE_TAG$it" }
+          } else {
+              listOf()
+          }
+      }
+
+      fun doesUserHasAccess(user: User?, tenant: String, access: List<String>): Boolean {
+          if (user == null) { // Security is disabled
+              return true
+          }
+          if (getUserTenant(user) != tenant) {
+              return false
+          }
+          if (isUserPrivateTenant(user)) {
+              return access.contains("$USER_TAG${user.name}")
+          }
+          return if (PluginSettings.isRbacEnabled()) {
+              user.backendRoles.map { "$BACKEND_ROLE_TAG$it" }.any { it in access }
+          } else {
+              true
+          }
+      }
+
+      private fun isUserPrivateTenant(user: User?): Boolean {
+          return getUserTenant(user) == PRIVATE_TENANT
+      }
+  }
+  ```

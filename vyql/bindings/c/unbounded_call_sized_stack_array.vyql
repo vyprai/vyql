@@ -1,0 +1,42 @@
+module bindings.c.unbounded_call_sized_stack_array;
+
+// A variable-length array's size is evaluated when the frame is laid out,
+// so `unsigned char buf[n]` claims n bytes of stack for whatever n holds
+// at that point. When n is the length a received-data API reports -- the
+// byte count of a payload a peer sent -- the sender chooses the size of
+// the receiver's stack allocation, and a message large enough exhausts
+// it. The bound the allocation needs is a comparison on that length
+// before it sizes the array, which is the fix shape everywhere this
+// family lands: reject the oversized value and return.
+//
+// The fact is emitted by the C frontend
+// (ccUnboundedCallSizedStackArrayObservations,
+// internal/extract/frontend/treesitter/c.go) from the syntax tree: the
+// array declarator's size must be a bare identifier, that identifier
+// must last be assigned from a call in the same function, and any
+// relational comparison naming it, in either operand order, clears the
+// fact, so a clamp, an early return and the mirrored spellings all read
+// as consulting it while a comparison of an unrelated value leaves it
+// standing. An equality check does not clear: the compacted text cannot
+// tell an exact-match fix from an error-sentinel check (`len == 0`), and
+// a sentinel must not vouch for a bound. The observation is
+// callee-neutral and carries the callee in the fact, so which calls
+// report a received length is decided here, in data: today zenoh-pico's
+// z_bytes_len, the documented byte count of the payload a sample
+// carries. The next library's spelling is a binding edit, not an engine
+// change -- an unrestricted callee list was measured at eighteen sites
+// across three trees of which one was received data, the rest sizing
+// stacks from config, list and macro arithmetic.
+//
+// Residuals, all false-negative: the comparison is not required to
+// precede the allocation, so a check after the declaration vouches for
+// it, and one in a sibling branch vouches for every array in the
+// function; the compacted body keeps comments, so a commented-out bound
+// still clears; and an identifier a non-call later overwrites stops
+// qualifying even when the call's value is the one the array used. The
+// equality residual runs the other way: a fix that pins the length by
+// equality against the expected size still reports.
+binding unboundedCallSizedStackArray {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "alloc.unbounded_call_sized_stack_array" and containsAny(node.token, ["callee=z_bytes_len"])
+  emit issue code.UnboundedCallSizedStackArray at node
+}

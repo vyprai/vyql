@@ -1,0 +1,9 @@
+module bindings.python.generated.m0c567cfe;
+
+binding deserialization0 {
+  requires {
+    dependency("jsonpickle")
+  }
+  query pattern callExpr where callee.path == "jsonpickle.decode"
+  emit sink code.Deserialization at args[0]
+}

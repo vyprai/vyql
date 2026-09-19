@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule EsmExportSpecifierEval {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_94]
+    id: "VYQL-INJ-206"
+    severity: critical
+  }
+  issue code.EsmExportSpecifierEval as sink
+}

@@ -1,0 +1,128 @@
+# Rank 1631 / CVE-2017-6503: qBittorrent displayed torrent metadata and
+# peer-supplied strings in Qt rich-text widgets and in the shared logger
+# without HTML escaping, so a crafted torrent's comment, creator string or
+# peer client name executed as markup in the GUI (cross-site scripting
+# through a desktop rich-text label, CWE-79; GHSA-rhmh-8w93-hhpf cites
+# commit 6ca3e4f0 directly). loadTorrentInfos in
+# src/gui/properties/propertieswidget.cpp did
+#
+#   comment_text->setText(Utils::Misc::parseHtmlLinks(m_torrent->comment()));
+#   label_created_by_val->setText(m_torrent->creator());
+#
+# where comment_text and label_created_by_val are QLabel widgets declared in
+# the .ui file, and QLabel renders rich text by default (Qt::AutoText). The
+# same unescaped values reach PeerListWidget::addPeer/updatePeer
+# (m_listModel->setData(..., peer.client())), DeletionConfirmationDlg (the
+# torrent name) and Logger::addMessage/addPeer, whose stored rows the Web UI
+# also displays. The fixed revision adds Utils::String::toHtmlEscaped (Qt's
+# toHtmlEscaped/Qt::escape under one name) and wraps all five sites. The
+# vulnerable construct is present at the parent and the remediation at the
+# commit; no pool correction.
+#
+# ATTENTION, no receiver type for the receivers this weakness actually uses,
+# rechecked. Re-measured on the real checkout over three --cache off runs per
+# revision (src/, cpp:283 c:5, ~50s and ~3.0GB each): 441/441/441 findings at
+# the parent and 440/440/440 at the fix, with byte-identical rule histograms
+# except one VYQL-MEM-005 whose sink is base/utils/string.cpp:210 -- the
+# a[i] subscript in slowEquals, untouched by the fix -- and the four
+# base/logger.cpp IntegerSizeArithmeticSink rows shifting one line with the
+# #include the fix adds. Nothing sits on any display call at either revision,
+# and `vyql match` returns no label on any setText/setData node or on any
+# comment()/creator()/client() getter in the four files.
+#
+# The receiver-type picture is narrower than the original entry recorded, and
+# was measured rather than assumed. The constructor-fact route already works
+# for C++: a probe `runtime.ReceiverType` fact on `QStandardItemModel` stamps
+# recv_type, and `callee.receiver.type == "QStandardItemModel"` then scopes
+# `m_listModel->setData(...)` -- m_listModel is `new QStandardItemModel(0,
+# PeerListDelegate::COL_COUNT)` at peerlistwidget.cpp:72, in-tree. What no
+# constructor supplies is exactly what this rank needs: comment_text,
+# label_created_by_val and label are widget members declared in
+# Qt-Designer-generated ui_*.h headers that are build artifacts absent from
+# the tree (the 27 .ui files under src/ match no frontend, so the class is
+# only recoverable by parsing the designer XML), `peer` is a
+# `const BitTorrent::PeerInfo &` parameter, and m_nativeInfo is assigned from
+# boost::const_pointer_cast rather than a constructor.
+#
+# The sink arm also fails open where the type is missing, which makes a
+# receiver-scoped Qt sink inert on this tree rather than merely unproven: a
+# probe QLabel-constrained `setText` HtmlRender sink labelled all 27 setText
+# argument nodes in propertieswidget.cpp at syntactic fidelity -- hash_lbl's
+# hex info-hash, the locale-formatted date and the friendly-unit size
+# included -- because the sink arm keeps syntactic fidelity when recv_type is
+# empty rather than withholding the label. The in-tree reachable set is 323
+# setText/setData sites over 97 receiver variables, overwhelmingly plain-text
+# controls.
+#
+# The source dies the same way and for a reason no engine change to types
+# alone would fix. The untrusted values arrive through the application's own
+# wrapper getters -- TorrentHandle::comment() -> m_torrentInfo.comment() ->
+# m_nativeInfo->comment(), and PeerInfo::client() ->
+# Utils::String::fromStdString(m_nativeInfo.client) -- thin wrappers over
+# libtorrent fields. The names are rare in this tree (.client() 3 sites,
+# .comment() 5, .creator() 4) but no library documents them, so a bare-name
+# source binding is a repro-shaped patch that labels any application's own
+# getter named comment; the source arm admits a label only where a receiver
+# type is known, and none of these receivers resolves one.
+#
+# The one difference the fix leaves inside loadTorrentInfos is the argument's
+# call nesting -- `setText(parseHtmlLinks(comment()))` against
+# `setText(parseHtmlLinks(toHtmlEscaped(comment())))` -- and hash_lbl's
+# `setText(m_torrent->hash())` carries the same bare-call shape as the
+# vulnerable comment site, so keying on it both encodes the fixing commit's
+# own layout and does not separate the sites within the function.
+#
+# No Qt vocabulary exists to build on: no C++ HtmlRender sink is shipped, and
+# core.HtmlEscape is bound only to `escape_html`, so Qt's
+# toHtmlEscaped/Qt::escape is unbound too. Shipping that control alone
+# measures zero here (no VYQL-INJ-004 row exists on any C++ file in this
+# tree), so nothing is shipped and the rank is held. Both cases reject
+# VYQL-INJ-004; when widget-member receiver types (ui_*.h recovery or .ui
+# parsing) and a torrent-metadata source land, the unescaped form must flip
+# to expect.
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1631: torrent metadata shown in a rich-text label unescaped"
+  lang cpp
+  file src/gui/properties/propertieswidget.cpp
+  reject VYQL-INJ-004
+  code
+  ```
+  void PropertiesWidget::loadTorrentInfos(BitTorrent::TorrentHandle *const torrent)
+  {
+      clear();
+      m_torrent = torrent;
+      if (!m_torrent) return;
+
+      hash_lbl->setText(m_torrent->hash());
+      if (m_torrent->hasMetadata()) {
+          // Comment
+          comment_text->setText(Utils::Misc::parseHtmlLinks(m_torrent->comment()));
+
+          label_created_by_val->setText(m_torrent->creator());
+      }
+  }
+  ```
+
+test "rank1631: the fixed revision escapes metadata before the label"
+  lang cpp
+  file src/gui/properties/propertieswidget.cpp
+  reject VYQL-INJ-004
+  code
+  ```
+  void PropertiesWidget::loadTorrentInfos(BitTorrent::TorrentHandle *const torrent)
+  {
+      clear();
+      m_torrent = torrent;
+      if (!m_torrent) return;
+
+      hash_lbl->setText(m_torrent->hash());
+      if (m_torrent->hasMetadata()) {
+          // Comment
+          comment_text->setText(Utils::Misc::parseHtmlLinks(
+              Utils::String::toHtmlEscaped(m_torrent->comment())));
+
+          label_created_by_val->setText(Utils::String::toHtmlEscaped(m_torrent->creator()));
+      }
+  }
+  ```

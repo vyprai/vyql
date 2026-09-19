@@ -1,0 +1,11 @@
+module code;
+
+concept SamlAssertionReplayBypass : issue {
+  cwe: [CWE_294, CWE_287]
+  reviewAssumption: "an attacker can capture a delivered SAML response or assertion and resubmit it, and nothing on the accepting side remembers having seen the assertion before"
+  reviewCategory: auth
+  reviewCondition: "SAML assertion validation accepts an assertion for authentication without any replay detection, so the same captured assertion authenticates again within its validity window"
+  reviewConfidence: high
+  reviewEvidence: "SAML token validation context {pattern} validates assertions through token validation parameters that never enable the validation stack's token replay check"
+  vulnerableTo: [authentication.AuthenticationBypass, authentication.ImproperAuthentication]
+}

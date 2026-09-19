@@ -1,0 +1,57 @@
+module bindings.ruby.generated.m18dedbda;
+
+binding userControlledData0 {
+  requires {
+    dependency("classifier-reborn")
+  }
+  query pattern callExpr where callee.method == "add_item"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("classifier-reborn")
+  }
+  query pattern callExpr where callee.method == "classify"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("classifier-reborn")
+  }
+  query pattern callExpr where callee.method == "classify_with_score"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("classifier-reborn")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("classifier-reborn")
+  }
+  query pattern callExpr where callee.method == "find_related"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("classifier-reborn")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("classifier-reborn")
+  }
+  query pattern callExpr where callee.method == "word_hash"
+  emit source core.UserControlledData at call.result
+}

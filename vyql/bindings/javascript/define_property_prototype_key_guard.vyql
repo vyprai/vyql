@@ -1,0 +1,26 @@
+module bindings.javascript.define_property_prototype_key_guard;
+
+// `obj[key] = value` and `Object.defineProperty(obj, key, descriptor)` differ
+// on exactly one point that matters for prototype pollution: assignment walks
+// the prototype chain and invokes an inherited setter, so a key of `__proto__`
+// reaches `Object.prototype`'s accessor instead of creating a property, while
+// `defineProperty` is specified to define an own property directly and never
+// consults an inherited accessor. MDN's own note on `Object.defineProperty`
+// says so, and it is the documented way to store a key whose name comes from
+// outside the program.
+//
+// A property-write helper that keeps both forms — the plain assignment for
+// ordinary names and `Object.defineProperty` for the names that would
+// otherwise be interpreted — has already made that distinction, so its
+// assignment is not the pollution sink it looks like in isolation. Requiring
+// the dynamic write to be present is what keeps this a statement about such a
+// helper rather than about every function that happens to call
+// `defineProperty`.
+binding definePropertyPrototypeKeyGuard {
+  query pattern callExpr where callee.analysis ~= "function.context" and args.any.context.language contains "javascript" and args.any.context.dynamicPropertyWrite contains "true" and args.any.context.callPath contains "Object.defineProperty"
+  emit check core.PrototypePollutionGuard at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

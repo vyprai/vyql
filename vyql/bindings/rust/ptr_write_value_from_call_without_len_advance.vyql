@@ -1,0 +1,47 @@
+module bindings.rust.ptr_write_value_from_call_without_len_advance;
+
+// The std::ptr::write partial-initialisation contract. ptr::write initialises
+// one raw location at a time and publishes nothing: the element count of the
+// region being filled is the caller's responsibility. The standard library's
+// own documentation of that discipline is explicit -- the RawVec::reserve
+// example in library/alloc writes each element and then advances the length in
+// the same iteration,
+//
+//     for x in elems {
+//         unsafe { ptr::write(self.buf.ptr().add(self.len), x.clone()); }
+//         self.len += 1;
+//     }
+//
+// and Vec::extend_with carries the comment "Increment the length in every
+// step in case next() panics" over the same shape. When the value handed to
+// ptr::write is produced by calling a trait method whose implementation the
+// caller supplies -- Clone::clone, Iterator::next, Default::default, the
+// From/Into and ToOwned families -- that call can unwind, and the container's
+// own destructor runs on whatever the region claims to hold. A raw cursor that
+// walks the region while the element count is already published claims the
+// unwritten tail as initialised, so a panic part-way through drops
+// uninitialised or stale values: double free and use of uninitialised memory
+// in one unwind.
+//
+// Four things must hold together, which is what keeps this off ordinary
+// initialisation. The write is one of the exact ptr::write call paths, so
+// write_volatile and write_bytes -- which fill rather than initialise one
+// value -- do not satisfy it. The cursor advance is one of the pointer
+// arithmetic methods on *mut T / *const T, matched exactly, which is the same
+// list the Index/IndexMut contract binding uses. The value reaches the write
+// as a call argument (call_arg:ptr.write:<receiver>.clone), so a value
+// already in hand from an earlier call, as in Vec's spec_from_iter_nested, is
+// not this bug: the panicking call there has finished before the first write.
+// And none of the three documented disciplines is present -- advancing the
+// count per element (`self.len += 1`, `meta[0] += 1`, the length guard's
+// increment_len), zeroing the length before the loop (set_len(0)), or
+// restoring it from a drop guard defined in the same function.
+//
+// Residual, in the false-negative direction only: prose in a comment can
+// satisfy the negation, and the guard spellings are matched as text, so a
+// count advanced with `n = n + 1`, or a length guard named something the
+// ecosystem has not standardised on, suppresses rather than fires.
+binding ptrWriteValueFromCallWithoutLenAdvance {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.callPath in ["ptr.write", "std.ptr.write", "core.ptr.write"] and node.context.call in ["offset", "add", "sub", "wrapping_offset", "wrapping_add", "wrapping_sub", "byte_offset", "byte_add", "byte_sub"] and containsAny(node.context.callArg, [".clone", ".next", ".default", ".from", ".into", ".to_owned", ".to_vec", ".to_string", ".try_into", ".try_from"]) and not (containsAny(node.token, ["+=1", "set_len(0)", "increment_len", "SetLenOnDrop", "Dropfor"]))
+  emit issue code.ClosureUnwindStaleLength at node
+}

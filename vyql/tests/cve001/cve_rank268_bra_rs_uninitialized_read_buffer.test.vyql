@@ -1,0 +1,50 @@
+# Rank 268 / CVE-2021-25905: bra-rs exposed Vec spare capacity as a
+# mutable slice and passed it to Read::read. A malicious or incorrect Read
+# implementation can inspect the input buffer even though it should only write.
+
+test "rank268: Read::read receives Vec spare capacity"
+  lang rust
+  expect VYQL-MEM-015
+  expect_review code.UninitializedBufferExposure
+  code
+  ```
+  use std::{io, slice};
+
+  fn fill_buf<R: io::Read>(inner: &mut R, buf: &mut Vec<u8>, consumed: usize) -> io::Result<&[u8]> {
+      let b = buf.len();
+      let raw = unsafe {
+          slice::from_raw_parts_mut(
+              buf.as_mut_ptr().add(b),
+              buf.capacity() - b,
+          )
+      };
+
+      match inner.read(raw) {
+          Ok(o) => {
+              unsafe {
+                  buf.set_len(b + o);
+              }
+              Ok(&buf[consumed..])
+          }
+          Err(e) => Err(e),
+      }
+  }
+  ```
+
+test "rank268: Vec spare capacity is initialized before Read::read"
+  lang rust
+  reject VYQL-MEM-015
+  reject_review code.UninitializedBufferExposure
+  code
+  ```
+  use std::io;
+
+  fn fill_buf<R: io::Read>(inner: &mut R, buf: &mut Vec<u8>, consumed: usize) -> io::Result<&[u8]> {
+      let b = buf.len();
+      buf.resize(buf.capacity(), 0);
+      let raw = &mut buf[b..];
+      let o = inner.read(raw)?;
+      buf.truncate(b + o);
+      Ok(&buf[consumed..])
+  }
+  ```

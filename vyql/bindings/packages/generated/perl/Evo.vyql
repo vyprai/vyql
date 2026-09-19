@@ -1,0 +1,129 @@
+module bindings.perl.generated.m21559073;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "mkdir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "symlink"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "link"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "utimes"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "stat"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "sysopen"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse6 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "syswrite"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse7 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "sysread"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "unlink"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "remove_tree"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUse10 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "flock"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse11 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "append"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse12 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "read_ref"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse13 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "write_many"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse14 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "find_files"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse15 {
+  requires {
+    dependency("Evo")
+  }
+  query pattern callExpr where callee.method == "traverse"
+  emit sink code.FileUseSink at args[0]
+}

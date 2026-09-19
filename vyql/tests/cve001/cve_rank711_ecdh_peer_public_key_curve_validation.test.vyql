@@ -1,0 +1,39 @@
+test "rank711: ECDH shared secret multiplies unvalidated peer public key"
+  lang javascript
+  expect VYQL-CRY-015
+  expect_review code.EcdhPeerPublicKeyMissingCurveValidation
+  code
+  ```
+  var PrivateKey = exports.PrivateKey = function() {};
+
+  PrivateKey.prototype.deriveSharedSecret = function(publicKey) {
+      if (!publicKey || !publicKey.Q)
+          throw new Error('publicKey is invalid');
+
+      var S = publicKey.Q.multiply(this.d);
+      return zeroBuffer(S.getX().toBigInteger().toString(16), this._size);
+  };
+  ```
+
+test "rank711: ECDH shared secret validates peer public key curve membership"
+  lang javascript
+  reject VYQL-CRY-015
+  reject_review code.EcdhPeerPublicKeyMissingCurveValidation
+  code
+  ```
+  var PrivateKey = exports.PrivateKey = function() {};
+
+  PrivateKey.prototype.onCurve = function(publicKey) {
+      var x = publicKey.Q.getX().x;
+      var y = publicKey.Q.getY().x;
+      return x && y;
+  };
+
+  PrivateKey.prototype.deriveSharedSecret = function(publicKey) {
+      if (!publicKey || !publicKey.Q || !this.onCurve(publicKey))
+          throw new Error('publicKey is invalid');
+
+      var S = publicKey.Q.multiply(this.d);
+      return zeroBuffer(S.getX().toBigInteger().toString(16), this._size);
+  };
+  ```

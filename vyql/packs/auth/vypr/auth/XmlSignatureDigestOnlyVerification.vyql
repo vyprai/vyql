@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule XmlSignatureDigestOnlyVerification {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_347, CWE_290]
+    id: "VYQL-AUTH-109"
+    severity: critical
+  }
+  issue code.XmlSignatureDigestOnlyVerification as verifier
+}

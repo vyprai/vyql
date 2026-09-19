@@ -1,0 +1,53 @@
+# Rank 251 / CVE-2020-4040: Bolt preview accepted posted content and
+# generated a preview without checking the content_edit CSRF token. The patch
+# rejects requests lacking an allowed user and a valid CSRF token before reading
+# the posted form body.
+
+test "rank251: Bolt preview builds content from posted form data without csrf"
+  lang php
+  expect VYQL-RF-003
+  code
+  ```
+  <?php
+  class Frontend {
+    public function preview(Request $request, $contenttypeslug) {
+      if (!$request->isMethod('POST')) {
+        throw new MethodNotAllowedHttpException(['POST']);
+      }
+
+      $contenttype = $this->getContentType($contenttypeslug);
+      $formValues = $request->request->all();
+      $content = $this->storage()->getContentObject($contenttypeslug, [], false);
+      $content->setFromPost($formValues, $contenttype);
+
+      return $this->render('record.twig', [], ['record' => $content]);
+    }
+  }
+  ```
+
+test "rank251: Bolt preview checks content csrf token before posted form data"
+  lang php
+  reject VYQL-RF-003
+  code
+  ```
+  <?php
+  class Frontend {
+    public function preview(Request $request, $contenttypeslug) {
+      if (!$request->isMethod('POST')) {
+        throw new MethodNotAllowedHttpException(['POST']);
+      }
+
+      $tokenValue = $request->request->get('content_edit', ['_token' => null])['_token'];
+      if (!$this->isAllowed('dashboard') || !$this->isCsrfTokenValid($tokenValue, 'content_edit')) {
+        return new Response('Not allowed or invalid CSRF token', Response::HTTP_FORBIDDEN);
+      }
+
+      $contenttype = $this->getContentType($contenttypeslug);
+      $formValues = $request->request->all();
+      $content = $this->storage()->getContentObject($contenttypeslug, [], false);
+      $content->setFromPost($formValues, $contenttype);
+
+      return $this->render('record.twig', [], ['record' => $content]);
+    }
+  }
+  ```

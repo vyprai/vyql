@@ -1,0 +1,11 @@
+module code;
+
+concept PcapPacketLengthMissingLowerBound : issue {
+  cwe: [CWE_20, CWE_125, CWE_787]
+  reviewAssumption: "a capture file or capture device controls the packet length fields of the pcap_pkthdr a pcap reader fills, including a length of zero"
+  reviewCategory: memory
+  reviewCondition: "a pcap reader validates the packet header's length only against a maximum or against the capture length and never excludes a zero length"
+  reviewConfidence: high
+  reviewEvidence: "pcap reader context {pattern} compares the packet length against an upper or cross-field bound without any test of that length for zero"
+  vulnerableTo: [validation.ImproperInputValidation, memory.OobRead, memory.OobWrite]
+}

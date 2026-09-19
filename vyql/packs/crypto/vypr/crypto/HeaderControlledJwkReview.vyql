@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule HeaderControlledJwkReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_347]
+    id: "VYQL-CRY-027"
+    severity: high
+  }
+  issue code.HeaderControlledJwkReview as sink
+}

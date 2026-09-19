@@ -1,0 +1,11 @@
+module code;
+
+concept RecursiveDeleteWithoutSymlinkCheck : issue {
+  cwe: [CWE_59, CWE_22]
+  reviewAssumption: "an attacker can plant an entry inside the listed directory, as world-writable spool, temporary or clone directories allow"
+  reviewCategory: path
+  reviewCondition: "a directory's entries are enumerated and each is passed to a recursive delete with no symbolic-link test and no no-follow resolution in the deleting code, so a directory entry that is a symbolic link makes the delete remove the link target's tree outside the listed directory"
+  reviewConfidence: medium
+  reviewEvidence: "directory cleanup {pattern} lists entries and recursively deletes each with no link-safety handling"
+  vulnerableTo: [path.LinkFollowing, path.PathTraversal]
+}

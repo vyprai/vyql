@@ -1,0 +1,28 @@
+module bindings.java.filepath_child_name_sink;
+
+// hudson.FilePath#child(String) is the Jenkins FilePath API's path resolver:
+// it "returns a FilePath representing a path relative to this one", the same
+// role java.io.File's two-argument constructor and ClassLoader.getResource
+// play for their roots -- both already FilePathAccess sinks. Whatever the
+// child() argument carries therefore decides a path component under the
+// directory the receiver holds, and on the controller that is workspace,
+// cache and library storage.
+//
+// The receiver's type is not visible to a binding (the callee path carries
+// the variable, `dir.child`, not `FilePath`), so this keys the bare method
+// name the way the rest of the Java corpus does for normalize,
+// getCanonicalPath and getResource. Measured against every clone under
+// /tmp/cve-work/rank*/ and both OWASP corpora: `.child(` occurs in none of
+// them, so the label costs nothing outside trees that use the FilePath API.
+//
+// Residual, stated rather than hidden: the label is structural, so a leaf
+// derived through an opaque transform -- a keyed digest of the caller's
+// text, as when a checkout directory is keyed on a MAC rather than a raw
+// name -- still carries taint through the digest call, which the engine
+// models as argument-to-return without routing the callee body. The
+// discriminating construct is the raw caller-supplied name reaching the
+// leaf.
+binding filePathChildNameSink9173 {
+  query pattern callExpr where callee.method == "child"
+  emit sink code.FilePathAccess at args[0]
+}

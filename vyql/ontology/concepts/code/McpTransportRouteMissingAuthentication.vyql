@@ -1,0 +1,11 @@
+module code;
+
+concept McpTransportRouteMissingAuthentication : issue {
+  cwe: [CWE_306, CWE_862]
+  reviewAssumption: "the port the router listens on is reachable by a caller the deployment does not trust with the tool set the MCP server registers"
+  reviewCategory: access_control
+  reviewCondition: "an MCP HTTP transport path is registered on a web router with no authentication handler in that route's own middleware chain"
+  reviewConfidence: high
+  reviewEvidence: "route registration {pattern} mounts an MCP transport path and its handler chain names no authentication middleware"
+  vulnerableTo: [authentication.MissingAuthentication, access_control.MissingAuthorization]
+}

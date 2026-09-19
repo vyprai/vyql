@@ -1,0 +1,51 @@
+# Rank 87 / CVE-2026-5360: the APER decoder filled reflect.String values
+# straight from parseOctetString bytes, skipping the X.680 PrintableString
+# alphabet constraint entirely. The fix routes strings through a validating
+# parsePrintableString wrapper.
+
+test "rank87: APER reflect.String decode via parseOctetString is unvalidated"
+  lang go
+  expect VYQL-VAL-038
+  code
+  ```
+  package aper
+
+  import "reflect"
+
+  func (pd *perBitData) parseField(v reflect.Value, params fieldParameters) error {
+  	switch v.Kind() {
+  	case reflect.String:
+  		if octetString, err := pd.parseOctetString(false, nil, nil); err != nil {
+  			return err
+  		} else {
+  			printableString := string(octetString)
+  			v.SetString(printableString)
+  			return nil
+  		}
+  	}
+  	return nil
+  }
+  ```
+
+test "rank87: APER reflect.String decode through the validating wrapper"
+  lang go
+  reject VYQL-VAL-038
+  code
+  ```
+  package aper
+
+  import "reflect"
+
+  func (pd *perBitData) parseField(v reflect.Value, params fieldParameters) error {
+  	switch v.Kind() {
+  	case reflect.String:
+  		printableString, err := pd.parsePrintableString(false, nil, nil)
+  		if err != nil {
+  			return err
+  		}
+  		v.SetString(printableString)
+  		return nil
+  	}
+  	return nil
+  }
+  ```

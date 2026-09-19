@@ -1,0 +1,129 @@
+# Rank 1565 / CVE-2024-32970: Phlex's javascript:-URL guard normalised
+# href values by stripping only tabs, spaces and newlines, so a scheme
+# carrying other control characters bypassed the check and executed
+# script through the rendered attribute (XSS, CWE-79). The attribute
+# writer __attributes__ in lib/phlex/sgml.rb did `next if lower_name ==
+# "href" && v.to_s.downcase.tr("\t \n", "").start_with?("javascript:")`
+# -- browsers strip the full control-character set when parsing URLs,
+# so "jav\x01ascript:" and scheme spellings with embedded controls
+# survive the tr and are emitted as href values. Fix da8f94342a (its
+# lib/phlex/sgml.rb hunk is the security change, bundled with 6613
+# lines of XSS fixtures and browser tests): the normalisation becomes
+# `v.to_s.downcase.tr("^a-z:", "").start_with?("javascript:")` -- only
+# lowercase letters and the colon survive, so no control character can
+# hide inside the scheme -- and the unsafe attribute-name check
+# normalises with tr("^a-z-", "").
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over lib/ and over the full tree
+# report 3 findings at or above high each, identically on the
+# vulnerable parent 2f40e77 and the fix: VYQL-INJ-004 on phlex/kit.rb
+# const_added (twice) and on SGML.render's renderable parameter. The
+# full JSON view holds 3 rows at the parent and 5 at the fix -- the two
+# extra are VYQL-RES-001 on browser_tests.rb, a file the fix commit
+# itself adds. Zero review flags, and nothing at all on __attributes__
+# at either revision: the attribute values reach the buffer through
+# `buffer <<` and no HtmlRender sink labels that write, so the guard
+# line is the only place the two revisions differ and nothing analyses
+# it.
+#
+# ## Why no binding converts it
+#
+# A probe binding on the callExpr route can see the strip-set literal:
+# `callee.method == "tr" and args.any.literal contains " "` labels the
+# weak form (1 on the vulnerable shape, 0 on the fixed shape), because
+# the delete-list "\t \n" carries a space and the keep-list "^a-z:"
+# does not. That discrimination is the spelling, not the strength:
+# `args.any.literal startsWith "^"` -- the keep-list marker, String#tr's
+# documented negation -- is rejected by scanner IR lowering ("operator
+# not implemented"), and the anchor that would tie the tr to the scheme
+# check is unavailable on the same route (node.context.call and
+# node.context.scopeCall both "not implemented in scanner IR lowering"
+# there), while the presenceNode route that can see the start_with?
+# call cannot read the tr argument -- anchor and argument live on
+# disjoint routes. Measured collateral of the unanchored form: an
+# exhaustive enumeration of `.tr(` with a space in the first string
+# argument across every clone under /tmp/cve-work finds 10 sites in 10
+# files, of which 2 are this shape (sgml.rb:385 and its repro); the
+# other 8 are ordinary string munging -- camelize/underscore name
+# folding, a query-string space encoding, and a template text strip
+# `tr("\t\r\n\f \"'§;", '')` -- and a genuinely complete delete-set
+# (tr("\x00-\x20", "")) carries a space too and would take the label:
+# the discriminator fires on enforcing variants, which is the
+# fix-layout-keying rejection shape. What would decide the pair is
+# normalisation-strength vocabulary, a character-class set comparison
+# against the characters the browser URL parser ignores -- two
+# vocabularies, unavailable at every layer today. Same
+# present-but-incomplete family as ranks 1551, 1522 and 1564. No
+# definition change shipped; no pool correction; no ENGINE-GAPS.md
+# entry (vocabulary, not a localised construct).
+#
+# Spec cve_rank1565 records the weak tr form and the strict
+# normalisation on the real __attributes__, both asserting reject
+# VYQL-INJ-004: when normalisation-strength vocabulary lands, the
+# weak-tr form must flip to expect.
+
+test "rank1565: the href scheme check strips three characters only"
+  lang ruby
+  file lib/phlex/sgml.rb
+  reject VYQL-INJ-004
+  code
+  ```
+  module Phlex
+    module SGML
+      def __attributes__(attributes, buffer = +"")
+        attributes.each do |k, v|
+          next unless v
+
+          name = case k
+            when String then k
+            when Symbol then k.name.tr("_", "-")
+            else raise ArgumentError, "Attribute keys should be Strings or Symbols."
+          end
+
+          lower_name = name.downcase
+          next if lower_name == "href" && v.to_s.downcase.tr("\t \n", "").start_with?("javascript:")
+
+          if HTML::EVENT_ATTRIBUTES.include?(lower_name) || name.match?(/[<>&"']/)
+            raise ArgumentError, "Unsafe attribute name detected: #{k}."
+          end
+
+          buffer << " " << name << '="' << v.gsub('"', "&quot;") << '"'
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1565: the fixed revision keeps only letters and the colon"
+  lang ruby
+  file lib/phlex/sgml.rb
+  reject VYQL-INJ-004
+  code
+  ```
+  module Phlex
+    module SGML
+      def __attributes__(attributes, buffer = +"")
+        attributes.each do |k, v|
+          next unless v
+
+          name = case k
+            when String then k
+            when Symbol then k.name.tr("_", "-")
+            else raise ArgumentError, "Attribute keys should be Strings or Symbols."
+          end
+
+          lower_name = name.downcase
+          next if lower_name == "href" && v.to_s.downcase.tr("^a-z:", "").start_with?("javascript:")
+
+          if HTML::EVENT_ATTRIBUTES.include?(lower_name.tr("^a-z-", "")) || name.match?(/[<>&"']/)
+            raise ArgumentError, "Unsafe attribute name detected: #{k}."
+          end
+
+          buffer << " " << name << '="' << v.gsub('"', "&quot;") << '"'
+        end
+      end
+    end
+  end
+  ```

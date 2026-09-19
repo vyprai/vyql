@@ -1,0 +1,11 @@
+module code;
+
+concept CsrfDisabledSink : issue {
+  cwe: [CWE_352]
+  reviewAssumption: "the endpoint changes state and is reachable from a browser session"
+  reviewCategory: csrf
+  reviewCondition: "a state-changing endpoint opts out of CSRF protection"
+  reviewConfidence: medium
+  reviewEvidence: "endpoint {pattern} is marked csrf-exempt"
+  vulnerableTo: [access_control.CsrfDisabled]
+}

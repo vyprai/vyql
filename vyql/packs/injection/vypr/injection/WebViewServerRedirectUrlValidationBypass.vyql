@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule WebViewServerRedirectUrlValidationBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79, CWE_20]
+    id: "VYQL-INJ-176"
+    severity: high
+  }
+  issue code.WebViewServerRedirectUrlValidationBypass as sink
+}

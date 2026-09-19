@@ -1,0 +1,10 @@
+module vypr.numeric;
+
+rule TaintedDivisionDenominator {
+  meta {
+    cwe: [CWE_369]
+    id: "VYQL-NUM-002"
+    severity: medium
+  }
+  taint core.UserControlledData -> code.DivisionDenominator
+}

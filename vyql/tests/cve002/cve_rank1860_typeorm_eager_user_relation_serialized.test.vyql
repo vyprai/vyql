@@ -1,0 +1,82 @@
+# Rank 1860 / CVE-2022-3019: ToolJet's Comment entity declared its user
+# relation `@OneToOne(() => User, ..., { eager: true })`, so every comment
+# query embedded the whole User row -- including forgotPasswordToken and the
+# password digest -- and the comments endpoints returned those comments
+# straight to the client. The fixed revision drops `eager` from the relation and returns
+# a query-builder projection that selects three named user fields.
+
+test "rank1860: typeorm entity eagerly embeds the user model"
+  lang javascript
+  file comment.entity.ts
+  expect VYQL-SEC-018
+  expect_review code.SensitiveModelJsonSerializationExposure
+  code
+  ```
+  import { Entity, Column, PrimaryGeneratedColumn, OneToOne, JoinColumn, BaseEntity } from 'typeorm';
+
+  @Entity({ name: 'users' })
+  export class User extends BaseEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ name: 'first_name' })
+    firstName: string;
+
+    @Column({ name: 'forgot_password_token' })
+    forgotPasswordToken: string;
+
+    @Column({ name: 'password_digest' })
+    password: string;
+  }
+
+  @Entity({ name: 'comments' })
+  export class Comment extends BaseEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ name: 'comment' })
+    comment: string;
+
+    @OneToOne(() => User, (user) => user.id, { eager: true })
+    @JoinColumn({ name: 'user_id' })
+    user: User;
+  }
+  ```
+
+test "rank1860: typeorm user relation stays lazy without the eager flag"
+  lang javascript
+  file comment.entity.ts
+  reject VYQL-SEC-018
+  reject_review code.SensitiveModelJsonSerializationExposure
+  code
+  ```
+  import { Entity, Column, PrimaryGeneratedColumn, OneToOne, JoinColumn, BaseEntity } from 'typeorm';
+
+  @Entity({ name: 'users' })
+  export class User extends BaseEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ name: 'first_name' })
+    firstName: string;
+
+    @Column({ name: 'forgot_password_token' })
+    forgotPasswordToken: string;
+
+    @Column({ name: 'password_digest' })
+    password: string;
+  }
+
+  @Entity({ name: 'comments' })
+  export class Comment extends BaseEntity {
+    @PrimaryGeneratedColumn('uuid')
+    id: string;
+
+    @Column({ name: 'comment' })
+    comment: string;
+
+    @OneToOne(() => User, (user) => user.id)
+    @JoinColumn({ name: 'user_id' })
+    user: User;
+  }
+  ```

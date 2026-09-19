@@ -1,0 +1,9 @@
+module bindings.elixir.generated.maea1854f;
+
+binding httpInput0 {
+  requires {
+    dependency("plug_cowboy")
+  }
+  query pattern callExpr where callee.method == "read_req_body"
+  emit source code.HttpInput at call.result
+}

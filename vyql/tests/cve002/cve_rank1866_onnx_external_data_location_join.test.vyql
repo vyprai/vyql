@@ -1,0 +1,294 @@
+# An .onnx model can keep its tensor bytes out of the protobuf, in a
+# neighbouring file the model names itself: each tensor's external_data
+# entries carry a location, an offset and a length. onnx/src/tensor.rs's
+# get_external_resources finds the location entry, takes the string form of
+# its value field, joins it onto the model's directory with
+# PathBuf::from(path).join(location), and hands the joined path to the data
+# resolver, which opens and reads it. The model file's author therefore
+# chooses the path that gets opened: an absolute location replaces the base
+# outright in Path::join, and a `..` component walks the join out of the
+# model directory, so a crafted model reads an arbitrary local file with
+# the loader's privileges -- path traversal, CWE-22.
+#
+# The fixed revision walks the location's components in place and refuses anything
+# that is not a Normal or CurDir component before joining.
+#
+# What fires without this change: nothing that discriminates. The tree
+# reports two VYQL-PATH-001 rows on the File::open calls inside the data
+# resolvers, but their source is a Python training script in an unrelated
+# crate -- taint crossing languages through the unresolved-call bridge --
+# and the same two rows survive at the fixed revision unchanged, so they carry no
+# information about this defect. The honest taint chain cannot exist in
+# Rust today: nothing labels the decoded protobuf as untrusted, taint dies
+# in the Ok wrapper around the decode result, and the provider's
+# read_bytes_from_path is a &dyn call the engine does not trace
+# (callee not traced), two stops confirmed with vyql trace.
+#
+# Nothing is minted. The concept (code.RemoteListingDownloadPath) and the
+# rule (VYQL-PATH-006) exist and cover an untrusted
+# document's names becoming local path components for C, JavaScript and
+# Rust's write side. The addition is the Rust binding
+# vyql/bindings/rust/parsed_entry_value_path_join.vyql: a function that
+# joins the string form of a parsed entry's value field onto a base path,
+# with a std path materialisation in the same function and none of std's
+# containment or traversal vocabulary. The consumption clause is what
+# separates a path join from an iterator join taking a separator; the
+# locator clause is what separates a parsed entry value from a locally
+# typed name. It is the read-side complement of
+# remote_uri_mirror_path_join, whose uri locator and create materialisation
+# describe a mirrored write: a parsed entry value names a file being
+# loaded, and the load is usually delegated to a resolver taking the path,
+# so any std path consumption counts and requiring the read itself would
+# miss the delegation.
+#
+# Measured. The vulnerable revision reports get_external_resources as
+# VYQL-PATH-006 and the patched revision reports none, three --cache off
+# runs each side, full tree: 4707 -> 4708 findings vulnerable, 4706 ->
+# 4706 patched, the one new row at onnx/src/tensor.rs:66. The
+# discrimination rides on the components() walk, std's own vocabulary, not
+# on the fixed revision's names: dropping the negations makes the patched revision
+# match again, and a dot-segment rejection or a strip_prefix containment
+# written in place also silences it (cases c and d). Precision, enumerated
+# rather than sampled: across every clone under the sibling ranks the
+# value.as_str and join co-occurrence exists in exactly one file, this
+# one; scanning the tough and tokio-tar trees with the binding adds no row
+# (tough's single PATH-006 row predates it and is the write-side binding's
+# metadata_base_url.as_str match).
+#
+# The offset/length half of the same fix -- the parsed offset and length
+# slicing the mmap without a bounds check -- is the native-parser bounds
+# family, not covered here: VYQL-MEM-005 reports the slice in both
+# revisions because that rule carries no bounds-check control clause at
+# all, so no fix can suppress it without a pack-level change across its
+# 2642 rows on this tree alone.
+
+test "rank1866: (a) a parsed entry's location value joined onto the model directory and delegated to a reader"
+  lang rust
+  file onnx/src/tensor.rs
+  expect VYQL-PATH-006
+  code
+  ```
+  use std::path::PathBuf;
+
+  struct StringStringEntryProto {
+      key: String,
+      value: String,
+  }
+
+  struct TensorProto {
+      external_data: Vec<StringStringEntryProto>,
+  }
+
+  fn get_external_resources(
+      buf: &mut Vec<u8>,
+      t: &TensorProto,
+      path: &str,
+  ) -> Result<(), String> {
+      let location = t
+          .external_data
+          .iter()
+          .find(|it| it.key == "location")
+          .map(|it| it.value.as_str())
+          .ok_or("Could not find external data location")?;
+
+      let offset: usize = t
+          .external_data
+          .iter()
+          .find(|it| it.key == "offset")
+          .map(|it| it.value.parse())
+          .transpose()
+          .map_err(|_| "Error while parsing offset value")?
+          .unwrap_or(0);
+
+      let p = PathBuf::from(path).join(location);
+      read_bytes_from_path(buf, &p, offset, None)?;
+      Ok(())
+  }
+  ```
+
+test "rank1866: (b) the patched form refuses non-normal components before joining"
+  lang rust
+  file onnx/src/tensor.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::path::PathBuf;
+
+  struct StringStringEntryProto {
+      key: String,
+      value: String,
+  }
+
+  struct TensorProto {
+      external_data: Vec<StringStringEntryProto>,
+  }
+
+  fn get_external_resources(
+      buf: &mut Vec<u8>,
+      t: &TensorProto,
+      path: &str,
+  ) -> Result<(), String> {
+      let location = t
+          .external_data
+          .iter()
+          .find(|it| it.key == "location")
+          .map(|it| it.value.as_str())
+          .ok_or("Could not find external data location")?;
+
+      let offset: usize = t
+          .external_data
+          .iter()
+          .find(|it| it.key == "offset")
+          .map(|it| it.value.parse())
+          .transpose()
+          .map_err(|_| "Error while parsing offset value")?
+          .unwrap_or(0);
+
+      let location_path = std::path::Path::new(location);
+      if location_path
+          .components()
+          .any(|c| !matches!(c, std::path::Component::Normal(_) | std::path::Component::CurDir))
+      {
+          return Err(format!(
+              "external data location must be a relative path inside the model directory, got {location:?}"
+          ));
+      }
+
+      let p = PathBuf::from(path).join(location_path);
+      read_bytes_from_path(buf, &p, offset, None)?;
+      Ok(())
+  }
+  ```
+
+test "rank1866: (c) a dot-segment rejection written in place also silences the join"
+  lang rust
+  file onnx/src/tensor.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::path::PathBuf;
+
+  struct StringStringEntryProto {
+      key: String,
+      value: String,
+  }
+
+  struct TensorProto {
+      external_data: Vec<StringStringEntryProto>,
+  }
+
+  fn get_external_resources(
+      buf: &mut Vec<u8>,
+      t: &TensorProto,
+      path: &str,
+  ) -> Result<(), String> {
+      let location = t
+          .external_data
+          .iter()
+          .find(|it| it.key == "location")
+          .map(|it| it.value.as_str())
+          .ok_or("Could not find external data location")?;
+
+      for segment in location.split('/') {
+          if segment == "." || segment == ".." {
+              return Err("external data location must stay inside the model directory".into());
+          }
+      }
+
+      let p = PathBuf::from(path).join(location);
+      read_bytes_from_path(buf, &p, 0, None)?;
+      Ok(())
+  }
+  ```
+
+test "rank1866: (d) a starts_with containment check is the same control"
+  lang rust
+  file onnx/src/tensor.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::path::PathBuf;
+
+  struct StringStringEntryProto {
+      key: String,
+      value: String,
+  }
+
+  struct TensorProto {
+      external_data: Vec<StringStringEntryProto>,
+  }
+
+  fn get_external_resources(
+      buf: &mut Vec<u8>,
+      t: &TensorProto,
+      path: &str,
+  ) -> Result<(), String> {
+      let location = t
+          .external_data
+          .iter()
+          .find(|it| it.key == "location")
+          .map(|it| it.value.as_str())
+          .ok_or("Could not find external data location")?;
+
+      let base = PathBuf::from(path);
+      let p = base.join(location);
+      if !p.starts_with(&base) {
+          return Err("external data location must stay inside the model directory".into());
+      }
+      read_bytes_from_path(buf, &p, 0, None)?;
+      Ok(())
+  }
+  ```
+
+test "rank1866: (e) a join of purely local components loads without the entry value"
+  lang rust
+  file onnx/src/builtin.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::fs;
+  use std::path::PathBuf;
+
+  fn load_builtin_weights(dir: &str) -> Vec<u8> {
+      let p = PathBuf::from(dir).join("weights.bin");
+      fs::read(&p).unwrap_or_default()
+  }
+  ```
+
+test "rank1866: (f) an iterator join taking a value's string form as a separator is not a path"
+  lang rust
+  file onnx/src/render.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  struct Entry {
+      key: String,
+      value: String,
+  }
+
+  fn render_row(entry: &Entry) -> String {
+      let cols = ["name", "shape"];
+      cols.join(entry.value.as_str())
+  }
+  ```
+
+test "rank1866: (g) a document entry's value naming a file to read is the same weakness"
+  lang rust
+  file manifest/src/blob.rs
+  expect VYQL-PATH-006
+  code
+  ```
+  use std::fs;
+  use std::path::PathBuf;
+
+  struct Entry {
+      key: String,
+      value: String,
+  }
+
+  fn load_referenced_blob(dir: &str, entry: &Entry) -> Vec<u8> {
+      let name = entry.value.as_str();
+      let p = PathBuf::from(dir).join(name);
+      fs::read(&p).unwrap_or_default()
+  }
+  ```

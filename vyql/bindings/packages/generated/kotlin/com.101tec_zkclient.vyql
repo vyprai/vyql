@@ -1,0 +1,53 @@
+module bindings.kotlin.generated.m348ae5bd;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("com.101tec:zkclient")
+  }
+  query pattern callExpr where callee.method == "createPersistent"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("com.101tec:zkclient")
+  }
+  query pattern callExpr where callee.method == "writeData"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite2 {
+  requires {
+    dependency("com.101tec:zkclient")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataRead3 {
+  requires {
+    dependency("com.101tec:zkclient")
+  }
+  query pattern callExpr where callee.method == "readData"
+  emit source code.StoredDataRead at call.result
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("com.101tec:zkclient")
+  }
+  query pattern callExpr where callee.method == "setAcl"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding storedDataRead5 {
+  requires {
+    dependency("com.101tec:zkclient")
+  }
+  query pattern callExpr where callee.method == "getAcl"
+  emit source code.StoredDataRead at call.result
+}

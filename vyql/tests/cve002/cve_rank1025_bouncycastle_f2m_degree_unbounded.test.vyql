@@ -1,0 +1,101 @@
+# Rank 1025 / CVE-2024-29857: importing an EC certificate with crafted F2m
+# parameters burns CPU in Bouncy Castle. The certificate's explicit curve
+# parameters reach X9Curve's parse constructor, where
+# int m = ((DerInteger)parameters[0]).IntValueExact feeds
+# new F2mCurve(m, k1, k2, k3, ...), and the binary-field curve degree drives
+# field arithmetic with no upper limit, so a large m makes curve evaluation
+# run far longer than any real key requires (CWE-400, CWE-125 also
+# assigned). The fixed revision caps the degree inside BuildField, before
+# the field is constructed:
+#
+#   int maxM = ImplGetInteger("Org.BouncyCastle.EC.F2m_MaxSize", 1142); // 2 * 571
+#   if (m > maxM)
+#       throw new ArgumentException("F2m m value out of range");
+#
+# ATTENTION, precision cost, re-measured. Nothing focused fires either side:
+# scanning crypto/src at both revisions of the fix reports the same 1815
+# findings, and ECCurve.cs alone reports the same four VYQL-NUM-005 rows and
+# one VYQL-CFG-014 row, none concerning the degree. Both DOS rules this CVE
+# invites are measured here. VYQL-DOS-006 (code.LengthDerivedAllocation)
+# describes a parsed length controlling an allocation, while this cost is
+# computation time and nothing is allocated from m. VYQL-DOS-042
+# (code.UnboundedResourceOperation) names the right weakness class but the
+# construct class it would need -- a caller-supplied numeric dimension
+# requiring a ceiling -- cannot be demanded generically: methods and
+# constructors taking an integer dimension such as m, n, size, len, bits or
+# degree number 243 in crypto/src/math and 336 across crypto/src, and
+# exactly one of them needed the ceiling this fix added. Narrowing to the
+# curve constructors does not rescue it: new F2mCurve( appears at 36 sites
+# in crypto/src, 19 with a variable first argument, and 18 of those 19 are
+# named-curve tables whose m is a locally assigned compile-time constant --
+# structurally indistinguishable from the parsed degree without vocabulary
+# that already knows which dimension needs bounding.
+#
+# The judgement is also not structural. Knowing that the degree drives
+# superlinear field arithmetic, and that 1142 is the sane ceiling because
+# the largest standard binary curve is 571 bits, is cryptographic domain
+# knowledge rather than anything the shape of the code carries. And the
+# remediation is centralised in the callee: the attacker-controlled flow
+# site (X9Curve.cs, ((DerInteger)parameters[0]).IntValueExact ->
+# new F2mCurve(m, k1, k2, k3, ...)) is byte-identical across the fix, so a
+# binding at the flow site cannot discriminate, and the only in-file signal
+# the fix leaves in ECCurve.cs is its own check -- a negation keyed there
+# encodes the fixing commit's layout rather than a documented control.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1025: binary field built from a degree with no upper bound"
+  lang csharp
+  file crypto/src/math/ec/ECCurve.cs
+  reject VYQL-DOS-006
+  reject VYQL-DOS-042
+  code
+  ```
+  public abstract class AbstractF2mCurve
+      : ECCurve
+  {
+      private static IFiniteField BuildField(int m, int k1, int k2, int k3)
+      {
+          int[] exponents = (k2 | k3) == 0
+              ? new int[]{ 0, k1, m }
+              : new int[]{ 0, k1, k2, k3, m };
+
+          return FiniteFields.GetBinaryExtensionField(exponents);
+      }
+
+      protected AbstractF2mCurve(int m, int k1, int k2, int k3)
+          : base(BuildField(m, k1, k2, k3))
+      {
+      }
+  }
+  ```
+
+test "rank1025: fix rejects a degree above the configured maximum"
+  lang csharp
+  file crypto/src/math/ec/ECCurve.cs
+  reject VYQL-DOS-006
+  reject VYQL-DOS-042
+  code
+  ```
+  public abstract class AbstractF2mCurve
+      : ECCurve
+  {
+      private static IFiniteField BuildField(int m, int k1, int k2, int k3)
+      {
+          int maxM = ImplGetInteger("Org.BouncyCastle.EC.F2m_MaxSize", 1142); // 2 * 571
+          if (m > maxM)
+              throw new ArgumentException("F2m m value out of range");
+
+          int[] exponents = (k2 | k3) == 0
+              ? new int[]{ 0, k1, m }
+              : new int[]{ 0, k1, k2, k3, m };
+
+          return FiniteFields.GetBinaryExtensionField(exponents);
+      }
+
+      protected AbstractF2mCurve(int m, int k1, int k2, int k3)
+          : base(BuildField(m, k1, k2, k3))
+      {
+      }
+  }
+  ```

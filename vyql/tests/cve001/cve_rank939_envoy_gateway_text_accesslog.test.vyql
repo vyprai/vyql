@@ -1,0 +1,84 @@
+# Rank 939 / CVE-2025-25294: Envoy Gateway defaulted access logs to a
+# JSON-looking text format, allowing request-derived fields to break structured
+# log records.
+
+test "rank939: default access log formatter uses text JSON string"
+  lang go
+  file accesslog.go
+  expect VYQL-INJ-184
+  expect_review code.TextAccessLogDefaultFormatInjection
+  code
+  ```
+  package translator
+
+  const EnvoyTextLogFormat = "{\"start_time\":\"%START_TIME%\",\"user-agent\":\"%REQ(USER-AGENT)%\"}\n"
+
+  func buildXdsAccessLog(text *ir.TextAccessLog) *fileaccesslog.FileAccessLog {
+      format := EnvoyTextLogFormat
+      if text.Format != nil {
+          format = *text.Format
+      }
+      if format == nil {
+          format = wrapperspb.String(EnvoyTextLogFormat)
+      }
+      return &fileaccesslog.FileAccessLog{
+          Path: text.Path,
+          AccessLogFormat: &fileaccesslog.FileAccessLog_LogFormat{
+              LogFormat: &cfgcore.SubstitutionFormatString{
+                  Format: &cfgcore.SubstitutionFormatString_TextFormatSource{
+                      TextFormatSource: &cfgcore.DataSource{
+                          Specifier: &cfgcore.DataSource_InlineString{
+                              InlineString: format,
+                          },
+                      },
+                  },
+              },
+          },
+      }
+  }
+  ```
+
+test "rank939: default access log formatter uses structured json fields"
+  lang go
+  file accesslog.go
+  reject VYQL-INJ-184
+  reject_review code.TextAccessLogDefaultFormatInjection
+  code
+  ```
+  package translator
+
+  var EnvoyJSONLogFields = map[string]string{
+      "start_time": "%START_TIME%",
+      "user-agent": "%REQ(USER-AGENT)%",
+  }
+
+  func buildXdsAccessLog(json *ir.JSONAccessLog, text *ir.TextAccessLog) *fileaccesslog.FileAccessLog {
+      if json.JSON == nil {
+          json.JSON = EnvoyJSONLogFields
+      }
+      _ = &fileaccesslog.FileAccessLog{
+          Path: json.Path,
+          AccessLogFormat: &fileaccesslog.FileAccessLog_LogFormat{
+              LogFormat: &cfgcore.SubstitutionFormatString{
+                  Format: &cfgcore.SubstitutionFormatString_JsonFormat{
+                      JsonFormat: json.JSON,
+                  },
+              },
+          },
+      }
+      return &fileaccesslog.FileAccessLog{
+          Path: text.Path,
+          AccessLogFormat: &fileaccesslog.FileAccessLog_LogFormat{
+              LogFormat: &cfgcore.SubstitutionFormatString{
+                  Format: &cfgcore.SubstitutionFormatString_TextFormatSource{
+                      TextFormatSource: &cfgcore.DataSource{
+                          Specifier: &cfgcore.DataSource_InlineString{
+                              InlineString: *text.Format,
+                          },
+                      },
+                  },
+              },
+          },
+      }
+  }
+  ```

@@ -1,0 +1,74 @@
+# Rank 1165 / CVE-2025-49137: haxcms-php's saveNode endpoint stores an
+# editor-supplied page description as raw HTML.
+#
+# Operations::saveNode() parses the posted page body into page-break blocks
+# and, for each one, takes the block's own "description" attribute (set by
+# the HAX editor's site/settings editor UI) and assigns it straight to
+# $page->description with no sanitization — the sibling branch two lines
+# above calls strip_tags() on the page body for the auto-generated
+# description, so the raw form is not a missing capability, only a path that
+# skips it when the editor supplies its own description. HAXcms later
+# renders $page->description as HTML wherever the page's metadata is
+# displayed, so an authenticated editor who includes HTML tags (other than
+# <script>, which some downstream renderer strips) in that attribute gets it
+# executed for any visitor. The fixed revision wraps the same assignment in
+# strip_tags().
+#
+# code.StoredHtmlWrite / VYQL-INJ-028 exist and judge "a
+# stored HTML write with no sanitizer proven for that write" — this shape
+# needs a binding, not a new concept or rule: PHP's saveNode() body has no
+# vocabulary at all for "this assignment is the unsanitized half of an
+# editor-supplied field", so nothing is labelled and the rule has
+# no sink to reason about.
+
+test "rank1165: saveNode assigns the page-break's description attribute straight to $page->description"
+  lang php
+  expect VYQL-INJ-028
+  expect_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+  class Operations {
+    public function saveNode() {
+      $site = $GLOBALS['HAXCMS']->loadSite($this->params['site']['name']);
+      if ($page = $site->loadNode($this->params['node']['id'])) {
+        foreach ($pageData as $data) {
+          $page->metadata->updated = time();
+          $clean = strip_tags($body);
+          if (isset($data["attributes"]["description"]) && $data["attributes"]["description"] != '') {
+            $page->description = $data["attributes"]["description"];
+          }
+          else {
+            $page->description = str_replace("\n", '', $clean);
+          }
+        }
+      }
+    }
+  }
+  ```
+
+test "rank1165: saveNode strips tags from the description attribute before assigning it"
+  lang php
+  reject VYQL-INJ-028
+  reject_review code.StoredHtmlWrite
+  code
+  ```
+  <?php
+  class Operations {
+    public function saveNode() {
+      $site = $GLOBALS['HAXCMS']->loadSite($this->params['site']['name']);
+      if ($page = $site->loadNode($this->params['node']['id'])) {
+        foreach ($pageData as $data) {
+          $page->metadata->updated = time();
+          $clean = strip_tags($body);
+          if (isset($data["attributes"]["description"]) && $data["attributes"]["description"] != '') {
+            $page->description = strip_tags($data["attributes"]["description"]);
+          }
+          else {
+            $page->description = str_replace("\n", '', $clean);
+          }
+        }
+      }
+    }
+  }
+  ```

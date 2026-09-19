@@ -1,0 +1,17 @@
+module bindings.objc.generated.mccc8be40;
+
+binding weakHash0 {
+  requires {
+    dependency("FirebaseCrashlytics")
+  }
+  query pattern callExpr where callee.method == "FIRCLSHashNSData"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("FirebaseCrashlytics")
+  }
+  query pattern callExpr where callee.method == "FIRCLSHashBytes"
+  emit issue code.WeakHash at call
+}

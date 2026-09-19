@@ -1,0 +1,137 @@
+# Rank 1766 / CVE-2025-24789: Snowflake JDBC's external-browser
+# authentication opened the SSO URL by falling back, whenever
+# java.awt.Desktop is unsupported, to a platform dispatch with a macOS
+# case and a catch-all -- and the catch-all launched
+#   runtime.exec("xdg-open " + ssoUrl)
+# by bare program name (SessionUtilExternalBrowser.java, CWE-426). On a
+# Windows host xdg-open exists in no system directory, so the process
+# launcher resolves it from the first writable %PATH% element: an attacker
+# with write access to a PATH directory escalates to the account running
+# the driver. The fixed revision (4f01bb8) adds a Windows case before the catch-all
+# that launches rundll32 in argument-array form, which both names a
+# system-resident handler and stops the URL being whitespace-tokenised.
+# The Linux catch-all keeps the bare xdg-open launch -- what clears the
+# finding is the Windows platform fact now present in the launching
+# method, in any spelling.
+
+test "rank1766: desktop fallback launches xdg-open by bare name with no Windows case"
+  lang java
+  file SessionUtilExternalBrowser.java
+  expect VYQL-PATH-081
+  expect_review code.UnqualifiedPosixProgramLaunch
+  code
+  ```
+  public class SessionUtilExternalBrowser {
+    public void openBrowser(String ssoUrl) throws Exception {
+      try {
+        if (!URLUtil.isValidURL(ssoUrl)) {
+          throw new Exception("Invalid SSOUrl found - " + ssoUrl);
+        }
+        if (java.awt.Desktop.isDesktopSupported()) {
+          URI uri = new URI(ssoUrl);
+          java.awt.Desktop.getDesktop().browse(uri);
+        } else {
+          Runtime runtime = Runtime.getRuntime();
+          Constants.OS os = Constants.getOS();
+          if (os == Constants.OS.MAC) {
+            runtime.exec("open " + ssoUrl);
+          } else {
+            // linux?
+            runtime.exec("xdg-open " + ssoUrl);
+          }
+        }
+      } catch (URISyntaxException | IOException ex) {
+        throw new Exception(ex);
+      }
+    }
+  }
+  ```
+
+test "rank1766: Windows case routes to a system handler before the POSIX catch-all"
+  lang java
+  file SessionUtilExternalBrowserPatched.java
+  reject VYQL-PATH-081
+  reject_review code.UnqualifiedPosixProgramLaunch
+  code
+  ```
+  public class SessionUtilExternalBrowserPatched {
+    public void openBrowser(String ssoUrl) throws Exception {
+      if (!URLUtil.isValidURL(ssoUrl)) {
+        throw new Exception("Invalid SSOUrl found - " + ssoUrl);
+      }
+      try {
+        Runtime runtime = Runtime.getRuntime();
+        Constants.OS os = Constants.getOS();
+        if (Desktop.isDesktopSupported()
+            && Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
+          Desktop.getDesktop().browse(new URI(ssoUrl));
+        } else if (os == Constants.OS.MAC) {
+          runtime.exec("open " + ssoUrl);
+        } else if (os == Constants.OS.WINDOWS) {
+          runtime.exec(new String[] {"rundll32", "url.dll,FileProtocolHandler", ssoUrl});
+        } else {
+          runtime.exec("xdg-open " + ssoUrl);
+        }
+      } catch (URISyntaxException | IOException ex) {
+        throw new Exception(ex);
+      }
+    }
+  }
+  ```
+
+test "rank1766: os.name guard inside the launching method clears the launch"
+  lang java
+  file BrowserLauncherOsName.java
+  reject VYQL-PATH-081
+  reject_review code.UnqualifiedPosixProgramLaunch
+  code
+  ```
+  public class BrowserLauncherOsName {
+    public void openBrowser(String ssoUrl) throws Exception {
+      if (System.getProperty("os.name").contains("Windows")) {
+        return;
+      }
+      Runtime.getRuntime().exec("xdg-open " + ssoUrl);
+    }
+  }
+  ```
+
+test "rank1766: isWindows predicate guard inside the launching method clears the launch"
+  lang java
+  file BrowserLauncherPredicate.java
+  reject VYQL-PATH-081
+  reject_review code.UnqualifiedPosixProgramLaunch
+  code
+  ```
+  public class BrowserLauncherPredicate {
+    public void openBrowser(String ssoUrl) throws Exception {
+      if (isWindows()) {
+        return;
+      }
+      Runtime.getRuntime().exec("xdg-open " + ssoUrl);
+    }
+
+    private boolean isWindows() {
+      return System.getProperty("os.name").contains("Windows");
+    }
+  }
+  ```
+
+test "rank1766: a sibling method's Windows guard does not clear the launch"
+  lang java
+  file BrowserLauncherSiblingGuard.java
+  expect VYQL-PATH-081
+  expect_review code.UnqualifiedPosixProgramLaunch
+  code
+  ```
+  public class BrowserLauncherSiblingGuard {
+    private boolean runningOnWindows() {
+      return Constants.getOS() == Constants.OS.WINDOWS;
+    }
+
+    public void openBrowser(String ssoUrl) throws Exception {
+      Runtime runtime = Runtime.getRuntime();
+      runtime.exec("xdg-open " + ssoUrl);
+    }
+  }
+  ```

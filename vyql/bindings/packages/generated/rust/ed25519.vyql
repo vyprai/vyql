@@ -1,0 +1,9 @@
+module bindings.rust.generated.m8460813d;
+
+binding secretValue0 {
+  requires {
+    dependency("ed25519")
+  }
+  query pattern callExpr where callee.method == "to_pkcs8_der"
+  emit source code.SecretValue at call.result
+}

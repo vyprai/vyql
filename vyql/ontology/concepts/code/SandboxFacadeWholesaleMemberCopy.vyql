@@ -1,0 +1,11 @@
+module code;
+
+concept SandboxFacadeWholesaleMemberCopy : issue {
+  cwe: [CWE_913]
+  reviewAssumption: "the facade is reachable from script the sandbox runs on behalf of an untrusted author"
+  reviewCategory: code_execution
+  reviewCondition: "a restricted facade handed to sandboxed script is populated by reflectively copying every own property descriptor of the host object it wraps, instead of an explicit member allowlist"
+  reviewConfidence: medium
+  reviewEvidence: "sandbox module {pattern} builds a null-prototype frozen facade from the host object's own keys and descriptors and runs script against a context assembled from it"
+  vulnerableTo: [injection.CodeInjection]
+}

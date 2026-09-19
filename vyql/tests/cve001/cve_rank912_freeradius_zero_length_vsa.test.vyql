@@ -1,0 +1,78 @@
+# Rank 912 / CVE-2009-3111: FreeRADIUS crashed on zero-length
+# Tunnel-Password/vendor attributes before skipping attrlen == 0.
+
+test "rank912: RADIUS VSA value pair parse lacks zero-length guard"
+  lang c
+  file radius.c
+  expect VYQL-DOS-037
+  expect_review code.ZeroLengthRadiusAttributeValueParse
+  code
+  ```
+  int rad_decode(void *packet, void *original, char *secret, unsigned char *ptr)
+  {
+      int vsa_tlen = 1;
+      int vsa_llen = 1;
+      int attrlen;
+      int attribute;
+      int packet_length = 64;
+      void *pair;
+      switch (vsa_tlen) {
+      case 1:
+          attribute = ptr[0];
+          break;
+      }
+      ptr += vsa_tlen;
+      switch (vsa_llen) {
+      case 1:
+          attrlen = ptr[0] - (vsa_tlen + vsa_llen);
+          break;
+      }
+      ptr += vsa_llen;
+      packet_length -= (vsa_tlen + vsa_llen);
+  create_pair:
+      pair = rad_attr2vp(packet, original, secret, attribute, attrlen, ptr);
+      debug_pair(pair);
+      ptr += attrlen;
+      packet_length -= attrlen;
+      return 0;
+  }
+  ```
+
+test "rank912: RADIUS VSA parser skips zero-length attributes"
+  lang c
+  file radius.c
+  reject VYQL-DOS-037
+  reject_review code.ZeroLengthRadiusAttributeValueParse
+  code
+  ```
+  int rad_decode(void *packet, void *original, char *secret, unsigned char *ptr)
+  {
+      int vsa_tlen = 1;
+      int vsa_llen = 1;
+      int attrlen;
+      int attribute;
+      int packet_length = 64;
+      void *pair;
+      switch (vsa_tlen) {
+      case 1:
+          attribute = ptr[0];
+          break;
+      }
+      ptr += vsa_tlen;
+      switch (vsa_llen) {
+      case 1:
+          attrlen = ptr[0] - (vsa_tlen + vsa_llen);
+          break;
+      }
+      ptr += vsa_llen;
+      packet_length -= (vsa_tlen + vsa_llen);
+  create_pair:
+      if (attrlen == 0) goto next;
+      pair = rad_attr2vp(packet, original, secret, attribute, attrlen, ptr);
+      debug_pair(pair);
+  next:
+      ptr += attrlen;
+      packet_length -= attrlen;
+      return 0;
+  }
+  ```

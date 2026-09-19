@@ -1,0 +1,41 @@
+module bindings.php.generated.mba691072;
+
+binding sqlExecution0 {
+  requires {
+    dependency("cakephp/migrations")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("cakephp/migrations")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("cakephp/migrations")
+  }
+  query pattern callExpr where callee.method == "fetchRow"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("cakephp/migrations")
+  }
+  query pattern callExpr where callee.method == "fetchAll"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("cakephp/migrations")
+  }
+  query pattern callExpr where callee.method == "truncate"
+  emit sink code.SqlExecution at args[0]
+}

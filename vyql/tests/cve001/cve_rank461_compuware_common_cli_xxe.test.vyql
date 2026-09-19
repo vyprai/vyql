@@ -1,0 +1,50 @@
+# Rank 461 / CVE-2022-41226: BMC AMI Common Configuration parsed CLI version
+# XML without hardening external entities.
+
+test "rank461: Compuware CLI version parser uses raw DocumentBuilderFactory"
+  lang java
+  file src/main/java/com/compuware/jenkins/common/utils/CLIVersionUtils.java
+  expect VYQL-DESER-004
+  code
+  ```
+  import java.io.InputStream;
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.w3c.dom.Document;
+
+  class CLIVersionUtils {
+    private static String parseXml(InputStream versionfile) throws Exception {
+      DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+      DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+      Document document = dBuilder.parse(versionfile);
+      return document.getDocumentElement().getAttribute("version");
+    }
+  }
+  ```
+
+test "rank461: Compuware CLI version parser disallows doctype"
+  lang java
+  file src/main/java/com/compuware/jenkins/common/utils/CLIVersionUtils.java
+  reject VYQL-DESER-004
+  code
+  ```
+  import java.io.InputStream;
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.w3c.dom.Document;
+
+  class CLIVersionUtils {
+    private static String parseXml(InputStream versionfile) throws Exception {
+      DocumentBuilderFactory dbFactory = DocumentBuilderFactory.newInstance();
+      dbFactory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+      dbFactory.setFeature("http://xml.org/sax/features/external-general-entities", false);
+      dbFactory.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+      dbFactory.setXIncludeAware(false);
+      dbFactory.setExpandEntityReferences(false);
+      DocumentBuilder dBuilder = dbFactory.newDocumentBuilder();
+      Document document = dBuilder.parse(versionfile);
+      return document.getDocumentElement().getAttribute("version");
+    }
+  }
+  ```
+

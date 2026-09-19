@@ -1,0 +1,49 @@
+module bindings.rust.generated.mc226c3b1;
+
+binding stdinInput0 {
+  requires {
+    dependency("console")
+  }
+  query pattern callExpr where callee.method == "read_char"
+  emit source code.StdinInput at call.result
+}
+
+binding stdinInput1 {
+  requires {
+    dependency("console")
+  }
+  query pattern callExpr where callee.method == "read_key"
+  emit source code.StdinInput at call.result
+}
+
+binding stdinInput2 {
+  requires {
+    dependency("console")
+  }
+  query pattern callExpr where callee.method == "read_key_raw"
+  emit source code.StdinInput at call.result
+}
+
+binding stdinInput3 {
+  requires {
+    dependency("console")
+  }
+  query pattern callExpr where callee.method == "read_line"
+  emit source code.StdinInput at call.result
+}
+
+binding stdinInput4 {
+  requires {
+    dependency("console")
+  }
+  query pattern callExpr where callee.method == "read_line_initial_text"
+  emit source code.StdinInput at call.result
+}
+
+binding stdinInput5 {
+  requires {
+    dependency("console")
+  }
+  query pattern callExpr where callee.method == "read_secure_line"
+  emit source code.StdinInput at call.result
+}

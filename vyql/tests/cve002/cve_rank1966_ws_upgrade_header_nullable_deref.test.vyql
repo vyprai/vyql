@@ -1,0 +1,183 @@
+# Rank 1966 / CVE-2024-37890: a WebSocket handshake reads the Upgrade header
+# and calls a string method on the value directly. Node documents
+# `IncomingMessage.headers` as a plain object where an absent header is simply
+# missing, and a request whose header count passes `maxHeadersCount` can drop
+# the very header that triggered the 'upgrade' event, so `headers.upgrade` is
+# `undefined` on a real request path. `undefined.toLowerCase()` throws, and the
+# exception is unhandled, so one request crashes the server (and the mirrored
+# client check crashes the client on a hostile response). CWE-476.
+#
+# The fixed revision reads the header once, excludes `undefined` ahead of the comparison,
+# and calls the method on the checked local. Both halves matter for detection:
+# the crash is calling a method on the raw header value, and the remediation is
+# an absence exclusion. The vulnerable function guards a *different*
+# header with a proceed-form ternary (`!== undefined ? x.trim() : false`), so
+# the exclusion must be read by its own operator shape, not credited by any
+# `undefined` comparison in the function: `x === undefined`, `x == null`,
+# `typeof x === 'undefined'` (absence forms, either as an early-abort `if` or
+# chained ahead of the call with `||`), and the proceed forms that actually
+# shield the call (`x !== undefined && x.m()`). The bare proceed-form
+# comparison a ternary emits carries no trailing operator and is not a guard
+# for a call made outside it.
+
+test "rank1966: handshake calls toLowerCase on the raw Upgrade header value"
+  lang javascript
+  file websocket-server.js
+  expect VYQL-MEM-006
+  expect_review code.NullableDeref
+  code
+  ```
+  const keyRegex = /^[+/0-9A-Za-z]{22}==$/;
+
+  class WebSocketServer extends EventEmitter {
+    handleUpgrade(req, socket, head, cb) {
+      socket.on('error', socketOnError);
+
+      const key =
+        req.headers['sec-websocket-key'] !== undefined
+          ? req.headers['sec-websocket-key'].trim()
+          : false;
+      const version = +req.headers['sec-websocket-version'];
+      const extensions = {};
+
+      if (
+        req.method !== 'GET' ||
+        req.headers.upgrade.toLowerCase() !== 'websocket' ||
+        !key ||
+        !keyRegex.test(key) ||
+        (version !== 8 && version !== 13) ||
+        !this.shouldHandle(req)
+      ) {
+        return abortHandshake(socket, 400);
+      }
+
+      completeUpgrade(...)
+    }
+  }
+  ```
+
+test "rank1966: client aborts on a response Upgrade header it dereferences raw"
+  lang javascript
+  file websocket.js
+  expect VYQL-MEM-006
+  expect_review code.NullableDeref
+  code
+  ```
+  function initAsClient(websocket, address, protocols, options) {
+    req.on('upgrade', (res, socket, head) => {
+      websocket.emit('upgrade', res);
+
+      if (websocket.readyState !== WebSocket.CONNECTING) return;
+
+      req = websocket._req = null;
+
+      if (res.headers.upgrade.toLowerCase() !== 'websocket') {
+        abortHandshake(websocket, socket, 'Invalid Upgrade header');
+        return;
+      }
+
+      const digest = createHash('sha1')
+        .update(key + GUID)
+        .digest('base64');
+    });
+  }
+  ```
+
+test "rank1966: handshake hoists the header read and excludes undefined first"
+  lang javascript
+  file websocket-server-fixed.js
+  reject VYQL-MEM-006
+  reject_review code.NullableDeref
+  code
+  ```
+  const keyRegex = /^[+/0-9A-Za-z]{22}==$/;
+
+  class WebSocketServer extends EventEmitter {
+    handleUpgrade(req, socket, head, cb) {
+      socket.on('error', socketOnError);
+
+      const key =
+        req.headers['sec-websocket-key'] !== undefined
+          ? req.headers['sec-websocket-key'].trim()
+          : false;
+      const version = +req.headers['sec-websocket-version'];
+      const upgrade = req.headers.upgrade;
+      const extensions = {};
+
+      if (
+        req.method !== 'GET' ||
+        upgrade === undefined ||
+        upgrade.toLowerCase() !== 'websocket' ||
+        !key ||
+        !keyRegex.test(key) ||
+        (version !== 8 && version !== 13) ||
+        !this.shouldHandle(req)
+      ) {
+        return abortHandshake(socket, 400);
+      }
+
+      completeUpgrade(...)
+    }
+  }
+  ```
+
+test "rank1966: the exclusion also holds written inline on the header path"
+  lang javascript
+  file websocket-server-inline-fixed.js
+  reject VYQL-MEM-006
+  reject_review code.NullableDeref
+  code
+  ```
+  const keyRegex = /^[+/0-9A-Za-z]{22}==$/;
+
+  class WebSocketServer extends EventEmitter {
+    handleUpgrade(req, socket, head, cb) {
+      socket.on('error', socketOnError);
+
+      const key =
+        req.headers['sec-websocket-key'] !== undefined
+          ? req.headers['sec-websocket-key'].trim()
+          : false;
+      const version = +req.headers['sec-websocket-version'];
+      const extensions = {};
+
+      if (
+        req.method !== 'GET' ||
+        req.headers.upgrade === undefined ||
+        req.headers.upgrade.toLowerCase() !== 'websocket' ||
+        !key ||
+        !keyRegex.test(key) ||
+        (version !== 8 && version !== 13) ||
+        !this.shouldHandle(req)
+      ) {
+        return abortHandshake(socket, 400);
+      }
+
+      completeUpgrade(...)
+    }
+  }
+  ```
+
+test "rank1966: an early-abort absence check also shields the dereference"
+  lang javascript
+  file websocket-server-early-abort.js
+  reject VYQL-MEM-006
+  reject_review code.NullableDeref
+  code
+  ```
+  class WebSocketServer extends EventEmitter {
+    handleUpgrade(req, socket, head, cb) {
+      socket.on('error', socketOnError);
+
+      if (req.headers.upgrade === undefined) {
+        return abortHandshake(socket, 400);
+      }
+
+      if (req.headers.upgrade.toLowerCase() !== 'websocket') {
+        return abortHandshake(socket, 400);
+      }
+
+      completeUpgrade(...)
+    }
+  }
+  ```

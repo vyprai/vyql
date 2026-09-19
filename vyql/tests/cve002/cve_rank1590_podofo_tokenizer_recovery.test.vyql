@@ -1,0 +1,220 @@
+# PoDoFo's tokenizer destroyed the output variant at the top of the
+# literal case and then returned from two parse-failure branches without
+# reconstructing it, so the caller read a destroyed, unowned union --
+# use-after-free / uninitialized read on the error path (CWE-416/CWE-457;
+# issues #275/#276, CVE-2025-9394). DetermineDataType in
+# src/podofo/main/PdfTokenizer.cpp ran `variant.~PdfVariant();` on entry,
+# and where utls::TryParse rejected a real or a number it did
+# `this->EnqueueToken(token, tokenType); ... return PdfLiteralDataType::Unknown;`
+# -- both early returns skip the placement-new into the variant union that
+# every other exit performs, leaving the storage the destructor just
+# released. Fix 22d16cb142 ("PdfTokenizer: Fixed free-after-use after
+# failing to parse content while reading literal tokens"): both branches
+# `goto Recovery`, a labeled common exit that placement-news
+# PdfVariant::NullMember into the variant before returning Unknown.
+#
+# ## Re-measured at the current tip
+#
+# Three `--cache off` runs per revision (timeout 180, --max-ram 6GB) over
+# PdfTokenizer.cpp: 4 findings at the parent and the identical 4 at the
+# fix, stable across all six runs -- VYQL-MEM-016 at :63 and VYQL-MEM-006
+# at :286/:290/:480 (the last shifts to :481 with the fix's one-line net
+# insert) -- none of them inside DetermineDataType. The `-flags only` view
+# reports 16 flags, likewise identical at both revisions and none on the
+# construct. Scanning the whole src/podofo/main tree (232 cpp files)
+# reports 909 findings at both revisions with the same four rows on
+# PdfTokenizer.cpp, so no cross-file analysis reaches the defect either.
+# `vyql match` labels no placement-new, no explicit destructor call and no
+# exit: the zero is real, not a `-flags` replacement misread.
+#
+# ## Why the miss holds
+#
+# The defect is an early return that bypasses the function's own exit
+# invariant -- every normal path reconstructs the destroyed union, the two
+# error paths do not -- which is the "released and not cleared before an
+# exit path" relation the ENGINE-GAPS entry scoped at ranks 1232/1314, here
+# in its C++ placement-new spelling. The C/C++ frontend's one exit-path
+# lifetime fact, `analysis.lifetime.release_then_return`
+# (ccLifetimeReleaseReturnObservations, the only thing VYQL-MEM-011 is
+# built on), keys on `delete X;` followed by a literal `return false`
+# within 160 bytes and never looks for a clearing write, so an explicit
+# destructor call plus `return PdfLiteralDataType::Unknown` is out of its
+# reach. The out-parameter family shipped since the first pass is
+# caller-side: VYQL-MEM-075 (MissingOutParamStatusCheck) anchors on the
+# caller's `(*id)->` null-guard idiom this caller does not have, and the
+# fix is centralised in the callee, which caller-side labelling cannot
+# discriminate in any case. A binding naming DetermineDataType would
+# detect this library rather than the weakness -- the method is internal,
+# not a documented API. No definition change shipped. Both forms pin the
+# miss as a double reject of the family's consumer: when an exit-path
+# observation covers the destroy-without-reconstruct form, the skipping
+# form must flip to expect VYQL-MEM-011.
+
+test "rank1590: the parse failure exits without reconstructing the destroyed variant"
+  lang cpp
+  file src/podofo/main/PdfTokenizer.cpp
+  reject VYQL-MEM-011
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <string_view>
+
+  enum class PdfTokenType { Literal };
+  enum class PdfLiteralDataType { Real, Number, Unknown };
+
+  class PdfVariant
+  {
+  public:
+      union
+      {
+          double m_Real;
+          long m_Number;
+          void *m_Null;
+      };
+
+      ~PdfVariant();
+  };
+
+  namespace utls
+  {
+      template <typename T>
+      bool TryParse(const std::string_view &token, T &value);
+  }
+
+  class PdfTokenizer
+  {
+  public:
+      PdfLiteralDataType DetermineDataType(std::string_view &token,
+          PdfTokenType tokenType, PdfVariant &variant)
+      {
+          switch (tokenType)
+          {
+              case PdfTokenType::Literal:
+              {
+                  variant.~PdfVariant();
+
+                  if (token.find('.') != std::string_view::npos)
+                  {
+                      double val;
+                      if (!utls::TryParse(token, val))
+                      {
+                          // Don't consume the token
+                          this->EnqueueToken(token, tokenType);
+                          return PdfLiteralDataType::Unknown;
+                      }
+
+                      new(&variant.m_Real) double(val);
+                      return PdfLiteralDataType::Real;
+                  }
+                  else if (!token.empty())
+                  {
+                      long num1;
+                      if (!utls::TryParse(token, num1))
+                      {
+                          // Don't consume the token
+                          this->EnqueueToken(token, tokenType);
+                          return PdfLiteralDataType::Unknown;
+                      }
+
+                      new(&variant.m_Number) long(num1);
+                      return PdfLiteralDataType::Number;
+                  }
+                  else
+                  {
+                      new(&variant.m_Null) void *(nullptr);
+                      return PdfLiteralDataType::Unknown;
+                  }
+              }
+          }
+
+          return PdfLiteralDataType::Unknown;
+      }
+
+      void EnqueueToken(std::string_view &token, PdfTokenType tokenType);
+  };
+  ```
+
+test "rank1590: the fixed revision routes failures through the recovery exit"
+  lang cpp
+  file src/podofo/main/PdfTokenizer.cpp
+  reject VYQL-MEM-011
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <string_view>
+
+  enum class PdfTokenType { Literal };
+  enum class PdfLiteralDataType { Real, Number, Unknown };
+
+  class PdfVariant
+  {
+  public:
+      union
+      {
+          double m_Real;
+          long m_Number;
+          void *m_Null;
+      };
+
+      ~PdfVariant();
+  };
+
+  namespace utls
+  {
+      template <typename T>
+      bool TryParse(const std::string_view &token, T &value);
+  }
+
+  class PdfTokenizer
+  {
+  public:
+      PdfLiteralDataType DetermineDataType(std::string_view &token,
+          PdfTokenType tokenType, PdfVariant &variant)
+      {
+          switch (tokenType)
+          {
+              case PdfTokenType::Literal:
+              {
+                  variant.~PdfVariant();
+
+                  if (token.find('.') != std::string_view::npos)
+                  {
+                      double val;
+                      if (!utls::TryParse(token, val))
+                      {
+                          // Don't consume the token
+                          this->EnqueueToken(token, tokenType);
+                          goto Recovery;
+                      }
+
+                      new(&variant.m_Real) double(val);
+                      return PdfLiteralDataType::Real;
+                  }
+                  else if (!token.empty())
+                  {
+                      long num1;
+                      if (!utls::TryParse(token, num1))
+                      {
+                          // Don't consume the token
+                          this->EnqueueToken(token, tokenType);
+                          goto Recovery;
+                      }
+
+                      new(&variant.m_Number) long(num1);
+                      return PdfLiteralDataType::Number;
+                  }
+                  else
+                  {
+                  Recovery:
+                      new(&variant.m_Null) void *(nullptr);
+                      return PdfLiteralDataType::Unknown;
+                  }
+              }
+          }
+
+          return PdfLiteralDataType::Unknown;
+      }
+
+      void EnqueueToken(std::string_view &token, PdfTokenType tokenType);
+  };
+  ```

@@ -1,0 +1,166 @@
+# Rank 1588 / CVE-2024-53866: pnpm's resolver kept the registry
+# metadata object alive between caching it and writing the cache
+# file, so any mutation applied to that shared object in between --
+# including through hooks and concurrent resolution -- was serialized
+# to disk and poisoned later resolutions (metadata cache integrity,
+# CWE-349/CWE-345; the advisory's registry-poisoning scenario).
+# pickPackage in resolving/npm-resolver/src/pickPackage.ts did
+# `ctx.metaCache.set(spec.name, meta)` and then deferred the disk
+# write through `runLimited(pkgMirror, (limit) => limit(async () => {
+# await saveMeta(pkgMirror, meta) }))`, with saveMeta itself calling
+# JSON.stringify(meta) at write time -- the write task captures the
+# live object, so whatever the object has become when the task runs
+# is what every later install reads. The fixing commit 11afcddea4
+# ("Merge commit from fork", the security merge; changeset "Don't
+# ever save mutated metadata to the metadata cache"): the meta is
+# stringified the moment it is cached (`const stringifiedMeta =
+# JSON.stringify(meta)` before the deferral), saveMeta takes the
+# string and writes it verbatim -- a snapshot immune to later
+# mutation.
+#
+# ATTENTION, shared-mutable snapshots, held on recheck. The defect is
+# one object serving two masters -- the in-memory cache and the
+# on-disk cache -- with the serialization deferred into another
+# function's task after the share: judging it needs "is the persisted
+# form a snapshot taken before the object was shared", which is
+# shared-mutable-state vocabulary (the LocklessSharedMutation family,
+# VYQL-RACE-002, judges races over shared maps -- here the sharing is
+# reference aliasing rather than concurrency). No snapshot vocabulary
+# has landed: nothing in the ontology names deferred serialization of
+# an aliased object, and VYQL-RACE-002 has no javascript emitter at
+# all. Measured at the span tip (3 x --cache off per revision,
+# timeout 180, --max-ram 6GB): scanning the whole npm-resolver
+# package reports 14 findings at the vulnerable revision and the same
+# 14 (same rules, same lines modulo the fix's two-line shift) at the
+# fixed one -- all library.param-source rows into SqlExecution,
+# FilePathAccess, UrlFetch and ProtoPollute sinks, none about the
+# meta shape, so the pair does not discriminate. Probe bindings on
+# the real shape isolate every discriminating token surface and each
+# fails the genericity test: `identifier contains "stringifiedMeta"`
+# (0 -> 3) and the raw argument spelling `saveMeta(pkgMirror, meta)`
+# (3 -> 0) key on the fix's own layout, and the one construct-level
+# discriminator -- JSON.stringify sitting in the callee's function
+# context rather than the sharer's -- measures 1 true positive
+# (reported twice through the nested-lambda context) beside a
+# same-package false positive, semverSatisfiesLoose's in-memory
+# semverRangeCache.set, that the fix does not clear, because the
+# share itself surfaces only as the bare last-segment token `set` and
+# the deferral's only spelling, runLimited, is this package's private
+# helper. The identity link the judgement needs -- that the object
+# crossing the deferral boundary is the one that was shared -- has no
+# route at all: the javascript frontend rejects `context.call_arg`
+# outright, the recorded call-argument-token gap first measured at
+# rank 1360 and restated here, and argument identity across function
+# boundaries would be a new dataflow relation, not a localized
+# correction. No ENGINE-GAPS.md entry beyond that restatement. No
+# definition change shipped. Spec cve_rank1588 records the deferred
+# write-time serialization and the cache-time snapshot off the real
+# code, both asserting reject VYQL-RACE-002: when snapshot vocabulary
+# lands, the write-time form must flip to expect.
+
+test "rank1588: the deferred write task serializes whatever the shared object became"
+  lang javascript
+  file resolving/npm-resolver/src/pickPackage.ts
+  reject VYQL-RACE-002
+  code
+  ```
+  import path from 'path'
+  import gfs from '@pnpm/graceful-fs'
+
+  export async function pickPackage (
+    ctx: {
+      fetch: (pkgName: string, registry: string, authHeaderValue?: string) => Promise<PackageMeta>
+      metaCache: PackageMetaCache
+    },
+    spec: RegistryPackageSpec,
+    pkgMirror: string,
+    opts: PickPackageOptions
+  ): Promise<{ meta: PackageMeta }> {
+    try {
+      let meta: PackageMeta = await ctx.fetch(spec.name, opts.registry, opts.authHeaderValue)
+      meta.cachedAt = Date.now()
+      // only save meta to cache, when it is fresh
+      ctx.metaCache.set(spec.name, meta)
+      if (!opts.dryRun) {
+        runLimited(pkgMirror, (limit) => limit(async () => {
+          try {
+            await saveMeta(pkgMirror, meta)
+          } catch (err: any) { // eslint-disable-line
+            // We don't care if this file was not written to the cache
+          }
+        }))
+      }
+      return { meta }
+    } catch (err: any) { // eslint-disable-line
+      throw err
+    }
+  }
+
+  const createdDirs = new Set<string>()
+
+  async function saveMeta (pkgMirror: string, meta: PackageMeta): Promise<void> {
+    const dir = path.dirname(pkgMirror)
+    if (!createdDirs.has(dir)) {
+      await gfs.mkdir(dir, { recursive: true })
+      createdDirs.add(dir)
+    }
+    const temp = pathTemp(pkgMirror)
+    await gfs.writeFile(temp, JSON.stringify(meta))
+    await renameOverwrite(temp, pkgMirror)
+  }
+  ```
+
+test "rank1588: the fixed revision snapshots the meta when it is cached"
+  lang javascript
+  file resolving/npm-resolver/src/pickPackage.ts
+  reject VYQL-RACE-002
+  code
+  ```
+  import path from 'path'
+  import gfs from '@pnpm/graceful-fs'
+
+  export async function pickPackage (
+    ctx: {
+      fetch: (pkgName: string, registry: string, authHeaderValue?: string) => Promise<PackageMeta>
+      metaCache: PackageMetaCache
+    },
+    spec: RegistryPackageSpec,
+    pkgMirror: string,
+    opts: PickPackageOptions
+  ): Promise<{ meta: PackageMeta }> {
+    try {
+      let meta: PackageMeta = await ctx.fetch(spec.name, opts.registry, opts.authHeaderValue)
+      meta.cachedAt = Date.now()
+      // only save meta to cache, when it is fresh
+      ctx.metaCache.set(spec.name, meta)
+      if (!opts.dryRun) {
+        // We stringify this meta here to avoid saving any mutations
+        // that could happen to the meta object.
+        const stringifiedMeta = JSON.stringify(meta)
+        runLimited(pkgMirror, (limit) => limit(async () => {
+          try {
+            await saveMeta(pkgMirror, stringifiedMeta)
+          } catch (err: any) { // eslint-disable-line
+            // We don't care if this file was not written to the cache
+          }
+        }))
+      }
+      return { meta }
+    } catch (err: any) { // eslint-disable-line
+      throw err
+    }
+  }
+
+  const createdDirs = new Set<string>()
+
+  async function saveMeta (pkgMirror: string, meta: string): Promise<void> {
+    const dir = path.dirname(pkgMirror)
+    if (!createdDirs.has(dir)) {
+      await gfs.mkdir(dir, { recursive: true })
+      createdDirs.add(dir)
+    }
+    const temp = pathTemp(pkgMirror)
+    await gfs.writeFile(temp, meta)
+    await renameOverwrite(temp, pkgMirror)
+  }
+  ```

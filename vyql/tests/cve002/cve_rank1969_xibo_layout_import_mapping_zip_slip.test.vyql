@@ -1,0 +1,166 @@
+# Xibo's layout import (LayoutFactory::createFromZip) walks a mapping.json
+# manifest stored inside the uploaded layout ZIP and, for each mapping
+# entry, concatenates the manifest's `file` element onto the server-side
+# library directory and opens the result for writing:
+#
+#     $mappings = json_decode($zip->getFromName('mapping.json'), true);
+#     foreach ($mappings as $file) {
+#         $temporaryFileName = $libraryLocation . $file['file'];
+#         $fileStream = $zip->getStream('library/' . $file['file']);
+#         if (!$temporaryFileStream = fopen($temporaryFileName, 'w')) { ... }
+#         while (!feof($fileStream)) {
+#             fwrite($temporaryFileStream, fread($fileStream, 8192));
+#         }
+#
+# A manifest entry such as `file: "../../../../public_html/shell.php"`
+# therefore decides where the archived bytes land, outside the library
+# directory and with the web server's privileges (CWE-22; the manifest
+# name never passes through an archive-entry API, it arrives as entry
+# *content*, so the classic getNameIndex/->name source route does not
+# see it). Fix 45c6b53c reduces the element to a single component first
+# -- `$fileName = basename($file['file']);` with empty/`.` entries
+# skipped -- which is the containment the concatenation never had.
+#
+# `vyql match` on the vulnerable revision labels the sink side only:
+# fopen is a code.FilePathAccess sink and basename is
+# bound as core.PathCanonicalization, but nothing labels the
+# ZipArchive member reads (`getFromName`/`getStream` return entry
+# content from a caller-supplied archive), so no taint path starts and
+# VYQL-PATH-001 cannot fire. The extraction loop itself is the shape
+# the ManualZipEntryFileWrite family reports for Go
+# (manualZipEntryFileWrite273/274) and C++ (manualZipEntryFileWrite24):
+# member data joined into a destination path and written with no
+# containment. zipMemberWriteWithoutContainment adds the PHP member of
+# that family, keyed on the documented ZipArchive surface (the
+# constructor, the member reads) and the extraction write pair
+# (fopen+fwrite or file_put_contents), with the documented
+# path-reduction calls (basename, realpath) as the neutralising forms.
+#
+# Measured on the real revision pair (full-tree scans, three
+# `--cache off` runs each, timeout 180, --max-ram 6GB): the vulnerable
+# revision reports exactly one VYQL-PATH-014, on
+# LayoutFactory::createFromZip (lib/Factory/LayoutFactory.php:1001),
+# and the patched revision reports zero -- the fixed revision's `basename` call is
+# the only basename or realpath anywhere in the 2219-line file, so the
+# containment negation discriminates exactly (2068 -> 2067 findings at
+# or above high; nothing else moved). The two sibling ZipArchive users
+# cannot pair with the write clause: lib/Service/ReportService.php
+# reads reportschedule.json and never opens a destination, and
+# lib/Twig/TransTokenParser.php's getStream is Twig's token stream in a
+# function with no file writes. Collateral, priced by exhaustive
+# enumeration of the member-read shape across the 166 sibling clones
+# (108 PHP files carry a getFromName/getStream/getNameIndex/locateName
+# call, 17 of those also carry the write pair at file level, and
+# scanning all 17 plus the remaining candidate trees reports the flag
+# on exactly one: typo3's ActionControllerTest.php, a test-fixture
+# round-trip that writes files and reads them back out of the archive
+# in one method) -- stated as the binding's residual rather than
+# hidden.
+
+test "rank1969: mapping.json entry names joined into the library path and written out"
+  lang php
+  file layout-import.php
+  expect VYQL-PATH-014
+  code
+  ```
+  <?php
+
+  class LayoutFactory
+  {
+      public function createFromZip($zipFile, $userId)
+      {
+          $libraryLocation = '/var/www/library/temp/';
+
+          $zip = new \ZipArchive();
+          if (!$zip->open($zipFile)) {
+              throw new \InvalidArgumentException('Unable to open ZIP');
+          }
+
+          $mappings = json_decode($zip->getFromName('mapping.json'), true);
+
+          foreach ($mappings as $file) {
+              $intendedMediaName = $file['name'];
+              $temporaryFileName = $libraryLocation . $file['file'];
+
+              $fileStream = $zip->getStream('library/' . $file['file']);
+
+              if (!$temporaryFileStream = fopen($temporaryFileName, 'w')) {
+                  throw new \InvalidArgumentException('Cannot save media file from ZIP file');
+              }
+
+              while (!feof($fileStream)) {
+                  fwrite($temporaryFileStream, fread($fileStream, 8192));
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1969: the manifest element reduced to one component before the join"
+  lang php
+  file layout-import-patched.php
+  reject VYQL-PATH-014
+  code
+  ```
+  <?php
+
+  class LayoutFactory
+  {
+      public function createFromZip($zipFile, $userId)
+      {
+          $libraryLocation = '/var/www/library/temp/';
+
+          $zip = new \ZipArchive();
+          if (!$zip->open($zipFile)) {
+              throw new \InvalidArgumentException('Unable to open ZIP');
+          }
+
+          $mappings = json_decode($zip->getFromName('mapping.json'), true);
+
+          foreach ($mappings as $file) {
+              $intendedMediaName = $file['name'];
+
+              $fileName = basename($file['file']);
+              if (empty($fileName) || $fileName == '.') {
+                  continue;
+              }
+
+              $temporaryFileName = $libraryLocation . $fileName;
+
+              $fileStream = $zip->getStream('library/' . $fileName);
+
+              if (!$temporaryFileStream = fopen($temporaryFileName, 'w')) {
+                  throw new \InvalidArgumentException('Cannot save media file from ZIP file');
+              }
+
+              while (!feof($fileStream)) {
+                  fwrite($temporaryFileStream, fread($fileStream, 8192));
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1969: a read-only member walk with no destination write"
+  lang php
+  file report-schedule.php
+  reject VYQL-PATH-014
+  code
+  ```
+  <?php
+
+  class ReportService
+  {
+      public function importSchedule($zipFile)
+      {
+          $zip = new \ZipArchive();
+          if (!$zip->open($zipFile)) {
+              throw new \InvalidArgumentException('Unable to open ZIP');
+          }
+
+          $json = json_decode($zip->getFromName('reportschedule.json'), true);
+
+          return $this->getSavedReportResults($json);
+      }
+  }
+  ```

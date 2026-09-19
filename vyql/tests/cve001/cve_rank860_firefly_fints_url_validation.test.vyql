@@ -1,0 +1,72 @@
+# Rank 860 / CVE-2019-14671: Firefly III stored a user-provided
+# FinTS endpoint URL before validating URL syntax and the HTTPS scheme.
+
+test "rank860: PHP FinTS import stores URL before scheme validation"
+  lang php
+  file NewFinTSJobHandler.php
+  expect VYQL-RF-036
+  expect_review code.ConfigUrlStoredBeforeSchemeValidation
+  code
+  ```
+  <?php
+  class NewFinTSJobHandler
+  {
+      public function configureJob(array $data): MessageBag
+      {
+          $config = [];
+          $config['fints_url']       = trim($data['fints_url'] ?? '');
+          $config['fints_port']      = (int)($data['fints_port'] ?? '');
+          $config['fints_bank_code'] = (string)($data['fints_bank_code'] ?? '');
+
+          $this->repository->setConfiguration($this->importJob, $config);
+
+          $finTS = app(FinTS::class, ['config' => $this->importJob->configuration]);
+          if (true !== ($checkConnection = $finTS->checkConnection())) {
+              return new MessageBag(['failed']);
+          }
+
+          return new MessageBag();
+      }
+  }
+  ```
+
+test "rank860: PHP FinTS import validates URL and HTTPS before storing"
+  lang php
+  file NewFinTSJobHandler.php
+  reject VYQL-RF-036
+  reject_review code.ConfigUrlStoredBeforeSchemeValidation
+  code
+  ```
+  <?php
+  class NewFinTSJobHandler
+  {
+      public function configureJob(array $data): MessageBag
+      {
+          $config = [];
+          $config['fints_url']       = trim($data['fints_url'] ?? '');
+          $config['fints_port']      = (int)($data['fints_port'] ?? '');
+          $config['fints_bank_code'] = (string)($data['fints_bank_code'] ?? '');
+
+          $config['fints_url'] = $this->validURI($config['fints_url']) ? $config['fints_url'] : '';
+          $this->repository->setConfiguration($this->importJob, $config);
+
+          $finTS = app(FinTS::class, ['config' => $this->importJob->configuration]);
+          if (true !== ($checkConnection = $finTS->checkConnection())) {
+              return new MessageBag(['failed']);
+          }
+
+          return new MessageBag();
+      }
+
+      private function validURI(string $fintsUri): bool
+      {
+          $res = filter_var($fintsUri, FILTER_VALIDATE_URL);
+          if (false === $res) {
+              return false;
+          }
+          $scheme = parse_url($fintsUri, PHP_URL_SCHEME);
+
+          return 'https' === $scheme;
+      }
+  }
+  ```

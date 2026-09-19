@@ -1,0 +1,9 @@
+module bindings.swift.generated.m9d36b8db;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/dmrschmidt/DSWaveformImage")
+  }
+  query pattern callExpr where callee.method == "samples"
+  emit sink code.FilePathAccess at args[0]
+}

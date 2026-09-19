@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule MimeSubtypeFileExtensionPathTraversal {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22]
+    id: "VYQL-PATH-032"
+    severity: high
+  }
+  issue code.MimeSubtypeFileExtensionPathTraversal as sink
+}

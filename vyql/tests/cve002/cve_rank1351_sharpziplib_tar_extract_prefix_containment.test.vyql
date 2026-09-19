@@ -1,0 +1,211 @@
+# Rank 1351 / CVE-2021-32840: SharpZipLib's TarArchive.ExtractEntry joined a
+# tar entry's name under the extraction directory and then tested containment
+# with a raw string prefix comparison on the canonicalised destination *file*:
+#
+#   string destFile = Path.Combine(destDir, name);
+#   if (!allowParentTraversal && !Path.GetFullPath(destFile).StartsWith(destDir, ...))
+#       throw new InvalidNameException(...);
+#   ...
+#   using (var outputStream = File.Create(destFile))
+#
+# Path.GetFullPath returns the full path of the file, not of its directory, so a
+# sibling whose name merely begins with the extraction directory's name passes
+# the comparison: with destDir "/tmp/x/output", an entry named "../output.txt"
+# canonicalises to "/tmp/x/output.txt", which StartsWith "/tmp/x/output" while
+# sitting outside it. An attacker-authored archive therefore writes over files
+# next to the extraction directory (CWE-22, CWE-184). The fixed revision compares the
+# destination's *directory* instead, Path.GetDirectoryName(Path.GetFullPath(..)),
+# so a sibling file does not share the prefix.
+#
+# The pool row for this rank named dlemstra/Magick.NET and CVE-2025-66628, whose
+# advisory is against ImageMagick's C core: the TIM decoder's
+# image_size = 2 * width * height overflow in coders/tim.c. The named commit in
+# the .NET binding only bumps src/Magick.Native/Magick.Native.version and the
+# trademark string, so no C# code carries the defect. That row is a dependency
+# mislink, and this rank reviews icsharpcode/SharpZipLib instead.
+#
+# Detection reuses code.ArchiveEntryRawPrefixContainment, minted for rank 231's
+# Python filesystem-image extractor, and gives it its first C# form: an entry
+# name joined under a directory with Path.Combine, containment tested by calling
+# String.StartsWith straight on the Path.GetFullPath result, and a file write or
+# directory creation in the same function. The .NET-documented containment forms
+# are all excluded -- comparing the parent directory, appending a directory
+# separator to the prefix, or Path.GetRelativePath -- because each of them makes
+# the prefix comparison an actual containment test.
+#
+# On the real checkout the vulnerable parent a0e96de reports VYQL-PATH-056 at
+# src/ICSharpCode.SharpZipLib/Tar/TarArchive.cs:645 and the fixed tree 5c3b293
+# reports no VYQL-PATH-056.
+
+test "rank1351: tar extraction tests containment with a prefix compare on the destination file"
+  lang csharp
+  file TarArchive.cs
+  expect VYQL-PATH-056
+  expect_review code.ArchiveEntryRawPrefixContainment
+  code
+  ```
+  using System;
+  using System.IO;
+
+  namespace ICSharpCode.SharpZipLib.Tar
+  {
+    public class TarArchive
+    {
+      private void ExtractEntry(string destDir, TarEntry entry, bool allowParentTraversal)
+      {
+        string name = entry.Name;
+
+        if (Path.IsPathRooted(name))
+        {
+          name = name.Substring(Path.GetPathRoot(name).Length);
+        }
+
+        name = name.Replace('/', Path.DirectorySeparatorChar);
+
+        string destFile = Path.Combine(destDir, name);
+
+        if (!allowParentTraversal && !Path.GetFullPath(destFile).StartsWith(destDir, StringComparison.InvariantCultureIgnoreCase))
+        {
+          throw new InvalidNameException("Parent traversal in paths is not allowed");
+        }
+
+        if (entry.IsDirectory)
+        {
+          EnsureDirectoryExists(destFile);
+        }
+        else
+        {
+          string parentDirectory = Path.GetDirectoryName(destFile);
+          EnsureDirectoryExists(parentDirectory);
+
+          using (var outputStream = File.Create(destFile))
+          {
+            ExtractContentsToStream(outputStream);
+          }
+        }
+      }
+    }
+  }
+  ```
+
+test "rank1351: comparing the destination's directory is a containment test"
+  lang csharp
+  file TarArchive.cs
+  reject VYQL-PATH-056
+  reject_review code.ArchiveEntryRawPrefixContainment
+  code
+  ```
+  using System;
+  using System.IO;
+
+  namespace ICSharpCode.SharpZipLib.Tar
+  {
+    public class TarArchive
+    {
+      private void ExtractEntry(string destDir, TarEntry entry, bool allowParentTraversal)
+      {
+        string name = entry.Name;
+
+        if (Path.IsPathRooted(name))
+        {
+          name = name.Substring(Path.GetPathRoot(name).Length);
+        }
+
+        name = name.Replace('/', Path.DirectorySeparatorChar);
+
+        string destFile = Path.Combine(destDir, name);
+        var destFileDir = Path.GetDirectoryName(Path.GetFullPath(destFile)) ?? "";
+
+        if (!allowParentTraversal && !destFileDir.StartsWith(destDir, StringComparison.InvariantCultureIgnoreCase))
+        {
+          throw new InvalidNameException("Parent traversal in paths is not allowed");
+        }
+
+        if (entry.IsDirectory)
+        {
+          EnsureDirectoryExists(destFile);
+        }
+        else
+        {
+          string parentDirectory = Path.GetDirectoryName(destFile);
+          EnsureDirectoryExists(parentDirectory);
+
+          using (var outputStream = File.Create(destFile))
+          {
+            ExtractContentsToStream(outputStream);
+          }
+        }
+      }
+    }
+  }
+  ```
+
+test "rank1351: a directory separator on the prefix keeps a sibling out"
+  lang csharp
+  file TarArchive.cs
+  reject VYQL-PATH-056
+  reject_review code.ArchiveEntryRawPrefixContainment
+  code
+  ```
+  using System;
+  using System.IO;
+
+  namespace ICSharpCode.SharpZipLib.Tar
+  {
+    public class TarArchive
+    {
+      private void ExtractEntry(string destDir, TarEntry entry, bool allowParentTraversal)
+      {
+        string name = entry.Name.Replace('/', Path.DirectorySeparatorChar);
+        string destFile = Path.Combine(destDir, name);
+
+        if (!allowParentTraversal && !Path.GetFullPath(destFile).StartsWith(destDir + Path.DirectorySeparatorChar, StringComparison.InvariantCultureIgnoreCase))
+        {
+          throw new InvalidNameException("Parent traversal in paths is not allowed");
+        }
+
+        EnsureDirectoryExists(Path.GetDirectoryName(destFile));
+
+        using (var outputStream = File.Create(destFile))
+        {
+          ExtractContentsToStream(outputStream);
+        }
+      }
+    }
+  }
+  ```
+
+test "rank1351: a relative path that never rises out of the directory is contained"
+  lang csharp
+  file TarArchive.cs
+  reject VYQL-PATH-056
+  reject_review code.ArchiveEntryRawPrefixContainment
+  code
+  ```
+  using System;
+  using System.IO;
+
+  namespace ICSharpCode.SharpZipLib.Tar
+  {
+    public class TarArchive
+    {
+      private void ExtractEntry(string destDir, TarEntry entry, bool allowParentTraversal)
+      {
+        string name = entry.Name.Replace('/', Path.DirectorySeparatorChar);
+        string destFile = Path.Combine(destDir, name);
+
+        if (!allowParentTraversal && Path.GetRelativePath(destDir, Path.GetFullPath(destFile)).StartsWith(".."))
+        {
+          throw new InvalidNameException("Parent traversal in paths is not allowed");
+        }
+
+        EnsureDirectoryExists(Path.GetDirectoryName(destFile));
+
+        using (var outputStream = File.Create(destFile))
+        {
+          ExtractContentsToStream(outputStream);
+        }
+      }
+    }
+  }
+  ```

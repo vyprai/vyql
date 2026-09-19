@@ -1,0 +1,9 @@
+module bindings.java.generated.m626ef3fe;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.apache.solr:solr-solrj")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

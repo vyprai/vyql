@@ -1,0 +1,171 @@
+# Rank 1328 / CVE-2024-27516: Live Helper Chat's operator panel echoed the
+# `search` query parameter into a template AngularJS compiles in the browser.
+#
+# lhc_web/design/defaulttheme/tpl/lhchat/onlineusers/section_online_users.tpl.php
+# rendered
+#
+#   <input ... ng-init='query=<?php echo json_encode(strip_tags($_GET['search']),
+#                                                    JSON_HEX_APOS);?>' ng-model="query" ...>
+#
+# in a template whose other nodes are AngularJS interpolations
+# ({{online.onlineusers.length}}, {{online.online_connected ? ... }}). strip_tags
+# removes markup and json_encode with JSON_HEX_APOS keeps the value inside the
+# single-quoted attribute, so no HTML or attribute break-out is possible -- but
+# neither of them touches `{` or `}`, and AngularJS evaluates `{{ ... }}` in
+# attribute values before ng-init ever runs. `?search={{123*123}}` renders 15129,
+# and on AngularJS 1.6+ (no expression sandbox) the same slot reaches arbitrary
+# JavaScript. The advisory calls it server-side template injection and names
+# lhfaq/faqweight.php; the reported entry point is
+# `index.php/site_admin/?search=...`, which is this template.
+#
+# Fix a61d231526 adds the only control that works in this context, removing the
+# interpolation delimiters themselves:
+#
+#   json_encode(str_replace(array('}}','{{'),'',strip_tags($_GET['search'])),JSON_HEX_APOS)
+#
+# and does the same for the FAQ widget's `keyword` template variable
+# (lhc_web/modules/lhfaq/faqwidget.php), which the widget template renders
+# through htmlspecialchars -- also useless against `{{`.
+#
+# code.IncompleteTemplateValidation / VYQL-INJ-024 is the concept for "a
+# template engine is used without the validation that makes caller-supplied
+# template syntax inert", and Jinja2 and Twig reach it through their own
+# bindings. PHP does not: nothing labels "this echo lands in markup a
+# client-side template engine compiles", so all the scanner sees here is an
+# HtmlRender sink with an HTML escape on the path, which it clears -- correct
+# for HTML, wrong for `{{ ... }}`.
+#
+# ATTENTION, engine gap. The tree carries no PHP review token for this shape,
+# deliberately. A token pairing the two facts such a template holds in its own
+# text -- an AngularJS or Vue directive attribute beside a `{{ ... }}`
+# interpolation, and an echo reading a request superglobal -- can only test
+# those facts as substrings of the whole file with its whitespace stripped, so
+# co-membership in one file is the entire relation between them. A Vue
+# directive on the first line combines with a superglobal echo 150 lines below;
+# a directive name that occurs only inside an HTML comment, only as a
+# JavaScript string literal, or only as `<pre>` documentation prose counts the
+# same as one on a live element. A Blade view (`{{ $post->title }}`,
+# interpolated and escaped server-side, never handed to a client engine) beside
+# an unrelated Vue island and one legacy superglobal echo fires too, which is
+# precisely the case a directive gate is there to exclude. The forms such a
+# token would have to cover to match what the frameworks document are equally
+# out of reach at that granularity:
+# `<?=` short echo, which is how most PHP templates echo at all; request data
+# reaching the echo through a variable; Vue's `@click` and `:class` shorthands;
+# sources beyond the four superglobals; and a correct delimiter-stripping fix
+# written as an escaped regex, which still reports.
+#
+# Discriminating this needs the echo's own markup context -- which element and
+# attribute the value lands in, and whether that element sits inside markup a
+# client-side engine compiles -- a relation between the echo and the
+# surrounding HTML tree, not a property of the file's text. The first case
+# below is pinned as a miss until that exists.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1328: the online-users search parameter is echoed into an AngularJS-compiled attribute"
+  lang php
+  file lhc_web/design/defaulttheme/tpl/lhchat/onlineusers/section_online_users.tpl.php
+  reject VYQL-INJ-024
+  reject_review code.IncompleteTemplateValidation
+  code
+  ```
+  <div class="row">
+      <div class="col-sm-2 form-group col-6">
+          <label id="online-users-count">{{online.onlineusers.length}}</label>
+      </div>
+      <div class="col-2 pe-0">
+          <input class="form-control form-control-sm" <?php if (isset($_GET['search'])) :?>ng-init='query=<?php echo json_encode(strip_tags($_GET['search']),JSON_HEX_APOS);?>'<?php endif?> ng-model="query" type="text" value="">
+      </div>
+  </div>
+  ```
+
+test "rank1328: removing the interpolation delimiters makes the echoed value inert"
+  lang php
+  file lhc_web/design/defaulttheme/tpl/lhchat/onlineusers/section_online_users.tpl.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <div class="row">
+      <div class="col-sm-2 form-group col-6">
+          <label id="online-users-count">{{online.onlineusers.length}}</label>
+      </div>
+      <div class="col-2 pe-0">
+          <input class="form-control form-control-sm" <?php if (isset($_GET['search'])) :?>ng-init='query=<?php echo json_encode(str_replace(array('}}','{{'),'',strip_tags($_GET['search'])),JSON_HEX_APOS);?>'<?php endif?> ng-model="query" type="text" value="">
+      </div>
+  </div>
+  ```
+
+test "rank1328: the same echo in a template no client-side engine compiles is not template injection"
+  lang php
+  file lhc_web/design/defaulttheme/tpl/lhchat/onlineusers/section_online_users.tpl.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <div class="row">
+      <div class="col-2 pe-0">
+          <input class="form-control form-control-sm" name="search" type="text" value="<?php echo htmlspecialchars($_GET['search']);?>">
+      </div>
+  </div>
+  ```
+
+test "rank1328: an AngularJS template interpolating only server-side translations is not reported"
+  lang php
+  file lhc_web/design/defaulttheme/tpl/lhchat/onlineusers/section_online_users.tpl.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <div class="row">
+      <div class="col-sm-2 form-group col-6">
+          <label id="online-users-count">{{online.onlineusers.length}}</label>
+      </div>
+      <div class="col-2 pe-0">
+          <input class="form-control form-control-sm" ng-model="query" type="text" value="" placeholder="<?php echo erTranslationClassLhTranslation::getInstance()->getTranslation('chat/lists/search_panel','Type to search');?>">
+      </div>
+  </div>
+  ```
+
+# The two cases below are a minimal pair for a separate PHP lowering gap this
+# template exposed, kept here because it is what the vulnerable file's own
+# `<?php if (...) :?> ... <?php endif?>` wrapper does to every other rule.
+# tree-sitter-php gives an alternative-syntax control structure a `colon_block`
+# body, and neither phpBranch (if/else/elseif) nor collectBlocks (while/for/
+# foreach) in internal/extract/frontend/treesitter/php.go has a case for it, so
+# every statement inside such a block is dropped from the lowered function. The
+# two snippets differ only in braces versus `:`/`endif`, and only the braced one
+# reports the echo of request data as XSS.
+
+test "rank1328: an echo of request data inside a braced conditional reaches the HTML sink"
+  lang php
+  file section_online_users.tpl.php
+  expect VYQL-INJ-004
+  code
+  ```
+  <input <?php if (isset($_GET['search'])) { ?>ng-init=<?php echo $_GET['search'];?><?php } ?> ng-model="query">
+  ```
+
+test "rank1328: the same echo inside an alternative-syntax conditional is dropped before labelling"
+  lang php
+  file section_online_users.tpl.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <input <?php if (isset($_GET['search'])) :?>ng-init=<?php echo $_GET['search'];?><?php endif?> ng-model="query">
+  ```
+
+# A third leg on the same echo pins why repairing that lowering gap alone would
+# not surface the weakness: rebuilt with braces and keeping the HTML escaping
+# the fix itself keeps, the echo still reports nothing. strip_tags is a
+# neutralising core.HtmlEscape control for the HtmlRender sink, and
+# json_encode passes `{` and `}` through, so the discriminator here is not the
+# escaping at all but the interpolation delimiters reaching a client-side
+# template engine -- the markup-context fact the frontend does not emit.
+
+test "rank1328: the braced echo keeping the HTML escaping stays silent"
+  lang php
+  file section_online_users.tpl.php
+  reject VYQL-INJ-004
+  code
+  ```
+  <input <?php if (isset($_GET['search'])) { ?>ng-init='query=<?php echo json_encode(strip_tags($_GET['search']),JSON_HEX_APOS);?>'<?php } ?> ng-model="query">
+  ```

@@ -1,0 +1,49 @@
+module bindings.scala.generated.m04c5a245;
+
+binding deserialization0 {
+  requires {
+    dependency("org.yaml:snakeyaml")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.yaml:snakeyaml")
+  }
+  query pattern callExpr where callee.method == "loadAs"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.yaml:snakeyaml")
+  }
+  query pattern callExpr where callee.method == "loadAll"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("org.yaml:snakeyaml")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("org.yaml:snakeyaml")
+  }
+  query pattern callExpr where callee.method == "compose"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("org.yaml:snakeyaml")
+  }
+  query pattern callExpr where callee.method == "composeAll"
+  emit sink code.Deserialization at args[0]
+}

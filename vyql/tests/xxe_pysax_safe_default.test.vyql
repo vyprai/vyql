@@ -1,0 +1,38 @@
+# Python stdlib SAX / minidom parsers do NOT resolve external entities by default —
+# expat only does so once feature_external_ges (or feature_external_pes) is enabled via
+# setFeature(...). So a make_parser() with no setFeature call in scope is a hardened,
+# safe parser; flagging it is a false positive (it was the single biggest driver of the
+# BenchmarkPython xxe FPR). The setFeature(..., True) variant remains a real XXE. This
+# mirrors the lxml resolve_entities=False hardening for the inverted stdlib default.
+
+test "python xxe: stdlib sax make_parser without setFeature is safe (external entities off by default)"
+  lang python
+  reject VYQL-DESER-002
+  code
+  ```
+  import xml.dom.minidom
+  import xml.sax
+
+  def handler(request):
+      data = request.headers.get("X-Body")
+      parser = xml.sax.make_parser()
+      doc = xml.dom.minidom.parseString(data, parser)
+      return doc
+  ```
+
+test "python xxe: stdlib sax parser with feature_external_ges enabled is vulnerable"
+  lang python
+  expect VYQL-DESER-002
+  code
+  ```
+  import xml.dom.minidom
+  import xml.sax
+  import xml.sax.handler
+
+  def handler(request):
+      data = request.headers.get("X-Body")
+      parser = xml.sax.make_parser()
+      parser.setFeature(xml.sax.handler.feature_external_ges, True)
+      doc = xml.dom.minidom.parseString(data, parser)
+      return doc
+  ```

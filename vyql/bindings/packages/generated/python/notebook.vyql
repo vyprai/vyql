@@ -1,0 +1,22 @@
+module bindings.python.generated.m9f68f3c1;
+
+binding httpInput0 {
+  requires {
+    dependency("notebook")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.HttpInput at call.result
+}
+
+binding htmlEscape1 {
+  requires {
+    dependency("notebook")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

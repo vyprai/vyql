@@ -1,0 +1,50 @@
+test "rank243: PrestaShop wishlist product sort order reaches SQL orderBy without validation"
+  lang php
+  expect VYQL-INJ-030
+  code
+  ```
+  <?php
+  use DbQuery;
+  use Validate;
+
+  class WishListProductSearchProvider
+  {
+      private function getProductsOrCount(ProductSearchContext $context, ProductSearchQuery $query, $type = 'products')
+      {
+          $querySearch = new DbQuery();
+
+          if ('products' === $type) {
+              $sortOrder = $query->getSortOrder()->toLegacyOrderBy(true);
+              $querySearch->orderBy($sortOrder . ' ' . $query->getSortOrder()->toLegacyOrderWay());
+              $products = $this->db->executeS($querySearch);
+          }
+      }
+  }
+  ```
+
+test "rank243: PrestaShop wishlist product sort order validates order fields and direction"
+  lang php
+  reject VYQL-INJ-030
+  code
+  ```
+  <?php
+  use DbQuery;
+  use Validate;
+
+  class WishListProductSearchProvider
+  {
+      private function getProductsOrCount(ProductSearchContext $context, ProductSearchQuery $query, $type = 'products')
+      {
+          $querySearch = new DbQuery();
+
+          if ('products' === $type) {
+              $sortOrder = $query->getSortOrder()->toLegacyOrderBy(true);
+              $sortWay = $query->getSortOrder()->toLegacyOrderWay();
+              if (Validate::isOrderBy($sortOrder) && Validate::isOrderWay($sortWay)) {
+                  $querySearch->orderBy($sortOrder . ' ' . $sortWay);
+              }
+              $products = $this->db->executeS($querySearch);
+          }
+      }
+  }
+  ```

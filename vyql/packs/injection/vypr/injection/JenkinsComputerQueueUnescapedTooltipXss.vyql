@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule JenkinsComputerQueueUnescapedTooltipXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-097"
+    severity: high
+  }
+  issue code.JenkinsComputerQueueUnescapedTooltipXss as sink
+}

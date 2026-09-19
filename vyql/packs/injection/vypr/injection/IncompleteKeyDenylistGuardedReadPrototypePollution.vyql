@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule IncompleteKeyDenylistGuardedReadPrototypePollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_1321]
+    id: "VYQL-INJ-244"
+    severity: high
+  }
+  issue code.IncompleteKeyDenylistGuardedReadPrototypePollution as sink
+}

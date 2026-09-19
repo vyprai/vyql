@@ -1,0 +1,34 @@
+module bindings.rust.url_domain_first_label_allowlist_lookup;
+
+// Platforms that serve an application's own schemes from a fixed loopback
+// naming convention -- custom webview protocols on `https://<name>.localhost/`
+// on Windows and Android, dev servers pinned to `localhost` subdomains --
+// recover the trusted name from the request URL's host so they can look it up
+// in the registry of registered names. The url crate documents the host
+// accessors (domain, host, host_str) as returning the host verbatim, and a
+// hostname is dot-separated labels (RFC 1035), so splitting it at a dot
+// literal and using a fragment as the contains_key/get lookup key hands the
+// registry a leading label of an attacker-chosen domain: `app.evil.com`
+// matches a registered `app`, every sibling host sharing the fragment passes
+// the gate, and with it whatever the gate guards -- IPC dispatch, privileged
+// scheme handlers, callback acceptance.
+//
+// The delimiter is pinned to the dot literal through the call-argument token,
+// which is what keeps ordinary splits out: a comma split of an encoding
+// header, a colon split stripping a port, a space split of a config line and
+// a zero-argument channel split all co-occur with host accessors and map
+// lookups in real code (measured: five such functions across four other
+// repositories) and none of them extracts a DNS label. The whole-host anchor
+// is the documented counterpart family on str: strip_suffix and ends_with tie
+// the match to the full host before anything is used as a lookup key, which
+// is why their presence anywhere in the function declines the shape. The
+// judgement lives in the pack rule; every clause here is a token match over
+// the function's own context tokens, so prose in a comment satisfies neither
+// side and a sibling function's anchor cannot clear the split. Residual, in
+// the false-positive direction only: a fix that keeps the dot split and
+// compares the remainder against a literal by equality emits no token Rust
+// extracts, so it still reads as unanchored.
+binding urlDomainFirstLabelAllowlistLookup {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["domain", "host", "host_str"] and containsAny(node.context.callArg, ["split_once:.", "split:.", "splitn:.", "rsplit_once:.", "rsplit:.", "rsplitn:."]) and node.context.call in ["contains_key", "get", "contains"] and not (node.context.call in ["strip_suffix", "ends_with"])
+  emit issue code.UrlDomainFirstLabelAllowlistLookup at node
+}

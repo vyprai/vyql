@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SudoCommandTempFileOperand {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_269, CWE_377]
+    id: "VYQL-AUTH-165"
+    severity: high
+  }
+  issue code.SudoCommandTempFileOperand as operand
+}

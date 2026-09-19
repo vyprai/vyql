@@ -1,0 +1,6 @@
+module bindings.javascript.generated.meffectmixedschedulersharedrunner;
+
+binding effectMixedSchedulerSharedRunner694 {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "effect_mixed_scheduler_shared_runner=true"
+  emit issue code.EffectMixedSchedulerSharedRunner at node
+}

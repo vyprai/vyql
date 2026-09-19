@@ -1,0 +1,9 @@
+module bindings.php.generated.mb2152210;
+
+binding deserialization0 {
+  requires {
+    dependency("lcobucci/jwt")
+  }
+  query pattern callExpr where callee.method == "LcobucciJWTParser::parse"
+  emit sink code.Deserialization at args[0]
+}

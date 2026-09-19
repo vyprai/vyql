@@ -1,0 +1,259 @@
+# seroval < 1.4.1 rebuilds a serialized node tree in
+# packages/seroval/src/core/context/deserializer.ts, and the names the
+# payload supplies resolve straight into the deserializer's fixed record
+# tables. The switch in `deserialize` returns `CONSTANT_VAL[node.s]` and
+# `SYMBOL_REF[node.s]`, and `deserializeError` selects its constructor with
+# `ERROR_CONSTRUCTOR[node.s]` before `new construct(deserializeString(node.m))`.
+# No lookup checks that the name is the record's own property, so a key the
+# table does not define still resolves through the record's prototype chain
+# -- the advisory's "overriding constant value and error deserialization"
+# (GHSA-3rxj-6cgf-8cfw, CWE-502), which is what hands back non-table values
+# (a `constructor` key reaches the `Object` function) and with them indirect
+# access to JS evaluation. The fixed revision, bundled in the 1.4.1/1.4.2
+# release commit ce9408ebc87312fcad345a73c172212f2a798060, routes all three
+# lookups through `deserializeKnownValue`, which returns `record[key]` only
+# after `Object.hasOwn(record, key)` and otherwise raises
+# `SerovalMalformedNodeError`.
+#
+# The same release hardens the property-write arm of the same file:
+# `deserializeProperties` wrote `result[deserializeString(key)] = value` with
+# no key validation at all; the fixed revision routes string keys through
+# `isValidKey` (denying `__proto__`, `constructor`, `prototype` and the
+# dunder accessors) and stores denied names with `Object.defineProperty`.
+# That arm is detected: on the vulnerable revision VYQL-INJ-013 reports the
+# dynamic write at deserializer.ts:240 and :242 with `code.ExternalEntryInput`
+# on the serialized fields as source, and on the patched revision the
+# string-key write inside `assignStringProperty` is suppressed by the
+# existing `definePropertyPrototypeKeyGuard` control binding. Tests (c) and
+# (d) pin that live half.
+#
+# ATTENTION, rechecked: vocabulary gap, for the arm the advisory names.
+#
+# 1. Nothing on the lookup path is judged, on either revision. Scanning the
+#    real checkout with the full findings view, `timeout 180 ./bin/vyql scan
+#    --cache off --max-ram 6GB`, three runs per revision, gives 88 findings
+#    (75 at or above high) on the vulnerable revision and 84 on the patched
+#    one, both stable across the three runs. The only rows that move across
+#    the fix are the property-write arm: VYQL-INJ-013 on deserializer.ts:240
+#    and :242 goes to a single residual row at :338, the symbol-keyed write
+#    behind `isValidSymbol`. Everything else in the diff is the file being
+#    rewritten (line shifts) and two scratch files the release deletes.
+#    `vyql match` on the vulnerable deserializer.ts labels
+#    `code.ExternalEntryInput` on the params at :560 and :637 and nothing
+#    else in the 300-646 range apart from `code.SqlExecution` on
+#    `ctx.base.refs.get(...)` arguments (:513, :525, :537, :574) -- the known
+#    `.get` over-labelling, not this defect. The `ERROR_CONSTRUCTOR[node.s]`
+#    lookups at :380/:384 and the `CONSTANT_VAL`/`SYMBOL_REF` returns at
+#    :566/:604 carry no label of any kind. `code.ReflectionInvoke`
+#    (VYQL-DESER-003) has a Java and a PHP emitter and none for JS/TS.
+# 2. The taint engine has the path. `vyql graph` on the vulnerable file
+#    shows deserializeError#param#node -> Attr(node.s) ->
+#    Subscript(ERROR_CONSTRUCTOR.__subscript) -> Call#1370 path=construct at
+#    deserializer.ts:384, so only the sink label is missing.
+# 3. The binding vocabulary cannot express the join. Bisected with probes
+#    against `deserializeError`'s `analysis.function.context` node (at :376):
+#    present are `index_base:ERROR_CONSTRUCTOR`, `index_key:node.s`,
+#    `subscript:ERROR_CONSTRUCTOR[node.s]`, `call_path:construct` and
+#    `call:construct`; absent are `own_property_key_guard`,
+#    `prototype_key_guard`, `prototype_name_guard` and -- the load-bearing
+#    one -- any `assign:` token, because `const construct = ...` is a
+#    `variable_declarator` and only `assignment_expression` emits `assign:`.
+#    No clause can say "this invocation's callee is the local the computed
+#    read populated", so the callee is reachable only by its own name, which
+#    is the rejected layout-keyed form. `callExpr` bindings cannot take the
+#    presence route instead: a `callExpr where node.context.language == ...`
+#    clause fails to lower ("query predicate node.context.language is not
+#    implemented in scanner IR lowering") while the run still exits 0 and
+#    reports zero findings.
+# 4. The invocation is the discriminating conjunct, and it is the one the
+#    join would buy. serializer.ts:394 reads the same table shape,
+#    `OBJECT_FLAG_CONSTRUCTOR[flag.type]`, but concatenates the retrieved
+#    value into a string and never invokes it -- so a fact joining a computed
+#    read to the invocation it feeds removes all four of this repository's
+#    production false positives at a stroke. Measured across the sibling
+#    checkouts under /tmp/cve-work/rank*/ (87,926 JS/TS files): 2,669 files
+#    contain a local assigned from a computed keyed read that is later
+#    invoked, 787 of them non-minified source, 477 of those with no
+#    `hasOwn`/`Object.create` anywhere in the file. A presence binding on
+#    that shape reports hundreds of files of ordinary registry dispatch, so
+#    the fact only pays as a taint-gated sink on the call node -- which needs
+#    the callee-provenance fact *and* a route for a `callExpr` binding to
+#    reach it.
+# 5. The fixed revision's own vocabulary is not a discriminator. The patched
+#    form's `deserializeKnownValue` and its `Object.hasOwn(record, key)` live
+#    in the helper the caller now delegates to, so the caller's own context
+#    never carries `own_property_key_guard`; what separates the revisions is
+#    that the caller no longer performs an unguarded computed read at all.
+#    That separation is semantic, not layout -- but it is only expressible
+#    with the join of point 3/4.
+#
+# What the vocabulary would need, per ENGINE-GAPS.md: a callee-provenance
+# fact for JavaScript call and `new` nodes -- the local or parameter whose
+# value the invocation consumes -- emitted in a form a `callExpr` binding
+# can read, so a sink binding can label an invocation whose callee is
+# resolved by a computed key off a param-crossing record and let
+# VYQL-DESER-003's taint rule do the attacker-controlled half. The taint
+# path is there; only the sink identification is not expressible.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1725: (a) the deserializer resolves serialized names into constant and constructor tables with no own-property check"
+  lang javascript
+  profile library
+  file deserializer.ts
+  reject VYQL-INJ-167
+  reject VYQL-DESER-003
+  code
+  ```
+  const CONSTANT_VAL: Record<string, unknown> = {};
+  const ERROR_CONSTRUCTOR: Record<string, ErrorConstructor> = {};
+
+  export function deserialize(node: any): unknown {
+    switch (node.t) {
+      case 0:
+        return CONSTANT_VAL[node.s];
+      case 6:
+        return deserializeError(node);
+      default:
+        return undefined;
+    }
+  }
+
+  function deserializeError(node: any): Error {
+    const construct = ERROR_CONSTRUCTOR[node.s];
+    return assignIndexedValue(node.i, new construct(node.m));
+  }
+
+  function assignIndexedValue(id: number, value: unknown): unknown {
+    return value;
+  }
+  ```
+
+test "rank1725: (b) the patched deserializer resolves table names through an own-property check"
+  lang javascript
+  profile library
+  file deserializer.ts
+  reject VYQL-INJ-167
+  reject VYQL-DESER-003
+  code
+  ```
+  const CONSTANT_VAL: Record<string, unknown> = {};
+
+  function deserializeKnownValue<T>(node: unknown, record: Record<string, T>, key: string): T {
+    if (Object.hasOwn(record, key)) {
+      return record[key];
+    }
+    throw new MalformedNodeError(node);
+  }
+
+  export function deserialize(node: any): unknown {
+    switch (node.t) {
+      case 0:
+        return deserializeKnownValue(node, CONSTANT_VAL, node.s);
+      default:
+        return undefined;
+    }
+  }
+  ```
+
+test "rank1725: (c) the unvalidated property write keyed by the serialized record is reported"
+  lang javascript
+  profile library
+  file deserializer.ts
+  expect VYQL-INJ-013
+  code
+  ```
+  function deserializeString(current: string): string {
+    return current;
+  }
+
+  export function deserializeProperties(record: any): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    const len = record.s;
+    const keys = record.k;
+    const vals = record.v;
+    for (let i = 0, key: unknown; i < len; i++) {
+      key = keys[i];
+      if (typeof key === 'string') {
+        result[deserializeString(key)] = vals[i];
+      }
+    }
+    return result;
+  }
+  ```
+
+test "rank1725: (d) the key-checked write with a defineProperty fallback is not reported"
+  lang javascript
+  profile library
+  file deserializer.ts
+  reject VYQL-INJ-013
+  code
+  ```
+  function isValidKey(key: string): boolean {
+    switch (key) {
+      case 'constructor':
+      case '__proto__':
+      case 'prototype':
+        return false;
+      default:
+        return true;
+    }
+  }
+
+  function assignStringProperty(
+    object: Record<string, unknown>,
+    key: string,
+    value: unknown,
+  ): void {
+    if (isValidKey(key)) {
+      object[key] = value;
+    } else {
+      Object.defineProperty(object, key, {
+        value,
+        configurable: true,
+        enumerable: true,
+        writable: true,
+      });
+    }
+  }
+
+  function assignProperty(
+    object: Record<string, unknown>,
+    key: unknown,
+    value: unknown,
+  ): void {
+    if (typeof key === 'string') {
+      assignStringProperty(object, key, value);
+    }
+  }
+
+  export function deserializeProperties(record: any): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    const keys = record.k;
+    const vals = record.v;
+    for (let i = 0; i < keys.length; i++) {
+      assignProperty(result, keys[i], vals[i]);
+    }
+    return result;
+  }
+  ```
+
+test "rank1725: (e) registry dispatch that reads a computed key but never invokes the retrieved value is not reported"
+  lang javascript
+  profile library
+  file serializer.ts
+  reject VYQL-INJ-167
+  reject VYQL-DESER-003
+  code
+  ```
+  const OBJECT_FLAG_CONSTRUCTOR: Record<string, string | undefined> = {};
+
+  export function resolveFlags(flags: Array<{ type: string; value: string }>): string | undefined {
+    let result = '';
+    for (let i = 0; i < flags.length; i++) {
+      const flag = flags[i];
+      result += OBJECT_FLAG_CONSTRUCTOR[flag.type] + '(' + flag.value + '),';
+    }
+    return result;
+  }
+  ```

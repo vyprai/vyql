@@ -1,0 +1,173 @@
+# Rank 1076 / CVE-2026-42570: devalue's parser allocated an array of whatever
+# length the payload declared. The sparse-array encoding is
+# [SPARSE, length, idx, val, idx, val, ...], and `hydrate` checked only
+# Number.isInteger(len) and len >= 0 before `const array = new Array(len)`,
+# while the elements are read one at a time afterwards -- so a few bytes
+# declaring a hundred million entries and supplying none still made the engine
+# reserve a contiguous backing store for them (CWE-770). The fixed revision
+# bounds the declared length against the maximum array length, builds the array
+# empty, touches the largest possible index once so the engine stays in
+# dictionary-elements mode, and only sets `length` at the end.
+#
+# ATTENTION, precision cost, measured. The first pass left this as a design
+# step: give code.LengthDerivedAllocation a sink form, allocation size as a
+# sink with the parsed length as the source, so a rule can ask the taint
+# question a presence over `new Array(n)` cannot. That step was built and
+# measured this pass -- a LengthDerivedAllocationSink concept, a binding on the
+# single-argument Array constructor (`args.count == 1` separates a length from
+# the element-list form), and `taint core.UserControlledData -> sink`. It
+# discriminates the motivating checkout exactly: 9 findings at 206ca6712f^
+# against 8 at 206ca6712f over three --cache off runs each, the one added
+# finding being this CVE at src/parse.js:226, and the spec pair below passing
+# both ways.
+#
+# It is still the idiom rather than the weakness. Across ten other JavaScript
+# trees the same rule reports 39 findings, 36 of them an array sized by a count
+# of data the program already holds -- vega's `Array(n0 + n1)`,
+# `n = groups.length; Array(n)`, `new Array(count)` off its own interpolator
+# parameter, undici's `headersLength = headers.length` -- which is bounded by
+# what is already in memory and is not an amplification. Only one collateral
+# finding (undici's test harness sizing `Array(encodingCount)` from a parsed
+# request header) has the declared-length shape. The split is 1 true positive
+# against 15 in real source files, so the rule does not ship.
+#
+# The reason the taint question cannot separate them is engine-side: a
+# container-count read lowers to a code.Attr node that inherits the object's
+# taint, so `const n = items.length; new Array(n)` carries a full untrusted
+# path exactly as `const len = value[1]; new Array(len)` does. Excluding the
+# count at the call, `node.value contains ".length"`/`".size"`, removes only
+# the inline spelling -- the local-indirection spelling is out of reach,
+# because a callExpr query exposes node.value, the callee fields, args.count
+# and args.any.literal and nothing that correlates an argument with its own
+# assignment. The third snippet is that shape and is what a future detection
+# must not report.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1076: the declared length sizes the allocation"
+  lang javascript
+  file src/parse.js
+  reject VYQL-DOS-006
+  code
+  ```
+  export function unflatten(parsed, revivers) {
+      const values = parsed;
+      const hydrated = [];
+
+      function hydrate(index) {
+          const value = values[index];
+
+          if (Array.isArray(value)) {
+              if (value[0] === -7) {
+                  // Sparse array encoding: [SPARSE, length, idx, val, ...]
+                  const len = value[1];
+
+                  if (!Number.isInteger(len) || len < 0) {
+                      throw new Error('Invalid input');
+                  }
+
+                  const array = new Array(len);
+                  hydrated[index] = array;
+
+                  for (let i = 2; i < value.length; i += 2) {
+                      const idx = value[i];
+                      if (!Number.isInteger(idx) || idx < 0 || idx >= len) {
+                          throw new Error('Invalid input');
+                      }
+                      array[idx] = hydrate(value[i + 1]);
+                  }
+              } else {
+                  const array = new Array(value.length);
+                  hydrated[index] = array;
+
+                  for (let i = 0; i < value.length; i += 1) {
+                      const n = value[i];
+                      if (n === -6) continue;
+                      array[i] = hydrate(n);
+                  }
+              }
+          }
+
+          return value;
+      }
+
+      return hydrate(0);
+  }
+  ```
+
+test "rank1076: the same length applied after the elements are placed"
+  lang javascript
+  file src/parse.js
+  reject VYQL-DOS-006
+  code
+  ```
+  const MAX_ARRAY_LEN = 2 ** 32 - 1;
+  const MAX_ARRAY_INDEX = MAX_ARRAY_LEN - 1;
+
+  export function unflatten(parsed, revivers) {
+      const values = parsed;
+      const hydrated = [];
+
+      function hydrate(index) {
+          const value = values[index];
+
+          if (Array.isArray(value)) {
+              if (value[0] === -7) {
+                  // Sparse array encoding: [SPARSE, length, idx, val, ...]
+                  const len = value[1];
+
+                  if (!is_valid_array_len(len)) {
+                      throw new Error('Invalid input');
+                  }
+
+                  const array = [];
+                  hydrated[index] = array;
+
+                  array[MAX_ARRAY_INDEX] = undefined;
+                  delete array[MAX_ARRAY_INDEX];
+
+                  for (let i = 2; i < value.length; i += 2) {
+                      const idx = value[i];
+                      if (!is_valid_array_index(idx) || idx >= len) {
+                          throw new Error('Invalid input');
+                      }
+                      array[idx] = hydrate(value[i + 1]);
+                  }
+
+                  array.length = len;
+              } else {
+                  const array = new Array(value.length);
+                  hydrated[index] = array;
+
+                  for (let i = 0; i < value.length; i += 1) {
+                      const n = value[i];
+                      if (n === -6) continue;
+                      array[i] = hydrate(n);
+                  }
+              }
+          }
+
+          return value;
+      }
+
+      return hydrate(0);
+  }
+  ```
+
+test "rank1076: a count of held data moved into a local sizes the same call"
+  lang javascript
+  file src/parse.js
+  reject VYQL-DOS-006
+  code
+  ```
+  export function parseRawHeaders(headers) {
+      const headersLength = headers.length;
+      const ret = new Array(headersLength);
+
+      for (let n = 0; n < headersLength; n += 2) {
+          ret[n] = headers[n].toString();
+      }
+
+      return ret;
+  }
+  ```

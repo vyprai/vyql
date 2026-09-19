@@ -1,0 +1,11 @@
+module code;
+
+concept WordPressPostsWhereDateSqlInjection : issue {
+  cwe: [CWE_89, CWE_20]
+  reviewAssumption: "the date variables are populated from request parameters before query_posts or the posts_where callback runs"
+  reviewCategory: sql
+  reviewCondition: "WordPress posts_where filter appends date parameter variables into SQL without strict validation"
+  reviewConfidence: high
+  reviewEvidence: "posts_where filter context {pattern} concatenates start/end date variables into post_date predicates and returns the SQL fragment"
+  vulnerableTo: [injection.SqlInjection, validation.ImproperInputValidation]
+}

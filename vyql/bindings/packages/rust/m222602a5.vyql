@@ -1,0 +1,421 @@
+module bindings.rust.generated.m222602a5;
+
+binding httpInput0 {
+  requires {
+    dependency("actix-web")
+  }
+  query pattern callExpr where callee.method == "query" and callee.receiver.type == "HttpRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("actix-web")
+  }
+  query pattern callExpr where callee.method == "form" and callee.receiver.type == "HttpRequest"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("axum")
+  }
+  query pattern callExpr where callee.method == "path" and callee.receiver.type == "Request"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("axum")
+  }
+  query pattern callExpr where callee.method == "query" and callee.receiver.type == "Request"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("rocket")
+  }
+  query pattern callExpr where callee.method == "param" and callee.receiver.type == "Request"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("std")
+  }
+  query pattern callExpr where callee.path ~= "std.env.var"
+  emit source code.SecretValue at call.result
+}
+
+binding externalApiResponse6 {
+  requires {
+    dependency("reqwest")
+  }
+  query pattern callExpr where callee.method == "text"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding externalApiResponse7 {
+  requires {
+    dependency("reqwest")
+  }
+  query pattern callExpr where callee.method == "json"
+  emit source code.ExternalApiResponse at call.result
+}
+
+binding urlFetch8 {
+  requires {
+    dependency("reqwest")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding sqlExecution9 {
+  requires {
+    dependency("sqlx")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution10 {
+  requires {
+    dependency("sqlx")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization11 {
+  requires {
+    dependency("sqlx")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding sqlExecution12 {
+  requires {
+    dependency("diesel")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution13 {
+  requires {
+    dependency("diesel")
+  }
+  query pattern callExpr where callee.method == "sql_query"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization14 {
+  requires {
+    dependency("diesel")
+  }
+  query pattern callExpr where callee.method == "filter"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding nosqlQuery15 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding commandExecution16 {
+  requires {
+    dependency("std::process")
+  }
+  query pattern callExpr where callee.path ~= "Command.new"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding codeEval17 {
+  requires {
+    dependency("rhai")
+  }
+  query pattern callExpr where callee.path ~= "rhai.Engine.eval"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization18 {
+  requires {
+    dependency("serde_json")
+  }
+  query pattern callExpr where callee.path ~= "serde_json.from_str"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization19 {
+  requires {
+    dependency("serde_yaml")
+  }
+  query pattern callExpr where callee.path ~= "serde_yaml.from_str"
+  emit sink code.Deserialization at args[0]
+}
+
+binding safeDeserialization20 {
+  requires {
+    dependency("serde_yaml")
+  }
+  query pattern callExpr where callee.path ~= "serde_yaml.from_str"
+  emit check core.SafeDeserialization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding deserialization21 {
+  requires {
+    dependency("bincode")
+  }
+  query pattern callExpr where callee.path ~= "bincode.deserialize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess22 {
+  requires {
+    dependency("std::fs")
+  }
+  query pattern callExpr where callee.path ~= "fs.read_to_string"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding pathCanonicalization23 {
+  requires {
+    dependency("std::fs")
+  }
+  query pattern callExpr where callee.path ~= "canonicalize"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding archiveEntryWrite24 {
+  requires {
+    dependency("tar")
+  }
+  query pattern callExpr where callee.method == "unpack"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding archiveEntryWrite25 {
+  requires {
+    dependency("zip")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding xmlParse26 {
+  requires {
+    dependency("roxmltree")
+  }
+  query pattern callExpr where callee.path ~= "roxmltree.Document.parse"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xpathQuery27 {
+  requires {
+    dependency("sxd-xpath")
+  }
+  query pattern callExpr where callee.method == "evaluate"
+  emit sink code.XpathQuery at args[0]
+}
+
+binding ldapQuery28 {
+  requires {
+    dependency("ldap3")
+  }
+  query pattern callExpr where callee.method == "streaming_search"
+  emit sink code.LdapQuery at args[1]
+}
+
+binding ldapEscape29 {
+  requires {
+    dependency("ldap3")
+  }
+  query pattern callExpr where callee.path ~= "ldap3.escape_filter"
+  emit check core.LdapEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding templateRender30 {
+  requires {
+    dependency("askama")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding regexCompile31 {
+  requires {
+    dependency("regex")
+  }
+  query pattern callExpr where callee.path ~= "Regex.new"
+  emit sink code.RegexCompileSink at args[0]
+}
+
+binding networkBind32 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.NetworkBind at args[0]
+}
+
+binding networkConnect33 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkData34 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "accept"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend35 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "send_to"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData36 {
+  requires {
+    dependency("mio")
+  }
+  query pattern callExpr where callee.method == "recv_from"
+  emit source code.NetworkData at call.result
+}
+
+binding htmlEscape37 {
+  requires {
+    dependency("ammonia")
+  }
+  query pattern callExpr where callee.path ~= "ammonia.clean"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape38 {
+  requires {
+    dependency("html-escape")
+  }
+  query pattern callExpr where callee.path ~= "html_escape.encode_text"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding shellEscape39 {
+  requires {
+    dependency("shell-escape")
+  }
+  query pattern callExpr where callee.path ~= "shell_escape.escape"
+  emit check core.ShellEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding xmlHardening40 {
+  requires {
+    dependency("quick-xml")
+  }
+  query pattern callExpr where callee.path ~= "quick_xml.Reader"
+  emit check core.XmlHardening at call {
+    covers sameReceiver {
+      anchor: callee.receiver
+    }
+  }
+}
+
+binding redirectAllowlist41 {
+  requires {
+    dependency("validator")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.RedirectAllowlist at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck42 {
+  requires {
+    dependency("actix-identity")
+  }
+  query pattern callExpr where callee.method == "from_request"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck43 {
+  requires {
+    dependency("casbin")
+  }
+  query pattern callExpr where callee.method == "check"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding csrfProtection44 {
+  requires {
+    dependency("actix-csrf")
+  }
+  query pattern callExpr where callee.path ~= "CsrfToken"
+  emit check core.CsrfProtection at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

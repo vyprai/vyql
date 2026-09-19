@@ -1,0 +1,241 @@
+# Tautulli's notification text can carry a backtick-wrapped expression that
+# the notification handler evaluates, so the handler has to hold a line: it
+# compiles the expression and allows only the names in a small allowlist
+# plus the notification parameters. `str_eval` in plexpy/notification_handler.py
+# enforced that line by walking `code.co_names`, and `co_names` on a code
+# object holds only the names the top-level code object itself loads. A
+# lambda body or a generator expression compiles to a separate code object
+# that the outer one reaches through `co_consts`, so a name used only inside
+# the nested scope is never checked and still runs -- `len.__self__` inside
+# a lambda recovers the real builtins module out of the
+# `{'__builtins__': {}}` eval and escapes the allowlist entirely (CWE-94 /
+# CWE-95). The fixed revision extracts the walk into `_check_names` and recurses into
+# `co_consts` for nested code objects.
+#
+# The row's commit 5610c167a17b0898d93d0588a0df81c03306ac52
+# is the v2.17.0 release bump (CHANGELOG.md and plexpy/version.py only). The
+# and the fixing change is 5cafde45727ffc21e4b80e78ad55c58ee7797b2e,, "Prevent RCE in
+# notification text eval", named by the v2.17.0 changelog entry for this CVE.
+# The vulnerable construct is present at 5cafde4^ and the remediation at
+# 5cafde4.
+#
+# Detection is `restrictedEvalNameFilterOmitsNestedScopes`
+# (vyql/bindings/python/restricted_eval_nested_scope_name_filter_gap.vyql)
+# emitting the new `code.RestrictedEvalNestedScopeNameFilterGap`
+# (VYQL-INJ-274). It anchors on a receiverless `compile()` plus a `co_names`
+# read in the same function and negates on the `co_consts` attribute, so the
+# discriminator is whether the guard descends into nested code objects, not
+# where the descent is written: the fixed revision's helper form and an inline descent
+# are both clean, and a guard built on `ast` or `symtable` is out of reach
+# because it never reads `co_names`.
+#
+# Measured with `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` on
+# the notification_handler.py of both revisions, three runs each: 2 findings
+# at 5cafde4^ and 1 at 5cafde4 on every run, the single delta being
+# VYQL-INJ-274 at notification_handler.py:1928. The whole repository does not
+# finish inside the bound, so the collateral is a reachable-set enumeration
+# rather than a subtree sample: across the 94,454 Python files of the corpus
+# checkouts, six functions read `.co_names` and call bare `compile()` --
+# this one, jinja2's `debug.py` frame rewrite (which also reads `co_consts`
+# and is excluded by the negation), and the vendored `pyratemp.py`
+# `EvalPseudoSandbox.compile`, whose own comment reads "prevent breakout via
+# new-style-classes" and which the binding reports without having been
+# written against it.
+#
+# Concepts considered before minting: `code.SandboxHostObjectMemberDenylistGap`
+# is the nearest neighbour but its condition is a live host object forwarded
+# behind a property-name denylist, which is a JavaScript proxy shape and
+# would misreport this guard's evidence text. `code.CodeEval` and
+# `code.ExpressionEval` are taint sinks and are labelled on the
+# `eval()` at both revisions -- the expression text reaches `str_eval` from
+# the stored notifier configuration rather than from a request, and the one
+# request-parameter route (`get_notify_text_preview`) returns at `test=True`
+# before any formatting, so no taint path separates the revisions.
+# `code.H2oJdbcDisallowedParameterDenylistGap` and
+# `code.PickleUnsafeImportBlocklistGap` are denylist gaps whose conditions
+# name one product's parameter or import namespace. The adjacent
+# sandbox-blocklist completeness question -- whether a frozenset of denied
+# attribute names covers every introspection route to builtins -- is
+# measured unanswerable at cve_rank1600, because that is an unbounded
+# enumeration; this one is a single structural fact about two documented
+# code-object attributes, which is why it is expressible here.
+
+test "rank1835: the notification expression filter reads only the top-level code object's names"
+  lang python
+  file plexpy/notification_handler.py
+  expect VYQL-INJ-274
+  expect_review code.RestrictedEvalNestedScopeNameFilterGap
+  code
+  ```
+  import re
+  from string import Formatter
+
+  import helpers
+
+
+  def str_eval(field_name, kwargs):
+      field_name = field_name.strip('`')
+      allowed_names = {
+          'bool': bool,
+          'divmod': helpers.helper_divmod,
+          'float': helpers.cast_to_float,
+          'int': helpers.cast_to_int,
+          'len': helpers.helper_len,
+          'round': helpers.helper_round,
+          'str': str
+      }
+      allowed_names.update(kwargs)
+      code = compile(field_name, '<string>', 'eval')
+      for name in code.co_names:
+          if name not in allowed_names:
+              raise NameError('Use of {name} not allowed'.format(name=name))
+      return eval(code, {'__builtins__': {}}, allowed_names)
+
+
+  class CustomFormatter(Formatter):
+      def __init__(self, default='{{{0}}}'):
+          self.default = default
+          self.eval_regex = re.compile(r'`.*?`')
+          self.eval_replace_regex = re.compile(r'{.*(`.*?`).*}')
+  ```
+
+test "rank1835: the same guard under a different receiver name, with no allowlist dictionary"
+  lang python
+  file plexpy/notifiers/script.py
+  expect VYQL-INJ-274
+  code
+  ```
+  def eval_restricted(expression, names):
+      c = compile(expression, '', 'eval')
+      for i in c.co_names:
+          if i not in names:
+              raise NameError("Name '%s' is not allowed." % i)
+      return eval(c, {'__builtins__': {}}, names)
+  ```
+
+test "rank1835: the fixed revision walks the nested code objects before evaluating"
+  lang python
+  file plexpy/notification_handler.py
+  reject VYQL-INJ-274
+  reject_review code.RestrictedEvalNestedScopeNameFilterGap
+  code
+  ```
+  import re
+  import types
+  from string import Formatter
+  from typing import Any, Callable
+
+  import helpers
+
+
+  def str_eval(field_name: str, kwargs: dict[str, Callable]) -> Any:
+      field_name = field_name.strip('`')
+      allowed_names = {
+          'bool': bool,
+          'divmod': helpers.helper_divmod,
+          'float': helpers.cast_to_float,
+          'int': helpers.cast_to_int,
+          'len': helpers.helper_len,
+          'round': helpers.helper_round,
+          'str': str
+      }
+      allowed_names.update(kwargs)
+      code = compile(field_name, '<string>', 'eval')
+      _check_names(code, allowed_names)
+      return eval(code, {'__builtins__': {}}, allowed_names)
+
+
+  def _check_names(code: types.CodeType, allowed_names: dict[str, Callable]):
+      for name in code.co_names:
+          if name not in allowed_names:
+              raise NameError(f'Use of {name} not allowed')
+      for const in code.co_consts:
+          if isinstance(const, types.CodeType):
+              _check_names(const, allowed_names)
+
+
+  class CustomFormatter(Formatter):
+      def __init__(self, default='{{{0}}}'):
+          self.default = default
+          self.eval_regex = re.compile(r'`.*?`')
+          self.eval_replace_regex = re.compile(r'{.*(`.*?`).*}')
+  ```
+
+test "rank1835: an inline descent into the nested code objects is equally clean"
+  lang python
+  file plexpy/notification_handler.py
+  reject VYQL-INJ-274
+  code
+  ```
+  import types
+
+  import helpers
+
+
+  def str_eval(field_name, kwargs):
+      field_name = field_name.strip('`')
+      allowed_names = {
+          'bool': bool,
+          'int': helpers.cast_to_int,
+          'len': helpers.helper_len,
+          'str': str
+      }
+      allowed_names.update(kwargs)
+      code = compile(field_name, '<string>', 'eval')
+      pending = [code]
+      while pending:
+          current = pending.pop()
+          for name in current.co_names:
+              if name not in allowed_names:
+                  raise NameError('Use of {name} not allowed'.format(name=name))
+          for const in current.co_consts:
+              if isinstance(const, types.CodeType):
+                  pending.append(const)
+      return eval(code, {'__builtins__': {}}, allowed_names)
+  ```
+
+test "rank1835: an expression filter built on the ast module does not read co_names"
+  lang python
+  file plexpy/notification_handler.py
+  reject VYQL-INJ-274
+  code
+  ```
+  import ast
+
+  import helpers
+
+
+  _DENIED_ATTRIBUTES = frozenset({
+      '__subclasses__', '__bases__', '__mro__', '__globals__',
+      '__code__', '__class__', '__dict__', '__builtins__',
+  })
+
+
+  def str_eval(field_name, kwargs):
+      field_name = field_name.strip('`')
+      allowed_names = {
+          'bool': bool,
+          'int': helpers.cast_to_int,
+          'len': helpers.helper_len,
+          'str': str
+      }
+      allowed_names.update(kwargs)
+      tree = ast.parse(field_name, mode='eval')
+      for node in ast.walk(tree):
+          if isinstance(node, ast.Attribute) and node.attr in _DENIED_ATTRIBUTES:
+              raise NameError('Use of {0} not allowed'.format(node.attr))
+          if isinstance(node, ast.Name) and node.id not in allowed_names:
+              raise NameError('Use of {0} not allowed'.format(node.id))
+      return eval(compile(tree, '<string>', 'eval'), {'__builtins__': {}}, allowed_names)
+  ```
+
+test "rank1835: a co_names read nowhere near a compile reports nothing"
+  lang python
+  file plexpy/database.py
+  reject VYQL-INJ-274
+  code
+  ```
+  def describe(frame):
+      names = list(frame.f_code.co_names)
+      return ', '.join(sorted(names))
+  ```

@@ -1,0 +1,8 @@
+module code;
+
+review code.ConvertSvgMultiSvgSanitizerBypass {
+  category: path
+  expected: [core.HtmlEscape, core.PathAccessCheck]
+  kind: attention
+  text: "review convert-svg multi-SVG conversion for selecting only the first SVG before sanitizing and rendering in Puppeteer"
+}

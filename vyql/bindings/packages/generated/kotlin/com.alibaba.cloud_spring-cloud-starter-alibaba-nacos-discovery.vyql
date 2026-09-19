@@ -1,0 +1,33 @@
+module bindings.kotlin.generated.m38d17cae;
+
+binding secretValue0 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery")
+  }
+  query pattern callExpr where callee.method == "getUsername"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery")
+  }
+  query pattern callExpr where callee.method == "getPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery")
+  }
+  query pattern callExpr where callee.method == "getAccessKey"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("com.alibaba.cloud:spring-cloud-starter-alibaba-nacos-discovery")
+  }
+  query pattern callExpr where callee.method == "getSecretKey"
+  emit source code.SecretValue at call.result
+}

@@ -1,0 +1,52 @@
+module bindings.java.spring_security_wildcard_exemption;
+
+// WebSecurity.ignoring() is Spring Security's documented way to drop every
+// security filter for matched requests -- its own JavaDoc asks that it be
+// used sparingly -- and the reactive stack builds the same exemption by
+// handing a MatcherSecurityWebFilterChain a path matcher and a filter list
+// that does nothing. Whatever control replaces the skipped filters (an
+// endpoint interceptor, a gateway check) guards only the paths it knows,
+// typically the ones it discovers at runtime, so an exemption whose pattern
+// is one hardcoded whole-prefix wildcard ("/namespace/**") covers every
+// other handler under that prefix too: those paths lose the filter chain
+// and keep no replacement control.
+//
+// The judgement lives in the pack rule; these bindings only recognise the
+// shape. The servlet form requires the ignoring call together with an
+// AntPathRequestMatcher built in the same method, the reactive form the
+// pathMatchers call together with a security filter chain built in the
+// same method, and both require a string literal that is a complete
+// wildcard pattern (it ends in "/**"). What clears the finding is the
+// pattern not being hardcoded: deriving the patterns at runtime appends
+// the wildcard to a computed prefix, so the negation on a "/**"
+// concatenation in the same method is the derivation marker, and a
+// matcher taking computed patterns has no wildcard literal to match. The
+// anchors are exact method names, so an authorization rule using the same
+// wildcard matcher constructors -- which grants access rather than
+// removing the filters -- is not an exemption, and the antMatchers DSL
+// spelling is not this recognition either.
+//
+// Residual, stated rather than hidden: a matcher built in a helper method
+// is invisible to the ignoring call's context (recall direction), an
+// exemption hardcoded as a constant-plus-wildcard concatenation reads as
+// derived (recall direction), and a hand-enumerated list of per-endpoint
+// wildcard literals inside an ignoring call still matches, though a
+// reviewer clears it as bounded to known endpoints.
+
+binding springSecurityIgnoringWildcardPattern {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.call in ["ignoring"]
+    and node.context.call in ["AntPathRequestMatcher"]
+    and (node.context.literal endsWith "/**")
+    and not (node.context.expr contains "/**")
+  emit issue code.HardcodedWildcardFilterChainExemption at node
+}
+
+binding springReactiveFilterChainWildcardPattern {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.call in ["pathMatchers"]
+    and node.context.call in ["MatcherSecurityWebFilterChain"]
+    and (node.context.literal endsWith "/**")
+    and not (node.context.expr contains "/**")
+  emit issue code.HardcodedWildcardFilterChainExemption at node
+}

@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m3e00b9de;
+
+binding urlFetch0 {
+  requires {
+    dependency("org.apache.httpcomponents:httpasyncclient")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.UrlFetch at args[0]
+}

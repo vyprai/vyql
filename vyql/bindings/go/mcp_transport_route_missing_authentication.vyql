@@ -1,0 +1,41 @@
+module bindings.go.mcp_transport_route_missing_authentication;
+
+// The Model Context Protocol's HTTP transports are not one endpoint but two.
+// mark3labs/mcp-go's SSE server documents them as `WithSSEEndpoint` and
+// `WithMessageEndpoint`, and the protocol describes the same split: the event
+// stream carries server-to-client notifications, while every client request --
+// `tools/call` included -- is POSTed to the message endpoint. A tool invocation
+// therefore never traverses the stream path at all, so the message path is the
+// one that has to carry the access control. A middleware chain applied to the
+// stream path alone protects the half of the transport that cannot invoke
+// anything.
+//
+// MCP's own security guidance is that a server exposed over HTTP authenticates
+// the requests it accepts, because a tool call is an arbitrary server-side
+// operation chosen by the caller: for a configuration or process-management
+// server that means writing files and restarting services. A registration of
+// the message endpoint whose handler chain names no authentication publishes
+// that operation set to whoever can reach the port (CWE-306).
+//
+// The shape is a router's own registration API -- gin's and echo's
+// `Any`/`GET`/`POST`/`Handle`, chi's and net/http's `Handle`/`HandleFunc` --
+// where the arguments name both an MCP transport and a message channel, and no
+// argument names an authentication handler. Go records each argument's callee
+// path alongside its literals on the registration node, so a middleware value
+// passed positionally is visible here and so is a handler named for the MCP
+// server; matching is case-insensitive substring, which is what makes
+// `AuthRequired`, `RequireAuth`, `JWTAuth` and `middleware.Authz` all read as
+// authentication being present.
+//
+// Two limits worth stating. A deployment that leaves both `WithSSEEndpoint` and
+// `WithMessageEndpoint` at their defaults spells the message path `/message`
+// with nothing MCP-shaped in it, and is only reached here when the handler
+// argument itself is named for the MCP server. And a chain whose authentication
+// lives in a middleware named for neither the mechanism nor the decision reads
+// as absent -- both are recall, not precision, which is why the finding is a
+// review target: it asserts that nothing in this route's own chain
+// authenticates, not that the deployment is reachable.
+binding goMcpTransportRouteMissingAuthentication {
+  query pattern callExpr where callee.method in ["Any", "GET", "POST", "PUT", "PATCH", "DELETE", "Handle", "HandleFunc", "Match", "RouteNotFound"] and args.any.literal contains "mcp" and args.any.literal contains "message" and not containsAny(args.any.literal, ["auth", "jwt", "session", "login", "bearer", "apikey", "api_key", "credential", "identity", "permission", "secure"])
+  emit issue code.McpTransportRouteMissingAuthentication at call
+}

@@ -1,0 +1,387 @@
+# Rank 1410 / CVE-2020-25020: mpxj reads Microsoft Project, Primavera,
+# GanttProject, Gantt Designer, Phoenix and ConceptDraw project files, and six
+# of its readers unmarshal the caller's stream through a SAX parser they build
+# themselves. Four of them built it from a stock factory:
+#
+#   SAXParserFactory factory = SAXParserFactory.newInstance();
+#   SAXParser saxParser = factory.newSAXParser();
+#   XMLReader xmlReader = saxParser.getXMLReader();
+#   SAXSource doc = new SAXSource(xmlReader, new InputSource(stream));
+#   Project ganttProject = (Project) CONTEXT.createUnmarshaller().unmarshal(doc);
+#
+# A JAXP SAXParserFactory left in its default state processes DOCTYPE
+# declarations and resolves external entities, so a `.gan`, `.ppx`, `.cdpz` or
+# Gantt Designer file carrying
+# `<!DOCTYPE p [<!ENTITY e SYSTEM "file:///etc/passwd">]>` makes the library
+# read local files and fetch attacker-chosen URLs on behalf of whatever opened
+# the project file -- CWE-611, GHSA-wcp5-m52f-mhh5.
+#
+# Step 0, `commit?` / metadata COMMIT_MISMATCH: the row is correct. Pool SHA
+# 0d830e8cbe5213968abb1bcb1c816ca2ee00aa53 resolves in joniles/mpxj as "XXE
+# vulnerability fix (#178)", 29 Aug 2020, and it is the fixing change rather than a
+# release bump: it adds net/sf/mpxj/common/UnmarshalHelper.java, whose
+# createXmlReader() sets
+# `factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)`
+# before newSAXParser(), and rewrites all seven XML readers to route through it.
+# The remediation is present at the fixed revision (the only SAXParserFactory left in
+# src/main/java is UnmarshalHelper's, hardened) and the vulnerable construct is
+# present at the parent: of seven `factory.newSAXParser()` sites at
+# 0d830e8cbe^, PhoenixReader:138, ConceptDrawProjectReader:117,
+# GanttDesignerReader:99 and GanttProjectReader:141 set no feature at all, while
+# MSPDIReader:197, PlannerReader:133 and PrimaveraPMFileReader:269
+# disallowed doctype declarations. No pool row correction.
+#
+# The construct is bound and the rule for it exists: binding xmlParserCreate143
+# labels `newSAXParser` code.XmlParserCreate and VYQL-DESER-004 judges it
+# medium unless a core.XmlHardening control covers the site. Scanning the four
+# unhardened readers on their own at 0d830e8cbe^ reports all four, with
+# `unless endpoint coveredBy core.XmlHardening` and
+# `unless sameReceiver coveredBy core.XmlHardening` both unsatisfied, and the
+# fixed forms of the same seven files plus UnmarshalHelper report none.
+#
+# On the real tree the four findings were suppressed, and the cause was the
+# receiver-name fallback behind `unless sameReceiver coveredBy
+# core.XmlHardening`. `Engine.sameReceiverGuardReceivers`
+# (internal/engine/engine.go) folded every guard node carrying concrete
+# `sameReceiver` coverage into one map keyed on the receiver's identifier text,
+# cached per control and qualified by neither file, package, function nor type,
+# and `Engine.sameReceiverGuarded` consulted it by name whenever the sink's own
+# `recv` node carries no coverage. Every one of the seven readers spells its
+# factory local `factory`, so MSPDIReader's one setFeature call cleared the four
+# unhardened readers in other packages; MerlinReader survived only because its
+# receiver chain is `DocumentBuilderFactory.newInstance`, a different name. The
+# fallback now keys a guard by its receiver's name within the guard's own file,
+# so a same-named local in another file no longer inherits the coverage, while a
+# receiver hardened in a constructor or initialiser still covers its uses
+# elsewhere in the same file -- the idiom the fallback exists for.
+#
+# Measured on the real tree: scanning src/main/java whole at 0d830e8cbe^
+# reports five VYQL-DESER-004 -- PhoenixReader:138,
+# ConceptDrawProjectReader:117, GanttDesignerReader:99, GanttProjectReader:141
+# and the untouched MerlinReader:169 -- stably over three runs, and the fixed
+# revision reports only MerlinReader:169. VYQL-DESER-002 stays at 49 rows on
+# the parent and the finding total moves 401 to 405, exactly the four recovered
+# rows and nothing else. On lucene/queryparser, the tree where the fallback was
+# first measured, the parent revision's nine rows are byte-identical before and
+# after, and the fixed revision goes from four rows to eight: the four that
+# return are the byte-identical unhardened constructions the upstream fix never
+# touched, and the only row the revision pair still removes is
+# CoreParser.java:137, the line that fix itself hardened.
+#
+# The last three cases below are the minimal pairs. The cross-file pair -- a
+# hardened reader and a stock reader, both locals named factory, one file each
+# -- differs from the same-file pair only in where the classes live, and that is
+# the only token that decides. Within one file the name-keyed approximation
+# still covers, deliberately, so a same-named local in the hardening's own file
+# stays silenced: the residual the same-file pair pins, and the reason the
+# unhardened local's name is the token the last pair varies.
+#
+# Two precision defects showed up in the same revision pair and are recorded
+# rather than fixed here. Binding xmlParse141 is `callee.method == "parse"` with
+# no receiver constraint, so of 49 VYQL-DESER-002 (CWE-611, high) rows on
+# src/main/java at 0d830e8cbe^, 46 are `DateFormat`/`DecimalFormat`/
+# `NumberFormat.parse` calls in DatatypeConverter and Record classes and two are
+# mpxj's own private `parse(...)` helpers. And VYQL-DESER-002 cannot separate
+# these revisions in either direction: its three real `XMLFilter.parse` rows are
+# ConceptDrawProjectReader:131 (genuinely vulnerable), MSPDIReader:229 and
+# PrimaveraPMFileReader:284 (both hardened), and at the fixed revision the row
+# simply moves to the hardened UnmarshalHelper.java:101.
+#
+# verify_current_expected: fixed
+#
+# The binding and rule predate the fix and are unchanged; only the engine's
+# receiver-key scoping moved. OWASP Java and Python are gated on the stacked
+# branch with the engine change in place.
+
+test "rank1410: GanttProjectReader unmarshals the caller's stream through a stock SAXParserFactory"
+  lang java
+  file src/main/java/net/sf/mpxj/ganttproject/GanttProjectReader.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package net.sf.mpxj.ganttproject;
+
+  import java.io.InputStream;
+
+  import javax.xml.bind.JAXBContext;
+  import javax.xml.bind.Unmarshaller;
+  import javax.xml.parsers.SAXParser;
+  import javax.xml.parsers.SAXParserFactory;
+  import javax.xml.transform.sax.SAXSource;
+
+  import org.xml.sax.InputSource;
+  import org.xml.sax.XMLReader;
+
+  import net.sf.mpxj.ProjectFile;
+  import net.sf.mpxj.ganttproject.schema.Project;
+
+  public final class GanttProjectReader extends AbstractProjectReader
+  {
+     @Override public ProjectFile read(InputStream stream) throws MPXJException
+     {
+        try
+        {
+           m_projectFile = new ProjectFile();
+           m_eventManager = m_projectFile.getEventManager();
+
+           m_projectFile.getProjectProperties().setFileApplication("GanttProject");
+           m_projectFile.getProjectProperties().setFileType("GAN");
+
+           m_eventManager.addProjectListeners(m_projectListeners);
+
+           SAXParserFactory factory = SAXParserFactory.newInstance();
+           SAXParser saxParser = factory.newSAXParser();
+           XMLReader xmlReader = saxParser.getXMLReader();
+           SAXSource doc = new SAXSource(xmlReader, new InputSource(stream));
+
+           if (CONTEXT == null)
+           {
+              throw CONTEXT_EXCEPTION;
+           }
+
+           Unmarshaller unmarshaller = CONTEXT.createUnmarshaller();
+
+           Project ganttProject = (Project) unmarshaller.unmarshal(doc);
+
+           readProjectProperties(ganttProject);
+           readTasks(ganttProject);
+
+           return m_projectFile;
+        }
+
+        catch (Exception ex)
+        {
+           throw new MPXJException("Failed to parse file", ex);
+        }
+     }
+
+     private ProjectFile m_projectFile;
+     private EventManager m_eventManager;
+     private static final JAXBContext CONTEXT;
+     private static JAXBException CONTEXT_EXCEPTION;
+  }
+  ```
+
+test "rank1410: the fixed revision builds every reader's XMLReader from a factory that disallows doctype declarations"
+  lang java
+  file src/main/java/net/sf/mpxj/common/UnmarshalHelper.java
+  reject VYQL-DESER-004
+  code
+  ```
+  package net.sf.mpxj.common;
+
+  import java.io.InputStream;
+
+  import javax.xml.bind.JAXBContext;
+  import javax.xml.parsers.ParserConfigurationException;
+  import javax.xml.parsers.SAXParserFactory;
+  import javax.xml.transform.sax.SAXSource;
+
+  import org.xml.sax.InputSource;
+  import org.xml.sax.SAXException;
+  import org.xml.sax.XMLReader;
+
+  public final class UnmarshalHelper
+  {
+     public static final Object unmarshal(JAXBContext context, InputStream stream) throws SAXException, ParserConfigurationException
+     {
+        return context.createUnmarshaller().unmarshal(new SAXSource(createXmlReader(), new InputSource(stream)));
+     }
+
+     public static final XMLReader createXmlReader() throws SAXException, ParserConfigurationException
+     {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setNamespaceAware(true);
+        return factory.newSAXParser().getXMLReader();
+     }
+  }
+  ```
+
+test "rank1410: the patched reader builds no parser of its own"
+  lang java
+  file src/main/java/net/sf/mpxj/ganttproject/GanttProjectReader.java
+  reject VYQL-DESER-004
+  code
+  ```
+  package net.sf.mpxj.ganttproject;
+
+  import java.io.InputStream;
+
+  import javax.xml.bind.JAXBContext;
+
+  import net.sf.mpxj.ProjectFile;
+  import net.sf.mpxj.common.UnmarshalHelper;
+  import net.sf.mpxj.ganttproject.schema.Project;
+
+  public final class GanttProjectReader extends AbstractProjectReader
+  {
+     @Override public ProjectFile read(InputStream stream) throws MPXJException
+     {
+        try
+        {
+           if (CONTEXT == null)
+           {
+              throw CONTEXT_EXCEPTION;
+           }
+
+           m_projectFile = new ProjectFile();
+           m_eventManager = m_projectFile.getEventManager();
+
+           m_projectFile.getProjectProperties().setFileApplication("GanttProject");
+           m_projectFile.getProjectProperties().setFileType("GAN");
+
+           m_eventManager.addProjectListeners(m_projectListeners);
+
+           Project ganttProject = (Project) UnmarshalHelper.unmarshal(CONTEXT, stream);
+
+           readProjectProperties(ganttProject);
+           readTasks(ganttProject);
+
+           return m_projectFile;
+        }
+
+        catch (Exception ex)
+        {
+           throw new MPXJException("Failed to parse file", ex);
+        }
+     }
+
+     private ProjectFile m_projectFile;
+     private EventManager m_eventManager;
+     private static final JAXBContext CONTEXT;
+     private static JAXBException CONTEXT_EXCEPTION;
+  }
+  ```
+
+test "rank1410: a sibling reader that hardens its own factory silences one that does not, because both locals are named factory"
+  lang java
+  file src/main/java/net/sf/mpxj/mspdi/MSPDIReader.java
+  reject VYQL-DESER-004
+  code
+  ```
+  package net.sf.mpxj.mspdi;
+
+  import java.io.InputStream;
+
+  import javax.xml.parsers.SAXParser;
+  import javax.xml.parsers.SAXParserFactory;
+  import javax.xml.transform.sax.SAXSource;
+
+  import org.xml.sax.InputSource;
+  import org.xml.sax.XMLReader;
+
+  public final class MSPDIReader
+  {
+     public XMLReader hardenedReader() throws Exception
+     {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setNamespaceAware(true);
+        SAXParser saxParser = factory.newSAXParser();
+        return saxParser.getXMLReader();
+     }
+  }
+
+  final class GanttProjectReader
+  {
+     public SAXSource sourceFor(InputStream stream) throws Exception
+     {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        SAXParser saxParser = factory.newSAXParser();
+        XMLReader xmlReader = saxParser.getXMLReader();
+        return new SAXSource(xmlReader, new InputSource(stream));
+     }
+  }
+  ```
+
+test "rank1410: renaming the unhardened factory's local, and nothing else, restores the finding"
+  lang java
+  file src/main/java/net/sf/mpxj/mspdi/MSPDIReader.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package net.sf.mpxj.mspdi;
+
+  import java.io.InputStream;
+
+  import javax.xml.parsers.SAXParser;
+  import javax.xml.parsers.SAXParserFactory;
+  import javax.xml.transform.sax.SAXSource;
+
+  import org.xml.sax.InputSource;
+  import org.xml.sax.XMLReader;
+
+  public final class MSPDIReader
+  {
+     public XMLReader hardenedReader() throws Exception
+     {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setNamespaceAware(true);
+        SAXParser saxParser = factory.newSAXParser();
+        return saxParser.getXMLReader();
+     }
+  }
+
+  final class GanttProjectReader
+  {
+     public SAXSource sourceFor(InputStream stream) throws Exception
+     {
+        SAXParserFactory plainFactory = SAXParserFactory.newInstance();
+        SAXParser saxParser = plainFactory.newSAXParser();
+        XMLReader xmlReader = saxParser.getXMLReader();
+        return new SAXSource(xmlReader, new InputSource(stream));
+     }
+  }
+  ```
+
+test "rank1410: a reader that hardens its factory in another file does not silence this one"
+  lang java
+  file src/main/java/net/sf/mpxj/mspdi/MSPDIReader.java
+  expect VYQL-DESER-004
+  code
+  ```
+  package net.sf.mpxj.mspdi;
+
+  import javax.xml.parsers.SAXParser;
+  import javax.xml.parsers.SAXParserFactory;
+
+  import org.xml.sax.XMLReader;
+
+  public final class MSPDIReader
+  {
+     public XMLReader hardenedReader() throws Exception
+     {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+        factory.setNamespaceAware(true);
+        SAXParser saxParser = factory.newSAXParser();
+        return saxParser.getXMLReader();
+     }
+  }
+  ```
+  file src/main/java/net/sf/mpxj/ganttproject/GanttProjectReader.java
+  code
+  ```
+  package net.sf.mpxj.ganttproject;
+
+  import java.io.InputStream;
+
+  import javax.xml.parsers.SAXParser;
+  import javax.xml.parsers.SAXParserFactory;
+
+  import org.xml.sax.InputSource;
+  import org.xml.sax.XMLReader;
+
+  final class GanttProjectReader
+  {
+     public org.xml.sax.SAXSource sourceFor(InputStream stream) throws Exception
+     {
+        SAXParserFactory factory = SAXParserFactory.newInstance();
+        SAXParser saxParser = factory.newSAXParser();
+        XMLReader xmlReader = saxParser.getXMLReader();
+        return new org.xml.sax.SAXSource(xmlReader, new InputSource(stream));
+     }
+  }
+  ```

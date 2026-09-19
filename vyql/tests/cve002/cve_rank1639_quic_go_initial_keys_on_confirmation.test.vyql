@@ -1,0 +1,87 @@
+# Rank 1639 / CVE-2025-59530: quic-go's Conn dropped Initial encryption
+# keys only conditionally -- on the client when the first Handshake packet
+# is sent, on the server when the first Handshake packet arrives --
+# and handleHandshakeConfirmed then dropped the Handshake level and
+# confirmed the handshake without ever touching the Initial level. A
+# misbehaving server that sends HANDSHAKE_DONE prematurely drives a client
+# through that transition with Initial keys still installed, and the next
+# Initial-protected packet reaches an assertion when queued for later
+# decryption, crashing the process (CWE-617/CWE-755, DoS;
+# GHSA-47m2-4cr7-mhcw). the fixing commit ce7c9ea8: it makes
+# handleHandshakeConfirmed drop protocol.EncryptionInitial unconditionally
+# ahead of the Handshake level. The remediation is present at the fixed revision and
+# absent at its parent 97f3aae; no row correction.
+#
+# FIXED by binding handshakeConfirmedInitialKeysNotDropped977 in
+# vyql/bindings/go/m48a985c1.vyql, emitting the existing
+# code.ProtocolStateReview (VYQL-AUTH-082, whose CWE list carries CWE-404,
+# improper resource shutdown/release -- RFC 9001 4.9.1 requires Initial
+# keys discarded no later than handshake confirmation). The anchor is the
+# cryptoStreamHandler.SetHandshakeConfirmed call the guarded method keeps
+# in both revisions, and the discriminator is the dropEncryptionLevel call
+# with the EncryptionInitial argument the fixed revision adds -- both spellings exist
+# in the tree before the change, so the binding keys on the protocol's own
+# vocabulary, not the fixing commit's. Measured on the real tree over
+# three --cache off runs each: the vulnerable revision reports exactly one
+# VYQL-AUTH-082, at connection.go:951 (handleHandshakeConfirmed's function
+# context, 70 findings total against a 69 baseline), and the patched
+# revision reports none (69 findings, back to baseline). connection.go
+# scanned alone discriminates the same way, 2 findings vs 1. Collateral:
+# cryptoStreamHandler.SetHandshakeConfirmed occurs nowhere else in the
+# corpus except one vendored quic-go v0.57.0 under nhost, which
+# carries the change and stays suppressed (0 AUTH-082 among its 984
+# findings).
+
+test "rank1639: go quic-go handshake confirmation drops handshake keys but keeps initial keys"
+  lang go
+  file connection.go
+  expect VYQL-AUTH-082
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  package connection
+
+  func (c *Conn) handleHandshakeConfirmed(now monotime.Time) error {
+      if err := c.dropEncryptionLevel(protocol.EncryptionHandshake, now); err != nil {
+          return err
+      }
+
+      c.handshakeConfirmed = true
+      c.cryptoStreamHandler.SetHandshakeConfirmed()
+
+      if !c.config.DisablePathMTUDiscovery && c.conn.capabilities().DF {
+          c.mtuDiscoverer.Start(now)
+      }
+      return nil
+  }
+  ```
+
+test "rank1639: go quic-go handshake confirmation drops initial keys first"
+  lang go
+  file connection.go
+  reject VYQL-AUTH-082
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  package connection
+
+  func (c *Conn) handleHandshakeConfirmed(now monotime.Time) error {
+      // Drop initial keys.
+      // On the client side, this should have happened when sending the first Handshake packet,
+      // but this is not guaranteed if the server misbehaves.
+      if err := c.dropEncryptionLevel(protocol.EncryptionInitial, now); err != nil {
+          return err
+      }
+      if err := c.dropEncryptionLevel(protocol.EncryptionHandshake, now); err != nil {
+          return err
+      }
+
+      c.handshakeConfirmed = true
+      c.cryptoStreamHandler.SetHandshakeConfirmed()
+
+      if !c.config.DisablePathMTUDiscovery && c.conn.capabilities().DF {
+          c.mtuDiscoverer.Start(now)
+      }
+      return nil
+  }
+  ```

@@ -1,0 +1,65 @@
+module bindings.ruby.generated.m426fc52d;
+
+binding logOutput0 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "debug"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput1 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput2 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "warn"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput3 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "error"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput4 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "fatal"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput5 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "unknown"
+  emit sink code.LogOutput at args[0]
+}
+
+binding fileUse6 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding storedDataRead7 {
+  requires {
+    dependency("meta_request")
+  }
+  query pattern callExpr where callee.method == "events_json"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,0 +1,251 @@
+# The PublicCMS UEditor controller's remote-image capture fetches each URL
+# the editor supplies, sniffs the response stream to derive a file
+# extension, and persists the stream into the site's web files whenever the
+# sniff yields any extension at all -- so every fetchable content type,
+# HTML and internal service responses included, is stored and handed back
+# to the editor as an uploaded image (server-side request forgery with
+# content persistence, CWE-918/CWE-436; issue #51). The gate in
+# `catchimage` (publiccms-parent/publiccms-core/src/main/java/com/
+# publiccms/controller/admin/sys/UeditorAdminController.java) reads:
+#
+#     FileType fileType = FileTypeDetector.detectFileType(inputStream);
+#     String suffix = fileType.getCommonExtension();
+#     if (CommonUtils.notEmpty(suffix)) { ... copyInputStreamToFile ... }
+#
+# The sniffing pair is the metadata-extractor library's documented API:
+# `FileTypeDetector.detectFileType(InputStream)` types the stream and
+# `FileType.getCommonExtension()` names the common extension of what it
+# found. Commit 0f4c4872 keeps the fetch and adds the family restriction
+# the feature implies -- `null != fileType.getMimeType() &&
+# fileType.getMimeType().startsWith("image/")` joins the gate, and an empty
+# result list now reports failure instead of success -- so a non-image
+# response is still fetched but no longer persisted or announced.
+#
+# ## Measured at the current tip
+#
+# Three `--cache off` runs per revision over each full checkout (timeout
+# 180, --max-ram 6GB): the controller carries one VYQL-INJ-001 row at
+# :157-:164 and two VYQL-INJ-009 rows at both revisions, identical across
+# the fix, plus one `core.ResourceRelease` flag on the try-with-resources
+# close at :208 -- nothing on the fetch, the sniff or the persist in either
+# the findings report or the `-flags only` view. The source half of the
+# request-forgery chain is labelled (`request.getParameterValues` ->
+# code.HttpInput at :210), but no Apache HttpClient call is bound: `HttpGet`
+# construction and `HttpClient.execute` match none of the Java
+# `code.UrlFetch` bindings (`openStream`, `openConnection`, `getForObject`,
+# `getForEntity`), and `CmsFileUtils.copyInputStreamToFile` is bound as no
+# sink. A fetch-side binding cannot discriminate this fix in principle --
+# the fixed revision fetches the same unvalidated URLs and only the
+# persistence is gated -- so the request-forgery detections that exist
+# (VYQL-RF-001 taint, the fetch-guard review family) fire identically at
+# both revisions even with the client bound.
+#
+# ## Why no binding ships
+#
+# The function context carries every call the gate uses, function-confined:
+# throwaway probes over both revisions label `detectFileType`,
+# `copyInputStreamToFile`, `HttpGet` and `getCommonExtension` at both, and
+# `getMimeType` only at the fixed revision -- a clean discriminator, but it
+# is the fixing commit's own API choice rather than the weakness. A probe
+# binding `detectFileType` + `copyInputStreamToFile` under
+# `not getMimeType/getContentType` on the three blocks below fires on the
+# any-type gate, stays dark on the shipped fix, and fires on the third
+# block: an extension allowlist restricting the persisted family to
+# jpg/png/gif without ever reading the mime type, an equally-valid
+# remediation the mime-read negation cannot see (an enum-membership gate
+# `fileType == FileType.JPEG` produces no call token at all). The general
+# condition -- the sniffed type is consulted but never restricted to the
+# family the feature promises -- has no token-level expression that is not
+# an enumeration of remediation spellings, and each spelling missed
+# mislabels a correctly-fixed variant.
+#
+# The shape also holds no second instance to measure precision on: across
+# 60,856 Java files in the local clone corpus, `detectFileType` occurs in
+# exactly this target's two revisions, `guessContentTypeFromStream`,
+# `getContentTypeFor` and `MimetypesFileTypeMap` in none, and
+# `probeContentType` only inside the Tika library's own detector
+# implementation -- a consumer nowhere. A concept minted for a population
+# of one tree would be inert everywhere else, and no existing concept
+# carries the semantics: `IncompleteFileExtensionValidation` is the other
+# axis of the same trust decision (admission on the sniffed extension while
+# the client-declared one goes unread, a documented pair on the
+# uploaded-file classes), `UnsanitizedSvgUpload` is domain-locked to SVG
+# sanitisers, and the request-forgery guard family is fetch-side.
+#
+# verify_current_expected: attention-vocabulary-gap, all three tests
+# rejected. Tests 1 and 2 pin the revision pair; test 3 pins the bar any
+# future detection must clear: when fetched-content family-restriction
+# vocabulary lands, test 1 flips to expect while tests 2 and 3 stay reject
+# -- a detection keyed on the mime read alone fails test 3, which is why
+# none ships today.
+
+test "rank1614: fetched content saves with any detected type"
+  lang java
+  file publiccms-parent/publiccms-core/src/main/java/com/publiccms/controller/admin/sys/UeditorAdminController.java
+  reject VYQL-RF-001
+  code
+  ```
+  package com.publiccms.controller.admin.sys;
+
+  import java.io.BufferedInputStream;
+  import java.util.ArrayList;
+  import java.util.List;
+  import java.util.Map;
+
+  import com.drew.imaging.FileType;
+  import com.drew.imaging.FileTypeDetector;
+
+  public class UeditorAdminController {
+
+      public Map<String, Object> catchimage(HttpServletRequest request) throws Exception {
+          try (CloseableHttpClient httpclient = HttpClients.custom()
+                  .setDefaultRequestConfig(CommonConstants.defaultRequestConfig).build();) {
+              String[] files = request.getParameterValues(FIELD_NAME + "[]");
+              if (CommonUtils.notEmpty(files)) {
+                  List<Map<String, Object>> list = new ArrayList<>();
+                  for (String image : files) {
+                      HttpGet httpget = new HttpGet(image);
+                      CloseableHttpResponse response = httpclient.execute(httpget);
+                      HttpEntity entity = response.getEntity();
+                      if (null != entity) {
+                          BufferedInputStream inputStream = new BufferedInputStream(entity.getContent());
+                          FileType fileType = FileTypeDetector.detectFileType(inputStream);
+                          String suffix = fileType.getCommonExtension();
+                          if (CommonUtils.notEmpty(suffix)) {
+                              String fileName = CmsFileUtils.getUploadFileName(suffix);
+                              String filePath = siteComponent.getWebFilePath(site, fileName);
+                              CmsFileUtils.copyInputStreamToFile(inputStream, filePath);
+                              list.add(getResultMap(true));
+                          }
+                      }
+                      EntityUtils.consume(entity);
+                  }
+                  Map<String, Object> map = getResultMap(true);
+                  map.put("list", list);
+                  return map;
+              }
+          } catch (Exception e) {
+              log.error(e.getMessage(), e);
+              return getResultMap(false);
+          }
+          return getResultMap(false);
+      }
+  }
+  ```
+
+test "rank1614: the fixed revision saves images only"
+  lang java
+  file publiccms-parent/publiccms-core/src/main/java/com/publiccms/controller/admin/sys/UeditorAdminController.java
+  reject VYQL-RF-001
+  code
+  ```
+  package com.publiccms.controller.admin.sys;
+
+  import java.io.BufferedInputStream;
+  import java.util.ArrayList;
+  import java.util.List;
+  import java.util.Map;
+
+  import com.drew.imaging.FileType;
+  import com.drew.imaging.FileTypeDetector;
+
+  public class UeditorAdminController {
+
+      public Map<String, Object> catchimage(HttpServletRequest request) throws Exception {
+          try (CloseableHttpClient httpclient = HttpClients.custom()
+                  .setDefaultRequestConfig(CommonConstants.defaultRequestConfig).build();) {
+              String[] files = request.getParameterValues(FIELD_NAME + "[]");
+              if (CommonUtils.notEmpty(files)) {
+                  List<Map<String, Object>> list = new ArrayList<>();
+                  for (String image : files) {
+                      HttpGet httpget = new HttpGet(image);
+                      CloseableHttpResponse response = httpclient.execute(httpget);
+                      HttpEntity entity = response.getEntity();
+                      if (null != entity) {
+                          BufferedInputStream inputStream = new BufferedInputStream(entity.getContent());
+                          FileType fileType = FileTypeDetector.detectFileType(inputStream);
+                          String suffix = fileType.getCommonExtension();
+                          if (null != fileType.getMimeType() && fileType.getMimeType().startsWith("image/")
+                                  && CommonUtils.notEmpty(suffix)) {
+                              String fileName = CmsFileUtils.getUploadFileName(suffix);
+                              String filePath = siteComponent.getWebFilePath(site, fileName);
+                              CmsFileUtils.copyInputStreamToFile(inputStream, filePath);
+                              list.add(getResultMap(true));
+                          }
+                      }
+                      EntityUtils.consume(entity);
+                  }
+                  if (list.isEmpty()) {
+                      return getResultMap(false);
+                  } else {
+                      Map<String, Object> map = getResultMap(true);
+                      map.put("list", list);
+                      return map;
+                  }
+              }
+          } catch (Exception e) {
+              log.error(e.getMessage(), e);
+              return getResultMap(false);
+          }
+          return getResultMap(false);
+      }
+  }
+  ```
+
+test "rank1614: an extension allowlist restricts the family without the mime read"
+  lang java
+  file publiccms-parent/publiccms-core/src/main/java/com/publiccms/controller/admin/sys/UeditorAdminController.java
+  reject VYQL-RF-001
+  code
+  ```
+  package com.publiccms.controller.admin.sys;
+
+  import java.io.BufferedInputStream;
+  import java.util.ArrayList;
+  import java.util.List;
+  import java.util.Map;
+
+  import com.drew.imaging.FileType;
+  import com.drew.imaging.FileTypeDetector;
+
+  public class UeditorAdminController {
+
+      public Map<String, Object> catchimage(HttpServletRequest request) throws Exception {
+          try (CloseableHttpClient httpclient = HttpClients.custom()
+                  .setDefaultRequestConfig(CommonConstants.defaultRequestConfig).build();) {
+              String[] files = request.getParameterValues(FIELD_NAME + "[]");
+              if (CommonUtils.notEmpty(files)) {
+                  List<Map<String, Object>> list = new ArrayList<>();
+                  for (String image : files) {
+                      HttpGet httpget = new HttpGet(image);
+                      CloseableHttpResponse response = httpclient.execute(httpget);
+                      HttpEntity entity = response.getEntity();
+                      if (null != entity) {
+                          BufferedInputStream inputStream = new BufferedInputStream(entity.getContent());
+                          FileType fileType = FileTypeDetector.detectFileType(inputStream);
+                          String suffix = fileType.getCommonExtension();
+                          if ("jpg".equals(suffix) || "png".equals(suffix) || "gif".equals(suffix)) {
+                              String fileName = CmsFileUtils.getUploadFileName(suffix);
+                              String filePath = siteComponent.getWebFilePath(site, fileName);
+                              CmsFileUtils.copyInputStreamToFile(inputStream, filePath);
+                              list.add(getResultMap(true));
+                          }
+                      }
+                      EntityUtils.consume(entity);
+                  }
+                  if (list.isEmpty()) {
+                      return getResultMap(false);
+                  } else {
+                      Map<String, Object> map = getResultMap(true);
+                      map.put("list", list);
+                      return map;
+                  }
+              }
+          } catch (Exception e) {
+              log.error(e.getMessage(), e);
+              return getResultMap(false);
+          }
+          return getResultMap(false);
+      }
+  }
+  ```

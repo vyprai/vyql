@@ -1,0 +1,17 @@
+module bindings.cpp.generated.m915ee8a7;
+
+binding networkSend0 {
+  requires {
+    dependency("boost-mpi")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("boost-mpi")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

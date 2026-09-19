@@ -1,0 +1,119 @@
+# OpenCV's vendored OpenJPEG: opj_jp2_read_header in 3rdparty/openjpeg/openjp2/jp2.c
+# captures the status of the header decode into ret and then reads the image
+# the decode handed back through p_image, inside a branch that tests only the
+# pointers' non-nullness:
+#
+#     ret = opj_j2k_read_header(p_stream, jp2->j2k, p_image, p_manager);
+#     if (p_image && *p_image) {
+#         (*p_image)->color_space = OPJ_CLRSPC_SRGB;
+#
+# The null guard proves the callee stored a pointer, not that the call
+# succeeded, and opj_j2k_read_header returns along its own error paths with
+# the image half-built -- so the writes and reads behind (*p_image)-> land on
+# the fields a failing decode abandoned mid-construction. The fix consults
+# the status in the same guard: `if (ret && p_image && *p_image)`.
+#
+# Snippets modelled on the real function: the assignment form the real code
+# uses (ret is declared separately above the call), the decoder's real
+# signature, and a member write through the double dereference.
+
+test "the image a decode handed back is read while its status goes unconsulted"
+  lang c
+  file 3rdparty/openjpeg/openjp2/jp2.c
+  expect VYQL-MEM-075
+  code
+  ```
+  typedef int OPJ_BOOL;
+  typedef struct { int color_space; } opj_image_t;
+  typedef struct { int dummy; } opj_stream_private_t;
+  typedef struct { int dummy; } opj_jp2_codec;
+
+  OPJ_BOOL opj_j2k_read_header(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image, int *manager);
+
+  int process(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image) {
+      int manager = 0;
+      OPJ_BOOL ret;
+      ret = opj_j2k_read_header(stream, codec, p_image, &manager);
+      if (p_image && *p_image) {
+          (*p_image)->color_space = 18;
+      }
+      return ret;
+  }
+  ```
+
+test "the same read gated on the decode's status reports nothing"
+  lang c
+  file 3rdparty/openjpeg/openjp2/jp2.c
+  reject VYQL-MEM-075
+  code
+  ```
+  typedef int OPJ_BOOL;
+  typedef struct { int color_space; } opj_image_t;
+  typedef struct { int dummy; } opj_stream_private_t;
+  typedef struct { int dummy; } opj_jp2_codec;
+
+  OPJ_BOOL opj_j2k_read_header(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image, int *manager);
+
+  int process(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image) {
+      int manager = 0;
+      OPJ_BOOL ret;
+      ret = opj_j2k_read_header(stream, codec, p_image, &manager);
+      if (ret && p_image && *p_image) {
+          (*p_image)->color_space = 18;
+      }
+      return ret;
+  }
+  ```
+
+test "a status consulted in a dominating branch also reports nothing"
+  lang c
+  file 3rdparty/openjpeg/openjp2/jp2.c
+  reject VYQL-MEM-075
+  code
+  ```
+  typedef int OPJ_BOOL;
+  typedef struct { int color_space; } opj_image_t;
+  typedef struct { int dummy; } opj_stream_private_t;
+  typedef struct { int dummy; } opj_jp2_codec;
+
+  OPJ_BOOL opj_j2k_read_header(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image, int *manager);
+
+  int process(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image) {
+      int manager = 0;
+      OPJ_BOOL ret;
+      ret = opj_j2k_read_header(stream, codec, p_image, &manager);
+      if (ret == 0) {
+          return ret;
+      }
+      if (p_image && *p_image) {
+          (*p_image)->color_space = 18;
+      }
+      return ret;
+  }
+  ```
+
+test "a branch that releases the handle instead of reading it reports nothing"
+  lang c
+  file 3rdparty/openjpeg/openjp2/jp2.c
+  reject VYQL-MEM-075
+  code
+  ```
+  typedef int OPJ_BOOL;
+  typedef struct { int color_space; } opj_image_t;
+  typedef struct { int dummy; } opj_stream_private_t;
+  typedef struct { int dummy; } opj_jp2_codec;
+
+  OPJ_BOOL opj_j2k_read_header(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image, int *manager);
+  void opj_image_destroy(opj_image_t *image);
+
+  int process(opj_stream_private_t *stream, opj_jp2_codec *codec, opj_image_t **p_image) {
+      int manager = 0;
+      OPJ_BOOL ret;
+      ret = opj_j2k_read_header(stream, codec, p_image, &manager);
+      if (p_image && *p_image) {
+          opj_image_destroy(*p_image);
+          *p_image = 0;
+      }
+      return ret;
+  }
+  ```

@@ -1,0 +1,8 @@
+module code;
+
+review code.UnanchoredOAuthEmailRegexAuthBypass {
+  category: auth
+  expected: [core.AuthenticationCheck, core.InputValidation]
+  kind: target
+  text: "verify OAuth email authorization uses exact or full-string matching instead of prefix regex matching"
+}

@@ -1,0 +1,7 @@
+module code;
+
+review code.ShortSecurityIdentifier {
+  category: crypto
+  kind: attention
+  text: "review shortened security identifiers for collision-resistant trust decisions"
+}

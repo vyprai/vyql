@@ -1,0 +1,44 @@
+# Groovy (Jenkins/Gradle/groovy.sql) coverage: command, SQLi, code eval.
+
+test "groovy: Jenkins params -> sh step is command injection"
+  lang groovy
+  expect VYQL-INJ-002
+  code
+  ```
+  def build(name) {
+    def b = params.BRANCH
+    sh("git checkout " + b)
+  }
+  ```
+
+test "groovy: a constant sh step is clean"
+  lang groovy
+  reject VYQL-INJ-002
+  code
+  ```
+  def build(name) {
+    sh("git status")
+  }
+  ```
+
+test "groovy: params -> sql.execute is SQL injection"
+  lang groovy
+  expect VYQL-INJ-001
+  code
+  ```
+  def lookup(name) {
+    def id = params.ID
+    sql.execute("SELECT * FROM users WHERE id = " + id)
+  }
+  ```
+
+test "groovy: params -> Eval.me is code injection"
+  lang groovy
+  expect VYQL-INJ-003
+  code
+  ```
+  def run(name) {
+    def x = params.EXPR
+    Eval.me(x)
+  }
+  ```

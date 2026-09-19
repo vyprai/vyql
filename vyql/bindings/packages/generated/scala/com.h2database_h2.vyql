@@ -1,0 +1,9 @@
+module bindings.scala.generated.m451fa4af;
+
+binding deserialization0 {
+  requires {
+    dependency("com.h2database:h2")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,175 @@
+# Rank 1222 / CVE-2023-48710: iTop's pages/exec.php dispatches a page by module,
+# page and environment names read from the request and then requires the file
+# it builds from them:
+#
+#   $sModule = utils::ReadParam('exec_module', '');
+#   $sModule = basename($sModule);
+#   $sPage = utils::ReadParam('exec_page', '', false, 'raw_data');
+#   $sPage = basename($sPage);
+#   $sEnvironment = utils::ReadParam('exec_env', utils::GetCurrentEnvironment());
+#   $sTargetPage = APPROOT.'env-'.$sEnvironment.'/'.$sModule.'/'.$sPage;
+#   if (!file_exists($sTargetPage)) { exit; }
+#   require_once($sTargetPage);
+#
+# $sModule and $sPage go through basename(), but exec_env does not, so the
+# environment segment of the path is fully attacker-controlled and the three
+# fields together can steer require_once at any file the web server can read
+# (CWE-98). The fixed revision adds a second condition alongside
+# file_exists -- the target's extension must be "php" -- but does not touch
+# how $sTargetPage is built.
+#
+# CAUGHT by rule VYQL-PATH-002 (FileInclusion), unchanged. utils::ReadParam
+# reads $_REQUEST, already a bound code.HttpInput source, and require_once
+# normalizes to the same php.sinks code.FileInclude binding as include, so a
+# scan of the real checkout's pages/ and application/ directories at the
+# vulnerable commit (timeout 180, --max-ram 4GB, --cache off) reports it
+# directly: source code.HttpInput at utils.inc.php:305 (the $_REQUEST read
+# inside ReadParam), sink code.FileInclude at exec.php:62, `unless endpoint
+# coveredBy core.PathAccessCheck` unsatisfied. No binding, concept, or rule
+# change made.
+#
+# The same scan against the patched commit still reports the identical
+# finding, one line lower (exec.php:63) — deliberately. Rank 1034 already
+# settled this: a check on the string shape of the target (basename there,
+# an extension comparison here) is not a core.PathAccessCheck allow-list, and
+# VYQL-PATH-002 has no `unless path coveredBy core.PathCanonicalization`
+# clause at all, so nothing about a target's name or suffix can suppress it —
+# only a check on the resolved endpoint can. The fixed revision does narrow
+# the bug (an attacker can reach only existing .php files, not upload
+# content under an arbitrary name and have it run), but the taint path
+# VYQL-PATH-002 is built to flag -- untrusted data steering which file gets
+# required, with no allow-list on the endpoint -- is exactly as present at
+# the fixed revision as at the vulnerable one. The second test below pins that both revisions expect, and the
+# third shows the same shape is silent once every segment is a literal.
+
+test "rank1222: exec_env, exec_module and exec_page steer require_once"
+  lang php
+  file application/utils.inc.php
+  code
+  ```
+  <?php
+  class utils
+  {
+      public static function ReadParam($sName, $defaultValue = "", $bAllowCLI = false, $sSanitizationFilter = 'parameter')
+      {
+          $retValue = $defaultValue;
+          if (isset($_REQUEST[$sName])) {
+              $retValue = $_REQUEST[$sName];
+          }
+          return $retValue;
+      }
+  }
+  ```
+  file pages/exec.php
+  expect VYQL-PATH-002
+  code
+  ```
+  <?php
+  require_once('../approot.inc.php');
+  require_once(APPROOT.'application/utils.inc.php');
+
+  $sModule = utils::ReadParam('exec_module', '');
+  $sModule = basename($sModule);
+
+  $sPage = utils::ReadParam('exec_page', '', false, 'raw_data');
+  $sPage = basename($sPage);
+
+  $sEnvironment = utils::ReadParam('exec_env', 'production');
+
+  $sTargetPage = APPROOT.'env-'.$sEnvironment.'/'.$sModule.'/'.$sPage;
+
+  if (!file_exists($sTargetPage))
+  {
+      echo "Wrong module, page name or environment...";
+      exit;
+  }
+
+  require_once($sTargetPage);
+  ```
+
+test "rank1222: the shipped extension check still reports, since it is not an allow-list"
+  lang php
+  file application/utils.inc.php
+  code
+  ```
+  <?php
+  class utils
+  {
+      public static function ReadParam($sName, $defaultValue = "", $bAllowCLI = false, $sSanitizationFilter = 'parameter')
+      {
+          $retValue = $defaultValue;
+          if (isset($_REQUEST[$sName])) {
+              $retValue = $_REQUEST[$sName];
+          }
+          return $retValue;
+      }
+  }
+  ```
+  file pages/exec.php
+  expect VYQL-PATH-002
+  code
+  ```
+  <?php
+  require_once('../approot.inc.php');
+  require_once(APPROOT.'application/utils.inc.php');
+
+  $sModule = utils::ReadParam('exec_module', '');
+  $sModule = basename($sModule);
+
+  $sPage = utils::ReadParam('exec_page', '', false, 'raw_data');
+  $sPage = basename($sPage);
+
+  $sEnvironment = utils::ReadParam('exec_env', 'production');
+
+  $sTargetPage = APPROOT.'env-'.$sEnvironment.'/'.$sModule.'/'.$sPage;
+
+  if (!file_exists($sTargetPage)
+      || (strtolower(pathinfo($sTargetPage, PATHINFO_EXTENSION)) !== "php")
+  ) {
+      echo "Wrong module, page name or environment...";
+      exit;
+  }
+
+  require_once($sTargetPage);
+  ```
+
+test "rank1222: a require_once built entirely from literals is not a finding"
+  lang php
+  file application/utils.inc.php
+  code
+  ```
+  <?php
+  class utils
+  {
+      public static function ReadParam($sName, $defaultValue = "", $bAllowCLI = false, $sSanitizationFilter = 'parameter')
+      {
+          $retValue = $defaultValue;
+          if (isset($_REQUEST[$sName])) {
+              $retValue = $_REQUEST[$sName];
+          }
+          return $retValue;
+      }
+  }
+  ```
+  file pages/exec.php
+  reject VYQL-PATH-002
+  code
+  ```
+  <?php
+  require_once('../approot.inc.php');
+  require_once(APPROOT.'application/utils.inc.php');
+
+  $sModule = 'itop-config';
+  $sPage = 'ajax.dashboard.php';
+  $sEnvironment = 'production';
+
+  $sTargetPage = APPROOT.'env-'.$sEnvironment.'/'.$sModule.'/'.$sPage;
+
+  if (!file_exists($sTargetPage))
+  {
+      echo "Wrong module, page name or environment...";
+      exit;
+  }
+
+  require_once($sTargetPage);
+  ```

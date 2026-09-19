@@ -1,0 +1,9 @@
+module bindings.swift.generated.m8775735e;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/cx-org/CombineX")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

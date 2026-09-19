@@ -1,0 +1,11 @@
+module code;
+
+concept ClassroomBookingsDisplayNameAltXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "the global menu label can contain an attacker-controlled stored display name"
+  reviewCategory: xss
+  reviewCondition: "classroombookings renders a user display name into an image alt attribute string without attribute escaping"
+  reviewConfidence: high
+  reviewEvidence: "layout template context {pattern} builds a CodeIgniter img() attribute string from the global menu label"
+  vulnerableTo: [injection.Xss]
+}

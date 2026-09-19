@@ -1,0 +1,9 @@
+module bindings.dart.generated.mda67a73c;
+
+binding deserialization0 {
+  requires {
+    dependency("syncfusion_flutter_calendar")
+  }
+  query pattern callExpr where callee.method == "parseRRule"
+  emit sink code.Deserialization at args[0]
+}

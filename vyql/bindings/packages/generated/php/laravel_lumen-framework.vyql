@@ -1,0 +1,18 @@
+module bindings.php.generated.md1ea5684;
+
+binding httpInput0 {
+  requires {
+    dependency("laravel/lumen-framework")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.HttpInput at call.result
+}
+
+binding redirectTarget1 {
+  requires {
+    dependency("laravel/lumen-framework")
+  }
+  query pattern callExpr where callee.method == "redirect"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

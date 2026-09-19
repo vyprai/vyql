@@ -1,0 +1,67 @@
+test "rank226: checksum error redirects may use request logoutURL"
+  lang groovy
+  expect VYQL-RF-009
+  expect_review code.ChecksumErrorLogoutRedirect
+  code
+  ```
+  class ApiController {
+    def index() {
+      boolean redirectClient = REDIRECT_RESPONSE
+      if (!(validationResponse == null)) {
+        if (validationResponse.getKey() == "checksumError") {
+          invalid(validationResponse.getKey(), validationResponse.getValue(), redirectClient);
+        } else {
+          invalid(validationResponse.getKey(), validationResponse.getValue(), redirectClient, errorRedirectUrl);
+        }
+      }
+    }
+
+    private void invalid(key, msg, redirectResponse = false, errorRedirectUrl = "") {
+      if (redirectResponse) {
+        respondWithRedirect(errorsJSONArray, errorRedirectUrl)
+      }
+    }
+
+    private void respondWithRedirect(errorsJSONArray, redirectUrl = "") {
+      String uriString = paramsProcessorUtil.getDefaultLogoutUrl()
+      if (!StringUtils.isEmpty(params.logoutURL)) {
+        uriString = params.logoutURL
+      }
+      redirect(url: uriString)
+    }
+  }
+  ```
+
+test "rank226: checksum error disables request logoutURL redirect"
+  lang groovy
+  reject VYQL-RF-009
+  reject_review code.ChecksumErrorLogoutRedirect
+  code
+  ```
+  class ApiController {
+    def index() {
+      boolean redirectClient = REDIRECT_RESPONSE
+      if (!(validationResponse == null)) {
+        if (validationResponse.getKey() == "checksumError") {
+          invalid(validationResponse.getKey(), validationResponse.getValue(), redirectClient, "", false);
+        } else {
+          invalid(validationResponse.getKey(), validationResponse.getValue(), redirectClient, errorRedirectUrl);
+        }
+      }
+    }
+
+    private void invalid(key, msg, redirectResponse = false, errorRedirectUrl = "", useLogoutUrl = true) {
+      if (redirectResponse) {
+        respondWithRedirect(errorsJSONArray, errorRedirectUrl, useLogoutUrl)
+      }
+    }
+
+    private void respondWithRedirect(errorsJSONArray, redirectUrl = "", useLogoutUrl = true) {
+      String uriString = paramsProcessorUtil.getDefaultLogoutUrl()
+      if (useLogoutUrl && !StringUtils.isEmpty(params.logoutURL)) {
+        uriString = params.logoutURL
+      }
+      redirect(url: uriString)
+    }
+  }
+  ```

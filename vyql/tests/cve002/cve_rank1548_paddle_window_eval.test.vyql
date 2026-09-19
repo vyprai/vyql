@@ -1,0 +1,123 @@
+# Rank 1548 / CVE-2022-46742: PaddlePaddle's audio window helper
+# built its window function by evaluating a caller-supplied name, so
+# any path passing user-influenced configuration into the audio
+# transforms executed arbitrary Python (code injection, CWE-95; PR
+# #47386). The tail of get_window in python/paddle/audio/functional/
+# window.py did `try: winfunc = eval('_' + winstr) except
+# NameError as e: ...`, where winstr is the caller-supplied window
+# name taken from the tuple head or the string itself. The fixing
+# commit 26c419ca38 ("[audio]fix audio get_window security error"):
+# a WindowFunctionRegister registry maps function names to
+# implementations (@window_function_register.register() decorators,
+# get by dict lookup), and eval is deleted.
+#
+# get_window is the module's public API, so the library profile's
+# parameter source labels its `window` parameter as a trust boundary
+# (code.ExternalEntryInput refines core.UserControlledData) and
+# VYQL-INJ-003 carries it through the subscript and the string
+# concatenation into eval. The registry form keeps the same public
+# parameter and the same concatenation but ends in a dict lookup, so
+# no code-execution sink exists anywhere in the function -- the
+# control is structural absence.
+#
+# Real-tree A/B, 3 x --cache off / timeout 180 / --max-ram 6GB: the
+# whole repository aborts at the 6 GiB ceiling at both revisions, so
+# the measured trees are the audio functional directory and
+# root-inclusive bounded copies that keep pyproject.toml at the scan
+# root. Auto profile on the functional directory alone resolves
+# Generic and reports zero at both revisions -- the sub-root scan
+# never sees the manifest that detects the library archetype, which
+# is why the first pass read this as an uncovered miss. With the
+# library profile active (explicitly, or auto-resolved from
+# pyproject.toml at the scan root): the vulnerable revision reports
+# one critical VYQL-INJ-003 on window.py (source the `window`
+# parameter at :302, sink eval at :351, fingerprint c498acdf7172db65,
+# 3/3 identical runs) and the fixed revision reports none (3/3), the
+# only other delta being a medium VYQL-AUTH-105 the fix's own
+# registry class attracts. A wider bounded copy adds one
+# VYQL-INJ-003 on tensor/einsum.py:553 -- an eval of a
+# parameter-derived equation string in the same library, present at
+# both revisions and untouched by this fix.
+
+test "rank1548: the public window name is evaluated as code"
+  lang python
+  profile library
+  file python/paddle/audio/functional/window.py
+  expect VYQL-INJ-003
+  code
+  ```
+  from typing import Tuple, Union
+
+
+  def get_window(
+      window: Union[str, Tuple[str, float]],
+      win_length: int,
+      fftbins: bool = True,
+  ):
+      args = ()
+      if isinstance(window, tuple):
+          winstr = window[0]
+          if len(window) > 1:
+              args = window[1:]
+      elif isinstance(window, str):
+          winstr = window
+
+      try:
+          winfunc = eval('_' + winstr)
+      except NameError as e:
+          raise ValueError("Unknown window type.") from e
+
+      params = (win_length,) + args
+      return winfunc(*params)
+  ```
+
+test "rank1548: the fixed revision looks the name up in a registry"
+  lang python
+  profile library
+  file python/paddle/audio/functional/window.py
+  reject VYQL-INJ-003
+  code
+  ```
+  from typing import Tuple, Union
+
+
+  class WindowFunctionRegister(object):
+      def __init__(self):
+          self._functions_dict = dict()
+
+      def register(self, func=None):
+          def add_subfunction(func):
+              name = func.__name__
+              self._functions_dict[name] = func
+              return func
+
+          return add_subfunction
+
+      def get(self, name):
+          return self._functions_dict[name]
+
+
+  window_function_register = WindowFunctionRegister()
+
+
+  def get_window(
+      window: Union[str, Tuple[str, float]],
+      win_length: int,
+      fftbins: bool = True,
+  ):
+      args = ()
+      if isinstance(window, tuple):
+          winstr = window[0]
+          if len(window) > 1:
+              args = window[1:]
+      elif isinstance(window, str):
+          winstr = window
+
+      try:
+          winfunc = window_function_register.get('_' + winstr)
+      except KeyError as e:
+          raise ValueError("Unknown window type.") from e
+
+      params = (win_length,) + args
+      return winfunc(*params)
+  ```

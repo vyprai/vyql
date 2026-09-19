@@ -1,0 +1,341 @@
+# Elixir language-gap narrowing: exhaustive coverage for adapter-claimed idioms.
+
+test "elixir exhaustive: Phoenix params reach command execution"
+  lang elixir
+  expect VYQL-INJ-002
+  code
+  ```
+  def index(conn, params) do
+    System.shell(params["cmd"])
+    System.cmd("sh", ["-c", params["cmd"]])
+  end
+  ```
+
+test "elixir exhaustive: constant commands are clean"
+  lang elixir
+  reject VYQL-INJ-002
+  code
+  ```
+  def index(conn, _params) do
+    System.shell("echo safe")
+    System.cmd("sh", ["-c", "echo safe"])
+  end
+  ```
+
+test "elixir exhaustive: Ecto raw query reaches SQL execution"
+  lang elixir
+  expect VYQL-INJ-001
+  code
+  ```
+  def index(conn, params) do
+    Ecto.Adapters.SQL.query(Repo, params["q"])
+    Ecto.Adapters.SQL.query!(Repo, params["q"])
+  end
+  ```
+
+test "elixir exhaustive: constant Ecto raw query is clean"
+  lang elixir
+  reject VYQL-INJ-001
+  code
+  ```
+  def index(conn, _params) do
+    Ecto.Adapters.SQL.query(Repo, "select 1")
+  end
+  ```
+
+test "elixir exhaustive: Code module evaluates tainted strings"
+  lang elixir
+  expect VYQL-INJ-003
+  code
+  ```
+  def index(conn, params) do
+    Code.eval_string(params["code"])
+    Code.compile_string(params["code"])
+  end
+  ```
+
+test "elixir exhaustive: constant Code module strings are clean"
+  lang elixir
+  reject VYQL-INJ-003
+  code
+  ```
+  def index(conn, _params) do
+    Code.eval_string("1 + 1")
+  end
+  ```
+
+test "elixir exhaustive: binary_to_term deserializes tainted data"
+  lang elixir
+  expect VYQL-DESER-001
+  code
+  ```
+  def index(conn, params) do
+    :erlang.binary_to_term(params["blob"])
+  end
+  ```
+
+test "elixir exhaustive: constant binary_to_term data is clean"
+  lang elixir
+  reject VYQL-DESER-001
+  code
+  ```
+  def index(conn, _params) do
+    :erlang.binary_to_term(<<131, 100, 0, 2, 111, 107>>)
+  end
+  ```
+
+test "elixir exhaustive: Regex.compile and compile! use tainted patterns"
+  lang elixir
+  expect VYQL-DOS-001
+  code
+  ```
+  def index(conn, params) do
+    Regex.compile(params["pattern"])
+    Regex.compile!(params["pattern"])
+  end
+  ```
+
+test "elixir exhaustive: constant regex patterns are clean"
+  lang elixir
+  reject VYQL-DOS-001
+  code
+  ```
+  def index(conn, _params) do
+    Regex.compile!("^[a-z]+$")
+  end
+  ```
+
+test "elixir exhaustive: File APIs access tainted paths"
+  lang elixir
+  expect VYQL-PATH-001
+  code
+  ```
+  def index(conn, params) do
+    p = params["path"]
+    File.read(p)
+    File.read!(p)
+    File.write(p, "x")
+    File.write!(p, "x")
+    File.open(p)
+    File.open!(p)
+    File.rm(p)
+    File.rm!(p)
+    File.stream!(p)
+    File.cp(p, "./out")
+    File.rename(p, "./out")
+    File.chmod(p, 0o600)
+  end
+  ```
+
+test "elixir exhaustive: constant File API paths are clean"
+  lang elixir
+  reject VYQL-PATH-001
+  code
+  ```
+  def index(conn, _params) do
+    File.read("./safe.txt")
+    File.cp("./safe.txt", "./out.txt")
+  end
+  ```
+
+test "elixir exhaustive: weak crypto primitives are reported"
+  lang elixir
+  expect VYQL-CRY-001
+  expect VYQL-CRY-002
+  code
+  ```
+  def f(data, key, iv) do
+    :crypto.hash(:md5, data)
+    :crypto.hash(:sha, data)
+    :crypto.crypto_one_time(:des_cbc, key, iv, data, true)
+    :crypto.crypto_one_time(:rc4, key, iv, data, true)
+  end
+  ```
+
+test "elixir exhaustive: stronger crypto primitives are clean"
+  lang elixir
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  code
+  ```
+  def f(data, key, iv) do
+    :crypto.hash(:sha256, data)
+    :crypto.crypto_one_time(:aes_256_cbc, key, iv, data, true)
+  end
+  ```
+
+test "elixir exhaustive: static IV and weak randomness are reported"
+  lang elixir
+  expect VYQL-CRY-004
+  expect VYQL-CRY-003
+  code
+  ```
+  def f(data, key) do
+    :crypto.crypto_one_time(:aes_256_cbc, key, "0000000000000000", data, true)
+    :rand.uniform()
+  end
+  ```
+
+test "elixir exhaustive: runtime IV and secure randomness are clean"
+  lang elixir
+  reject VYQL-CRY-004
+  reject VYQL-CRY-003
+  code
+  ```
+  def f(data, key, iv) do
+    :crypto.crypto_one_time(:aes_256_cbc, key, iv, data, true)
+    :crypto.strong_rand_bytes(32)
+  end
+  ```
+
+test "elixir exhaustive: insecure cookie and cleartext URL are reported"
+  lang elixir
+  expect VYQL-CFG-007
+  expect VYQL-CFG-006
+  code
+  ```
+  def index(conn, _params) do
+    put_resp_cookie(conn, "sid", "v", secure: false)
+    HTTPoison.get("http://example.com")
+    Req.get("http://example.com")
+  end
+  ```
+
+test "elixir exhaustive: secure cookie and HTTPS URL are clean"
+  lang elixir
+  reject VYQL-CFG-007
+  reject VYQL-CFG-006
+  code
+  ```
+  def index(conn, _params) do
+    put_resp_cookie(conn, "sid", "v", secure: true)
+    HTTPoison.get("https://example.com")
+  end
+  ```
+
+test "elixir exhaustive: File.chmod world-writable mode is reported"
+  lang elixir
+  expect VYQL-CFG-008
+  code
+  ```
+  def f() do
+    File.chmod("./upload", 0o777)
+  end
+  ```
+
+test "elixir exhaustive: restrictive File.chmod mode is clean"
+  lang elixir
+  reject VYQL-CFG-008
+  code
+  ```
+  def f() do
+    File.chmod("./secret", 0o600)
+  end
+  ```
+
+test "elixir exhaustive: trust boundary stores tainted session value"
+  lang elixir
+  expect VYQL-CFG-014
+  code
+  ```
+  def index(conn, params) do
+    Plug.Conn.put_session(conn, :user_id, params["user_id"])
+  end
+  ```
+
+test "elixir exhaustive: validated value is clean for trust boundary"
+  lang elixir
+  reject VYQL-CFG-014
+  code
+  ```
+  def index(conn, params) do
+    clean = validate_role(params["role"])
+    Plug.Conn.put_session(conn, :role, clean)
+  end
+  ```
+
+test "elixir exhaustive: LDAP and XPath queries receive tainted expressions"
+  lang elixir
+  expect VYQL-INJ-005
+  expect VYQL-INJ-006
+  code
+  ```
+  def index(conn, params) do
+    :eldap.search(conn, params["filter"])
+    SweetXml.xpath(doc, params["xp"])
+  end
+  ```
+
+test "elixir exhaustive: escaped LDAP and XPath expressions are clean"
+  lang elixir
+  reject VYQL-INJ-005
+  reject VYQL-INJ-006
+  code
+  ```
+  def index(conn, params) do
+    :eldap.search(conn, encode_for_ldap(params["filter"]))
+    SweetXml.xpath(doc, escape_xpath(params["xp"]))
+  end
+  ```
+
+test "elixir exhaustive: Phoenix raw renders tainted HTML"
+  lang elixir
+  expect VYQL-INJ-004
+  code
+  ```
+  def index(conn, params) do
+    Phoenix.HTML.raw(params["html"])
+  end
+  ```
+
+test "elixir exhaustive: escaped HTML is clean for raw render"
+  lang elixir
+  reject VYQL-INJ-004
+  code
+  ```
+  def index(conn, params) do
+    Phoenix.HTML.raw(escape_html(params["html"]))
+  end
+  ```
+
+test "elixir exhaustive: sensitive operations require auth"
+  lang elixir
+  expect VYQL-AUTH-001
+  code
+  ```
+  def index(conn, params) do
+    change_password()
+  end
+  ```
+
+test "elixir exhaustive: auth guard suppresses sensitive operation"
+  lang elixir
+  reject VYQL-AUTH-001
+  code
+  ```
+  def index(conn, params) do
+    require_auth(conn)
+    change_password()
+  end
+  ```
+
+test "elixir exhaustive: object lookup by user input is IDOR"
+  lang elixir
+  expect VYQL-AUTH-002
+  code
+  ```
+  def index(conn, params) do
+    Accounts.get_user(params["id"])
+  end
+  ```
+
+test "elixir exhaustive: ownership guard suppresses IDOR"
+  lang elixir
+  reject VYQL-AUTH-002
+  code
+  ```
+  def index(conn, params) do
+    check_ownership(conn, params["id"])
+    Accounts.get_user(params["id"])
+  end
+  ```

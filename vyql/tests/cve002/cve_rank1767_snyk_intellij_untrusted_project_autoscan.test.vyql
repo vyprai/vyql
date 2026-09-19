@@ -1,0 +1,266 @@
+# Snyk's IntelliJ plugin auto-ran its project scan the moment a project is
+# opened: SnykTaskQueueService.scan() queues a Task.Backgroundable whose run()
+# body saves the documents and then unconditionally fans out into
+# scheduleSnykCodeScan / scheduleOssScan / scheduleIacScan / scheduleContainerScan.
+# Those scans drive the Snyk CLI over the opened project, and analyzing a
+# project executes the project's own build tooling and metadata files, so a
+# user who clones a malicious repository gets code execution the moment the IDE
+# opens it (CWE-78 / CWE-94 as recorded by the advisory; the injection itself
+# lives in the snyk CLI npm package, this repository's share of the defect is
+# that the scan is launched with no notion of whether the project is trusted).
+#
+# The fixed revision (56682f4b, GHSA-4vrv-93c7-m92j) adds a workspace-trust gate at the
+# very top of run():
+#     project.basePath?.let {
+#         if (!confirmScanningAndSetWorkspaceTrustedStateIfNeeded(Paths.get(it))) return
+#     }
+# backed by three new files in a private snyk.trust package: a
+# WorkspaceTrustSettings persistent component holding a trusted-path list, a
+# WorkspaceTrustService consulting it, and TrustedProjects.kt showing a modal
+# MessageDialogBuilder.yesNo dialog and recording the answer.
+#
+# ATTENTION, rechecked. Nothing here is a dataflow defect and nothing in the
+# remediation is nameable through a documented API, so no binding separates the
+# two revisions. Measured on the real checkout, three --cache off runs per
+# side, stable:
+#   * `vyql match` on SnykTaskQueueService.kt labels nothing at either
+#     revision -- no source, no sink, no control. project.basePath is the IDE's
+#     own configuration, not attacker text, and the fan-out calls are the
+#     plugin's own private methods.
+#   * The whole repository scans to 12 findings at 56682f4b^ and a
+#     byte-identical 12 at 56682f4b -- same rules, same finding fingerprints,
+#     over three runs each. Eleven sit on test fixtures
+#     (kubernetes-deployment.yaml, terraform-main.tf, package.json,
+#     requirements.txt, ConsoleCommandRunnerTest.kt). The one finding in
+#     src/main is VYQL-CFG-004 code.CertValidationDisabled on the CLI
+#     downloader's NoopHostnameVerifier
+#     (services/download/HttpRequestHelper.kt:12) -- a real but separate
+#     weakness in the same plugin, carried identically by both revisions, so
+#     it is not coverage of this one.
+#   * The review-flag view agrees: 10 flags at 56682f4b^ against 11 at
+#     56682f4b, the only difference a core.ResourceRelease control on the fix's
+#     own new test helper (src/test/kotlin/snyk/InMemoryFsRule.kt:30). A
+#     control, not a detection -- `-flag-loc trust` returns no flags at all on
+#     the fixed revision, so nothing labels the trust package the fix adds.
+#   * The counterweight test fails. The new trust files import only generic
+#     IntelliJ platform APIs -- MessageDialogBuilder, Messages,
+#     SimplePersistentStateComponent, @Service, Logger -- plus java.nio.file.
+#     Across every clone under /tmp/cve-work, MessageDialogBuilder appears in
+#     exactly one Kotlin file, TrustedProjects.kt, the fixed revision itself,
+#     so a binding keyed on it is keyed on the fixing commit's own vocabulary:
+#     renaming the helper it sits behind loses the flag entirely. basePath,
+#     the other candidate, appears in 22 Kotlin files across the same corpus
+#     and is semantically just "where the project lives".
+#   * The gate is not nameable where it stands anyway. `vyql graph` on the
+#     fixed service file lowers `project.basePath?.let` as a call named
+#     project.basePath.let, while the negated
+#     `!confirmScanningAndSetWorkspaceTrustedStateIfNeeded(Paths.get(it))` on
+#     the next line yields no call node carrying the helper's name at all:
+#     tree-sitter-kotlin parses `!guard(it)` as a call_expression whose callee
+#     is a unary_expression, and ktConv.dotted
+#     (internal/extract/frontend/treesitter/kotlin.go:710) has no case for
+#     that kind, so the call lowers with Path "?". That is the callee-side
+#     face of the engine gap recorded against rank 1214, and it is open even
+#     though the argument-side half is fixed. Closing it would make the
+#     helper's own name reachable -- and that name is precisely what a
+#     binding must not key on.
+#   * The fix consults no documented IntelliJ trust API anywhere: it rolls its
+#     own dialog over MessageDialogBuilder and its own allowlist over
+#     SimplePersistentStateComponent. So the "did the fix leave a documented
+#     API call inside the method it guards" test fails, and the shape reduces
+#     to a scan handler with no authorization signal in its body -- the
+#     measured-unshippable family, every variant of which scores identically
+#     on the vulnerable and the patched tree because the control lands in
+#     named helpers and framework hooks.
+#
+# The spec pins the miss: neither revision of the auto-scan may fire the
+# command-injection rule of the advisory's own class, the trust-boundary
+# misconfig rule, or the missing-authentication rule. Nothing is `expect`ed,
+# because nothing is labelled -- a positive assertion here would fail rather
+# than document.
+
+test "rank1767: the auto-scan launched on project open, with no trust gate"
+  lang kotlin
+  file src/main/kotlin/io/snyk/plugin/services/SnykTaskQueueService.kt
+  reject VYQL-INJ-002
+  reject VYQL-CFG-014
+  reject VYQL-AUTH-001
+  code
+  ```
+  package io.snyk.plugin.services
+
+  import com.intellij.openapi.application.ApplicationManager
+  import com.intellij.openapi.components.Service
+  import com.intellij.openapi.fileEditor.FileDocumentManager
+  import com.intellij.openapi.progress.BackgroundTaskQueue
+  import com.intellij.openapi.progress.ProgressIndicator
+  import com.intellij.openapi.progress.Task
+  import com.intellij.openapi.project.Project
+  import io.snyk.plugin.getSnykCachedResults
+  import io.snyk.plugin.isIacEnabled
+  import io.snyk.plugin.isContainerEnabled
+  import io.snyk.plugin.pluginSettings
+
+  @Service
+  class SnykTaskQueueService(val project: Project) {
+      private val taskQueue = BackgroundTaskQueue(project, "Snyk")
+      private val taskQueueIac = BackgroundTaskQueue(project, "Snyk: Iac")
+      private val taskQueueContainer = BackgroundTaskQueue(project, "Snyk: Container")
+
+      private val settings
+          get() = pluginSettings()
+
+      fun scan() {
+          taskQueue.run(object : Task.Backgroundable(project, "Snyk wait for changed files to be saved on disk", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  ApplicationManager.getApplication().invokeAndWait {
+                      FileDocumentManager.getInstance().saveAllDocuments()
+                  }
+                  indicator.checkCanceled()
+
+                  if (settings.snykCodeSecurityIssuesScanEnable || settings.snykCodeQualityIssuesScanEnable) {
+                      scheduleSnykCodeScan()
+                  }
+
+                  waitUntilCliDownloadedIfNeeded(indicator)
+                  indicator.checkCanceled()
+
+                  if (settings.ossScanEnable) {
+                      scheduleOssScan()
+                  }
+                  if (isIacEnabled() && settings.iacScanEnabled) {
+                      scheduleIacScan()
+                  }
+                  if (isContainerEnabled() && settings.containerScanEnabled) {
+                      scheduleContainerScan()
+                  }
+              }
+          })
+      }
+
+      private fun waitUntilCliDownloadedIfNeeded(indicator: ProgressIndicator) {
+          if (!isCliInstalled()) return
+          Thread.sleep(waitForDownloadMillis)
+      }
+
+      private fun scheduleOssScan() {
+          taskQueue.run(object : Task.Backgroundable(project, "Snyk is running...", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  val cliAdapter = CliAdapter(project)
+                  cliAdapter.scan()
+              }
+          })
+      }
+
+      private fun scheduleIacScan() {
+          taskQueueIac.run(object : Task.Backgroundable(project, "Snyk IaC is scanning...", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  val iacService = getIacService(project)
+                  iacService?.scan()
+              }
+          })
+      }
+
+      private fun scheduleContainerScan() {
+          taskQueueContainer.run(object : Task.Backgroundable(project, "Snyk Container is scanning...", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  val containerResult = getContainerService(project)?.scan()
+              }
+          })
+      }
+
+      private fun scheduleSnykCodeScan() {}
+      private fun isCliInstalled() = true
+      private fun getIacService(project: Project) = null
+      private fun getContainerService(project: Project) = null
+
+      companion object {
+          var waitForDownloadMillis = 100L
+      }
+  }
+  ```
+
+test "rank1767: the trust gate added at the top of the auto-scan body"
+  lang kotlin
+  file src/main/kotlin/io/snyk/plugin/services/SnykTaskQueueService.kt
+  reject VYQL-INJ-002
+  reject VYQL-CFG-014
+  reject VYQL-AUTH-001
+  code
+  ```
+  package io.snyk.plugin.services
+
+  import com.intellij.openapi.application.ApplicationManager
+  import com.intellij.openapi.components.Service
+  import com.intellij.openapi.fileEditor.FileDocumentManager
+  import com.intellij.openapi.progress.BackgroundTaskQueue
+  import com.intellij.openapi.progress.ProgressIndicator
+  import com.intellij.openapi.progress.Task
+  import com.intellij.openapi.project.Project
+  import io.snyk.plugin.pluginSettings
+  import io.snyk.plugin.isIacEnabled
+  import io.snyk.plugin.isContainerEnabled
+  import snyk.trust.confirmScanningAndSetWorkspaceTrustedStateIfNeeded
+  import java.nio.file.Paths
+
+  @Service
+  class SnykTaskQueueService(val project: Project) {
+      private val taskQueue = BackgroundTaskQueue(project, "Snyk")
+      private val taskQueueIac = BackgroundTaskQueue(project, "Snyk: Iac")
+      private val taskQueueContainer = BackgroundTaskQueue(project, "Snyk: Container")
+
+      private val settings
+          get() = pluginSettings()
+
+      fun scan() {
+          taskQueue.run(object : Task.Backgroundable(project, "Snyk wait for changed files to be saved on disk", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  project.basePath?.let {
+                      if (!confirmScanningAndSetWorkspaceTrustedStateIfNeeded(Paths.get(it))) return
+                  }
+
+                  ApplicationManager.getApplication().invokeAndWait {
+                      FileDocumentManager.getInstance().saveAllDocuments()
+                  }
+                  indicator.checkCanceled()
+
+                  if (settings.snykCodeSecurityIssuesScanEnable || settings.snykCodeQualityIssuesScanEnable) {
+                      scheduleSnykCodeScan()
+                  }
+
+                  waitUntilCliDownloadedIfNeeded(indicator)
+                  indicator.checkCanceled()
+
+                  if (settings.ossScanEnable) {
+                      scheduleOssScan()
+                  }
+                  if (isIacEnabled() && settings.iacScanEnabled) {
+                      scheduleIacScan()
+                  }
+              }
+          })
+      }
+
+      private fun waitUntilCliDownloadedIfNeeded(indicator: ProgressIndicator) {
+          if (!isCliInstalled()) return
+          Thread.sleep(waitForDownloadMillis)
+      }
+
+      private fun scheduleOssScan() {
+          taskQueue.run(object : Task.Backgroundable(project, "Snyk is running...", true) {
+              override fun run(indicator: ProgressIndicator) {
+                  val cliAdapter = CliAdapter(project)
+                  cliAdapter.scan()
+              }
+          })
+      }
+
+      private fun scheduleIacScan() {}
+      private fun scheduleSnykCodeScan() {}
+      private fun isCliInstalled() = true
+
+      companion object {
+          var waitForDownloadMillis = 100L
+      }
+  }
+  ```

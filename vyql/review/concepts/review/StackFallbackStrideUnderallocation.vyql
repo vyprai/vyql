@@ -1,0 +1,7 @@
+module code;
+
+review code.StackFallbackStrideUnderallocation {
+  category: memory
+  kind: attention
+  text: "review whether the heap fallback buffer is sized for every row the write loop writes; multiply the count by the stride the loop advances the buffer by"
+}

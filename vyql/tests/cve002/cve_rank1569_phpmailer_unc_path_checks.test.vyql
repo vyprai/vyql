@@ -1,0 +1,114 @@
+# Rank 1569 / CVE-2020-36326: PHPMailer 6.1.8 through 6.4.0
+# allows object injection through phar deserialization via addAttachment
+# (CWE-502): fileIsAccessible evaluates the filesystem state predicates
+# file_exists($path) and is_readable($path) on the raw path BEFORE the
+# scheme validation isPermittedPath($path) -- which rejects every RFC3986
+# scheme including phar:// -- is consulted in the return statement, so the
+# predicates themselves open the attacker-chosen stream wrapper (and, on
+# Windows, a \\host\share UNC pathname) before the guard can refuse it.
+# The 6.1.7 form was safe because the inline guard short-circuited on
+# isPermittedPath first; the consolidation commit folded the four inline
+# guards into one helper and reordered the checks, introducing the CVE the
+# advisory later cites that commit for. The real fix is 26f2848
+# ("Reorder path checks, fixes CVE-2020-36326", in 6.4.1): move the
+# isPermittedPath call ahead of the probes and return early -- the only
+# difference between the two revisions is that three-line reorder, so the
+# pair below differs only in statement order.
+#
+# ATTENTION, delegated-guard order attribution. Measured on the real
+# checkout (3 x --cache off, timeout 180, --max-ram 6GB per revision at
+# the span tip): src/ reports 9 findings at both revisions, 8 fingerprints
+# byte-identical and the ninth line-shifted by the fix's +3 lines, and 20
+# flags at both, line-shifted only -- nothing analyses fileIsAccessible
+# or the attachment path at either revision. The order-relation family
+# shipped for go/c/cpp/objc/js/python fits the shape exactly
+# (code.FileCheck reaches the deferred validation, VYQL-PATH-084), but PHP
+# has no FileCheck binding at all, and the discriminating half cannot be
+# written generically: keying the guard on its helper name
+# (callee.method == "isPermittedPath") measures 1 -> 0 across the pair
+# yet detects this library rather than the weakness, while the generic
+# spelling (the scheme-anchored preg_match inside the helper body) puts
+# the fact in a sibling function the region-scoped reaches relation
+# cannot cross, measuring 0 -> 0 -- the delegated-check attribution gap
+# on its PHP leg. Binding the predicates as phar deserialization sinks
+# instead measures VYQL-DESER-001 at 2 on BOTH revisions: taint is
+# order-blind and the guard call sits in the same function at both. Both
+# blocks assert reject VYQL-PATH-084 and reject VYQL-DESER-001; the
+# vulnerable block must flip to expect once a delegated validation's
+# identity is attributed to its call site (or a phar sink gains an
+# order-aware control), and the reordered block must stay reject.
+
+test "rank1569: filesystem probes run before the delegated scheme validation"
+  lang php
+  file src/PHPMailer.php
+  reject VYQL-PATH-084
+  reject VYQL-DESER-001
+  code
+  ```
+  <?php
+
+  class PHPMailer
+  {
+      protected static function isPermittedPath($path)
+      {
+          return !preg_match('#^[a-z][a-z\d+.-]*://#i', $path);
+      }
+
+      protected static function fileIsAccessible($path)
+      {
+          $readable = file_exists($path);
+          //If not a UNC path (expected to start with \\), check read permission
+          if (strpos($path, '\\\\') !== 0) {
+              $readable = $readable && is_readable($path);
+          }
+          return static::isPermittedPath($path) && $readable;
+      }
+
+      public function addAttachment($path, $name = '')
+      {
+          if (!static::fileIsAccessible($path)) {
+              throw new Exception($this->lang('file_access') . $path);
+          }
+          return true;
+      }
+  }
+  ```
+
+test "rank1569: the scheme validation runs before the filesystem probes"
+  lang php
+  file src/PHPMailer.php
+  reject VYQL-PATH-084
+  reject VYQL-DESER-001
+  code
+  ```
+  <?php
+
+  class PHPMailer
+  {
+      protected static function isPermittedPath($path)
+      {
+          return !preg_match('#^[a-z][a-z\d+.-]*://#i', $path);
+      }
+
+      protected static function fileIsAccessible($path)
+      {
+          if (!static::isPermittedPath($path)) {
+              return false;
+          }
+          $readable = file_exists($path);
+          //If not a UNC path (expected to start with \\), check read permission
+          if (strpos($path, '\\\\') !== 0) {
+              $readable = $readable && is_readable($path);
+          }
+          return $readable;
+      }
+
+      public function addAttachment($path, $name = '')
+      {
+          if (!static::fileIsAccessible($path)) {
+              throw new Exception($this->lang('file_access') . $path);
+          }
+          return true;
+      }
+  }
+  ```

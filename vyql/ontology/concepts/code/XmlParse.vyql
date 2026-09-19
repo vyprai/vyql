@@ -1,0 +1,7 @@
+module code;
+
+concept XmlParse : sink {
+  cwe: [CWE_611]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [deserialization.Xxe]
+}

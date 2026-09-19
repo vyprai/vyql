@@ -1,0 +1,102 @@
+# Rank 1553 / CVE-2018-12026: Passenger's SpawningKit opened its work
+# directory files by path after handing the directory to the
+# application's user, so the app could plant symlinks and have the
+# privileged agent read or write through them (symlink time-of-check
+# time-of-use privilege escalation, CWE-59/CWE-367). StdChannelsAsyncPipeWriter
+# in src/agent/Core/SpawningKit/SmartSpawner.h did `int fd =
+# syscalls::open((workDir + "/stdin").c_str(), O_WRONLY | O_APPEND);`
+# and the stdout_and_err sibling the same -- the app owns workDir after
+# finalization, so each path resolution traverses attacker-controlled
+# components, and loadAnnotationsFromEnvDumpDir read each file through
+# `path + "/" + ent->d_name` the same way. The fixing commit fd3717a3cd is
+# ("SpawningKit: ensure safe reading of files
+# in the work dir after its finalization ... This allows the app to
+# arbitrarily modify the work dir to insert symlinks"): the Session
+# captures directory file descriptors BEFORE finalization (workDirFd,
+# responseDirFd, responseErrorDirFd, envDumpDirFd,
+# envDumpAnnotationsDirFd, per-step FDs, all safely closed on
+# destruction), and every later open goes through `syscalls::openat(
+# state->workDirFd, "stdin", O_WRONLY | O_APPEND | O_NOFOLLOW)` --
+# relative to the pinned descriptor and refusing symlinks outright.
+
+#
+# ATTENTION, ownership-delegation vocabulary. The corpus has the
+# TOCTOU family -- VYQL-RACE-001 (FileToctou, CWE-367, a
+# FileCheck-reaches-FileUse pattern rule) -- and it labels the use
+# side of this defect but never the danger: the opens at
+# SmartSpawner.h carry code.FileUse/FileUseSink while no FileCheck
+# exists, because the danger is not check-then-use of a file's
+# properties but path re-resolution through an attacker-owned
+# directory. The nofollow family shipped since (VYQL-PATH-045,
+# VYQL-PATH-076, VYQL-PATH-083) is bound for Go, Rust and Python and
+# keys on the chown and the open sharing one function. Measured with
+# a probe binding of exactly that maximal shape on C++: it fires one
+# VYQL-PATH-076 on a same-function chown-then-open control (zero with
+# O_NOFOLLOW) and zero on the whole passenger src/agent tree, because
+# here the delegation (syscalls::chown in Handshake/WorkDir.h
+# finalize and Handshake/Prepare.h createFifo) and the uses
+# (syscalls::open in SmartSpawner.h and Handshake/Perform.h) sit in
+# different functions in different files, joined only through runtime
+# session state -- and the opens are non-creating (O_WRONLY|O_APPEND
+# and O_RDONLY on pre-created FIFOs), so even the O_CREATE-keyed
+# vocabulary would not apply. Re-measured on the real code: scanning
+# src/agent/Core/SpawningKit reports the same 20 findings at both
+# revisions (19 VYQL-MEM-006 NullableDeref plus 1 VYQL-RACE-002 on
+# DirectSpawner.h, none on the channel opens), and no symlink,
+# nofollow or delegated-ownership flag appears on either revision.
+# The judgement needed -- opens below a directory the untrusted user
+# controls must pin the directory and refuse symlinks -- is program-
+# wide ownership vocabulary plus cross-file fact reach, not a
+# localised construct. Spec cve_rank1553 records the path-based
+# channel open and the pinned openat O_NOFOLLOW form, both asserting
+# reject VYQL-RACE-001: when ownership-open vocabulary lands, the
+# path form must flip to expect.
+
+test "rank1553: the channel files are opened by path through the given-away directory"
+  lang cpp
+  file src/agent/Core/SpawningKit/SmartSpawner.h
+  reject VYQL-RACE-001
+  code
+  ```
+  #include <fcntl.h>
+  #include <string>
+
+  class StdChannelsAsyncPipeWriter {
+  private:
+      std::string workDir;
+
+      int openStdin() {
+          int fd = syscalls::open((workDir + "/stdin").c_str(), O_WRONLY | O_APPEND);
+          return fd;
+      }
+
+      int openStdoutAndErr() {
+          int fd = syscalls::open((workDir + "/stdout_and_err").c_str(), O_RDONLY);
+          return fd;
+      }
+  };
+  ```
+
+test "rank1553: the fixed revision opens relative to the pinned descriptor refusing symlinks"
+  lang cpp
+  file src/agent/Core/SpawningKit/SmartSpawner.h
+  reject VYQL-RACE-001
+  code
+  ```
+  #include <fcntl.h>
+
+  class StdChannelsAsyncPipeWriter {
+  private:
+      const int workDirFd;
+
+      int openStdin() {
+          int fd = syscalls::openat(workDirFd, "stdin", O_WRONLY | O_APPEND | O_NOFOLLOW);
+          return fd;
+      }
+
+      int openStdoutAndErr() {
+          int fd = syscalls::openat(workDirFd, "stdout_and_err", O_RDONLY | O_NOFOLLOW);
+          return fd;
+      }
+  };
+  ```

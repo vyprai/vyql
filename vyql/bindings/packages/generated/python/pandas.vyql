@@ -1,0 +1,17 @@
+module bindings.python.generated.ma76c4951;
+
+binding codeEval0 {
+  requires {
+    dependency("pandas")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("pandas")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}

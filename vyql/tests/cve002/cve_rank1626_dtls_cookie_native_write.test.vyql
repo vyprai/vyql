@@ -1,0 +1,207 @@
+# pyOpenSSL's DTLS cookie-generation callback (src/OpenSSL/SSL.py,
+# _CookieGenerateCallbackHelper) wraps a user function and copies its returned
+# bytes into the OpenSSL-provided cookie buffer:
+#
+#   cookie = callback(conn)
+#   out[0 : len(cookie)] = cookie
+#   outlen[0] = len(cookie)
+#
+# `out` is the `unsigned char *` of the C callback signature -- native memory
+# with an implicit capacity of DTLS1_COOKIE_LENGTH (32) bytes -- and the write
+# extent is `len()` of the value being written, so a callback returning a
+# longer cookie writes past the buffer (CWE-787). Fix commit
+# 57f09bb4bb051d3bc2a1abd36e9525313d5cd408 ("Fix buffer overflow in DTLS
+# cookie generation callback", #1479) inserts the missing bound before the
+# first write: `if len(cookie) > max_cookie_len: raise ValueError(...)`, with
+# `max_cookie_len = getattr(_lib, "DTLS1_COOKIE_LENGTH", 255)` read in the
+# enclosing scope. The pool's row pointed at the 26.0.0 release-bump commit
+# 358cbf29c4e364c59930e53a270116249581eaa3; the fixing commit above is its ancestor.
+#
+# Detected by binding cffiCallbackNativeSliceWrite in
+# vyql/bindings/python/cffi_callback_native_slice_write.vyql, judged by
+# VYQL-MEM-016 through the existing code.RawMemoryCopySize concept. The
+# registration and the write are never in the same function -- the write sits
+# in the nested callback body and `_ffi.callback` is called by the enclosing
+# `__init__` -- and only the enclosing function's context sees both, because a
+# nested function's context does not reach the enclosing scope's calls while a
+# function's context inherits its nested functions' tokens. So the finding is
+# reported at the function that performs the registration (:717), eight lines
+# above the write. The bound is a comparison in either operand order, and the
+# negation is on the operators rather than on any bound's name, so the fix's
+# own vocabulary (`max_cookie_len`, `DTLS1_COOKIE_LENGTH`) is never consulted.
+#
+# Measured on the real checkout, 3 x --cache off runs per revision (timeout
+# 180, --max-ram 6GB): the tree reports 59 findings at 57f09bb^ with
+# VYQL-MEM-016 on SSL.py:717 and 58 at 57f09bb with no RawMemoryCopySize
+# anywhere in src/ -- every run identical, the one finding the whole delta.
+# The reachable set of cffi callback registrations is enumerable and small:
+# 11 in pyopenssl, 112 in cffi's own source and test tree, 2 in
+# python-sounddevice, and none in the 22840 Python files of the surrounding
+# rank clones or either benchmark corpus. Of those 125 registrations exactly
+# one satisfies the binding, and it is this one; cffi's backend_ctypes.py
+# carries the length-slice idiom `args = args[:len(BArgs)]` in a function with
+# no registration, and reports nothing.
+#
+# The remaining cases pin the precision. A Python-level destination is not
+# the same judgement -- slicing a bytearray past its end raises rather than
+# corrupting memory -- and a registration next to that idiom still reports,
+# which is the binding's co-membership residual: within the registering
+# function the anchor and the copy are co-membership rather than a relation.
+
+test "rank1626: the dtls cookie wrapper writes a callback-returned value into the native cookie buffer with a value-derived extent"
+  lang python
+  file src/OpenSSL/SSL.py
+  expect VYQL-MEM-016
+  reject VYQL-MEM-003
+  code
+  ```
+  from functools import wraps
+
+
+  class _CookieGenerateCallbackHelper(_CallbackExceptionHelper):
+      def __init__(self, callback):
+          _CallbackExceptionHelper.__init__(self)
+
+          @wraps(callback)
+          def wrapper(ssl, out, outlen):
+              try:
+                  conn = Connection._reverse_mapping[ssl]
+                  cookie = callback(conn)
+                  out[0 : len(cookie)] = cookie
+                  outlen[0] = len(cookie)
+                  return 1
+              except Exception as e:
+                  self._problems.append(e)
+                  # "a zero return value can be used to abort the handshake"
+                  return 0
+
+          self.callback = _ffi.callback(
+              "int (*)(SSL *, unsigned char *, unsigned int *)",
+              wrapper,
+          )
+  ```
+
+test "rank1626: the fixed revision bounds the cookie against the native buffer's capacity before writing"
+  lang python
+  file src/OpenSSL/SSL.py
+  reject VYQL-MEM-003
+  reject VYQL-MEM-016
+  code
+  ```
+  from functools import wraps
+
+
+  class _CookieGenerateCallbackHelper(_CallbackExceptionHelper):
+      def __init__(self, callback):
+          _CallbackExceptionHelper.__init__(self)
+
+          max_cookie_len = getattr(_lib, "DTLS1_COOKIE_LENGTH", 255)
+
+          @wraps(callback)
+          def wrapper(ssl, out, outlen):
+              try:
+                  conn = Connection._reverse_mapping[ssl]
+                  cookie = callback(conn)
+                  if len(cookie) > max_cookie_len:
+                      raise ValueError(
+                          f"Cookie too long (got {len(cookie)} bytes, "
+                          f"max {max_cookie_len})"
+                      )
+                  out[0 : len(cookie)] = cookie
+                  outlen[0] = len(cookie)
+                  return 1
+              except Exception as e:
+                  self._problems.append(e)
+                  # "a zero return value can be used to abort the handshake"
+                  return 0
+
+          self.callback = _ffi.callback(
+              "int (*)(SSL *, unsigned char *, unsigned int *)",
+              wrapper,
+          )
+  ```
+
+test "rank1626: a bound written in the other operand order discharges the write"
+  lang python
+  file src/OpenSSL/SSL.py
+  reject VYQL-MEM-003
+  reject VYQL-MEM-016
+  code
+  ```
+  from functools import wraps
+
+
+  class _CookieGenerateCallbackHelper(_CallbackExceptionHelper):
+      def __init__(self, callback):
+          _CallbackExceptionHelper.__init__(self)
+
+          cap = 255
+
+          @wraps(callback)
+          def wrapper(ssl, out, outlen):
+              try:
+                  conn = Connection._reverse_mapping[ssl]
+                  cookie = callback(conn)
+                  if cap < len(cookie):
+                      raise ValueError("cookie too long")
+                  out[0 : len(cookie)] = cookie
+                  outlen[0] = len(cookie)
+                  return 1
+              except Exception as e:
+                  self._problems.append(e)
+                  return 0
+
+          self.callback = _ffi.callback(
+              "int (*)(SSL *, unsigned char *, unsigned int *)",
+              wrapper,
+          )
+  ```
+
+test "rank1626: clamping the extent inside the subscript is safe without a comparison"
+  lang python
+  file src/OpenSSL/SSL.py
+  reject VYQL-MEM-003
+  reject VYQL-MEM-016
+  code
+  ```
+  from functools import wraps
+
+
+  class _CookieGenerateCallbackHelper(_CallbackExceptionHelper):
+      def __init__(self, callback):
+          _CallbackExceptionHelper.__init__(self)
+
+          @wraps(callback)
+          def wrapper(ssl, out, outlen):
+              try:
+                  conn = Connection._reverse_mapping[ssl]
+                  cookie = callback(conn)
+                  out[0 : min(len(cookie), 255)] = cookie
+                  outlen[0] = min(len(cookie), 255)
+                  return 1
+              except Exception as e:
+                  self._problems.append(e)
+                  return 0
+
+          self.callback = _ffi.callback(
+              "int (*)(SSL *, unsigned char *, unsigned int *)",
+              wrapper,
+          )
+  ```
+
+test "rank1626: the same extent written into a python-level buffer is not a memory-safety defect"
+  lang python
+  file src/OpenSSL/SSL.py
+  reject VYQL-MEM-003
+  reject VYQL-MEM-016
+  code
+  ```
+  def read_chunk(stream):
+      b = bytearray(4096)
+      while True:
+          read = stream.read(4096)
+          if not read:
+              break
+          b[: len(read)] = read
+          process(b)
+  ```

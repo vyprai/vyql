@@ -1,0 +1,81 @@
+module bindings.ruby.generated.m7688ad65;
+
+binding networkSend0 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding secretValue1 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "wsse_auth"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "ssl_cert_key_file"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "ssl_cert_key_password"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "ssl_cert_file"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "ssl_ca_cert_file"
+  emit source code.SecretValue at call.result
+}
+
+binding weakCipher6 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "ssl_ciphers"
+  emit issue code.WeakCipher at call
+}
+
+binding secretValue7 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "basic_auth"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue8 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "digest_auth"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue9 {
+  requires {
+    dependency("savon")
+  }
+  query pattern callExpr where callee.method == "ntlm"
+  emit source code.SecretValue at call.result
+}

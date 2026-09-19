@@ -1,0 +1,50 @@
+# Rank 846 / CVE-2026-27611: FileBrowser share-info leaked a tokenized
+# direct-download URL before the share password challenge.
+
+test "rank846: public share info exposes tokenized direct download url"
+  lang go
+  file share.go
+  expect VYQL-AUTH-056
+  expect_review code.ShareInfoDirectDownloadTokenExposure
+  code
+  ```
+  package http
+
+  import "net/http"
+
+  func shareInfoHandler(w http.ResponseWriter, r *http.Request, d *requestContext) (int, error) {
+      hash := r.URL.Query().Get("hash")
+      shareLink, err := store.Share.GetByHash(hash)
+      if err != nil {
+          return http.StatusNotFound, err
+      }
+      commonShare := shareLink.CommonShare
+      commonShare.DownloadURL = getShareURL(r, hash, true, shareLink.Token)
+      commonShare.ShareURL = getShareURL(r, hash, false, shareLink.Token)
+      return renderJSON(w, r, commonShare)
+  }
+  ```
+
+test "rank846: public share info omits direct tokenized download url"
+  lang go
+  file share.go
+  reject VYQL-AUTH-056
+  reject_review code.ShareInfoDirectDownloadTokenExposure
+  code
+  ```
+  package http
+
+  import "net/http"
+
+  func shareInfoHandler(w http.ResponseWriter, r *http.Request, d *requestContext) (int, error) {
+      hash := r.URL.Query().Get("hash")
+      shareLink, err := store.Share.GetByHash(hash)
+      if err != nil {
+          return http.StatusNotFound, err
+      }
+      commonShare := shareLink.CommonShare
+      commonShare.ShareURL = getShareURL(r, hash, false, "")
+      return renderJSON(w, r, commonShare)
+  }
+  ```
+

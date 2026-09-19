@@ -1,0 +1,9 @@
+module bindings.c.generated.m9c57f7de;
+
+binding deserialization0 {
+  requires {
+    dependency("kf5solid")
+  }
+  query pattern callExpr where callee.method == "Solid::Predicate::fromString"
+  emit sink code.Deserialization at args[0]
+}

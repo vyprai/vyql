@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ClamscanBinaryPathShellCommandInjection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78]
+    id: "VYQL-INJ-068"
+    severity: critical
+  }
+  issue code.ClamscanBinaryPathShellCommandInjection as sink
+}

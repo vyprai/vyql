@@ -1,0 +1,6 @@
+module code;
+
+concept HttpHeaderValidationDisabled : issue {
+  cwe: [CWE_113, CWE_444]
+  vulnerableTo: [injection.CrlfInjection, injection.HttpResponseSplitting]
+}

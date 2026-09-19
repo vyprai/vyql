@@ -1,0 +1,8 @@
+module code;
+
+review code.ResolvedUrlOriginOnlyContainment {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review URL forwarding that confines the resolved target by origin only, leaving the base URL's path prefix unenforced"
+}

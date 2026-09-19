@@ -1,0 +1,8 @@
+module code;
+
+review code.OpenedWindowConcatenatedDocumentWrite {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review documents written into a newly opened window, so the elements are created and their attributes assigned as properties instead of concatenated into a markup string"
+}

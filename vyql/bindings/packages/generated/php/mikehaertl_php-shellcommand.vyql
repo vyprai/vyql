@@ -1,0 +1,9 @@
+module bindings.php.generated.mf1b6ae9b;
+
+binding commandExecution0 {
+  requires {
+    dependency("mikehaertl/php-shellcommand")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}

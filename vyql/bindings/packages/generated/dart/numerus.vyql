@@ -1,0 +1,9 @@
+module bindings.dart.generated.m0e0fd30a;
+
+binding deserialization0 {
+  requires {
+    dependency("numerus")
+  }
+  query pattern callExpr where callee.method == "toRomanNumeralValue"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept MysqlConnectErrorUseAfterFree : issue {
+  cwe: [CWE_416]
+  reviewAssumption: "the failed connection helper releases the connection handle while its caller still expects the handle to remain valid for error reporting"
+  reviewCategory: memory
+  reviewCondition: "a failed MySQL connect helper frees an owned connection handle and a caller then reads MySQL error state from that same handle after the helper returns false"
+  reviewConfidence: high
+  reviewEvidence: "mysql connection lifetime context {pattern} releases the handle on connect failure and later reads mysql_errno/mysql_error/mysql_sqlstate from the released handle"
+  vulnerableTo: [memory.UseAfterFree]
+}

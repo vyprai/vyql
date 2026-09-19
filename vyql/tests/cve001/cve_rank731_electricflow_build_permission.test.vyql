@@ -1,0 +1,60 @@
+# Rank 731 / CVE-2021-21647: Jenkins ElectricFlow/CloudBees Flow exposed a
+# build-queue endpoint without checking Item.BUILD on the target project.
+
+test "rank731: Jenkins build action queues project without build permission"
+  lang java
+  file ElectricFlowEFRunAPIAction.java
+  expect VYQL-AUTH-048
+  expect_review code.JenkinsBuildScheduleMissingPermission
+  code
+  ```
+  import hudson.model.Cause;
+  import hudson.model.CauseAction;
+  import hudson.model.Job;
+  import jenkins.model.Jenkins;
+  import org.kohsuke.stapler.StaplerRequest;
+  import org.kohsuke.stapler.StaplerResponse;
+
+  class ElectricFlowEFRunAPIAction<T extends Job<?, ?> & hudson.model.Queue.Task> {
+    private T project;
+
+    public void doBuild(StaplerRequest req, StaplerResponse rsp) throws Exception {
+      Cause.UserIdCause userIdCause = new Cause.UserIdCause();
+      CauseAction ca = new CauseAction(userIdCause);
+      Jenkins.get().getQueue().schedule(project, 0, ca);
+      rsp.setStatus(201);
+    }
+  }
+  ```
+
+test "rank731: Jenkins build action checks Item.BUILD before queueing"
+  lang java
+  file ElectricFlowEFRunAPIAction.java
+  reject VYQL-AUTH-048
+  reject_review code.JenkinsBuildScheduleMissingPermission
+  code
+  ```
+  import hudson.model.Cause;
+  import hudson.model.CauseAction;
+  import hudson.model.Item;
+  import hudson.model.Job;
+  import jenkins.model.Jenkins;
+  import org.kohsuke.stapler.StaplerRequest;
+  import org.kohsuke.stapler.StaplerResponse;
+
+  class ElectricFlowEFRunAPIAction<T extends Job<?, ?> & hudson.model.Queue.Task> {
+    private T project;
+
+    public void doBuild(StaplerRequest req, StaplerResponse rsp) throws Exception {
+      if (!project.hasPermission(Item.BUILD)) {
+        rsp.setStatus(403);
+        return;
+      }
+
+      Cause.UserIdCause userIdCause = new Cause.UserIdCause();
+      CauseAction ca = new CauseAction(userIdCause);
+      Jenkins.get().getQueue().schedule(project, 0, ca);
+      rsp.setStatus(201);
+    }
+  }
+  ```

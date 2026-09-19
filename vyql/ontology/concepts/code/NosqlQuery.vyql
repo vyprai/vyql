@@ -1,0 +1,7 @@
+module code;
+
+concept NosqlQuery : sink {
+  cwe: [CWE_943]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.NosqlInjection]
+}

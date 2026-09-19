@@ -1,0 +1,160 @@
+# Rank 1986 / CVE-2017-6298: ytnef stored the result of calloc() into a
+# struct member and immediately copied attacker-controlled bytes through it,
+# so a TNEF attachment whose declared size makes the allocation fail is
+# written through NULL (CWE-476; X41 D-Sec advisory x41-2017-002, finding
+# "1 of 9. Null Pointer Deref / calloc return value not checked"). lib/ytnef.c
+# at the fixed revision's parent holds that shape at TNEFCodePage, TNEFBody,
+# TNEFOriginalMsgClass, TNEFFromHandler, TNEFSubjectHandler, TNEFIcon,
+# TNEFFillMapi, TNEFAttachmentFilename, TNEFAttachmentSave and DecompressRTF.
+# The fixed revision b36d6b25b7a546fc28d6c3812124e487987a4910 is the merge of
+# PR #27, so `git show` prints an empty combined diff and the patch is read
+# with `git diff 86df793 <sha>`: it inserts a call to a file-local check macro
+# (#define ALLOCCHECK(x) { if(!x) ... return(-1); }) between each allocation
+# and the copy that fills it.
+
+test "rank1986: calloc result stored to a member and copied through is reported"
+  lang c
+  file lib/ytnef.c
+  expect VYQL-MEM-018
+  code
+  ```
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct { unsigned char *data; unsigned int size; } variableLength;
+  typedef struct { variableLength body; } TNEFStruct;
+
+  /* TNEFBody at lib/ytnef.c:263, parent of the fix: the member target is
+     filled by calloc and used as the copy destination with no check. */
+  int TNEFBody(TNEFStruct *TNEF, int id, char *data, int size) {
+    TNEF->body.size = size;
+    TNEF->body.data = calloc(size, sizeof(unsigned char));
+    memcpy(TNEF->body.data, data, size);
+    return 0;
+  }
+
+  /* the PT_STRING8 arm of TNEFFillMapi at lib/ytnef.c:700, the
+     two-segment spelling of the same shape */
+  int fill_string8(variableLength *vl, unsigned char *d) {
+    vl->data = calloc(vl->size, sizeof(unsigned char));
+    memcpy(vl->data, d, vl->size);
+    return 0;
+  }
+  ```
+
+test "rank1986: a file-local check macro between the allocation and the copy suppresses"
+  lang c
+  file lib/ytnef.c
+  reject VYQL-MEM-018
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  #include <stdlib.h>
+  #include <string.h>
+  #include <stdio.h>
+
+  typedef struct { unsigned char *data; unsigned int size; } variableLength;
+  typedef struct { variableLength body; } TNEFStruct;
+
+  #define ALLOCCHECK(x) { if(!x) { printf("Out of Memory at %s : %i\n", __FILE__, __LINE__); return(-1); } }
+
+  /* TNEFBody as the patch leaves it: the null test lives in the macro body,
+     and only the macro's name and its argument reach the call site, so the
+     check has to be credited through the definition. */
+  int TNEFBody(TNEFStruct *TNEF, int id, char *data, int size) {
+    TNEF->body.size = size;
+    TNEF->body.data = calloc(size, sizeof(unsigned char));
+    ALLOCCHECK(TNEF->body.data);
+    memcpy(TNEF->body.data, data, size);
+    return 0;
+  }
+  ```
+
+test "rank1986: an inlined guard on the qualified three-segment target suppresses"
+  lang c
+  file lib/ytnef.c
+  reject VYQL-MEM-018
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef struct { unsigned char *data; unsigned int size; } variableLength;
+  typedef struct { variableLength body; } TNEFStruct;
+
+  /* the same remediation written out at the call site: the guard is spelled
+     on the full path the assignment stored, not only its trailing segments */
+  int TNEFBodyGuarded(TNEFStruct *TNEF, int id, char *data, int size) {
+    TNEF->body.size = size;
+    TNEF->body.data = calloc(size, sizeof(unsigned char));
+    if (!TNEF->body.data) return -1;
+    memcpy(TNEF->body.data, data, size);
+    return 0;
+  }
+  ```
+
+test "rank1986: an inlined guard on the trailing segments of the target suppresses"
+  lang c
+  file lib/ytnef.c
+  reject VYQL-MEM-018
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef struct { unsigned char *data; unsigned int size; } variableLength;
+
+  /* TNEFFillMapi's own spelling: a local alias holds the pointer, so the
+     guard reads the two-segment member path the assignment stored */
+  int fill_guarded(variableLength *vl, unsigned char *d) {
+    vl->data = calloc(vl->size, sizeof(unsigned char));
+    if (!vl->data) return -1;
+    memcpy(vl->data, d, vl->size);
+    return 0;
+  }
+  ```
+
+test "rank1986: the stored result used through a member access is reported"
+  lang c
+  file lib/ytnef.c
+  expect VYQL-MEM-018
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef struct { unsigned int size; } payload;
+  typedef struct { payload *data; unsigned int size; } variableLength;
+  typedef struct { variableLength body; } TNEFStruct;
+
+  /* TNEFFillMapi's p->properties, the other way a stored allocation result
+     is written through: directly, by a member access */
+  int TNEFBodyArrow(TNEFStruct *TNEF, int id, char *data, int size) {
+    TNEF->body.size = size;
+    TNEF->body.data = calloc(size, sizeof(payload));
+    TNEF->body.data->size = size;
+    return 0;
+  }
+  ```
+
+test "rank1986: a scalar call result that is only read is not a dereference"
+  lang c
+  file lib/ytnef.c
+  reject VYQL-MEM-018
+  reject_review code.UncheckedNullableResultDeref
+  code
+  ```
+  #include <stdlib.h>
+  #include <string.h>
+
+  typedef struct { int count; unsigned char *data; } props;
+
+  /* TNEFFillMapi's own opening: p->count holds a length, not a pointer, and
+     feeding it to a size computation cannot fault on null. Restricting the
+     use to one that writes through the stored value is what keeps the
+     observation off ordinary scalar plumbing. */
+  int fill_counts(props *p, unsigned char *data) {
+    p->count = SwapDWord(data, 4);
+    p->data = calloc(p->count, sizeof(props));
+    return 0;
+  }
+  ```

@@ -1,0 +1,29 @@
+module bindings.c.assert_only_length_copy;
+
+// memcpy(3), memmove(3), strncpy(3) and strncat(3) copy exactly the count they
+// are handed, so a function that bounds that count only inside assert() has
+// written down the amount it depends on and made no runtime decision with it:
+// assert() compiles to nothing in a build that defines NDEBUG, and the copy
+// then takes whatever the caller passes. The comparison's presence is the
+// reading -- the bound was meant to hold -- and its construct is the defect,
+// because the same comparison in an if, a switch case or a loop condition
+// does run. That separates this from a copy nobody compared, which is a much
+// larger set and carries no statement of intent at all.
+//
+// The fact is emitted by the C frontend (ccAssertOnlyLengthCopyObservations,
+// internal/extract/frontend/treesitter/c.go) from the syntax tree, and is
+// callee-neutral, so which spellings count as raw copies is decided here, in
+// data: the four C standard byte-count copy primitives and documented library
+// aliases of the same signature. The next project's prefixed spelling is a
+// binding edit, not an engine change.
+//
+// Residuals, all false-negative: the frontend reads the comparison anywhere in
+// the function, so a bound checked for a sibling copy clears this one too; the
+// compacted body keeps comments, so a commented-out runtime check still clears;
+// and a destination the function allocates by the count itself is bounded by
+// construction, which the fact cannot see, so those sites are reported
+// alongside the ones that cannot be.
+binding assertOnlyLengthCopy {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "copy.assert_only_length_bound" and containsAny(node.token, ["callee=memcpy", "callee=memmove", "callee=strncpy", "callee=strncat", "callee=pj_memcpy", "callee=SDL_memcpy"])
+  emit issue code.AssertOnlyLengthCopy at node
+}

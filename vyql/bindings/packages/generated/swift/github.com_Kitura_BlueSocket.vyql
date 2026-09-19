@@ -1,0 +1,25 @@
+module bindings.swift.generated.m3aedab92;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/Kitura/BlueSocket")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("github.com/Kitura/BlueSocket")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("github.com/Kitura/BlueSocket")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

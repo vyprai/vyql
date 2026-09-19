@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m6b6bf41a;
+
+binding regexCompile0 {
+  requires {
+    dependency("ip-regex")
+  }
+  query pattern callExpr where callee.method == "ipRegex"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

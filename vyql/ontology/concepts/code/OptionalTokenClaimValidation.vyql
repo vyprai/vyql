@@ -1,0 +1,11 @@
+module code;
+
+concept OptionalTokenClaimValidation : issue {
+  cwe: [CWE_287, CWE_290]
+  reviewAssumption: "the claim set reaching the validator is chosen by whoever minted or introspected the token, so a claim the validator treats as optional can simply be absent"
+  reviewCondition: "a token claim is compared against its expected value only inside a guard that the claim is non-empty, and no branch rejects the token when the claim is absent"
+  reviewCategory: auth
+  reviewConfidence: high
+  reviewEvidence: "token validation context {pattern} gates its issuer comparison on the issuer claim being non-empty while an expected issuer is in scope, with no observed rejection of a token carrying no issuer"
+  vulnerableTo: [authentication.ImproperAuthentication, authentication.AuthenticationBypass]
+}

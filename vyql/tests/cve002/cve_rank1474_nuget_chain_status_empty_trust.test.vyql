@@ -1,0 +1,214 @@
+# Rank 1474 / CVE-2024-0057: NuGet.Client decided certificate trust from the
+# contents of X509Chain.ChainStatus without handling the case where the chain
+# build failed and left that array empty.
+#
+# CertificateUtility.IsSelfIssued and SignatureUtility.GetCertificateChain both
+# configured the chain policy, built the chain, threw the build's boolean result
+# away, and then asks LINQ whether any status flag disqualifies:
+#
+#   IX509Chain chain = chainHolder.Chain2;
+#   chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+#   chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority | ...;
+#
+#   CertificateChainUtility.BuildWithPolicy(chain, certificate);
+#
+#   if (chain.ChainStatus.Any(
+#       chainStatus => chainStatus.Status.HasFlag(X509ChainStatusFlags.Cyclic) ||
+#                      chainStatus.Status.HasFlag(X509ChainStatusFlags.PartialChain) ||
+#                      chainStatus.Status.HasFlag(X509ChainStatusFlags.NotSignatureValid)))
+#   {
+#       return false;
+#   }
+#
+# X509Chain.Build returns false when the certificate is not valid under the
+# policy, and the platform is not obliged to explain why: ChainStatus can come
+# back empty. Enumerable.Any over an empty sequence is false, so the guard
+# above passes on exactly the chains that could not be validated at all, and
+# the caller reads an unbuildable chain as a clean one. The fixed revision captures the
+# build result and refuses an empty status array before any flag is inspected:
+#
+#   bool buildSuccess = CertificateChainUtility.BuildWithPolicy(chain, certificate);
+#
+#   if (!buildSuccess && chain.ChainStatus.Length == 0)
+#   {
+#       throw new SignatureException(Strings.CertificateChainValidationFailed);
+#   }
+#
+# CertificateChainUtility.GetCertificateChain gets the same treatment on its own
+# accumulator -- if (fatalStatuses.Any()) becomes
+# if (chain.ChainStatus.Length == 0 || fatalStatuses.Count > 0) -- and
+# Signature.Verify and Timestamp.Verify return SignatureVerificationStatus.Unknown
+# with UnknownBuildStatus when the build fails with no statuses.
+#
+# The binding is written from the .NET documentation for X509Chain and
+# Enumerable.Any, not from NuGet's code. A method that configures
+# X509Chain.ChainPolicy is the method that performs the build, and a LINQ
+# predicate over X509Chain.ChainStatus is a trust decision taken from the status
+# array; if that method never tests the array for emptiness, the empty array
+# means "no disqualifying flag found". The negation lists the emptiness spellings
+# the API itself offers (.Length and .Count against 0), so it survives renaming:
+# with the fixed revision's buildSuccess local renamed the patched snippet still does not
+# report.
+#
+# The .ChainPolicy clause is what keeps the binding on the deciding method.
+# Measured on NuGetGallery's Validation.PackageSigning.ValidateCertificate, which
+# is correct code: OnlineCertificateVerifier.GetEndCertificateStatusFromInvalidChain
+# tests chain.ChainStatus.Length == 0 first and is declined by the negation, while
+# its private helper OnlyEndCertificateRevokedInInvalidChain queries ChainStatus
+# with no emptiness test of its own because the caller makes it -- the
+# function-local attribution gap of rank 1377. Without the .ChainPolicy clause
+# that helper reports (1 row at OnlineCertificateVerifier.cs:175); with it the
+# tree is clean, because the helper never touches the chain policy.
+#
+# Residual, stated rather than hidden: a method that builds a chain with the
+# default policy, touching no ChainPolicy member, is not covered, and neither is
+# the Signature.Verify / Timestamp.Verify half of the change, where the statuses
+# arrive through an out parameter and the deciding method never names ChainStatus
+# at all. Both are recall, not precision.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off), counts identical
+# across three runs per revision. src/NuGet.Core/NuGet.Packaging/Signing at
+# 3333f352ec^ (150 csharp files): 116 findings before the binding, 118 after,
+# the two added rows at Utility/CertificateUtility.cs:307 (IsSelfIssued) and
+# Utility/SignatureUtility.cs:644 (GetCertificateChain) -- the two methods the
+# fix patches. At 3333f352ec: 116 findings and no VYQL-CFG-004. The whole
+# NuGet.Client repository is too large to scan inside the bound, so the shape's
+# reachable set is enumerated exhaustively instead: across all 3737 .cs files,
+# 13 mention ChainStatus and exactly 2 lines query it through LINQ --
+# SignatureUtility.cs:666 and CertificateUtility.cs:331 -- both inside the
+# scanned subtree, so the subtree scan covers the whole reachable set.
+#
+# Collateral, enumerated rather than sampled: across the 10708 csharp files in the
+# 203 CVE clones under /tmp/cve-work, the only LINQ query over ChainStatus outside
+# NuGet.Client is NuGetGallery's OnlineCertificateVerifier.cs, measured above at 0.
+
+test "rank1474: a chain build whose trust decision reads ChainStatus flags without handling an empty status array"
+  lang csharp
+  file src/NuGet.Core/NuGet.Packaging/Signing/Utility/CertificateUtility.cs
+  expect VYQL-CFG-004
+  code
+  ```
+  using System.Linq;
+  using System.Security.Cryptography.X509Certificates;
+
+  namespace NuGet.Packaging.Signing
+  {
+      public static class CertificateUtility
+      {
+          public static bool IsSelfIssued(X509Certificate2 certificate)
+          {
+              using (X509ChainHolder chainHolder = X509ChainHolder.CreateForCodeSigning())
+              {
+                  IX509Chain chain = chainHolder.Chain2;
+
+                  chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+                  chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority |
+                      X509VerificationFlags.IgnoreRootRevocationUnknown |
+                      X509VerificationFlags.IgnoreEndRevocationUnknown;
+
+                  CertificateChainUtility.BuildWithPolicy(chain, certificate);
+
+                  if (chain.ChainElements.Count != 1)
+                  {
+                      return false;
+                  }
+
+                  if (chain.ChainStatus.Any(
+                      chainStatus => chainStatus.Status.HasFlag(X509ChainStatusFlags.Cyclic) ||
+                                     chainStatus.Status.HasFlag(X509ChainStatusFlags.PartialChain) ||
+                                     chainStatus.Status.HasFlag(X509ChainStatusFlags.NotSignatureValid)))
+                  {
+                      return false;
+                  }
+
+                  return true;
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1474: the same chain build refusing an empty status array before inspecting any flag"
+  lang csharp
+  file src/NuGet.Core/NuGet.Packaging/Signing/Utility/CertificateUtility.cs
+  reject VYQL-CFG-004
+  code
+  ```
+  using System.Linq;
+  using System.Security.Cryptography.X509Certificates;
+
+  namespace NuGet.Packaging.Signing
+  {
+      public static class CertificateUtility
+      {
+          public static bool IsSelfIssued(X509Certificate2 certificate)
+          {
+              using (X509ChainHolder chainHolder = X509ChainHolder.CreateForCodeSigning())
+              {
+                  IX509Chain chain = chainHolder.Chain2;
+
+                  chain.ChainPolicy.RevocationMode = X509RevocationMode.NoCheck;
+                  chain.ChainPolicy.VerificationFlags = X509VerificationFlags.AllowUnknownCertificateAuthority |
+                      X509VerificationFlags.IgnoreRootRevocationUnknown |
+                      X509VerificationFlags.IgnoreEndRevocationUnknown;
+
+                  bool buildSuccess = CertificateChainUtility.BuildWithPolicy(chain, certificate);
+
+                  if (!buildSuccess && chain.ChainStatus.Length == 0)
+                  {
+                      throw new SignatureException(Strings.CertificateChainValidationFailed);
+                  }
+
+                  if (chain.ChainElements.Count != 1)
+                  {
+                      return false;
+                  }
+
+                  if (chain.ChainStatus.Any(
+                      chainStatus => chainStatus.Status.HasFlag(X509ChainStatusFlags.Cyclic) ||
+                                     chainStatus.Status.HasFlag(X509ChainStatusFlags.PartialChain) ||
+                                     chainStatus.Status.HasFlag(X509ChainStatusFlags.NotSignatureValid)))
+                  {
+                      return false;
+                  }
+
+                  return true;
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1474: a status-flag helper whose caller owns the chain policy and the emptiness check"
+  lang csharp
+  file src/Validation.PackageSigning.ValidateCertificate/OnlineCertificateVerifier.cs
+  reject VYQL-CFG-004
+  code
+  ```
+  using System.Linq;
+  using System.Security.Cryptography.X509Certificates;
+
+  namespace NuGet.Services.Validation.PackageSigning
+  {
+      public class OnlineCertificateVerifier
+      {
+          private bool OnlyEndCertificateRevokedInInvalidChain(X509Chain chain)
+          {
+              if (chain.ChainStatus.Any(s => (s.Status & ~X509ChainStatusFlags.Revoked) != X509ChainStatusFlags.NoError))
+              {
+                  return false;
+              }
+
+              if (!chain.ChainElements[0].ChainElementStatus.Any())
+              {
+                  return false;
+              }
+
+              return chain.ChainElements
+                          .Cast<X509ChainElement>()
+                          .Skip(1)
+                          .All(e => e.ChainElementStatus.All(s => s.Status == X509ChainStatusFlags.NoError));
+          }
+      }
+  }
+  ```

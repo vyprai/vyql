@@ -1,0 +1,110 @@
+# Pygments' image formatter asks fontconfig for a font path by interpolating
+# the configured font name into a shell command. FontManager._get_nix_font_path
+# in pygments/formatters/img.py ran
+# getstatusoutput('fc-list "%s:style=%s" file' % (name, style)), where name is
+# the font_name formatter option -- attacker-controlled through
+# `pygmentize -O font_name=...` -- so a crafted option broke out of the quoted
+# context and executed an arbitrary command (shell injection, CWE-78). The
+# fixing commit db6dd826f8 is the merge of pull request #501; the readable fix
+# is its first parent e0e6a3d ("Fix Shell Injection in
+# FontManager._get_nix_font_path"), which wraps the interpolated pattern in
+# shlex.quote and drops the manual double quotes. The merge row's parent
+# carries the change, so the vulnerable tree is e0e6a3d^ (4e0b1c8).
+#
+# Pygments is a library, and the scan reports the shape under the `library`
+# threat model: a public-API parameter is the trust boundary, so
+# FontManager.__init__'s parameters carry code.ExternalEntryInput, the
+# receiver holds it across the self._create_nix() dispatch it performs, and
+# VYQL-INJ-002 fires when the stored name reaches getstatusoutput's format
+# string. The expect block is the class verbatim -- __init__ dispatches
+# _create_nix itself, exactly as the real code does, and no driver is needed.
+# The reject block is the patched form: shlex.quote around the pattern is the
+# core.ShellEscape control the rule's `unless path coveredBy` clause accepts,
+# so the same class reports nothing.
+#
+# The repository itself carries a .swift lexer fixture under tests/, and the
+# iOS profile fingerprints on the bare extension -- a question the extension
+# inventory answers with "a .swift file exists somewhere in the tree", which
+# that one fixture satisfies -- so the checkout resolved the iOS threat model
+# and dropped the library entry points that report this shape. The profile now
+# asks the swift:sources project fact instead, which walks the tree skipping
+# test and documentation directories, so the auto-resolved profile for the
+# checkout is the library one and the finding survives an ordinary
+# `vyql scan` of the repository root.
+
+test "rank1623: font name from a public parameter into fc-list"
+  lang python
+  file pygments/formatters/img.py
+  profile library
+  expect VYQL-INJ-002
+  code
+  ```
+  class FontManager(object):
+
+      def __init__(self, font_name, font_size=14):
+          self.font_name = font_name
+          self.font_size = font_size
+          self.fonts = {}
+          if not font_name:
+              self.font_name = 'Bitstream Vera Sans Mono'
+          self._create_nix()
+
+      def _get_nix_font_path(self, name, style):
+          try:
+              from commands import getstatusoutput
+          except ImportError:
+              from subprocess import getstatusoutput
+          exit, out = getstatusoutput('fc-list "%s:style=%s" file' %
+                                      (name, style))
+          if not exit:
+              lines = out.splitlines()
+              if lines:
+                  path = lines[0].strip().strip(':')
+                  return path
+
+      def _create_nix(self):
+          for name in ['Roman', 'Book', 'Normal']:
+              path = self._get_nix_font_path(self.font_name, name)
+              if path is not None:
+                  self.fonts['NORMAL'] = path
+  ```
+
+test "rank1623: shlex.quote around the font pattern is safe"
+  lang python
+  file pygments/formatters/img.py
+  profile library
+  reject VYQL-INJ-002
+  code
+  ```
+  import shlex
+
+
+  class FontManager(object):
+
+      def __init__(self, font_name, font_size=14):
+          self.font_name = font_name
+          self.font_size = font_size
+          self.fonts = {}
+          if not font_name:
+              self.font_name = 'Bitstream Vera Sans Mono'
+          self._create_nix()
+
+      def _get_nix_font_path(self, name, style):
+          try:
+              from commands import getstatusoutput
+          except ImportError:
+              from subprocess import getstatusoutput
+          exit, out = getstatusoutput('fc-list %s file' %
+                                      shlex.quote("%s:style=%s" % (name, style)))
+          if not exit:
+              lines = out.splitlines()
+              if lines:
+                  path = lines[0].strip().strip(':')
+                  return path
+
+      def _create_nix(self):
+          for name in ['Roman', 'Book', 'Normal']:
+              path = self._get_nix_font_path(self.font_name, name)
+              if path is not None:
+                  self.fonts['NORMAL'] = path
+  ```

@@ -1,0 +1,52 @@
+test "rank835: C last-frame access without rejecting zero frames"
+  lang c
+  expect VYQL-MEM-041
+  expect_review code.ZeroCountLastElementAccess
+  code
+  ```
+  typedef struct Frame {
+    int size;
+    int blocks;
+  } Frame;
+
+  typedef struct Ctx {
+    unsigned totalframes;
+    Frame *frames;
+  } Ctx;
+
+  int read_header(Ctx *ctx) {
+    ctx->frames = av_malloc(ctx->totalframes * sizeof(Frame));
+    if (!ctx->frames) return -1;
+    ctx->frames[0].blocks = 1;
+    ctx->frames[ctx->totalframes - 1].size = 4;
+    ctx->frames[ctx->totalframes - 1].blocks = 1;
+    return 0;
+  }
+  ```
+
+test "rank835: C last-frame access rejects zero frames first"
+  lang c
+  reject VYQL-MEM-041
+  reject_review code.ZeroCountLastElementAccess
+  code
+  ```
+  typedef struct Frame {
+    int size;
+    int blocks;
+  } Frame;
+
+  typedef struct Ctx {
+    unsigned totalframes;
+    Frame *frames;
+  } Ctx;
+
+  int read_header(Ctx *ctx) {
+    if (!ctx->totalframes) return -1;
+    ctx->frames = av_malloc(ctx->totalframes * sizeof(Frame));
+    if (!ctx->frames) return -1;
+    ctx->frames[0].blocks = 1;
+    ctx->frames[ctx->totalframes - 1].size = 4;
+    ctx->frames[ctx->totalframes - 1].blocks = 1;
+    return 0;
+  }
+  ```

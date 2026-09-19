@@ -1,0 +1,17 @@
+module bindings.rust.generated.m2c898170;
+
+binding weakHash0 {
+  requires {
+    dependency("fnv")
+  }
+  query pattern callExpr where callee.method == "fnv1a"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("fnv")
+  }
+  query pattern callExpr where callee.method == "finish"
+  emit issue code.WeakHash at call
+}

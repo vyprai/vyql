@@ -1,0 +1,33 @@
+module bindings.python.generated.mcd43ef2a;
+
+binding deserialization0 {
+  requires {
+    dependency("tomlkit")
+  }
+  query pattern callExpr where callee.method == "loads"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("tomlkit")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("tomlkit")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("tomlkit")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

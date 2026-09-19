@@ -1,0 +1,50 @@
+# Rank 92 / CVE-2023-1260: the SCC admission plugin ignored every non-empty
+# pod subresource wholesale, so ephemeralcontainers updates skipped security
+# context constraints admission entirely. The fix ignores only an explicit
+# allowlist of subresources.
+
+test "rank92: SCC admission ignores all non-empty subresources"
+  lang go
+  expect VYQL-AUTH-174
+  code
+  ```
+  package sccadmission
+
+  func shouldIgnore(a admission.Attributes) (bool, error) {
+  	if a.GetResource().GroupResource() != coreapi.Resource("pods") {
+  		return true, nil
+  	}
+  	if len(a.GetSubresource()) != 0 {
+  		return true, nil
+  	}
+  	pod, ok := a.GetObject().(*coreapi.Pod)
+  	if !ok {
+  		return false, fmt.Errorf("could not convert")
+  	}
+  	return false, nil
+  }
+  ```
+
+test "rank92: SCC admission ignores only allowlisted subresources"
+  lang go
+  reject VYQL-AUTH-174
+  code
+  ```
+  package sccadmission
+
+  var ignoredSubresources = sets.NewString("logging", "binding")
+
+  func shouldIgnore(a admission.Attributes) (bool, error) {
+  	if a.GetResource().GroupResource() != coreapi.Resource("pods") {
+  		return true, nil
+  	}
+  	if subresource := a.GetSubresource(); len(subresource) != 0 && ignoredSubresources.Has(subresource) {
+  		return true, nil
+  	}
+  	pod, ok := a.GetObject().(*coreapi.Pod)
+  	if !ok {
+  		return false, fmt.Errorf("could not convert")
+  	}
+  	return false, nil
+  }
+  ```

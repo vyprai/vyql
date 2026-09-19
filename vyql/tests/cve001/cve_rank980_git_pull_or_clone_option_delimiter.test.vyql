@@ -1,0 +1,46 @@
+# Rank 980 / CVE-2022-24437: git-pull-or-clone passed a caller-controlled
+# repository URL to `git clone` argv before an end-of-options delimiter.
+
+test "rank980: git clone argv lacks end-of-options before URL"
+  lang javascript
+  file index.js
+  expect VYQL-INJ-031
+  expect_review code.CommandOptionInjection
+  code
+  ```
+  function gitPullOrClone(url, outPath, opts, cb) {
+    const depth = opts.depth == null ? 1 : opts.depth;
+
+    function gitClone() {
+      const flag = depth < Infinity ? '--depth=' + depth : '--single-branch';
+      const args = ['clone', flag, url, outPath];
+      spawn('git', args, {}, function (err) {
+        cb(err);
+      });
+    }
+
+    gitClone();
+  }
+  ```
+
+test "rank980: git clone argv uses end-of-options before URL"
+  lang javascript
+  file index.js
+  reject VYQL-INJ-031
+  reject_review code.CommandOptionInjection
+  code
+  ```
+  function gitPullOrClone(url, outPath, opts, cb) {
+    const depth = opts.depth == null ? 1 : opts.depth;
+
+    function gitClone() {
+      const flag = depth < Infinity ? '--depth=' + depth : '--single-branch';
+      const args = ['clone', flag, '--', url, outPath];
+      spawn('git', args, {}, function (err) {
+        cb(err);
+      });
+    }
+
+    gitClone();
+  }
+  ```

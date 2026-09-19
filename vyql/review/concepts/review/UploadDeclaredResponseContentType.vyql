@@ -1,0 +1,8 @@
+module code;
+
+review code.UploadDeclaredResponseContentType {
+  category: xss
+  expected: [core.SafeResponseContentType]
+  kind: attention
+  text: "review the file download response so a stored renderable content type is served as an inert type, as an attachment, or with nosniff rather than parsed inline"
+}

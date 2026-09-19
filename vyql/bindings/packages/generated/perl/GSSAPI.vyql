@@ -1,0 +1,41 @@
+module bindings.perl.generated.m1b5fccea;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("GSSAPI")
+  }
+  query pattern callExpr where callee.method == "GSSAPI::init_sec_context"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("GSSAPI")
+  }
+  query pattern callExpr where callee.method == "GSSAPI::accept_sec_context"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue2 {
+  requires {
+    dependency("GSSAPI")
+  }
+  query pattern callExpr where callee.method == "GSSAPI::acquire_cred"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("GSSAPI")
+  }
+  query pattern callExpr where callee.method == "GSSAPI::add_cred"
+  emit source code.SecretValue at call.result
+}

@@ -1,0 +1,49 @@
+module bindings.ruby.generated.mb30b9b4b;
+
+binding deserialization0 {
+  requires {
+    dependency("dry-types")
+  }
+  query pattern callExpr where callee.method == "visit_json_hash"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("dry-types")
+  }
+  query pattern callExpr where callee.method == "visit_params_hash"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("dry-types")
+  }
+  query pattern callExpr where callee.method == "visit_params_array"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("dry-types")
+  }
+  query pattern callExpr where callee.method == "call_unsafe"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("dry-types")
+  }
+  query pattern callExpr where callee.method == "parse_arguments"
+  emit sink code.Deserialization at args[0]
+}
+
+binding dynamicCodeLoad5 {
+  requires {
+    dependency("dry-types")
+  }
+  query pattern callExpr where callee.method == "compile_fn"
+  emit sink code.DynamicCodeLoad at args[0]
+}

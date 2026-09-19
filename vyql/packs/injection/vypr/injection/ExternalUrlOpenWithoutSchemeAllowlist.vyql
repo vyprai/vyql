@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ExternalUrlOpenWithoutSchemeAllowlist {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_78, CWE_20]
+    id: "VYQL-INJ-248"
+    severity: high
+  }
+  issue code.ExternalUrlOpenWithoutSchemeAllowlist as sink
+}

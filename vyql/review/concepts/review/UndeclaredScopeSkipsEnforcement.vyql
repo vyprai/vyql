@@ -1,0 +1,7 @@
+module code;
+
+review code.UndeclaredScopeSkipsEnforcement {
+  category: auth
+  kind: attention
+  text: "review guards that conjoin a permission-membership test with the bare presence of the requirement it compares against, because an undeclared requirement then skips the check"
+}

@@ -1,0 +1,152 @@
+# Rank 1147 / CVE-2025-59050: Greenshot deserializes the payload of any
+# WM_COPYDATA Windows message with an unrestricted BinaryFormatter, and any
+# process on the same desktop can send that message, so a lower-privileged
+# process achieves code execution in Greenshot's process through a known
+# BinaryFormatter gadget chain (CWE-502).
+#
+# The message payload read out of Message.LParam is labelled
+# code.MessageInput, which carries the taint through the COPYDATASTRUCT
+# decode, the array copy and the MemoryStream into the Deserialize argument.
+# The fix assigns a SerializationBinder to the formatter before the read;
+# that assignment is labelled core.SafeDeserialization with dominance-based
+# endpoint coverage, so it covers the read it precedes and not one it
+# follows.
+
+test "rank1147: WM_COPYDATA bytes are deserialized with an unrestricted BinaryFormatter"
+  lang csharp
+  file CopyData.cs
+  expect VYQL-DESER-001
+  code
+  ```
+  using System.IO;
+  using System.Runtime.InteropServices;
+  using System.Runtime.Serialization.Formatters.Binary;
+  using System.Windows.Forms;
+
+  namespace Greenshot.Helpers
+  {
+      public class CopyDataTransport
+      {
+          private const int WM_COPYDATA = 0x4A;
+
+          protected override void WndProc(ref Message m)
+          {
+              if (m.Msg == WM_COPYDATA)
+              {
+                  var cds = (COPYDATASTRUCT) Marshal.PtrToStructure(m.LParam, typeof(COPYDATASTRUCT));
+                  if (cds.cbData > 0)
+                  {
+                      byte[] data = new byte[cds.cbData];
+                      Marshal.Copy(cds.lpData, data, 0, cds.cbData);
+                      MemoryStream stream = new MemoryStream(data);
+                      BinaryFormatter b = new BinaryFormatter();
+                      CopyDataObjectData cdo = (CopyDataObjectData) b.Deserialize(stream);
+                  }
+              }
+              base.WndProc(ref m);
+          }
+      }
+  }
+  ```
+
+test "rank1147: the deserializer is bound to an allowlisting SerializationBinder"
+  lang csharp
+  file CopyData.cs
+  reject VYQL-DESER-001
+  code
+  ```
+  using System.IO;
+  using System.Runtime.InteropServices;
+  using System.Runtime.Serialization;
+  using System.Runtime.Serialization.Formatters.Binary;
+  using System.Windows.Forms;
+
+  namespace Greenshot.Helpers
+  {
+      public class CopyDataTransport
+      {
+          private const int WM_COPYDATA = 0x4A;
+
+          protected override void WndProc(ref Message m)
+          {
+              if (m.Msg == WM_COPYDATA)
+              {
+                  var cds = (COPYDATASTRUCT) Marshal.PtrToStructure(m.LParam, typeof(COPYDATASTRUCT));
+                  if (cds.cbData > 0)
+                  {
+                      byte[] data = new byte[cds.cbData];
+                      Marshal.Copy(cds.lpData, data, 0, cds.cbData);
+                      MemoryStream stream = new MemoryStream(data);
+                      BinaryFormatter b = new BinaryFormatter();
+                      b.Binder = new SafeSerializationBinder();
+                      CopyDataObjectData cdo = (CopyDataObjectData) b.Deserialize(stream);
+                  }
+              }
+              base.WndProc(ref m);
+          }
+      }
+
+      internal class SafeSerializationBinder : SerializationBinder
+      {
+          public override System.Type BindToType(string assemblyName, string typeName)
+          {
+              if (typeName == typeof(CopyDataObjectData).FullName)
+              {
+                  return typeof(CopyDataObjectData);
+              }
+              throw new System.Security.SecurityException("Suspicious type received via WM_COPYDATA");
+          }
+      }
+  }
+  ```
+
+test "rank1147: a binder assigned after the read covers nothing it follows"
+  lang csharp
+  file CopyData.cs
+  expect VYQL-DESER-001
+  code
+  ```
+  using System.IO;
+  using System.Runtime.InteropServices;
+  using System.Runtime.Serialization;
+  using System.Runtime.Serialization.Formatters.Binary;
+  using System.Windows.Forms;
+
+  namespace Greenshot.Helpers
+  {
+      public class CopyDataTransport
+      {
+          private const int WM_COPYDATA = 0x4A;
+
+          protected override void WndProc(ref Message m)
+          {
+              if (m.Msg == WM_COPYDATA)
+              {
+                  var cds = (COPYDATASTRUCT) Marshal.PtrToStructure(m.LParam, typeof(COPYDATASTRUCT));
+                  if (cds.cbData > 0)
+                  {
+                      byte[] data = new byte[cds.cbData];
+                      Marshal.Copy(cds.lpData, data, 0, cds.cbData);
+                      MemoryStream stream = new MemoryStream(data);
+                      BinaryFormatter b = new BinaryFormatter();
+                      CopyDataObjectData cdo = (CopyDataObjectData) b.Deserialize(stream);
+                      b.Binder = new SafeSerializationBinder();
+                  }
+              }
+              base.WndProc(ref m);
+          }
+      }
+
+      internal class SafeSerializationBinder : SerializationBinder
+      {
+          public override System.Type BindToType(string assemblyName, string typeName)
+          {
+              if (typeName == typeof(CopyDataObjectData).FullName)
+              {
+                  return typeof(CopyDataObjectData);
+              }
+              throw new System.Security.SecurityException("Suspicious type received via WM_COPYDATA");
+          }
+      }
+  }
+  ```

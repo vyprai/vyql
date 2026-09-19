@@ -1,0 +1,8 @@
+module code;
+
+review code.StatamicAssetUploadPhpExtensionValidationBypass {
+  category: upload
+  expected: [core.AllowlistValidation]
+  kind: attention
+  text: "review Statamic front-end form asset upload rules for explicit PHP executable extension rejection"
+}

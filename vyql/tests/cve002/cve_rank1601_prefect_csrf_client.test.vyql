@@ -1,0 +1,126 @@
+# Rank 1601 / CVE-2023-6022: Prefect's orchestration client sent
+# state-changing requests to the (often localhost) orchestration API
+# with no CSRF token, so a malicious page in the same browser could
+# drive a user's local Prefect server cross-site (cross-site request
+# forgery against the local API, CWE-352; PR #12314). The client in
+# src/prefect/client/base.py issued POST/PUT/PATCH/DELETE through
+# plain httpx with no challenge-response -- nothing bound a request
+# to the client the API trusts. The fixing commit 227dfcc7e3
+# ("Add CSRF support to orchestration client (#12314)") touches zero
+# server files: the client gains enable_csrf_support with a
+# per-client uuid (csrf_client_id), a server-fetched expiring
+# csrf_token attached to every change request (_add_csrf_headers),
+# and a 403-"Invalid CSRF token" retry that clears and re-fetches
+# the token; orchestration.py enables the support and settings
+# expose the tokens. The server's enforcement already exists at the
+# parent -- src/prefect/server/api/middleware.py compares
+# Prefect-Csrf-Token/-Client headers against the database token for
+# POST/PUT/PATCH/DELETE, gated on PREFECT_SERVER_CSRF_PROTECTION_
+# ENABLED (default False) -- so the remediation is client
+# capability, and no revision pair differs on any server file.
+#
+# ATTENTION, csrf-client protocol completeness, held on recheck.
+# Measured at the span tip on the real checkout (3 x --cache off per
+# revision, timeout 180, --max-ram 6GB): base.py reports 1 finding
+# at the parent (VYQL-INJ-009 on the response-to-log path) and 3 at
+# the fix -- the two additions are VYQL-RF-001 UrlFetch rows on the
+# added token-fetch call (send at :235, self.send(token_request) at
+# :362, both sourced from the send parameter), the documented
+# syntactic over-labelling, not CSRF coverage. The whole client
+# directory reports 47 findings at the parent and 49 at the fix,
+# byte-identical across runs, all RF-001/AUTH-099/DESER-001/INJ-009;
+# the server API tree (identical at both revisions) reports 39
+# findings, none CSRF-family. vyql match on the vulnerable base.py
+# labels only parameter sources and one LogOutput sink -- the
+# request dispatch carries no label at all, so the 1st-pass zero was
+# real, not a misread view. The csrf family split on recheck:
+# ranks 1567 and 1592 converted because their guards live in the
+# same file and language as the defect (a form-key submit handler;
+# an oauth callback reading `code` without `state`), while rank 1581
+# held for constructor-registered coverage. Here the guard is the
+# server middleware in another process: no revision of the client
+# tree states whether the far end enforces the challenge, and the
+# fixing commit itself ships a deliberately tokenless state-changing
+# client -- cloud.py constructs PrefectHttpxClient with
+# enable_csrf_support=False because Cloud authenticates with API
+# keys and no ambient browser authority -- so "a state-changing
+# client request without a challenge token" does not separate defect
+# from correct code even inside the fix. The false-positive surface
+# of such a rule is measured: 1903 .post(/.put(/.patch(/.delete(
+# call sites across three collateral python trees (posthog 1775, a
+# 116-site sub-tree, jupyter_server 12), ordinary API clients none
+# of which is a CSRF defect. No csrf-client vocabulary exists in any
+# language -- every csrf binding is a server-side framework token
+# check -- and negating on the fix's own names
+# (enable_csrf_support, _add_csrf_headers, x-prefect-csrf) is the
+# fixing commit's own layout. No ENGINE-GAPS.md entry: no taint path
+# is interrupted, the missing piece is cross-process protocol state,
+# not a construct the engine mishandles. No definition change
+# shipped. Spec cve_rank1601 records the plain change request and
+# the token-attached form, both asserting reject VYQL-AUTH-079: when
+# csrf-client vocabulary lands, the plain form must flip to expect.
+
+test "rank1601: change requests carry no challenge token"
+  lang python
+  file src/prefect/client/base.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import httpx
+
+
+  class PrefectHttpxClient(httpx.AsyncClient):
+      async def send(self, request, *args, **kwargs):
+          response = await super().send(request, *args, **kwargs)
+          return response
+
+      async def create_flow(self, name):
+          return await self.post("/flows/", json={"name": name})
+  ```
+
+test "rank1601: the fixed revision attaches a csrf token to every change"
+  lang python
+  file src/prefect/client/base.py
+  reject VYQL-AUTH-079
+  code
+  ```
+  import uuid
+  from datetime import datetime, timezone
+
+  import httpx
+  from prefect.client.schemas.objects import CsrfToken
+
+
+  class PrefectHttpxClient(httpx.AsyncClient):
+      def __init__(self, *args, enable_csrf_support=False, **kwargs):
+          self.enable_csrf_support = enable_csrf_support
+          self.csrf_token = None
+          self.csrf_token_expiration = None
+          self.csrf_client_id = uuid.uuid4()
+          super().__init__(*args, **kwargs)
+
+      async def _add_csrf_headers(self, request):
+          if self.csrf_token is None or (
+              self.csrf_token_expiration
+              and datetime.now(timezone.utc) > self.csrf_token_expiration
+          ):
+              response = await self.get(
+                  "/csrf/token",
+                  params={"client": str(self.csrf_client_id)},
+              )
+              token = CsrfToken(**response.json())
+              self.csrf_token = token.token
+              self.csrf_token_expiration = token.expiration
+
+          request.headers["x-prefect-csrf"] = self.csrf_token
+          request.headers["x-prefect-csrf-client"] = str(self.csrf_client_id)
+
+      async def send(self, request, *args, **kwargs):
+          is_change_request = request.method.lower() in {"post", "put", "patch", "delete"}
+          if self.enable_csrf_support and is_change_request:
+              await self._add_csrf_headers(request)
+          return await super().send(request, *args, **kwargs)
+
+      async def create_flow(self, name):
+          return await self.post("/flows/", json={"name": name})
+  ```

@@ -1,0 +1,111 @@
+# Rank 132 / CVE-2008-1897 (AST-2008-006): the IAX2 call lookup matches an
+# incoming frame against an existing call on the peer's source call number, and
+# consults the frame's destination call number only in the branch where no peer
+# number is known yet, so a full frame that names no destination number is
+# accepted as the existing call. The fix threads a full_frame flag down to the
+# match and requires the destination number to equal the call's own number
+# before a full frame is taken for it; mini/meta/video/registration lookups
+# pass 0 and keep the looser match.
+
+test "rank132: c full-frame call lookup without destination binding is review-visible"
+  lang c
+  expect VYQL-AUTH-087
+  expect_review code.ProtocolFrameBindingReview
+  code
+  ```
+  struct sockaddr_in {
+      struct { unsigned int s_addr; } sin_addr;
+      unsigned short sin_port;
+  };
+  struct chan_iax2_pvt {
+      struct sockaddr_in addr;
+      unsigned short peercallno;
+      unsigned short callno;
+  };
+
+  static int match(struct sockaddr_in *sin, unsigned short callno,
+                   unsigned short dcallno, const struct chan_iax2_pvt *cur)
+  {
+      if ((cur->addr.sin_addr.s_addr == sin->sin_addr.s_addr) &&
+          (cur->addr.sin_port == sin->sin_port)) {
+          if ((cur->peercallno == callno) ||
+              ((dcallno == cur->callno) && !cur->peercallno)) {
+              return 1;
+          }
+      }
+      return 0;
+  }
+  ```
+
+test "rank132: c full-frame call lookup with destination binding is clean"
+  lang c
+  reject VYQL-AUTH-087
+  reject_review code.ProtocolFrameBindingReview
+  code
+  ```
+  struct sockaddr_in {
+      struct { unsigned int s_addr; } sin_addr;
+      unsigned short sin_port;
+  };
+  struct chan_iax2_pvt {
+      struct sockaddr_in addr;
+      unsigned short peercallno;
+      unsigned short callno;
+  };
+
+  static int match(struct sockaddr_in *sin, unsigned short callno,
+                   unsigned short dcallno, const struct chan_iax2_pvt *cur, int full_frame)
+  {
+      if ((cur->addr.sin_addr.s_addr == sin->sin_addr.s_addr) &&
+          (cur->addr.sin_port == sin->sin_port)) {
+          if ((cur->peercallno == 0 || cur->peercallno == callno) &&
+              (full_frame ? dcallno == cur->callno : 1)) {
+              return 1;
+          }
+      }
+      return 0;
+  }
+  ```
+
+test "rank132: a call table walk that never compares the destination number is not the shape"
+  lang c
+  reject VYQL-AUTH-087
+  reject_review code.ProtocolFrameBindingReview
+  code
+  ```
+  struct chan_iax2_pvt {
+      unsigned short peercallno;
+      unsigned short callno;
+  };
+
+  static int match_peer_only(unsigned short callno, unsigned short dcallno,
+                             const struct chan_iax2_pvt *cur)
+  {
+      if (cur->peercallno == callno) {
+          return 1;
+      }
+      return 0;
+  }
+  ```
+
+test "rank132: optional destination binding generalises across names"
+  lang c
+  expect VYQL-AUTH-087
+  expect_review code.ProtocolFrameBindingReview
+  code
+  ```
+  struct call_session {
+      unsigned short peercallno;
+      unsigned short callno;
+  };
+
+  static int session_matches(unsigned short src, unsigned short dst,
+                             const struct call_session *sess)
+  {
+      if ((sess->peercallno == src) ||
+          ((dst == sess->callno) && !sess->peercallno)) {
+          return 1;
+      }
+      return 0;
+  }
+  ```

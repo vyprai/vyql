@@ -1,0 +1,33 @@
+module bindings.perl.generated.mdd98cc15;
+
+binding networkData0 {
+  requires {
+    dependency("JSAN")
+  }
+  query pattern callExpr where callee.method == "_read_script"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("JSAN")
+  }
+  query pattern callExpr where callee.method == "_connected_to"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("JSAN")
+  }
+  query pattern callExpr where callee.path ~= "jsan"
+  emit sink code.FilePathAccess at args.any
+}
+
+binding archiveEntryWrite3 {
+  requires {
+    dependency("JSAN")
+  }
+  query pattern callExpr where callee.method == "_read_script"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

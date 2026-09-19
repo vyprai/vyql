@@ -1,0 +1,9 @@
+module bindings.swift.generated.m870289e4;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/StanfordBDHG/CardinalKitFHIR")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

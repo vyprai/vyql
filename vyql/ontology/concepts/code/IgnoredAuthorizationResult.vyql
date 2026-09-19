@@ -1,0 +1,6 @@
+module code;
+
+concept IgnoredAuthorizationResult : issue {
+  cwe: [CWE_252, CWE_285, CWE_863]
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

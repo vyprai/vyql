@@ -1,0 +1,9 @@
+module bindings.ruby.generated.ma5207318;
+
+binding filePathAccess0 {
+  requires {
+    dependency("prawn")
+  }
+  query pattern callExpr where callee.method == "image"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule ResolvedUrlOriginOnlyContainment {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22, CWE_20]
+    id: "VYQL-PATH-090"
+    severity: high
+  }
+  issue code.ResolvedUrlOriginOnlyContainment as sink
+}

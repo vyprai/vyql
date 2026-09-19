@@ -1,0 +1,33 @@
+module bindings.go.generated.m4a873653;
+
+binding networkConnect0 {
+  requires {
+    dependency("go.opentelemetry.io/otel/exporters/otlp")
+  }
+  query pattern callExpr where callee.method == "WithTracesEndpoint"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("go.opentelemetry.io/otel/exporters/otlp")
+  }
+  query pattern callExpr where callee.method == "WithMetricsEndpoint"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("go.opentelemetry.io/otel/exporters/otlp")
+  }
+  query pattern callExpr where callee.method == "WithTracesHeaders"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("go.opentelemetry.io/otel/exporters/otlp")
+  }
+  query pattern callExpr where callee.method == "WithMetricsHeaders"
+  emit source code.NetworkData at call.result
+}

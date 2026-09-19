@@ -1,0 +1,143 @@
+# Rank 1521 / CVE-2021-25931: OpenNMS' requisition UI concatenated
+# $scope values into growl notification messages, which the growl
+# directive renders as HTML, so a requisition name or node label
+# carrying markup executed in the operator's browser (cross-site
+# scripting, CWE-79; NMS-13231 backport). The controllers in
+# core/web-assets/src/main/assets/js/apps/onms-requisitions/lib/
+# scripts/controllers did
+# `$scope.foreignSource = $routeParams.foreignSource` and then
+# `growl.success('The definition for the requisition ' +
+# $scope.foreignSource + ' has been saved.')` and a dozen siblings,
+# while one path wrapped the message in $sanitize (HTML sanitising,
+# wrong for a text context). The fixing commit eb08b5ed4c
+# ("NMS-13231: Backport Security Issues from Last Month") wraps every
+# interpolation in lodash's _.escape and drops the $sanitize calls
+# (escaping, not sanitising, is the control a text notification
+# needs). No pool correction.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over the onms-requisitions app
+# (60 javascript files) report **2 findings each, deterministically,
+# identically on the vulnerable parent and the fixed eb08b5ed4c**:
+# two VYQL-INJ-013 prototype-pollution rows in model/Requisition.js
+# (DomInput@154 -> ProtoPollute@160) and model/RequisitionsData.js
+# (DomInput@66 -> ProtoPollute@71), far from the notification code.
+# The full findings view was read, not the `-flags` only view. No
+# rule names any controller, no finding sits on any growl or bootbox
+# line, and VYQL-INJ-004 reports zero at both revisions. The 1st
+# pass's zero was real.
+#
+# ## Why nothing ships
+#
+# Both halves the 1st pass called missing are bindable today, and
+# neither converts the rank:
+#
+# * The sink is a library fact. angular-growl-2 v0.7.9 -- the
+#   version core/web-assets/package.json pins -- renders the message
+#   text as HTML unconditionally: growlDirective.js:90 templates
+#   `<div class="growl-message" ng-bind-html="message.text">` and
+#   growlMessageService adds it with
+#   `message.text = $sce.trustAsHtml(String(message.text))`. A probe
+#   binding `callee.path ~= "growl.success"` emitting
+#   `sink code.HtmlRender at args[0]` labels exactly
+#   ForeignSource.js:457/477/520.
+# * The source is a framework fact. AngularJS documents $routeParams
+#   as the current route's URL parameters; a probe binding on
+#   `callee.path ~= "$routeParams"` emitting
+#   `source code.DomInput at call.result` labels
+#   ForeignSource.js:57 (`$routeParams.foreignSource`).
+#
+# With both probes loaded the real tree still reports the same
+# 2 findings at both revisions (3x3, --cache off): the taint path
+# dies at the member store. `vyql trace -from code.DomInput -to
+# code.HtmlRender` names the node: the source at ForeignSource.js:57
+# reaches `Call#703 call=$scope.foreignSource` and stops with "no
+# outgoing flow (callee not traced -- external or cross-package)" --
+# `$scope.foreignSource = $routeParams.foreignSource` lowers to an
+# unresolved pseudo-call, so the later `$scope.foreignSource` read
+# inside the save closure carries nothing. Minimal pairs with the
+# probes in place: a local-variable hop
+# (`var fs = $routeParams.foreignSource; growl.success('...' + fs)`)
+# and a direct read (`growl.success('...' + $routeParams.foreignSource)`)
+# both report VYQL-INJ-004 HIGH, and the _.escape-wrapped direct read
+# stays silent (the HtmlEscape control neutralises inline in the
+# concatenation). Only the $scope member hop reports nothing, so the
+# construct is isolated. Carrying taint through a member-store
+# pseudo-call is a new dataflow relation, not a mechanical fix.
+#
+# The alternate source route -- tainting the parameters of functions
+# assigned to $scope members (Requisitions.js's
+# `$scope.removeAllNodes = function(foreignSource)`, invoked from
+# ng-click with template values) -- is the measured-unshippable
+# "taint every parameter of an application's own action surface"
+# shape (1322: +88 findings for 1 true positive).
+#
+# Measurement trap recorded here: a probe emitting code.CliArgument
+# on the opennms tree reads as a clean zero because the Library / SDK
+# analysis profile's entrypoints gate source labelling by exact
+# concept identity; code.DomInput passes that gate. When the sink
+# binding and member-store provenance land, the raw tests below must
+# flip to expect.
+#
+# No definition change shipped. No ENGINE-GAPS.md entry beyond the
+# member-field boundary the ledger already carries (1518, 1545).
+#
+# ## Recheck measurements (knowledge base tip e39dc5f05)
+#
+# Baseline 3x3 over the app: 2/2/2 vulnerable, 2/2/2 fixed,
+# identical rule sets. Probe A/B 3x3: identical 2/2/2 both
+# revisions. Minimal-pair scans over the probe corpus: 2 VYQL-INJ-004
+# (local-var hop, direct read), 0 with _.escape, 0 on the $scope hop.
+# Narrow spec passing with -v. Rank stays ATTENTION.
+
+test "rank1521: requisition names hop the scope member into the notification"
+  lang javascript
+  file core/web-assets/src/main/assets/js/apps/onms-requisitions/lib/scripts/controllers/ForeignSource.js
+  reject VYQL-INJ-004
+  code
+  ```
+  angular.module('onms-requisitions').controller('ForeignSourceController', ['$scope', '$routeParams', 'RequisitionsService', 'growl', function($scope, $routeParams, $window, RequisitionsService, growl) {
+      $scope.foreignSource = $routeParams.foreignSource;
+
+      $scope.save = function() {
+          RequisitionsService.saveForeignSourceDefinition($scope.foreignSourceDef).then(
+              function() {
+                  growl.success('The definition for the requisition ' + $scope.foreignSource + ' has been saved.');
+              }
+          );
+      };
+  }]);
+  ```
+
+test "rank1521: the fixed revision escapes every interpolation"
+  lang javascript
+  file core/web-assets/src/main/assets/js/apps/onms-requisitions/lib/scripts/controllers/ForeignSource.js
+  reject VYQL-INJ-004
+  code
+  ```
+  angular.module('onms-requisitions').controller('ForeignSourceController', ['$scope', '$routeParams', 'RequisitionsService', 'growl', function($scope, $routeParams, $window, RequisitionsService, growl) {
+      $scope.foreignSource = $routeParams.foreignSource;
+
+      $scope.save = function() {
+          RequisitionsService.saveForeignSourceDefinition($scope.foreignSourceDef).then(
+              function() {
+                  growl.success('The definition for the requisition ' + _.escape($scope.foreignSource) + ' has been saved.');
+              }
+          );
+      };
+  }]);
+  ```
+
+test "rank1521: a route parameter read straight into the notification"
+  lang javascript
+  file core/web-assets/src/main/assets/js/apps/onms-requisitions/lib/scripts/controllers/ForeignSource.js
+  reject VYQL-INJ-004
+  code
+  ```
+  angular.module('onms-requisitions').controller('ForeignSourceController', ['$scope', '$routeParams', 'growl', function($scope, $routeParams, growl) {
+      $scope.save = function() {
+          growl.success('The definition for the requisition ' + $routeParams.foreignSource + ' has been saved.');
+      };
+  }]);
+  ```

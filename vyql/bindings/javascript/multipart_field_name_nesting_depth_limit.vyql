@@ -1,0 +1,51 @@
+module bindings.javascript.multipart_field_name_nesting_depth_limit;
+
+// A `multipart/form-data` part carries a client-chosen field *name*, and every
+// multipart parser in this ecosystem hands that name to the application
+// verbatim: busboy, formidable, multiparty and dicer all document a `field`
+// event whose first argument is the raw name off the wire. Middleware that
+// wants HTML's nested-name convention -- `a[b][c]` -- then feeds that name to a
+// path expander, whose documented job is to create one container per path
+// segment: `append-field`'s `appendField(store, key, value)` ("sets a value on
+// an object, adding array parts as it goes"), `dset`, `set-value`,
+// `object-path`'s `set`, `dot-prop`'s `set`, lodash `_.set`/`_.setWith`. The
+// number of objects allocated and the number of walk steps taken are therefore
+// both the number of bracket groups the client typed, and a client can type a
+// few thousand of them inside a field name of a few kilobytes -- so a small
+// request buys deep-nested allocation, once per part, for as many parts as the
+// part limit allows (CWE-400/CWE-770).
+//
+// A cap on the field name's *length* is not a cap on its depth: a bracket group
+// costs three characters, so any name-size limit generous enough to be usable
+// still admits hundreds of levels. The remediation is a separate ceiling on the
+// number of levels, which is what this ecosystem calls a depth or nesting limit
+// -- `qs` and `body-parser` document `depth`, glob and GraphQL matchers
+// document `maxDepth`/`depthLimit`. The negation therefore names that quantity
+// in the spellings a parser would use, whether it is read off an options object
+// or held in a local counter, rather than any one library's identifier.
+//
+// The module is the unit. The expansion happens inside the parser's `field`
+// callback, but that callback cannot see the event registration or the
+// content-type test that make the name untrusted -- both sit in the enclosing
+// function -- while a ceiling may equally be enforced in the callback or before
+// the parser is constructed. The two literal clauses are what keep this a
+// statement about a multipart body parser rather than about every module that
+// calls a path setter: `set`-family helpers are everywhere, and outside a
+// multipart field handler their path is usually a constant the program wrote
+// itself.
+//
+// Every clause is a node-derived token and none of them reads the module's own
+// prose. At module scope `containsAny(node.context.literal, ...)` reaches the
+// raw source and a comment can satisfy it, so the two literal clauses are
+// written as exact `in [...]` tests, which cannot be; the negations use
+// `selector` and `identifier`, which are comment-proof at module scope.
+binding jsMultipartFieldNameNestedExpansionWithoutDepthLimit {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "javascript"
+    and node.context.literal in ["field"]
+    and node.context.literal in ["multipart"]
+    and containsAny(node.context.callPath, ["appendField", "dset", "setValue", "deepSet", "objectPath.set", "dotProp.set", "_.set", "lodash.set", "_.setWith"])
+    and not (containsAny(node.context.selector, ["Depth", "depth", "Nesting", "nesting", "maxLevels", "MaxLevels", "levelLimit", "LevelLimit", "maxSegments", "MaxSegments", "segmentLimit", "SegmentLimit", "maxBrackets", "MaxBrackets", "bracketLimit", "BracketLimit", "maxKeys", "MaxKeys"]))
+    and not (containsAny(node.context.identifier, ["Depth", "depth", "Nesting", "nesting", "maxLevels", "MaxLevels", "levelLimit", "LevelLimit", "maxSegments", "MaxSegments", "segmentLimit", "SegmentLimit", "maxBrackets", "MaxBrackets", "bracketLimit", "BracketLimit", "maxKeys", "MaxKeys"]))
+  emit issue code.UnboundedAllocationReview at node
+}

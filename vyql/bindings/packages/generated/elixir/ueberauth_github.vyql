@@ -1,0 +1,50 @@
+module bindings.elixir.generated.mea10675c;
+
+binding redirectTarget0 {
+  requires {
+    dependency("ueberauth_github")
+  }
+  query pattern callExpr where callee.method == "authorize_url!"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("ueberauth_github")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("ueberauth_github")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("ueberauth_github")
+  }
+  query pattern callExpr where callee.method == "get_token!"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("ueberauth_github")
+  }
+  query pattern callExpr where callee.method == "get_token!"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding secretValue5 {
+  requires {
+    dependency("ueberauth_github")
+  }
+  query pattern callExpr where callee.method == "get_token!"
+  emit source code.SecretValue at call.result
+}

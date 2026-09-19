@@ -1,0 +1,17 @@
+module bindings.c.generated.me42e1aa9;
+
+binding secretValue0 {
+  requires {
+    dependency("hash-library")
+  }
+  query pattern callExpr where callee.method == "hmac"
+  emit source code.SecretValue at call.result
+}
+
+binding weakHash1 {
+  requires {
+    dependency("hash-library")
+  }
+  query pattern callExpr where callee.method == "getHash"
+  emit issue code.WeakHash at call
+}

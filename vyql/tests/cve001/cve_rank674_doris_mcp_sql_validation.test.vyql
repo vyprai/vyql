@@ -1,0 +1,38 @@
+# Rank 674 / CVE-2025-58337: Doris MCP server executed caller SQL through
+# the MCP helper before applying SQL security validation.
+
+test "rank674: MCP SQL helper executes caller SQL without security validation"
+  lang python
+  expect VYQL-INJ-149
+  code
+  ```
+  class DorisQueryExecutor:
+      async def execute_sql_for_mcp(self, sql: str, session_id: str = "mcp_session", user_id: str = "mcp_user"):
+          class MockAuthContext:
+              def __init__(self):
+                  self.user_id = user_id
+                  self.permissions = ["read_data", "execute_query"]
+                  self.session_id = session_id
+
+          auth_context = MockAuthContext()
+          query_request = QueryRequest(sql=sql, session_id=session_id, user_id=user_id)
+          result = await self.execute_query(query_request, auth_context)
+          return {"success": True, "data": result.data}
+  ```
+
+test "rank674: MCP SQL helper validates SQL security before execution"
+  lang python
+  reject VYQL-INJ-149
+  code
+  ```
+  class DorisQueryExecutor:
+      async def execute_sql_for_mcp(self, sql: str, session_id: str = "mcp_session", user_id: str = "mcp_user"):
+          security_manager = DorisSecurityManager(self.connection_manager.config)
+          validation_result = await security_manager.validate_sql_security(sql, auth_context)
+          if not validation_result.is_valid:
+              return {"success": False, "error": validation_result.error_message}
+
+          query_request = QueryRequest(sql=sql, session_id=session_id, user_id=user_id)
+          result = await self.execute_query(query_request, auth_context)
+          return {"success": True, "data": result.data}
+  ```

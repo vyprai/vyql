@@ -1,0 +1,17 @@
+module bindings.groovy.generated.m4266f2c2;
+
+binding filePathAccess0 {
+  requires {
+    dependency("com.squareup:javapoet")
+  }
+  query pattern callExpr where callee.method == "writeToPath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("com.squareup:javapoet")
+  }
+  query pattern callExpr where callee.method == "writeToFile"
+  emit sink code.FilePathAccess at args[0]
+}

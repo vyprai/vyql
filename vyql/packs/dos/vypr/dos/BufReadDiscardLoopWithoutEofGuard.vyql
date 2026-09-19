@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule BufReadDiscardLoopWithoutEofGuard {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_400, CWE_835]
+    id: "VYQL-DOS-028"
+    severity: high
+  }
+  issue code.BufReadDiscardLoopWithoutEofGuard as discard
+}

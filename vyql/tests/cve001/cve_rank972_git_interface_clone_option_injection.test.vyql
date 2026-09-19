@@ -1,0 +1,44 @@
+# Rank 972 / CVE-2022-1440: git-interface built `git clone` argv from a
+# split command string without an end-of-options delimiter before repository.
+
+test "rank972: git clone string lacks end-of-options before repository"
+  lang javascript
+  profile api
+  file src/index.ts
+  expect VYQL-INJ-031
+  expect_review code.CommandOptionInjection
+  code
+  ```
+  export class Git {
+    protected gitExec(cmd: string): Promise<string> {
+      return Promise.resolve(cmd);
+    }
+
+    public clone(repository: string, dest: string, options?: { depth?: number }) {
+      const opt = options || { depth: Infinity };
+      const depthOption = opt.depth !== Infinity ? ` --depth=${opt.depth}` : '';
+      return this.gitExec(`clone ${repository} ${dest}${depthOption}`);
+    }
+  }
+  ```
+
+test "rank972: git clone string uses end-of-options before repository"
+  lang javascript
+  profile api
+  file src/index.ts
+  reject VYQL-INJ-031
+  reject_review code.CommandOptionInjection
+  code
+  ```
+  export class Git {
+    protected gitExec(cmd: string): Promise<string> {
+      return Promise.resolve(cmd);
+    }
+
+    public clone(repository: string, dest: string, options?: { depth?: number }) {
+      const opt = options || { depth: Infinity };
+      const depthOption = opt.depth !== Infinity ? `--depth=${opt.depth}` : '';
+      return this.gitExec(`clone ${depthOption} -- ${repository} ${dest}`);
+    }
+  }
+  ```

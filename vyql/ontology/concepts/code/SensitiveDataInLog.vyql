@@ -1,0 +1,11 @@
+module code;
+
+concept SensitiveDataInLog : issue {
+  cwe: [CWE_532]
+  reviewAssumption: "the log is readable by someone who should not hold the secret"
+  reviewCategory: secret
+  reviewCondition: "credential or token material is written to a log or console sink"
+  reviewConfidence: medium
+  reviewEvidence: "log write {pattern} carries credential material"
+  vulnerableTo: [crypto.CleartextStorage]
+}

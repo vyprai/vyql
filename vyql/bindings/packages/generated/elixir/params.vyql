@@ -1,0 +1,33 @@
+module bindings.elixir.generated.m35de3585;
+
+binding userControlledData0 {
+  requires {
+    dependency("params")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("params")
+  }
+  query pattern callExpr where callee.method == "changeset"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("params")
+  }
+  query pattern callExpr where callee.method == "from"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("params")
+  }
+  query pattern callExpr where callee.method == "data"
+  emit source core.UserControlledData at call.result
+}

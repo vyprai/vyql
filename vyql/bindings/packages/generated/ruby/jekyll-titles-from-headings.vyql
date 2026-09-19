@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m3e574eae;
+
+binding userControlledData0 {
+  requires {
+    dependency("jekyll-titles-from-headings")
+  }
+  query pattern callExpr where callee.method == "generate"
+  emit source core.UserControlledData at call.result
+}

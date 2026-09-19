@@ -1,0 +1,33 @@
+module bindings.cpp.generated.m21200970;
+
+binding deserialization0 {
+  requires {
+    dependency("cjson")
+  }
+  query pattern callExpr where callee.method == "cJSON_Parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("cjson")
+  }
+  query pattern callExpr where callee.method == "cJSON_ParseWithLength"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("cjson")
+  }
+  query pattern callExpr where callee.method == "cJSON_ParseWithOpts"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("cjson")
+  }
+  query pattern callExpr where callee.method == "cJSON_ParseWithLengthOpts"
+  emit sink code.Deserialization at args[0]
+}

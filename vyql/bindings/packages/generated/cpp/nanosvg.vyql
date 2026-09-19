@@ -1,0 +1,25 @@
+module bindings.cpp.generated.m47af3081;
+
+binding deserialization0 {
+  requires {
+    dependency("nanosvg")
+  }
+  query pattern callExpr where callee.method == "nsvgParseFromFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("nanosvg")
+  }
+  query pattern callExpr where callee.method == "nsvgParse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("nanosvg")
+  }
+  query pattern callExpr where callee.method == "nsvgParseFromFile"
+  emit sink code.FilePathAccess at args[0]
+}

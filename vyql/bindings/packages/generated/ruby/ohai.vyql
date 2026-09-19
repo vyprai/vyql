@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m3dbb369f;
+
+binding commandExecution0 {
+  requires {
+    dependency("ohai")
+  }
+  query pattern callExpr where callee.method == "shell_out"
+  emit sink code.CommandExecution at args[0]
+}

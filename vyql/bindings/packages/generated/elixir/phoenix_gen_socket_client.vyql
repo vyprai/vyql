@@ -1,0 +1,9 @@
+module bindings.elixir.generated.me47bbd95;
+
+binding deserialization0 {
+  requires {
+    dependency("phoenix_gen_socket_client")
+  }
+  query pattern callExpr where callee.method == "decode_message"
+  emit sink code.Deserialization at args[0]
+}

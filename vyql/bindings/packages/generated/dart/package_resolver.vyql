@@ -1,0 +1,57 @@
+module bindings.dart.generated.ma7a79070;
+
+binding urlFetch0 {
+  requires {
+    dependency("package_resolver")
+  }
+  query pattern callExpr where callee.method == "loadConfigMap"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("package_resolver")
+  }
+  query pattern callExpr where callee.method == "loadConfig"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("package_resolver")
+  }
+  query pattern callExpr where callee.method == "readFileAsString"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("package_resolver")
+  }
+  query pattern callExpr where callee.method == "urlFor"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("package_resolver")
+  }
+  query pattern callExpr where callee.method == "packagePath"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("package_resolver")
+  }
+  query pattern callExpr where callee.method == "resolvePackageUri"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("package_resolver")
+  }
+  query pattern callExpr where callee.method == "resolveUri"
+  emit sink code.FilePathAccess at args[0]
+}

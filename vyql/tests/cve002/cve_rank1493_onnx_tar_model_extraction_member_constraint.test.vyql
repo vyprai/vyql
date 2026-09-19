@@ -1,0 +1,190 @@
+# Rank 1493 / CVE-2024-7776 (onnx/onnx, CWE-22 with CWE-59 for the link arm):
+# onnx's backend test runner downloads a model bundle over the network and
+# unpacks it with bare tarfile. onnx/backend/test/runner/__init__.py:227 is the
+# whole of it:
+#
+#   urlretrieve(model_test.url, download_file.name)
+#   with tarfile.open(download_file.name) as t:
+#       t.extractall(models_dir)
+#
+# `model_test.url` comes from the test suite's model list, so whoever serves that
+# tarball decides every member name inside it. Before Python 3.14 tarfile's
+# default extraction writes an absolute member name to that absolute path, walks
+# a member name's `..` components out of `models_dir`, and recreates a symlink or
+# hard-link member with the target the archive names -- so any member lands at an
+# arbitrary path with the extracting process's privileges. The weakness is not
+# which archive is opened: it is that an archive from a lower-trust producer is
+# expanded with no constraint on where its entries may land.
+#
+# Interestingly the same repository has the safe form. onnx/hub.py's
+# download_model_with_test_data walked members through a local
+# _tar_members_filter that rejects an escaping path and a link member, and passed
+# `filter="data"` where tarfile offers it. 1b70f9b673259360b6a2339c4bd97db9ea6e552f
+# lifts that pair into onnx/utils.py as _extract_model_safe and routes both call
+# sites -- hub.py's and the test runner's -- through it, deleting the bare
+# extractall. Pool row verified: repo, CVE and commit match the advisory, the
+# vulnerable call is present at the parent, and the remediation is present at the
+# fix. No corpus correction.
+#
+# What fires today, without this change: nothing on the extraction. VYQL-PATH-004
+# is `taint core.UserControlledData -> code.ArchiveEntryWrite` and its sink is the
+# extraction *destination*, which here is the runner's own models_dir and is not
+# attacker-chosen -- the wrong axis. VYQL-PATH-007's Python route is the
+# `archive_symlink_filter_bypass` frontend fact
+# (internal/extract/frontend/treesitter/python.go:1015), which requires the
+# function's name to contain "extract" and requires a `.getmembers()` walk as its
+# evidence that entries are being looked at at all. download_model does neither,
+# and inspecting nothing is strictly more dangerous than the partial-validation
+# shape that fact is written for.
+#
+# Vocabulary is checked for reuse first and nothing is minted here: the concept
+# (code.ArchiveSymlinkFilterBypass), its review twin and the rule (VYQL-PATH-007)
+# all exist, and Go reaches the rule through a binding rather than
+# a frontend fact (vyql/bindings/go/archiveSymlinkFilterBypass.vyql). What is
+# added is the Python binding of the same shape,
+# vyql/bindings/python/tarfile_extraction_member_filter.vyql, keyed on tarfile's
+# own documented surface: a function that calls tarfile.open and then extract or
+# extractall while naming none of the documented constraints -- the `filter=`
+# keyword or a tarfile.data_filter/tar_filter reference, a `members=` sequence,
+# or an inline entry inspection (getmembers, getnames, issym, islnk, linkname).
+# The tarfile.open anchor keeps it off zipfile, whose extractall sanitises member
+# names before joining them to the destination, and off the many unrelated
+# `.extract(` methods in Python code.
+#
+# Measured. `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` over
+# onnx/backend (the whole onnx/ package does not finish inside the bound) reports
+# 205 findings on the vulnerable revision and 203 on the fixed one, identical over
+# three runs each, and VYQL-PATH-007 goes 1 -> 0: the one row is
+# test/runner/__init__.py:227, the vulnerable function itself. hub.py and utils.py
+# are 0 at both revisions -- the pre-existing safe extraction and the extracted
+# helper are both cleared by the constraints they name.
+#
+# Precision, enumerated rather than sampled. Across the 210 repository clones
+# under /tmp/cve-work/rank*/, 86 Python files mention extractall or .extract( and
+# 62 mention tarfile as well; the binding lands on 13 functions in 7 other
+# repositories, and every one of them is the named shape -- a downloaded or
+# caller-supplied tarball expanded with no member constraint (subversion's release
+# script, notebook's install_nbextension, metagpt's dataset fetch, v8's test-data
+# fetch, four mindsdb sites including the multipart upload handler, three mlflow
+# sites, lxml's build-time libxml2 fetch). None is a shape mismatch. One is a
+# known CVE in its own right: mlflow/pyfunc/dbconnect_artifact_cache.py:140, the
+# rank 1397 finding this rule otherwise cannot reach.
+#
+# The limit worth naming: on rank 1397's fix shape -- validate the archive in a
+# helper that raises, leave the extraction bare -- this binding reports the
+# patched revision as well, because the patched function still names none of
+# tarfile's constraints and the control lives one resolved call away, outside
+# endpointGuarded's function-local reach (internal/engine/engine.go:1160, the
+# 1377/1397 attribution-gap family). VYQL-PATH-007 is an attention-kind review
+# rule at medium confidence, which is the right register for that: the extraction
+# is genuinely unconstrained at its own call site and a reviewer confirms the
+# helper. Case (e) pins that non-discrimination so it is not mistaken for a
+# regression.
+
+test "rank1493: (a) a downloaded model tarball expanded with no constraint on its member names"
+  lang python
+  file onnx/backend/test/runner/__init__.py
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import tarfile
+  import tempfile
+  from urllib.request import urlretrieve
+
+
+  def download_model(model_test, models_dir):
+      download_file = tempfile.NamedTemporaryFile(delete=False)
+      try:
+          download_file.close()
+          urlretrieve(model_test.url, download_file.name)
+          with tarfile.open(download_file.name) as t:
+              t.extractall(models_dir)
+      except Exception:
+          raise
+      finally:
+          os.remove(download_file.name)
+  ```
+
+test "rank1493: (b) the extracted helper naming tarfile's data filter and a filtered member list"
+  lang python
+  file onnx/utils.py
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import tarfile
+
+
+  def _extract_model_safe(model_tar_path, local_model_with_data_dir_path):
+      with tarfile.open(model_tar_path) as model_with_data_zipped:
+          if hasattr(tarfile, "data_filter"):
+              model_with_data_zipped.extractall(
+                  path=local_model_with_data_dir_path, filter="data"
+              )
+          else:
+              model_with_data_zipped.extractall(
+                  path=local_model_with_data_dir_path,
+                  members=_tar_members_filter(
+                      model_with_data_zipped, local_model_with_data_dir_path
+                  ),
+              )
+  ```
+
+test "rank1493: (c) an inline member walk that rejects an escaping path and a link entry"
+  lang python
+  file onnx/hub.py
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import tarfile
+
+
+  def unpack(local_path, base):
+      with tarfile.open(local_path) as tar:
+          for member in tar.getmembers():
+              abs_member = os.path.abspath(os.path.join(base, member.name))
+              if not abs_member.startswith(os.path.abspath(base)):
+                  raise RuntimeError("directory traversal sequence")
+              if member.issym() or member.islnk():
+                  raise RuntimeError("symbolic link")
+          tar.extractall(base)
+  ```
+
+test "rank1493: (d) zipfile's extractall, which sanitises member names itself, is not the shape"
+  lang python
+  reject VYQL-PATH-007
+  reject_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import zipfile
+
+
+  def unpack(local_path, dest):
+      with zipfile.ZipFile(local_path) as archive:
+          archive.extractall(dest)
+  ```
+
+test "rank1493: (e) member validation delegated to a helper that raises still reports"
+  lang python
+  file mlflow/pyfunc/dbconnect_artifact_cache.py
+  expect VYQL-PATH-007
+  expect_review code.ArchiveSymlinkFilterBypass
+  code
+  ```
+  import os
+  import tarfile
+
+  from mlflow.utils.file_utils import check_tarfile_security
+
+
+  def extract_archive_to_dir(archive_path, dest_dir):
+      check_tarfile_security(archive_path)
+      os.makedirs(dest_dir, exist_ok=True)
+      with tarfile.open(archive_path, "r") as tar:
+          tar.extractall(path=dest_dir)
+      return dest_dir
+  ```

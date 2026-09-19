@@ -1,0 +1,12 @@
+# Rank 45 / CVE-2026-10044: Goofish prompt path input reaches filesystem
+# reads/writes without the Path.resolve()/relative_to containment fix.
+
+test "rank45: prompt path reaches file path access"
+  expect VYQL-PATH-001
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.FilePathAccess
+  edge FLOWS src -> sink
+  ```
+

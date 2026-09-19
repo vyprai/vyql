@@ -1,0 +1,11 @@
+module code;
+
+concept PrivilegedWorkflowUntrustedCodeExecution : issue {
+  cwe: [CWE_94, CWE_95]
+  reviewAssumption: "the copied files can contain code imported by the framework command during the privileged workflow run"
+  reviewCategory: code_execution
+  reviewCondition: "a privileged CI workflow stages untrusted pull-request code before invoking a code-loading framework command"
+  reviewConfidence: high
+  reviewEvidence: "workflow context {pattern} combines a privileged PR trigger, untrusted file copy, and framework code execution"
+  vulnerableTo: [injection.CodeInjection]
+}

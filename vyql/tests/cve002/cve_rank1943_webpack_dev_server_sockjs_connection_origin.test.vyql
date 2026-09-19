@@ -1,0 +1,138 @@
+# Rank 1943 / CVE-2018-14732: webpack-dev-server accepted sockjs WebSocket
+# connections after validating only the Host header of the connection request.
+# The Host check keeps DNS rebinding out but not cross-site WebSocket
+# hijacking: a browser always sends the target's Host, so a page on any other
+# origin passes `checkHost(conn.headers)` and reaches the HMR channel (CWE-352,
+# CWE-346). The fixed revision passes the header name to the existing checker and calls
+# it a second time with "origin", closing the connection on failure.
+#
+# Caught by widening the sockjs half of the existing origin-check family:
+# `code.WebSocketUpgradeMissingOriginCheck` and its rule VYQL-RF-031
+# covered the `ws` custom-upgrade shape (handleUpgrade with noServer), the
+# Python decorator shape and the C++ handshake shape. The sockjs shape —
+# `sockjs.createServer` plus a 'connection' listener — had no binding. The new
+# JavaScript binding keys on the documented sockjs server construction and
+# connection event, requires the Host-header read that shows the module means
+# to validate its peer, and negates on any origin selector or literal, which
+# is exactly what the fixed revision adds.
+
+test "rank1943: sockjs connection listener validates host but never origin"
+  lang javascript
+  file Server.js
+  expect VYQL-RF-031
+  expect_review code.WebSocketUpgradeMissingOriginCheck
+  code
+  ```
+  const sockjs = require('sockjs');
+  const url = require('url');
+
+  Server.prototype.checkHost = function (headers) {
+    // allow user to opt-out this security check, at own risk
+    if (this.disableHostCheck) return true;
+
+    // get the Host header and extract hostname
+    // we don't care about port not matching
+    const hostHeader = headers.host;
+    if (!hostHeader) return false;
+
+    // use the node url-parser to retrieve the hostname from the host-header.
+    const hostname = url.parse(`//${hostHeader}`, false, true).hostname;
+
+    // always allow localhost host, for convience
+    if (hostname === 'localhost') return true;
+
+    // disallow
+    return false;
+  };
+
+  Server.prototype.listen = function (port, hostname, fn) {
+    const returnValue = this.listeningApp.listen(port, hostname, (err) => {
+      const sockServer = sockjs.createServer({
+        // Use provided up-to-date sockjs-client
+        sockjs_url: '/__webpack_dev_server__/sockjs.bundle.js',
+        log: () => {}
+      });
+
+      sockServer.on('connection', (conn) => {
+        if (!conn) return;
+        if (!this.checkHost(conn.headers)) {
+          this.sockWrite([conn], 'error', 'Invalid Host header');
+          conn.close();
+          return;
+        }
+        this.sockets.push(conn);
+
+        conn.on('close', () => {
+          const connIndex = this.sockets.indexOf(conn);
+          if (connIndex >= 0) {
+            this.sockets.splice(connIndex, 1);
+          }
+        });
+
+        if (this.hot) this.sockWrite([conn], 'hot');
+      });
+
+      sockServer.installHandlers(this.listeningApp, {
+        prefix: '/sockjs-node'
+      });
+    });
+
+    return returnValue;
+  };
+  ```
+
+test "rank1943: sockjs connection listener also validates the origin header"
+  lang javascript
+  file Server.js
+  reject VYQL-RF-031
+  reject_review code.WebSocketUpgradeMissingOriginCheck
+  code
+  ```
+  const sockjs = require('sockjs');
+  const url = require('url');
+
+  Server.prototype.checkHost = function (headers, headerToCheck) {
+    // allow user to opt-out this security check, at own risk
+    if (this.disableHostCheck) return true;
+
+    if (!headerToCheck) headerToCheck = 'host';
+
+    const hostHeader = headers[headerToCheck];
+    if (!hostHeader) return false;
+
+    const hostname = url.parse(`//${hostHeader}`, false, true).hostname;
+    if (hostname === 'localhost') return true;
+
+    return false;
+  };
+
+  Server.prototype.listen = function (port, hostname, fn) {
+    const returnValue = this.listeningApp.listen(port, hostname, (err) => {
+      const sockServer = sockjs.createServer({
+        sockjs_url: '/__webpack_dev_server__/sockjs.bundle.js',
+        log: () => {}
+      });
+
+      sockServer.on('connection', (conn) => {
+        if (!conn) return;
+        if (!this.checkHost(conn.headers)) {
+          this.sockWrite([conn], 'error', 'Invalid Host header');
+          conn.close();
+          return;
+        }
+        if (!this.checkHost(conn.headers, 'origin')) {
+          this.sockWrite([conn], 'error', 'Invalid Origin header');
+          conn.close();
+          return;
+        }
+        this.sockets.push(conn);
+      });
+
+      sockServer.installHandlers(this.listeningApp, {
+        prefix: '/sockjs-node'
+      });
+    });
+
+    return returnValue;
+  };
+  ```

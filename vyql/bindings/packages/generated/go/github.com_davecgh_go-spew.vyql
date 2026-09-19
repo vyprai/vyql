@@ -1,0 +1,97 @@
+module bindings.go.generated.m80404178;
+
+binding logOutput0 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Errorf"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput1 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Fprint"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput2 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Fprintf"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput3 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Fprintln"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput4 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Print"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput5 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Printf"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput6 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Println"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput7 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Sprint"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput8 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Sprintf"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput9 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Sprintln"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput10 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "Dump"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput11 {
+  requires {
+    dependency("github.com/davecgh/go-spew")
+  }
+  query pattern callExpr where callee.method == "ConfigState.Dump"
+  emit sink code.LogOutput at args[0]
+}

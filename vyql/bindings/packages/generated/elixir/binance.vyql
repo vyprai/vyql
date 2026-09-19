@@ -1,0 +1,17 @@
+module bindings.elixir.generated.m49825113;
+
+binding networkConnect0 {
+  requires {
+    dependency("binance")
+  }
+  query pattern callExpr where callee.method == "signed_request_binance"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("binance")
+  }
+  query pattern callExpr where callee.method == "unsigned_request_binance"
+  emit sink code.NetworkConnectSink at args[0]
+}

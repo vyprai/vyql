@@ -1,0 +1,8 @@
+module code;
+
+review code.IncompleteKeyDenylistGuardedReadPrototypePollution {
+  category: prototype_pollution
+  expected: [core.PrototypePollutionGuard]
+  kind: attention
+  text: "extend a guarded property read's key denylist to constructor and prototype, or require the key to be an own property, before handing the value back for a caller to traverse"
+}

@@ -1,0 +1,33 @@
+module bindings.dart.generated.m1eabbf77;
+
+binding deserialization0 {
+  requires {
+    dependency("bson")
+  }
+  query pattern callExpr where callee.method == "EJsonCodec.parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("bson")
+  }
+  query pattern callExpr where callee.method == "Codec.deserialize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("bson")
+  }
+  query pattern callExpr where callee.method == "BsonCodec.deserialize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("bson")
+  }
+  query pattern callExpr where callee.method == "BSON.deserialize"
+  emit sink code.Deserialization at args[0]
+}

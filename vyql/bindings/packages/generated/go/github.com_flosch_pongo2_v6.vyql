@@ -1,0 +1,26 @@
+module bindings.go.generated.mae71c9bb;
+
+binding templateRender0 {
+  requires {
+    dependency("github.com/flosch/pongo2/v6")
+  }
+  query pattern callExpr where callee.method == "FromString"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender1 {
+  requires {
+    dependency("github.com/flosch/pongo2/v6")
+  }
+  query pattern callExpr where callee.method == "FromFile"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender2 {
+  requires {
+    dependency("github.com/flosch/pongo2/v6")
+  }
+  query pattern callExpr where callee.method == "FromCache"
+  emit sink code.TemplateRender at args[0]
+}
+

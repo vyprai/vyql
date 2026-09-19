@@ -1,0 +1,31 @@
+module bindings.rust.index_operator_without_bounds_check;
+
+// The std::ops::Index and std::ops::IndexMut contracts: the indexing operator
+// panics when the index is out of bounds, and it is the implementation that
+// provides the check -- Vec and [T] compare against their length before
+// touching memory. A container that implements either trait by computing the
+// element address with raw-pointer arithmetic straight from the index
+// parameter, with no comparison anywhere in the method body, turns every
+// container[index] in safe caller code into an unchecked read or write at an
+// arbitrary offset from the heap allocation.
+//
+// The trait's required method names -- index, index_mut -- are fixed by the
+// standard library documentation, so the entrypoint is identifiable without
+// knowing the crate. The methods that can compute an element address from an
+// index are the pointer-arithmetic primitives on *mut T / *const T: offset,
+// add, sub and their wrapping_ and byte_ variants, matched exactly so a
+// same-suffix method on another type (addr_of, checked_add) does not satisfy
+// the clause. Any bounds relation the implementation establishes has to
+// compare the index against something, and the Rust frontend emits no
+// structured token for a comparison expression, so a < or > character in the
+// method body's text is the only carrier of "a comparison exists here".
+//
+// Residual, in the false-negative direction only: a comparison inside a
+// comment or a turbofish in the body satisfies the negation, and a check
+// established outside the method -- a checked wrapper routing to an unchecked
+// inner helper -- is invisible to a function-scoped binding. That is the
+// standard delegation limit, not specific to this shape.
+binding indexOperatorWithoutBoundsCheck {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.name in ["index", "index_mut"] and node.context.call in ["offset", "add", "sub", "wrapping_offset", "wrapping_add", "wrapping_sub", "byte_offset", "byte_add", "byte_sub"] and not (containsAny(node.token, ["<", ">"]))
+  emit issue code.IndexOperatorWithoutBoundsCheck at node
+}

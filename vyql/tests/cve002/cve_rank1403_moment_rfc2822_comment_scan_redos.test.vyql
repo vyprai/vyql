@@ -1,0 +1,131 @@
+# Rank 1403 / CVE-2022-31129: moment's RFC 2822 date parser stripped comments out
+# of the input string with an unanchored global substitution whose negated
+# character class admitted the comment's own opening delimiter, so the cost of
+# `moment(str)` is quadratic in the length of the string (CWE-1333 inefficient
+# regular expression complexity, CWE-400).
+#
+# `configFromRFC2822` (src/lib/create/from-string.js:189) calls
+# `preprocessRFC2822(config._i)` on the raw string the caller passed to
+# `moment()`, and that helper's first substitution is
+# `s.replace(/\([^)]*\)|[\n\t]/g, ' ')`. `[^)]` excludes the closing parenthesis
+# but not the opening one, so at every `(` in the subject the class runs to the
+# end of the string and then gives a character back at a time looking for a `)`
+# that is not there. A subject of n unclosed `(` costs O(n^2): each of the n
+# start positions repeats the whole failing scan.
+#
+# The fixed revision is one character: `/\([^()]*\)|[\n\t]/g`. With the opening delimiter in
+# the excluded set the class stops at the next `(`, so each opener is examined at
+# most twice and the substitution is linear. Nothing else changes -- no length
+# cap on the input, no replacement of the regex by a hand-written scan -- so the
+# whole discriminator is the negated class, and it is a structural property of
+# the pattern rather than of the operand.
+#
+# The pool row carries no flag and reads correctly:
+# 9a3b5894f3d5d602948ac8a02e4ee528a49ca3a3 is the targeted one-line fix, the
+# vulnerable class is present at its parent, and the remediation is present at
+# the commit itself.
+#
+# What the detection keys on is the shape, not this pattern: a `String.prototype`
+# regex operation whose pattern scans between a matched pair of ASCII bracket
+# delimiters with a quantified negated class that excludes the closing delimiter
+# and admits the opening one. Admitting the opener is what lets a failing scan run
+# to the end of the subject and be repeated at every nested opener, so the family
+# covers `<[^>]*>`, `\{[^}]*\}` and `\[[^\]]*\]` alongside this CVE's
+# `\([^)]*\)`, in greedy and lazy spellings alike; each is quadratic on a run of
+# unclosed openers and each is linear once the opener joins the excluded set.
+# The label is the existing `code.RegexMatchSink` on the subject string, so the
+# judgement stays where it is -- VYQL-DOS-002 requires a taint path from
+# `core.UserControlledData` -- and no concept, rule or rule ID is added.
+# `code.CatastrophicRegex` is considered and rejected for this: it is an
+# ungated presence issue, and the ungated form of exactly this criterion is what
+# rank 1343 measured at one real finding in seven to eleven. Gating on taint is
+# the difference. Measured: the label lands 12 times across misp's
+# app/webroot/js, microweber's bundled jquery-1.9.1.js, mattermost's
+# recap_text_formatter.tsx, matrix-appservice-irc's src/irc/formatting.ts,
+# marked/src and locutus/src, and adds zero findings on any of them -- the
+# DOS-002 count is unchanged on misp (671 findings), microweber (71), mattermost
+# (249), matrix-appservice-irc (97), locutus (215), mermaid (128), markdown-it
+# (14), marked (6) and mediawiki-skins-Citizen (2). On moment's own src the count
+# is a stable 2 -> 1 over three `--cache off` runs of each revision, and the
+# finding that disappears is exactly the one on lib/create/from-string.js:153.
+# The residual is src/test/helpers/common-locale.js:91, a real instance of the
+# same shape (`/(\[[^\]]*\])/g`) in a test helper whose subject is moment's own
+# locale data and is reached only through a `code.DomInput` source misattributed
+# to that data.
+
+test "rank1403: the RFC 2822 comment stripper admits the opening delimiter"
+  lang javascript
+  file src/lib/create/from-string.js
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  export function preprocessRFC2822(s) {
+      // Remove comments and folding whitespace and replace multiple-spaces with a single space
+      return s
+          .replace(/\([^)]*\)|[\n\t]/g, ' ')
+          .replace(/(\s\s+)/g, ' ')
+          .replace(/^\s\s*/, '')
+          .replace(/\s\s*$/, '');
+  }
+
+  export function configFromRFC2822(config) {
+      var match = rfc2822.exec(preprocessRFC2822(config._i));
+      if (!match) {
+          config._isValid = false;
+      }
+      return match;
+  }
+  ```
+
+test "rank1403: excluding the opening delimiter makes the comment stripper linear"
+  lang javascript
+  file src/lib/create/from-string.js
+  profile library
+  reject VYQL-DOS-002
+  code
+  ```
+  export function preprocessRFC2822(s) {
+      // Remove comments and folding whitespace and replace multiple-spaces with a single space
+      return s
+          .replace(/\([^()]*\)|[\n\t]/g, ' ')
+          .replace(/(\s\s+)/g, ' ')
+          .replace(/^\s\s*/, '')
+          .replace(/\s\s*$/, '');
+  }
+
+  export function configFromRFC2822(config) {
+      var match = rfc2822.exec(preprocessRFC2822(config._i));
+      if (!match) {
+          config._isValid = false;
+      }
+      return match;
+  }
+  ```
+
+# The same shape with a different delimiter pair and no moment API, to show the
+# criterion is the bracket scan and not this CVE's pattern text.
+
+test "rank1403: a tag stripper whose negated class admits the opening angle bracket"
+  lang javascript
+  file src/markup.js
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  export function stripTags(markup) {
+      return markup.replace(/<[^>]+>/gm, '');
+  }
+  ```
+
+test "rank1403: the tag stripper excluding both angle brackets is clean"
+  lang javascript
+  file src/markup.js
+  profile library
+  reject VYQL-DOS-002
+  code
+  ```
+  export function stripTags(markup) {
+      return markup.replace(/<[^<>]+>/gm, '');
+  }
+  ```

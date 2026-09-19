@@ -1,0 +1,10 @@
+module vypr.auth;
+
+rule SmellUserEnum {
+  meta {
+    cwe: [CWE_204]
+    id: "VYQL-SMELL-ENUM"
+    severity: info
+  }
+  issue code.UserEnumSmell as s
+}

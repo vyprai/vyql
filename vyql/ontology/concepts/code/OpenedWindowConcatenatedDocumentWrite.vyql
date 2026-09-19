@@ -1,0 +1,11 @@
+module code;
+
+concept OpenedWindowConcatenatedDocumentWrite : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "a caller can control at least one of the values concatenated into the document string"
+  reviewCategory: xss
+  reviewCondition: "a window opened by the page is filled with an HTML document assembled by string concatenation, and the concatenation resumes inside an unterminated tag attribute"
+  reviewConfidence: medium
+  reviewEvidence: "new window context {pattern} writes a concatenated markup string with document.write instead of creating the elements and assigning their attributes as properties"
+  vulnerableTo: [injection.Xss]
+}

@@ -1,0 +1,7 @@
+module code;
+
+review code.UncheckedPrefixOffsetArithmetic {
+  category: memory
+  kind: attention
+  text: "review whether the compared string is longer than the prefix its guard matched; advance the pointer no further than the bytes the bounded comparison verified"
+}

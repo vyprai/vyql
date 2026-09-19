@@ -1,0 +1,141 @@
+# Rank 1308 / CVE-2017-12652: libpng's chunk reader trusted the 4-byte length
+# field straight off the wire. png_read_chunk_header (pngrutil.c:156) reads the
+# chunk header into a local buffer, decodes the length with
+# png_get_uint_31(png_ptr, buf), and returns it with no upper bound at all;
+# every handler that receives that length as a parameter (e.g. png_handle_eXIf
+# at pngrutil.c:2014) passes it straight to png_malloc_warn() as an allocation
+# size, and png_push_read_chunk (pngpread.c:167) repeats the decode against
+# png_ptr->push_length on the push-reader path. A crafted PNG with an oversized
+# ancillary-chunk length drives an arbitrarily large allocation before a single
+# byte of the chunk's payload has been validated (CWE-400/CWE-789).
+#
+# The fixing diff (347538ef) touches only the two decode functions: each gains
+# the same guard right before the length is used -- compare it against
+# png_ptr->user_chunk_malloc_max (or the PNG_USER_CHUNK_MALLOC_MAX build
+# default) and png_chunk_error() out if it is larger, for every chunk type
+# except IDAT (which has its own incremental-read cap). The allocation sites
+# are byte-identical across the revision pair.
+#
+# Re-measured on the real revision pair (three --cache off runs per side,
+# timeout 180, --max-ram 6GB): the full findings view reports an identical
+# rule mix on both sides -- 82 findings on pngrutil.c/pngpread.c in every
+# run, an empty line-number-normalized diff -- and the -flags view is
+# likewise identical at 9732 flags per run, with no finding or flag inside
+# png_read_chunk_header, png_handle_eXIf or png_push_read_chunk at either
+# revision. `vyql match` on the real files reports no label at all in those
+# ranges, and VYQL-DOS-006 fires nowhere on the whole tree. The knowledge-base
+# chain this converts under already exists end to end:
+# code.LengthDerivedAllocation (concept, CWE-400/789), VYQL-DOS-006 (rule),
+# and the generated C wrapper lengthDerivedAllocation100 consuming
+# node.analysis ~= "allocation.length_derived_before_file_bound". The blocker
+# is the C frontend's recognizer, ccLengthDerivedAllocationBeforeFileBound
+# (internal/extract/frontend/treesitter/c.go), still pinned to one other
+# codebase's literals: it requires a literal read_and_decode_block_header(..)
+# call with an &out parameter, a literal malloc_from_callbacks(<size> call
+# site, and excuses only the hasKnownFileSize / fileSize-runningFilePos guard
+# text. The Go route is no more general -- both bindings that emit the concept
+# there are instance-pinned (a functionName contains "readNBytes" clause and
+# an r.ContentLength selector), so each member of this class has so far been
+# pinned by hand at its own names.
+#
+# No bounded widening separates this pair, measured on libpng itself:
+#  - consumer-side recognition cannot discriminate -- png_handle_eXIf and
+#    every other allocation site are byte-identical at both revisions,
+#    because the fix lands entirely inside the decode functions, so any key
+#    on the allocation scores the same before and after;
+#  - decode-side recognition (which does discriminate: the fix inserts
+#    `length > limit` between the decode and the return) over-reports
+#    bounded code in the same file -- png_handle_IHDR decodes width and
+#    height through the same png_get_uint_31 and stores them into png_ptr
+#    fields with no in-function comparison, because their bounds are applied
+#    downstream in png_check_IHDR, and png_handle_sPLT bounds its derived
+#    count with a third idiom (`dl > max_dl` against
+#    PNG_SIZE_MAX / sizeof (png_sPLT_entry)). Guard recognition that accepts
+#    all three idioms while rejecting none of the bounded decoders is the
+#    classification decision itself, not a correction to a known one.
+#
+# The converting form is the cross-function analysis already on file in
+# ENGINE-GAPS: a handler that allocates with a length parameter tracing back
+# to a decode, with no bound anywhere on the path. That is a new
+# classification carrying a guard-model design decision (which comparisons
+# count as bounds, and how far a parameter may trace), not a localized
+# correction, so the miss stays held rather than a recognizer widening being
+# smuggled in as one.
+#
+# verify_current_expected: attention-engine-gap, rechecked; the vulnerable and
+# fixed forms both reject at current definitions, and the real revision pair
+# differs by nothing the scanner reports on these files.
+
+test "rank1308: chunk length is decoded with no upper bound and used directly as a malloc size"
+  lang c
+  file pngrutil.c
+  reject VYQL-DOS-006
+  reject VYQL-DOS-041
+  reject VYQL-NUM-001
+  reject_review code.LengthDerivedAllocation
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  png_uint_32 png_read_chunk_header(png_structrp png_ptr) {
+     png_byte buf[8];
+     png_uint_32 length;
+
+     png_read_data(png_ptr, buf, 8);
+     length = png_get_uint_31(png_ptr, buf);
+
+     png_ptr->chunk_name = PNG_CHUNK_FROM_STRING(buf + 4);
+
+     png_reset_crc(png_ptr);
+     png_calculate_crc(png_ptr, buf + 4, 4);
+
+     png_check_chunk_name(png_ptr, png_ptr->chunk_name);
+
+     return length;
+  }
+
+  void png_handle_eXIf(png_structrp png_ptr, png_inforp info_ptr, png_uint_32 length) {
+     info_ptr->eXIf_buf = png_malloc_warn(png_ptr, length);
+     png_crc_read(png_ptr, info_ptr->eXIf_buf, length);
+  }
+  ```
+
+test "rank1308: fix compares the decoded length against the user chunk-malloc limit before it is ever used"
+  lang c
+  file pngrutil.c
+  reject VYQL-DOS-006
+  reject VYQL-DOS-041
+  reject VYQL-NUM-001
+  reject_review code.LengthDerivedAllocation
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  png_uint_32 png_read_chunk_header(png_structrp png_ptr) {
+     png_byte buf[8];
+     png_uint_32 length;
+
+     png_read_data(png_ptr, buf, 8);
+     length = png_get_uint_31(png_ptr, buf);
+
+     png_ptr->chunk_name = PNG_CHUNK_FROM_STRING(buf + 4);
+
+     png_reset_crc(png_ptr);
+     png_calculate_crc(png_ptr, buf + 4, 4);
+
+     png_check_chunk_name(png_ptr, png_ptr->chunk_name);
+
+     if (png_ptr->chunk_name != png_IDAT) {
+        png_alloc_size_t limit = PNG_SIZE_MAX;
+        if (png_ptr->user_chunk_malloc_max > 0 && png_ptr->user_chunk_malloc_max < limit)
+           limit = png_ptr->user_chunk_malloc_max;
+        if (length > limit)
+           png_chunk_error(png_ptr, "chunk data is too large");
+     }
+
+     return length;
+  }
+
+  void png_handle_eXIf(png_structrp png_ptr, png_inforp info_ptr, png_uint_32 length) {
+     info_ptr->eXIf_buf = png_malloc_warn(png_ptr, length);
+     png_crc_read(png_ptr, info_ptr->eXIf_buf, length);
+  }
+  ```

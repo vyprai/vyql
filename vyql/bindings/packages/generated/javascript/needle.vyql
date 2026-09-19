@@ -1,0 +1,17 @@
+module bindings.javascript.generated.m7575f75e;
+
+binding urlFetch0 {
+  requires {
+    dependency("needle")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding httpInput1 {
+  requires {
+    dependency("needle")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.HttpInput at call.result
+}

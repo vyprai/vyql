@@ -1,0 +1,59 @@
+module bindings.javascript.loop_restart_without_progress;
+
+// A scanning loop can reach a restart -- a `continue` -- without passing any
+// progress step for the variables its exit reads: the advance sits below
+// the branch that restarts, so the exit re-evaluates over unchanged values,
+// takes the same branch again, and the cycle cannot reach the exit (the
+// loop spins for as long as the branch keeps matching, CWE-835). The
+// classic spelling is a budgeted fetch loop, `while (next && i < limit) {
+// if (skip(next)) continue; ...; next = body.next; i++ }`, where the skip
+// branch freezes both the cursor and the counter.
+//
+// Both facts are structural and produced by the JavaScript frontend for
+// this purpose, attributed to the innermost function that owns the loop.
+// `loop_restart_without_progress` holds when some restart bound to the loop
+// is dominated by no progress evidence -- no assignment, augmented
+// assignment or update writing an exit variable, no method call receiving
+// one as its receiver (the mutating idiom: `it.next()`, `queue.shift()`),
+// and no call to a closure defined in the same function whose body carries
+// such evidence (`getArg()` shifting the argument vector the condition
+// reads) -- while the body carries evidence somewhere, so a loop whose exit
+// is flipped elsewhere (`while (running)`) or reached only by `break` stays
+// out. while, do-while and update-less `for(;;)` loops carry the fact: a
+// for-loop with an update clause does not, because `continue` still runs
+// it, nor do for-in/for-of loops, whose iterator advances mechanically; and
+// a condition that assigns (`while ((line = read()) != null)`) advances
+// every iteration. Nothing here names any API.
+//
+// `loop_progress_hidden_in_call` holds when the restart's dominating path
+// carries a call to a bare name the function does not define -- an import,
+// a parameter, a global. Such a call may advance the loop through effects
+// the fact cannot see, which is a judgement for the rule, so it is emitted
+// as a control and the rule's `unless` decides: a loop advanced only
+// through an opaque call's side effects is not reported, and extending that
+// decision is a rule edit, not a frontend one.
+//
+// Residual, stated: a restart whose branch self-clears the latch that
+// selects it (`if (skip) { skip = false; continue }`) reports, because the
+// cleared variable is not one the exit reads and the fact is per-restart,
+// not carried across iterations; a labeled `continue` is skipped, since it
+// binds to the loop its label names; and resolution looks one hop inside
+// the analyzed function only, so a helper the file defines outside it is as
+// opaque as an import -- the false-negative direction, neutralised in data
+// by the control above.
+binding loopRestartWithoutProgress {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript"
+    and node.context.loopRestartWithoutProgress == "true"
+  emit issue code.LoopRestartWithoutProgressCheck at node
+}
+
+binding loopProgressHiddenInCall {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript"
+    and node.context.loopRestartWithoutProgress == "true"
+    and node.context.loopProgressHiddenInCall == "true"
+  emit check core.LoopProgressCallSideEffect at node {
+    covers sameScope {
+      anchor: node
+    }
+  }
+}

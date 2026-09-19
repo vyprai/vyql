@@ -1,0 +1,57 @@
+module bindings.objc.generated.m484e8ca1;
+
+binding deserialization0 {
+  requires {
+    dependency("libwebp")
+  }
+  query pattern callExpr where callee.method == "ReadPNG"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("libwebp")
+  }
+  query pattern callExpr where callee.method == "ReadPNM"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("libwebp")
+  }
+  query pattern callExpr where callee.method == "ReadJPEG"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("libwebp")
+  }
+  query pattern callExpr where callee.method == "ReadTIFF"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("libwebp")
+  }
+  query pattern callExpr where callee.method == "ReadWebP"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("libwebp")
+  }
+  query pattern callExpr where callee.method == "DecodeWebP"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("libwebp")
+  }
+  query pattern callExpr where callee.method == "DecodeWebPIncremental"
+  emit sink code.Deserialization at args[0]
+}

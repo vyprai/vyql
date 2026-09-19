@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m2500e91f;
+
+binding filePathAccess0 {
+  requires {
+    dependency("nifticlib")
+  }
+  query pattern callExpr where callee.method == "znzopen"
+  emit sink code.FilePathAccess at args[0]
+}

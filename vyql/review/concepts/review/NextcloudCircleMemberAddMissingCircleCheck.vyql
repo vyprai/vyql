@@ -1,0 +1,8 @@
+module code;
+
+review code.NextcloudCircleMemberAddMissingCircleCheck {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review Nextcloud Circles member-add APIs for circle visibility checks before accepting circle member IDs"
+}

@@ -1,0 +1,17 @@
+module bindings.rust.generated.m23276cb7;
+
+binding deserialization0 {
+  requires {
+    dependency("hexf-parse")
+  }
+  query pattern callExpr where callee.method == "parse_hexf32"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("hexf-parse")
+  }
+  query pattern callExpr where callee.method == "parse_hexf64"
+  emit sink code.Deserialization at args[0]
+}

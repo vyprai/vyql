@@ -1,0 +1,8 @@
+module code;
+
+review code.ShiftedClusterSizeAllocationMissingBounds {
+  category: memory
+  expected: [core.MemoryBoundsCheck, core.IntegerOverflowGuard]
+  kind: target
+  text: "review filesystem cluster-size allocation for sector-bit and cluster-bit bounds before shift-derived sizes are used"
+}

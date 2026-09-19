@@ -1,0 +1,25 @@
+# Rank 996 / CVE-2026-33147: GMT remote dataset id buffer overflow.
+# Fresh scan evidence includes VYQL-MEM-002 at the vulnerable strcpy.
+
+test "rank996: GMT copies remote dataset id with strcpy"
+  lang c
+  expect VYQL-MEM-002
+  code
+  ```
+  void gmt_remote_dataset_id(char *ifile) {
+      char file[4096];
+      strcpy(file, ifile);
+  }
+  ```
+
+test "rank996: GMT copies remote dataset id with bounded strncpy"
+  lang c
+  reject VYQL-MEM-002
+  code
+  ```
+  void gmt_remote_dataset_id(char *ifile) {
+      char file[4096];
+      strncpy(file, ifile, sizeof(file) - 1);
+      file[sizeof(file) - 1] = 0;
+  }
+  ```

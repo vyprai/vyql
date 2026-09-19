@@ -1,0 +1,149 @@
+# Rank 1444 / CVE-2026-33032 (GHSA-h6c2-x2m2-mwhf, CWE-306):
+# 0xJacky/nginx-ui embeds an MCP server so an assistant can read and edit nginx
+# configuration and restart the service. mark3labs/mcp-go's SSE transport is
+# configured with two paths, and `internal/mcp/server.go` names both:
+#
+#   server.NewSSEServer(mcpServer,
+#       server.WithSSEEndpoint("/mcp"),
+#       server.WithMessageEndpoint("/mcp_message"))
+#
+# Those two are not interchangeable. The SSE path is the server-to-client event
+# stream; every client request -- `initialize`, `tools/list` and, decisively,
+# `tools/call` -- is POSTed to the message path. `mcp/router.go` mounted them on
+# gin like this:
+#
+#   r.Any("/mcp", middleware.IPWhiteList(), middleware.AuthRequired(),
+#       func(c *gin.Context) { mcp.ServeHTTP(c) })
+#   r.Any("/mcp_message", middleware.IPWhiteList(),
+#       func(c *gin.Context) { mcp.ServeHTTP(c) })
+#
+# The authenticated route is the one that can only stream events. The route that
+# accepts tool invocations carries an IP allow-list and nothing else, and the
+# allow-list is empty by default, which `IPWhiteList` treats as "permit every
+# source". So any client that could reach the port could call
+# `nginx_config_add`, `nginx_config_modify`, `nginx_config_enable` and
+# `restart_nginx` with no credential of any kind -- writing arbitrary files into
+# the nginx configuration directory and restarting the daemon onto them. CVSS
+# 9.8. The advisory's CWE-306 is exact: the operation is not under-authorized,
+# it is unauthenticated.
+#
+# The pool row named d454a2a9d2111be4b895243f7f6cb33a78b54347, which is a real
+# nginx-ui commit -- "prevent panic on nil interface conversion for tool
+# arguments" -- three weeks later and unrelated to it; at that commit
+# both routes carry `AuthRequired`. The remediation is
+# 413dc631eea852f9a583d0caeb9f6e5f453e5a85, whose `mcp/router.go` hunk adds
+# `middleware.AuthRequired()` to the `/mcp_message` registration and whose new
+# `mcp/router_test.go` asserts it. The commit's subject is about WebSocket origin
+# validation, so the row's SHA cannot be recovered by reading subjects; the fixed revision
+# is found by asking which commit last touched `mcp/router.go` before the row's.
+#
+# What fires without this. Both revisions of the whole tree, three `--cache off`
+# runs each: 422 findings on 413dc631ee^ and 407 on 413dc631ee, deterministic,
+# and `mcp/router.go` appears in neither. Nothing labelled the route
+# registrations at all -- `vyql match` on `mcp/` reported sinks in the tool
+# handlers (FilePathAccess, SqlExecution, UnsafeUpload) and no node in
+# `router.go`. That is the shape the notes call "findings in the function are not
+# coverage": the tools the CVE exposes carry labels, and the thing that exposed
+# them is invisible.
+#
+# What it took. The discriminator is on the registration call node itself, not
+# on the enclosing function: Go's lowering walks each argument with
+# `collectValTokens`, and a call passed positionally contributes its callee path,
+# so `r.Any("/mcp_message", middleware.IPWhiteList(), ...)` carries the tokens
+# `/mcp_message`, `middleware.IPWhiteList`, `IPWhiteList` and `middleware`,
+# while the patched form adds `middleware.AuthRequired` and `AuthRequired`. A
+# function-scoped binding could not have worked here: both routes live in one
+# `InitRouter`, and `call_path:middleware.AuthRequired` is present in the
+# function's context tokens on both revisions.
+#
+# Precision. The path clause requires both `mcp` and `message` among the
+# registration's own tokens, which is what separates the message channel from
+# the event stream. A first revision keyed on `/mcp` alone and reported three
+# times on nhost's `services/mcp/auth/auth_test.go`, where
+# `router.POST("/mcp", a.Middleware(), ...)` mounts an auth middleware whose
+# name does not contain "auth"; narrowing to the message channel took that to 0
+# while leaving the target at 1. Across the ~160 repository clones on this
+# machine, a grep enumeration of Go route registrations naming both `mcp` and
+# `message` finds exactly this file plus two commented-out doc examples in
+# vendored mcp-go, and neither comment produces a node. On the target tree the
+# rule adds exactly one finding to the vulnerable revision and none to the
+# patched one.
+#
+# Not keyed on the fixed revision's vocabulary. Substituting `middleware.Authenticate()`,
+# `middleware.RequireLogin()` or `middleware.CheckJWT()` for the fixed revision's own
+# `AuthRequired` suppresses the finding just the same; `middleware.VerifyUser()`
+# does not, which is the recall limit the binding states.
+
+test "rank1444: MCP message endpoint registered without authentication"
+  lang go
+  file router.go
+  expect VYQL-AUTH-134
+  expect_review code.McpTransportRouteMissingAuthentication
+  code
+  ```
+  package mcp
+
+  import (
+      "github.com/0xJacky/Nginx-UI/internal/mcp"
+      "github.com/0xJacky/Nginx-UI/internal/middleware"
+      "github.com/gin-gonic/gin"
+  )
+
+  func InitRouter(r *gin.Engine) {
+      r.Any("/mcp", middleware.IPWhiteList(), middleware.AuthRequired(),
+          func(c *gin.Context) {
+              mcp.ServeHTTP(c)
+          })
+      r.Any("/mcp_message", middleware.IPWhiteList(),
+          func(c *gin.Context) {
+              mcp.ServeHTTP(c)
+          })
+  }
+  ```
+
+test "rank1444: both MCP transport paths behind the same authentication"
+  lang go
+  file router.go
+  reject VYQL-AUTH-134
+  reject_review code.McpTransportRouteMissingAuthentication
+  code
+  ```
+  package mcp
+
+  import (
+      "github.com/0xJacky/Nginx-UI/internal/mcp"
+      "github.com/0xJacky/Nginx-UI/internal/middleware"
+      "github.com/gin-gonic/gin"
+  )
+
+  func InitRouter(r *gin.Engine) {
+      r.Any("/mcp", middleware.IPWhiteList(), middleware.AuthRequired(),
+          func(c *gin.Context) {
+              mcp.ServeHTTP(c)
+          })
+      r.Any("/mcp_message", middleware.IPWhiteList(), middleware.AuthRequired(),
+          func(c *gin.Context) {
+              mcp.ServeHTTP(c)
+          })
+  }
+  ```
+
+test "rank1444: an MCP-aware auth middleware on a non-message route is clean"
+  lang go
+  file auth_route.go
+  reject VYQL-AUTH-134
+  reject_review code.McpTransportRouteMissingAuthentication
+  code
+  ```
+  package server
+
+  import "github.com/gin-gonic/gin"
+
+  type Auth struct{}
+
+  func (a *Auth) Middleware() gin.HandlerFunc { return func(c *gin.Context) {} }
+
+  func mount(router *gin.Engine, a *Auth, mcpHandler gin.HandlerFunc) {
+      router.POST("/mcp", a.Middleware(), mcpHandler)
+  }
+  ```

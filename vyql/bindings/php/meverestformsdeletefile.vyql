@@ -1,0 +1,6 @@
+module bindings.php.generated.meverestformsdeletefile;
+
+binding everestFormsEntryFileDeleteWithoutPathGuard474 {
+  query pattern presenceNode where node.kind == "call" and node.path ~= "analysis.php.everest_forms_entry_file_delete_without_path_guard"
+  emit issue code.EverestFormsEntryFileDeleteWithoutPathGuard at node
+}

@@ -1,0 +1,35 @@
+module bindings.php.generated.m895f4b2b;
+
+binding httpInput0 {
+  requires {
+    dependency("slim/slim")
+  }
+  query pattern callExpr where callee.method == "addBodyParsingMiddleware"
+  emit source code.HttpInput at call.result
+}
+
+binding redirectTarget1 {
+  requires {
+    dependency("slim/slim")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("slim/slim")
+  }
+  query pattern callExpr where callee.method == "emit"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding redirectTarget3 {
+  requires {
+    dependency("slim/slim")
+  }
+  query pattern callExpr where callee.method == "redirect"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

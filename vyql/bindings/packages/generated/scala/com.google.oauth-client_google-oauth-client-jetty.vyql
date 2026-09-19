@@ -1,0 +1,17 @@
+module bindings.scala.generated.m31d1e098;
+
+binding httpInput0 {
+  requires {
+    dependency("com.google.oauth-client:google-oauth-client-jetty")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit source code.HttpInput at call.result
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.google.oauth-client:google-oauth-client-jetty")
+  }
+  query pattern callExpr where callee.method == "queryToMap"
+  emit sink code.Deserialization at args[0]
+}

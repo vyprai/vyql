@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule ConfigUrlStoredBeforeSchemeValidation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_918, CWE_20]
+    id: "VYQL-RF-036"
+    severity: high
+  }
+  issue code.ConfigUrlStoredBeforeSchemeValidation as config
+}

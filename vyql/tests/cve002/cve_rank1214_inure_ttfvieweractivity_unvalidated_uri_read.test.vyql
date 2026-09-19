@@ -1,0 +1,111 @@
+# Rank 1214 / CVE-2023-4876: Inure's TTFViewerActivity reads whatever
+# content URI the Intent that started it carries and opens it directly, with
+# no check that the URI names a TTF font before handing it to the content
+# resolver:
+#
+#   val typeFace = TTFHelper.getTTFFile(contentResolver.openInputStream(intent.data!!)!!,
+#                                       applicationContext,
+#                                       DocumentFile.fromSingleUri(applicationContext, intent!!.data!!)!!.name!!)
+#
+# TTFViewerActivity is exported (android:exported="true") with an
+# intent-filter for android.intent.action.VIEW over content/file/http/https
+# data and no mimeType restriction, so any app on the device can start it
+# with an Intent naming any file the sender can grant read access to, and
+# Inure opens and displays that file's bytes as if it were a font, without
+# checking the Intent's declared type or the resolved name's extension
+# (CWE-200, exposure of sensitive information to an unauthorized actor).
+# Fix 1f0d4d0af47e ("Patched Exposure of Sensitive Information to an
+# Unauthorized Actor") wraps the read in a check --
+# `intent?.type == MimeConstants.ttfType && ...name.endsWith(".ttf")` --
+# and shows a warning instead of opening the stream when either fails.
+#
+# The fixing commit is 1f0d4d0af47e (Build92), confirmed against huntr's
+# report for this CVE; pool.tsv names it, not the unrelated RecyclerView
+# fix 7db5511753 beside it.
+#
+# Detected as VYQL-PATH-001 through intentInput125 (Activity.intent ->
+# Intent.data) and filePathAccess126 (ContentResolver.openInputStream). The
+# non-null assertions (`!!`) around the Uri no longer hide the argument:
+# the Kotlin frontend lowers a unary_expression pass-through for a postfix
+# operator instead of a Seq wrapper, which the sink applicator skips. The
+# patched form's extension allowlist (`name.endsWith(".ttf")`) is a
+# core.PathAccessCheck (pathAccessCheck127) whose CFG dominance covers the
+# read inside the guarded branch.
+
+test "rank1214: TTFViewerActivity opens the Intent's URI directly, asserted non-null"
+  lang kotlin
+  expect VYQL-PATH-001
+  code
+  ```
+  class TTFViewerActivity : BaseActivity() {
+      fun onCreate() {
+          lifecycleScope.launch(Dispatchers.Default) {
+              kotlin.runCatching {
+                  val typeFace = TTFHelper.getTTFFile(contentResolver.openInputStream(intent.data!!)!!,
+                                                      applicationContext,
+                                                      DocumentFile.fromSingleUri(applicationContext, intent!!.data!!)!!.name!!)
+
+                  withContext(Dispatchers.Main) {
+                      fontEditText.setTypeface(typeFace, Typeface.NORMAL)
+                  }
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1214: the fixed activity checks the Intent's declared type and the resolved name's extension first"
+  lang kotlin
+  reject VYQL-PATH-001
+  code
+  ```
+  class TTFViewerActivity : BaseActivity() {
+      fun onCreate() {
+          lifecycleScope.launch(Dispatchers.Default) {
+              kotlin.runCatching {
+                  if (intent?.type == MimeConstants.ttfType && DocumentFile.fromSingleUri(applicationContext, intent!!.data!!)?.name!!.endsWith(".ttf")) {
+                      val typeFace = TTFHelper.getTTFFile(contentResolver.openInputStream(intent.data!!)!!,
+                                                          applicationContext,
+                                                          DocumentFile.fromSingleUri(applicationContext, intent!!.data!!)!!.name!!)
+
+                      withContext(Dispatchers.Main) {
+                          fontEditText.setTypeface(typeFace, Typeface.NORMAL)
+                      }
+                  } else {
+                      showWarning("ERR: invalid file type ${intent?.type!!}")
+                  }
+              }
+          }
+      }
+  }
+  ```
+
+# The minimal pair: same source (Activity.intent -> Intent.data), same sink
+# (ContentResolver.openInputStream), same asserted argument; only whether an
+# extension allowlist dominates the read differs.
+
+test "rank1214: the asserted Uri reaches openInputStream unguarded"
+  lang kotlin
+  expect VYQL-PATH-001
+  code
+  ```
+  class Foo {
+      fun bar() {
+          val x = contentResolver.openInputStream(intent.data!!)
+      }
+  }
+  ```
+
+test "rank1214: the identical read guarded by an extension allowlist does not report"
+  lang kotlin
+  reject VYQL-PATH-001
+  code
+  ```
+  class Foo {
+      fun bar() {
+          if (DocumentFile.fromSingleUri(applicationContext, intent!!.data!!)?.name!!.endsWith(".ttf")) {
+              val x = contentResolver.openInputStream(intent.data!!)
+          }
+      }
+  }
+  ```

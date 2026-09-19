@@ -1,0 +1,17 @@
+module bindings.elixir.generated.mb208f223;
+
+binding weakHash0 {
+  requires {
+    dependency("xxhash")
+  }
+  query pattern callExpr where callee.method == "xxh32"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("xxhash")
+  }
+  query pattern callExpr where callee.method == "xxh64"
+  emit issue code.WeakHash at call
+}

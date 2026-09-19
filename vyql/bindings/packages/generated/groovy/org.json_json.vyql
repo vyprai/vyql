@@ -1,0 +1,51 @@
+module bindings.groovy.generated.mabd4eead;
+
+binding deserialization0 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "nextString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "nextTo"
+  emit sink code.Deserialization at args[0]
+}
+
+binding htmlEscape3 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding htmlEscape4 {
+  requires {
+    dependency("org.json:json")
+  }
+  query pattern callExpr where callee.method == "unescape"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

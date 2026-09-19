@@ -1,0 +1,247 @@
+# Rank 1745 / CVE-2026-44649: SillyTavern's trusted-header SSO auto-login
+# reads the Authelia `Remote-User` and Authentik `X-Authentik-Username`
+# headers and logs the named user in with no credential, without checking
+# that the request's direct peer is a reverse proxy configured to set
+# those headers (CWE-290, CWE-287 -- authentication bypass by spoofing a
+# header the app assumes only a trusted proxy can set). Any network client
+# able to reach the port can send `Remote-User: <handle>` and become any
+# enabled user.
+#
+# src/users.js at the merge parent has, verbatim:
+#
+#   async function tryAutoLogin(request, basicAuthMode) {
+#       ...
+#       if (AUTHELIA_AUTH && await autheliaUserLogin(request)) {
+#           return true;
+#       }
+#       if (AUTHENTIK_AUTH && await authentikUserLogin(request)) {
+#           return true;
+#       }
+#   }
+#
+#   async function autheliaUserLogin(request) {
+#       return headerUserLogin(request, 'Remote-User');
+#   }
+#
+#   async function authentikUserLogin(request) {
+#       return headerUserLogin(request, 'X-Authentik-Username');
+#   }
+#
+#   async function headerUserLogin(request, header = 'Remote-User') {
+#       const remoteUser = request.get(header);
+#       ...
+#       for (const userHandle of userHandles) {
+#           if (remoteUser.toLowerCase() === userHandle) {
+#               request.session.handle = userHandle;
+#               return true;
+#           }
+#       }
+#       return false;
+#   }
+#
+# The pool row records merge 51ad27fb86d39a3daca3adaa970375c9670c12df; the
+# substantive fix is the commit inside it, d96d1451 "Add IP whitelist for SSO
+# authentication headers (#5404)", which adds an `sso.trustedProxies` config
+# (default ['127.0.0.1', '::1']), an isRequestFromTrustedProxy(ip) CIDR match
+# via the ip-matching package, and gates headerUserLogin on it -- the reject
+# case below is that function verbatim.
+#
+# ATTENTION, rechecked: the self-asserted identity-header family (also
+# ranks 1256 Kanboard PHP, 1092 erxes TS, 1091 Envoy C++) still has no
+# vocabulary, and the precision hold stands. Measured on the real
+# checkout, three --cache off runs per side:
+#
+# 1. Nothing fires on the vulnerable tree. src/ at the merge parent
+#    aa50edcf reports 1247/1247/1247 findings (692 at or above high)
+#    with zero VYQL-AUTH rows and zero findings in users.js; at the
+#    merge 51ad27fb the same runs report 1315/1315/1315 (719 at or
+#    above high), the single VYQL-AUTH row being AUTH-079's
+#    SensitiveOperation mark on the new getAccountVersion password hash
+#    (users.js:944), unrelated. The 1st pass measured 691/1315 at or
+#    above high; the +1 at the parent is background drift from rules
+#    shipped for other ranks, none of it on this shape.
+# 2. The label set at the shape is unchanged and still cannot carry a
+#    finding. `vyql match` on a repro of headerUserLogin labels
+#    `request.query` as code.HttpInput (javascript.input) but not the
+#    header read: the generated express binding keys `req.get`
+#    (packages/generated/javascript/express.vyql) on the receiver
+#    literal `req`, while `request.get` -- this code's spelling -- is
+#    bound only as the npm request client's outbound fetch, a
+#    code.UrlFetch sink. The session write `request.session.handle =
+#    userHandle` does lower to a code.TrustBoundary sink (callee.path
+#    ~= "session"), but its only consumer, VYQL-CFG-014 (taint
+#    core.UserControlledData -> code.TrustBoundary), cannot fire: the
+#    header value only selects which stored handle is written, so
+#    `vyql trace -from code.HttpInput -to code.TrustBoundary` reports
+#    2 sources, 0 reaching a sink. Widening the express binding to the
+#    `request` receiver would not convert the rank even as a label: it
+#    collides with the npm request client's `request.get(url)` and
+#    turns every outbound fetch result into an HttpInput source, and no
+#    rule consumes a header source for identity establishment in any
+#    case.
+# 3. The hold is the 1st pass's precision measurement, unchanged: the
+#    read is the integration pattern Authelia and Authentik document,
+#    their security model is that the app is reachable only through the
+#    proxy (the docs' trusted-source-IP option is a recommendation, not
+#    a requirement), so a rule keying on the read without an in-code
+#    trusted-proxy gate fires on the documented baseline of every
+#    correct deployment as readily as on this one -- the control that
+#    separates them is network topology, which is not in the source. A
+#    binding naming Remote-User / X-Authentik-Username names proxy
+#    deployment conventions, not any library's documented API, so it
+#    fails the genericity test too. The family-wide concept the
+#    ENGINE-GAPS entry records for ranks 1091/1092 (a self-asserted
+#    credential accepted as proof of authentication) has resisted a
+#    single shape across those two; this rank's trusted-proxy header
+#    and 1256's superglobal are a third and fourth, so minting it here
+#    is a per-case concept rather than a per-weakness-class one.
+#
+# The first two tests pin the two revisions as misses on the nearest
+# shipped concept (VYQL-AUTH-012, proxy client-IP spoofing, which must
+# not fire: the header carries a username for an authentication
+# decision, not a client IP for access control). The third is a firing
+# control: the same header value read through the labelled
+# `req.headers['remote-user']` spelling and echoed reports VYQL-INJ-004,
+# so the suite exercises a firing rule and pins exactly which spelling
+# is unlabelled. When identity-assertion vocabulary lands, the first
+# test must flip to expect.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1745: SSO auto-login trusts the Remote-User header without a peer check"
+  lang javascript
+  file src/users.js
+  reject VYQL-AUTH-012
+  code
+  ```
+  async function tryAutoLogin(request, basicAuthMode) {
+      if (!ENABLE_ACCOUNTS || request.user || !request.session) {
+          return false;
+      }
+
+      if (!request.query.noauto) {
+          if (AUTHELIA_AUTH && await autheliaUserLogin(request)) {
+              return true;
+          }
+
+          if (AUTHENTIK_AUTH && await authentikUserLogin(request)) {
+              return true;
+          }
+      }
+
+      return false;
+  }
+
+  async function autheliaUserLogin(request) {
+      return headerUserLogin(request, 'Remote-User');
+  }
+
+  async function authentikUserLogin(request) {
+      return headerUserLogin(request, 'X-Authentik-Username');
+  }
+
+  async function headerUserLogin(request, header = 'Remote-User') {
+      if (!request.session) {
+          return false;
+      }
+
+      const remoteUser = request.get(header);
+      if (!remoteUser) {
+          return false;
+      }
+      console.debug(`Attempting auto-login for user from header ${header}: ${remoteUser}`);
+
+      const userHandles = await getAllUserHandles();
+      for (const userHandle of userHandles) {
+          if (remoteUser.toLowerCase() === userHandle) {
+              const user = await storage.getItem(toKey(userHandle));
+              if (user && user.enabled) {
+                  request.session.handle = userHandle;
+                  return true;
+              }
+          }
+      }
+      return false;
+  }
+  ```
+
+test "rank1745: the fixed revision checks the direct peer against the trusted proxies first"
+  lang javascript
+  file src/users.js
+  reject VYQL-AUTH-012
+  code
+  ```
+  const TRUSTED_PROXIES = filterValidIpPatterns(getConfigValue('sso.trustedProxies', ['127.0.0.1', '::1']) ?? []);
+
+  function isRequestFromTrustedProxy(ip) {
+      if (!Array.isArray(TRUSTED_PROXIES)) {
+          return false;
+      }
+
+      if (TRUSTED_PROXIES.length === 1 && TRUSTED_PROXIES[0] === '*') {
+          return true;
+      }
+
+      if (!ip || ip === 'unknown') {
+          return false;
+      }
+
+      for (const entry of TRUSTED_PROXIES) {
+          try {
+              const match = ipMatching.getMatch(entry);
+              if (ipMatching.matches(ip, match)) {
+                  return true;
+              }
+          } catch (e) {
+              continue;
+          }
+      }
+
+      return false;
+  }
+
+  async function headerUserLogin(request, header = 'Remote-User') {
+      if (!request.session) {
+          return false;
+      }
+
+      const remoteUser = request.get(header);
+      if (!remoteUser) {
+          return false;
+      }
+      console.debug(`Attempting auto-login for user from header ${header}: ${remoteUser}`);
+
+      const ip = getIpFromRequest(request);
+      const isTrusted = isRequestFromTrustedProxy(ip);
+      if (!isTrusted) {
+          console.warn(`Received ${header} header from untrusted IP ${ip}. Ignoring for auto-login.`);
+          return false;
+      }
+
+      const userHandles = await getAllUserHandles();
+      for (const userHandle of userHandles) {
+          if (remoteUser.toLowerCase() === userHandle) {
+              const user = await storage.getItem(toKey(userHandle));
+              if (user && user.enabled) {
+                  request.session.handle = userHandle;
+                  return true;
+              }
+          }
+      }
+      return false;
+  }
+  ```
+
+test "rank1745: the same header read through the labelled req.headers spelling reports when echoed"
+  lang javascript
+  file src/users.js
+  expect VYQL-INJ-004
+  code
+  ```
+  const express = require('express');
+
+  async function echoLoginUser(req, res) {
+      const remoteUser = req.headers['remote-user'];
+      res.send(`auto-login saw ${remoteUser}`);
+  }
+  ```

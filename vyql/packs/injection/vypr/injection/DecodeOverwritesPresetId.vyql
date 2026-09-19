@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule DecodeOverwritesPresetId {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_915]
+    id: "VYQL-INJ-281"
+    severity: high
+  }
+  issue code.DecodeOverwritesPresetId as sink
+}

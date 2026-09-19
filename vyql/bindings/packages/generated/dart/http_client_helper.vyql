@@ -1,0 +1,73 @@
+module bindings.dart.generated.m9a96523c;
+
+binding networkConnect0 {
+  requires {
+    dependency("http_client_helper")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("http_client_helper")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("http_client_helper")
+  }
+  query pattern callExpr where callee.method == "head"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("http_client_helper")
+  }
+  query pattern callExpr where callee.method == "put"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("http_client_helper")
+  }
+  query pattern callExpr where callee.method == "patch"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("http_client_helper")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("http_client_helper")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect7 {
+  requires {
+    dependency("http_client_helper")
+  }
+  query pattern callExpr where callee.method == "readBytes"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect8 {
+  requires {
+    dependency("http_client_helper")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkConnectSink at args[0]
+}

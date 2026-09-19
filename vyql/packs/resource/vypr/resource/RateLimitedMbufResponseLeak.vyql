@@ -1,0 +1,11 @@
+module vypr.resource;
+
+rule RateLimitedMbufResponseLeak {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_772, CWE_400]
+    id: "VYQL-RES-005"
+    severity: high
+  }
+  issue code.RateLimitedMbufResponseLeak as leak
+}

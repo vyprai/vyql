@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m342baf0a;
+
+binding urlFetch0 {
+  requires {
+    dependency("actionmailbox")
+  }
+  query pattern callExpr where callee.method == "post"
+  emit sink code.UrlFetch at args[0]
+}

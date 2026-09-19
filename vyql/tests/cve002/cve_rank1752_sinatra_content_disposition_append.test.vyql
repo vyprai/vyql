@@ -1,0 +1,146 @@
+# CVE-2022-45442: Sinatra's attachment helper interpolated the filename into
+# the Content-Disposition response header with no escaping, so an application
+# handing it a caller-supplied name could splice a quote, a carriage return or
+# a line feed into the header value (CWE-113). The vulnerable form, verbatim
+# from lib/sinatra/base.rb at the fixed revision's parent:
+#
+#   def attachment(filename = nil, disposition = :attachment)
+#     response['Content-Disposition'] = disposition.to_s.dup
+#     return unless filename
+#
+#     params = format('; filename="%s"', File.basename(filename))
+#     response['Content-Disposition'] << params
+#     ext = File.extname(filename)
+#     content_type(ext) unless response['Content-Type'] || ext.empty?
+#   end
+#
+# File.basename strips directory separators only; it leaves the quote and the
+# line terminators intact, and core.PathCanonicalization neutralizes path
+# traversal alone, so nothing on the path clears the header injection. The fixed revision
+# ea8fc949 applies the WHATWG multipart-form-data replacement table:
+#
+#   params = format('; filename="%s"', File.basename(filename).gsub(/["\r\n]/, MULTIPART_FORM_DATA_REPLACEMENT_TABLE))
+#
+# Two Sinatra spellings of the header write had no sink: the element write
+# `response['Content-Disposition'] = v` (Rack::Response documents []=, and
+# Sinatra's own content_type uses it) and the in-place append
+# `response['Content-Disposition'] << v` this helper builds the value with.
+# Both are bound now: the element write by the same exact-receiver route the
+# Rack `headers[k] = v` binding uses, and the append because a `<<` statement
+# whose left side is an element reference lowers to a call on that reference
+# (dotted path `response[]`) instead of a Format whose value is discarded.
+# Before that lowering the same helper with the write spelled `=` reported
+# while the `<<` spelling reported nothing -- the pair isolating the append
+# construct.
+#
+# The helper is modelled in the caller's class rather than Sinatra::Helpers:
+# a receiverless call resolves within its own class today, and the framework's
+# helpers-are-mixed-in dispatch (route block in an application subclass, body
+# in Sinatra::Helpers) is a cross-package hop the resolver does not trace --
+# the same receiverless-hop family the ledger records for Ruby. The route-block
+# append below is the single-scope spelling real applications write and needs
+# no hop at all.
+
+test "rank1752: a request-supplied filename reaches the Content-Disposition header through the attachment helper"
+  lang ruby
+  expect VYQL-INJ-010
+  code
+  ```
+  class App
+    def attachment(filename = nil, disposition = :attachment)
+      response['Content-Disposition'] = disposition.to_s.dup
+      return unless filename
+
+      disposition_params = format('; filename="%s"', File.basename(filename))
+      response['Content-Disposition'] << disposition_params
+      ext = File.extname(filename)
+      content_type(ext) unless response['Content-Type'] || ext.empty?
+    end
+
+    def download
+      attachment(params[:name])
+      "ok"
+    end
+  end
+  ```
+
+test "rank1752: a route block appending the request name into the header directly"
+  lang ruby
+  expect VYQL-INJ-010
+  code
+  ```
+  class App
+    get '/download' do
+      response['Content-Disposition'] << "; filename=\"#{params[:name]}\""
+      "ok"
+    end
+  end
+  ```
+
+test "rank1752: the element-write spelling of the same header value"
+  lang ruby
+  expect VYQL-INJ-010
+  code
+  ```
+  class App
+    def attachment(filename = nil, disposition = :attachment)
+      return unless filename
+      response['Content-Disposition'] = format('; filename="%s"', File.basename(filename))
+    end
+
+    def download
+      attachment(params[:name])
+      "ok"
+    end
+  end
+  ```
+
+test "rank1752: the patched replacement table strips the header terminators"
+  lang ruby
+  reject VYQL-INJ-010
+  code
+  ```
+  class App
+    MULTIPART_FORM_DATA_REPLACEMENT_TABLE = {
+      '"'  => '%22',
+      "\r" => '%0D',
+      "\n" => '%0A'
+    }.freeze
+
+    def attachment(filename = nil, disposition = :attachment)
+      response['Content-Disposition'] = disposition.to_s.dup
+      return unless filename
+
+      disposition_params = format('; filename="%s"', File.basename(filename).gsub(/["\r\n]/, MULTIPART_FORM_DATA_REPLACEMENT_TABLE))
+      response['Content-Disposition'] << disposition_params
+      ext = File.extname(filename)
+      content_type(ext) unless response['Content-Type'] || ext.empty?
+    end
+
+    def download
+      attachment(params[:name])
+      "ok"
+    end
+  end
+  ```
+
+test "rank1752: a fixed filename is not an injection site"
+  lang ruby
+  reject VYQL-INJ-010
+  code
+  ```
+  class App
+    def attachment(filename = nil, disposition = :attachment)
+      response['Content-Disposition'] = disposition.to_s.dup
+      return unless filename
+
+      disposition_params = format('; filename="%s"', File.basename(filename))
+      response['Content-Disposition'] << disposition_params
+    end
+
+    def download
+      attachment("report.csv")
+      "ok"
+    end
+  end
+  ```

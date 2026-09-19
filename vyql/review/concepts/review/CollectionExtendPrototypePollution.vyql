@@ -1,0 +1,8 @@
+module code;
+
+review code.CollectionExtendPrototypePollution {
+  category: prototype_pollution
+  expected: [core.PrototypePollutionGuard]
+  kind: attention
+  text: "review Collection.js extend for __proto__ filtering before recursive byLink/setVal object merges"
+}

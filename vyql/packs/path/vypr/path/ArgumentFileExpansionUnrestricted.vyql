@@ -1,0 +1,13 @@
+module vypr.path;
+
+rule ArgumentFileExpansionUnrestricted {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_22]
+    id: "VYQL-PATH-061"
+    severity: medium
+  }
+  issue code.ArgumentFileExpansion as p
+  unless p.endpoint coveredBy core.ArgumentFileExpansionControl
+  unless p.path coveredBy core.ArgumentFileExpansionControl
+}

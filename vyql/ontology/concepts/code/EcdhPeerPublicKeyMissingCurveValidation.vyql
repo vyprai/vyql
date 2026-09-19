@@ -1,0 +1,11 @@
+module code;
+
+concept EcdhPeerPublicKeyMissingCurveValidation : issue {
+  cwe: [CWE_347, CWE_200]
+  reviewAssumption: "an attacker can provide a malformed peer public key and observe derived-secret behavior"
+  reviewCategory: crypto
+  reviewCondition: "ECDH shared-secret derivation multiplies the private scalar by a peer public point without validating that point belongs to the curve"
+  reviewConfidence: high
+  reviewEvidence: "ECDH derivation context {pattern} uses publicKey.Q.multiply(this.d) without an observed on-curve check"
+  vulnerableTo: [crypto.ImproperSignatureCheck, secrets.SecretLeak]
+}

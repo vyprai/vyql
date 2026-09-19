@@ -1,0 +1,11 @@
+module code;
+
+concept HiddenBlockPresenceDisclosure : issue {
+  cwe: [CWE_200]
+  reviewAssumption: "a block record whose target is deliberately hidden -- an autoblock, whose address MediaWiki never shows -- is returned by the same lookup as an ordinary block, so branching on the lookup result tells a viewer the hidden record exists"
+  reviewCondition: "block-management UI is chosen from a block lookup that still includes hidden autoblocks"
+  reviewCategory: privacy
+  reviewConfidence: high
+  reviewEvidence: "block lookup context {pattern} selects between change-block and block links for the target without excluding autoblock-type results"
+  vulnerableTo: [secrets.SecretLeak]
+}

@@ -1,0 +1,249 @@
+# A TUF client learns every target name from the repository's own signed
+# metadata: the targets.json it fetches and parses is a map whose keys are
+# file names, and the delegated role names arrive the same way. tough's
+# Repository::cache walks that map and, for each name, tough/src/cache.rs's
+# cache_target fetches the target and writes it under
+# `outdir.as_ref().join(filename)` through an OpenOptions write/create/open
+# chain -- nothing normalises the name, checks the joined path stays inside
+# the outdir, or encodes its path separators. The repository therefore
+# decides the path components of a file written with the caching process's
+# privileges: a target or delegated role named `../../.bashrc`-style walks
+# the join out of the cache directory. CWE-22.
+#
+# The fixed revision introduces a TargetName type whose resolved() form path-cleans the
+# raw name, and moves the storing half of cache_target into lib.rs's
+# save_target, which canonicalises the outdir, joins the resolved name, and
+# refuses to write unless the resulting file's parent directory starts_with
+# the outdir. The delegated-role half of the change percent-encodes the name
+# inside the delegated_filename/load_delegations callees.
+#
+# What fires without this change: nothing on the defect. The vulnerable tree
+# reports 34 findings, and the only PATH rows are a taint finding on the
+# caller-supplied metadata_outdir parameter and a VYQL-PATH-006 row on
+# tuftool's download_root (present on both revisions, from the uri sibling
+# below). cache_target's write is not even a bound sink -- OpenOptions open
+# has no FilePathAccess binding -- and no Rust source concept can reach the
+# name: it is deserialised out of serde_json inside schema parsing, a
+# HashMap key several calls away from the join, so the taint route is out
+# of reach in both directions.
+#
+# Nothing is minted. The archive-parsing neighbours in this family key the
+# size-interpretation conflict (conditional vs absent extended-header
+# override), which is not this shape; the weakness class -- a remote
+# listing's names joined into local download paths -- is
+# code.RemoteListingDownloadPath under VYQL-PATH-006. The addition is a
+# sibling binding in vyql/bindings/rust/remote_uri_mirror_path_join.vyql
+# for the case where the remote never hands the client a uri/url value:
+# the names arrive inside a fetched and parsed document, and the function
+# itself retrieves them by name -- a fetch/download-named call receiving
+# the name's string form (as_str), a Path::join onto the local base, and
+# the write through an OpenOptions builder chain or a plain create. The
+# neutralising markers are std's containment vocabulary, exactly the uri
+# sibling's, so the fixed revision's starts_with/canonicalize in save_target
+# suppresses the row wherever it is written.
+#
+# Measured. The vulnerable revision reports cache_target
+# (tough/src/cache.rs:206) as VYQL-PATH-006 and the patched revision
+# reports no row there, three --cache off runs each; the discrimination
+# rides on the join/write co-location and the std containment markers, not
+# on any name the fixed revision introduces -- fetch_target, join, as_str and
+# OpenOptions are identical in both revisions. Collateral, enumerated
+# rather than sampled: the only other Rust trees under the sibling clones
+# (thrift, tokio-tar and its patched copy) report zero PATH-006 rows, and
+# grep-enumerating the shape's reachable set inside tough -- every file
+# carrying both a join and a fetch/download call -- yields five files of
+# which only cache_target matches; tuftool's download.rs joins CLI-supplied
+# names with no fetch in the function, and lib.rs's load_delegations joins
+# role names onto a Url for the fetch itself with no file write. The
+# binding's residual, stated rather than hidden: the fetch and the join are
+# co-located in one function but their arguments are not unified, so a
+# function that fetches one remote name while storing a locally built path
+# can still match -- the same residual the uri sibling carries for its
+# join operand, and nothing in the measured trees exercises it. The
+# delegated-role half of the changeed revision (percent-encoding inside
+# delegated_filename) sanitises in the callee, so a function-local binding
+# cannot see it; that is the known Rust delegated-control family, not a
+# new gap.
+
+test "rank1863: (a) a repository target name fetched by name and written under a join of itself, no containment"
+  lang rust
+  file tough/src/cache.rs
+  expect VYQL-PATH-006
+  code
+  ```
+  use std::fs::OpenOptions;
+  use std::io::Read;
+  use std::path::Path;
+
+  pub struct Repository;
+  pub struct Target;
+
+  impl Repository {
+      fn cache_target<P: AsRef<Path>>(&self, outdir: P, name: &str) -> Result<(), ()> {
+          let t = self
+              .targets
+              .signed
+              .find_target(name)
+              .ok_or(())?;
+          let (sha, filename) = self.target_digest_and_filename(t, name);
+          let mut reader = self.fetch_target(t, &sha, filename.as_str())?;
+          let path = outdir.as_ref().join(filename);
+          let mut f = OpenOptions::new()
+              .write(true)
+              .create(true)
+              .open(&path)?;
+          std::io::copy(&mut reader, &mut f)?;
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1863: (b) the patched save_target canonicalises the base and refuses a path outside it"
+  lang rust
+  file tough/src/lib.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::path::Path;
+
+  pub struct Repository;
+
+  impl Repository {
+      pub fn save_target<P>(&self, name: &str, outdir: P) -> Result<(), ()>
+      where
+          P: AsRef<Path>,
+      {
+          let outdir = outdir.as_ref();
+          let outdir = outdir.canonicalize()?;
+          if !outdir.is_dir() {
+              return Err(());
+          }
+          let filename = name.resolved();
+          let resolved_filepath = outdir.join(filename);
+          let filepath_dir = resolved_filepath.parent().ok_or(())?;
+          if !filepath_dir.starts_with(&outdir) {
+              return Err(());
+          }
+          let mut f = tempfile::NamedTempFile::new_in(&filepath_dir)?;
+          f.persist(&resolved_filepath)?;
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1863: (c) a starts_with containment check written in place is the same control"
+  lang rust
+  file tough/src/cache.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::fs::OpenOptions;
+  use std::io::Read;
+  use std::path::Path;
+
+  pub struct Repository;
+  pub struct Target;
+
+  impl Repository {
+      fn cache_target<P: AsRef<Path>>(&self, outdir: P, name: &str) -> Result<(), ()> {
+          let t = self
+              .targets
+              .signed
+              .find_target(name)
+              .ok_or(())?;
+          let (sha, filename) = self.target_digest_and_filename(t, name);
+          let mut reader = self.fetch_target(t, &sha, filename.as_str())?;
+          let path = outdir.as_ref().join(filename);
+          if !path.starts_with(outdir.as_ref()) {
+              return Err(());
+          }
+          let mut f = OpenOptions::new()
+              .write(true)
+              .create(true)
+              .open(&path)?;
+          std::io::copy(&mut reader, &mut f)?;
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1863: (d) an atomic fetch_add next to a local join is not a retrieval"
+  lang rust
+  file src/counter.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::fs::OpenOptions;
+  use std::path::Path;
+  use std::sync::atomic::AtomicUsize;
+
+  pub struct Writer {
+      count: AtomicUsize,
+  }
+
+  impl Writer {
+      pub fn write_state<P: AsRef<Path>>(&self, dir: P, key: &str) -> std::io::Result<()> {
+          let n = self.count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+          let path = dir.as_ref().join(format!("state-{}.txt", n));
+          let mut f = OpenOptions::new()
+              .write(true)
+              .create(true)
+              .open(&path)?;
+          use std::io::Write;
+          f.write_all(key.as_str().as_bytes())
+      }
+  }
+  ```
+
+test "rank1863: (e) fetching by name and joining it but only reading the result back stays with the taint rules"
+  lang rust
+  file tough/src/cache.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::path::Path;
+
+  pub struct Repository;
+  pub struct Target;
+
+  impl Repository {
+      fn inspect_target<P: AsRef<Path>>(&self, outdir: P, name: &str) -> Result<String, ()> {
+          let t = self
+              .targets
+              .signed
+              .find_target(name)
+              .ok_or(())?;
+          let (sha, filename) = self.target_digest_and_filename(t, name);
+          let mut reader = self.fetch_target(t, &sha, filename.as_str())?;
+          let path = outdir.as_ref().join(filename);
+          let mut buf = String::new();
+          use std::io::Read;
+          reader.read_to_string(&mut buf)?;
+          std::fs::read_to_string(&path).map_err(|_| ())
+      }
+  }
+  ```
+
+test "rank1863: (f) storing under a locally derived name with no fetch in the function"
+  lang rust
+  file src/store.rs
+  reject VYQL-PATH-006
+  code
+  ```
+  use std::fs::OpenOptions;
+  use std::path::Path;
+
+  pub struct Store;
+
+  impl Store {
+      pub fn write_manifest<P: AsRef<Path>>(&self, dir: P, version: u32) -> std::io::Result<()> {
+          let path = dir.as_ref().join(format!("manifest-{}.json", version));
+          let mut f = OpenOptions::new()
+              .write(true)
+              .create(true)
+              .open(&path)?;
+          use std::io::Write;
+          f.write_all(b"{}")
+      }
+  }
+  ```

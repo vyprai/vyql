@@ -1,0 +1,107 @@
+# Rank 1099 / CVE-2022-31121: Hyperledger Fabric's orderer treated any
+# non-Submit gRPC StepRequest as a consensus message, so a request with
+# neither oneof case set reached DispatchConsensus with a nil consensus
+# request and crashed the node deeper in the dispatch path (CWE-20). The
+# generated oneof accessor returns nil unless its case was set:
+#
+#   func (m *StepRequest) GetConsensusRequest() *ConsensusRequest {
+#       if x, ok := m.GetPayload().(*StepRequest_ConsensusRequest); ok {
+#           return x.ConsensusRequest
+#       }
+#       return nil
+#   }
+#
+# The fix requires GetConsensusRequest() to be non-nil before dispatching
+# and returns an error otherwise. Note the fix re-calls the accessor inline
+# at the guarded dispatch site, so the call shape is identical in both
+# revisions and only the enclosing guard differs.
+#
+# ATTENTION, not mechanical, re-measured at scanner d0cae877d. The generic
+# vocabulary for this class exists but reaches no Go code:
+# code.NullableDeref's only Go binding is hardcoded to one free5gc function
+# (nullableDeref39, bindings/packages/go/m39efcd29.vyql), and
+# code.UncheckedNullableResultDeref (VYQL-MEM-018) fires only from the C and
+# C++ extractors' analysis.nullable_result.unchecked_deref fact
+# (ccUncheckedNullableResultDerefObservations, c.go:3003), which models a
+# local assignment then a member dereference -- here the accessor result is
+# never assigned or dereferenced locally; it is passed inline as an
+# argument. vyql match on the real service.go labels no source, sink or
+# control, and three scans of the orderer subtree per revision report 13
+# findings each with none in common/cluster/service.go. An exhaustive grep
+# of the whole tree finds exactly one unguarded GetConsensusRequest flowing
+# into DispatchConsensus -- service.go:96, the vulnerability; every other
+# occurrence is nil-guarded or is the vendored definition.
+#
+# Three function-context probes on the real cluster package at both
+# revisions locate what a presence binding could key on:
+#   - callPath contains DispatchConsensus + GetConsensusRequest fires on
+#     both revisions (1/1);
+#   - adding `not (node.context.binary contains "!=nil")` fires on neither
+#     (0/0): the vulnerable function's own submitReq != nil guard -- on the
+#     OTHER oneof case -- satisfies the blanket negation, and a
+#     discriminator dispatch always carries one guarded accessor;
+#   - only negating the fix's own guard variable (`nsensusReq!=nil`)
+#     discriminates (1/0), which is the fixing commit's layout, not a
+#     generic condition.
+# The missing fact is a join between "local assigned from accessor X" and
+# "nil guard on that local": goAtomToken returns "" for every CallExpr
+# except len() (internal/extract/frontend/golang/golang.go:1368), so
+# `consensusReq := request.GetConsensusRequest()` emits no assign: token,
+# and presence predicates cannot unify a variable name across assign: and
+# binary: clauses regardless. That is the "a check cannot be attributed to
+# the value it is applied to" defect in ENGINE-GAPS.md (measured instances
+# 1420/1427/1430), restated for this nilness-guard family by rank 1885's
+# branch-correlated nilness entry with its Go comma-ok instance. Design
+# work on the concept and the guard analysis together, not a port. Both
+# tests below pin the miss against both memory rules.
+#
+# verify_current_expected: attention-not-mechanical
+
+test "rank1099: a non-submit request is dispatched as consensus with no nil check"
+  lang go
+  file orderer/common/cluster/service.go
+  reject VYQL-MEM-006
+  reject VYQL-MEM-018
+  code
+  ```
+  package cluster
+
+  func (s *Service) handleMessage(stream StepStream, addr string, exp *certificateExpirationCheck) error {
+    request, err := stream.Recv()
+    if err != nil {
+      return err
+    }
+
+    if submitReq := request.GetSubmitRequest(); submitReq != nil {
+      return s.handleSubmit(submitReq, stream, addr)
+    }
+
+    // Else, it's a consensus message.
+    return s.Dispatcher.DispatchConsensus(stream.Context(), request.GetConsensusRequest())
+  }
+  ```
+
+test "rank1099: the fixed revision requires the consensus field to be populated"
+  lang go
+  file orderer/common/cluster/service.go
+  reject VYQL-MEM-006
+  reject VYQL-MEM-018
+  code
+  ```
+  package cluster
+
+  func (s *Service) handleMessage(stream StepStream, addr string, exp *certificateExpirationCheck) error {
+    request, err := stream.Recv()
+    if err != nil {
+      return err
+    }
+
+    if submitReq := request.GetSubmitRequest(); submitReq != nil {
+      return s.handleSubmit(submitReq, stream, addr)
+    } else if consensusReq := request.GetConsensusRequest(); consensusReq != nil {
+      return s.Dispatcher.DispatchConsensus(stream.Context(), request.GetConsensusRequest())
+    }
+
+    return errors.Errorf("message is neither a Submit nor a Consensus request")
+  }
+  ```

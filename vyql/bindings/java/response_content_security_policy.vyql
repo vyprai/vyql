@@ -1,0 +1,65 @@
+module bindings.java.responseContentSecurityPolicy;
+
+// A Content-Security-Policy response header is the documented way to tell a
+// browser not to execute what a response carries: the header is an IETF/W3C
+// standard and every Java response API bottoms out in setting it by name.
+//
+// core.SafeResponseContentType names the guarantee rather than the mechanism
+// -- the response is constrained so a browser will not run script in it -- and
+// each frontend supplies the API that delivers it. The Go bindings deliver it
+// with an inert content-type literal; this one delivers it with the policy
+// header, which is the same guarantee stated to the browser directly. VYQL-INJ-004
+// already consults the concept as its endpoint guard
+// (`unless endpoint coveredBy core.SafeResponseContentType`), so making the
+// header visible in Java lets that rule stop reporting an endpoint the moment
+// the endpoint is actually hardened, instead of reporting the hardened form
+// identically to the vulnerable one.
+//
+// Two spellings cover the two documented ways a Java handler sets a response
+// header:
+//
+//   - Spring's `ResponseEntity.HeadersBuilder.header(String, String...)`, the
+//     builder a controller chains off `ResponseEntity.ok()`. A chained call
+//     flattens to one call node per link with the whole chain as its path, so
+//     `callee.method` is the link that carried the argument and not the tail
+//     of the chain -- which is what keeps the Content-Type link and the
+//     Content-Encoding link out of this binding.
+//   - `HttpServletResponse.setHeader` / `addHeader`, the servlet pair a filter
+//     or a raw handler uses, and the one Spring Security's own
+//     ContentSecurityPolicyHeaderWriter delegates to.
+//
+// `Content-Security-Policy-Report-Only` is declined: that header only reports
+// violations, it does not block them, so a response carrying it is not
+// hardened and a finding on it must stand. It is a separate name that contains
+// the enforced one as a prefix, so the exclusion is on the suffix.
+//
+// This is a check and only ever suppresses, and it is scoped to the single
+// rule that consumes the concept, so the failure mode is a missed suppression
+// on a genuinely hardened endpoint rather than a new report on ordinary code.
+
+binding springResponseContentSecurityPolicy {
+  query pattern callExpr where callee.method == "header" and args.any.literal contains "Content-Security-Policy" and not (args.any.literal contains "-Report-Only")
+  emit check core.SafeResponseContentType at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding servletResponseContentSecurityPolicySet {
+  query pattern callExpr where callee.method == "setHeader" and args.any.literal contains "Content-Security-Policy" and not (args.any.literal contains "-Report-Only")
+  emit check core.SafeResponseContentType at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding servletResponseContentSecurityPolicyAdd {
+  query pattern callExpr where callee.method == "addHeader" and args.any.literal contains "Content-Security-Policy" and not (args.any.literal contains "-Report-Only")
+  emit check core.SafeResponseContentType at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

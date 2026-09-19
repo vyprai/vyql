@@ -1,0 +1,9 @@
+module bindings.dart.generated.m247b9314;
+
+binding deserialization0 {
+  requires {
+    dependency("syncfusion_flutter_pdf")
+  }
+  query pattern callExpr where callee.method == "decodeXMLConversion"
+  emit sink code.Deserialization at args[0]
+}

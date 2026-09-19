@@ -1,0 +1,73 @@
+module bindings.elixir.generated.mbb4bffae;
+
+binding filePathAccess0 {
+  requires {
+    dependency("circuits_i2c")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("circuits_i2c")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("circuits_i2c")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData3 {
+  requires {
+    dependency("circuits_i2c")
+  }
+  query pattern callExpr where callee.method == "write!"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend4 {
+  requires {
+    dependency("circuits_i2c")
+  }
+  query pattern callExpr where callee.method == "write!"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData5 {
+  requires {
+    dependency("circuits_i2c")
+  }
+  query pattern callExpr where callee.method == "write_read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend6 {
+  requires {
+    dependency("circuits_i2c")
+  }
+  query pattern callExpr where callee.method == "write_read"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData7 {
+  requires {
+    dependency("circuits_i2c")
+  }
+  query pattern callExpr where callee.method == "write_read!"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend8 {
+  requires {
+    dependency("circuits_i2c")
+  }
+  query pattern callExpr where callee.method == "write_read!"
+  emit sink code.NetworkSend at args[0]
+}

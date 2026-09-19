@@ -1,0 +1,97 @@
+# Rank 1008 / CVE-2026-44437: Angular SSR open redirect / request steering via
+# an encoded X-Forwarded-Prefix header. validateHeaders checked the header with
+# a denylist regex for literal ".." path segments
+# (INVALID_PREFIX_REGEX = /^(?:\\|\/[/\\])|(?:^|[/\\])\.\.?(?:[/\\]|$)/). A value
+# like /%2e%2e/evil contains no literal "..", so it passes the denylist, and a
+# downstream consumer (the browser handling the redirect Location, or the
+# router) percent-decodes it into ../ and steers the redirect (CWE-22, CWE-601).
+# The fixed revision replaces the denylist with an allow-list regex
+# (VALID_PREFIX_REGEX = /^\/([a-z0-9_-]+\/)*[a-z0-9_-]*$/i) that rejects the "%"
+# character, and adds the trustProxyHeaders option to strip or gate proxy
+# headers.
+#
+# ATTENTION, no precise generic detection. The decode that turns %2e%2e into ../
+# does not happen in the validated code; it happens in a downstream consumer, so
+# there is no locally visible check-then-decode ordering to key on. The
+# header-to-redirect flow is labelled at the source end
+# (request.headers.get('X-Forwarded-Prefix') is code.HttpInput) but no
+# RedirectTargetSink binding covers the Fetch-API redirect construction the
+# engine-side code uses (a Headers set of Location feeding new Response, or
+# Response.redirect); the shipped sink bindings name the express/koa/fastify and
+# browser-navigation spellings only. That construction is also unchanged by the
+# fix -- the remediation is entirely upstream in the validation regex and the
+# proxy-header stripping -- so a source-to-sink open-redirect rule would fire
+# identically on both revisions. Flagging any denylist ".." validation as
+# insufficient would flag ordinary code everywhere, since a denylist is correct
+# whenever the value is not later percent-decoded, and the only textual
+# difference between the revisions is the validation regex's own content.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1008: X-Forwarded-Prefix validated by a denylist that misses encoded traversal"
+  lang javascript
+  file packages/angular/ssr/src/utils/validation.ts
+  reject VYQL-RF-013
+  code
+  ```
+  const INVALID_PREFIX_REGEX = /^(?:\\|\/[/\\])|(?:^|[/\\])\.\.?(?:[/\\]|$)/;
+
+  function validateHeaders(request: Request): void {
+    const headers = request.headers;
+    const xForwardedPrefix = headers.get('x-forwarded-prefix');
+    if (xForwardedPrefix && INVALID_PREFIX_REGEX.test(xForwardedPrefix)) {
+      throw new Error('Header "x-forwarded-prefix" must not contain ".", ".." path segments.');
+    }
+  }
+  ```
+
+test "rank1008: fix validates X-Forwarded-Prefix with an allow-list regex"
+  lang javascript
+  file packages/angular/ssr/src/utils/validation.ts
+  reject VYQL-RF-013
+  code
+  ```
+  const VALID_PREFIX_REGEX = /^\/([a-z0-9_-]+\/)*[a-z0-9_-]*$/i;
+
+  function validateHeaders(request: Request): void {
+    const headers = request.headers;
+    const xForwardedPrefix = headers.get('x-forwarded-prefix');
+    if (xForwardedPrefix && !VALID_PREFIX_REGEX.test(xForwardedPrefix)) {
+      throw new Error('Header "x-forwarded-prefix" is invalid.');
+    }
+  }
+  ```
+
+test "rank1008: redirect target joined from the forwarded prefix reports nothing"
+  lang javascript
+  file packages/angular/ssr/src/app-engine.ts
+  reject VYQL-RF-002
+  code
+  ```
+  function redirectBasedOnAcceptLanguage(request: Request): Response | null {
+    const { pathname } = new URL(request.url);
+    const prefix = request.headers.get('X-Forwarded-Prefix') ?? '';
+    const subPath = '/en/';
+
+    return createRedirectResponse(joinUrlParts(prefix, pathname, subPath), 302, {
+      'Vary': 'Accept-Language',
+    });
+  }
+
+  function joinUrlParts(...parts: string[]): string {
+    const normalizedParts: string[] = [];
+    for (const part of parts) {
+      if (part === '') {
+        continue;
+      }
+      normalizedParts.push(part.replace(/^\/+|\/+$/g, ''));
+    }
+    return '/' + normalizedParts.join('/');
+  }
+
+  function createRedirectResponse(location: string, status: number): Response {
+    const resHeaders = new Headers();
+    resHeaders.set('Location', location);
+    return new Response(null, { status, headers: resHeaders });
+  }
+  ```

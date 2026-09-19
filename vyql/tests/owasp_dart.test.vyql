@@ -1,0 +1,63 @@
+# OWASP-replica coverage for Dart — true positive plus opaque-predicate pruning.
+
+test "dart: request param -> rawQuery is SQLi"
+  lang dart
+  expect VYQL-INJ-001
+  code
+  ```
+  void f() {
+    var u = request.params["id"];
+    db.rawQuery("SELECT " + u);
+  }
+  ```
+
+test "dart: opaque-false if taints only the dead branch — clean SQLi"
+  lang dart
+  reject VYQL-INJ-001
+  code
+  ```
+  void f() {
+    var u = request.params["id"];
+    var c = "ok";
+    if (1 > 100) { c = u; }
+    db.rawQuery("SELECT " + c);
+  }
+  ```
+
+test "dart: opaque-false ternary selects the clean arm — clean SQLi"
+  lang dart
+  reject VYQL-INJ-001
+  code
+  ```
+  void f() {
+    var u = request.params["id"];
+    var c = (1 > 100) ? u : "ok";
+    db.rawQuery("SELECT " + c);
+  }
+  ```
+
+test "dart: reassignment in a live branch is still SQLi (no FN)"
+  lang dart
+  expect VYQL-INJ-001
+  code
+  ```
+  void f() {
+    var u = request.params["id"];
+    var c = "ok";
+    if (1 < 100) { c = u; }
+    db.rawQuery("SELECT " + c);
+  }
+  ```
+
+test "dart: opaque switch routes taint to a dead arm — clean SQLi"
+  lang dart
+  reject VYQL-INJ-001
+  code
+  ```
+  void f() {
+    var u = request.params["id"];
+    var c = "ok";
+    switch (1) { case 9: c = u; break; default: c = "safe"; }
+    db.rawQuery("SELECT " + c);
+  }
+  ```

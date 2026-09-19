@@ -1,0 +1,180 @@
+# Rank 1547 / CVE-2021-38383: OwnTone's net_bind() read its bound
+# address out of the getaddrinfo chain after freeaddrinfo released it,
+# so a crafted service configuration could make the port/address read
+# touch freed memory (use-after-free, CWE-416; reported by Ba Jinsheng).
+# src/misc.c walked the chain `for (ptr = servinfo; ptr; ptr =
+# ptr->ai_next)` to bind a socket, then called freeaddrinfo(servinfo)
+# at line 309 and still read `ptr->ai_addr` three times after it:
+# getsockname(fd, ptr->ai_addr, &ptr->ai_addrlen) writes through the
+# freed storage, and net_port_get / net_address_get read it back. The
+# pointer is legal by shape -- an element of the chain -- and fatal by
+# lifetime. Pool commit 246d8ae0ce is the real fix (COMMIT_OK,
+# "[misc] Fix use-after-free in net_bind()"): getsockname writes into
+# a local `union net_sockaddr naddr = { 0 }` with its own socklen_t
+# naddr_len, an over-long result is rejected (naddr_len > sizeof(naddr)
+# goes to error), and the port/address readers take &naddr -- no
+# chain dereference survives the free. No pool correction.
+#
+# Held as a double miss after re-measuring against the current
+# knowledge base. Both labels the VYQL-MEM-007 pipeline needs are
+# absent, and neither can be added in data:
+#
+# * No release label on the deallocator. code.PointerFree is
+#   `node.path ~= "free"` (exact segment), so freeaddrinfo carries no
+#   label. A probe binding `callee.path == "freeaddrinfo"` was
+#   measured on the real file: 56 -> 58 findings, 9 -> 11 high,
+#   identically at both revisions -- the two new rows are MEM-007
+#   false positives pairing the free with the unrelated `*port`
+#   derefs in the DPRINTF calls (misc.c:313/328 at the parent,
+#   315/336 at the fix), because the rule checks no pointer identity.
+#   Zero discrimination, pure precision loss.
+# * No use label on the member reads. `ptr->ai_addr` lowers to a
+#   code.Attr node (c.go field_expression case), and code.PointerUse
+#   is deref-primitive-only (`*p`, the __deref lowering) -- the gap
+#   recorded at rank 1645. A probe labelling every Attr as
+#   code.PointerUse does light the defect up -- MEM-007 with
+#   first: freeaddrinfo @ 309, second: PointerUse @ 318/325/326 --
+#   but it also fires on the fixed form: `&naddr.sa` at the patched
+#   getsockname is an Attr too, so the patched revision reports the
+#   same rule on the same line (71/24 vs 73/26 findings/high), and
+#   the file as a whole moves 56 -> 73. ccConv.dotted (c.go:6493)
+#   normalises `->` to `.`, so a pointer-member read and a
+#   value-member read are indistinguishable at every data layer.
+# * Ordering is no longer the blocker: under the probe, the pre-free
+#   loop reads of ptr->ai_family/ai_addr (misc.c:281-302) never pair
+#   with the free, only the post-free sites do -- `reaches` orders
+#   the siblings correctly, as rank 1425 measured. What is missing
+#   is the use-side fact plus pointer provenance (the 1312 family:
+#   ptr derives from servinfo through the ai_next walk, which no
+#   fact records).
+#
+# Measured clean on the real code, three --cache off runs per side:
+# src/misc.c reports 56 findings / 9 high at both revisions; inside
+# net_bind only three NullableDeref rows on `*port` appear (MEM-006,
+# low, both sides, line-number shift only). The full tree reports
+# 2703 rows at the parent. No definition change ships: the release
+# label alone is measured precision-negative, and the use label is
+# an engine fact (pointer-vs-value member read) recorded in
+# ENGINE-GAPS.md, not a binding. When that member-read lifetime
+# vocabulary plus chain provenance land, the chain-dereferencing
+# form below must flip VYQL-MEM-007 to expect.
+
+test "rank1547: the bound address is read through the freed chain"
+  lang c
+  file src/misc.c
+  reject VYQL-MEM-007
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <sys/socket.h>
+  #include <netdb.h>
+
+  typedef union net_sockaddr { struct sockaddr sa; } net_sockaddr_t;
+
+  int getsockname(int fd, struct sockaddr *addr, socklen_t *len);
+  void net_port_get(int *port, net_sockaddr_t *sa);
+  void net_address_get(char *addr, int size, net_sockaddr_t *sa);
+
+  int net_bind(short unsigned *port, int type, const char *log_service_name)
+  {
+      struct addrinfo hints = { 0 };
+      struct addrinfo *servinfo;
+      struct addrinfo *ptr;
+      char addr[50];
+      char strport[8];
+      int fd;
+      int ret;
+
+      ret = getaddrinfo(NULL, strport, &hints, &servinfo);
+      if (ret < 0)
+          return -1;
+
+      for (ptr = servinfo; ptr != NULL; ptr = ptr->ai_next)
+        {
+          fd = socket(ptr->ai_family, type, ptr->ai_protocol);
+          if (fd < 0)
+              continue;
+
+          ret = bind(fd, ptr->ai_addr, ptr->ai_addrlen);
+          if (ret < 0)
+              continue;
+
+          break;
+        }
+
+      freeaddrinfo(servinfo);
+
+      if (!ptr)
+          return -1;
+
+      ret = getsockname(fd, ptr->ai_addr, &ptr->ai_addrlen);
+      if (ret < 0)
+          return -1;
+
+      net_port_get(port, (net_sockaddr_t *)ptr->ai_addr);
+      net_address_get(addr, sizeof(addr), (net_sockaddr_t *)ptr->ai_addr);
+      return fd;
+  }
+  ```
+
+test "rank1547: the fixed revision reads the address from a local copy"
+  lang c
+  file src/misc.c
+  reject VYQL-MEM-007
+  reject VYQL-MEM-006
+  code
+  ```
+  #include <sys/socket.h>
+  #include <netdb.h>
+
+  typedef union net_sockaddr { struct sockaddr sa; } net_sockaddr_t;
+
+  int getsockname(int fd, struct sockaddr *addr, socklen_t *len);
+  void net_port_get(int *port, net_sockaddr_t *sa);
+  void net_address_get(char *addr, int size, net_sockaddr_t *sa);
+
+  int net_bind(short unsigned *port, int type, const char *log_service_name)
+  {
+      struct addrinfo hints = { 0 };
+      struct addrinfo *servinfo;
+      struct addrinfo *ptr;
+      union net_sockaddr naddr = { 0 };
+      socklen_t naddr_len = sizeof(naddr);
+      char addr[50];
+      char strport[8];
+      int fd;
+      int ret;
+
+      ret = getaddrinfo(NULL, strport, &hints, &servinfo);
+      if (ret < 0)
+          return -1;
+
+      for (ptr = servinfo; ptr != NULL; ptr = ptr->ai_next)
+        {
+          fd = socket(ptr->ai_family, type, ptr->ai_protocol);
+          if (fd < 0)
+              continue;
+
+          ret = bind(fd, ptr->ai_addr, ptr->ai_addrlen);
+          if (ret < 0)
+              continue;
+
+          break;
+        }
+
+      freeaddrinfo(servinfo);
+
+      if (!ptr)
+          return -1;
+
+      ret = getsockname(fd, &naddr.sa, &naddr_len);
+      if (ret < 0)
+          return -1;
+      else if (naddr_len > sizeof(naddr))
+          return -1;
+
+      net_port_get(port, &naddr);
+      net_address_get(addr, sizeof(addr), &naddr);
+      return fd;
+  }
+  ```

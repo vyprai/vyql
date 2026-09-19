@@ -1,0 +1,81 @@
+module bindings.groovy.generated.m5175e394;
+
+binding userControlledData0 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "getPathSegments"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "getQueryParameters"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "getHeaderString"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "getCookies"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "getRequestUri"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "getAbsolutePath"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "getPathParameters"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "target"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "readEntity"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData9 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "valueOf"
+  emit source core.UserControlledData at call.result
+}

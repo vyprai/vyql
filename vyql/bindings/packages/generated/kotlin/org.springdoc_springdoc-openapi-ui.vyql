@@ -1,0 +1,44 @@
+module bindings.kotlin.generated.m50a4674c;
+
+binding redirectTarget0 {
+  requires {
+    dependency("org.springdoc:springdoc-openapi-ui")
+  }
+  query pattern callExpr where callee.method == "redirectToUi"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget1 {
+  requires {
+    dependency("org.springdoc:springdoc-openapi-ui")
+  }
+  query pattern callExpr where callee.method == "buildUrl"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget2 {
+  requires {
+    dependency("org.springdoc:springdoc-openapi-ui")
+  }
+  query pattern callExpr where callee.method == "buildUrlWithContextPath"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.springdoc:springdoc-openapi-ui")
+  }
+  query pattern callExpr where callee.method == "resolveResource"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding httpInput4 {
+  requires {
+    dependency("org.springdoc:springdoc-openapi-ui")
+  }
+  query pattern callExpr where callee.method == "openapiJson"
+  emit source code.HttpInput at call.result
+}

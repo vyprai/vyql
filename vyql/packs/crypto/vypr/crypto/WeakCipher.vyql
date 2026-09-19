@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule WeakCipher {
+  meta {
+    benchmark: crypto
+    cwe: [CWE_327, CWE_326]
+    id: "VYQL-CRY-002"
+    severity: medium
+  }
+  issue code.WeakCipher as c
+}

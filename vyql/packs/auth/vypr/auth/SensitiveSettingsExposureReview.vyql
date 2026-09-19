@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SensitiveSettingsExposureReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_306, CWE_287, CWE_200]
+    id: "VYQL-AUTH-175"
+    severity: high
+  }
+  issue code.SensitiveSettingsExposureReview as sink
+}

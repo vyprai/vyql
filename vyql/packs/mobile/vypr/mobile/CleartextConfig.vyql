@@ -1,0 +1,10 @@
+module vypr.mobile;
+
+rule CleartextConfig {
+  meta {
+    cwe: [CWE_319]
+    id: "VYQL-MOB-004"
+    severity: medium
+  }
+  issue code.CleartextConfig as c
+}

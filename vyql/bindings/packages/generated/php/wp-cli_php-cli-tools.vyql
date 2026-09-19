@@ -1,0 +1,25 @@
+module bindings.php.generated.m87de9ee0;
+
+binding commandExecution0 {
+  requires {
+    dependency("wp-cli/php-cli-tools")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("wp-cli/php-cli-tools")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding cliArgument2 {
+  requires {
+    dependency("wp-cli/php-cli-tools")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}

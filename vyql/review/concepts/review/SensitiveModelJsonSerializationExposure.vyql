@@ -1,0 +1,8 @@
+module code;
+
+review code.SensitiveModelJsonSerializationExposure {
+  category: secret
+  expected: [core.SecretRedaction]
+  kind: attention
+  text: "return explicit safe fields or a public serializer instead of exposing full or privileged user/model representations"
+}

@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ResultStageAccessDecision {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_284, CWE_863]
+    id: "VYQL-AUTH-168"
+    severity: high
+  }
+  issue code.ResultStageAccessDecision as sink
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.TemplateContextRedirectUrlWithoutAllowlist {
+  category: request_forgery
+  expected: [core.RedirectAllowlist]
+  kind: target
+  text: "verify a request-sourced redirect destination passes same-origin validation before it is reflected into the rendered template context"
+}

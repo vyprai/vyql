@@ -1,0 +1,93 @@
+# Rank 409 / CVE-2010-10007: click-reminder's ItemAction accepted iid from the
+# action message and interpolated it into item_id SQL predicates before the patch
+# added numeric validation.
+
+test "rank409: click-reminder item id reaches SQL without numeric validation"
+  lang php
+  file BaseAction.php
+  expect VYQL-INJ-073
+  expect_review code.UnvalidatedNumericSqlInterpolation
+  code
+  ```
+  <?php
+  class BaseAction {
+      protected $message = null;
+
+      protected function getMessageParam($param, $err_message, $err_no) {
+          if (array_key_exists($param, $this->message)) {
+              return $this->message[$param];
+          }
+          throw new Exception($err_message, $err_no);
+      }
+
+      protected function db_query($query) {
+          return $this->mysql->query($query);
+      }
+  }
+
+  class ItemAction extends BaseAction {
+      protected $iid = null;
+
+      protected function checkItemBelongs() {
+          global $DB;
+          $result = $this->db_query("SELECT sessions.user_id
+              FROM $DB[sessions], $DB[items]
+              WHERE sessions.user_id=items.user_id
+                  AND item_id=$this->iid
+              LIMIT 1");
+      }
+
+      function __construct($message) {
+          $this->iid = $this->getMessageParam('iid',
+              "No IID provided", ERR_NO_IID);
+      }
+  }
+  ```
+
+test "rank409: click-reminder item id is numeric-validated before SQL use"
+  lang php
+  file BaseAction.php
+  reject VYQL-INJ-073
+  reject_review code.UnvalidatedNumericSqlInterpolation
+  code
+  ```
+  <?php
+  class BaseAction {
+      protected $message = null;
+
+      protected function getMessageParam($param, $err_message, $err_no) {
+          if (array_key_exists($param, $this->message)) {
+              return $this->message[$param];
+          }
+          throw new Exception($err_message, $err_no);
+      }
+
+      protected function db_query($query) {
+          if (strpos($query, ';') !== false) {
+              throw new Exception("Query contains semicolon", ERR_DB);
+          }
+          return $this->mysql->query($query);
+      }
+  }
+
+  class ItemAction extends BaseAction {
+      protected $iid = null;
+
+      protected function checkItemBelongs() {
+          global $DB;
+          $result = $this->db_query("SELECT sessions.user_id
+              FROM $DB[sessions], $DB[items]
+              WHERE sessions.user_id=items.user_id
+                  AND item_id=$this->iid
+              LIMIT 1");
+      }
+
+      function __construct($message) {
+          $this->iid = $this->getMessageParam('iid',
+              "No IID provided", ERR_NO_IID);
+          if (!is_numeric($this->iid)) {
+              throw new Exception("Malformed IID", ERR_NO_IID);
+          }
+      }
+  }
+  ```

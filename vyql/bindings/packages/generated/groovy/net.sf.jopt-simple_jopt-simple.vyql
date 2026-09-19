@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m7411a3e7;
+
+binding cliArgument0 {
+  requires {
+    dependency("net.sf.jopt-simple:jopt-simple")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}

@@ -1,0 +1,7 @@
+module code;
+
+review code.PublicKeyHashBindingReview {
+  category: crypto
+  kind: attention
+  text: "review signature verification flows that accept a public key without checking it matches the committed key hash"
+}

@@ -1,0 +1,479 @@
+# Rank 1418 / CVE-2026-44694 (GHSA-cmrh-wvq6-wm9r, recorded CWE-367 + CWE-918,
+# both right): czlonkowski/n8n-mcp is an MCP server that gives a model the n8n
+# node catalogue and, through `n8n_trigger_webhook_workflow` and the chat and
+# form trigger handlers, the ability to make the server issue an HTTP request to
+# an n8n webhook. The URL is built from tool arguments the model chooses, so the
+# trust boundary is the model's: anything that reaches the model's context --
+# a fetched page, a workflow description, another tool's result -- can steer the
+# hostname the server connects to, while the server itself holds the n8n API key
+# and usually sits inside the network the operator is trying to protect.
+#
+# The project knows this and ships a filter. `src/utils/ssrf-protection.ts`
+# exports `SSRFProtection.validateWebhookUrl(urlString)`, which parses the URL,
+# rejects non-HTTP schemes, rejects the cloud-metadata hostnames by name, then:
+#
+#   const { address } = await lookup(hostname);
+#   resolvedIP = address;
+#   ...
+#   if (CLOUD_METADATA.has(resolvedIP)) return { valid: false, ... };
+#   const isLocalhost = LOCALHOST_PATTERNS.has(hostname) ||
+#                       resolvedIP === '::1' || resolvedIP.startsWith('127.');
+#   if (PRIVATE_IP_RANGES.some(regex => regex.test(resolvedIP))) return { valid: false, ... };
+#   ...
+#   return { valid: true };
+#
+# and its own doc comment says "@security Uses DNS resolution to prevent DNS
+# rebinding attacks". It does not. `dns.lookup` returns a `{ address, family }`
+# record -- a value, not a connection -- and `validateWebhookUrl` throws the
+# address away and returns a bare verdict. Every caller then issues the request
+# against the *hostname*: `axios.request({ url: chatUrl, ... })` in
+# `chat-handler.ts`, `axios.request({ url: formUrl, ... })` in `form-handler.ts`,
+# `axios.create({ baseURL: new URL('/', webhookUrl) })` in
+# `n8n-api-client.triggerWebhook`, and `axios.get(settingsUrl)` in
+# `n8n-version.fetchN8nVersion`. Each of those resolves the name a second time
+# through Node's own lookup, and two resolutions of a name whose DNS the
+# attacker controls need not agree. A record with a one-second TTL answers the
+# validating lookup with a public address and the connecting lookup with
+# 127.0.0.1 or 169.254.169.254. The check and the use are the same name resolved
+# twice, which is why the axis is CWE-367 and the consequence is CWE-918.
+#
+# So this is not a missing SSRF guard and not an incomplete denylist -- the
+# denylist is unusually thorough, covering IPv4 ranges, IPv4-mapped and 6to4
+# IPv6, and four clouds' metadata addresses. The defect is that the guard's
+# answer cannot bind the connection.
+#
+# bcaba839409d470abeb4a6ad9b361b553a1098eb fixes it on the transport, which is
+# where Node documents the control. `validateWebhookUrl`'s result type gains
+# `address` and `family` and every `{ valid: true }` return carries them; a new
+# `SSRFProtection.createPinnedAgents(address, family)` builds an `http.Agent`
+# and an `https.Agent` whose `createConnection` is wrapped to inject
+# `lookup: pinnedLookup`, a resolver that ignores the hostname and answers with
+# the address that validates, in both shapes Node's lookup contract allows
+# (`options.all` array and the `(address, family)` callback); and each caller
+# passes the pair as `httpAgent`/`httpsAgent`. `N8nApiClient` does the same for
+# its configured `baseUrl` through a request interceptor, and `maxRedirects: 0`
+# is added on the authenticated client so a redirect cannot reintroduce a second
+# hostname.
+#
+# The pool row is correct and needs no correction: repo, CVE and SHA all resolve,
+# and the row is a GitHub "Merge commit from fork" whose `git show` prints the
+# full diff -- not one of the empty-combined-diff shapes. The vulnerable
+# `return { valid: true }` is present at the parent and the pinned agents are
+# present at the fixed revision, checked in both directions.
+#
+# What fires without this, measured `--cache off --max-ram 6GB`, union over three
+# runs of each revision, over `src/` (206 TypeScript files): **674 findings and
+# 31 flags on both revisions, identical**. Three of those findings are
+# VYQL-RF-001 rows landing on the exact call sites this CVE is about --
+# `chat-handler.ts:120`, `form-handler.ts:413`, `n8n-api-client.ts:443` -- and
+# every one of them survives at the fixed revision, because they are the generic
+# "tainted URL reaches `code.UrlFetch`" shape and the change does not remove the
+# taint, it pins the socket. Their stated reason is also wrong for this code:
+# each says "unless path coveredBy core.AllowlistValidation: not satisfied --
+# none found anywhere on flows", but an allowlist is exactly what
+# `validateWebhookUrl` is; what is missing is that it cannot bind the
+# connection. Findings on the vulnerable lines are not coverage of the
+# vulnerability, and a rule that reports the patched revision identically is not
+# discrimination -- so the rank is not CAUGHT by VYQL-RF-001.
+#
+# code.UnpinnedResolvedAddressCheck (VYQL-RF-047, minted here) is the vocabulary
+# that is missing. Reuse is checked first against every concept that declares
+# `vulnerableTo: [request_forgery.Ssrf]`: code.WebhookUrlFetchMissingSsrfGuard is
+# "posts to a webhook URL *without* an observed URL guard", the opposite of this
+# code, which has one; code.IncompleteIpDenylist (VYQL-RF-004) is a denylist
+# missing ranges, and this one is missing none; code.RequestHostUrlValidationBypass
+# is validation that trusts the request's own Host header; code.CloudBaseOpenUrlSsrf
+# and code.ChamiloUnsafeGuzzleUrlFetch are unvalidated fetches;
+# code.ConfigUrlStoredBeforeSchemeValidation is an ordering defect between storing
+# and validating; core.AllowlistValidation is a *control* and emitting it here
+# would clear findings rather than raise one. The TOCTOU side is checked too --
+# code.FileCheck/code.FileUse, code.TempFileDirectoryCreationRace,
+# code.LockFileCreateMissingNoFollow, code.PathBasedSandboxExposeBindRace are the
+# four CWE-367 concepts in the ontology and all four are filesystem races over a
+# path. Nothing in the ontology says "the value that validates is not the
+# value that is used because the name resolves twice", which is a weakness
+# class, not this product's semantics: it fires on any Node SSRF filter with the
+# same shape and has direct analogues in Python (`socket.getaddrinfo` then
+# `requests.get(url)`) and Go (`net.LookupIP` then `http.Get(url)`).
+#
+# The binding is module scope. The filter and the pinning helper are siblings --
+# in n8n-mcp both are static methods of one class, and in the plainer idiom both
+# are module-level functions -- so a function-scoped binding cannot see them
+# together, which is rank 1372's and rank 1377's gap
+# (`endpointGuarded`, `internal/engine/engine.go:1160`). Module scope sidesteps
+# it here rather than needing it fixed, because the JavaScript module context
+# carries the whole file's structured tokens: the fixed revision's module
+# context holds 240 tokens including `call_path:http.Agent`,
+# `selector:https.Agent`, `selector:proto.createConnection` and
+# `prop:lookup=pinnedLookup`, well under the 512-token cap, so nothing the
+# negations need is truncated away.
+#
+# Rank 1380's counterweight is what makes this shippable rather than ATTENTION:
+# the fixed revision leaves documented API calls inside the unit it guards. `lookup` is a
+# documented option of `net.createConnection`, `http.Agent` and `https.Agent`,
+# and constructing an agent is the documented way to give a connection its own
+# resolver -- so the negations name `http.Agent`, `https.Agent`,
+# `net.connect`/`net.createConnection`, `tls.connect`, `undici.Agent`, a
+# `.createConnection` selector and a `lookup=` property, none of which is
+# n8n-mcp's vocabulary. Tested by renaming rather than argued: rewriting the
+# patched file with `createPinnedAgents` -> `mkAgents`, `pinnedLookup` -> `zz`
+# and `PinnedAgents` -> `AgentPair` still reports **0**, so the discrimination
+# is on the Node API and not on the fixed revision's helper names.
+#
+# Module scope brings rank 1412's comment trap, and it is tested here rather
+# than assumed: prepending two comment lines to the vulnerable file that name
+# `http.Agent({ lookup })`, `net.createConnection`, `https.Agent`,
+# `tls.connect` and `prop lookup=pinned` leaves the flag at **1**. The
+# negations use `callPath`, `selector` and `prop`, the module-and-range literal
+# clauses use exact `literal in [...]`, and the range-regex clause reads
+# `node.context.regex`, which is produced from a regex node and so has no comment
+# route at all; no clause uses `containsAny` over `node.context.literal` at
+# module scope.
+#
+# It ships as two bindings, not one, because a `presenceNode` `where` clause
+# rejects a parenthesised alternative (`predicate left side must be
+# node.<field>`) and the range test has two forms -- a prefix handed to
+# `startsWith`, and a range-anchored regex. That is worth stating because the
+# rejection is silent at scan time: a `.vyql` that fails to compile makes `scan`
+# report **zero findings and exit 0**, so the single-binding draft with the
+# parenthesised `or` looked exactly like a binding that matched nothing.
+#
+# Every clause is checked for being load-bearing by dropping it. Dropping all
+# three negations makes the *patched* file report 1, so the discrimination lives
+# entirely in them and not in the gate. Dropping the `prop` negation alone makes
+# the third case below (a validating resolver handed to `axios.get(url, {
+# lookup })`) report, and dropping the `callPath`/`selector` negations alone
+# makes the fifth case below (`tls.connect({ host: address })`, the other
+# documented way to reach the address that validates) report -- so neither
+# negation group subsumes the other: one covers pinning the resolver, the other
+# covers skipping the resolver entirely. The positive gate is what rejects the
+# fourth and sixth cases: the fourth has the ranges but no resolution, the sixth
+# has the resolution but no range.
+#
+# Whole-`src/` A/B on the two checkouts: **675 findings on the vulnerable
+# revision and 674 on the patched**, stable over three `--cache off` runs each,
+# the single delta being VYQL-RF-047 HIGH at `src/utils/ssrf-protection.ts:1`.
+# No other finding moves and no flag count changes.
+#
+# Collateral is enumerated, not sampled, because a one-file delta on a small
+# repository is not evidence. Across the ~120 repositories cloned for this
+# campaign there are 87030 JavaScript and TypeScript files. Two supersets of the
+# binding's positive gate are enumerated over all of them: **38** files import
+# Node's `dns`/`dns/promises`, of which **22** also carry private, loopback or
+# link-local address text; and **90** files contain a `dns`-shaped module string
+# at all, of which **23** also make a `lookup`/`resolve`/`resolve4`/`resolve6`
+# call. Their union, excluding this rank's own target and probe copies, is
+# **21 files**, which is the whole reachable set. Every one of the 21 is scanned
+# individually.
+#
+# **Twenty of the 21 report 0, and the twenty-first is a true positive in another
+# repository, found by the binding and read afterwards.** n8n's own
+# `packages/@n8n/ai-workflow-builder.ee/evaluations/cli/webhook.ts` has the same
+# defect as n8n-mcp and is not the subject of this CVE:
+# `validateWebhookUrlWithDns(webhookUrl)` calls `dns.resolve` and `dns.resolve6`,
+# runs every returned address through `isPrivateIp`, throws if any is private --
+# and then `sendWebhookNotification` calls `fetch(webhookUrl, ...)` on the
+# hostname, with no agent and no pinned resolver. That file is never opened
+# while authoring the binding; it surfaced because widening the range test to
+# regex form brought `/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/` into reach. Finding an
+# unrelated project's instance of the class is the genericity test passing on
+# real code rather than on argument.
+#
+# Two of the twenty zeroes are the interesting negatives. n8n's
+# `@n8n/backend-network/src/ssrf/ssrf-protection.service.ts` is a correct
+# implementation of exactly this control -- its doc comment says the custom
+# lookup "can be passed to `socket.connect({ lookup })` or
+# `axios.request({ lookup })`" -- but it is out of reach because it classifies
+# ranges through a library rather than through address text, so it is a true
+# negative for the wrong reason and is recorded as such rather than claimed as
+# proof of the negation. Vite's `packages/vite/src/node/utils.ts` is a genuine
+# false positive in the first revision: `getLocalhostAddressIfDiffersFromDNS`
+# calls `dns.lookup('localhost')` and rewrites `'127.0.0.1'` in a dev-server
+# URL, which satisfied a literal list that included whole addresses. Narrowing
+# the list from whole addresses (`127.0.0.1`, `::1`, `169.254.169.254`) to
+# *range prefixes and range regexes* (`127.`, `10.`, `192.168.`, `^10\.`,
+# `^169\.254\.`, ...) took vite to 0 while leaving n8n-mcp at 1, because
+# rewriting one address is not classifying a range. That is the difference
+# between using a special-use address and testing for one. The remaining
+# eighteen zeroes are three yarn release bundles, three copies of one Misskey
+# OAuth provider, a matrix-appservice-irc test harness, a lobe-chat launcher
+# script, and eight n8n SSRF test files -- which matters because
+# `inTestOrSeedFile` is inert, so a test fixture has to be excluded by the
+# clauses themselves rather than by its path, and here it is: a test asserting
+# that a filter blocks `10.0.0.1` neither imports `dns` nor tests a range.
+#
+# The honest limit, stated rather than hidden: a filter that classifies ranges
+# through `ipaddr.js`, `ip-address`, `netmask` or a hand-rolled integer
+# comparison carries no address text and is missed -- n8n's own correct service
+# is the example, and a vulnerable filter written the same way would be too.
+# That is the recall direction, which is the safe one, and it is what keeps the
+# binding off every module that merely mentions an address.
+
+test "rank1418: an SSRF host filter resolves the hostname itself, tests the resolved address against private ranges, and returns only a verdict"
+  lang javascript
+  file src/utils/ssrf-protection.ts
+  expect VYQL-RF-047
+  expect_review code.UnpinnedResolvedAddressCheck
+  code
+  ```
+  import { URL } from 'url';
+  import { lookup } from 'dns/promises';
+
+  const CLOUD_METADATA = new Set([
+    '169.254.169.254',
+    '169.254.170.2',
+    'metadata.google.internal',
+  ]);
+
+  const PRIVATE_IP_RANGES = [
+    /^10\./,
+    /^192\.168\./,
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+    /^169\.254\./,
+    /^127\./,
+  ];
+
+  export class SSRFProtection {
+    static async validateWebhookUrl(urlString: string): Promise<{
+      valid: boolean;
+      reason?: string
+    }> {
+      try {
+        const url = new URL(urlString);
+
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          return { valid: false, reason: 'Invalid protocol. Only HTTP/HTTPS allowed.' };
+        }
+
+        const hostname = url.hostname.toLowerCase();
+
+        if (CLOUD_METADATA.has(hostname)) {
+          return { valid: false, reason: 'Cloud metadata endpoint blocked' };
+        }
+
+        let resolvedIP: string;
+        try {
+          const { address } = await lookup(hostname);
+          resolvedIP = address;
+        } catch (error) {
+          return { valid: false, reason: 'DNS resolution failed' };
+        }
+
+        if (CLOUD_METADATA.has(resolvedIP)) {
+          return { valid: false, reason: 'Hostname resolves to cloud metadata endpoint' };
+        }
+
+        if (resolvedIP === '::1' || resolvedIP.startsWith('127.')) {
+          return { valid: false, reason: 'Localhost access is blocked in strict mode' };
+        }
+
+        if (PRIVATE_IP_RANGES.some(regex => regex.test(resolvedIP))) {
+          return { valid: false, reason: 'Private IP addresses not allowed' };
+        }
+
+        return { valid: true };
+      } catch (error) {
+        return { valid: false, reason: 'Invalid URL format' };
+      }
+    }
+  }
+  ```
+
+test "rank1418: the same filter returning the resolved address and building agents that pin the connection to it"
+  lang javascript
+  file src/utils/ssrf-protection.ts
+  reject_review code.UnpinnedResolvedAddressCheck
+  code
+  ```
+  import { URL } from 'url';
+  import { lookup } from 'dns/promises';
+  import http from 'http';
+  import https from 'https';
+
+  export interface PinnedAgents {
+    httpAgent: http.Agent;
+    httpsAgent: https.Agent;
+  }
+
+  export interface WebhookUrlValidationResult {
+    valid: boolean;
+    reason?: string;
+    address?: string;
+    family?: 4 | 6;
+  }
+
+  const CLOUD_METADATA = new Set([
+    '169.254.169.254',
+    '169.254.170.2',
+    'metadata.google.internal',
+  ]);
+
+  const PRIVATE_IP_RANGES = [
+    /^10\./,
+    /^192\.168\./,
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+    /^169\.254\./,
+    /^127\./,
+  ];
+
+  export class SSRFProtection {
+    static async validateWebhookUrl(urlString: string): Promise<WebhookUrlValidationResult> {
+      try {
+        const url = new URL(urlString);
+
+        if (!['http:', 'https:'].includes(url.protocol)) {
+          return { valid: false, reason: 'Invalid protocol. Only HTTP/HTTPS allowed.' };
+        }
+
+        const hostname = url.hostname.toLowerCase();
+
+        if (CLOUD_METADATA.has(hostname)) {
+          return { valid: false, reason: 'Cloud metadata endpoint blocked' };
+        }
+
+        let resolvedIP: string;
+        let resolvedFamily: 4 | 6;
+        try {
+          const { address, family } = await lookup(hostname);
+          resolvedIP = address;
+          resolvedFamily = family === 6 ? 6 : 4;
+        } catch (error) {
+          return { valid: false, reason: 'DNS resolution failed' };
+        }
+
+        if (CLOUD_METADATA.has(resolvedIP)) {
+          return { valid: false, reason: 'Hostname resolves to cloud metadata endpoint' };
+        }
+
+        if (resolvedIP === '::1' || resolvedIP.startsWith('127.')) {
+          return { valid: false, reason: 'Localhost access is blocked in strict mode' };
+        }
+
+        if (PRIVATE_IP_RANGES.some(regex => regex.test(resolvedIP))) {
+          return { valid: false, reason: 'Private IP addresses not allowed' };
+        }
+
+        return { valid: true, address: resolvedIP, family: resolvedFamily };
+      } catch (error) {
+        return { valid: false, reason: 'Invalid URL format' };
+      }
+    }
+
+    static createPinnedAgents(address: string, family: 4 | 6): PinnedAgents {
+      const pinnedLookup = (_hostname: string, options: any, callback: any): void => {
+        if (options && options.all) {
+          callback(null, [{ address, family }]);
+        } else {
+          callback(null, address, family);
+        }
+      };
+
+      const httpAgent = new http.Agent({ keepAlive: false });
+      const httpsAgent = new https.Agent({ keepAlive: false });
+
+      const wrap = <A extends http.Agent>(agent: A): A => {
+        const proto = Object.getPrototypeOf(agent);
+        const original = proto.createConnection;
+        (agent as any).createConnection = function (options: any, cb: any) {
+          return original.call(this, { ...options, lookup: pinnedLookup }, cb);
+        };
+        return agent;
+      };
+
+      return { httpAgent: wrap(httpAgent), httpsAgent: wrap(httpsAgent) };
+    }
+  }
+  ```
+
+test "rank1418: a filter that validates inside the resolver the client passes to the request, so the connection uses the address it checked"
+  lang javascript
+  file src/utils/guarded-lookup.js
+  reject_review code.UnpinnedResolvedAddressCheck
+  code
+  ```
+  const dns = require('dns/promises');
+  const axios = require('axios');
+
+  const PRIVATE = [/^10\./, /^192\.168\./, /^169\.254\./, /^127\./];
+
+  async function guardedLookup(hostname, options, callback) {
+    const { address, family } = await dns.lookup(hostname);
+    if (PRIVATE.some((re) => re.test(address))) {
+      callback(new Error('blocked address'));
+      return;
+    }
+    callback(null, address, family);
+  }
+
+  async function fetchUrl(urlString) {
+    return axios.get(urlString, { lookup: guardedLookup, maxRedirects: 0 });
+  }
+
+  module.exports = { fetchUrl };
+  ```
+
+test "rank1418: an allowlist over an address the caller holds, which resolves nothing and so has no second resolution to disagree with"
+  lang javascript
+  file src/utils/ip-allowlist.js
+  reject_review code.UnpinnedResolvedAddressCheck
+  code
+  ```
+  const PRIVATE = [/^10\./, /^192\.168\./, /^172\.16\./, /^169\.254\./, /^127\./];
+
+  function isPrivateAddress(address) {
+    if (address === '::1' || address.startsWith('127.')) return true;
+    return PRIVATE.some((re) => re.test(address));
+  }
+
+  function assertPeerAllowed(socket) {
+    if (isPrivateAddress(socket.remoteAddress)) {
+      throw new Error('peer address not allowed');
+    }
+  }
+
+  module.exports = { isPrivateAddress, assertPeerAllowed };
+  ```
+
+test "rank1418: a filter that connects to the address it validated rather than handing the hostname back to the transport"
+  lang javascript
+  file src/utils/direct-connect.js
+  reject_review code.UnpinnedResolvedAddressCheck
+  code
+  ```
+  const dns = require('dns/promises');
+  const tls = require('tls');
+
+  const PRIVATE = [/^10\./, /^192\.168\./, /^169\.254\./, /^127\./];
+
+  async function connectToValidated(urlString) {
+    const url = new URL(urlString);
+    const { address } = await dns.lookup(url.hostname);
+    if (PRIVATE.some((re) => re.test(address))) {
+      throw new Error('blocked address');
+    }
+    return tls.connect({ host: address, port: Number(url.port) || 443, servername: url.hostname });
+  }
+
+  module.exports = { connectToValidated };
+  ```
+
+test "rank1418: a resolver that looks a name up for its records rather than to classify the address it returns"
+  lang javascript
+  file src/utils/mail-domain.js
+  reject_review code.UnpinnedResolvedAddressCheck
+  code
+  ```
+  const dns = require('dns/promises');
+
+  async function mailHostsFor(domain) {
+    const records = await dns.resolveMx(domain);
+    const hosts = [];
+    for (const record of records.sort((a, b) => a.priority - b.priority)) {
+      const { address } = await dns.lookup(record.exchange);
+      hosts.push({ exchange: record.exchange, address });
+    }
+    return hosts;
+  }
+
+  module.exports = { mailHostsFor };
+  ```

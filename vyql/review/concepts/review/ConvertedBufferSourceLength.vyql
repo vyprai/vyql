@@ -1,0 +1,7 @@
+module code;
+
+review code.ConvertedBufferSourceLength {
+  category: memory
+  kind: attention
+  text: "review whether the length passed beside a re-encoded buffer measures the converted result; name the conversion's result and pass its size"
+}

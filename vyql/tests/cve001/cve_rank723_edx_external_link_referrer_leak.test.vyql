@@ -1,0 +1,37 @@
+# Rank 723 / CVE-2015-2286: edX footer social links could receive password
+# reset tokens through the Referer header until rel=noreferrer was added.
+
+test "rank723: external footer links missing noreferrer can leak token URLs"
+  lang config
+  file footer-edx-new.html
+  expect VYQL-SEC-025
+  expect_review code.ExternalLinkReferrerLeak
+  code
+  ```
+  ## mako
+  <div class="footer-follow-links">
+    <a href="${settings.PLATFORM_TWITTER_URL}" title="${_("Twitter")}">
+      <span class="copy">${_("Twitter")}</span>
+    </a>
+    <a href="${settings.PLATFORM_FACEBOOK_ACCOUNT}" title="${_("Facebook")}">
+      <span class="copy">${_("Facebook")}</span>
+    </a>
+  </div>
+  ```
+
+test "rank723: noreferrer on external footer links prevents referrer leakage"
+  lang config
+  file footer-edx-new.html
+  reject VYQL-SEC-025
+  code
+  ```
+  ## mako
+  <div class="footer-follow-links">
+    <a href="${settings.PLATFORM_TWITTER_URL}" title="${_("Twitter")}" rel="noreferrer">
+      <span class="copy">${_("Twitter")}</span>
+    </a>
+    <a href="${settings.PLATFORM_FACEBOOK_ACCOUNT}" title="${_("Facebook")}" rel="noreferrer">
+      <span class="copy">${_("Facebook")}</span>
+    </a>
+  </div>
+  ```

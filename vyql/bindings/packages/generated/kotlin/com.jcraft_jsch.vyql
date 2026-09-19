@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m3608ca15;
+
+binding commandExecution0 {
+  requires {
+    dependency("com.jcraft:jsch")
+  }
+  query pattern callExpr where callee.method == "ChannelExec.setCommand"
+  emit sink code.CommandExecution at args[0]
+}

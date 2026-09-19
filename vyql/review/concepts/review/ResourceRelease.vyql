@@ -1,0 +1,6 @@
+module core;
+
+review core.ResourceRelease {
+  category: resource
+  kind: check
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept ChakraScopeSlotArrayUncheckedIndex : issue {
+  cwe: [CWE_129, CWE_125, CWE_787]
+  reviewAssumption: "a malformed let/const binding can leave a symbol without a valid scope-slot location before bytecode emission"
+  reviewCategory: memory
+  reviewCondition: "scope-slot identifiers are written into a property-id array without checking the slot against the array size"
+  reviewConfidence: medium
+  reviewEvidence: "Chakra scope-slot array context {pattern} indexes propertyIdsForScopeSlotArray with symbol-derived or special scope slots"
+  vulnerableTo: [memory.OobRead, memory.OobWrite]
+}

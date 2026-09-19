@@ -1,0 +1,30 @@
+module bindings.swift.generated.m4cfc762c;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/vapor/template-kit")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding templateRender1 {
+  requires {
+    dependency("github.com/vapor/template-kit")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding htmlEscape2 {
+  requires {
+    dependency("github.com/vapor/template-kit")
+  }
+  query pattern callExpr where callee.method == "htmlEscaped"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

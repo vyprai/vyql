@@ -1,0 +1,20 @@
+module bindings.java.client_selected_authentication_mode;
+
+// A sign-in endpoint that deserialises its request body accepts, in that body,
+// the name of the mechanism the caller wants to be authenticated by. Reading
+// that field back -- the bean accessors getAuthenticate and getAuthMode --
+// hands the caller the choice of which credential check runs, so the receiver
+// of such a read is a security decision taken from client data (CWE-807): the
+// caller who picked "LDAP" or "OIDC" also picked that no password of theirs
+// would be verified. The label sits on the receiver, not the returned string,
+// because what makes the decision client-controlled is the object it is read
+// from: a request object the endpoint deserialised from the wire, as opposed
+// to a LoginRequest the server built itself after verifying the external
+// credential -- the same accessor read on the latter carries no taint and
+// reports nothing. getAuthType is deliberately absent: on a servlet request
+// it reads the scheme the server itself authenticated by, which the caller
+// does not choose.
+binding clientSelectedAuthenticationMode {
+  query pattern callExpr where callee.method in ["getAuthenticate", "getAuthMode"]
+  emit sink code.ClientControlledSecurityDecision at callee.receiver
+}

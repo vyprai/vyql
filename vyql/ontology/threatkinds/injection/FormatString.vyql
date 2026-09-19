@@ -1,0 +1,6 @@
+module injection;
+
+threat FormatString {
+  cwe: [CWE_134]
+  desc: "Untrusted data used as a format string"
+}

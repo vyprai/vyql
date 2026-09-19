@@ -1,0 +1,11 @@
+module code;
+
+concept SelfSizedCopyIntoDeclaredArray : issue {
+  cwe: [CWE_120, CWE_787]
+  reviewAssumption: "the copied object can carry a length greater than the destination's declared size"
+  reviewCategory: memory
+  reviewCondition: "a byte-count copy takes its count from the copied object's own length field and writes into an array the function declares with a constant size, while no comparison in the function relates that destination's size to anything"
+  reviewConfidence: medium
+  reviewEvidence: "copy context {pattern} writes a declared-size array with a count read from the same object as the source, while no comparison mentions the destination's size"
+  vulnerableTo: [memory.OobWrite]
+}

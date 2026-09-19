@@ -1,0 +1,45 @@
+# Rank 127 / CVE-2025-55013: Assemblyline service client used the task sha256
+# as a local filename before validating it against a SHA-256 allowlist.
+
+test "rank127: task sha256 is joined into tasking directory without validation"
+  lang python
+  profile library
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+
+  class TaskHandler:
+      def __init__(self, tasking_dir):
+          self.tasking_dir = tasking_dir
+
+      def download_file(self, sha256, sid):
+          file_path = os.path.join(self.tasking_dir, sha256)
+          with open(file_path, "wb") as f:
+              f.write(b"data")
+          return file_path
+  ```
+
+test "rank127: task sha256 allowlist suppresses tasking directory traversal"
+  lang python
+  profile library
+  reject VYQL-PATH-001
+  code
+  ```
+  import os
+  import re
+
+  SHA256_REGEX = re.compile(r"^[a-fA-F0-9]{64}$")
+
+  class TaskHandler:
+      def __init__(self, tasking_dir):
+          self.tasking_dir = tasking_dir
+
+      def download_file(self, sha256, sid):
+          if not SHA256_REGEX.match(sha256):
+              raise ValueError("invalid sha256")
+          file_path = os.path.join(self.tasking_dir, sha256)
+          with open(file_path, "wb") as f:
+              f.write(b"data")
+          return file_path
+  ```

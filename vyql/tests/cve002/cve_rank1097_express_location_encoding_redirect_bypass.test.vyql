@@ -1,0 +1,173 @@
+# Rank 1097 / CVE-2024-29041: Express's res.location() encoded the whole URL,
+# so a malformed value could encode to something a browser reads differently
+# than the string an application's redirect allowlist checked, bypassing a
+# correctly written allowlist (CWE-601, CWE-1286). The flaw is inside the
+# dependency after a correct allowlist, so the report that belongs to this CVE
+# is the dependency finding: a pin below 4.19.2, the release the advisory
+# names as first fixed.
+
+test "rank1097: an express pin below the first fixed release is a dependency finding"
+  lang javascript
+  file app.js
+  code
+  ```
+  const express = require('express');
+
+  const ALLOWED_HOSTS = new Set(['app.example.com', 'www.example.com']);
+
+  function isAllowedRedirect(url) {
+    try {
+      const parsed = new URL(url, 'https://app.example.com');
+      return ALLOWED_HOSTS.has(parsed.host);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  const app = express();
+
+  app.get('/login', function (req, res) {
+    const target = req.query.next;
+    if (isAllowedRedirect(target)) {
+      res.redirect(target);
+    } else {
+      res.redirect('/');
+    }
+  });
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "portal-web",
+    "dependencies": {
+      "express": "4.19.1"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2024-29041
+  reject VYQL-RF-002
+
+test "rank1097: an express pin at the first fixed release is clean"
+  lang javascript
+  file app.js
+  code
+  ```
+  const express = require('express');
+
+  const ALLOWED_HOSTS = new Set(['app.example.com', 'www.example.com']);
+
+  function isAllowedRedirect(url) {
+    try {
+      const parsed = new URL(url, 'https://app.example.com');
+      return ALLOWED_HOSTS.has(parsed.host);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  const app = express();
+
+  app.get('/login', function (req, res) {
+    const target = req.query.next;
+    if (isAllowedRedirect(target)) {
+      res.redirect(target);
+    } else {
+      res.redirect('/');
+    }
+  });
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "portal-web",
+    "dependencies": {
+      "express": "4.19.2"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+
+test "rank1097: an express pin on the 5.x line is past the fix"
+  lang javascript
+  file app.js
+  code
+  ```
+  const express = require('express');
+
+  const app = express();
+
+  app.get('/login', function (req, res) {
+    res.redirect(req.query.next);
+  });
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "portal-web",
+    "dependencies": {
+      "express": "^5.0.1"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+
+# The validated redirect stays unreported whatever the library version: the
+# caller is doing the correct thing, and the vulnerable-library report is
+# carried by the dependency finding above, not by an open-redirect finding on
+# correct code.
+
+test "rank1097: the unvalidated redirect is still reported on its own"
+  lang javascript
+  file app.js
+  code
+  ```
+  const express = require('express');
+
+  const app = express();
+
+  app.get('/login', function (req, res) {
+    res.redirect(req.query.next);
+  });
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "portal-web",
+    "dependencies": {
+      "express": "4.19.2"
+    }
+  }
+  ```
+  expect VYQL-RF-002
+
+# The library's own fix, kept so a later reader can see what changed inside
+# Express rather than inferring it from the advisory text.
+
+test "rank1097: the fixed revision encodes only the portion of the url after its host"
+  lang javascript
+  file lib/response.js
+  code
+  ```
+  var schemaAndHostRegExp = /^(?:[a-zA-Z][a-zA-Z0-9+.-]*:)?\/\/[^\\\/\?]+/;
+
+  res.location = function location(url) {
+    var loc;
+    if (url === 'back') {
+      loc = this.req.get('Referrer') || '/';
+    } else {
+      loc = String(url);
+    }
+
+    var m = schemaAndHostRegExp.exec(loc);
+    var pos = m ? m[0].length + 1 : 0;
+    loc = loc.slice(0, pos) + encodeUrl(loc.slice(pos));
+
+    return this.set('Location', loc);
+  };
+  ```
+  reject VYQL-RF-002

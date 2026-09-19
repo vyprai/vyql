@@ -1,0 +1,6 @@
+module bindings.php.mediawiki_block_toolbox_autoblock_presence;
+
+binding mediawikiBlockToolboxAutoblockPresence {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and containsAny(node.token, ["assign_call_method:getBlock", "assign_call_method:getIpRangeBlock", "assign_call_method:newFromTarget", "assign_call_method:getUserBlock"]) and containsAny(node.token, ["call_arg_method:makeSpecialUrlSubpage:'Block'", "call_arg_method:makeSpecialUrlSubpage:\"Block\"", "call_arg_method:makeSpecialUrlSubpage:'Unblock'", "call_arg_method:makeSpecialUrlSubpage:\"Unblock\"", "call_arg_method:makeSpecialUrl:'Block'", "call_arg_method:makeSpecialUrl:\"Block\"", "call_arg_method:getTitleFor:'Block'", "call_arg_method:getTitleFor:\"Block\"", "call_arg_method:getTitleFor:'Unblock'", "call_arg_method:getTitleFor:\"Unblock\""]) and not containsAny(node.token, ["TYPE_AUTO", "isAutoblock", "getAutoblock", "AUTOBLOCK", "autoBlock"])
+  emit issue code.HiddenBlockPresenceDisclosure at node
+}

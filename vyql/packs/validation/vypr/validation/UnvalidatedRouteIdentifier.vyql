@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule UnvalidatedRouteIdentifier {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20, CWE_158, CWE_248]
+    id: "VYQL-VAL-036"
+    severity: medium
+  }
+  issue code.UnvalidatedRouteIdentifier as handler
+}

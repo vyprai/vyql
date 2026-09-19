@@ -1,0 +1,17 @@
+module bindings.scala.generated.me4787b71;
+
+binding deserialization0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-plus")
+  }
+  query pattern callExpr where callee.method == "bindToENC"
+  emit sink code.Deserialization at args[0]
+}
+
+binding storedDataRead1 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-plus")
+  }
+  query pattern callExpr where callee.method == "lookupNamingEntries"
+  emit source code.StoredDataRead at call.result
+}

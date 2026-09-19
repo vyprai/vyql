@@ -1,0 +1,43 @@
+test "rank664: Dokploy remote config write interpolates raw YAML into shell command"
+  lang javascript
+  expect VYQL-INJ-119
+  code
+  ```
+  export const writeConfigRemote = async (
+    serverId: string,
+    appName: string,
+    traefikConfig: string,
+  ) => {
+    try {
+      const { DYNAMIC_TRAEFIK_PATH } = paths(true);
+      const configPath = path.join(DYNAMIC_TRAEFIK_PATH, `${appName}.yml`);
+      await execAsyncRemote(serverId, `echo '${traefikConfig}' > ${configPath}`);
+    } catch (e) {
+      console.error("Error saving the YAML config file:", e);
+    }
+  };
+  ```
+
+test "rank664: Dokploy remote config write base64-decodes quoted payload"
+  lang javascript
+  reject VYQL-INJ-119
+  code
+  ```
+  export const writeConfigRemote = async (
+    serverId: string,
+    appName: string,
+    traefikConfig: string,
+  ) => {
+    try {
+      const { DYNAMIC_TRAEFIK_PATH } = paths(true);
+      const configPath = path.join(DYNAMIC_TRAEFIK_PATH, `${appName}.yml`);
+      const encoded = encodeBase64(traefikConfig);
+      await execAsyncRemote(
+        serverId,
+        `echo "${encoded}" | base64 -d > "${configPath}"`,
+      );
+    } catch (e) {
+      console.error("Error saving the YAML config file:", e);
+    }
+  };
+  ```

@@ -1,0 +1,44 @@
+module bindings.swift.streaming_decompression_completion_unchecked;
+
+// A streaming decompressor hands the peer control of the expansion ratio:
+// the transport bounds only the compressed bytes, while the decompressed
+// size is whatever the stream says. The SwiftNIO decompressors are driven by
+// a loop bounded only by the compressed body's remaining byte count
+// (`while part.readableBytes > 0`), and the zlib wrapper underneath
+// consumes inflate's return code only as an error-code guard, discarding
+// the completion bit -- so a peer appending data behind the compressed
+// stream keeps the driver inflating past the end of the message (the
+// spin/zip-bomb vector), and a truncated stream ends unnoticed. The finding
+// is the Swift member of the streaming decompression family whose Python,
+// Rust and Go bindings live in this repository; each member discriminates on
+// its ecosystem's documented bounding vocabulary -- max_length and
+// unconsumed_tail for Python's decompressor steps, min/clamp/take/truncate
+// for Rust's output pipeline, io.LimitReader for Go's reader-drain loops.
+// Swift's is the completion protocol: a driver that consults a completion
+// state names it, in any of the usual spellings (complete, finished, done,
+// either capitalisation), and any such identifier in the file suppresses,
+// because the finding is about the driver ignoring completion rather than
+// about which construct consults it.
+//
+// The anchor is necessarily file-wide: swift.go emits exactly one context
+// node per file and no per-function facts, and while-statements lower to a
+// conditionless nir.Loop, so "a decompression step driven by the compressed
+// remainder" is approximated by the file containing both the step and the
+// ByteBuffer remainder read that bounds the loop (readableBytes). The step
+// is matched exactly -- the decompressor's decompress and zlib's inflate,
+// the two spellings the API documents, the same exact-match choice the
+// Python member makes -- so constructing a decompressor
+// (NIOHTTPRequestDecompressor(limit:)) or naming one in prose does not
+// reach, and comments produce no AST nodes either. Residuals: a step spelled
+// differently (gunzip, a bespoke inflateStream) does not anchor; a
+// completion state spelled outside the family (atEnd, exhausted) does not
+// suppress; zlib's Z_STREAM_END error-code guard deliberately does not
+// count, because the wrapper's guard is present whether or not the
+// completion bit is propagated; and an unrelated completion-spelled
+// identifier anywhere in the file suppresses -- the false-negative
+// direction, the same residual the Python member documents for
+// positionally-bounded steps.
+binding streamingDecompressionCompletionUnchecked {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "swift" and node.context.call in ["decompress", "inflate"] and containsAny(node.context.call, ["readableBytes"]) and not (containsAny(node.context.identifier, ["complet", "finish", "done"]))
+  emit issue code.UnboundedResourceOperation at node
+}

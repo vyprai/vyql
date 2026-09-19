@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule IncompleteMassAssignmentIdUnset {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_915]
+    id: "VYQL-INJ-058"
+    severity: high
+  }
+  issue code.IncompleteMassAssignmentIdUnset as sink
+}

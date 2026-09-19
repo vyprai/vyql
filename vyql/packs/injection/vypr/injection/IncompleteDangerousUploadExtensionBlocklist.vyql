@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule IncompleteDangerousUploadExtensionBlocklist {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_434]
+    id: "VYQL-INJ-070"
+    severity: critical
+  }
+  issue code.IncompleteDangerousUploadExtensionBlocklist as validator
+}

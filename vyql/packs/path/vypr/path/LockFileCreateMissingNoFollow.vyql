@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule LockFileCreateMissingNoFollow {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_59, CWE_367]
+    id: "VYQL-PATH-045"
+    severity: high
+  }
+  issue code.LockFileCreateMissingNoFollow as sink
+}

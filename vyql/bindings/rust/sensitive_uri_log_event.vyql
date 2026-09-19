@@ -1,0 +1,32 @@
+module bindings.rust.sensitive_uri_log_event;
+
+// A log macro whose own arguments format the request's URI writes it into
+// the log event unredacted. The HTTP frameworks' Request accessor is
+// documented as `request.uri()` / `req.uri()` (hyper, axum, tower), with
+// `url` the same accessor where the framework types it as a Url, and the
+// five level macros of tracing and the log crate all carry the formatted
+// message and the structured fields in their argument list. A credential
+// embedded in the URI -- a webhook token in the path, an API key in the
+// query -- therefore reaches whatever collects that log level, including
+// when a redacted form is passed in a sibling field of the same event.
+//
+// The macro's argument identifiers are the atoms the frontend lowers it
+// with, re-exposed as call_arg:<macro>:<atom> tokens on the lowered call
+// node, and the exact-token match keeps a derived spelling from satisfying
+// it: a redacted_uri or sanitized_url passed instead of the raw object no
+// longer carries the bare uri atom. A flow-based operand route cannot make
+// that distinction, because every redacted form still derives from the raw
+// URI one or two hops upstream.
+//
+// Two exclusions keep this on the request URI itself. An atom set that
+// carries one of the structural component accessors (path, scheme, host,
+// port, authority) is reading a part of the URI rather than the whole, and
+// those parts carry no credentials -- logging `request.uri().path()` is
+// ordinary request tracing, not a leak; the credential-bearing parts,
+// query strings and userinfo, are deliberately not on that list. And a
+// bare uri/url atom with no request receiver beside it is a service's own
+// endpoint being announced, which every operator log does.
+binding sensitiveUriLogEvent {
+  query pattern presenceNode where node.path in ["debug", "info", "trace", "warn", "error"] and node.token in ["call_arg:debug:uri", "call_arg:debug:url", "call_arg:info:uri", "call_arg:info:url", "call_arg:trace:uri", "call_arg:trace:url", "call_arg:warn:uri", "call_arg:warn:url", "call_arg:error:uri", "call_arg:error:url"] and node.token in ["call_arg:debug:request", "call_arg:debug:req", "call_arg:info:request", "call_arg:info:req", "call_arg:trace:request", "call_arg:trace:req", "call_arg:warn:request", "call_arg:warn:req", "call_arg:error:request", "call_arg:error:req"] and not (node.token in ["call_arg:debug:path", "call_arg:debug:scheme", "call_arg:debug:host", "call_arg:debug:port", "call_arg:debug:authority", "call_arg:info:path", "call_arg:info:scheme", "call_arg:info:host", "call_arg:info:port", "call_arg:info:authority", "call_arg:trace:path", "call_arg:trace:scheme", "call_arg:trace:host", "call_arg:trace:port", "call_arg:trace:authority", "call_arg:warn:path", "call_arg:warn:scheme", "call_arg:warn:host", "call_arg:warn:port", "call_arg:warn:authority", "call_arg:error:path", "call_arg:error:scheme", "call_arg:error:host", "call_arg:error:port", "call_arg:error:authority"])
+  emit issue code.RemoteUrlObjectDebugLog at node
+}

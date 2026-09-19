@@ -1,0 +1,58 @@
+module bindings.rust.zip_member_write_without_containment;
+
+// The zip crate hands the extracting code whatever the archive declares:
+// by_index and by_name are the documented member reads that yield each
+// ZipFile in turn, and name/name_raw read back the member path the
+// archive's own bytes chose -- attacker-controlled text that the crate's
+// own documentation warns against using for extraction. std's join keeps
+// every parent-directory component such a value carries -- an absolute
+// name replaces the base outright, a `..` component walks the join out of
+// the directory -- so a manual extraction loop that joins the member name
+// onto a destination directory and creates a file or directory there lets
+// the archive decide where the bytes land, with the extracting process's
+// privileges (CWE-22). The convenience API is the other discipline:
+// ZipArchive::extract sanitizes member names itself, and a loop over it
+// never reads a member name at all.
+//
+// The loop is recognised by its documented parts together: a member read
+// (by_index/by_name), the member name (name/name_raw), the destination
+// join, and a by-name write -- a file or directory create, a copy into a
+// created file, or an OpenOptions builder chain. A member read alone is a
+// read-only walk (listing an archive's contents, hashing members), and a
+// join plus write alone is any file-writing code, from cache builders to
+// download savers -- the archive read is what makes it an extraction loop.
+//
+// The neutralising forms are the crate's own safe-name accessors and
+// std's containment vocabulary: enclosed_name is the documented
+// safe-to-use form (it rejects absolute paths and `..` escapes outright),
+// sanitized_name and mangled_name rewrite the path ignoring components
+// with special meaning, and starts_with/strip_prefix against the base, a
+// components() walk, canonicalize, or an is_absolute test are std's
+// containment routes. Any of these in the function means the member name
+// was reduced or checked before use, which is what the review flag asks
+// about.
+//
+// The member reads and the name accessors are matched exactly, not by
+// substring: by_name as a substring also reads a store's find_by_name
+// lookup (measured -- a fixture-writing test carrying such a lookup was
+// the one off-tree hit the substring form produced). The exact form does
+// not reach the crate's later *_decrypt member reads, stated rather than
+// silently widened.
+//
+// Residual, stated rather than hidden: the containment test is by call
+// name, so a hand-rolled dot-segment rejection over the name's bytes is
+// invisible and the flag stands -- the reduction has to go through a
+// named API to be seen, and a guard spelled inside an assert!-style
+// macro wrapper contributes no call token (measured -- a starts_with
+// containment inside assert! did not neutralise), so the containment has
+// to sit on a plain statement to be seen. The member read and the join
+// are co-located in one function but their arguments are not unified, so
+// a function that reads members for one purpose while writing a locally
+// built path can still match -- the archive read plus the join plus the
+// write is the evidence the flag carries. And a loop split across a
+// reader function and a writer function reports nothing here, the
+// standard delegation limit.
+binding zipMemberWriteWithoutContainment {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["by_index", "by_name"] and node.context.call in ["name", "name_raw"] and node.context.call == "join" and containsAny(node.context.callPath, ["File.create", "create_dir_all", "fs.create_dir", "fs.write", "fs.copy", "fs.rename", "fs.hard_link", "fs.symlink", "write.open", "append.open", "create.open", "truncate.open"]) and not containsAny(node.context.call, ["enclosed_name", "mangled_name", "starts_with", "strip_prefix", "components", "canonicalize", "is_absolute", "sanitize"]) and not containsAny(node.context.callPath, ["ParentDir", "CurDir"]) and not (node.token contains "\"..\"") and not (node.token contains "\".\"")
+  emit issue code.ManualZipEntryFileWrite at node
+}

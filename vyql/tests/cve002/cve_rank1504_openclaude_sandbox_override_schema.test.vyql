@@ -1,0 +1,90 @@
+# Rank 1504 / CVE-2026-42074: the Bash and PowerShell tools exposed
+# dangerouslyDisableSandbox in the model-facing input schema, so a
+# model-controlled tool_use payload could set the flag directly and run its
+# command outside the sandbox (CWE-284, CWE-306). shouldUseSandbox() returned
+# false -- no sandbox -- when input.dangerouslyDisableSandbox was set and
+# policy allowed unsandboxed commands, with nothing distinguishing model tool
+# input from a trusted internal caller. The fix ("fix: require trusted
+# approval for sandbox override (#778)") omits the parameter from the
+# model-facing schema in both tools and makes the override require an internal
+# _dangerouslyDisableSandboxApproved field the schema does not advertise.
+
+test "rank1504: the tool schema advertises the sandbox override to the model"
+  lang javascript
+  file src/tools/BashTool/BashTool.tsx
+  expect VYQL-AUTH-179
+  code
+  ```
+  const z = { strictObject: (o: object) => o, boolean: () => ({}), string: () => ({}), object: (o: object) => o };
+  const semanticBoolean = (x: unknown) => x;
+  const lazySchema = (f: () => unknown) => f;
+  const isBackgroundTasksDisabled = false;
+
+  const fullInputSchema = lazySchema(() => z.strictObject({
+    command: z.string(),
+    dangerouslyDisableSandbox: semanticBoolean(z.boolean()),
+    _simulatedSedEdit: z.object({}),
+  }));
+
+  // The model-facing schema narrows the full one but never names the override,
+  // so the advertised contract still accepts it.
+  const inputSchema = lazySchema(() => isBackgroundTasksDisabled ? fullInputSchema().omit({
+    run_in_background: true,
+    _simulatedSedEdit: true
+  }) : fullInputSchema().omit({
+    _simulatedSedEdit: true
+  }));
+  ```
+
+test "rank1504: the override is omitted from the model-facing schema"
+  lang javascript
+  file src/tools/BashTool/BashTool.tsx
+  reject VYQL-AUTH-179
+  code
+  ```
+  const z = { strictObject: (o: object) => o, boolean: () => ({}), string: () => ({}), object: (o: object) => o };
+  const semanticBoolean = (x: unknown) => x;
+  const lazySchema = (f: () => unknown) => f;
+  const isBackgroundTasksDisabled = false;
+
+  const fullInputSchema = lazySchema(() => z.strictObject({
+    command: z.string(),
+    dangerouslyDisableSandbox: semanticBoolean(z.boolean()),
+    _dangerouslyDisableSandboxApproved: z.boolean(),
+    _simulatedSedEdit: z.object({}),
+  }));
+
+  // The override stays typed for trusted internal callers but is not part of
+  // the advertised contract.
+  const inputSchema = lazySchema(() => isBackgroundTasksDisabled ? fullInputSchema().omit({
+    run_in_background: true,
+    dangerouslyDisableSandbox: true,
+    _dangerouslyDisableSandboxApproved: true,
+    _simulatedSedEdit: true
+  }) : fullInputSchema().omit({
+    dangerouslyDisableSandbox: true,
+    _dangerouslyDisableSandboxApproved: true,
+    _simulatedSedEdit: true
+  }));
+  ```
+
+test "rank1504: an internal policy constant is not a tool parameter"
+  lang javascript
+  file src/tools/BashTool/BashTool.tsx
+  reject VYQL-AUTH-179
+  code
+  ```
+  const z = { strictObject: (o: object) => o, boolean: () => ({}), string: () => ({}), object: (o: object) => o };
+  const lazySchema = (f: () => unknown) => f;
+
+  // A trusted policy object holds the override; nothing here is a declared
+  // tool input, so the advertised schema carries no override at all.
+  const policy = {
+    dangerouslyDisableSandbox: true,
+  };
+
+  const fullInputSchema = lazySchema(() => z.strictObject({
+    command: z.string(),
+  }));
+  const inputSchema = lazySchema(() => fullInputSchema());
+  ```

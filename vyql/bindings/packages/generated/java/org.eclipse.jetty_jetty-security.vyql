@@ -1,0 +1,73 @@
+module bindings.java.generated.m88c293c3;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-security")
+  }
+  query pattern callExpr where callee.method == "login"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-security")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-security")
+  }
+  query pattern callExpr where callee.method == "validateRequest"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck3 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-security")
+  }
+  query pattern callExpr where callee.method == "authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-security")
+  }
+  query pattern callExpr where callee.method == "isAuthorized"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck5 {
+  requires {
+    dependency("org.eclipse.jetty:jetty-security")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

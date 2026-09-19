@@ -1,0 +1,41 @@
+module bindings.ruby.package_entry_walk_without_duplicate_rejection;
+
+// A package verifier that walks an archive's entries by name, asserts the
+// expected member is present by that name, and rejects no duplicate member
+// names is verifying an archive it has not pinned: with duplicates allowed,
+// the per-name facts the walk collects describe the *last* entry of each
+// name while a reader that takes the *first* match consumes a different
+// copy. RubyGems' `Gem::Package` is the worked example -- `verify_files`
+// walked `gem.each`, dispatched each entry, collected names into `@files`,
+// and asserted `@files.include? 'data.tar.gz'`, while every per-name fact
+// it fed forward was a hash write keyed by `entry.full_name` (a later
+// duplicate overwrites an earlier one) and `extract_files` later took the
+// first `data.tar.gz` entry and returned. A gem carrying a second
+// `data.tar.gz` ahead of the signed one therefore installed its first copy
+// under the signature computed for its last. The .gem format's fixed member
+// names -- `metadata.gz`, `data.tar.gz`, `checksums.yaml` -- are the
+// documented vocabulary of that walk, the same role `.nuspec` and
+// `META-INF/MANIFEST.MF` play for the C# binding of this concept.
+//
+// The walk's absence side is the Ruby exactly-one vocabulary: `group_by`
+// (the spelling the upstream fix used), `tally` and `uniq` each express
+// "these names are distinct", so any of them standing in the file means the
+// walk does reject duplicates and the flag does not fire -- however the
+// rejection is spelled, not only as the fix spelled it.
+//
+// Class scope carries the label because the walk and its name-keyed writes
+// span several methods of one class. Ruby context facts for positive call
+// and literal conjuncts combine at file level (a scope-call miss falls back
+// to the file-wide call search), so sibling and nested classes of a file
+// that contains the walk share the label, and the rejection is honoured
+// wherever in the file it stands. The tokens are AST-derived, so a comment
+// naming either side cannot stand in for the call or the literal.
+binding packageEntryWalkWithoutDuplicateRejection {
+  query pattern presenceNode where node.scope == "class"
+    and node.context.language == "ruby"
+    and containsAny(node.context.call, ["each"])
+    and containsAny(node.context.call, ["include?", "member?"])
+    and containsAny(node.context.literal, ["data.tar.gz", "metadata.gz", "checksums.yaml"])
+    and not containsAny(node.context.call, ["group_by", "tally", "uniq"])
+  emit issue code.AmbiguousArchiveManifestSelection at node
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept SvgNestedResourceValidationBypass : issue {
+  cwe: [CWE_611, CWE_918, CWE_502, CWE_22]
+  reviewAssumption: "attacker-controlled SVG content can contain nested image references to remote, local, or dangerous wrapper URLs that bypass top-level resource policy"
+  reviewCategory: request_forgery
+  reviewCondition: "SVG images are accepted after top-level URL validation without validating nested image href references"
+  reviewConfidence: high
+  reviewEvidence: "SVG image cache context {pattern} resolves and stores image content, accepts type svg, and lacks parsing of nested image href/xlink references through the same resource validation"
+  vulnerableTo: [request_forgery.Ssrf, deserialization.Xxe, path.PathTraversal]
+}

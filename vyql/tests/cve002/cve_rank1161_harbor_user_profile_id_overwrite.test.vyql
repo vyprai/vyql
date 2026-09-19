@@ -1,0 +1,127 @@
+# Rank 1161 / CVE-2019-19023: Harbor's user-profile PUT handler set the
+# authenticated caller's own id on a models.User literal, then decoded the
+# request body into that same variable. encoding/json overwrites a field the
+# moment the body names it, so a caller who names "user_id" in the body
+# redirects the update to a different account and can reach the admin's
+# email and password reset. The fix decodes into a bare struct and assigns
+# the session id after the decode, once the payload has been read.
+#
+# The frontend records the preset-then-decode construct as a per-call fact
+# anchored at the decode (analysis.go.decode_overwrites_preset_fields,
+# tokens naming the preset fields), and the decodeOverwritesPresetId
+# binding reports it when a preset field is identifier-suffixed. The first
+# test is the vulnerable shape and expects the finding; the second is the
+# patched shape and rejects it. The third test is Harbor's real spelling:
+# the decode sits behind the project's own DecodeJSONReq wrapper, which the
+# verb-keyed fact cannot see, so the real file stays unreported -- the
+# recorded residual, not a discrimination this spec asserts.
+
+test "rank1161: user profile struct pre-set with the caller id, then decoded over"
+  lang go
+  expect VYQL-INJ-281
+  expect_review code.DecodeOverwritesPresetId
+  code
+  ```
+  package api
+
+  import (
+    "encoding/json"
+    "net/http"
+  )
+
+  type User struct {
+    UserID   int    `json:"user_id"`
+    Email    string `json:"email"`
+    Realname string `json:"realname"`
+  }
+
+  type UserAPI struct {
+    userID int
+  }
+
+  func (ua *UserAPI) Put(r *http.Request) error {
+    user := User{UserID: ua.userID}
+    if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+      return err
+    }
+    return changeUserProfile(user)
+  }
+
+  func changeUserProfile(u User) error {
+    return nil
+  }
+  ```
+
+test "rank1161: user profile decodes into a bare struct, id set from the session after"
+  lang go
+  reject VYQL-INJ-281
+  reject_review code.DecodeOverwritesPresetId
+  code
+  ```
+  package api
+
+  import (
+    "encoding/json"
+    "net/http"
+  )
+
+  type User struct {
+    UserID   int    `json:"user_id"`
+    Email    string `json:"email"`
+    Realname string `json:"realname"`
+  }
+
+  type UserAPI struct {
+    userID int
+  }
+
+  func (ua *UserAPI) Put(r *http.Request) error {
+    user := User{}
+    if err := json.NewDecoder(r.Body).Decode(&user); err != nil {
+      return err
+    }
+    user.UserID = ua.userID
+    return changeUserProfile(user)
+  }
+
+  func changeUserProfile(u User) error {
+    return nil
+  }
+  ```
+
+test "rank1161: the decode hidden behind the project's own wrapper stays unreported"
+  lang go
+  reject VYQL-INJ-281
+  reject_review code.DecodeOverwritesPresetId
+  code
+  ```
+  package api
+
+  import "net/http"
+
+  type User struct {
+    UserID   int    `json:"user_id"`
+    Email    string `json:"email"`
+    Realname string `json:"realname"`
+  }
+
+  type UserAPI struct {
+    userID int
+  }
+
+  func (ua *UserAPI) decodeJSONReq(v interface{}, r *http.Request) error {
+    return unmarshalBody(r, v)
+  }
+
+  func (ua *UserAPI) Put(r *http.Request) error {
+    user := User{UserID: ua.userID}
+    if err := ua.decodeJSONReq(&user, r); err != nil {
+      return err
+    }
+    return changeUserProfile(user)
+  }
+
+  func changeUserProfile(u User) error {
+    return nil
+  }
+  ```

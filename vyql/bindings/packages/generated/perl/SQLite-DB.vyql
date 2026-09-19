@@ -1,0 +1,17 @@
+module bindings.perl.generated.m82df2154;
+
+binding commandExecution0 {
+  requires {
+    dependency("SQLite-DB")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("SQLite-DB")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.SqlExecution at args[0]
+}

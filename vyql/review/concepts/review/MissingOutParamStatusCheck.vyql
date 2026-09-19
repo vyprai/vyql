@@ -1,0 +1,7 @@
+module code;
+
+review code.MissingOutParamStatusCheck {
+  category: memory
+  kind: attention
+  text: "review whether the call that handed this output back succeeded; consult its return status before reading the fields behind the pointer"
+}

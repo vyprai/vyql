@@ -1,0 +1,17 @@
+module bindings.rust.generated.m8204cda9;
+
+binding deserialization0 {
+  requires {
+    dependency("bzip2-sys")
+  }
+  query pattern callExpr where callee.method == "BZ2_bzDecompressInit"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("bzip2-sys")
+  }
+  query pattern callExpr where callee.method == "BZ2_bzDecompress"
+  emit sink code.Deserialization at args[0]
+}

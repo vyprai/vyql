@@ -1,0 +1,85 @@
+test "rank867: missing user login path skips dummy password hash"
+  lang python
+  expect VYQL-AUTH-064
+  expect_review code.PasswordHashMissingUserBalance
+  code
+  ```
+  from werkzeug.security import check_password_hash
+
+  LOGMSG_WAR_SEC_LOGIN_FAILED = "Login failed: {}"
+
+  class Log:
+      def info(self, message):
+          pass
+
+  log = Log()
+
+  class SecurityManager:
+      def find_user(self, username=None, email=None):
+          return None
+
+      def update_user_auth_stat(self, user, success):
+          pass
+
+      def auth_user_db(self, username, password):
+          if username is None or username == "":
+              return None
+          user = self.find_user(username=username)
+          if user is None:
+              user = self.find_user(email=username)
+          if user is None or (not user.is_active):
+              log.info(LOGMSG_WAR_SEC_LOGIN_FAILED.format(username))
+              return None
+          elif check_password_hash(user.password, password):
+              self.update_user_auth_stat(user, True)
+              return user
+          else:
+              self.update_user_auth_stat(user, False)
+              log.info(LOGMSG_WAR_SEC_LOGIN_FAILED.format(username))
+              return None
+  ```
+
+test "rank867: dummy hash balances missing user login path"
+  lang python
+  reject VYQL-AUTH-064
+  code
+  ```
+  from werkzeug.security import check_password_hash
+
+  LOGMSG_WAR_SEC_LOGIN_FAILED = "Login failed: {}"
+
+  class Log:
+      def info(self, message):
+          pass
+
+  log = Log()
+
+  class SecurityManager:
+      def find_user(self, username=None, email=None):
+          return None
+
+      def update_user_auth_stat(self, user, success):
+          pass
+
+      def auth_user_db(self, username, password):
+          if username is None or username == "":
+              return None
+          user = self.find_user(username=username)
+          if user is None:
+              user = self.find_user(email=username)
+          if user is None or (not user.is_active):
+              check_password_hash(
+                  "pbkdf2:sha256:150000$Z3t6fmj2$22da622d94a1f8118"
+                  "c0976a03d2f18f680bfff877c9a965db9eedc51bc0be87c",
+                  "password",
+              )
+              log.info(LOGMSG_WAR_SEC_LOGIN_FAILED.format(username))
+              return None
+          elif check_password_hash(user.password, password):
+              self.update_user_auth_stat(user, True)
+              return user
+          else:
+              self.update_user_auth_stat(user, False)
+              log.info(LOGMSG_WAR_SEC_LOGIN_FAILED.format(username))
+              return None
+  ```

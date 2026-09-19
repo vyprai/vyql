@@ -1,0 +1,9 @@
+module bindings.java.generated.mfb7a0f79;
+
+binding codeEval0 {
+  requires {
+    dependency("org.apache.pig:pig")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CodeEval at args[0]
+}

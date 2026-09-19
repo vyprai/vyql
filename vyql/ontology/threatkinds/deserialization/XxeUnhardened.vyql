@@ -1,0 +1,6 @@
+module deserialization;
+
+threat XxeUnhardened {
+  cwe: [CWE_611]
+  desc: "XML parser created without entity hardening"
+}

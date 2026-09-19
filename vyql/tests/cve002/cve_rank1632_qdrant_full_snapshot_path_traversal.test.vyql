@@ -1,0 +1,173 @@
+# Rank 1632 / CVE-2024-2221 (GHSA-hm95-xqg2-4w57, CWE-22): qdrant's full
+# snapshot REST API served and deleted files at a request-chosen path.
+#
+# GET and DELETE /snapshots/{snapshot_name} hand the URL segment straight to
+# get_full_snapshot_path in lib/storage/src/content_manager/snapshots/mod.rs,
+# which builds the path with `Path::new(toc.snapshots_path()).join(snapshot_name)`
+# and returns it after an existence check alone -- no canonicalisation, no
+# containment, so `../` in the segment reaches any file the process can read or
+# remove. The sibling Collection::get_snapshot_path in
+# lib/collection/src/collection/snapshots.rs canonicalised both sides and
+# compared them, but joined onto the raw directory and returned the
+# non-canonicalised path. The fixed revision (3ab5172e, "Fix arbitrary path traversal
+# vulnerability in full snapshot REST API (#3856)", first released in v1.8.3)
+# canonicalises the directory first, joins onto the canonical directory,
+# canonicalises the result, and rejects anything whose components do not start
+# with the canonical directory.
+#
+# Corpus corrections. The pool row's commit e6411907 is "Bump version to 1.8.0
+# (#3779)" -- a release bump touching Cargo.toml, a changelog and
+# docs/redoc/default_version.js, which is also where the recorded `javascript`
+# language most plausibly comes from. The advisory itself references that bump,
+# so the row faithfully records a wrong advisory reference. The fixing commit is Rust,
+# landing in lib/storage and lib/collection.
+#
+# ATTENTION, engine gap: the Rust frontend emits no nir.Return, so a function's
+# return value never carries taint to its callers. Lowering flows a
+# `nir.Return` value into the function's `__ret__` node
+# (internal/extract/lowering/lowering.go, the nir.Return case), and the Go
+# frontend feeds it (internal/extract/frontend/golang/golang.go returns
+# nir.Return for result statements), but internal/extract/frontend/treesitter/rust.go
+# constructs no Return statement at all. Measured with a minimal pair in one file:
+#
+#   helper computes `Path::new(dir).join(name)` and the caller reads the file
+#   -> VYQL-PATH-001 (the join is an untraced method call, so its result keeps
+#      the argument taint while the flow stays inside one function);
+#   the identical join moved into a helper that returns the joined path
+#   -> nothing. Not the join's fault: a helper that returns its parameter
+#   unchanged, or `name.to_string()`, is equally dark, while the same three
+#   shapes in Go all report. The taint dies at the callee boundary because no
+#      return node exists to flow into `__ret__`.
+#
+# The extraction is not the open question. tree-sitter-rust's grammar already
+# separates a block's trailing value from its statements: a tail expression
+# parses as a bare expression node (call_expression, binary_expression,
+# try_expression, await_expression), while a semicolon-terminated expression
+# and every if/match/loop used in statement position parse as
+# expression_statement -- which is exactly the predicate blockTail already
+# implements for if/else arm values. Lowering the function body's tail through
+# `nir.Return{Value: c.blockTail(body)}` is a three-line change confined to the
+# function_item case, and `?` and `.await` tails already lower as nir.Thru.
+#
+# A probe of that change, plus a live std canonicalize control (the shipped
+# pathCanonicalization23 is gated on `dependency("std::fs")`, and the Rust
+# frontend emits no code.Import so no dependency requirement can ever be
+# satisfied -- Cargo.toml is not parsed as a manifest either), reports the real
+# endpoint end to end and discriminates: snapshot_api.rs:73
+# `NamedFile::open(file_name)` reads 1 VYQL-PATH-001 high on the vulnerable
+# revision and 0 on the fixed one, three cache-off runs each, through the full
+# chain get_full_snapshot_path#param#snapshot_name -> join -> Ok(..) ->
+# get_full_snapshot_path#ret# -> NamedFile::open. It also un-pins the return
+# cases of the module-resolution gap recorded at rank 1847.
+#
+# The change is held for the resolution flood it exposes, not for the
+# extraction: across eleven Rust trees it adds 477 findings, and on uv alone
+# 144 fresh VYQL-PATH-001 rows all trace to one source,
+# core.UserControlledData @ scripts/transform_readme.py:88, reaching Rust file
+# sinks through `replace#ret# -> .. -> join#param#input` -- a Python nested
+# function's return feeding a Rust free function's parameter through the
+# shared name-keyed short-name fallback in resolveTargets. Those edges exist
+# at the base revision too (the same source appears in 1 finding there); they
+# carry nothing because no return node has a value. Giving every return a value
+# turns the pre-existing misrouting into a flood, so the return-taint change
+# needs the resolution scoping settled first -- the sweep named in the engine
+# gap file.
+#
+# Naming the sink does not help on its own: binding
+# `actix_files::NamedFile::open` as code.FilePathAccess without the return flow
+# adds exactly two findings (snapshot_api.rs:134 and :449, fed through
+# unresolvable method receivers, which pass argument taint through
+# conservatively), identical before and at the fixed revision.
+#
+# The remediation would also be invisible at the caller-side sink even with
+# return flow, because the containment check lives inside the callee -- the
+# Rust attribution gap recorded at rank 1364 -- which is why the probe needed
+# the canonicalize control to discriminate.
+#
+# The expect block keeps the source, the join and the sink of the real
+# endpoint (with std::fs::read_to_string standing in for the actix-files sink,
+# which no binding labels) in one function, where the flow works. The first
+# reject block moves the join behind a function boundary -- the shape of the
+# real code -- and pins the miss: it reports nothing today and starts
+# reporting once return-value taint exists. The second reject block is the
+# patched form.
+
+test "rank1632: a request-chosen snapshot name is joined and opened in one function"
+  lang rust
+  expect VYQL-PATH-001
+  code
+  ```
+  use actix_files::NamedFile;
+  use actix_web::web;
+  use std::path::Path;
+
+  pub async fn do_get_full_snapshot(snapshots_path: &str, snapshot_name: &str) -> std::io::Result<String> {
+      let file_name = Path::new(snapshots_path).join(snapshot_name);
+      std::fs::read_to_string(file_name)
+  }
+
+  #[get("/snapshots/{snapshot_name}")]
+  async fn get_full_snapshot(toc: web::Data<TableOfContent>, path: web::Path<String>) -> impl Responder {
+      let snapshot_name = path.into_inner();
+      do_get_full_snapshot(toc.snapshots_path(), &snapshot_name).await
+  }
+  ```
+
+test "rank1632: the same join returned from a helper and opened by the caller reports nothing"
+  lang rust
+  reject VYQL-PATH-001
+  code
+  ```
+  use actix_web::web;
+  use std::path::{Path, PathBuf};
+
+  pub async fn get_full_snapshot_path(snapshots_path: &str, snapshot_name: &str) -> PathBuf {
+      Path::new(snapshots_path).join(snapshot_name)
+  }
+
+  pub async fn do_get_full_snapshot(snapshots_path: &str, snapshot_name: &str) -> std::io::Result<String> {
+      let file_name = get_full_snapshot_path(snapshots_path, snapshot_name).await;
+      std::fs::read_to_string(file_name)
+  }
+
+  #[get("/snapshots/{snapshot_name}")]
+  async fn get_full_snapshot(toc: web::Data<TableOfContent>, path: web::Path<String>) -> impl Responder {
+      let snapshot_name = path.into_inner();
+      do_get_full_snapshot(toc.snapshots_path(), &snapshot_name).await
+  }
+  ```
+
+test "rank1632: the snapshot path canonicalised and contained inside the snapshots directory"
+  lang rust
+  reject VYQL-PATH-001
+  code
+  ```
+  use actix_web::web;
+  use std::path::{Path, PathBuf};
+
+  pub async fn get_full_snapshot_path(snapshots_path: &str, snapshot_name: &str) -> std::io::Result<PathBuf> {
+      let absolute_snapshot_dir = match Path::new(snapshots_path).canonicalize() {
+          Ok(p) => p,
+          Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "snapshot dir")),
+      };
+      let absolute_snapshot_path = match absolute_snapshot_dir.join(snapshot_name).canonicalize() {
+          Ok(p) => p,
+          Err(_) => return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "snapshot")),
+      };
+      if !absolute_snapshot_path.starts_with(&absolute_snapshot_dir) {
+          return Err(std::io::Error::new(std::io::ErrorKind::NotFound, "snapshot"));
+      }
+      Ok(absolute_snapshot_path)
+  }
+
+  pub async fn do_get_full_snapshot(snapshots_path: &str, snapshot_name: &str) -> std::io::Result<String> {
+      let file_name = get_full_snapshot_path(snapshots_path, snapshot_name).await?;
+      std::fs::read_to_string(file_name)
+  }
+
+  #[get("/snapshots/{snapshot_name}")]
+  async fn get_full_snapshot(toc: web::Data<TableOfContent>, path: web::Path<String>) -> impl Responder {
+      let snapshot_name = path.into_inner();
+      do_get_full_snapshot(toc.snapshots_path(), &snapshot_name).await
+  }
+  ```

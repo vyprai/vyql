@@ -1,0 +1,9 @@
+module bindings.java.generated.m9f3bdecf;
+
+binding httpInput0 {
+  requires {
+    dependency("io.netty:netty-codec-http")
+  }
+  query pattern callExpr where callee.method == "ClientCookieDecoder.decode"
+  emit source code.HttpInput at call.result
+}

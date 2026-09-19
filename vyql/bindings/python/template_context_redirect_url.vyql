@@ -1,0 +1,27 @@
+module bindings.python.template_context_redirect_url;
+
+// A class-based view builds the rendered page's template context in
+// get_context_data, and the documented redirect round-trip stores the
+// request's destination parameter into that context so the rendered form
+// posts it back for a later redirect: Django's own authentication views
+// document the `next` query parameter and reflect exactly this way, and a
+// project's own context slot names the same thing when it is spelled
+// `redirect_url`, `redirect_to`, `next_url` or `return_url`. The store is
+// the reachable sink of the round-trip -- the template and the redirect
+// call live in other files or other request handlers, so a taint path
+// between them does not exist -- and the control is the same same-origin
+// validator family the direct form uses: is_safe_url,
+// url_has_allowed_host_and_scheme, and the urlsplit/urlparse-based checks
+// a project builds its own guard from.
+//
+// The request read is required in the same function: a slot filled from
+// the view's own success URL or a validated helper carries no request
+// data, and the function scope keeps a request read elsewhere in the view
+// from crediting the store. Residual: a store that interpolates request
+// parameters after a fixed reverse()d base URL is same-origin by
+// construction and still reports -- the advisory text is the verify step
+// for that shape.
+binding templateContextRedirectUrlWithoutAllowlist {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.functionName == "get_context_data" and containsAny(node.context.subscript, ["REDIRECT_URL", "redirect_url", "redirect_to", "next_url", "return_url", "['next']", "[\"next\"]"]) and containsAny(node.context.callPath, ["request.GET", "request.POST"]) and not (containsAny(node.context.callPath, ["is_safe_url", "is_safe_redirect_url", "url_has_allowed_host_and_scheme", "is_valid_url", "get_valid_next_url_from_request", "urlsplit", "urlparse", "URLValidator"]))
+  emit issue code.TemplateContextRedirectUrlWithoutAllowlist at node
+}

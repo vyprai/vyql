@@ -1,0 +1,11 @@
+module code;
+
+concept SudoCommandTempFileOperand : issue {
+  cwe: [CWE_269, CWE_377]
+  reviewAssumption: "the command runs on the local host under a passwordless sudoers grant, and whoever administers that grant has to cover every path the operand can take"
+  reviewCategory: auth
+  reviewCondition: "a function builds a sudo command string while taking the file it operates on from the tempfile API, whose generated name forces the authorizing grant to wildcard the shared temporary directory"
+  reviewConfidence: high
+  reviewEvidence: "sudo-over-tempfile context {pattern} assigns a tempfile-API-created file and a sudo-prefixed command string in the same function, so the sudoers entry covering the command must match any name the tempfile API generates"
+  vulnerableTo: [access_control.PrivilegeEscalation, path.InsecureTempFile]
+}

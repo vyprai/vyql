@@ -1,0 +1,40 @@
+test "rank734: Elefant admin preview renders POST body without admin gate"
+  lang php
+  file preview.php
+  expect VYQL-INJ-160
+  expect_review code.ElefantAdminPreviewMissingAdminXss
+  code
+  ```
+  <?php
+  $wp = new Webpage ($_POST);
+  $page->id = $_POST['id'];
+  $page->title = $_POST['title'];
+  $page->menu_title = (! empty ($_POST['menu_title'])) ? $_POST['menu_title'] : $_POST['title'];
+  $page->window_title = (! empty ($_POST['window_title'])) ? $_POST['window_title'] : $_POST['title'];
+  $page->description = $_POST['description'];
+  $page->keywords = $_POST['keywords'];
+  $page->layout = $_POST['layout'];
+  echo $tpl->run_includes ($_POST['body']);
+  ?>
+  ```
+
+test "rank734: Elefant admin preview requires admin before rendering POST body"
+  lang php
+  file preview.php
+  reject VYQL-INJ-160
+  reject_review code.ElefantAdminPreviewMissingAdminXss
+  code
+  ```
+  <?php
+  $this->require_admin ();
+  $wp = new Webpage ($_POST);
+  $page->id = $_POST['id'];
+  $page->title = $_POST['title'];
+  $page->menu_title = (! empty ($_POST['menu_title'])) ? $_POST['menu_title'] : $_POST['title'];
+  $page->window_title = (! empty ($_POST['window_title'])) ? $_POST['window_title'] : $_POST['title'];
+  $page->description = $_POST['description'];
+  $page->keywords = $_POST['keywords'];
+  $page->layout = $_POST['layout'];
+  echo $tpl->run_includes ($_POST['body']);
+  ?>
+  ```

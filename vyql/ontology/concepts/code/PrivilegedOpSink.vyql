@@ -1,0 +1,7 @@
+module code;
+
+concept PrivilegedOpSink : sink {
+  cwe: [CWE_284]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [smartcontract.PrivilegedDestruct]
+}

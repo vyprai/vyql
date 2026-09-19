@@ -1,0 +1,8 @@
+module code;
+
+review code.OffsetLengthBoundsOverflow {
+  category: numeric
+  expected: [core.IntegerOverflowGuard]
+  kind: attention
+  text: "review offset-plus-length bounds checks for widened arithmetic before comparing with the buffer length"
+}

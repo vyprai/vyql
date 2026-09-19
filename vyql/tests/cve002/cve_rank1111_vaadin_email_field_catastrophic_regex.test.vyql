@@ -1,0 +1,150 @@
+# Rank 1111 / CVE-2021-31405: Vaadin flow-components' EmailField validates
+# input against a hand-written email regex whose domain-suffix group repeats
+# an unescaped dot (any character) directly followed by an unbounded class,
+# `(?:.[a-zA-Z0-9-]+)*`, so crafted input backtracks catastrophically through
+# the server-side re-validation and hangs the JVM thread (CWE-400). The
+# pattern lives in a class-level `static final String` whose name is handed
+# to the field's validation support, which compiles it in another file -- no
+# regex API and no literal is visible at any call site, so the structure of
+# the constant's value is what carries the weakness. The fix keeps the same
+# shape but a linear pattern: one dot literal and a bounded tail class.
+
+test "rank1111: the domain-suffix group repeats an unescaped dot inside an unbounded class"
+  lang java
+  file EmailField.java
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.flow.component.textfield;
+
+  public class EmailField extends GeneratedVaadinEmailField<EmailField, String> {
+      private static final String EMAIL_PATTERN = "^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:.[a-zA-Z0-9-]+)*$";
+
+      private TextFieldValidationSupport validationSupport;
+
+      private TextFieldValidationSupport getValidationSupport() {
+          validationSupport = new TextFieldValidationSupport(this);
+          validationSupport.setPattern(EMAIL_PATTERN);
+          return validationSupport;
+      }
+  }
+  ```
+
+test "rank1111: the fixed pattern is one dot literal and a bounded tail class"
+  lang java
+  file EmailField.java
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.flow.component.textfield;
+
+  public class EmailField extends GeneratedVaadinEmailField<EmailField, String> {
+      private static final String EMAIL_PATTERN = "^" + "([a-zA-Z0-9_\\.\\-+])+" // local
+              + "@" + "[a-zA-Z0-9-.]+" // domain
+              + "\\." + "[a-zA-Z0-9-]{2,}" // tld
+              + "$";
+
+      private TextFieldValidationSupport validationSupport;
+
+      private TextFieldValidationSupport getValidationSupport() {
+          validationSupport = new TextFieldValidationSupport(this);
+          validationSupport.setPattern(EMAIL_PATTERN);
+          return validationSupport;
+      }
+  }
+  ```
+
+test "rank1111: the fixed pattern spelled as one literal is still linear"
+  lang java
+  file EmailField.java
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.flow.component.textfield;
+
+  public class EmailField extends GeneratedVaadinEmailField<EmailField, String> {
+      private static final String EMAIL_PATTERN =
+          "^([a-zA-Z0-9_\\.\\-+])+@[a-zA-Z0-9-.]+\\.[a-zA-Z0-9-]{2,}$";
+
+      private TextFieldValidationSupport validationSupport;
+
+      private TextFieldValidationSupport getValidationSupport() {
+          validationSupport = new TextFieldValidationSupport(this);
+          validationSupport.setPattern(EMAIL_PATTERN);
+          return validationSupport;
+      }
+  }
+  ```
+
+test "rank1111: the same nested-quantifier pattern passed to Pattern.compile"
+  lang java
+  file EmailValidator.java
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.flow.component.textfield;
+
+  import java.util.regex.Pattern;
+
+  final class TextFieldValidationSupport {
+      private Pattern pattern;
+
+      void setPattern(String pattern) {
+          this.pattern = Pattern.compile("^[a-zA-Z0-9-]+(?:.[a-zA-Z0-9-]+)*$");
+      }
+  }
+  ```
+
+test "rank1111: a linear pattern passed to the same compile site stays clean"
+  lang java
+  file EmailValidator.java
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.flow.component.textfield;
+
+  import java.util.regex.Pattern;
+
+  final class TextFieldValidationSupport {
+      private Pattern pattern;
+
+      void setPattern(String pattern) {
+          this.pattern = Pattern.compile("^[a-zA-Z0-9_-]+(?:\\.[a-zA-Z0-9_-]+)*$");
+      }
+  }
+  ```
+
+test "rank1111: a String regex method with a catastrophic literal reports"
+  lang java
+  file Scrubber.java
+  expect VYQL-DOS-003
+  code
+  ```
+  package com.example;
+
+  public class Scrubber {
+      public String scrub(String input) {
+          return input.replaceAll("(a+)+$", "x");
+      }
+  }
+  ```
+
+test "rank1111: a String regex method with a linear literal is clean"
+  lang java
+  file Scrubber.java
+  reject VYQL-DOS-003
+  code
+  ```
+  package com.example;
+
+  public class Scrubber {
+      public boolean looksLikeEmail(String input) {
+          return input.matches("[a-z0-9.]+@[a-z0-9.]+");
+      }
+  }
+  ```

@@ -1,0 +1,47 @@
+test "rank515: Symfony request query interpolated into Pimcore condition"
+  lang php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class CustomerTransformerController
+  {
+      public function checkForNameDuplicatesAction(Request $request): JsonResponse
+      {
+          $value = $request->query->get('value', null);
+
+          if ($value !== null) {
+              $list = $this->getCompanyRepository()->getList();
+              $list->addConditionParam(sprintf('name LIKE "%%%s%%"', (string) $value));
+              $foundObjects = $list->getData();
+          }
+
+          return new JsonResponse([]);
+      }
+  }
+  ```
+
+test "rank515: Pimcore condition uses placeholders for Symfony request query"
+  lang php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class CustomerTransformerController
+  {
+      public function checkForNameDuplicatesAction(Request $request): JsonResponse
+      {
+          $value = $request->query->get('value', null);
+
+          if ($value !== null) {
+              $list = $this->getCompanyRepository()->getList();
+              $list->addConditionParam('name LIKE ?', '%' . $value . '%');
+              $foundObjects = $list->getData();
+          }
+
+          return new JsonResponse([]);
+      }
+  }
+  ```

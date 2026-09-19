@@ -1,0 +1,11 @@
+module code;
+
+concept HighlightedSearchResultHtmlEscapeMissing : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "indexed title, body, or query text can contain attacker-controlled HTML rendered in the search UI"
+  reviewCategory: xss
+  reviewCondition: "search result highlighting builds trusted HTML from indexed title/content text before HTML escaping"
+  reviewConfidence: high
+  reviewEvidence: "search result context {pattern} normalizes title/content text, wraps matches in HTML, and returns highlighted result content without escaping the normalized values"
+  vulnerableTo: [injection.Xss]
+}

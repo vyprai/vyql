@@ -1,0 +1,255 @@
+# Rank 1785 / CVE-2025-62168 (CWE-532): Squid's error-page and TRACE
+# outputs packed the full HTTP request without the credential mask.
+# HttpHeader::packInto (src/HttpHeader.h:99) takes a documented boolean,
+# mask_sensitive_info, that elides AUTHORIZATION and PROXY_AUTHORIZATION
+# values, and 0951a0681011dfca3d78c84fd7f1e19c78a4443f threads it through
+# HttpRequest::pack as well. At the parent, three externally visible
+# outputs build without it: ErrorState::Dump (src/errorpage.cc:886) packed
+# the whole request into the %W mailto body emailed to the administrator,
+# possibly over insecure SMTP; the %R error-page code fell back to
+# ErrorState::request_hdrs, a char* the constructor path filled with
+# xstrdup(unparsedrequest) -- the raw, unparsed client bytes, credentials
+# intact -- whenever the request failed to parse; and
+# clientReplyContext::traceReply (src/client_side_reply.cc:1001) echoed
+# the request through swapOut into the TRACE response. The fixed revision
+# passes true at all three, deletes the request_hdrs bypass field, and
+# flips the email_err_data directive default to off. Remediation
+# confirmed present at the fixed revision; all three constructs
+# confirmed at its parent.
+#
+# Rechecked, and the first pass's ATTENTION no longer holds. The blocker
+# it recorded was that the only output-context anchors available were the
+# fix's own layout or MemBuf::append; the two delivery calls the fix
+# leaves in place are neither. StoreEntry::replaceHttpReply installs the
+# reply a client reads and AnyP::Uri::Encode percent-encodes a buffer
+# bound for a URL, both documented, both present at both revisions, and
+# each sits in exactly one function of the 1406-file src/ tree that also
+# serializes a request. The discriminator is the mask argument itself: a
+# second argument on the pack call means the caller passed the control
+# explicitly, whatever it is spelled. Measured on the real checkout,
+# whole src/ subtree, three --cache off runs per side: 2998 findings at
+# both revisions, byte-identical after line normalisation, before the
+# change; 3000 at the parent and 2998 at the fixed revision after it,
+# the two added rows being VYQL-SEC-044 at client_side_reply.cc:1000 and
+# VYQL-SEC-034 at errorpage.cc:852 and nothing else moving. Zero rows on
+# either rule across protobuf, qpdf, quassel, radare2, redis and
+# wireshark, whose trees carry none of the three anchors.
+#
+# The %R raw-buffer path stays uncovered and is the recorded residual:
+# it serializes nothing, so no mask argument exists to omit, and its
+# anchors are the error-page template machinery alone.
+
+test "error page and TRACE outputs pack the request without the credential mask"
+  lang cpp
+  file src/errorpage.cc
+  expect VYQL-SEC-044
+  expect VYQL-SEC-034
+  code
+  ```
+  class Packable { public: virtual void append(const char *, int) {} };
+
+  class CharacterSet { public: int cs; };
+
+  class SBuf {
+  public:
+      const char *buf() const { return b; }
+      char b[4096];
+  };
+
+  class SBufStream {
+  public:
+      SBuf buf;
+      const SBufStream &operator<<(const char *) { return *this; }
+      const SBufStream &operator<<(const SBuf &) { return *this; }
+  };
+
+  namespace AnyP { namespace Uri {
+      // percent-encodes a buffer bound for a URL
+      SBuf Encode(const SBuf &buf, const CharacterSet &ignore);
+  } }
+
+  class HttpHeader {
+  public:
+      // packs all the entries; mask_sensitive_info elides
+      // AUTHORIZATION and PROXY_AUTHORIZATION values
+      void packInto(Packable *p, bool mask_sensitive_info = false) const;
+  };
+
+  class MemBuf {
+  public:
+      void init() {}
+      void append(const char *buf, int len) { (void) buf; (void) len; }
+      const char *content() { return buf; }
+      char buf[4096];
+  };
+
+  class StoreEntry { public: void replaceHttpReply(class HttpReply *rep); void buffer() {} };
+
+  class HttpReply {
+  public:
+      void setHeaders(int a, const char *b, const char *c, int d, int e, int f) {}
+  };
+
+  class HttpReplyPointer {
+  public:
+      HttpReply *get() const { return rep; }
+      HttpReply *rep;
+  };
+
+  class HttpRequest {
+  public:
+      // packs request-line and headers, appends the terminator;
+      // maskSensitiveInfo elides credential headers
+      void pack(Packable *p, bool maskSensitiveInfo = false) const;
+      void swapOut(StoreEntry *e);
+      HttpHeader header;
+  };
+
+  class ErrorState {
+  public:
+      char *request_hdrs = nullptr;
+      HttpRequest *request = nullptr;
+
+      void Dump(MemBuf &out);
+      void compileLegacyCode(MemBuf &mb, char *&p);
+  };
+
+  // emailed to the administrator for %W, possibly over insecure SMTP
+  void
+  ErrorState::Dump(MemBuf &out)
+  {
+      SBufStream body;
+      body << "HTTP Request:\r\n";
+      MemBuf r;
+      r.init();
+      request->pack(&r);
+      body << r.content();
+      out << "&body=" << AnyP::Uri::Encode(body.buf.buf(), CharacterSet());
+  }
+
+  // rendered into the error page shown to the client
+  void
+  ErrorState::compileLegacyCode(MemBuf &mb, char *&p)
+  {
+      if (request) {
+          request->header.packInto(&mb, true); // hide authorization data
+      } else if (request_hdrs) {
+          p = request_hdrs;   // raw unparsed request bytes, credentials intact
+      } else {
+          p = "[no request]";
+      }
+  }
+
+  // TRACE method reply: echoes the stored request back to the client
+  void
+  clientReplyContext_traceReply(HttpRequest *request, StoreEntry *entry, HttpReplyPointer &rep)
+  {
+      entry->buffer();
+      entry->replaceHttpReply(rep.get());
+      request->swapOut(entry);
+  }
+  ```
+
+test "the fixed revision threads the mask through every externally visible pack"
+  lang cpp
+  file src/errorpage.cc
+  reject VYQL-SEC-034
+  reject VYQL-SEC-044
+  code
+  ```
+  class Packable { public: virtual void append(const char *, int) {} };
+
+  class CharacterSet { public: int cs; };
+
+  class SBuf {
+  public:
+      const char *buf() const { return b; }
+      char b[4096];
+  };
+
+  class SBufStream {
+  public:
+      SBuf buf;
+      const SBufStream &operator<<(const char *) { return *this; }
+      const SBufStream &operator<<(const SBuf &) { return *this; }
+  };
+
+  namespace AnyP { namespace Uri {
+      // percent-encodes a buffer bound for a URL
+      SBuf Encode(const SBuf &buf, const CharacterSet &ignore);
+  } }
+
+  class HttpHeader {
+  public:
+      // packs all the entries; mask_sensitive_info elides
+      // AUTHORIZATION and PROXY_AUTHORIZATION values
+      void packInto(Packable *p, bool mask_sensitive_info = false) const;
+  };
+
+  class MemBuf {
+  public:
+      void init() {}
+      int contentSize() const { return 0; }
+      const char *content() { return buf; }
+      char buf[4096];
+  };
+
+  class StoreEntry { public: void replaceHttpReply(class HttpReply *rep); void buffer() {} };
+
+  class HttpReply {
+  public:
+      void setHeaders(int a, const char *b, const char *c, int d, int e, int f) {}
+  };
+
+  class HttpReplyPointer {
+  public:
+      HttpReply *get() const { return rep; }
+      HttpReply *rep;
+  };
+
+  class HttpRequest {
+  public:
+      // packs request-line and headers, appends the terminator;
+      // maskSensitiveInfo elides credential headers
+      void pack(Packable *p, bool maskSensitiveInfo = false) const;
+      HttpHeader header;
+  };
+
+  class ErrorState {
+  public:
+      HttpRequest *request = nullptr;
+
+      void Dump(MemBuf &out);
+      void compileLegacyCode(MemBuf &mb, char *&p);
+  };
+
+  void
+  ErrorState::Dump(MemBuf &out)
+  {
+      SBufStream body;
+      body << "HTTP Request:\r\n";
+      MemBuf r;
+      r.init();
+      request->pack(&r, true /* hide authorization data */);
+      body << r.content();
+      out << "&body=" << AnyP::Uri::Encode(body.buf.buf(), CharacterSet());
+  }
+
+  void
+  ErrorState::compileLegacyCode(MemBuf &mb, char *&p)
+  {
+      if (request)
+          request->pack(&mb, true /* hide authorization data */);
+      else
+          p = "[no request]";
+  }
+
+  void
+  clientReplyContext_traceReply(HttpRequest *request, StoreEntry *entry, HttpReplyPointer &rep)
+  {
+      MemBuf content;
+      content.init();
+      request->pack(&content, true /* hide authorization data */);
+      entry->replaceHttpReply(rep.get());
+  }
+  ```

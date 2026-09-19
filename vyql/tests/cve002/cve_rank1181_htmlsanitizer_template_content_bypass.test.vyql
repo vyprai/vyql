@@ -1,0 +1,95 @@
+# Rank 1181 / CVE-2026-25543: mganss/HtmlSanitizer's attribute-and-tag walk
+# enumerates the tree with QuerySelectorAll("*") and strips disallowed tags and
+# attributes from each match. A <template> element's children live in a
+# separate document fragment reachable only through IHtmlTemplateElement.Content
+# (per the HTML standard, template content is not part of the normal light DOM),
+# so QuerySelectorAll never reaches it. An attacker who can get "template" onto
+# the allowed-tags list — a common allowance for client-side templating — can
+# smuggle a live <script> inside <template><script>...</script></template> and
+# have it survive sanitization untouched (CWE-79/CWE-116). The fixed
+# revision recurses DoSanitize into the template's document fragment before
+# continuing the walk.
+#
+# Detection: HtmlSanitizerLogicReview exists for exactly this shape
+# (sanitizer/parser pipelines worth a manual bypass review). The gap is a
+# missing csharp binding: a function that walks QuerySelectorAll("*") and
+# calls RemoveAttribute without ever naming IHtmlTemplateElement is the general
+# shape of an AngleSharp-based tree walk that has not accounted for template
+# content, regardless of which library wrote it. Naming IHtmlTemplateElement
+# anywhere in the function -- the fixed revision's recursion, or any other
+# template-aware handling -- clears the review.
+
+test "rank1181: the attribute-stripping walk never names IHtmlTemplateElement"
+  lang csharp
+  file src/HtmlSanitizer/HtmlSanitizer.cs
+  expect VYQL-INJ-200
+  expect_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  using System.Linq;
+  using AngleSharp.Dom;
+  using AngleSharp.Html.Dom;
+
+  public class HtmlSanitizer
+  {
+      private void DoSanitize(IHtmlDocument dom, IParentNode context, string baseUrl = "")
+      {
+          foreach (var tag in context.QuerySelectorAll("*").Where(t => !IsAllowedTag(t)).ToList())
+          {
+              RemoveTag(tag, RemoveReason.NotAllowedTag);
+          }
+
+          foreach (var tag in context.QuerySelectorAll("*").ToList())
+          {
+              foreach (var attribute in tag.Attributes.Where(a => !IsAllowedAttribute(a)).ToList())
+              {
+                  RemoveAttribute(tag, attribute, RemoveReason.NotAllowedAttribute);
+              }
+          }
+
+          DoPostProcess(dom, context as INode);
+      }
+  }
+  ```
+
+test "rank1181: recursing into IHtmlTemplateElement.Content before stripping clears the review"
+  lang csharp
+  file src/HtmlSanitizer/HtmlSanitizer.cs
+  reject VYQL-INJ-200
+  reject_review code.HtmlSanitizerLogicReview
+  code
+  ```
+  using System.Linq;
+  using AngleSharp.Dom;
+  using AngleSharp.Html.Dom;
+
+  public class HtmlSanitizer
+  {
+      private void DoSanitize(INode dom, IParentNode context, string baseUrl = "")
+      {
+          foreach (var tag in context.QuerySelectorAll("*").Where(t => !IsAllowedTag(t)).ToList())
+          {
+              RemoveTag(tag, RemoveReason.NotAllowedTag);
+          }
+
+          foreach (var tag in context.QuerySelectorAll("*").ToList())
+          {
+              if (tag is IHtmlTemplateElement templateElement && templateElement.Content is IDocumentFragment fragment)
+              {
+                  DoSanitize(fragment, fragment, baseUrl);
+              }
+
+              foreach (var attribute in tag.Attributes.Where(a => !IsAllowedAttribute(a)).ToList())
+              {
+                  RemoveAttribute(tag, attribute, RemoveReason.NotAllowedAttribute);
+              }
+          }
+
+          var doc = dom as IHtmlDocument ?? dom.Owner as IHtmlDocument;
+          if (doc != null)
+          {
+              DoPostProcess(doc, context as INode);
+          }
+      }
+  }
+  ```

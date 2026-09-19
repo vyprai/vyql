@@ -1,0 +1,155 @@
+# pjproject's digest authentication copied pre-hashed credential data
+# into a fixed stack buffer using the credential's own length field, with
+# only a lower-bound check, so an over-long digest string overflowed the
+# 128-byte ha1 buffer (stack buffer overflow, CWE-121/CWE-787; PR #4912).
+# The pre-computed branch of pjsip_auth_create_digest2 in pjsip/src/
+# pjsip/sip_auth_client.c validated
+# `PJ_ASSERT_RETURN(cred_info->data.slen >= (pj_ssize_t)digest_strlen,
+# PJ_EINVAL)` -- enough bytes, never too many -- and then did
+# `pj_memcpy( ha1, cred_info->data.ptr, cred_info->data.slen );` into
+# `char ha1[PJSIP_AUTH_MAX_DIGEST_BUFFER_LENGTH * 2]`. The fixing commit
+# c82123ea6f ("Fix stack buffer overflow in pjsip_auth_create_digest2()"):
+# the copy takes exactly digest_strlen, capping it to the expected digest
+# hex length regardless of trailing bytes the caller included.
+#
+# Detected by the self_sized_declared_array fact
+# (ccSelfSizedCopyIntoDeclaredArrayObservations,
+# internal/extract/frontend/treesitter/c.go) through binding
+# selfSizedCopyDeclaredArray in vyql/bindings/c/
+# self_sized_copy_declared_array.vyql, judged by VYQL-MEM-076. The fact
+# reports a byte-count copy whose count is the copied object's own length
+# field -- source and count reading two fields of one object, here
+# cred_info->data.ptr with cred_info->data.slen -- into an array the
+# function declares with a constant size, when no relational comparison
+# in the function relates that destination's size to anything. The
+# declaration is the only statement of the destination's capacity and a
+# count taken from the object being copied is bounded by that object,
+# not by the destination, so the lower bound does not discharge it: it
+# proves the source suffices and says nothing about the array. The fix
+# replaces the self-declared count with a separately computed bound, and
+# the fact no longer pairs the arguments; the unconditional VYQL-MEM-016
+# raw-copy smell fires on both forms, and pj_memcpy itself was unlabelled
+# before the binding's alias list named it.
+#
+# The destination half is what keeps the rule quiet on the 153 same-base
+# copies the collateral trees hold: a count read from the copied object
+# into a caller-supplied or heap-allocated buffer has no declared
+# capacity to consult, so the fourth case rejects. An explicit bound on
+# the count against the destination's own size clears it (third case,
+# OpenSSL's ssl_session_hash shape), in either operand order.
+#
+# Measured on the real checkout, 3 x --cache off runs per revision
+# (timeout 180, --max-ram 6GB): pjsip/src reports 1067 findings at the
+# parent with VYQL-MEM-076 at sip_auth_client.c:385 beside three more on
+# the same idiom in sip_auth_aka.c, and 1066 at the fix with the CVE
+# site gone -- every other rule count identical across all six runs.
+# Collateral: pjlib/src 1 (os_info.c, the same idiom), openssl/test 1,
+# mbedtls/programs 1, and 0 across mbedtls/library, httpd/modules,
+# hermes/external, ImageMagick6/coders and grpc/src/core; the openssl,
+# ImageMagick6 and grpc full trees abort at the 6GB ceiling and are not
+# measurable under it.
+
+test "rank1580: the pre-computed digest is copied by the credential's own length"
+  lang c
+  file pjsip/src/pjsip/sip_auth_client.c
+  expect VYQL-MEM-076
+  code
+  ```
+  #include <string.h>
+
+  typedef struct { const char *ptr; long slen; } pj_str_t;
+  typedef struct { int data_type; pj_str_t data; } pjsip_cred_info;
+
+  #define pj_memcpy memcpy
+
+  #define PJSIP_CRED_DATA_DIGEST 2
+  #define PJSIP_AUTH_MAX_DIGEST_BUFFER_LENGTH 64
+
+  char *create_digest2(char *result, const pjsip_cred_info *cred_info,
+                       unsigned digest_strlen)
+  {
+      char ha1[PJSIP_AUTH_MAX_DIGEST_BUFFER_LENGTH * 2];
+
+      if (result_len(result) < digest_strlen)
+          return NULL;
+
+      if (cred_info->data_type == PJSIP_CRED_DATA_DIGEST) {
+          if (cred_info->data.slen < digest_strlen)
+              return NULL;
+          pj_memcpy(ha1, cred_info->data.ptr, cred_info->data.slen);
+      }
+      return ha1;
+  }
+  ```
+
+test "rank1580: the fixed revision copies exactly the digest length"
+  lang c
+  file pjsip/src/pjsip/sip_auth_client.c
+  reject VYQL-MEM-076
+  code
+  ```
+  #include <string.h>
+
+  typedef struct { const char *ptr; long slen; } pj_str_t;
+  typedef struct { int data_type; pj_str_t data; } pjsip_cred_info;
+
+  #define pj_memcpy memcpy
+
+  #define PJSIP_CRED_DATA_DIGEST 2
+  #define PJSIP_AUTH_MAX_DIGEST_BUFFER_LENGTH 64
+
+  char *create_digest2(char *result, const pjsip_cred_info *cred_info,
+                       unsigned digest_strlen)
+  {
+      char ha1[PJSIP_AUTH_MAX_DIGEST_BUFFER_LENGTH * 2];
+
+      if (result_len(result) < digest_strlen)
+          return NULL;
+
+      if (cred_info->data_type == PJSIP_CRED_DATA_DIGEST) {
+          if (cred_info->data.slen < digest_strlen)
+              return NULL;
+          pj_memcpy(ha1, cred_info->data.ptr, digest_strlen);
+      }
+      return ha1;
+  }
+  ```
+
+test "rank1580: a count bounded by the destination's own size is consulted"
+  lang c
+  file pjsip/src/pjsip/sip_auth_client.c
+  reject VYQL-MEM-076
+  code
+  ```
+  #include <string.h>
+
+  typedef struct { const unsigned char *session_id; unsigned session_id_length; } session_t;
+
+  unsigned long session_hash(const session_t *a)
+  {
+      unsigned char tmp_storage[4];
+
+      if (a->session_id_length < sizeof(tmp_storage)) {
+          memset(tmp_storage, 0, sizeof(tmp_storage));
+          memcpy(tmp_storage, a->session_id, a->session_id_length);
+      }
+      return tmp_storage[0] | tmp_storage[1];
+  }
+  ```
+
+test "rank1580: a count from the copied object into a caller's buffer has no declared capacity"
+  lang c
+  file pjsip/src/pjsip/sip_auth_client.c
+  reject VYQL-MEM-076
+  code
+  ```
+  #include <string.h>
+
+  typedef struct { const char *ptr; long slen; } pj_str_t;
+
+  char *dup_field(char *out, const pj_str_t *field)
+  {
+      memcpy(out, field->ptr, field->slen);
+      return out;
+  }
+  ```

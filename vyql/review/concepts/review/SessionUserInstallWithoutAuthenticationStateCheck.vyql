@@ -1,0 +1,8 @@
+module code;
+
+review code.SessionUserInstallWithoutAuthenticationStateCheck {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review session-user installs on unauthenticated routes for an already-authenticated check and a restore of the prior identity"
+}

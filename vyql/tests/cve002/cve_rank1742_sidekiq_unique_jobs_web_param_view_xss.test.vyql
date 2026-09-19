@@ -1,0 +1,78 @@
+# Rank 1742 / CVE-2024-25122: the Sidekiq-Web extension routes read the
+# filter, cursor and digest request parameters straight into the view
+# instance variables and hand the route to erb(). Sinatra's erb helper
+# renders with stdlib ERB, which does not escape <%= %> output, and the
+# gem's own templates write the variables into HTML attributes
+# (value="<%= @filter %>"), so a filter such as "><script>...</script> is
+# reflected into the admin page unescaped. Fix cd09ba610f wraps every
+# params read in the extension's h() escape helper (Rack's escape_html)
+# at the assignment, leaving the templates untouched.
+#
+# FIXED by widening code.RequestViewVariableHtmlEscapeMissing to Ruby:
+# a Ruby route method whose context assigns a view variable directly
+# from params and renders through erb() emits the existing review
+# concept, and VYQL-INJ-162 reports it. The h()-wrapped assignment
+# produces no direct "=params" assignment token, so the patched routes
+# stay clean. Controller-side analysis cannot see a template that
+# escapes in place (<%= h @filter %>); that remediation style would
+# still be reported, which is the false-positive direction kept.
+#
+# verify_current_expected: fixed
+
+test "rank1742: sinatra route renders request parameters into erb view variables unescaped"
+  lang ruby
+  file lib/sidekiq_unique_jobs/web.rb
+  expect VYQL-INJ-162
+  code
+  ```
+  module SidekiqUniqueJobs
+    module Web
+      def self.registered(app)
+        app.get "/locks" do
+          @filter         = params[:filter] || "*"
+          @filter         = "*" if @filter == ""
+          @count          = (params[:count] || 100).to_i
+          @current_cursor = params[:cursor]
+          @prev_cursor    = params[:prev_cursor]
+
+          @total_size, @next_cursor, @locks = digests.page(
+            cursor: @current_cursor,
+            pattern: @filter,
+            page_size: @count,
+          )
+
+          erb(unique_template(:locks))
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1742: the fixed route escapes each parameter before it reaches the view variable"
+  lang ruby
+  file lib/sidekiq_unique_jobs/web.rb
+  reject VYQL-INJ-162
+  code
+  ```
+  module SidekiqUniqueJobs
+    module Web
+      def self.registered(app)
+        app.get "/locks" do
+          @filter         = h(params[:filter] || "*")
+          @filter         = "*" if @filter == ""
+          @count          = h(params[:count] || 100).to_i
+          @current_cursor = h(params[:cursor])
+          @prev_cursor    = h(params[:prev_cursor])
+
+          @total_size, @next_cursor, @locks = digests.page(
+            cursor: @current_cursor,
+            pattern: @filter,
+            page_size: @count,
+          )
+
+          erb(unique_template(:locks))
+        end
+      end
+    end
+  end
+  ```

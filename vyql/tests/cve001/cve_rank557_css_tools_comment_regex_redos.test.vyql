@@ -1,0 +1,62 @@
+# Rank 557 / CVE-2023-26364: @adobe/css-tools used a CSS comment
+# regex with nested ambiguous repetition, allowing ReDoS while stripping comments.
+
+test "rank557: css-tools nested comment regex is catastrophic"
+  lang javascript
+  file index.ts
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  import CssParseError from '../CssParseError';
+
+  const commentre = /\/\*[^*]*\*+([^/*][^*]*\*+)*\//g;
+
+  export const parse = (css: string): Array<string> => {
+    function trim(str: string) {
+      return str.trim();
+    }
+
+    function selector() {
+      const m = /^([^{]+)/.exec(css);
+      if (!m) {
+        return;
+      }
+
+      const res = trim(m[0]).replace(commentre, '');
+      return res.split(',').map(s => trim(s));
+    }
+
+    return selector() || [];
+  };
+  ```
+
+test "rank557: css-tools non-greedy comment regex is clean"
+  lang javascript
+  file index.ts
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  import CssParseError from '../CssParseError';
+
+  const commentre = /\/\*[^]*?(?:\*\/|$)/g;
+
+  export const parse = (css: string): Array<string> => {
+    function trim(str: string) {
+      return str.trim();
+    }
+
+    function selector() {
+      const m = /^([^{]+)/.exec(css);
+      if (!m) {
+        return;
+      }
+
+      const res = trim(m[0]).replace(commentre, '');
+      return res.split(',').map(s => trim(s));
+    }
+
+    return selector() || [];
+  };
+  ```

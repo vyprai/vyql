@@ -1,0 +1,153 @@
+# Rank 1549 / CVE-2025-49132: Pterodactyl's locale endpoint fed raw
+# request values into the translation file loader, so a crafted
+# namespace or locale traversed out of the language directory and
+# read arbitrary .php files (path traversal to local file inclusion,
+# CWE-22/CWE-434; fixed quietly as "fix: add additional input
+# validation"). __invoke in app/Http/Controllers/Base/
+# LocaleController.php did `$locales = explode(' ',
+# $request->input('locale') ?? ''); $namespaces = explode(' ',
+# $request->input('namespace') ?? ''); ... $this->loader->load(
+# $locale, str_replace('.', '/', $namespace))` -- the loader reads
+# lang/<locale>/<namespace>.php under the project root, and both path
+# segments arrive unvalidated. The fixing commit 24c82b0e33 is the
+# real fix: a LocaleRequest FormRequest gates the endpoint with
+# `['locale' => ['required', 'string', 'regex:/^[a-z][a-z]$/'],
+# 'namespace' => ['required', 'string', 'regex:/^[a-z]{1,191}$/']]`
+# -- character allowlists that make traversal spellings unspellable
+# -- and the controller takes LocaleRequest instead of Request.
+#
+# CAUGHT by VYQL-PATH-001, and the earlier "no rule fires" was a
+# scoping artifact rather than a coverage gap: the source and the sink
+# both arrive through bindings gated on the composer lock, and a scan
+# whose root is the controller file alone leaves the manifest out of
+# scope, so every dependency-gated binding is inert and the file reads
+# as clean. Scanned over the real checkout (3 x --cache off,
+# timeout 180, --max-ram 6GB) the vulnerable revision reports
+# VYQL-PATH-001 HIGH at LocaleController.php:25 -> :33 -- source
+# code.HttpInput by php.input on the base-Request `->input()` read,
+# sink code.FilePathAccess by php.sinks on the `load()` argument --
+# and the fixed revision reports nothing on that file beyond the
+# unrelated weak-hash row, which merely moves from :43 to :34 as the
+# file shortens. `vyql diff` over the two revisions shows exactly one
+# semantic delta, this rule's row. The sink label is a bare-method
+# match at syntactic fidelity (the lock carries vlucas/phpdotenv
+# transitively through laravel/framework, and a package whose own API
+# documents `load($path)` contributes that spelling), which is why the
+# finding carries medium confidence; the discrimination is carried by
+# the source side, and it is the fix's own control: a parameter typed
+# with a form request class is validated input, not raw, so the same
+# `load()` call still carries the sink label at the fixed revision and
+# no longer reports. No definition change shipped. Spec
+# cve_rank1549 records the raw loader feed expecting VYQL-PATH-001
+# and the form-request form rejecting it, each with the lock the real
+# checkout scans under.
+
+test "rank1549: the loader is fed raw request segments"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "laravel/framework", "version": "v11.0.0"},
+          {"name": "vlucas/phpdotenv", "version": "v5.6.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Http/Controllers/Base/LocaleController.php
+  expect VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  namespace Pterodactyl\Http\Controllers\Base;
+
+  use Illuminate\Http\Request;
+  use Illuminate\Http\JsonResponse;
+  use Illuminate\Translation\Translator;
+  use Illuminate\Contracts\Translation\Loader;
+  use Pterodactyl\Http\Controllers\Controller;
+
+  class LocaleController extends Controller
+  {
+      protected Loader $loader;
+
+      public function __construct(Translator $translator)
+      {
+          $this->loader = $translator->getLoader();
+      }
+
+      public function __invoke(Request $request): JsonResponse
+      {
+          $locales = explode(' ', $request->input('locale') ?? '');
+          $namespaces = explode(' ', $request->input('namespace') ?? '');
+
+          $response = [];
+          foreach ($locales as $locale) {
+              $response[$locale] = [];
+              foreach ($namespaces as $namespace) {
+                  $response[$locale][$namespace] = $this->i18n(
+                      $this->loader->load($locale, str_replace('.', '/', $namespace))
+                  );
+              }
+          }
+
+          return new JsonResponse($response, 200, [
+              'ETag' => md5(json_encode($response, JSON_THROW_ON_ERROR)),
+          ]);
+      }
+  }
+  ```
+
+test "rank1549: the fixed revision allowlists both segments"
+  lang php
+  file composer.lock
+  code
+  ```
+  {
+      "packages": [
+          {"name": "laravel/framework", "version": "v11.0.0"},
+          {"name": "vlucas/phpdotenv", "version": "v5.6.0"}
+      ],
+      "packages-dev": []
+  }
+  ```
+  file app/Http/Controllers/Base/LocaleController.php
+  reject VYQL-PATH-001
+  code
+  ```
+  <?php
+
+  namespace Pterodactyl\Http\Controllers\Base;
+
+  use Illuminate\Http\JsonResponse;
+  use Illuminate\Translation\Translator;
+  use Illuminate\Contracts\Translation\Loader;
+  use Pterodactyl\Http\Controllers\Controller;
+  use Pterodactyl\Http\Requests\Base\LocaleRequest;
+
+  class LocaleController extends Controller
+  {
+      protected Loader $loader;
+
+      public function __construct(Translator $translator)
+      {
+          $this->loader = $translator->getLoader();
+      }
+
+      public function __invoke(LocaleRequest $request): JsonResponse
+      {
+          $locale = $request->input('locale');
+          $namespace = $request->input('namespace');
+
+          $response[$locale][$namespace] = $this->i18n(
+              $this->loader->load($locale, $namespace)
+          );
+
+          return new JsonResponse($response, 200, [
+              'ETag' => md5(json_encode($response, JSON_THROW_ON_ERROR)),
+          ]);
+      }
+  }
+  ```

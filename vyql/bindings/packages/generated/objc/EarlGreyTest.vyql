@@ -1,0 +1,9 @@
+module bindings.objc.generated.m4610b723;
+
+binding codeEval0 {
+  requires {
+    dependency("EarlGreyTest")
+  }
+  query pattern callExpr where callee.method == "actionForJavaScriptExecution"
+  emit sink code.CodeEval at args[0]
+}

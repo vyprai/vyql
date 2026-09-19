@@ -1,0 +1,8 @@
+module code;
+
+review code.BackendCalendarEventsMissingAuthorization {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: target
+  text: "verify backend calendar event APIs require an authenticated role and appointment-view privilege before returning appointment or customer data"
+}

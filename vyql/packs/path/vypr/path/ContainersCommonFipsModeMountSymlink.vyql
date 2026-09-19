@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule ContainersCommonFipsModeMountSymlink {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_59, CWE_22]
+    id: "VYQL-PATH-023"
+    severity: high
+  }
+  issue code.ContainersCommonFipsModeMountSymlink as sink
+}

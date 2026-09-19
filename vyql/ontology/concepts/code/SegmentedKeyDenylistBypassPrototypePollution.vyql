@@ -1,0 +1,11 @@
+module code;
+
+concept SegmentedKeyDenylistBypassPrototypePollution : issue {
+  cwe: [CWE_1321]
+  reviewAssumption: "a caller can supply a key such as \"__proto__.polluted\" whose full string is not itself __proto__, constructor, or prototype, but whose delimiter-separated segments include one"
+  reviewCategory: prototype_pollution
+  reviewCondition: "a denylist checks an untrusted key for membership in a fixed unsafe-name set as a whole string before forwarding the key downstream, but the key is later split on a delimiter and its segments used to build a nested object path, so a segment carrying an unsafe name never fails the whole-string check"
+  reviewConfidence: high
+  reviewEvidence: "key-forwarding context {pattern} iterates untrusted object keys, tests each whole key with indexOf/includes against a fixed unsafe-name list, and forwards any key that is not an exact match without checking its delimiter-separated segments"
+  vulnerableTo: [injection.PrototypePollution]
+}

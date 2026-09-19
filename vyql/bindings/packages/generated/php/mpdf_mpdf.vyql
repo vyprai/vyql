@@ -1,0 +1,74 @@
+module bindings.php.generated.m540714b3;
+
+binding htmlRender0 {
+  requires {
+    dependency("mpdf/mpdf")
+  }
+  query pattern callExpr where callee.method == "print_ob_text"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("mpdf/mpdf")
+  }
+  query pattern callExpr where callee.method == "print_ob_textarea"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("mpdf/mpdf")
+  }
+  query pattern callExpr where callee.method == "print_ob_select"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender3 {
+  requires {
+    dependency("mpdf/mpdf")
+  }
+  query pattern callExpr where callee.method == "print_ob_imageinput"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender4 {
+  requires {
+    dependency("mpdf/mpdf")
+  }
+  query pattern callExpr where callee.method == "print_ob_button"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender5 {
+  requires {
+    dependency("mpdf/mpdf")
+  }
+  query pattern callExpr where callee.method == "print_ob_checkbox"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender6 {
+  requires {
+    dependency("mpdf/mpdf")
+  }
+  query pattern callExpr where callee.method == "print_ob_radio"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding redirectTarget7 {
+  requires {
+    dependency("mpdf/mpdf")
+  }
+  query pattern callExpr where callee.method == "SetFormSubmit"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding httpInput8 {
+  requires {
+    dependency("mpdf/mpdf")
+  }
+  query pattern callExpr where callee.method == "SetFormSubmit"
+  emit source code.HttpInput at call.result
+}

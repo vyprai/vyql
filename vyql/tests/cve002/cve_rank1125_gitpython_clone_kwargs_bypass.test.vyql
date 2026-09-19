@@ -1,0 +1,134 @@
+# Rank 1125 / CVE-2023-40267: GitPython's clone/clone_from denylist checked the
+# clone options passed as the multi_options list and never the same option
+# passed as a keyword argument, so an extensible-shell option such as
+# upload_pack reached git clone unchecked (CWE-78). The weakness is inside the
+# library: a caller relying on the documented allow_unsafe_options guard is
+# correct code, and the report that belongs to this CVE is the dependency
+# finding on a pin below 3.1.32, the release the advisory names as first fixed.
+
+test "rank1125: a gitpython pin below the first fixed release is a dependency finding"
+  lang python
+  file app.py
+  code
+  ```
+  from git import Repo
+
+  def import_project(request):
+      url = request.args.get("repo_url")
+      upload_pack = request.args.get("upload_pack")
+      dest = tempfile.mkdtemp()
+      return Repo.clone_from(url, dest, upload_pack=upload_pack)
+  ```
+  file requirements.txt
+  code
+  ```
+  gitpython==3.1.27
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2023-40267
+
+test "rank1125: a gitpython pin at the first fixed release is clean"
+  lang python
+  file app.py
+  code
+  ```
+  from git import Repo
+
+  def import_project(request):
+      url = request.args.get("repo_url")
+      upload_pack = request.args.get("upload_pack")
+      dest = tempfile.mkdtemp()
+      return Repo.clone_from(url, dest, upload_pack=upload_pack)
+  ```
+  file requirements.txt
+  code
+  ```
+  gitpython==3.1.32
+  ```
+  reject VYQL-SCA-001
+
+# The clone call itself stays correct code whatever the library version: the
+# caller is relying on the library's documented option guard, and the
+# vulnerable-library report is carried by the dependency finding above, not by
+# a shell-injection finding on correct code.
+
+test "rank1125: the clone call guarded by the library is not an injection finding"
+  lang python
+  file app.py
+  code
+  ```
+  from git import Repo
+
+  def import_project(request):
+      url = request.args.get("repo_url")
+      upload_pack = request.args.get("upload_pack")
+      dest = tempfile.mkdtemp()
+      return Repo.clone_from(url, dest, upload_pack=upload_pack)
+  ```
+  file requirements.txt
+  code
+  ```
+  gitpython==3.1.27
+  ```
+  reject code.GitCloneBranchOptionShellInjection
+
+# Both revisions of the library's own _clone, kept so a later reader can see
+# what the patch changes rather than inferring it from the advisory text: the
+# unpatched form routes only the multi_options spellings through the denylist,
+# the patched form routes the keyword spellings through the same check. Neither
+# reports today, which is the honest state -- the guard-coverage relation that
+# would discriminate them is the one recorded for the dispatch/parallel-path
+# family, and naming multi_options or kwargs would name this project rather
+# than the weakness.
+
+test "rank1125: the unpatched _clone checks only the multi_options spellings"
+  lang python
+  file git/repo/base.py
+  code
+  ```
+  class Repo(object):
+      @classmethod
+      def _clone(cls, git, url, path, odb_default_type, progress, multi_options=None, **kwargs):
+          multi = None
+          if multi_options:
+              multi = shlex.split(" ".join(multi_options))
+
+          allow_unsafe_protocols = kwargs.pop("allow_unsafe_protocols", False)
+          allow_unsafe_options = kwargs.pop("allow_unsafe_options", False)
+
+          if not allow_unsafe_protocols:
+              Git.check_unsafe_protocols(str(url))
+          if not allow_unsafe_options and multi_options:
+              Git.check_unsafe_options(options=multi_options, unsafe_options=cls.unsafe_git_clone_options)
+
+          proc = git.clone(multi, Git.polish_url(str(url)), path, with_extended_output=True, as_process=True, v=True, **kwargs)
+          return cls._build_repo(path, odb_default_type, progress, proc)
+  ```
+  reject_review code.GitCloneBranchOptionShellInjection
+
+test "rank1125: the patched _clone routes the keyword spellings through the same check"
+  lang python
+  file git/repo/base.py
+  code
+  ```
+  class Repo(object):
+      @classmethod
+      def _clone(cls, git, url, path, odb_default_type, progress, multi_options=None, **kwargs):
+          multi = None
+          if multi_options:
+              multi = shlex.split(" ".join(multi_options))
+
+          allow_unsafe_protocols = kwargs.pop("allow_unsafe_protocols", False)
+          allow_unsafe_options = kwargs.pop("allow_unsafe_options", False)
+
+          if not allow_unsafe_protocols:
+              Git.check_unsafe_protocols(str(url))
+          if not allow_unsafe_options:
+              Git.check_unsafe_options(options=list(kwargs.keys()), unsafe_options=cls.unsafe_git_clone_options)
+          if not allow_unsafe_options and multi_options:
+              Git.check_unsafe_options(options=multi_options, unsafe_options=cls.unsafe_git_clone_options)
+
+          proc = git.clone(multi, Git.polish_url(str(url)), path, with_extended_output=True, as_process=True, v=True, **kwargs)
+          return cls._build_repo(path, odb_default_type, progress, proc)
+  ```
+  reject_review code.GitCloneBranchOptionShellInjection

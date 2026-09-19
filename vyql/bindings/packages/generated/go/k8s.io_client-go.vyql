@@ -1,0 +1,9 @@
+module bindings.go.generated.m25236ce9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("k8s.io/client-go")
+  }
+  query pattern callExpr where callee.method == "dataFromSliceOrFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,49 @@
+module bindings.c.generated.mc021190d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("kubazip")
+  }
+  query pattern callExpr where callee.method == "zip_open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("kubazip")
+  }
+  query pattern callExpr where callee.method == "zip_entry_open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("kubazip")
+  }
+  query pattern callExpr where callee.method == "zip_entry_opencasesensitive"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("kubazip")
+  }
+  query pattern callExpr where callee.method == "zip_entry_openbyindex"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding archiveEntryWrite4 {
+  requires {
+    dependency("kubazip")
+  }
+  query pattern callExpr where callee.method == "zip_entry_write"
+  emit sink code.ArchiveEntryWrite at args[0]
+}
+
+binding storedDataRead5 {
+  requires {
+    dependency("kubazip")
+  }
+  query pattern callExpr where callee.method == "zip_entry_read"
+  emit source code.StoredDataRead at call.result
+}

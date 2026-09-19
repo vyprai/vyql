@@ -1,0 +1,17 @@
+module bindings.perl.generated.mea98df63;
+
+binding networkData0 {
+  requires {
+    dependency("ACH")
+  }
+  query pattern callExpr where callee.method == "printAllData"
+  emit source code.NetworkData at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("ACH")
+  }
+  query pattern callExpr where callee.method == "getData"
+  emit source code.SecretValue at call.result
+}

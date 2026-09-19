@@ -1,0 +1,11 @@
+module code;
+
+concept ModexpZeroExponentIterationUnderflow : issue {
+  cwe: [CWE_191, CWE_400]
+  reviewAssumption: "callers can provide a zero exponent with an exponent length above the short-exponent branch, triggering unsigned underflow or inflated gas accounting"
+  reviewCategory: numeric
+  reviewCondition: "modular exponentiation gas accounting subtracts one from a zero exponent bit length before adding the positive length term"
+  reviewConfidence: high
+  reviewEvidence: "modexp iteration context {pattern} computes (exponent.bitand(...).bits() - 1) as a parenthesized subexpression"
+  vulnerableTo: [memory.IntegerOverflow, dos.UncontrolledResourceConsumption]
+}

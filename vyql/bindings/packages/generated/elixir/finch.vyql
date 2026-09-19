@@ -1,0 +1,49 @@
+module bindings.elixir.generated.m7bdd805f;
+
+binding networkSend0 {
+  requires {
+    dependency("finch")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("finch")
+  }
+  query pattern callExpr where callee.method == "request!"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("finch")
+  }
+  query pattern callExpr where callee.method == "stream"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("finch")
+  }
+  query pattern callExpr where callee.method == "stream_while"
+  emit source code.NetworkData at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("finch")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  requires {
+    dependency("finch")
+  }
+  query pattern callExpr where callee.method == "request!"
+  emit source code.HttpInput at call.result
+}

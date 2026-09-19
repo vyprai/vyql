@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mfc2f2fc0;
+
+binding deserialization0 {
+  requires {
+    dependency("opentelemetry")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

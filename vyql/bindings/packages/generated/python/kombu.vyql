@@ -1,0 +1,25 @@
+module bindings.python.generated.m0d6f79f6;
+
+binding networkData0 {
+  requires {
+    dependency("kombu")
+  }
+  query pattern callExpr where callee.method == "receive"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("kombu")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("kombu")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

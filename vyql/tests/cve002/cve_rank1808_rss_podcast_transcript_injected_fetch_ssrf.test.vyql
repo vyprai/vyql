@@ -1,0 +1,433 @@
+# summarize takes the URL it fetches for a podcast transcript out of the feed
+# itself. packages/core/src/content/transcript/providers/podcast/
+# rss-transcript.ts exports tryFetchTranscriptFromFeedXml, which receives the
+# RSS XML and the fetch implementation to use, regexes each <item> for a
+# <podcast:transcript url="..."> attribute, entity-decodes the value, and
+# dispatches it to the network:
+#
+#   const transcriptUrl = decodeXmlEntities(preferred.url);
+#   const res = await fetchImpl(transcriptUrl, {
+#     redirect: "follow",
+#     signal: AbortSignal.timeout(TRANSCRIPTION_TIMEOUT_MS),
+#     headers: { accept: "text/vtt,..." },
+#   });
+#
+# Whoever controls the feed controls the URL, and nothing between the regex and
+# the socket examines it: any scheme, any host, redirects followed
+# automatically, so a malicious feed points the process at loopback or a cloud
+# metadata endpoint and reads the answer back as transcript text. The callers
+# pass the transport through ({ fetchImpl: flow.options.fetch, feedXml, ... }),
+# so the injected value is the standard fetch. The fixing commit 3c5522440c48
+# routes the dispatch through fetchTranscriptUrl, which parses the URL, allows
+# only http/https, rejects blocked hostname suffixes and special-use address
+# prefixes, pins DNS for the connection, and follows redirects manually --
+# redirect: "manual" plus a capped loop that re-validates each hop -- so the
+# call that reaches the socket is await pinnedFetchImpl(target.url.href, ...)
+# on a local holding the parameter's value.
+#
+# ATTENTION, rechecked: engine gap, the parameter form of the callee-provenance
+# family (ENGINE-GAPS.md; the local-alias form is the rank-1088 entry, the
+# computed-read form the rank-1725 one). A callee-path binding matches the call
+# site's textual callee, so `callee.path ~= "fetch"` labels `fetch(...)` and
+# `flow.options.fetch(...)` but not `fetchImpl(...)`, where the callee is a
+# parameter of the enclosing function holding the function value. Everything
+# else in the path is measured working, and four findings sharpen what a fix
+# needs:
+#
+# 1. The substitution proves the path. Naming the global at that one call on
+#    the vulnerable parent -- `await fetchImpl(` -> `await fetch(` at
+#    rss-transcript.ts:53, nothing else changed -- takes the checkout from 431
+#    findings to 432 and adds exactly one VYQL-RF-001 row with sink
+#    `code.UrlFetch @ .../rss-transcript.ts:53` and the full taint path from
+#    source to `Arg#503`. The file as written reports nothing: `vyql match` on
+#    it labels `code.ExternalEntryInput` on the exported parameters at :18 and
+#    `code.SqlExecution` on a `.get(...)` argument at :61 (the known
+#    over-labelling), and no `code.UrlFetch` anywhere.
+# 2. No binding predicate reaches the callee's declared type. The callExpr
+#    predicate set (compile_shapes.go lowerV2CallShapeAtom) is callee.method,
+#    callee.path, callee.receiver.type, args.count, args.any.literal,
+#    scope.call.*, and filter.global; `node.context.*` is not among them and a
+#    binding using it fails to lower while the run still exits 0 reporting
+#    zero (the masquerade family, re-measured at the rank-1725 recheck). So
+#    even a param_type token emitted into the function context -- which
+#    JavaScript does not emit today; csharp.go:300, java.go:707, php.go:454 and
+#    c.go:611 do -- could not be read by the callExpr binding that has to emit
+#    the sink.
+# 3. The destructured spelling loses the type before any of that. Measured
+#    against the extractor: a simple `function f(fetchImpl: typeof fetch, ...)`
+#    extracts ParamTypes {"fetchImpl": "fetch"}, but the destructured spelling
+#    this file uses, `({ fetchImpl, feedXml }: { fetchImpl: typeof fetch; ... })`,
+#    extracts {"feedXml }": "}"} -- paramTypes (javascript.go:3483) has no
+#    object_pattern case, so funcParamTypes falls back to jsParamTypesFromText,
+#    which comma-splits the annotation block. The `typeof fetch` annotation is
+#    therefore not in the graph at all for this shape.
+# 4. Resolving the callee would not separate the revisions. Naming the global
+#    at the patched revision's own socket call -- `await pinnedFetchImpl(` ->
+#    `await fetch(` at rss-transcript.ts:334 -- makes VYQL-RF-001 report there
+#    too, through resolveTranscriptFetchTarget's return value, with both
+#    `unless` clauses reading "not satisfied — no neutralizing control
+#    dominates the path": the remediation's scheme, hostname and redirect
+#    checks are hand-rolled and no control concept labels them. The gap closure
+#    is a half-unlock, not a discrimination.
+#
+# Bounded scans (timeout 180, --cache off --max-ram 6GB, run from inside the
+# worktree with the worktree's binary), three runs per revision: the vulnerable
+# parent reports 431 findings (327 at or above high) with none on
+# rss-transcript.ts; the patched revision reports 437 (332 at or above high),
+# stable across the three runs. `vyql diff` on the two JSON outputs: 429
+# fingerprints unchanged, 2 removed, 8 added, every added row landing on the
+# fix's own new files (packages/core/src/content/dns-pinned-fetch.ts:70,
+# fetch-capabilities.ts:33, src/shared/dns-pinned-fetch.ts:70,
+# src/shared/fetch-capabilities.ts:33, tests/dns-pinned-fetch.test.ts) or the
+# rewritten url-fetch-guard, none on the transcript dispatch the advisory is
+# about. The RF-001 rows the podcast providers do carry are the callers' own
+# feed fetches, `flow.options.fetch(...)` at apple-flow.ts:37 and :123 and
+# spotify-flow.ts:150, which the dotted spelling of the same callee-path rule
+# labels on both revisions.
+#
+# What the vocabulary would need, per ENGINE-GAPS.md: callee parameter
+# provenance exposed at the call node in a form a callExpr predicate can read.
+# For this file's spelling that is three coupled changes -- destructuring-aware
+# parameter-type threading, the fact or resolution itself, and a binding route
+# to it -- plus a control concept for hand-rolled URL scheme and host
+# validation before the patched revision stops reporting. Not mechanical.
+
+test "rank1808: a feed-derived transcript URL is fetched through the injected fetch implementation"
+  lang javascript
+  file rss-transcript.ts
+  profile library
+  reject VYQL-RF-001
+  code
+  ```
+  type TranscriptCandidate = { url: string; type: string | null };
+
+  export async function tryFetchTranscriptFromFeedXml({
+    fetchImpl,
+    feedXml,
+  }: {
+    fetchImpl: typeof fetch;
+    feedXml: string;
+  }): Promise<{ text: string; transcriptUrl: string } | null> {
+    const items = extractFeedItems(feedXml);
+    for (const item of items) {
+      const preferred = selectPreferred(extractPodcastTranscriptCandidatesFromItem(item));
+      if (!preferred) continue;
+      const transcriptUrl = decodeXmlEntities(preferred.url);
+      const res = await fetchImpl(transcriptUrl, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(30000),
+        headers: { accept: "text/vtt,text/plain,application/json;q=0.9,*/*;q=0.8" },
+      });
+      if (!res.ok) return null;
+      const body = await res.text();
+      return { text: body, transcriptUrl };
+    }
+    return null;
+  }
+
+  function extractFeedItems(xml: string): string[] {
+    const out: string[] = [];
+    for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) out.push(m[1] ?? "");
+    return out;
+  }
+
+  function extractPodcastTranscriptCandidatesFromItem(itemXml: string): TranscriptCandidate[] {
+    const matches = itemXml.matchAll(
+      /<podcast:transcript\b[^>]*\burl\s*=\s*(['"])([^'"]+)\1[^>]*>/gi,
+    );
+    const results: TranscriptCandidate[] = [];
+    for (const match of matches) {
+      const url = match[2]?.trim();
+      if (!url) continue;
+      results.push({ url, type: null });
+    }
+    return results;
+  }
+
+  function selectPreferred(c: TranscriptCandidate[]): TranscriptCandidate | null {
+    return c[0] ?? null;
+  }
+
+  function decodeXmlEntities(v: string): string {
+    return v.replaceAll("&amp;", "&");
+  }
+  ```
+
+test "rank1808: the same body names fetch directly and reports"
+  lang javascript
+  file rss-transcript.ts
+  profile library
+  expect VYQL-RF-001
+  code
+  ```
+  type TranscriptCandidate = { url: string; type: string | null };
+
+  export async function tryFetchTranscriptFromFeedXml({
+    fetchImpl,
+    feedXml,
+  }: {
+    fetchImpl: typeof fetch;
+    feedXml: string;
+  }): Promise<{ text: string; transcriptUrl: string } | null> {
+    const items = extractFeedItems(feedXml);
+    for (const item of items) {
+      const preferred = selectPreferred(extractPodcastTranscriptCandidatesFromItem(item));
+      if (!preferred) continue;
+      const transcriptUrl = decodeXmlEntities(preferred.url);
+      const res = await fetch(transcriptUrl, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(30000),
+        headers: { accept: "text/vtt,text/plain,application/json;q=0.9,*/*;q=0.8" },
+      });
+      if (!res.ok) return null;
+      const body = await res.text();
+      return { text: body, transcriptUrl };
+    }
+    return null;
+  }
+
+  function extractFeedItems(xml: string): string[] {
+    const out: string[] = [];
+    for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) out.push(m[1] ?? "");
+    return out;
+  }
+
+  function extractPodcastTranscriptCandidatesFromItem(itemXml: string): TranscriptCandidate[] {
+    const matches = itemXml.matchAll(
+      /<podcast:transcript\b[^>]*\burl\s*=\s*(['"])([^'"]+)\1[^>]*>/gi,
+    );
+    const results: TranscriptCandidate[] = [];
+    for (const match of matches) {
+      const url = match[2]?.trim();
+      if (!url) continue;
+      results.push({ url, type: null });
+    }
+    return results;
+  }
+
+  function selectPreferred(c: TranscriptCandidate[]): TranscriptCandidate | null {
+    return c[0] ?? null;
+  }
+
+  function decodeXmlEntities(v: string): string {
+    return v.replaceAll("&amp;", "&");
+  }
+  ```
+
+test "rank1808: the patched form validates scheme, resolved addresses and each redirect before dispatch"
+  lang javascript
+  file rss-transcript.ts
+  profile library
+  reject VYQL-RF-001
+  code
+  ```
+  type TranscriptCandidate = { url: string; type: string | null };
+
+  const MAX_TRANSCRIPT_REDIRECTS = 10;
+  const BLOCKED_HOSTNAME_SUFFIXES = [".localhost", ".internal"];
+  const BLOCKED_IPV4_PREFIXES = ["0.", "10.", "127.", "169.254.", "192.168."];
+
+  export async function tryFetchTranscriptFromFeedXml({
+    fetchImpl,
+    feedXml,
+  }: {
+    fetchImpl: typeof fetch;
+    feedXml: string;
+  }): Promise<{ text: string; transcriptUrl: string } | null> {
+    const items = extractFeedItems(feedXml);
+    for (const item of items) {
+      const preferred = selectPreferred(extractPodcastTranscriptCandidatesFromItem(item));
+      if (!preferred) continue;
+      const transcriptUrl = decodeXmlEntities(preferred.url);
+      const res = await fetchTranscriptUrl(fetchImpl, transcriptUrl, {
+        signal: AbortSignal.timeout(30000),
+        headers: { accept: "text/vtt,text/plain,application/json;q=0.9,*/*;q=0.8" },
+      });
+      if (!res.ok) return null;
+      const body = await res.text();
+      return { text: body, transcriptUrl };
+    }
+    return null;
+  }
+
+  async function fetchTranscriptUrl(
+    fetchImpl: typeof fetch,
+    rawUrl: string,
+    options: { signal?: AbortSignal; headers?: HeadersInit },
+    redirectCount = 0,
+  ): Promise<Response> {
+    const target = await resolveTranscriptFetchTarget(rawUrl);
+    const pinnedFetchImpl = fetchImpl;
+    const response = await pinnedFetchImpl(target.url.href, {
+      headers: options.headers,
+      signal: options.signal,
+      redirect: "manual",
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const location = response.headers.get("location");
+    if (!location) return response;
+    if (redirectCount >= MAX_TRANSCRIPT_REDIRECTS) {
+      throw new Error("RSS transcript URL redirected too many times");
+    }
+    const nextUrl = new URL(location, target.url.href).href;
+    return await fetchTranscriptUrl(fetchImpl, nextUrl, options, redirectCount + 1);
+  }
+
+  async function resolveTranscriptFetchTarget(
+    rawUrl: string,
+  ): Promise<{ url: URL }> {
+    let url: URL;
+    try {
+      url = new URL(rawUrl);
+    } catch {
+      throw new Error("RSS transcript URL is invalid");
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("RSS transcript URL must use http or https");
+    }
+    const hostname = url.hostname.trim().replace(/^\[|\]$/g, "").toLowerCase();
+    if (hostname === "localhost" || BLOCKED_HOSTNAME_SUFFIXES.some((s) => hostname.endsWith(s))) {
+      throw new Error("RSS transcript URL resolves to a blocked local network host");
+    }
+    if (BLOCKED_IPV4_PREFIXES.some((p) => hostname.startsWith(p))) {
+      throw new Error("RSS transcript URL resolves to a blocked local network address");
+    }
+    return { url };
+  }
+
+  function extractFeedItems(xml: string): string[] {
+    const out: string[] = [];
+    for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) out.push(m[1] ?? "");
+    return out;
+  }
+
+  function extractPodcastTranscriptCandidatesFromItem(itemXml: string): TranscriptCandidate[] {
+    const matches = itemXml.matchAll(
+      /<podcast:transcript\b[^>]*\burl\s*=\s*(['"])([^'"]+)\1[^>]*>/gi,
+    );
+    const results: TranscriptCandidate[] = [];
+    for (const match of matches) {
+      const url = match[2]?.trim();
+      if (!url) continue;
+      results.push({ url, type: null });
+    }
+    return results;
+  }
+
+  function selectPreferred(c: TranscriptCandidate[]): TranscriptCandidate | null {
+    return c[0] ?? null;
+  }
+
+  function decodeXmlEntities(v: string): string {
+    return v.replaceAll("&amp;", "&");
+  }
+  ```
+
+test "rank1808: the patched form's own dispatch reports once the callee is named directly"
+  lang javascript
+  file rss-transcript.ts
+  profile library
+  expect VYQL-RF-001
+  code
+  ```
+  type TranscriptCandidate = { url: string; type: string | null };
+
+  const MAX_TRANSCRIPT_REDIRECTS = 10;
+  const BLOCKED_HOSTNAME_SUFFIXES = [".localhost", ".internal"];
+  const BLOCKED_IPV4_PREFIXES = ["0.", "10.", "127.", "169.254.", "192.168."];
+
+  export async function tryFetchTranscriptFromFeedXml({
+    fetchImpl,
+    feedXml,
+  }: {
+    fetchImpl: typeof fetch;
+    feedXml: string;
+  }): Promise<{ text: string; transcriptUrl: string } | null> {
+    const items = extractFeedItems(feedXml);
+    for (const item of items) {
+      const preferred = selectPreferred(extractPodcastTranscriptCandidatesFromItem(item));
+      if (!preferred) continue;
+      const transcriptUrl = decodeXmlEntities(preferred.url);
+      const res = await fetchTranscriptUrl(fetchImpl, transcriptUrl, {
+        signal: AbortSignal.timeout(30000),
+        headers: { accept: "text/vtt,text/plain,application/json;q=0.9,*/*;q=0.8" },
+      });
+      if (!res.ok) return null;
+      const body = await res.text();
+      return { text: body, transcriptUrl };
+    }
+    return null;
+  }
+
+  async function fetchTranscriptUrl(
+    fetchImpl: typeof fetch,
+    rawUrl: string,
+    options: { signal?: AbortSignal; headers?: HeadersInit },
+    redirectCount = 0,
+  ): Promise<Response> {
+    const target = await resolveTranscriptFetchTarget(rawUrl);
+    const pinnedFetchImpl = fetchImpl;
+    const response = await fetch(target.url.href, {
+      headers: options.headers,
+      signal: options.signal,
+      redirect: "manual",
+    });
+    if (![301, 302, 303, 307, 308].includes(response.status)) return response;
+    const location = response.headers.get("location");
+    if (!location) return response;
+    if (redirectCount >= MAX_TRANSCRIPT_REDIRECTS) {
+      throw new Error("RSS transcript URL redirected too many times");
+    }
+    const nextUrl = new URL(location, target.url.href).href;
+    return await fetchTranscriptUrl(fetchImpl, nextUrl, options, redirectCount + 1);
+  }
+
+  async function resolveTranscriptFetchTarget(
+    rawUrl: string,
+  ): Promise<{ url: URL }> {
+    let url: URL;
+    try {
+      url = new URL(rawUrl);
+    } catch {
+      throw new Error("RSS transcript URL is invalid");
+    }
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      throw new Error("RSS transcript URL must use http or https");
+    }
+    const hostname = url.hostname.trim().replace(/^\[|\]$/g, "").toLowerCase();
+    if (hostname === "localhost" || BLOCKED_HOSTNAME_SUFFIXES.some((s) => hostname.endsWith(s))) {
+      throw new Error("RSS transcript URL resolves to a blocked local network host");
+    }
+    if (BLOCKED_IPV4_PREFIXES.some((p) => hostname.startsWith(p))) {
+      throw new Error("RSS transcript URL resolves to a blocked local network address");
+    }
+    return { url };
+  }
+
+  function extractFeedItems(xml: string): string[] {
+    const out: string[] = [];
+    for (const m of xml.matchAll(/<item\b[^>]*>([\s\S]*?)<\/item>/gi)) out.push(m[1] ?? "");
+    return out;
+  }
+
+  function extractPodcastTranscriptCandidatesFromItem(itemXml: string): TranscriptCandidate[] {
+    const matches = itemXml.matchAll(
+      /<podcast:transcript\b[^>]*\burl\s*=\s*(['"])([^'"]+)\1[^>]*>/gi,
+    );
+    const results: TranscriptCandidate[] = [];
+    for (const match of matches) {
+      const url = match[2]?.trim();
+      if (!url) continue;
+      results.push({ url, type: null });
+    }
+    return results;
+  }
+
+  function selectPreferred(c: TranscriptCandidate[]): TranscriptCandidate | null {
+    return c[0] ?? null;
+  }
+
+  function decodeXmlEntities(v: string): string {
+    return v.replaceAll("&amp;", "&");
+  }
+  ```

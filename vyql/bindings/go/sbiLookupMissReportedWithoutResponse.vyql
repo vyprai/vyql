@@ -1,0 +1,25 @@
+module bindings.go.sbiLookupMissReportedWithoutResponse;
+
+// A service handler resolves a request-addressed record with a comma-ok store
+// lookup and answers a miss by building a problem-details value with the NF's
+// util helper and reporting it through the NF logger. Reporting a miss is not
+// answering it: the request is finished only when the handler writes the
+// response -- gin's Context.JSON and its siblings -- and returns from that
+// branch. A branch that reports the miss and falls through leaves the handler
+// running on a value the lookup did not produce, and the first use of it, a
+// type assertion on the stored interface, panics on the nil interface value.
+//
+// The response write counts only where the miss was detected. The scope is the
+// branch holding the problem construction, so a handler that answers the miss
+// inside the branch that found it does not report, and a write in a later,
+// unrelated branch does not clear a branch that fell through. A branch that
+// sets the problem variable without reporting it through the logger is
+// deferring to a guard that follows rather than handling the miss, and is left
+// alone.
+binding sbiLookupMissReportedWithoutResponse {
+  requires {
+    dependency("github.com/free5gc/udr/internal/util")
+  }
+  query pattern presenceNode where node.kind == "call" and node.path ~= "ProblemDetailsNotFound" and node.context.scopeCall contains ".Errorf" and not (containsAny(node.context.scopeCall, ["c.JSON", "c.XML", "c.YAML", "c.String", "c.Data", "c.AbortWithStatus", "c.AbortWithStatusJSON", "c.AbortWithError"]))
+  emit issue code.NullableDeref at node
+}

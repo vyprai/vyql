@@ -1,0 +1,25 @@
+module bindings.perl.generated.m267a5c99;
+
+binding deserialization0 {
+  requires {
+    dependency("P5U")
+  }
+  query pattern callExpr where callee.method == "YAML::Tiny::Load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("P5U")
+  }
+  query pattern callExpr where callee.method == "YAML::Tiny::LoadFile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("P5U")
+  }
+  query pattern callExpr where callee.method == "YAML::Tiny::read_string"
+  emit sink code.Deserialization at args[0]
+}

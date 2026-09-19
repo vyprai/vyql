@@ -1,0 +1,37 @@
+# Rank 639 / CVE-2026-27982: django-allauth accepted SAML RelayState
+# as a post-login redirect target without allauth's safe-url validator.
+test "rank639: SAML RelayState URL becomes redirect target without safe-url validation"
+  lang python
+  file utils.py
+  expect VYQL-RF-024
+  code
+  ```
+  from urllib.parse import urlparse
+
+  def decode_relay_state(relay_state):
+      next_url = None
+      if relay_state:
+          parts = urlparse(relay_state)
+          if parts.scheme or parts.netloc or (parts.path and parts.path.startswith("/")):
+              next_url = relay_state
+      return next_url
+  ```
+
+test "rank639: SAML RelayState redirect target uses allauth safe-url validation"
+  lang python
+  file utils.py
+  reject VYQL-RF-024
+  code
+  ```
+  from urllib.parse import urlparse
+  from allauth.account.adapter import get_adapter as get_account_adapter
+
+  def decode_relay_state(relay_state):
+      next_url = None
+      if relay_state:
+          parts = urlparse(relay_state)
+          if parts.scheme or parts.netloc or (parts.path and parts.path.startswith("/")):
+              if get_account_adapter().is_safe_url(relay_state):
+                  next_url = relay_state
+      return next_url
+  ```

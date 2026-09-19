@@ -1,0 +1,25 @@
+module bindings.rust.header_value_decode_unwrapped;
+
+// A HeaderValue in the http crate is a bag of bytes: the wire format permits
+// header contents that are not valid UTF-8, and to_str() is the documented
+// decode to text, returning Err whenever the bytes are not visible ASCII.
+// Unwrapping that decode turns a malformed header into a Rust panic, and
+// inside request handling there is no Result for the panic to travel in, so
+// one request with an odd header byte takes the worker down. The returning
+// forms -- unwrap_or_default(), unwrap_or(...), or matching on the Result and
+// rejecting the request -- keep this binding quiet.
+//
+// The shape is recognised at function scope over the compacted body text
+// rather than on the call node, because the idiom is habitually written
+// inside a macro invocation or a deep iterator chain whose interior emits no
+// call nodes at all; the text route survives that and is indifferent to
+// formatting. Two residuals come with it. The two needles co-occur as
+// members of one function, so a header read and an unwrapped to_str() on an
+// unrelated value in the same function still match. And the body text keeps
+// comments, so a comment naming the idiom in a function that also reads a
+// header can match on its own. Both are over-reporting in the review
+// direction; neither hides a vulnerable call.
+binding headerValueDecodeUnwrapped {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.token, ["to_str().unwrap()", "to_str().expect("]) and containsAny(node.token, ["headers.get", "headers().get"])
+  emit issue code.UncheckedDecodeResult at node
+}

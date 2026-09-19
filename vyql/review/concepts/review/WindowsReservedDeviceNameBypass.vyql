@@ -1,0 +1,7 @@
+module code;
+
+review code.WindowsReservedDeviceNameBypass {
+  category: path
+  kind: attention
+  text: "review Windows reserved device-name denylist coverage for superscript digit variants"
+}

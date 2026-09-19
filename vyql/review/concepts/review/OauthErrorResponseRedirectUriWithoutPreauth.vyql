@@ -1,0 +1,8 @@
+module code;
+
+review code.OauthErrorResponseRedirectUriWithoutPreauth {
+  category: request_forgery
+  expected: [core.RedirectAllowlist]
+  kind: attention
+  text: "review OAuth error handling that redirects to the request's own redirect_uri before pre-authorization validates it"
+}

@@ -1,0 +1,68 @@
+module bindings.go.generated.md6dcc4ff;
+
+binding httpInput0 {
+  requires {
+    dependency("google.golang.org/appengine")
+  }
+  query pattern callExpr where callee.method == "NewContext"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("google.golang.org/appengine")
+  }
+  query pattern callExpr where callee.method == "WithContext"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("google.golang.org/appengine")
+  }
+  query pattern callExpr where callee.method == "AccessToken"
+  emit source code.SecretValue at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("google.golang.org/appengine")
+  }
+  query pattern callExpr where callee.method == "CurrentOAuth"
+  emit source code.HttpInput at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("google.golang.org/appengine")
+  }
+  query pattern callExpr where callee.method == "OAuthConsumerKey"
+  emit source code.SecretValue at call.result
+}
+
+binding redirectTarget5 {
+  requires {
+    dependency("google.golang.org/appengine")
+  }
+  query pattern callExpr where callee.method == "LoginURL"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget6 {
+  requires {
+    dependency("google.golang.org/appengine")
+  }
+  query pattern callExpr where callee.method == "LoginURLFederated"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget7 {
+  requires {
+    dependency("google.golang.org/appengine")
+  }
+  query pattern callExpr where callee.method == "LogoutURL"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

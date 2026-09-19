@@ -1,0 +1,8 @@
+# Rank 19 / CVE-2026-33693: ActivityPub Federation Rust incomplete IP denylist.
+
+test "rank19: incomplete IP denylist is a CVE anchor"
+  expect VYQL-RF-004
+  graph
+  ```
+  node guard code.IncompleteIpDenylist
+  ```

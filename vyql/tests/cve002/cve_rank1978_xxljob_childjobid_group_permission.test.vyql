@@ -1,0 +1,324 @@
+# Rank 1978 / CVE-2024-42681 (GHSA-cpfp-m5qw-c4r3, CWE-732): xxl-job's admin
+# console binds a whole XxlJobInfo form object on /jobinfo/add and /jobinfo/update,
+# and its childJobId field is a comma list of sub-task IDs. The service
+# (XxlJobServiceImpl at fix parent 5d71149) splits the list and, per ID,
+#
+#	XxlJobInfo childJobInfo = xxlJobInfoDao.loadById(Integer.parseInt(childJobIdItem));
+#	if (childJobInfo==null) { return FAIL; }          // existence only
+#
+# so a normal user whose permission list covers group A can attach a sub-task
+# from group B: the referenced job is resolved and the reference persisted with
+# no check that the login user may operate on the child's job group. Fix
+# a2dc901 threads the login user down from the controller and adds
+# `if (!loginUser.validPermission(childJobInfo.getJobGroup())) return FAIL;`
+# beside the existence check, in both add() and update().
+#
+# Diagnosis, verified with match/resolve/trace on a repro of the real layout:
+#   - the source half works: the @RequestMapping handler parameter entry is
+#     labelled code.HttpInput, and taint survives the getter, split() and
+#     Integer.parseInt.
+#   - the call `xxlJobService.add(jobInfo)` on the interface-typed field DOES
+#     dispatch into XxlJobServiceImpl.add: the taint path runs
+#     JobInfoController.add#param#jobInfo -> Arg -> XxlJobServiceImpl.add#param#jobInfo,
+#     and on the real checkout six VYQL-INJ-004/009 rows now sit inside
+#     XxlJobServiceImpl with exactly that prefix. Interface/abstract dispatch
+#     into concrete overrides resolves (resolveTargets' abstract branch,
+#     internal/extract/lowering/lowering.go:5350, returns
+#     resolveDerivedMethods(...) as reach-only targets). Tests 1 and 3 below
+#     differ only in the lookup spelling and flip the finding, with the
+#     interface hop held constant.
+#   - the remaining miss is one name: the project's lookup spelling `loadById`
+#     is not a sink. code.ObjectLookupByUserInput binds findById,
+#     getReferenceById, getAccount and getOrder only.
+#
+# Measured on the real checkout (three --cache off runs each revision, timeout
+# 180, --max-ram 6GB): 134 findings at the parent and 136 at the fixed revision
+# (the +2 are VYQL-INJ-004 on the new error-message strings), with zero
+# VYQL-AUTH-002 rows in all six runs and nothing on the childJobId loop -- the
+# only rows inside XxlJobServiceImpl are INJ-004/INJ-009 on the i18n message
+# formatting and log calls, not the permission defect.
+#
+# A probe binding `callee.method == "loadById" -> code.ObjectLookupByUserInput`
+# was A/B'd on the same trees (three runs each): +12 VYQL-AUTH-002 at the parent
+# (146 total) and +12 at the fixed revision (148 total) -- byte-identical sets,
+# zero discrimination, because VYQL-AUTH-002's `unless endpoint coveredBy
+# core.OwnershipCheck` is satisfied by neither the fix's `validPermission` nor
+# the project's `hasPermission` (bound as core.AuthorizationCheck, a sibling
+# concept, and used only by trigger() at :363, not by add/update/remove/start).
+# The only discriminator available is `validPermission`, the project's own model
+# method. Reach for both names, enumerated exhaustively: `.loadById(` occurs in
+# xxl-job alone across every Java-bearing clone under /tmp/cve-work (66 rank
+# directories, 115,749 .java files; the three other textual hits are
+# `unloadByIdle`, `downloadById()` and `InvalidPermission.Duplicate`), and
+# `validPermission` in xxl-job alone. Neither identifier occurs in
+# /tmp/bench/BenchmarkJava or /tmp/bench/BenchmarkPython, so neither binding has
+# a measurable effect on any corpus -- a detection change with no number.
+#
+# verify_current_expected: attention-vocabulary-gap. Tests 1, 2 and 4 pin the
+# miss (reject while nothing detects); test 3 is the positive control proving
+# the interface hop resolves and only the spelling is dark. When `loadById` (or
+# the DAO-lookup family generally) is bound as a lookup sink, test 1 flips to
+# expect VYQL-AUTH-002 -- and the fixed revision still reports until a control
+# covering the loaded object's group is bound, at which point test 2 stays
+# reject and becomes the discriminator.
+
+test "rank1978: a child-job reference resolved behind the service interface with no group permission check reports nothing"
+  lang java
+  file JobInfoController.java
+  reject VYQL-AUTH-002
+  code
+  ```
+  package com.xxl.job.admin.controller;
+
+  import org.springframework.stereotype.Controller;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.bind.annotation.ResponseBody;
+  import javax.annotation.Resource;
+
+  @Controller
+  @RequestMapping("/jobinfo")
+  public class JobInfoController {
+      @Resource
+      private XxlJobService xxlJobService;
+
+      @RequestMapping("/add")
+      @ResponseBody
+      public ReturnT<String> add(XxlJobInfo jobInfo) {
+          return xxlJobService.add(jobInfo);
+      }
+  }
+
+  interface XxlJobService {
+      ReturnT<String> add(XxlJobInfo jobInfo);
+  }
+
+  class XxlJobInfoDao {
+      public XxlJobInfo loadById(int id) { return null; }
+      public XxlJobInfo findById(int id) { return null; }
+      public void save(XxlJobInfo info) { }
+  }
+
+  class XxlJobInfo {
+      private String childJobId;
+      public String getChildJobId() { return childJobId; }
+  }
+
+  class ReturnT<T> {
+      public static final int FAIL_CODE = 500;
+      public ReturnT(int code, String msg) { }
+      public ReturnT(String msg) { }
+  }
+
+  class XxlJobServiceImpl implements XxlJobService {
+      private XxlJobInfoDao xxlJobInfoDao;
+
+      public ReturnT<String> add(XxlJobInfo jobInfo) {
+          if (jobInfo.getChildJobId() != null && jobInfo.getChildJobId().trim().length() > 0) {
+              String[] childJobIds = jobInfo.getChildJobId().split(",");
+              for (String childJobIdItem : childJobIds) {
+                  if (childJobIdItem != null && childJobIdItem.trim().length() > 0) {
+                      XxlJobInfo childJobInfo = xxlJobInfoDao.loadById(Integer.parseInt(childJobIdItem));
+                      if (childJobInfo == null) {
+                          return new ReturnT<String>(ReturnT.FAIL_CODE, "child job not found");
+                      }
+                  }
+              }
+          }
+          xxlJobInfoDao.save(jobInfo);
+          return new ReturnT<String>("ok");
+      }
+  }
+  ```
+
+test "rank1978: the patched loop validates the child job's group against the login user"
+  lang java
+  file JobInfoControllerFixed.java
+  reject VYQL-AUTH-002
+  code
+  ```
+  package com.xxl.job.admin.controller;
+
+  import org.springframework.stereotype.Controller;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.bind.annotation.ResponseBody;
+  import javax.annotation.Resource;
+
+  @Controller
+  @RequestMapping("/jobinfo")
+  public class JobInfoController {
+      @Resource
+      private XxlJobService xxlJobService;
+
+      @RequestMapping("/add")
+      @ResponseBody
+      public ReturnT<String> add(XxlJobInfo jobInfo) {
+          return xxlJobService.add(jobInfo);
+      }
+  }
+
+  interface XxlJobService {
+      ReturnT<String> add(XxlJobInfo jobInfo);
+  }
+
+  class XxlJobInfoDao {
+      public XxlJobInfo loadById(int id) { return null; }
+      public void save(XxlJobInfo info) { }
+  }
+
+  class XxlJobInfo {
+      private String childJobId;
+      public String getChildJobId() { return childJobId; }
+      public int getJobGroup() { return 0; }
+  }
+
+  class ReturnT<T> {
+      public static final int FAIL_CODE = 500;
+      public ReturnT(int code, String msg) { }
+      public ReturnT(String msg) { }
+  }
+
+  class XxlJobUser {
+      public boolean validPermission(int jobGroup) { return true; }
+  }
+
+  class XxlJobServiceImpl implements XxlJobService {
+      private XxlJobInfoDao xxlJobInfoDao;
+
+      public ReturnT<String> add(XxlJobInfo jobInfo, XxlJobUser loginUser) {
+          if (jobInfo.getChildJobId() != null && jobInfo.getChildJobId().trim().length() > 0) {
+              String[] childJobIds = jobInfo.getChildJobId().split(",");
+              for (String childJobIdItem : childJobIds) {
+                  if (childJobIdItem != null && childJobIdItem.trim().length() > 0) {
+                      XxlJobInfo childJobInfo = xxlJobInfoDao.loadById(Integer.parseInt(childJobIdItem));
+                      if (childJobInfo == null) {
+                          return new ReturnT<String>(ReturnT.FAIL_CODE, "child job not found");
+                      }
+                      if (!loginUser.validPermission(childJobInfo.getJobGroup())) {
+                          return new ReturnT<String>(ReturnT.FAIL_CODE, "permission limit");
+                      }
+                  }
+              }
+          }
+          xxlJobInfoDao.save(jobInfo);
+          return new ReturnT<String>("ok");
+      }
+  }
+  ```
+
+test "rank1978: the same loop behind the interface under the bound lookup spelling reports the direct object lookup"
+  lang java
+  file JobInfoControllerBoundSpelling.java
+  expect VYQL-AUTH-002
+  code
+  ```
+  package com.xxl.job.admin.controller;
+
+  import org.springframework.stereotype.Controller;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.bind.annotation.ResponseBody;
+  import javax.annotation.Resource;
+
+  @Controller
+  @RequestMapping("/jobinfo")
+  public class JobInfoController {
+      @Resource
+      private XxlJobService xxlJobService;
+
+      @RequestMapping("/add")
+      @ResponseBody
+      public ReturnT<String> add(XxlJobInfo jobInfo) {
+          return xxlJobService.add(jobInfo);
+      }
+  }
+
+  interface XxlJobService {
+      ReturnT<String> add(XxlJobInfo jobInfo);
+  }
+
+  class XxlJobInfoDao {
+      public XxlJobInfo findById(int id) { return null; }
+      public void save(XxlJobInfo info) { }
+  }
+
+  class XxlJobInfo {
+      private String childJobId;
+      public String getChildJobId() { return childJobId; }
+  }
+
+  class ReturnT<T> {
+      public static final int FAIL_CODE = 500;
+      public ReturnT(int code, String msg) { }
+      public ReturnT(String msg) { }
+  }
+
+  class XxlJobServiceImpl implements XxlJobService {
+      private XxlJobInfoDao xxlJobInfoDao;
+
+      public ReturnT<String> add(XxlJobInfo jobInfo) {
+          if (jobInfo.getChildJobId() != null && jobInfo.getChildJobId().trim().length() > 0) {
+              String[] childJobIds = jobInfo.getChildJobId().split(",");
+              for (String childJobIdItem : childJobIds) {
+                  if (childJobIdItem != null && childJobIdItem.trim().length() > 0) {
+                      XxlJobInfo childJobInfo = xxlJobInfoDao.findById(Integer.parseInt(childJobIdItem));
+                      if (childJobInfo == null) {
+                          return new ReturnT<String>(ReturnT.FAIL_CODE, "child job not found");
+                      }
+                  }
+              }
+          }
+          xxlJobInfoDao.save(jobInfo);
+          return new ReturnT<String>("ok");
+      }
+  }
+  ```
+
+test "rank1978: the same lookup in the handler under the project's spelling reports nothing"
+  lang java
+  file JobInfoControllerInlineUnbound.java
+  reject VYQL-AUTH-002
+  code
+  ```
+  package com.xxl.job.admin.controller;
+
+  import org.springframework.stereotype.Controller;
+  import org.springframework.web.bind.annotation.RequestMapping;
+  import org.springframework.web.bind.annotation.ResponseBody;
+  import javax.annotation.Resource;
+
+  @Controller
+  @RequestMapping("/jobinfo")
+  public class JobInfoController {
+      @Resource
+      private XxlJobInfoDao xxlJobInfoDao;
+
+      @RequestMapping("/add")
+      @ResponseBody
+      public ReturnT<String> add(XxlJobInfo jobInfo) {
+          String[] childJobIds = jobInfo.getChildJobId().split(",");
+          for (String childJobIdItem : childJobIds) {
+              XxlJobInfo childJobInfo = xxlJobInfoDao.loadById(Integer.parseInt(childJobIdItem));
+              if (childJobInfo == null) {
+                  return new ReturnT<String>(ReturnT.FAIL_CODE, "child job not found");
+              }
+          }
+          xxlJobInfoDao.save(jobInfo);
+          return new ReturnT<String>("ok");
+      }
+  }
+
+  class XxlJobInfoDao {
+      public XxlJobInfo loadById(int id) { return null; }
+      public void save(XxlJobInfo info) { }
+  }
+
+  class XxlJobInfo {
+      private String childJobId;
+      public String getChildJobId() { return childJobId; }
+  }
+
+  class ReturnT<T> {
+      public static final int FAIL_CODE = 500;
+      public ReturnT(int code, String msg) { }
+      public ReturnT(String msg) { }
+  }
+  ```

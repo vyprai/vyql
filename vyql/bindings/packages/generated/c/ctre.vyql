@@ -1,0 +1,41 @@
+module bindings.c.generated.ma9bf29d9;
+
+binding userControlledData0 {
+  requires {
+    dependency("ctre")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("ctre")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("ctre")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("ctre")
+  }
+  query pattern callExpr where callee.method == "tokenize"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("ctre")
+  }
+  query pattern callExpr where callee.method == "split"
+  emit source core.UserControlledData at call.result
+}

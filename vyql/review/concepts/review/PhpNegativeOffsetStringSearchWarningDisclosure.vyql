@@ -1,0 +1,8 @@
+module code;
+
+review code.PhpNegativeOffsetStringSearchWarningDisclosure {
+  category: secret
+  expected: [core.InputValidation]
+  kind: target
+  text: "review PHP negative-offset string searches on request keys for a strlen lower-bound guard"
+}

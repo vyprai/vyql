@@ -1,0 +1,159 @@
+# Rank 1599 / CVE-2026-48781: Postiz's auth middleware treated the
+# verified JWT payload as the user object itself, so authorization
+# attributes inside the token body -- isSuperAdmin, activated -- were
+# trusted for the token's whole lifetime without re-resolving the
+# account, and a downgraded or deactivated user kept every privilege
+# until expiry (stale-claim privilege escalation, CWE-345/CWE-287;
+# the release commit "feat: security fixes" also strips stored
+# integration credentials -- token, refreshToken,
+# customInstanceDetails -- from the no-auth integrations response and
+# deletes the NowPayments crypto endpoints). AuthMiddleware in
+# apps/backend/src/services/auth/auth.middleware.ts did
+# `let user = AuthService.verifyJWT(auth) as User | null;` -- the
+# signed body becomes the User, claims and all, and `user.activated`
+# / `user.isSuperAdmin` are read straight off it. Pool commit
+# 23696d2973 is the real fix (COMMIT_OK): the middleware verifies the
+# signature only, requires payload.id, and re-resolves
+# `let user = (await this._userService.getUserById(payload.id)) as
+# User | null;` -- the database is the authority, the token merely
+# names the account.
+#
+# ATTENTION, claim-to-principal resolution, held on recheck. The
+# signature check exists and runs -- the defect is treating the
+# verified payload as the principal rather than as a lookup key, the
+# claim-trust family of ranks 1546 (rate limiting keyed on an
+# unsigned claim) and 1621 (authorization deciding from decoded.role
+# for the token's lifetime), with the trust inverted. Measured at the
+# span tip on the real checkout (3 x --cache off per revision,
+# timeout 180, --max-ram 6GB): both revisions report 382 findings
+# over the whole tree, byte-identical on the auth files, and
+# auth.middleware.ts carries exactly one finding at each revision --
+# VYQL-AUTH-079 on code.SensitiveOperation at :50 (vulnerable) / :59
+# (fixed), the auditreview.marks label on the impersonate cookie
+# read, present before and after. The shipped JavaScript JWT
+# vocabulary all targets weak verification, not trusted claims:
+# jwtUnverified650/651 (algorithm none), weakJwtSecret652/653 (weak
+# secret substrings) and jwtVerifyAlgorithmFromTokenHeader1420
+# (asymmetric algorithm confusion) key on the verify call's own
+# arguments, and Postiz's verify is correct -- a symmetric secret
+# through a wrapper whose callee path is the application's own
+# AuthService.verifyJWT, unresolved to the jsonwebtoken call it
+# wraps. No session-resolution vocabulary exists in any language
+# (SessionUserInstallWithoutAuthenticationStateCheck is PHP,
+# UnverifiedEmailClaimIdentity python, OptionalTokenClaimValidation
+# go), and no rule can ask "are authorization attributes re-resolved
+# from the store rather than read from the token". A binding on
+# Postiz's own AuthMiddleware would detect this application rather
+# than the weakness: the only tokens that differ between the
+# revisions are the fix's own names (getUserById, payload?.id), and
+# encoding those as the discriminator is the fixing commit's own
+# layout; the fixed form still reads user.activated and installs
+# req.user = user, and the vulnerable form's own store lookup
+# (getOrgsByUserId(user.id)) intervenes before the install, so any
+# "a store lookup intervenes" negation clears the vulnerable form
+# too -- zero discrimination either way. No ENGINE-GAPS.md entry: no
+# taint path is interrupted -- the vocabulary to ask the question is
+# what is missing, and the cross-package static-method resolution it
+# would additionally need is the known interface-receiver family,
+# not a localized correction. No definition change shipped. Spec
+# cve_rank1599 records the payload-as-user form and the re-resolved
+# form, both asserting reject VYQL-AUTH-079: when session-resolution
+# vocabulary lands, the payload-as-user form must flip to expect.
+
+test "rank1599: the token payload becomes the user"
+  lang javascript
+  file apps/backend/src/services/auth/auth.middleware.ts
+  reject VYQL-AUTH-079
+  code
+  ```
+  import { Injectable, NestMiddleware } from '@nestjs/common';
+  import { Request, Response, NextFunction } from 'express';
+  import { AuthService } from '@gitroom/helpers/auth/auth.service';
+  import { User } from '@prisma/client';
+  import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
+
+  @Injectable()
+  export class AuthMiddleware implements NestMiddleware {
+    async use(req: Request, res: Response, next: NextFunction) {
+      const auth = req.headers.auth || req.cookies.auth;
+      if (!auth) {
+        throw new HttpForbiddenException();
+      }
+      try {
+        let user = AuthService.verifyJWT(auth) as User | null;
+
+        if (!user) {
+          throw new HttpForbiddenException();
+        }
+
+        if (!user.activated) {
+          throw new HttpForbiddenException();
+        }
+
+        if (user.isSuperAdmin) {
+          // super-admin claims read straight from the signed body
+        }
+
+        req.user = user;
+        next();
+      } catch (err) {
+        throw new HttpForbiddenException();
+      }
+    }
+  }
+  ```
+
+test "rank1599: the fixed revision re-resolves the user from the database"
+  lang javascript
+  file apps/backend/src/services/auth/auth.middleware.ts
+  reject VYQL-AUTH-079
+  code
+  ```
+  import { Injectable, NestMiddleware } from '@nestjs/common';
+  import { Request, Response, NextFunction } from 'express';
+  import { AuthService } from '@gitroom/helpers/auth/auth.service';
+  import { User } from '@prisma/client';
+  import { UsersService } from '@gitroom/nestjs-libraries/database/prisma/users/users.service';
+  import { HttpForbiddenException } from '@gitroom/nestjs-libraries/services/exception.filter';
+
+  @Injectable()
+  export class AuthMiddleware implements NestMiddleware {
+    constructor(private _userService: UsersService) {}
+
+    async use(req: Request, res: Response, next: NextFunction) {
+      const auth = req.headers.auth || req.cookies.auth;
+      if (!auth) {
+        throw new HttpForbiddenException();
+      }
+      try {
+        // Verify the JWT signature only. Never trust authorization-relevant
+        // claims (id, isSuperAdmin, activated) from the token body — always
+        // re-resolve the user from the database using the id.
+        const payload = AuthService.verifyJWT(auth) as User | null;
+
+        if (!payload?.id) {
+          throw new HttpForbiddenException();
+        }
+
+        let user = (await this._userService.getUserById(payload.id)) as User | null;
+
+        if (!user) {
+          throw new HttpForbiddenException();
+        }
+
+        if (!user.activated) {
+          throw new HttpForbiddenException();
+        }
+
+        if (user.isSuperAdmin) {
+          // super-admin claims read from the database record
+        }
+
+        req.user = user;
+        next();
+      } catch (err) {
+        throw new HttpForbiddenException();
+      }
+    }
+  }
+  ```

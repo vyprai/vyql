@@ -1,0 +1,9 @@
+module bindings.java.generated.mbdc5badc;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.springframework.amqp:spring-amqp")
+  }
+  query pattern callExpr where callee.method == "getBody"
+  emit source core.UserControlledData at call.result
+}

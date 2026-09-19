@@ -1,0 +1,25 @@
+module bindings.swift.generated.m3a1cbe6c;
+
+binding fileUse0 {
+  requires {
+    dependency("github.com/NordicSemiconductor/IOS-DFU-Library")
+  }
+  query pattern callExpr where callee.method == "unzipItem"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("github.com/NordicSemiconductor/IOS-DFU-Library")
+  }
+  query pattern callExpr where callee.method == "extract"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding archiveEntryWrite2 {
+  requires {
+    dependency("github.com/NordicSemiconductor/IOS-DFU-Library")
+  }
+  query pattern callExpr where callee.method == "addEntry"
+  emit sink code.ArchiveEntryWrite at args[0]
+}

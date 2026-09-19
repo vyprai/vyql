@@ -1,0 +1,9 @@
+module bindings.java.generated.m385bef9a;
+
+binding httpInput0 {
+  requires {
+    dependency("io.springfox:springfox-swagger2")
+  }
+  query pattern callExpr where callee.method == "getDocumentation"
+  emit source code.HttpInput at call.result
+}

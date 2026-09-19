@@ -1,0 +1,17 @@
+module bindings.go.generated.ma8943996;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/allegro/bigcache")
+  }
+  query pattern callExpr where callee.method == "Set"
+  emit source code.SecretValue at call.result
+}
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/allegro/bigcache")
+  }
+  query pattern callExpr where callee.method == "Hash"
+  emit issue code.WeakHash at call
+}

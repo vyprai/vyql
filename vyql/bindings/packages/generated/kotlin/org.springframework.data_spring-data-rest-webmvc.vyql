@@ -1,0 +1,25 @@
+module bindings.kotlin.generated.m61f1e65b;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.data:spring-data-rest-webmvc")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}
+
+binding httpInput1 {
+  requires {
+    dependency("org.springframework.data:spring-data-rest-webmvc")
+  }
+  query pattern callExpr where callee.method == "getBody"
+  emit source code.HttpInput at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("org.springframework.data:spring-data-rest-webmvc")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}

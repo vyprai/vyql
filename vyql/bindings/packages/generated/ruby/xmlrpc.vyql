@@ -1,0 +1,9 @@
+module bindings.ruby.generated.maa9b8780;
+
+binding deserialization0 {
+  requires {
+    dependency("xmlrpc")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,217 @@
+module bindings.elixir.generated.md3359d57;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "aggregate"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery1 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "find_one_and_update"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery2 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "find_one_and_replace"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery3 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "find_one_and_delete"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery4 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery5 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "find_one"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery6 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "raw_find"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery7 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery8 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "direct_command"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery9 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "command!"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery10 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "insert_one"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery11 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "insert_one!"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery12 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "insert_many"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery13 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "insert_many!"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery14 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "delete_one"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery15 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "delete_one!"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery16 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "delete_many"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery17 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "delete_many!"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery18 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "replace_one"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery19 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "replace_one!"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery20 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "update_one"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery21 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "update_one!"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery22 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "update_many"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery23 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "update_many!"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding deserialization24 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkSend25 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData26 {
+  requires {
+    dependency("mongodb")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}

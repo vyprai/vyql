@@ -1,0 +1,11 @@
+module code;
+
+concept ExpiredCachedAuthTokenReuse : issue {
+  cwe: [CWE_613]
+  reviewAssumption: "the cached token is used for authenticated requests and becomes invalid or stale after its expiry time"
+  reviewCategory: auth
+  reviewCondition: "cached authentication or bearer-token material is only reused while its expiry/timeout is still after the current time"
+  reviewConfidence: high
+  reviewEvidence: "auth token cache context {pattern} returns cached token material from an expiry-before-now branch"
+  vulnerableTo: [authentication.ImproperAuthentication]
+}

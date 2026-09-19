@@ -1,0 +1,191 @@
+# PHP core-language exhaustive coverage for adapter-claimed web idioms.
+
+test "php exhaustive: superglobals reach SQL command eval deser include path SSRF upload and archive sinks"
+  lang php
+  expect VYQL-INJ-001
+  expect VYQL-INJ-002
+  expect VYQL-INJ-003
+  expect VYQL-DESER-001
+  expect VYQL-PATH-001
+  expect VYQL-PATH-002
+  expect VYQL-RF-001
+  expect VYQL-INJ-015
+  expect VYQL-PATH-004
+  code
+  ```
+  <?php
+  $v = $_GET["v"];
+  mysqli_query($db, $v);
+  system($v);
+  eval($v);
+  unserialize($v);
+  include($v);
+  fopen($v, "r");
+  curl_exec($v);
+  move_uploaded_file($_FILES["f"]["tmp_name"], $v);
+  $zip->extractTo($v);
+  ?>
+  ```
+
+test "php exhaustive: escaping constants basename and fixed destinations suppress common injection/path findings"
+  lang php
+  reject VYQL-INJ-001
+  reject VYQL-INJ-002
+  reject VYQL-INJ-003
+  reject VYQL-DESER-001
+  reject VYQL-PATH-001
+  reject VYQL-PATH-002
+  reject VYQL-RF-001
+  reject VYQL-INJ-015
+  reject VYQL-PATH-004
+  code
+  ```
+  <?php
+  $p = basename($_GET["v"]);
+  mysqli_query($db, "select 1");
+  system(escapeshellarg($_GET["v"]));
+  eval("1 + 1");
+  unserialize("a:0:{}");
+  include("safe.php");
+  fopen($p, "r");
+  curl_exec("https://example.com");
+  move_uploaded_file($_FILES["f"]["tmp_name"], "uploads/fixed.dat");
+  $zip->extractTo("safe");
+  ?>
+  ```
+
+test "php exhaustive: output header log mail CSV mass session LDAP XPath regex auth and IDOR findings are reported"
+  lang php
+  expect VYQL-INJ-004
+  expect VYQL-INJ-010
+  expect VYQL-INJ-009
+  expect VYQL-INJ-017
+  expect VYQL-INJ-014
+  expect VYQL-INJ-012
+  expect VYQL-CFG-002
+  expect VYQL-CFG-014
+  expect VYQL-INJ-005
+  expect VYQL-INJ-006
+  expect VYQL-DOS-001
+  expect VYQL-AUTH-001
+  expect VYQL-AUTH-002
+  code
+  ```
+  <?php
+  $v = $_GET["v"];
+  echo($v);
+  header("X-Name: " . $v);
+  error_log($v);
+  mail($to, $subject, $body, $v);
+  fputcsv($fh, [$v]);
+  $user->fill($_POST);
+  session_id($v);
+  $_SESSION["role"] = $v;
+  ldap_search($conn, "dc=x", $v);
+  $xml->xpath($v);
+  preg_match($v, "aaaa");
+  changePassword($v);
+  $repo->find($_GET["id"]);
+  ?>
+  ```
+
+test "php exhaustive: encoders validators constants and guards suppress output trust auth and IDOR findings"
+  lang php
+  reject VYQL-INJ-004
+  reject VYQL-INJ-010
+  reject VYQL-INJ-009
+  reject VYQL-INJ-017
+  reject VYQL-INJ-014
+  reject VYQL-INJ-012
+  reject VYQL-CFG-002
+  reject VYQL-CFG-014
+  reject VYQL-INJ-005
+  reject VYQL-INJ-006
+  reject VYQL-DOS-001
+  code
+  ```
+  <?php
+  $v = $_GET["v"];
+  echo(htmlspecialchars($v));
+  header("X-Name: safe");
+  error_log("safe");
+  mail($to, $subject, $body, "From: safe@example.com");
+  fputcsv($fh, ["safe"]);
+  $user->fill(["name" => "safe"]);
+  session_id("system");
+  $_SESSION["role"] = validateRole($v);
+  ldap_search($conn, "dc=x", ldap_escape($v));
+  $xml->xpath(xpathEscape($v));
+  preg_match("/^[a-z]+$/", "aaaa");
+  ?>
+  ```
+
+test "php exhaustive: crypto config permission temp cleartext cookie CSRF JWT cert and resource findings are reported"
+  lang php
+  expect VYQL-CRY-001
+  expect VYQL-CRY-002
+  expect VYQL-CRY-003
+  expect VYQL-CRY-004
+  expect VYQL-CFG-001
+  expect VYQL-CFG-003
+  expect VYQL-CFG-004
+  expect VYQL-CFG-005
+  expect VYQL-CFG-006
+  expect VYQL-CFG-007
+  expect VYQL-CFG-008
+  expect VYQL-CFG-009
+  expect VYQL-PATH-003
+  expect VYQL-RES-001
+  code
+  ```
+  <?php
+  hash("md5", $data);
+  openssl_encrypt($data, "des-ecb", $key, 0, "0000000000000000");
+  rand();
+  withoutMiddleware("VerifyCsrfToken");
+  header("Access-Control-Allow-Origin: *");
+  header("X-Frame-Options: ALLOWALL");
+  curl_setopt_array($ch, [CURLOPT_SSL_VERIFYPEER => false, CURLOPT_SSL_VERIFYHOST => 0]);
+  JWT::decode($jwt, $key, ["none"]);
+  file_get_contents("http://example.com");
+  setcookie("sid", "1", ["httponly" => false, "secure" => false]);
+  chmod("/tmp/x", 0777);
+  fopen("/tmp/fixed", "w");
+  fopen("data.txt", "r");
+  ?>
+  ```
+
+test "php exhaustive: stronger crypto secure config restrictive permissions temp and closed resources are clean"
+  lang php
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-CRY-003
+  reject VYQL-CRY-004
+  reject VYQL-CFG-003
+  reject VYQL-CFG-004
+  reject VYQL-CFG-005
+  reject VYQL-CFG-006
+  reject VYQL-CFG-007
+  reject VYQL-CFG-008
+  reject VYQL-CFG-009
+  reject VYQL-PATH-003
+  reject VYQL-RES-001
+  code
+  ```
+  <?php
+  hash("sha256", $data);
+  openssl_encrypt($data, "aes-256-gcm", $key, 0, $iv);
+  random_bytes(16);
+  header("Access-Control-Allow-Origin: https://example.com");
+  header("X-Frame-Options: DENY");
+  curl_setopt_array($ch, [CURLOPT_SSL_VERIFYPEER => true]);
+  JWT::decode($jwt, $key, ["RS256"]);
+  file_get_contents("https://example.com");
+  file_get_contents("http://127.0.0.1:8080");
+  setcookie("sid", "1", ["httponly" => true, "secure" => true]);
+  chmod("/tmp/x", 0600);
+  tmpfile();
+  $fh = fopen("data.txt", "r");
+  fclose($fh);
+  ?>
+  ```

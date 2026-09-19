@@ -1,0 +1,12 @@
+module vypr.dos;
+
+rule LoopRestartWithoutProgress {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_835, CWE_400]
+    id: "VYQL-DOS-050"
+    severity: high
+  }
+  issue code.LoopRestartWithoutProgressCheck as loop
+  unless loop.sameScope coveredBy core.LoopProgressCallSideEffect
+}

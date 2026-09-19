@@ -1,0 +1,7 @@
+module code;
+
+review code.ThreadLocalScopeOverwriteWithoutCleanup {
+  category: race
+  kind: target
+  text: "verify ThreadLocal request or scope lifecycle setup clears any previous scope before installing a new per-thread cache"
+}

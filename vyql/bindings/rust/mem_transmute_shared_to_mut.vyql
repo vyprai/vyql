@@ -1,0 +1,44 @@
+module bindings.rust.mem_transmute_shared_to_mut;
+
+// std::mem::transmute reinterprets the bits of a value as another type, and
+// the Rustonomicon names transmuting a shared reference into a mutable one as
+// straight undefined behaviour: &T carries no exclusivity, so the &mut it
+// becomes is a mutable alias to storage the compiler may have assumed
+// immutable, and writing through it corrupts whatever else reaches that
+// storage. The same review point the raw-pointer double-cast already carries
+// (ffi_callback_mutable_alias, and the resolved unsafe_mutable_alias flag),
+// reached through the transmute spelling instead.
+//
+// Two spellings build a &mut this way, and both are keyed on the type text
+// the call itself carries:
+//
+// 1. explicit type parameters, source a shared reference, target mutable:
+//        mem::transmute::<&Value, &mut Value>(current)
+//    A source that is itself &mut (`transmute::<&mut Header, &mut [u8; 128]>`)
+//    already holds exclusivity and is a layout question, not an aliasing one,
+//    so it stays unlabelled.
+// 2. a `let` whose annotated type is &mut and whose initializer transmutes,
+//    the form where inference hides the source type entirely:
+//        let v: &mut Value = unsafe { mem::transmute(v) };
+//    The annotation needle alone also matches the call-argument token of a
+//    transmute *from* an &mut (`call_arg:std.mem.transmute:&mutself.x`, a
+//    same-layout reinterpretation that keeps its exclusivity), so the clause
+//    requires the assignment form `= ... transmute(` in the same body to tie
+//    the two together. Even tied, nothing proves the argument of that
+//    transmute was shared rather than mutable -- that is why this is a review
+//    issue rather than a definitive finding, and only reading the argument's
+//    provenance settles it.
+//
+// The compacted body keeps comments, so a commented-out transmute still reads
+// as present -- false positive direction only. A bare `transmute(...)` call
+// after a module-level `use std::mem::transmute` carries no `mem::` inside
+// the function body and is not labelled.
+binding memTransmuteTurbofishSharedToMut {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.token contains "mem::transmute::<&" and node.token contains ",&mut" and not (node.token contains "transmute::<&mut")
+  emit issue code.UnsafeMutableAlias at node
+}
+
+binding memTransmuteLetAnnotatedMut {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.token contains ":&mut" and containsAny(node.token, ["=mem::transmute(", "=std::mem::transmute(", "=core::mem::transmute(", "=unsafe{mem::transmute(", "=unsafe{std::mem::transmute(", "=unsafe{core::mem::transmute(", "=unsafe{::std::mem::transmute(", "=unsafe{::core::mem::transmute("])
+  emit issue code.UnsafeMutableAlias at node
+}

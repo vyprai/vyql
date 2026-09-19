@@ -1,0 +1,56 @@
+# Rank 813 / CVE-2022-1457: FacturaScripts stored page-option title values
+# from request parameters without stripping/escaping HTML.
+
+test "rank813: page option title request value is persisted without HTML stripping"
+  lang php
+  file EditPageOption.php
+  expect VYQL-INJ-117
+  expect_review code.PersistentModelTitleStoredXss
+  code
+  ```
+  <?php
+  class EditPageOption
+  {
+      private function setColumnOption(&$column, string $name, string $key, bool $isWidget, bool $allowEmpty)
+      {
+          $newValue = $this->request->request->get($name . '-' . $key);
+          if ($isWidget) {
+              if (!empty($newValue) || $allowEmpty) {
+                  $column['children'][0][$key] = $newValue;
+              }
+              return;
+          }
+
+          if (!empty($newValue) || $allowEmpty) {
+              $column[$key] = $newValue;
+          }
+      }
+  }
+  ```
+
+test "rank813: page option title request value is stripped before persistence"
+  lang php
+  file EditPageOption.php
+  reject VYQL-INJ-117
+  reject_review code.PersistentModelTitleStoredXss
+  code
+  ```
+  <?php
+  class EditPageOption
+  {
+      private function setColumnOption(&$column, string $name, string $key, bool $isWidget, bool $allowEmpty)
+      {
+          $newValue = self::toolBox()::utils()::noHtml($this->request->request->get($name . '-' . $key));
+          if ($isWidget) {
+              if (!empty($newValue) || $allowEmpty) {
+                  $column['children'][0][$key] = $newValue;
+              }
+              return;
+          }
+
+          if (!empty($newValue) || $allowEmpty) {
+              $column[$key] = $newValue;
+          }
+      }
+  }
+  ```

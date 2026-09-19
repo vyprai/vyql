@@ -1,0 +1,17 @@
+module bindings.ruby.generated.me2efb633;
+
+binding envVariable0 {
+  requires {
+    dependency("memory_profiler")
+  }
+  query pattern callExpr where callee.method == "deserialize_hash"
+  emit source code.EnvVariable at call.result
+}
+
+binding deserialization1 {
+  requires {
+    dependency("memory_profiler")
+  }
+  query pattern callExpr where callee.method == "deserialize_hash"
+  emit sink code.Deserialization at args[0]
+}

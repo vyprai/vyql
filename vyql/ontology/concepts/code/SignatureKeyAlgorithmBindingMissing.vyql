@@ -1,0 +1,11 @@
+module code;
+
+concept SignatureKeyAlgorithmBindingMissing : issue {
+  cwe: [CWE_347]
+  reviewAssumption: "the signature packet's declared public-key algorithm is attacker-chosen input, and the verifying key carries its own algorithm declaration next to the algorithm-specific parameters"
+  reviewCategory: crypto
+  reviewCondition: "signature verification dispatches on the signature's declared public-key algorithm and uses the verifying key's algorithm-specific parameters without checking the declared algorithm against the key's own"
+  reviewConfidence: high
+  reviewEvidence: "signature verification context {pattern} delegates to the primitive verifier taking the algorithm and the key parameters as separate arguments, reads the signature's declared algorithm and the key's parameters, and never reads the key's algorithm field"
+  vulnerableTo: [crypto.ImproperSignatureCheck]
+}

@@ -1,0 +1,8 @@
+module core;
+
+concept RegexEscape : check {
+  applies: path
+  covers: [path]
+  cwe: [CWE_1333]
+  neutralizes: [dos.ReDoS]
+}

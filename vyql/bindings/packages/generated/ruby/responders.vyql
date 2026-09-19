@@ -1,0 +1,18 @@
+module bindings.ruby.generated.m8ad8dde5;
+
+binding htmlRender0 {
+  requires {
+    dependency("responders")
+  }
+  query pattern callExpr where callee.method == "respond_with"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding redirectTarget1 {
+  requires {
+    dependency("responders")
+  }
+  query pattern callExpr where callee.method == "respond_with"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

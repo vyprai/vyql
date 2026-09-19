@@ -1,0 +1,10 @@
+module vypr.desktop;
+
+rule InsecureElectronConfig {
+  meta {
+    cwe: [CWE_829]
+    id: "VYQL-DSK-001"
+    severity: high
+  }
+  issue code.ElectronNodeIntegration as c
+}

@@ -1,0 +1,41 @@
+module bindings.objc.generated.mc6b72449;
+
+binding networkSend0 {
+  requires {
+    dependency("Socket.IO-Client-Swift")
+  }
+  query pattern callExpr where callee.method == "emit"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("Socket.IO-Client-Swift")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("Socket.IO-Client-Swift")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("Socket.IO-Client-Swift")
+  }
+  query pattern callExpr where callee.method == "parseEngineData"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("Socket.IO-Client-Swift")
+  }
+  query pattern callExpr where callee.method == "parseEngineMessage"
+  emit source code.NetworkData at call.result
+}

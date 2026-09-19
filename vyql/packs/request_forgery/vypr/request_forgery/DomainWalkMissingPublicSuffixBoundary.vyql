@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule DomainWalkMissingPublicSuffixBoundary {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_200, CWE_346]
+    id: "VYQL-RF-046"
+    severity: medium
+  }
+  issue code.DomainWalkMissingPublicSuffixBoundary as target
+}

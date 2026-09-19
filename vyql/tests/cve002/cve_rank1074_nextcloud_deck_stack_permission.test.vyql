@@ -1,0 +1,130 @@
+# Rank 1074 / CVE-2021-39225: Nextcloud Deck let any authenticated user read a
+# stack, and the cards on it, by asking for its id with no check that the caller
+# may see that board (CWE-639, CWE-862). GET /boards/{boardId}/stacks/{stackId}
+# reaches StackApiController::get, which passes $this->request->getParam('stackId')
+# straight into StackService::find; the service validates that the id is numeric
+# and then reads through the mappers, $this->stackMapper->find($stackId) followed
+# by $this->cardMapper->findAll($stackId). The fix adds the framework permission
+# check the sibling methods already carry,
+# $this->permissionService->checkPermission($this->stackMapper, $stackId,
+# Acl::PERMISSION_READ), before the read.
+#
+# ATTENTION: the sink and the rule are in place and the miss sits upstream of
+# both. The mapper read is labelled today -- `->find($id)` emits
+# code.ObjectLookupByUserInput and VYQL-AUTH-002 judges
+# core.UserControlledData -> code.ObjectLookupByUserInput unless the endpoint is
+# covered by core.OwnershipCheck -- but no source starts a path at either end of
+# the chain: IRequest::getParam, the app framework's documented request-parameter
+# accessor, is unbound, and a service-layer $stackId parameter is reachable only
+# through the caller. A probe getParam source binding fires the entry chain at
+# the controller's own ->find(...) call, which is itself a sink -- and fires it
+# on the fixed revision too, because the check the fix adds lives in the callee,
+# and a method call on a constructor-injected field receiver never resolves
+# (resolveTargets types receivers from declared field types and same-scope
+# assignments only; deck defines nine `find` methods, so the unique-name fallback
+# cannot apply), so taint stops at the caller and no endpoint coverage can see
+# the control. Labelling the service parameter instead needs the find-verb
+# parameter-entry convention, which measured +27 collateral findings for one
+# true one on this tree alone (every data-mapper find taints into SQL and lookup
+# sinks), so that family is unshippable. Both snippets reject VYQL-AUTH-002
+# today; the first must report and the second stay silent once the entry chain
+# is labelled and the callee is traced.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1074: a stack id from the request reaches the mapper read unchecked"
+  lang php
+  file lib/Controller/StackApiController.php
+  reject VYQL-AUTH-002
+  code
+  ```
+  <?php
+
+  namespace OCA\Deck\Controller;
+
+  use OCP\AppFramework\Controller;
+  use OCP\IRequest;
+
+  class StackApiController extends Controller {
+      private $stackService;
+
+      public function __construct($appName, IRequest $request, StackService $stackService, $userId) {
+          parent::__construct($appName, $request);
+          $this->stackService = $stackService;
+      }
+
+      public function get() {
+          $stack = $this->stackService->find($this->request->getParam('stackId'));
+
+          return $stack;
+      }
+  }
+
+  class StackService {
+      private $stackMapper;
+
+      public function __construct(StackMapper $stackMapper) {
+          $this->stackMapper = $stackMapper;
+      }
+
+      public function find($stackId) {
+          if (is_numeric($stackId) === false) {
+              throw new BadRequestException('stack id must be a number');
+          }
+
+          $stack = $this->stackMapper->find($stackId);
+
+          return $stack;
+      }
+  }
+  ```
+
+test "rank1074: the same read behind the permission check the fix adds"
+  lang php
+  file lib/Controller/StackApiController.php
+  reject VYQL-AUTH-002
+  code
+  ```
+  <?php
+
+  namespace OCA\Deck\Controller;
+
+  use OCP\AppFramework\Controller;
+  use OCP\IRequest;
+
+  class StackApiController extends Controller {
+      private $stackService;
+
+      public function __construct($appName, IRequest $request, StackService $stackService, $userId) {
+          parent::__construct($appName, $request);
+          $this->stackService = $stackService;
+      }
+
+      public function get() {
+          $stack = $this->stackService->find($this->request->getParam('stackId'));
+
+          return $stack;
+      }
+  }
+
+  class StackService {
+      private $stackMapper;
+      private $permissionService;
+
+      public function __construct(StackMapper $stackMapper, PermissionService $permissionService) {
+          $this->stackMapper = $stackMapper;
+          $this->permissionService = $permissionService;
+      }
+
+      public function find($stackId) {
+          if (is_numeric($stackId) === false) {
+              throw new BadRequestException('stack id must be a number');
+          }
+
+          $this->permissionService->checkPermission($this->stackMapper, $stackId, Acl::PERMISSION_READ);
+          $stack = $this->stackMapper->find($stackId);
+
+          return $stack;
+      }
+  }
+  ```

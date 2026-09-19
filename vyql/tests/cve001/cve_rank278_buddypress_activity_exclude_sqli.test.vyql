@@ -1,0 +1,46 @@
+# Rank 278 / CVE-2012-2109: BP_Activity_Activity::get() interpolated the
+# caller-controlled $exclude list directly into an activity SQL NOT IN clause.
+
+test "rank278: buddypress activity exclude list reaches SQL without integer parsing"
+  lang php
+  expect VYQL-INJ-030
+  expect_review code.UnparameterizedSqlQueryParser
+  code
+  ```
+  <?php
+  class BP_Activity_Activity {
+    function get( $exclude = false ) {
+      global $wpdb;
+      $where_conditions = array();
+      if ( $exclude )
+        $where_conditions['exclude'] = "a.id NOT IN ({$exclude})";
+      $where_sql = 'WHERE ' . join( ' AND ', $where_conditions );
+      return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM a {$where_sql}" ) );
+    }
+  }
+  ```
+
+test "rank278: buddypress activity exclude list is parsed as integer ids"
+  lang php
+  reject VYQL-INJ-030
+  reject_review code.UnparameterizedSqlQueryParser
+  code
+  ```
+  <?php
+  class BP_Activity_Activity {
+    function get( $exclude = false ) {
+      global $wpdb;
+      $where_conditions = array();
+      if ( !empty( $exclude ) ) {
+        if ( is_array( $exclude ) ) {
+          $exclude = implode( ',', array_map( 'absint', $exclude ) );
+        } else {
+          $exclude = implode( ',', array_map( 'absint', explode( ',', $exclude ) ) );
+        }
+        $where_conditions['exclude'] = "a.id NOT IN ({$exclude})";
+      }
+      $where_sql = 'WHERE ' . join( ' AND ', $where_conditions );
+      return $wpdb->get_results( $wpdb->prepare( "SELECT * FROM a {$where_sql}" ) );
+    }
+  }
+  ```

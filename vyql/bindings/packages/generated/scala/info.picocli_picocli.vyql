@@ -1,0 +1,25 @@
+module bindings.scala.generated.mde751e8f;
+
+binding cliArgument0 {
+  requires {
+    dependency("info.picocli:picocli")
+  }
+  query pattern callExpr where callee.method == "parseArgs"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("info.picocli:picocli")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit source code.CliArgument at call.result
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("info.picocli:picocli")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

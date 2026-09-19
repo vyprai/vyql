@@ -1,0 +1,11 @@
+module code;
+
+concept NestedParamExpansionWithoutDepthLimit : issue {
+  cwe: [CWE_674, CWE_400]
+  reviewAssumption: "the decoded query string is supplied by a caller, so a key can carry arbitrarily many bracket groups"
+  reviewCategory: resource
+  reviewCondition: "a nested-parameter decoder expands bracket-delimited key segments into nested containers with no ceiling on the nesting depth"
+  reviewConfidence: medium
+  reviewEvidence: "nested param decode context {pattern} percent-decodes pairs and scans bracket-delimited subkeys with no depth-limit assignment or comparison in the module"
+  vulnerableTo: [dos.StackExhaustion, dos.UncontrolledResourceConsumption]
+}

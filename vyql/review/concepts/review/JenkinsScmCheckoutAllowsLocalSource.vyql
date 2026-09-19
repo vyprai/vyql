@@ -1,0 +1,8 @@
+module code;
+
+review code.JenkinsScmCheckoutAllowsLocalSource {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review Jenkins SCM checkout implementations for a FilePath.isRemote() branch that rejects file:// and local-directory repository locations in controller-side workspaces"
+}

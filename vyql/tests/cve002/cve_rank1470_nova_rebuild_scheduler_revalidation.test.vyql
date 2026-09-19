@@ -1,0 +1,101 @@
+test "rank1470: rebuild dispatches a replacement image to the instance's own host"
+  lang python
+  expect VYQL-AUTH-145
+  expect_review code.RedeployPinnedHostSchedulerBypass
+  code
+  ```
+  from nova import exception
+  from nova import objects
+
+
+  class API(object):
+      def rebuild(self, context, instance, image_href, admin_password):
+          orig_image_ref = instance.image_ref or ''
+          image_id, image = self._get_image(context, image_href)
+          instance.image_ref = image_href
+          instance.save(expected_task_state=[None])
+          try:
+              request_spec = objects.RequestSpec.get_by_instance_uuid(
+                  context, instance.uuid)
+          except exception.RequestSpecNotFound:
+              request_spec = None
+          self.compute_task_api.rebuild_instance(
+              context, instance=instance, new_pass=admin_password,
+              image_ref=image_href, orig_image_ref=orig_image_ref,
+              host=instance.host, request_spec=request_spec)
+  ```
+
+test "rank1470: rebuild constrains the scheduling request to the instance's host"
+  lang python
+  reject VYQL-AUTH-145
+  reject_review code.RedeployPinnedHostSchedulerBypass
+  code
+  ```
+  from nova import exception
+  from nova import objects
+
+
+  class API(object):
+      def rebuild(self, context, instance, image_href, admin_password):
+          orig_image_ref = instance.image_ref or ''
+          image_id, image = self._get_image(context, image_href)
+          instance.image_ref = image_href
+          instance.save(expected_task_state=[None])
+          host = instance.host
+          try:
+              request_spec = objects.RequestSpec.get_by_instance_uuid(
+                  context, instance.uuid)
+              if orig_image_ref != image_href:
+                  request_spec.requested_destination = objects.Destination(
+                      host=instance.host, node=instance.node)
+                  request_spec.image = objects.ImageMeta.from_dict(image)
+                  request_spec.save()
+                  host = None
+          except exception.RequestSpecNotFound:
+              request_spec = None
+          self.compute_task_api.rebuild_instance(
+              context, instance=instance, new_pass=admin_password,
+              image_ref=image_href, orig_image_ref=orig_image_ref,
+              host=host, request_spec=request_spec)
+  ```
+
+test "rank1470: evacuate unsets the host and pins the scheduler to the target node"
+  lang python
+  reject VYQL-AUTH-145
+  reject_review code.RedeployPinnedHostSchedulerBypass
+  code
+  ```
+  from nova import exception
+  from nova import objects
+
+
+  class API(object):
+      def evacuate(self, context, instance, host, on_shared_storage,
+                   admin_password=None, force=None):
+          migration = objects.Migration(context,
+                                        source_compute=instance.host,
+                                        source_node=instance.node,
+                                        instance_uuid=instance.uuid,
+                                        status='accepted',
+                                        migration_type='evacuation')
+          migration.create()
+          try:
+              request_spec = objects.RequestSpec.get_by_instance_uuid(
+                  context, instance.uuid)
+          except exception.RequestSpecNotFound:
+              request_spec = None
+          if force is False and host:
+              nodes = objects.ComputeNodeList.get_all_by_host(context, host)
+              host = None
+              target = nodes[0]
+              if request_spec:
+                  destination = objects.Destination(
+                      host=target.host,
+                      node=target.hypervisor_hostname)
+                  request_spec.requested_destination = destination
+          return self.compute_task_api.rebuild_instance(
+              context, instance=instance, new_pass=admin_password,
+              image_ref=None, orig_image_ref=None, recreate=True,
+              on_shared_storage=on_shared_storage, host=host,
+              request_spec=request_spec)
+  ```

@@ -1,0 +1,61 @@
+module bindings.kotlin.generated.ma038310b;
+
+binding secretValue0 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "getSecret"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "getAccessToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "getRefreshToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "getAuthorizationHeaderValue"
+  emit source code.SecretValue at call.result
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "isAuthorized"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "queryParam"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("org.springframework.social:spring-social-core")
+  }
+  query pattern callExpr where callee.method == "queryParams"
+  emit source core.UserControlledData at call.result
+}

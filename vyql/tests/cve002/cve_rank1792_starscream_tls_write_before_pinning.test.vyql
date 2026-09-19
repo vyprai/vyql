@@ -1,0 +1,243 @@
+# Rank 1792 / CVE-2017-5887 (CWE-295): daltoniam/starscream's WebSocket
+# (Source/WebSocket.swift at the fixed revision's parent 1385936) negotiates TLS on the
+# CFStream pair and performs SSL pinning -- but only inside the stream-delegate
+# handler `stream(_:handle:)`, which runs on sharedWorkQueue when
+# `.hasBytesAvailable`/`.hasSpaceAvailable` events arrive. The write operation
+# that `createHTTPRequest()` parks on writeQueue spins on
+# `outStream.hasSpaceAvailable` itself and then calls
+# `outStream.write(bytes, maxLength:)` without consulting `certValidated`, so
+# the upgrade request -- headers, cookies, Authorization, whatever the app
+# attached -- is transmitted to a peer whose certificate the pinning validator
+# would have rejected. A MITM with any certificate receives the request before
+# the delegate's check can disconnect. Fix dbeb119 ("some cleanup and SSL
+# pinning fix") hoists the pinning check into the write block itself: it reads
+# `kCFStreamPropertySSLPeerTrust`, runs `sec.isValid(trust, domain:)`, sets
+# `certValidated`, and returns without writing when validation fails; it also
+# cancels pending write operations on disconnect. The pool row is correct: the
+# pinning race is present at the parent and the remediation is present at the
+# fix.
+#
+# What fires today, union over three `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB` runs per revision at both the auto (mobile_ios) and `-profile
+# generic` profiles: 0 findings on the vulnerable tree (1385936) and the
+# identical 0 on the fixed tree (dbeb119). The flag view adds 13 review flags
+# on each revision, the same 13 both times -- `core.LockRelease` and
+# `core.ResourceRelease` reviews from the defer/lock lowering, nothing
+# certificate-related. `vyql graph` on WebSocket.swift shows 0
+# analysis.function.context nodes against 1 analysis.module.context and 9
+# analysis.class.context per file.
+#
+# ATTENTION, an engine gap: the attribution-gap family's Swift instance, both
+# revisions pinned as misses.
+#
+# The blocker -- swift has no per-function context facts, so placement of the
+# control relative to the write is invisible at every scope the binding
+# surface offers. `swift.go` emits exactly one context node per file
+# (`swModuleContext`, analysis.module.context) whose structured tokens
+# (`function_name:`, `call_path:`, `call:`, `selector:`, `identifier:`,
+# `literal:`, plus `param_label:`/`param_name:` for every handler in the file)
+# are collected file-wide by `swStructuredContextTokens`; it never populates
+# `nir.FuncDef.ContextTokens`, so `functionContextAnalysisEvent` emits nothing
+# and `analysis.class.context` carries only class_name/class_base. A
+# module-scope clause on `kCFStreamPropertySSLPeerTrust` is therefore
+# satisfied identically whether the trust read sits in the write's own closure
+# (fixed) or in a sibling stream-delegate handler (vulnerable); the only
+# tokens unique to the fixed tree are the fixed revision's own vocabulary
+# (`cancelAllOperations`, the sharedWorkQueue.async wrapper). Keying on those
+# encodes the fixing commit's own layout and dies on the rename test.
+#
+# The rule surface cannot take the placement either, and the graph pins why.
+# Swift nodes carry per-function region/order identity, and the engine's
+# ordering relation already separates the revisions: at the fix the
+# `sec.isValid` call sits at region fn25/if37.t order 2749 and the
+# `outStream.write` at fn25 order 2773, same function root, so `reaches` holds;
+# at the parent the validation sits in fn37 while the write sits in fn25,
+# regions incomparable, so it does not. No rule consumes that as a suppressor:
+# `unless ... coveredBy` suppresses only through a PROTECTS/CHECKS edge (no
+# binding emits one here), `sameFunctionContextGuarded` (which requires the
+# guard to be an analysis.function.context node, and swift emits none), or
+# `Dominates` -- which fails on BOTH revisions because the fixed guard's
+# if-nested region is a descendant of the write's region, not an ancestor --
+# and the positive `reaches` select form reports the node the check reaches,
+# which is the fixed revision, the wrong way round. `core.CertificateValidation`
+# exists in the ontology and no rule consumes it as a check.
+#
+# Considered and declined: (1) binding `kCFStreamSSLValidatesCertificateChain:
+# false` (starscream's separate, documented `disableSSLCertValidation` opt-out
+# at lines 337-341) to `code.CertValidationDisabled` is generic and cheap, but
+# it fires identically at both revisions of this file -- it is a different
+# weakness than this one and cannot be this pair's discriminator. (2) A
+# file-wide "TLS-configured stream write with no trust read anywhere in the
+# file" fires on every CFStream client relying on system-default chain
+# validation, which is the ordinary safe spelling: across the clone pool only
+# two other Swift trees carry this vocabulary at all, and one of them is
+# exactly that spelling -- thrift's TSocketTransport sets
+# `.socketSecurityLevel` to `negotiatedSSL` and writes with no pinning of its
+# own (the other is corelibs-foundation's Stream.swift, the framework's own
+# implementation of these property keys). (3) The taint/check route is
+# unavailable in principle: no untrusted source flows into the write, and
+# no rule consumes `core.CertificateValidation` as a check.
+#
+# The change belongs in the frontend: populate `ContextTokens` per Swift
+# function (and decide closure attribution -- closure bodies lower inline
+# into the enclosing function via `trailingLambdaStmts`, which is the
+# granularity this weakness needs; `functionScopeKey`'s region fallback
+# already derives the sink side, so the frontend emission is the missing
+# half). That is a new fact emission for every Swift function scan-wide, not
+# a localized correction, so it is not mechanical; a reaches-suppressor rule
+# polarity would serve the same discrimination and is likewise a rule-engine
+# design decision, not a data change.
+#
+# verify_current_expected: attention-engine-gap; cases 1 and 2 (the shipped
+# INJ-004 placement-invisibility pair) expected, cases 3 and 4 pinned.
+
+test "rank1792: stdin read written straight to the stream, the shipped swift vocabulary the scanner does see"
+  lang swift
+  file Source/Sender.swift
+  profile generic
+  expect VYQL-INJ-004
+  code
+  ```
+  import Foundation
+
+  open class Sender: NSObject {
+      var outStream: OutputStream?
+
+      func send() {
+          let line = readLine()
+          outStream.write(line, maxLength: 4)
+      }
+  }
+  ```
+
+test "rank1792: the same read and write with the pinning check hoisted into the write's own block, placement invisible at module scope"
+  lang swift
+  file Source/SenderPinned.swift
+  profile generic
+  expect VYQL-INJ-004
+  code
+  ```
+  import Foundation
+
+  open class SenderPinned: NSObject {
+      var security: SSLTrustValidator?
+      var outStream: OutputStream?
+
+      func send() {
+          let line = readLine()
+          if let sec = security {
+              let trust = outStream.property(forKey: kCFStreamPropertySSLPeerTrust as Stream.PropertyKey) as! SecTrust
+              let domain = outStream.property(forKey: kCFStreamSSLPeerName as Stream.PropertyKey) as? String
+              if !sec.isValid(trust, domain: domain) {
+                  return
+              }
+          }
+          outStream.write(line, maxLength: 4)
+      }
+  }
+  ```
+
+test "rank1792: the websocket upgrade request written to the TLS stream while the pinning check lives only in the stream-delegate handler"
+  lang swift
+  file Source/WebSocket.swift
+  reject VYQL-CFG-004
+  code
+  ```
+  import Foundation
+
+  open class WebSocket: NSObject, StreamDelegate {
+      public var security: SSLTrustValidator?
+      private var certValidated = false
+      var outStream: OutputStream?
+      var writeQueue: OperationQueue
+
+      private func createHTTPRequest() {
+          outStream.setProperty(StreamSocketSecurityLevel.negotiatedSSL as AnyObject, forKey: Stream.PropertyKey.socketSecurityLevelKey)
+
+          let bytes = UnsafeRawPointer((data as NSData).bytes).assumingMemoryBound(to: UInt8.self)
+          let operation = BlockOperation()
+          operation.addExecutionBlock { [weak self, weak operation] in
+              guard let sOperation = operation else { return }
+              while !outStream.hasSpaceAvailable && !sOperation.isCancelled {
+                  usleep(100)
+                  guard !sOperation.isCancelled else { return }
+              }
+              // no certValidated consultation here: the bytes leave before
+              // the delegate handler's pinning check has run
+              outStream.write(bytes, maxLength: data.count)
+          }
+          writeQueue.addOperation(operation)
+      }
+
+      open func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
+          if let sec = security, !certValidated, [.hasBytesAvailable, .hasSpaceAvailable].contains(eventCode) {
+              let trust = aStream.property(forKey: kCFStreamPropertySSLPeerTrust as Stream.PropertyKey) as! SecTrust
+              let domain = aStream.property(forKey: kCFStreamSSLPeerName as Stream.PropertyKey) as? String
+              if sec.isValid(trust, domain: domain) {
+                  certValidated = true
+              } else {
+                  let error = errorWithDetail("Invalid SSL certificate", code: 1)
+                  disconnectStream(error)
+                  return
+              }
+          }
+          if eventCode == .hasBytesAvailable {
+              processInputStream()
+          }
+      }
+
+      func processInputStream() {}
+      func disconnectStream(_ error: Error?) {}
+      func errorWithDetail(_ detail: String, code: Int) -> Error { NSError() }
+  }
+  ```
+
+test "rank1792: the patched write block, pinning evaluated on the stream's peer trust before any byte is written"
+  lang swift
+  file Source/WebSocketPatched.swift
+  reject VYQL-CFG-004
+  code
+  ```
+  import Foundation
+
+  open class WebSocketPatched: NSObject, StreamDelegate {
+      public var security: SSLTrustValidator?
+      private var certValidated = false
+      var outStream: OutputStream?
+      var writeQueue: OperationQueue
+
+      private func createHTTPRequest() {
+          outStream.setProperty(StreamSocketSecurityLevel.negotiatedSSL as AnyObject, forKey: Stream.PropertyKey.socketSecurityLevelKey)
+
+          let bytes = UnsafeRawPointer((data as NSData).bytes).assumingMemoryBound(to: UInt8.self)
+          let operation = BlockOperation()
+          operation.addExecutionBlock { [weak self, weak operation] in
+              guard let sOperation = operation, let s = self else { return }
+              while !outStream.hasSpaceAvailable && !sOperation.isCancelled {
+                  usleep(100)
+                  guard !sOperation.isCancelled else { return }
+              }
+              guard !sOperation.isCancelled, let _ = self else { return }
+              // Do the pinning now if needed
+              if let sec = s.security, !s.certValidated {
+                  let trust = outStream.property(forKey: kCFStreamPropertySSLPeerTrust as Stream.PropertyKey) as! SecTrust
+                  let domain = outStream.property(forKey: kCFStreamSSLPeerName as Stream.PropertyKey) as? String
+                  s.certValidated = sec.isValid(trust, domain: domain)
+                  if !s.certValidated {
+                      return
+                  }
+              }
+              outStream.write(bytes, maxLength: data.count)
+          }
+          writeQueue.addOperation(operation)
+      }
+
+      open func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
+          if eventCode == .hasBytesAvailable {
+              processInputStream()
+          }
+      }
+
+      func processInputStream() {}
+  }
+  ```

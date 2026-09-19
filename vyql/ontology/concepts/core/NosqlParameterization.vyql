@@ -1,0 +1,7 @@
+module core;
+
+concept NosqlParameterization : check {
+  applies: path
+  covers: [path]
+  neutralizes: [injection.NosqlInjection]
+}

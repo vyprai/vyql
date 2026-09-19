@@ -1,0 +1,17 @@
+module bindings.objc.generated.m719324f4;
+
+binding urlFetch0 {
+  requires {
+    dependency("CTMediator")
+  }
+  query pattern callExpr where callee.method == "performActionWithUrl"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("CTMediator")
+  }
+  query pattern callExpr where callee.method == "performTarget"
+  emit source core.UserControlledData at call.result
+}

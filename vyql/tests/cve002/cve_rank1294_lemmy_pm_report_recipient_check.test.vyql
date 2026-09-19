@@ -1,0 +1,171 @@
+# Rank 1294 / CVE-2024-23649: Lemmy's private-message report endpoint
+# (`create_pm_report` in crates/api/src/private_message_report/create.rs)
+# read the target private message by the caller-supplied
+# `private_message_id` and immediately built a `PrivateMessageReportForm`
+# from it, with no check that the requesting user is the message's
+# recipient. Any authenticated user could therefore file a report against
+# a private message addressed to someone else -- including the sender's
+# own outgoing message -- disclosing its content to admins via
+# `PrivateMessageReportView` and the report-email path (CWE-862).
+#
+# Fix commit bc32b408b523b9b64aa57b8e47748f96cce0dae5 ("Fixing private
+# message reports.", #4279) adds, right after the `PrivateMessage::read`
+# lookup and before the report form is built: `if person_id !=
+# private_message.recipient_id { Err(LemmyErrorType::CouldntCreateReport)? }`.
+# The rest of the diff (api_tests/src/private_message.spec.ts,
+# api_tests/src/shared.ts) is TypeScript integration-test scaffolding for
+# the new check, not part of the vulnerable or fixed code itself -- despite
+# the pool row's "typescript" language, the actual fix lives entirely in
+# Rust; the row names rust.
+#
+# ATTENTION, vocabulary gap. `vyql explain` on a verbatim repro of
+# `create_pm_report` reports no findings on either revision; `vyql match`
+# labels only the three `data.*` field reads as code.Param/code.ExternalEntryInput
+# (library.param-source) and nothing else -- `PrivateMessage::read` and
+# `PrivateMessageReport::report` are not bound as anything, so no rule can
+# see this function at all. A bounded scan of the real repository (--cache
+# off --max-ram 5GB) reports 44 findings, none in private_message_report/
+# or naming private_message anywhere.
+#
+# code.IdorPolicyReview ("review object lookup or delete criteria for a
+# current-principal ownership constraint") is the nearest concept by theme
+# -- this is exactly an object lookup (`PrivateMessage::read`) whose result
+# feeds a mutating action with no current-principal ownership check -- but
+# it has no Rust binding today, only PHP and JavaScript ones, and every
+# existing binding for it (see rank1146's ledger note for the same gap in
+# Java) is a hardcoded per-CVE structural match in that language's
+# treesitter frontend (`phpReview`/JS `callPath`+`identifier` literals)
+# rather than a general Rust pattern computed from the AST. Adding
+# a Rust one would mean writing a new `rust_review` fact in
+# internal/extract/frontend/treesitter/rust.go recognizing "a `Type::read`
+# call followed by a mutating call built from its result, with no
+# comparison between one of the read struct's fields and the current
+# principal in between" -- a new classification, not a correction to an
+# existing switch case, and exactly the kind of design call rank1146 also
+# declined to make inside this loop. No definition change attempted.
+#
+# Rechecked on the current knowledge base; the miss holds, and the blocker
+# decomposes into one fact that has since changed and two that have not.
+# (1) The source half of VYQL-AUTH-002 is now present: the Library/SDK
+# profile's param-source labels every public-API parameter of
+# `create_pm_report` as `code.ExternalEntryInput`, which refines
+# `core.UserControlledData`, so the request-derived `private_message_id` is
+# a live taint source on this tree. What is missing is only the sink.
+# (2) The Rust `code.ObjectLookupByUserInput` set binds the generic
+# by-identity spellings `find_by_id`, `get_user` and `get_account`
+# (bindings/rust/mdc4f74cd.vyql), not Lemmy's own `Crud::read(pool, id)`
+# accessor. Binding `callee.method == "read"` at args[1] was measured on the
+# real checkout: it takes the tree from 44 findings to 140, of which 96 are
+# VYQL-AUTH-002 rows landing on ~50 files (`read_community.rs` reading a
+# public community by id, `post/like.rs`, `build_response.rs`, every
+# `*_report/resolve.rs`) for one true positive -- and the fixed revision
+# reports the identical 140 findings and 96 rows, so the binding buys no
+# discrimination at all. The reachable set is the reason: exhaustive grep
+# counts 237 `X::read(`/`.read(` calls in lemmy (59 of them the
+# `X::read(&mut context.pool(), <arg>)` handler form, across 20 distinct
+# types, most of them public objects), 572 in uv, 448 in kata-containers,
+# 186 in wasmtime, 144 in grin, 127 in zeptoclaw, because `read` is also
+# std's `Read::read`. Which of those types holds private content is not in
+# the code.
+# (3) The rule's `unless endpoint coveredBy core.OwnershipCheck` half cannot
+# be satisfied by this fix under any generic binding: the Rust
+# `core.OwnershipCheck` set is `check_ownership` and `require_owner` only,
+# and the fix is a bare inline `if person_id != private_message.recipient_id`
+# with no named API at all -- the comparison's left side comes from
+# `local_user_view.person.id` and its right side from a field of the row
+# just read, and neither the field name nor the guard's absence is a
+# contract. Keying the neutraliser on `recipient_id` would encode the fixing
+# commit's own vocabulary, and a sibling handler that delegates the same
+# comparison to a helper stays invisible (the Rust delegated-check gap).
+# Both revisions of the full tree still scan identically at 44 findings,
+# 19 at or above high, 3 x `--cache off` runs each, with zero findings in
+# crates/api/src/private_message_report/ on either side.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions reject
+# code.IdorPolicyReview (nearest review concept by theme; no Rust binding
+# exists for it, and the rule that would consume a lookup sink cannot
+# separate the fixed revision either).
+
+test "rank1294: report creation trusts the caller-supplied private_message_id with no recipient check"
+  lang rust
+  file create.rs
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  pub async fn create_pm_report(
+    data: Json<CreatePrivateMessageReport>,
+    context: Data<LemmyContext>,
+    local_user_view: LocalUserView,
+  ) -> Result<Json<PrivateMessageReportResponse>, LemmyError> {
+    let local_site = LocalSite::read(&mut context.pool()).await?;
+
+    let reason = data.reason.trim().to_string();
+    check_report_reason(&reason, &local_site)?;
+
+    let person_id = local_user_view.person.id;
+    let private_message_id = data.private_message_id;
+    let private_message = PrivateMessage::read(&mut context.pool(), private_message_id).await?;
+
+    let report_form = PrivateMessageReportForm {
+      creator_id: person_id,
+      private_message_id,
+      original_pm_text: private_message.content,
+      reason,
+    };
+
+    let report = PrivateMessageReport::report(&mut context.pool(), &report_form)
+      .await
+      .with_lemmy_type(LemmyErrorType::CouldntCreateReport)?;
+
+    let private_message_report_view =
+      PrivateMessageReportView::read(&mut context.pool(), report.id).await?;
+
+    Ok(Json(PrivateMessageReportResponse {
+      private_message_report_view,
+    }))
+  }
+  ```
+
+test "rank1294: report creation rejects a caller who is not the message's recipient"
+  lang rust
+  file create.rs
+  reject_review code.IdorPolicyReview
+  code
+  ```
+  pub async fn create_pm_report(
+    data: Json<CreatePrivateMessageReport>,
+    context: Data<LemmyContext>,
+    local_user_view: LocalUserView,
+  ) -> Result<Json<PrivateMessageReportResponse>, LemmyError> {
+    let local_site = LocalSite::read(&mut context.pool()).await?;
+
+    let reason = data.reason.trim().to_string();
+    check_report_reason(&reason, &local_site)?;
+
+    let person_id = local_user_view.person.id;
+    let private_message_id = data.private_message_id;
+    let private_message = PrivateMessage::read(&mut context.pool(), private_message_id).await?;
+
+    if person_id != private_message.recipient_id {
+      Err(LemmyErrorType::CouldntCreateReport)?
+    }
+
+    let report_form = PrivateMessageReportForm {
+      creator_id: person_id,
+      private_message_id,
+      original_pm_text: private_message.content,
+      reason,
+    };
+
+    let report = PrivateMessageReport::report(&mut context.pool(), &report_form)
+      .await
+      .with_lemmy_type(LemmyErrorType::CouldntCreateReport)?;
+
+    let private_message_report_view =
+      PrivateMessageReportView::read(&mut context.pool(), report.id).await?;
+
+    Ok(Json(PrivateMessageReportResponse {
+      private_message_report_view,
+    }))
+  }
+  ```

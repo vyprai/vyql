@@ -1,0 +1,206 @@
+# CVE-2026-5067 (Zephyr, c; CWE-170/CWE-120, improper null termination
+# feeding an out-of-bounds read/write): the HTTP server's header callback
+# accumulated each header value in ctx->header_buffer, sized by
+# CONFIG_HTTP_SERVER_MAX_HEADER_LEN, and on the final chunk of the
+# Sec-WebSocket-Key value copied it into the fixed 32-byte ctx->ws_sec_key
+# with
+#
+#     strncpy(ctx->ws_sec_key, ctx->header_buffer,
+#             MIN(sizeof(ctx->ws_sec_key), offset));
+#
+# (subsys/net/lib/http/http_server_http1.c:899 at the vulnerable revision).
+# The clamp bounds the write to the destination, so nothing overflows the
+# copy itself -- but when the header is at least 32 bytes the copy fills all
+# of ws_sec_key and writes no NUL. handle_http1_to_websocket_upgrade()
+# (subsys/net/lib/http/http_server_ws.c:49-51) then does
+# `strncpy(key_accept, client->ws_sec_key, key_len); key_len =
+# strlen(key_accept);` -- strlen reads past the unterminated key into
+# whatever follows, and psa_hash_compute consumes `olen + key_len` bytes of
+# it. The fixed revision (5d653fcfd) rejects the request before copying when
+# `offset >= sizeof(ctx->ws_sec_key)`, switches to memcpy for the now-bounded
+# length, and writes the terminating NUL by hand.
+#
+# What the scanner sees is the bound, not the terminator: the copy is
+# clamped to the destination's own sizeof with no room reserved, in a
+# function whose only NUL store terminates a different buffer. The shipped
+# binding anchors on exactly that shape -- strncpy's length argument is a
+# clamp whose operand is a buffer sizeof (or the sizeof named directly),
+# with no `-1` reserve in any argument token, no `n >= sizeof(...)`
+# rejection, and no literal terminator stored through a plain local. The
+# fix disappears the clamp entirely (memcpy with a plain identifier length),
+# so the finding drops with it.
+#
+# Case one is the vulnerable callback, stripped of the parser plumbing;
+# case two the fixed form. Case three is the reserve spelling
+# `MIN(sizeof(dst) - 1, n)`, the form strncpy(3)'s own examples and CERT
+# MEM35-C recommend. Case four is the sibling Zephyr shape this class also
+# covers: modem_cellular.c:2001 clamps by the source buffer's sizeof with
+# no terminator anywhere, which strands the destination the same way, so it
+# must stay an expect. Case five is virtual.c:414, the clamp followed by
+# `buf[len - 1] = '\0'`, which terminates the copy's own destination and
+# must reject.
+
+test "rank1991: websocket key copied with a saturating clamp reserves no terminator"
+  lang c
+  file http_server_http1.c
+  expect VYQL-MEM-068
+  code
+  ```
+  #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+  struct http_client_ctx {
+	unsigned char header_buffer[48];
+	unsigned char ws_sec_key[32];
+	int websocket_sec_key_next;
+  };
+
+  static int on_header_value(struct http_client_ctx *ctx, const char *at, unsigned long length)
+  {
+	size_t offset = strnlen(ctx->header_buffer, sizeof(ctx->header_buffer));
+
+	if (offset + length > sizeof(ctx->header_buffer) - 1U) {
+		return 0;
+	}
+
+	memcpy(ctx->header_buffer + offset, at, length);
+	offset += length;
+	ctx->header_buffer[offset] = '\0';
+
+	if (ctx->websocket_sec_key_next) {
+		strncpy(ctx->ws_sec_key, ctx->header_buffer,
+			MIN(sizeof(ctx->ws_sec_key), offset));
+		ctx->websocket_sec_key_next = false;
+	}
+
+	return 0;
+  }
+  ```
+
+test "rank1991: rejecting the over-length key and writing the NUL by hand"
+  lang c
+  file http_server_http1.c
+  reject VYQL-MEM-068
+  code
+  ```
+  struct http_client_ctx {
+	unsigned char header_buffer[48];
+	unsigned char ws_sec_key[32];
+	int websocket_sec_key_next;
+  };
+
+  static int on_header_value(struct http_client_ctx *ctx, const char *at, unsigned long length)
+  {
+	size_t offset = strnlen(ctx->header_buffer, sizeof(ctx->header_buffer));
+
+	if (offset + length > sizeof(ctx->header_buffer) - 1U) {
+		return 0;
+	}
+
+	memcpy(ctx->header_buffer + offset, at, length);
+	offset += length;
+	ctx->header_buffer[offset] = '\0';
+
+	if (ctx->websocket_sec_key_next) {
+		if (offset >= sizeof(ctx->ws_sec_key)) {
+			return -77;
+		}
+		memcpy(ctx->ws_sec_key, ctx->header_buffer, offset);
+		ctx->ws_sec_key[offset] = '\0';
+		ctx->websocket_sec_key_next = false;
+	}
+
+	return 0;
+  }
+  ```
+
+test "rank1991: a clamp that reserves the terminator byte is the documented safe form"
+  lang c
+  file http_server_http1.c
+  reject VYQL-MEM-068
+  code
+  ```
+  #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+  struct http_client_ctx {
+	unsigned char header_buffer[48];
+	unsigned char ws_sec_key[32];
+	int websocket_sec_key_next;
+  };
+
+  static int on_header_value(struct http_client_ctx *ctx, const char *at, unsigned long length)
+  {
+	size_t offset = strnlen(ctx->header_buffer, sizeof(ctx->header_buffer));
+
+	if (offset + length > sizeof(ctx->header_buffer) - 1U) {
+		return 0;
+	}
+
+	memcpy(ctx->header_buffer + offset, at, length);
+	offset += length;
+	ctx->header_buffer[offset] = '\0';
+
+	if (ctx->websocket_sec_key_next) {
+		strncpy(ctx->ws_sec_key, ctx->header_buffer,
+			MIN(sizeof(ctx->ws_sec_key) - 1, offset));
+		ctx->websocket_sec_key_next = false;
+	}
+
+	return 0;
+  }
+  ```
+
+test "rank1991: a clamp on the source buffer's sizeof strands the destination the same way"
+  lang c
+  file modem_cellular.c
+  expect VYQL-MEM-068
+  code
+  ```
+  #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+  struct modem_cellular_data {
+	char imei[16];
+	char imsi[16];
+  };
+
+  static int modem_cellular_get_modem_info(struct modem_cellular_data *data,
+					   int type, char *info, size_t size)
+  {
+	switch (type) {
+	case 0:
+		strncpy(info, &data->imei[0], MIN(size, sizeof(data->imei)));
+		break;
+	case 1:
+		strncpy(info, &data->imsi[0], MIN(size, sizeof(data->imsi)));
+		break;
+	default:
+		return -61;
+	}
+
+	return 0;
+  }
+  ```
+
+test "rank1991: a clamp followed by a terminator write on the copy's own destination"
+  lang c
+  file virtual.c
+  reject VYQL-MEM-068
+  code
+  ```
+  #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+  struct virtual_iface_context {
+	char name[16];
+  };
+
+  char *net_virtual_get_name(struct virtual_iface_context *ctx, char *buf, size_t len)
+  {
+	if (buf == NULL || len == 0) {
+		return NULL;
+	}
+
+	strncpy(buf, ctx->name, MIN(len, sizeof(ctx->name)));
+	buf[len - 1] = '\0';
+
+	return buf;
+  }
+  ```

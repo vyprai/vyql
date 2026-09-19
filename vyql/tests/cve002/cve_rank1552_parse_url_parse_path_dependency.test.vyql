@@ -1,0 +1,245 @@
+# Rank 1552 / CVE-2022-2216: parse-url delegates its URL parsing to
+# the parse-path dependency (lib/index.js requires parse-path and
+# returns parsePath(url) unchanged), and before the fix it pinned a
+# release of that parser whose own advisory is CVE-2022-0624 /
+# GHSA-3j8f-xvm3-ffx4 -- parse-path below 5.0.0 splits a URL on the
+# protocol and credential delimiters without validating that the
+# scheme appears once and that encoded credentials are decoded before
+# they are re-inspected, so `javascript://javascript:alert` yields a
+# host the caller treats as data and every parse-url consumer inherits
+# the misparse (GHSA-7f3x-x4pr-wqhj records the parse-url side as SSRF,
+# CWE-918, affected below 6.0.1). Fix 21c72ab941 is the advisory's own
+# referenced commit; it changes package.json from "parse-path":
+# "^4.0.4" to "parse-path": "^5.0.0" (is-ssh ^1.3.0 -> ^1.4.0,
+# protocols ^1.4.0 -> ^2.0.1 alongside). The parse-url source the fix
+# does touch is documentation and an unrelated git-ssh heuristic
+# bolted onto the returned object -- the returned parsePath(url) call
+# is byte-identical on both sides, so there is no guard in this
+# repository to key on and the report that belongs to this CVE is the
+# dependency finding: an npm pin of parse-path below 5.0.0.
+#
+# The 1st pass held this rank ATTENTION because the feed carried no
+# parse-path advisory, and recorded the dependency advisory under the
+# wrong id: CVE-2022-2215 is a GiveWP WordPress plugin XSS, while
+# parse-path below 5.0.0 is CVE-2022-0624. The id and the CWE are
+# corrected here from the advisories themselves.
+#
+# Threshold is set on the dependency, not on parse-url, and that is a
+# measured choice rather than a convenience: the remediation is the
+# parse-path bump, and the parse-url release history does not track
+# it. `git tag --contains 21c72ab941` names 6.0.1 first, matching the
+# advisory's patched version, but tag 6.0.0 (and 6.0.5, which the
+# maintainer re-published on the same unpatched commit e8dbac1) still
+# pins parse-path ^4.0.0, so a parse-url-side floor would both report
+# this row's fixed revision -- the fix commit does not bump parse-url's
+# own version, which stays 5.0.8 -- and clear a release that still
+# ships the vulnerable parser. A parse-path floor does neither. The
+# feed holds one threshold per artifact, so pins below the advisory's
+# range report too; that over-match is this row's stated residual.
+#
+# Measured on the real checkouts at 21c72ab941^ and 21c72ab941 with
+# the advisory in place: the parent reports VYQL-SCA-001 and
+# VYQL-SCA-002 on package.json:parse-path with the advisory id in the
+# evidence, the fixed tree reports neither, and the only other
+# findings on either tree are four VYQL-INJ-009 rows on example/
+# index.js that exist at both revisions and are unaffected by the
+# change. sbom.ReachableSymbol was already set on the parse-path node
+# before the change -- lib/index.js requires the parser at both
+# revisions -- so the entry adds the missing vulnerability half and
+# nothing else.
+
+test "rank1552: a parse-path pin below the first release that validates the scheme is a dependency finding"
+  lang javascript
+  file lib/index.js
+  code
+  ```
+  "use strict"
+
+  const parsePath = require("parse-path")
+      , normalizeUrl = require("normalize-url")
+
+  function parseUrl(url, normalize = false) {
+      if (typeof url !== "string" || !url.trim()) {
+          throw new Error("Invalid url.")
+      }
+      if (normalize) {
+          if (typeof normalize !== "object") {
+              normalize = {
+                  stripHash: false
+              }
+          }
+          url = normalizeUrl(url, normalize)
+      }
+      const parsed = parsePath(url)
+      return parsed;
+  }
+
+  module.exports = parseUrl;
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "parse-url",
+    "version": "5.0.8",
+    "description": "An advanced url parser supporting git urls too.",
+    "main": "lib/index.js",
+    "dependencies": {
+      "is-ssh": "^1.3.0",
+      "normalize-url": "^6.1.0",
+      "parse-path": "^4.0.4",
+      "protocols": "^1.4.0"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2022-0624
+  expect VYQL-SCA-002
+
+test "rank1552: the parse-path bump past the first scheme-validating release is clean"
+  lang javascript
+  file lib/index.js
+  code
+  ```
+  "use strict"
+
+  const parsePath = require("parse-path")
+      , normalizeUrl = require("normalize-url")
+
+  const parseUrl = (url, normalize = false) => {
+
+      // Constants
+      const GIT_RE = /((git@|http(s)?:\/\/)([\w\.@]+)(\/|:))(([\~,\w,\-,\_,\/]+)(.git){0,1}((\/){0,1}))/
+
+      if (typeof url !== "string" || !url.trim()) {
+          throw new Error("Invalid url.")
+      }
+
+      if (normalize) {
+          if (typeof normalize !== "object") {
+              normalize = {
+                  stripHash: false
+              }
+          }
+          url = normalizeUrl(url, normalize)
+      }
+
+      const parsed = parsePath(url)
+
+      // Potential git-ssh urls
+      if (parsed.protocol === "file") {
+          const matched  = parsed.href.match(GIT_RE)
+          if (matched) {
+              parsed.protocols = ["ssh"]
+              parsed.protocol = "ssh"
+              parsed.resource = matched[4]
+              parsed.user = "git"
+              parsed.pathname = `/${matched[6]}`
+          }
+      }
+
+      return parsed;
+  }
+
+  module.exports = parseUrl;
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "parse-url",
+    "version": "5.0.8",
+    "description": "An advanced url parser supporting git urls too.",
+    "main": "lib/index.js",
+    "dependencies": {
+      "is-ssh": "^1.4.0",
+      "normalize-url": "^6.1.0",
+      "parse-path": "^5.0.0",
+      "protocols": "^2.0.1"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SCA-002
+
+test "rank1552: the unpatched 6.0.x release line's looser parse-path pin is a dependency finding"
+  lang javascript
+  file lib/index.js
+  code
+  ```
+  "use strict"
+
+  const parsePath = require("parse-path")
+      , normalizeUrl = require("normalize-url")
+
+  function parseUrl(url, normalize = false) {
+      if (typeof url !== "string" || !url.trim()) {
+          throw new Error("Invalid url.")
+      }
+      if (normalize) {
+          if (typeof normalize !== "object") {
+              normalize = {
+                  stripHash: false
+              }
+          }
+          url = normalizeUrl(url, normalize)
+      }
+      const parsed = parsePath(url)
+      return parsed;
+  }
+
+  module.exports = parseUrl;
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "parse-url",
+    "version": "6.0.0",
+    "description": "An advanced url parser supporting git urls too.",
+    "main": "lib/index.js",
+    "dependencies": {
+      "is-ssh": "^1.3.0",
+      "normalize-url": "^6.1.0",
+      "parse-path": "^4.0.0",
+      "protocols": "^1.4.0"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2022-0624
+  expect VYQL-SCA-002
+
+test "rank1552: a vulnerable parse-path pin nothing imports is present but not reachable"
+  lang javascript
+  file lib/index.js
+  code
+  ```
+  "use strict"
+
+  const normalizeUrl = require("normalize-url")
+
+  function normalize(input) {
+      return normalizeUrl(input, { stripHash: false })
+  }
+
+  module.exports = normalize;
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "parse-url",
+    "version": "5.0.8",
+    "description": "An advanced url parser supporting git urls too.",
+    "main": "lib/index.js",
+    "dependencies": {
+      "is-ssh": "^1.3.0",
+      "normalize-url": "^6.1.0",
+      "parse-path": "^4.0.4",
+      "protocols": "^1.4.0"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  reject VYQL-SCA-002

@@ -1,0 +1,144 @@
+# CVE-2022-24440: cocoapods-downloader passes a Podfile-supplied git URL to
+# git as a positional argument, so a value beginning with `--` becomes an
+# option (CWE-74, CWE-88). Git.preprocess_options in
+# lib/cocoapods-downloader/git.rb builds
+#
+#   command = ['ls-remote',
+#              options[:git],
+#              options[:branch]]
+#   output = Git.execute_command('git', command)
+#
+# and `:git => '--upload-pack=touch ./HELLO1;'` runs that command. The runner
+# (API.execute_command in api.rb) shellescapes every element before
+# interpolating the command string into a backtick, so the shell is protected
+# but git's own option parser is not: the value is one shell-safe token that
+# ls-remote reads as an option, and `--upload-pack` names a program git
+# executes as the transport helper. Fix 52a0d54464 inserts the end-of-options
+# separator between the subcommand and the values and rejects any input
+# starting with `--` or containing ` --`; after `--` every element is a
+# repository or pattern, so no spelling of the value can become an option.
+#
+# Detection is presence based on the argument vector, judged by the existing
+# rules VYQL-INJ-031 and VYQL-VAL-004: binding
+# gitArgvSubcommandThenOptionValue in
+# vyql/bindings/ruby/git_argv_positional_value.vyql reports the function whose
+# ls-remote vector places an options-hash value directly after the subcommand
+# element -- the spelling with nothing before the value to end option parsing.
+# The remediated spelling has `'--',` between them and does not match. This is
+# the same route and concept as the ruby-git fetch vector (rank 1694's
+# gitArgvPositionalValueLeadsVector, same weakness class) and the isomorphic-git
+# clone vector (commandOptionInjection252 in
+# vyql/bindings/javascript/mfb63017a.vyql).
+#
+# A taint route cannot discriminate this fix: `options[:git]` reaches the
+# runner in both revisions (shellescape is shell quoting, and `--` clears no
+# taint), so the separator would have to be a control concept, and none
+# declares one. Measured on the vulnerable revision, taint from
+# Git.preprocess_options#param#options dies at the argv Seq (git.rb:26) --
+# `Git.execute_command` does not resolve across the module boundary into
+# API.execute_command, and the backtick the runner interpolates into is not
+# lowered to a call at all, so no command sink exists anywhere in the tree.
+# Those two engine facts still stand, as does the orphaned taint sink:
+# code.CommandOptionInjectionSink is emitted by four bindings and consumed by
+# no rule, so argument injection stays unreportable by taint in every
+# language. core.ProcessArgVector correctly neutralises
+# injection.CommandInjection only, so the argv literal's control label does
+# not suppress the presence finding.
+#
+# Measured 3x --cache off per revision, profile library: the vulnerable
+# revision of lib/ reports VYQL-INJ-031 and VYQL-VAL-004 once each on
+# Git.preprocess_options (git.rb:23) as the only deltas against the fixed
+# revision, which reports neither; the other six findings (3 VYQL-PATH-001,
+# 2 VYQL-RF-001, 1 VYQL-RES-001, all remote_file.rb) are identical on both
+# revisions. The `assign:` shape `'ls-remote',options[:` occurs in no other
+# .rb file across the corpus clones.
+#
+# verify_current_expected: fixed-git-argv-presence
+
+test "rank1050: a caller-supplied git URL becomes a git option"
+  lang ruby
+  file lib/cocoapods-downloader/git.rb
+  profile library
+  expect VYQL-INJ-031
+  code
+  ```
+  module Pod
+    module Downloader
+      class Git < Base
+        def self.preprocess_options(options)
+          return options unless options[:branch]
+
+          command = ['ls-remote',
+                     options[:git],
+                     options[:branch]]
+          output = Git.execute_command('git', command)
+          match = commit_from_ls_remote output, options[:branch]
+
+          return options if match.nil?
+
+          options[:commit] = match
+          options.delete(:branch)
+
+          options
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1050: fix rejects a leading dash and separates the arguments"
+  lang ruby
+  file lib/cocoapods-downloader/git.rb
+  profile library
+  reject VYQL-INJ-031
+  code
+  ```
+  module Pod
+    module Downloader
+      class Git < Base
+        def self.preprocess_options(options)
+          return options unless options[:branch]
+
+          input = [options[:git], options[:commit]].map(&:to_s)
+          invalid = input.compact.any? { |value| value.start_with?('--') || value.include?(' --') }
+          raise DownloaderError, "Provided unsafe input for git #{options}." if invalid
+
+          command = ['ls-remote',
+                     '--',
+                     options[:git],
+                     options[:branch]]
+
+          output = Git.execute_command('git', command)
+          match = commit_from_ls_remote output, options[:branch]
+
+          return options if match.nil?
+
+          options[:commit] = match
+          options.delete(:branch)
+
+          options
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1050: neither backtick form is labelled a command sink"
+  lang ruby
+  file lib/cocoapods-downloader/api.rb
+  profile library
+  reject VYQL-INJ-031
+  code
+  ```
+  module Pod
+    module Downloader
+      module API
+        def run(executable, command)
+          out1 = `#{executable} #{command}`
+          out2 = `\n#{executable} #{command} 2>&1`
+          [out1, out2]
+        end
+      end
+    end
+  end
+  ```

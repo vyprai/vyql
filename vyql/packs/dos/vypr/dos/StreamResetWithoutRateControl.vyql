@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule StreamResetWithoutRateControl {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_400, CWE_770]
+    id: "VYQL-DOS-044"
+    severity: high
+  }
+  issue code.StreamResetWithoutRateControl as teardown
+}

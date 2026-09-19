@@ -1,0 +1,12 @@
+# Rank 18 / CVE-2016-10890: Activity Log stored IP/activity data reached
+# WP_List_Table HTML rendering without escaping.
+
+test "rank18: stored activity data reaches html rendering"
+  expect VYQL-INJ-018
+  graph
+  ```
+  node src code.DatabaseRead
+  node sink code.HtmlRender
+  edge FLOWS src -> sink
+  ```
+

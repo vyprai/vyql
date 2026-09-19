@@ -1,0 +1,8 @@
+module code;
+
+review code.EcPointIdentityElementMissing {
+  category: crypto
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review elliptic-curve point double/add/mul operations for point-at-infinity handling before modular inversion and scalar multiplication"
+}

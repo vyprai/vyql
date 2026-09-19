@@ -1,0 +1,49 @@
+module bindings.go.generated.mb5e4ad24;
+
+binding networkConnect0 {
+  requires {
+    dependency("cloud.google.com/go/compute")
+  }
+  query pattern callExpr where callee.method == "executeHTTPRequestWithResponse"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("cloud.google.com/go/compute")
+  }
+  query pattern callExpr where callee.method == "executeHTTPRequestWithResponse"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("cloud.google.com/go/compute")
+  }
+  query pattern callExpr where callee.method == "executeHTTPRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("cloud.google.com/go/compute")
+  }
+  query pattern callExpr where callee.method == "executeHTTPRequest"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("cloud.google.com/go/compute")
+  }
+  query pattern callExpr where callee.method == "executeStreamingHTTPRequest"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("cloud.google.com/go/compute")
+  }
+  query pattern callExpr where callee.method == "executeStreamingHTTPRequest"
+  emit sink code.NetworkSend at args[0]
+}

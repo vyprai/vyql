@@ -1,0 +1,262 @@
+# spray-json's recursive-descent JSON parser recursed into nested objects
+# and arrays with no depth limit, so a deeply nested JSON document threw a
+# StackOverflowError and took the parsing thread down (denial of service
+# through unbounded recursion, CWE-674/CWE-400; PR #284, fixes #286).
+# `value` in src/main/scala/spray/json/JsonParser.scala dispatched on the
+# cursor character to `object`/`array`, whose member and element loops
+# called `value` again -- the nesting depth bounded only by the input's own
+# nesting, the stack the only budget. The fixing commit d56d7f42134 (the
+# merge "fix-uncontrolled-recursion"; the commit inside it, a558753, names
+# the CVE in its own message) adds a JsonParserSettings.maxDepth defaulting
+# to 1000, threads a remainingNesting parameter through
+# `value`/`object`/`array`, and throws a ParsingException once the remaining
+# nesting reaches zero.
+#
+# ATTENTION, rechecked. The depth-budget family of 1559/1586/1612/1697:
+# the corpus's CWE-400 rules judge per-iteration progress, not a depth
+# carried through recursion, so nothing can ask whether the parse stops at
+# a depth cap. Re-measured on the real checkout, three --cache off runs per
+# side, stable: the full tree (28 scala files) reports 0 findings and 0
+# flags at both revisions, and `vyql match` on JsonParser.scala labels
+# nothing at all -- no source, no sink, no control -- so no rule was firing
+# that a flags-only view hid. The later-shipped nesting-ceiling vocabulary
+# does not reach here: NestedExtglobExpansionWithoutDepthLimit is bound in
+# javascript and NestedParamExpansionWithoutDepthLimit in ruby, and both
+# concepts state a query-string or glob convention rather than structured
+# text parsing, so neither a Scala emitter nor reuse of the concept fits.
+#
+# What a Scala binding can key on is the complete inventory the frontend
+# emits for a function context (scFunctionContext, scala.go:291): the
+# function's name and the assign/call_path/call/call_arg/selector/expr/
+# literal tokens of its body. There is no module or class context node, no
+# match-construct token, and no fact for a call resolving to an enclosing
+# function, so the mutual cycle value -> object -> value is not addressable.
+# Measured with probe bindings on the real code:
+#
+#   * The discriminator is available. A function-scope binding whose
+#     positives hold at `value` and whose negation is the generic ceiling
+#     spellings already shipped with the ruby binding (max_depth, maxDepth,
+#     max_nesting, maxNesting, ...) reports 1 at the fix parent and 0 at the
+#     fix. The ceiling names land in a literal token through the patched
+#     exception's interpolated string, and a Scala function context carries
+#     only AST-derived tokens, so a comment cannot silence the negation.
+#   * The positives are not. Requiring both container-open delimiters as
+#     substring matches fires 34 times across 25 ordinary scala files for
+#     one true positive. Requiring them as exact literal tokens narrows
+#     that to one file -- and that file is a value formatter, not a parser:
+#     zeppelin's CqlFormatter.formatHuman delimits its output with
+#     mkString("{", ", ", "}") and mkString("[", ", ", "]"), so the
+#     conjuncts select code that handles both container kinds, not code
+#     that parses. The reachable set is exhaustive: all 774 non-target
+#     scala files under the corpus clones, scanned in five bounded chunks.
+#   * The exact-token form also misses the sibling instance of this same
+#     weakness in this same language: play's FormUtils.doFromJson walks a
+#     JsValue with no depth bound and dispatches on JsObject and JsArray
+#     types, not on characters, so it carries no delimiter literal at all.
+#     A shape that catches spray-json's character-level spelling while
+#     missing the type-level spelling of the same unbounded walk keys on
+#     this library's implementation style rather than the weakness, and the
+#     next variant walks past it. Keying on spray-json's own identifiers
+#     instead detects the library, and minting a concept for the class adds
+#     a fifth per-shape sibling to a weakness class that already carries
+#     four.
+#
+# Not an engine gap: extraction and resolution work (`vyql graph` carries
+# JsonParser.`value` and the Call path=`value` re-entry), and the missing
+# piece is a recursion-depth observation over a call-graph cycle plus the
+# language-neutral rule over it -- design work the self-recursion entry
+# already records, and no analysis.recursion.* fact exists in the frontend
+# today. No Scala corpus exists in either benchmark suite, so a broad scala
+# shape has no precision gate to be measured against at all.
+#
+# The spec pins the miss against the parser-progress rule of the right
+# class. When depth-budget vocabulary lands, the unbounded parser and the
+# type-dispatched sibling walk must flip to expect; the depth-capped parser
+# must stay rejected, and the formatter's flag is the recorded cost of any
+# delimiter-keyed positives.
+
+test "rank1776: the json parser recurses without a depth cap"
+  lang scala
+  file src/main/scala/spray/json/JsonParser.scala
+  reject VYQL-DOS-029
+  code
+  ```
+  package spray.json
+
+  class JsonParser(input: ParserInput) {
+    private var jsValue: JsValue = _
+
+    def parseJsValue(): JsValue = {
+      `value`()
+      jsValue
+    }
+
+    private def `value`(): Unit = {
+      (cursorChar: @switch) match {
+        case 'f' => `false`()
+        case 'n' => `null`()
+        case 't' => `true`()
+        case '{' => advance(); `object`()
+        case '[' => advance(); `array`()
+        case '"' => `string`()
+        case _ => fail("JSON Value")
+      }
+    }
+
+    private def `object`(): Unit = {
+      if (cursorChar != '}') {
+        @tailrec def members(): Unit = {
+          `string`()
+          require(':')
+          `value`()
+          if (ws(',')) members()
+        }
+        members()
+      }
+    }
+
+    private def `array`(): Unit = {
+      if (cursorChar != ']') {
+        @tailrec def values(): Unit = {
+          `value`()
+          if (ws(',')) values()
+        }
+        values()
+      }
+    }
+  }
+  ```
+
+test "rank1776: the fixed revision threads a nesting budget through the recursion"
+  lang scala
+  file src/main/scala/spray/json/JsonParser.scala
+  reject VYQL-DOS-029
+  code
+  ```
+  package spray.json
+
+  class JsonParser(input: ParserInput, settings: JsonParserSettings) {
+    private var jsValue: JsValue = _
+
+    def parseJsValue(): JsValue = {
+      `value`(settings.maxDepth)
+      jsValue
+    }
+
+    private def `value`(remainingNesting: Int): Unit =
+      if (remainingNesting == 0)
+        throw new ParsingException(
+          "JSON input nested too deeply",
+          s"JSON input was nested more deeply than the configured limit of maxNesting = ${settings.maxDepth}")
+      else {
+        (cursorChar: @switch) match {
+          case 'f' => `false`()
+          case 'n' => `null`()
+          case 't' => `true`()
+          case '{' => advance(); `object`(remainingNesting)
+          case '[' => advance(); `array`(remainingNesting)
+          case '"' => `string`()
+          case _ => fail("JSON Value")
+        }
+      }
+
+    private def `object`(remainingNesting: Int): Unit = {
+      if (cursorChar != '}') {
+        @tailrec def members(): Unit = {
+          `string`()
+          require(':')
+          `value`(remainingNesting - 1)
+          if (ws(',')) members()
+        }
+        members()
+      }
+    }
+
+    private def `array`(remainingNesting: Int): Unit = {
+      if (cursorChar != ']') {
+        @tailrec def values(): Unit = {
+          `value`(remainingNesting - 1)
+          if (ws(',')) values()
+        }
+        values()
+      }
+    }
+  }
+  ```
+
+test "rank1776: the same unbounded walk dispatched on value types carries no delimiter literal"
+  lang scala
+  file core/play/src/main/scala/play/api/data/Form.scala
+  reject VYQL-DOS-029
+  code
+  ```
+  package play.api.data
+
+  import play.api.libs.json._
+
+  private[data] object FormUtils {
+    def fromJson(js: JsValue, maxChars: Long): Map[String, String] =
+      doFromJson(FromJsonRoot(js), Map.empty, 0, maxChars)
+
+    @annotation.tailrec
+    private def doFromJson(
+        context: FromJsonContext,
+        form: Map[String, String],
+        cumulativeChars: Int,
+        maxChars: Long
+    ): Map[String, String] = context match {
+      case FromJsonTerm              => form
+      case ctx: FromJsonContextValue =>
+        ctx.next
+        ctx.value match {
+          case obj: JsObject if obj.fields.nonEmpty =>
+            doFromJson(FromJsonObject(ctx, obj.fields.toIndexedSeq, 0), form, cumulativeChars, maxChars)
+          case JsArray(values) if values.nonEmpty =>
+            doFromJson(FromJsonArray(ctx, values.toIndexedSeq, 0), form, cumulativeChars, maxChars)
+          case JsNull | JsArray(_) | JsObject(_) =>
+            doFromJson(ctx.next, form, cumulativeChars, maxChars)
+          case simple =>
+            val value = simple match {
+              case JsString(v) => v
+              case JsNumber(v) => v.toString
+            }
+            val prefix             = ctx.prefix
+            val newCumulativeChars = cumulativeChars + prefix.length + value.length
+            if (newCumulativeChars > maxChars) {
+              throw FormJsonExpansionTooLarge(maxChars)
+            }
+            doFromJson(ctx.next, form.updated(prefix, value), newCumulativeChars, maxChars)
+        }
+    }
+  }
+  ```
+
+test "rank1776: a value formatter delimits both container kinds without parsing anything"
+  lang scala
+  file cassandra/src/main/scala/org/apache/zeppelin/cassandra/CqlFormatter.scala
+  reject VYQL-DOS-029
+  code
+  ```
+  package org.apache.zeppelin.cassandra
+
+  class CqlFormatter {
+    def formatHuman(obj: Object): String = {
+      if (obj == null) {
+        "null"
+      } else {
+        obj match {
+          case m: java.util.Map[Object, Object] =>
+            m.asScala.map { case (k, v) => formatHuman(k) + ": " + formatHuman(v) }.mkString("{", ", ", "}")
+          case l: java.util.List[Object] =>
+            l.asScala.map(x => formatHuman(x)).mkString("[", ", ", "]")
+          case s: java.util.Set[Object] =>
+            s.asScala.map(x => formatHuman(x)).mkString("{", ", ", "}")
+          case t: TupleValue =>
+            (0 until t.size()).map(i => formatHuman(t.getObject(i))).mkString("(", ", ", ")")
+          case other =>
+            other.toString
+        }
+      }
+    }
+  }
+  ```

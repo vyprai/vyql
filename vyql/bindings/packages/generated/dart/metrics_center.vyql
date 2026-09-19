@@ -1,0 +1,9 @@
+module bindings.dart.generated.meeaa8dd0;
+
+binding deserialization0 {
+  requires {
+    dependency("metrics_center")
+  }
+  query pattern callExpr where callee.method == "GoogleBenchmarkParser.parse"
+  emit sink code.Deserialization at args[0]
+}

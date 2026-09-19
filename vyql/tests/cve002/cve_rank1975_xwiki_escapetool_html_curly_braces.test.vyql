@@ -1,0 +1,348 @@
+# Rank 1975 / CVE-2024-31996 (GHSA-hf43-47q4-fhq5, CWE-94, CWE-95): the
+# XWiki escaping tool's `html()` inherits Velocity Tools' HTML-entity
+# escaping, which covers `& < > " '` and nothing else
+# (xwiki-commons-core/xwiki-commons-velocity/src/main/java/org/xwiki/velocity/tools/EscapeTool.java
+# at fix parent b94142e2^):
+#
+#     public class EscapeTool extends org.apache.velocity.tools.generic.EscapeTool
+#     {
+#         @Override
+#         public String xml(Object content) { ... }   // overridden
+#         // no html() override: inherits escapeHtml4, entity-escaping only
+#     }
+#
+# XWiki wiki syntax treats `{{ ... }}` as a macro, so a template answering
+# with `$escapetool.html($request.place)` passes the braces through and the
+# advisory's PoC ships `{{/html}}{{velocity}}#evaluate($request.eval)` in
+# the `place` parameter of `Panels.PanelLayoutUpdate`, closing the enclosing
+# HTML macro and evaluating attacker Velocity on the server. Fix b94142e2
+# overrides `html()` with a translator that also maps `{` to `&lcub;` and
+# `}` to `&rcub;`; the cherry-picks b0805160 (to the 15.5 stream) and
+# ed7ff515 (to the 14.10 stream) are its release-branch copies. `git tag
+# --contains` puts the fix first in xwiki-commons-15.9-rc-1, then 15.5.4
+# and 14.10.19, and the advisory's own maven package record
+# (org.xwiki.commons:xwiki-commons-velocity) names exactly those three as
+# patched, over the affected ranges >= 3.0.1 < 14.10.19, >= 15.0-rc-1
+# < 15.5.4 and >= 15.6-rc-1 < 15.9-rc-1.
+#
+# The completeness of the escape lives entirely inside the library, so the
+# application's `$escapetool.html(...)` call is correct code once the
+# library carries the override and identical on both sides of the fix: no
+# application-side pattern separates a vulnerable pin from a fixed one, and
+# the report that belongs to this CVE is the dependency finding, a Maven
+# pin of org.xwiki.commons:xwiki-commons-velocity below 15.9-rc-1. The feed
+# holds one threshold per artifact and the advisory's own range has three
+# branches, so the patched older-stream micro-releases (14.10.19 onward,
+# 15.5.4, 15.5.5) report too, as do pins below the 3.0.1 range floor; that
+# is the row's stated residual rather than a second threshold.
+#
+# Measured on real checkouts of the assigned repository (timeout 180,
+# --max-ram 6GB, --cache off, 3 runs per revision): the 15.8 release tree,
+# inside the advisory's top affected range, goes 448 -> 450 findings, the
+# +2 being VYQL-SCA-001 medium and VYQL-SCA-002 high on
+# xwiki-commons-core/xwiki-commons-legacy/xwiki-commons-legacy-velocity/pom.xml,
+# both carrying "advisory CVE-2024-31996" and "15.8 is below 15.9-rc-1, the
+# first fixed version" (the legacy module declares the coordinate as a real
+# dependency at ${project.version}). The 15.9 release tree is clean at 454
+# findings, 3/3 runs. The b94142e2^ and b94142e2 development checkouts both
+# report 15.9-SNAPSHOT, which the version comparator reads as equal to the
+# threshold, so neither fires -- a development tree's version is not the
+# released coordinate, and the release-tag pair above is the discriminating
+# A/B. Reachability (SCA-002) links through the legacy module's own imports
+# of org.xwiki.velocity classes. Platform-family consumers reference the
+# coordinate as ${commons.version}, a property no same-tree pom defines, so
+# the reader leaves those pins unresolved and they stay silent.
+#
+# The code-level route stays closed, and the last four tests pin why:
+#   - the Java side has no node to bind. At the parent there is no `html()`
+#     method in the file at all, so a discriminating binding must key on
+#     the *absence of an override* in a subclass of
+#     org.apache.velocity.tools.generic.EscapeTool. That is the fixing
+#     commit's own layout, and velocity-tools' documentation says nothing
+#     that would lead anyone to write it: the genericity test fails, and
+#     exactly one such class exists in the world.
+#   - the template side is line-regex extraction, not nodes. The
+#     xwiki_velocity scope emits input, state_change, csrf_check, escape
+#     and wiki_embed events, but the escape event exists only for the
+#     `{{{$escapetool` line construct beside the wiki-embed sink; an
+#     escape call wrapping a value on an ordinary print line is text
+#     inside a matched line, not a node, so "escaped for HTML" and
+#     "escaped for wiki syntax" are indistinguishable in the IR. That is
+#     the config text-template escape-node engine gap; the final two
+#     tests are its isolating pair -- identical template, differing only
+#     in the escape. Kinship, not a mint: the same wrong-parser escaping
+#     family as code.JavaScriptTemplateHtmlEscapeMismatch (VYQL-INJ-171)
+#     and code.ErbHrefUrlHtmlEscapeOnly, and the wiki-render sink half of
+#     the pair the xwiki-platform sibling ships for the `{{{$` construct.
+
+test "rank1975: a velocity-tools pin below the first brace-escaping release is a dependency finding"
+  lang java
+  file src/main/java/example/PanelLayout.java
+  code
+  ```
+  package example;
+
+  import org.apache.velocity.VelocityContext;
+  import org.xwiki.velocity.tools.EscapeTool;
+
+  public class PanelLayout {
+      private final VelocityContext context = new VelocityContext();
+
+      public PanelLayout()
+      {
+          this.context.put(EscapeTool.DEFAULT_KEY, new EscapeTool());
+      }
+
+      public String place(String requestPlace)
+      {
+          return new EscapeTool().html(requestPlace);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>org.xwiki.commons</groupId>
+        <artifactId>xwiki-commons-velocity</artifactId>
+        <version>15.8</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2024-31996
+  expect VYQL-SCA-002
+
+test "rank1975: a pin at the first brace-escaping release is clean"
+  lang java
+  file src/main/java/example/PanelLayout.java
+  code
+  ```
+  package example;
+
+  import org.apache.velocity.VelocityContext;
+  import org.xwiki.velocity.tools.EscapeTool;
+
+  public class PanelLayout {
+      private final VelocityContext context = new VelocityContext();
+
+      public PanelLayout()
+      {
+          this.context.put(EscapeTool.DEFAULT_KEY, new EscapeTool());
+      }
+
+      public String place(String requestPlace)
+      {
+          return new EscapeTool().html(requestPlace);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>org.xwiki.commons</groupId>
+        <artifactId>xwiki-commons-velocity</artifactId>
+        <version>15.9-rc-1</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SCA-002
+
+test "rank1975: an older-stream pin the advisory names is a dependency finding"
+  lang java
+  file src/main/java/example/PanelLayout.java
+  code
+  ```
+  package example;
+
+  import org.apache.velocity.VelocityContext;
+  import org.xwiki.velocity.tools.EscapeTool;
+
+  public class PanelLayout {
+      private final VelocityContext context = new VelocityContext();
+
+      public PanelLayout()
+      {
+          this.context.put(EscapeTool.DEFAULT_KEY, new EscapeTool());
+      }
+
+      public String place(String requestPlace)
+      {
+          return new EscapeTool().html(requestPlace);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>org.xwiki.commons</groupId>
+        <artifactId>xwiki-commons-velocity</artifactId>
+        <version>15.4</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2024-31996
+
+test "rank1975: a current-release pin is clean"
+  lang java
+  file src/main/java/example/PanelLayout.java
+  code
+  ```
+  package example;
+
+  import org.apache.velocity.VelocityContext;
+  import org.xwiki.velocity.tools.EscapeTool;
+
+  public class PanelLayout {
+      private final VelocityContext context = new VelocityContext();
+
+      public PanelLayout()
+      {
+          this.context.put(EscapeTool.DEFAULT_KEY, new EscapeTool());
+      }
+
+      public String place(String requestPlace)
+      {
+          return new EscapeTool().html(requestPlace);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>org.xwiki.commons</groupId>
+        <artifactId>xwiki-commons-velocity</artifactId>
+        <version>15.10</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SCA-002
+
+test "rank1975: the inheriting tool exposes no node that separates it from the overriding one"
+  lang java
+  file EscapeTool.java
+  reject VYQL-INJ-004
+  code
+  ```
+  package org.xwiki.velocity.tools;
+
+  import java.util.Objects;
+  import org.xwiki.xml.XMLUtils;
+
+  public class EscapeTool extends org.apache.velocity.tools.generic.EscapeTool
+  {
+      public static final String DEFAULT_KEY = "escapetool";
+
+      public EscapeTool()
+      {
+          setKey(DEFAULT_KEY);
+      }
+
+      @Override
+      public String xml(Object content)
+      {
+          return XMLUtils.escape(Objects.toString(content, null));
+      }
+  }
+  ```
+
+test "rank1975: the overriding tool is the same shape to any binding"
+  lang java
+  file EscapeToolFixed.java
+  reject VYQL-INJ-004
+  code
+  ```
+  package org.xwiki.velocity.tools;
+
+  import java.util.Map;
+  import org.apache.commons.text.StringEscapeUtils;
+  import org.apache.commons.text.translate.CharSequenceTranslator;
+  import org.apache.commons.text.translate.LookupTranslator;
+
+  public class EscapeTool extends org.apache.velocity.tools.generic.EscapeTool
+  {
+      public static final String DEFAULT_KEY = "escapetool";
+
+      private static final CharSequenceTranslator XWIKI_ESCAPE_HTML4 = StringEscapeUtils.ESCAPE_HTML4.with(
+          new LookupTranslator(Map.ofEntries(
+              Map.entry("{", "&lcub;"),
+              Map.entry("}", "&rcub;")
+          ))
+      );
+
+      @Override
+      public String html(Object content)
+      {
+          if (content == null) {
+              return null;
+          }
+          return XWIKI_ESCAPE_HTML4.translate(String.valueOf(content));
+      }
+  }
+  ```
+
+test "rank1975: a request parameter escaped for HTML only still reaches the render"
+  lang config
+  file PanelLayoutUpdate.xml
+  reject VYQL-INJ-004
+  code
+  ```
+  <xwikidoc>
+    <web>Panels</web>
+    <name>PanelLayoutUpdate</name>
+    <content><![CDATA[
+  #set ($layout = "$request.place")
+  $response.getWriter().print("$escapetool.html($layout)")
+    ]]></content>
+  </xwikidoc>
+  ```
+
+test "rank1975: the same template escaped for wiki syntax is clean"
+  lang config
+  file PanelLayoutUpdateFixed.xml
+  reject VYQL-INJ-004
+  code
+  ```
+  <xwikidoc>
+    <web>Panels</web>
+    <name>PanelLayoutUpdate</name>
+    <content><![CDATA[
+  #set ($layout = "$request.place")
+  $response.getWriter().print("$escapetool.xml($layout)")
+    ]]></content>
+  </xwikidoc>
+  ```

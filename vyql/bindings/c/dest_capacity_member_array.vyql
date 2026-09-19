@@ -1,0 +1,37 @@
+module bindings.c.dest_capacity_member_array;
+
+// A struct that declares one of its fields as an array of constant size has
+// stated that field's capacity in the one place it can be stated, so a
+// byte-count transfer into that field is bounded by the declaration and by
+// nothing else. A count taken from elsewhere -- a length read off the wire, a
+// value a caller hands over -- is bounded by wherever it came from, and a
+// function that never compares that count has no bound on the write at all:
+// the transfer runs past the member array exactly when the count is the larger
+// of the two. The declaration is what makes this a small set, which is why the
+// count is required to be a bare identifier the body never relates to anything
+// rather than any transfer into any field.
+//
+// The fact is emitted by the C frontend
+// (ccDestCapacityMemberArrayObservations,
+// internal/extract/frontend/treesitter/c.go) from the syntax tree and is
+// callee-neutral, carrying the argument position the member array occupies so
+// that which spellings count as transfers, and which of their arguments is the
+// destination, is decided here in data: the two C standard byte-copy
+// primitives and documented library aliases of the same signature take the
+// destination first (pjlib's pj_memcpy, SDL's SDL_memcpy), while the dissector
+// toolkit's bulk-copy primitive takes it second -- tvb_memcpy copies `length`
+// bytes at `offset` into `target` and, per its own header comment, "assumes
+// that the target memory is already allocated; it does not allocate or free
+// the target memory", a byte-count copy into a destination whose capacity the
+// caller must know. Keeping the position here rather than in the engine is
+// what stops a transfer that reads from a member array from being read as one
+// that writes into it.
+//
+// Residuals, all false-negative: the count is the call's last argument, so a
+// spelling that follows it with a flags word is not paired; a destination or
+// count wrapped in a cast is not paired; and a bound enforced in the caller of
+// a helper is invisible to the helper's own body.
+binding destCapacityMemberArray {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "copy.member_capacity_unchecked" and containsAny(node.token, ["arg0=memcpy", "arg0=memmove", "arg0=pj_memcpy", "arg0=SDL_memcpy", "arg1=tvb_memcpy"])
+  emit issue code.DestCapacityUncheckedCopy at node
+}

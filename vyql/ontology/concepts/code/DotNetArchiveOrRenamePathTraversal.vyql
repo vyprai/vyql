@@ -1,0 +1,11 @@
+module code;
+
+concept DotNetArchiveOrRenamePathTraversal : issue {
+  cwe: [CWE_22]
+  reviewAssumption: "archive entry names or rename names can contain traversal segments that escape the configured root directory"
+  reviewCategory: path
+  reviewCondition: ".NET archive extraction or rename code joins caller-controlled names into filesystem paths without canonical containment under the root"
+  reviewConfidence: high
+  reviewEvidence: ".NET filesystem context {pattern} combines archive entry names or rename targets into destination paths before observed Path.GetFullPath plus StartsWith containment"
+  vulnerableTo: [path.PathTraversal]
+}

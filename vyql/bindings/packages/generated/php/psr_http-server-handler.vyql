@@ -1,0 +1,9 @@
+module bindings.php.generated.m77f0ad2f;
+
+binding httpInput0 {
+  requires {
+    dependency("psr/http-server-handler")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit source code.HttpInput at call.result
+}

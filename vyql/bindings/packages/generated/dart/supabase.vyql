@@ -1,0 +1,9 @@
+module bindings.dart.generated.m1bdd1ca3;
+
+binding networkSend0 {
+  requires {
+    dependency("supabase")
+  }
+  query pattern callExpr where callee.method == "AuthHttpClient.send"
+  emit sink code.NetworkSend at args[0]
+}

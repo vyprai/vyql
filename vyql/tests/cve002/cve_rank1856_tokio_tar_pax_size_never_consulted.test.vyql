@@ -1,0 +1,346 @@
+# tokio-tar at the fixed revision 22b3f88 (CVE-2025-62518, CWE-436/CWE-20)
+# sizes every entry's data read from the ustar header's octal size field alone.
+# POSIX gives a pax extended header's size record plain precedence over that
+# field -- the record exists to carry values the fixed octal field cannot, and
+# its size value is the size of the following entry's data. The walker
+# captures the raw extended-header bytes for each entry and hands them to the
+# entry for path resolution, but the function that frames the data read never
+# receives them: it reads Header::entry_size and bounds the reader with take,
+# and no extended-header consult appears in it at all. The regression test the
+# fix ships builds an archive whose blob entry declares a larger extended size
+# than its header size, and the lenient reader ends the entry early, so the
+# next entry's header is read from inside the blob's data -- the entry walk
+# itself is fed attacker-chosen bytes.
+#
+# src/archive.rs poll_next_raw at the vulnerable revision bf266ff is the whole shape:
+#
+#     let file_pos = *next;
+#     let size = header.entry_size()?;
+#
+#     let mut data = VecDeque::with_capacity(1);
+#     data.push_back(EntryIo::Data(archive.clone().take(size)));
+#
+# The fixed revision threads the captured pax bytes into the framing function and applies
+# the size record before the take:
+#
+#     let mut size = header.entry_size()?;
+#     if let Some(pax) = pax_extensions_data.map(pax_extensions) {
+#         for extension in pax {
+#             ...
+#             match key {
+#                 "size" => { size = size_str.parse::<u64>()?; }
+#                 ...
+#
+# This is the second measured shape of the extended-header precedence family:
+# the conditional half (the record consulted but applied only when the base
+# field is zero) is bound separately on its own atoms, and the two stay
+# separate because their evidence names different things -- a zero-comparison
+# this shape does not carry, and a consult this shape does not contain.
+#
+# What fires at the vulnerable revision: nothing on the defect. `scan --cache off` over
+# the vulnerable checkout reports 76 findings -- 39 MEM-006, 33 DOS-042, two
+# MEM-005, a PATH-083 and a PATH-001 -- including nine NullableDeref rows on
+# the header unwraps inside poll_next_raw itself, and none on the size
+# derivation that is the bug. With this rule both revisions report 77 and the
+# diff between them is exactly two rows: this one at src/archive.rs:498 on
+# the parent only, and a DOS-042 row the 23 lines of regression test the fixing commit
+# commit itself adds on the fixed side only. Three runs per side, identical
+# each time. The positive atoms name the tar family's own surface -- entry_size
+# appears in no other rust tree among the campaign's clones -- so the
+# reachable set outside this crate is empty.
+#
+# Vocabulary checked for reuse before minting. code.ConditionalExtendedHeaderOverride
+# is the same interpretation conflict over the same record, but its condition
+# names a zero-comparison on the base field that this shape does not carry --
+# here the override is absent, not conditional -- so reusing the label would
+# state a condition the flagged code does not satisfy. code.AmbiguousMessageBodyFraming
+# is the HTTP/1 Transfer-Encoding pair, code.AmbiguousArchiveManifestSelection
+# is about which entry a manifest lookup selects, and the ArchiveSymlinkFilterBypass
+# family keys on entry names and paths. None covers "the extended-header
+# records are never consulted where the format gives them precedence", so
+# code.AbsentExtendedHeaderOverride is minted for that class.
+#
+# It is bound in Rust, where the tar crate family publishes both halves:
+# Header::entry_size reads the base header's size field, and the reader's
+// take bounds the bytes handed to the entry. The consult is recognised on
+# the published pax_extensions surface in any spelling this family uses --
+# a bare function value passed to map, a direct call, or the
+# pax_extensions_value lookup helper -- so the fixed revision and the sibling crate's
+# unconditional form both clear it.
+#
+# Deliberately uncovered, and why: a parser consulting the records through
+# an accessor this family does not name. The negation keys on the published
+# surface, so a differently-named consult reads as absent and would be
+# reported; there is no second measured instance to pin more spellings on.
+
+test "tokio-tar: entry data sized from the base header alone while no pax consult appears in the framing function"
+  lang rust
+  file src/archive.rs
+  expect VYQL-VAL-035
+  expect_review code.AbsentExtendedHeaderOverride
+  code
+  ```
+  use std::io;
+
+  struct Header;
+
+  impl Header {
+      fn new_old() -> Header {
+          Header
+      }
+
+      fn entry_size(&self) -> io::Result<u64> {
+          Ok(0)
+      }
+  }
+
+  struct Archive;
+
+  impl Clone for Archive {
+      fn clone(&self) -> Archive {
+          Archive
+      }
+  }
+
+  impl Archive {
+      fn take(&self, _size: u64) -> Archive {
+          Archive
+      }
+  }
+
+  struct EntryIo;
+
+  impl EntryIo {
+      fn data(_archive: Archive) -> EntryIo {
+          EntryIo
+      }
+  }
+
+  fn poll_next_raw(next: u64) -> io::Result<u64> {
+      let header = Header::new_old();
+      let file_pos = next;
+      let size = header.entry_size()?;
+
+      let mut data = VecDeque::with_capacity(1);
+      data.push_back(EntryIo::data(Archive.clone().take(size)));
+      let _ = data;
+      let _ = file_pos;
+      Ok(size)
+  }
+  ```
+
+test "tokio-tar: a pax consult in a sibling function does not clear the flag on the framing function"
+  lang rust
+  file src/archive.rs
+  expect VYQL-VAL-035
+  expect_review code.AbsentExtendedHeaderOverride
+  code
+  ```
+  use std::io;
+
+  struct Header;
+
+  impl Header {
+      fn new_old() -> Header {
+          Header
+      }
+
+      fn entry_size(&self) -> io::Result<u64> {
+          Ok(0)
+      }
+  }
+
+  struct Archive;
+
+  impl Clone for Archive {
+      fn clone(&self) -> Archive {
+          Archive
+      }
+  }
+
+  impl Archive {
+      fn take(&self, _size: u64) -> Archive {
+          Archive
+      }
+  }
+
+  struct EntryIo;
+
+  impl EntryIo {
+      fn data(_archive: Archive) -> EntryIo {
+          EntryIo
+      }
+  }
+
+  fn poll_next_raw() -> io::Result<u64> {
+      let header = Header::new_old();
+      let size = header.entry_size()?;
+      let data = EntryIo::data(Archive.clone().take(size));
+      let _ = data;
+      Ok(size)
+  }
+
+  fn entry_path(pax_extensions: Option<&[u8]>) -> io::Result<()> {
+      if let Some(pax) = pax_extensions {
+          let _ = pax.len();
+      }
+      Ok(())
+  }
+  ```
+
+test "tokio-tar: patched framing consults the pax records before sizing the data read"
+  lang rust
+  file src/archive.rs
+  reject VYQL-VAL-035
+  code
+  ```
+  use std::io;
+
+  struct Header;
+
+  impl Header {
+      fn new_old() -> Header {
+          Header
+      }
+
+      fn entry_size(&self) -> io::Result<u64> {
+          Ok(0)
+      }
+  }
+
+  struct PaxExtension<'a>(&'a [u8]);
+
+  impl<'a> PaxExtension<'a> {
+      fn key(&self) -> Result<&str, ()> {
+          Ok("")
+      }
+
+      fn value(&self) -> Result<&str, ()> {
+          Ok("")
+      }
+  }
+
+  struct PaxIter<'a>(Option<PaxExtension<'a>>);
+
+  impl<'a> Iterator for PaxIter<'a> {
+      type Item = Result<PaxExtension<'a>, ()>;
+
+      fn next(&mut self) -> Option<Self::Item> {
+          None
+      }
+  }
+
+  fn pax_extensions(data: &[u8]) -> PaxIter<'_> {
+      let _ = data;
+      PaxIter(None)
+  }
+
+  struct Archive;
+
+  impl Clone for Archive {
+      fn clone(&self) -> Archive {
+          Archive
+      }
+  }
+
+  impl Archive {
+      fn take(&self, _size: u64) -> Archive {
+          Archive
+      }
+  }
+
+  struct EntryIo;
+
+  impl EntryIo {
+      fn data(_archive: Archive) -> EntryIo {
+          EntryIo
+      }
+  }
+
+  fn poll_next_raw(pax_extensions_data: Option<&[u8]>) -> io::Result<u64> {
+      let mut header = Header::new_old();
+      let mut size = header.entry_size()?;
+      if let Some(pax) = pax_extensions_data.map(pax_extensions) {
+          for extension in pax {
+              let extension = extension.map_err(|_e| io::Error::other("parse"))?;
+              let Ok(key) = extension.key() else {
+                  continue;
+              };
+              match key {
+                  "size" => {
+                      let size_str =
+                          extension.value().map_err(|_e| io::Error::other("value"))?;
+                      size = size_str
+                          .parse::<u64>()
+                          .map_err(|_e| io::Error::other("size"))?;
+                  }
+                  _ => {
+                      continue;
+                  }
+              }
+          }
+      }
+      let data = EntryIo::data(Archive.clone().take(size));
+      let _ = data;
+      Ok(size)
+  }
+  ```
+
+test "tokio-tar: a lookup-helper consult in the framing function clears the flag"
+  lang rust
+  file src/archive.rs
+  reject VYQL-VAL-035
+  code
+  ```
+  use std::io;
+
+  struct Header;
+
+  impl Header {
+      fn new_old() -> Header {
+          Header
+      }
+
+      fn entry_size(&self) -> io::Result<u64> {
+          Ok(0)
+      }
+  }
+
+  fn pax_extensions_value(_data: &[u8], _key: &str) -> Option<u64> {
+      None
+  }
+
+  struct Archive;
+
+  impl Clone for Archive {
+      fn clone(&self) -> Archive {
+          Archive
+      }
+  }
+
+  impl Archive {
+      fn take(&self, _size: u64) -> Archive {
+          Archive
+      }
+  }
+
+  struct EntryIo;
+
+  impl EntryIo {
+      fn data(_archive: Archive) -> EntryIo {
+          EntryIo
+      }
+  }
+
+  fn poll_next_raw(pax_extensions: Option<&[u8]>) -> io::Result<u64> {
+      let mut header = Header::new_old();
+      let mut size = header.entry_size()?;
+      if let Some(pax_size) = pax_extensions.and_then(|p| pax_extensions_value(p, "size")) {
+          size = pax_size;
+      }
+      let data = EntryIo::data(Archive.clone().take(size));
+      let _ = data;
+      let _ = header;
+      Ok(size)
+  }
+  ```

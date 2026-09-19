@@ -1,0 +1,8 @@
+module code;
+
+review code.DotcmsSqlUtilBlacklistBypass {
+  category: sql
+  expected: [core.SqlParameterization, core.InputValidation]
+  kind: attention
+  text: "review dotCMS SQLUtil blacklist sanitization before using request-controlled sort, direction, or condition fragments in SQL"
+}

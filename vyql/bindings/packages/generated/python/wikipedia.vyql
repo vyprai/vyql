@@ -1,0 +1,41 @@
+module bindings.python.generated.m7b761a9b;
+
+binding userControlledData0 {
+  requires {
+    dependency("wikipedia")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("wikipedia")
+  }
+  query pattern callExpr where callee.method == "geosearch"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("wikipedia")
+  }
+  query pattern callExpr where callee.method == "suggest"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("wikipedia")
+  }
+  query pattern callExpr where callee.method == "page"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("wikipedia")
+  }
+  query pattern callExpr where callee.method == "summary"
+  emit source core.UserControlledData at call.result
+}

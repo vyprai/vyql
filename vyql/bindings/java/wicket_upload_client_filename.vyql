@@ -1,0 +1,36 @@
+module bindings.java.wicket_upload_client_filename;
+
+// Apache Wicket's `org.apache.wicket.markup.html.form.upload.FileUpload`
+// documents `getClientFileName()` as the file name the *client* sent: it is
+// read straight off the multipart part (`FileItem.getName()` beneath it), and
+// Wicket normalises nothing about it. RFC 7578 puts no constraint on that
+// field either, so a request may carry directory separators and `..`
+// segments in it. The value is therefore a request parameter that happens to
+// look like a file name, not a file name.
+//
+// This labels a function that reads a Wicket upload's client file name and
+// hands it to storage -- an attachment save, a blob path, a repository put,
+// a copy or a stream write -- while no call in that function reduces the
+// value to a bare name first. That is the shape a traversal takes: the
+// stored path is `<root>/<whatever the browser sent>`, so `../../` in the
+// part header decides where the bytes land.
+//
+// The reductions listed as neutralising are the documented ones: commons-io
+// `FilenameUtils` (getName "gets the name minus the path from a full
+// fileName", normalize, getBaseName), `Paths.get(...).getFileName()`,
+// `File.getCanonicalPath`/`getCanonicalFile`, `Path.toRealPath`, Spring's
+// `StringUtils.cleanPath`, and percent-encoding the component with
+// `URLEncoder.encode` or Jenkins' `Util.rawEncode`. Any of them in the
+// function means the name was reduced before it was used, which is what the
+// review flag asks about.
+//
+// Residual, stated rather than hidden: the neutralising test is by call path,
+// so a project that centralises the reduction in a helper of its own is
+// recognised only when that helper hangs off `FilenameUtils` -- the
+// commons-io class such helpers conventionally extend. A reduction routed
+// through an unrelated class name is invisible from the caller's context and
+// the flag stands.
+binding wicketUploadClientFileNameStorage9137 {
+  query pattern presenceNode where node.scope == "function" and node.context.callPath contains "getClientFileName" and containsAny(node.context.call, ["saveAttachment", "writeTo", "writeToTempFile", "save", "store", "put", "copy", "transferTo", "mkdirs", "commit"]) and not (containsAny(node.context.callPath, ["FilenameUtils.", "Paths.get", "getFileName", "getBaseName", "getCanonicalPath", "getCanonicalFile", "toRealPath", "cleanPath", "normalize", "substringAfterLast", "URLEncoder.encode", "Util.rawEncode"]))
+  emit issue code.UploadFilePathTraversalWrite at node
+}

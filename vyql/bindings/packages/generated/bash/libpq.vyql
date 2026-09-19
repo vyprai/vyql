@@ -1,0 +1,9 @@
+module bindings.bash.generated.mfe205cfa;
+
+binding sqlExecution0 {
+  requires {
+    dependency("libpq")
+  }
+  query pattern callExpr where callee.path ~= "Makefile"
+  emit sink code.SqlExecution at args.any
+}

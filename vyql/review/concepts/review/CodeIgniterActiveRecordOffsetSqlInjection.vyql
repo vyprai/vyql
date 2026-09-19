@@ -1,0 +1,8 @@
+module code;
+
+review code.CodeIgniterActiveRecordOffsetSqlInjection {
+  category: sql
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review CodeIgniter Active Record offset values for integer casting before query compilation"
+}

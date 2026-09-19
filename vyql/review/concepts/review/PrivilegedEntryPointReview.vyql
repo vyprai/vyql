@@ -1,0 +1,8 @@
+module code;
+
+review code.PrivilegedEntryPointReview {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review privileged entry point dispatch and caller privilege checks"
+}

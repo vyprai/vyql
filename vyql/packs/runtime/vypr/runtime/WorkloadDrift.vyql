@@ -1,0 +1,10 @@
+module vypr.runtime;
+
+rule WorkloadDrift {
+  meta {
+    id: "VYQL-RTM-002"
+    severity: high
+  }
+  fact runtime.Process as p
+  where p.image not in [nginx, redis, postgres, python, node, ruby, java]
+}

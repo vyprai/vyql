@@ -1,0 +1,9 @@
+module bindings.python.generated.mf261cea3;
+
+binding expressionEval0 {
+  requires {
+    dependency("colorlog")
+  }
+  query pattern callExpr where callee.method == "parse_colors"
+  emit sink code.ExpressionEval at args[0]
+}

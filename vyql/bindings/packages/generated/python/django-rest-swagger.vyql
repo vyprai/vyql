@@ -1,0 +1,9 @@
+module bindings.python.generated.m03dfd3c9;
+
+binding htmlRender0 {
+  requires {
+    dependency("django-rest-swagger")
+  }
+  query pattern callExpr where callee.method == "SwaggerSchemaView.get"
+  emit sink code.HtmlRender at args[0]
+}

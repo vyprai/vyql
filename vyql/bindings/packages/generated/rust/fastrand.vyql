@@ -1,0 +1,9 @@
+module bindings.rust.generated.m36d8a95d;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("fastrand")
+  }
+  query pattern callExpr where callee.method == "gen_u32"
+  emit issue code.WeakRandomValue at call
+}

@@ -1,0 +1,49 @@
+module bindings.python.generated.m27518148;
+
+binding filePathAccess0 {
+  requires {
+    dependency("importlib-metadata")
+  }
+  query pattern callExpr where callee.method == "read_text"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("importlib-metadata")
+  }
+  query pattern callExpr where callee.method == "read_bytes"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("importlib-metadata")
+  }
+  query pattern callExpr where callee.method == "locate"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("importlib-metadata")
+  }
+  query pattern callExpr where callee.method == "locate_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("importlib-metadata")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("importlib-metadata")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

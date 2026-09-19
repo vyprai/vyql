@@ -1,0 +1,112 @@
+# Rank 808 / CVE-2017-1000431: eZ Publish legacy reused request
+# numeric search and browse parameters without casting them before the
+# search/template state was rendered back to the browser.
+
+test "rank808: eZ Publish search request numeric parameters are reused without narrowing"
+  lang php
+  file search.php
+  expect VYQL-INJ-170
+  expect_review code.EzPublishSearchNumericParamXss
+  code
+  ```
+  <?php
+  $http = eZHTTPTool::instance();
+
+  if ( $http->hasVariable( 'BrowsePageLimit' ) )
+  {
+      $pageLimit = $http->variable( 'BrowsePageLimit' );
+  }
+  else
+  {
+      if ( $http->hasVariable( 'SearchPageLimit' ) )
+      {
+          $searchPageLimit = $http->variable( 'SearchPageLimit' );
+      }
+      $pageLimit = pageLimit( $searchPageLimit );
+  }
+
+  if ( $http->hasVariable( "SectionID" ) )
+  {
+      $searchSectionID = $http->variable( "SectionID" );
+  }
+
+  $searchTimestamp = 0;
+  if ( $http->hasVariable( 'SearchTimestamp' ) )
+  {
+      $searchTimestamp = $http->variable( 'SearchTimestamp' );
+  }
+
+  foreach ( $subTreeList as $subTreeItem )
+  {
+      if ( $subTreeItem > 0 )
+      {
+          $subTreeArray[] = $subTreeItem;
+      }
+  }
+
+  $searchResult = eZSearch::search( $searchText, array(
+      'SearchLimit' => $pageLimit,
+      'SearchSectionID' => $searchSectionID,
+      'SearchTimestamp' => $searchTimestamp,
+      'SearchSubTreeArray' => $subTreeArray,
+  ) );
+
+  $tpl->setVariable( 'search_page_limit', $searchPageLimit );
+  $tpl->setVariable( "search_section_id", $searchSectionID );
+  $tpl->setVariable( 'search_timestamp', $searchTimestamp );
+  return $Module->run( 'browse', array(), array( "NodeList" => $searchResult ) );
+  ```
+
+test "rank808: eZ Publish search request numeric parameters are narrowed"
+  lang php
+  file search.php
+  reject VYQL-INJ-170
+  code
+  ```
+  <?php
+  $http = eZHTTPTool::instance();
+
+  if ( $http->hasVariable( 'BrowsePageLimit' ) )
+  {
+      $pageLimit = (int)$http->variable( 'BrowsePageLimit' );
+  }
+  else
+  {
+      if ( $http->hasVariable( 'SearchPageLimit' ) )
+      {
+          $searchPageLimit = (int)$http->variable( 'SearchPageLimit' );
+      }
+      $pageLimit = pageLimit( $searchPageLimit );
+  }
+
+  if ( $http->hasVariable( "SectionID" ) )
+  {
+      $searchSectionID = (int)$http->variable( "SectionID" );
+  }
+
+  $searchTimestamp = 0;
+  if ( $http->hasVariable( 'SearchTimestamp' ) )
+  {
+      $searchTimestamp = (int)$http->variable( 'SearchTimestamp' );
+  }
+
+  foreach ( $subTreeList as $subTreeItem )
+  {
+      if ( is_numeric( $subTreeItem ) && $subTreeItem > 0 )
+      {
+          $subTreeArray[] = $subTreeItem;
+      }
+  }
+
+  $searchResult = eZSearch::search( $searchText, array(
+      'SearchLimit' => $pageLimit,
+      'SearchSectionID' => $searchSectionID,
+      'SearchTimestamp' => $searchTimestamp,
+      'SearchSubTreeArray' => $subTreeArray,
+  ) );
+
+  $tpl->setVariable( 'search_page_limit', $searchPageLimit );
+  $tpl->setVariable( "search_section_id", $searchSectionID );
+  $tpl->setVariable( 'search_timestamp', $searchTimestamp );
+  return $Module->run( 'browse', array(), array( "NodeList" => $searchResult ) );
+  ```

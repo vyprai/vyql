@@ -1,0 +1,142 @@
+# Rank 1144 / CVE-2023-34251: Grav guards Twig's `filter` and `map` callback
+# filters against dangerous function names but leaves `reduce` on Twig's
+# stock implementation, so `{{ array|reduce('system') }}` still reaches
+# arbitrary PHP execution (CWE-94).
+#
+# Twig's array filters `filter`, `map` and `reduce` each pass their arrow
+# value to PHP as a callable -- array_filter, a variable-function call and
+# array_reduce -- and re-registering a filter name from an extension
+# replaces the built-in, which is the documented way an application puts a
+# guard in front of them. Twig's 1.x line, which Grav pins, documents no
+# arrow for `sort` or `find`, so the set of three is the engine's own. An
+# extension that overrides a strict subset leaves the rest on the stock
+# callable-accepting implementation, and the partial-override binding
+# reports that subset as code.IncompleteTemplateValidation. The
+# registrations are read at module scope, so names registered through a
+# computed name enumerate no literal and stay with the unsandboxed-render
+# binding that clears on them.
+#
+# verify_current_expected: fixed
+
+test "rank1144: reduce is left on the stock callable-accepting implementation"
+  lang php
+  file GravExtension.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+  class GravExtension extends AbstractExtension
+  {
+      public function getFilters()
+      {
+          return [
+              new TwigFilter('abs', 'abs'),
+              new TwigFilter('count', 'count'),
+
+              // Security fix
+              new TwigFilter('filter', [$this, 'filterFilter'], ['needs_environment' => true]),
+              new TwigFilter('map', [$this, 'mapFilter'], ['needs_environment' => true]),
+          ];
+      }
+
+      function filterFilter(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |filter("' . $arrow . '") is not allowed.');
+          }
+
+          return twig_array_filter($env, $array, $arrow);
+      }
+
+      function mapFilter(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |map("' . $arrow . '") is not allowed.');
+          }
+
+          return twig_array_map($env, $array, $arrow);
+      }
+  }
+  ```
+
+test "rank1144: every callback-accepting filter carries the guard"
+  lang php
+  file GravExtension.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+  class GravExtension extends AbstractExtension
+  {
+      public function getFilters()
+      {
+          return [
+              new TwigFilter('abs', 'abs'),
+              new TwigFilter('count', 'count'),
+
+              // Security fixes
+              new TwigFilter('filter', [$this, 'filterFunc'], ['needs_environment' => true]),
+              new TwigFilter('map', [$this, 'mapFunc'], ['needs_environment' => true]),
+              new TwigFilter('reduce', [$this, 'reduceFunc'], ['needs_environment' => true]),
+          ];
+      }
+
+      public function getFunctions()
+      {
+          return [
+              new TwigFunction('count', 'count'),
+
+              // Security fixes
+              new TwigFunction('filter', [$this, 'filterFunc'], ['needs_environment' => true]),
+              new TwigFunction('map', [$this, 'mapFunc'], ['needs_environment' => true]),
+              new TwigFunction('reduce', [$this, 'reduceFunc'], ['needs_environment' => true]),
+          ];
+      }
+
+      function filterFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |filter("' . $arrow . '") is not allowed.');
+          }
+
+          return twig_array_filter($env, $array, $arrow);
+      }
+
+      function mapFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |map("' . $arrow . '") is not allowed.');
+          }
+
+          return twig_array_map($env, $array, $arrow);
+      }
+
+      function reduceFunc(Environment $env, $array, $arrow)
+      {
+          if (!$arrow instanceof \Closure && !is_string($arrow) || Utils::isDangerousFunction($arrow)) {
+              throw new RuntimeError('Twig |reduce("' . $arrow . '") is not allowed.');
+          }
+
+          return twig_array_map($env, $array, $arrow);
+      }
+  }
+  ```
+
+test "rank1144: a computed name enumerates no literal to compare against the set"
+  lang php
+  file twig.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+  class twig
+  {
+      public static function init()
+      {
+          foreach (['filter', 'map', 'reduce', 'sort'] as $name) {
+              $dummyFilter = new \Twig\TwigFilter($name, ['\\ze\\twig', 'dummyFilter']);
+              self::$twig->addFilter($dummyFilter);
+          }
+      }
+  }
+  ```

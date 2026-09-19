@@ -1,0 +1,11 @@
+module code;
+
+concept RunTestsAutoApprovalExecutesCode : issue {
+  cwe: [CWE_862, CWE_269]
+  reviewAssumption: "the model can invoke the test-runner tool and running project tests executes workspace-controlled code"
+  reviewCategory: auth
+  reviewCondition: "a test-runner tool executes cargo test or equivalent project code while declaring automatic approval"
+  reviewConfidence: high
+  reviewEvidence: "tool approval context {pattern} exposes a run_tests-style tool with ExecutesCode capability and cargo test execution but lacks a required or suggested approval gate"
+  vulnerableTo: [access_control.MissingAuthorization, access_control.PrivilegeEscalation]
+}

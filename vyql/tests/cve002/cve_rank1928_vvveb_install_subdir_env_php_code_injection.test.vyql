@@ -1,0 +1,218 @@
+# Vvveb's installer takes the deployment subdirectory from the POST body
+# (install/controller/index.php, reachable unauthenticated while the
+# application is not yet installed) and splices it straight into the
+# application's env.php, a PHP source file loaded on every request:
+#
+#   $subdir = $this->request->post['subdir'] ?? $this->subdir ?? false;
+#   if ($subdir) {
+#       $subdir = '/' . trim($subdir, '/ ');
+#       $this->replaceInFile(DIR_ROOT . 'env.php',
+#           "define('V_SUBDIR_INSTALL', false",
+#           "define('V_SUBDIR_INSTALL', '{$subdir}'");
+#   }
+#
+# with replaceInFile() the usual read-modify-write helper:
+#
+#   $content = file_get_contents($file);
+#   $content = str_replace($search, $replace, $content);
+#   return file_put_contents($file, $content);
+#
+# A subdir of x'); <arbitrary PHP> // closes the define()'s string literal
+# and appends statements of the submitter's choosing, so the next request
+# that includes env.php executes them: pre-auth RCE (CWE-74/CWE-94). The
+# fix routes the value through the framework's filename sanitizer first
+# ($subdir = sanitizeFileName($subdir)) and tightens that sanitizer's
+# character class.
+#
+# This is the same weakness class the .env bindings report
+# (VYQL-INJ-156, code.EnvFileVariableInjection): an environment file is
+# rewritten out of caller-supplied values with no escaping between the
+# request read and the write. env.php is the PHP spelling of an
+# environment file -- its assignment syntax is define() calls instead of
+# KEY=value lines -- so two new sibling bindings,
+# envPhpFileRewriteWithRequestValues and
+# envPhpFileRewriteWithRequestSubscripts, reuse the shipped concept and
+# rule for a class that rewrites env.php (the Magento/Vvveb spelling) via
+# file_put_contents()/File::put() out of values read from the HTTP
+# request, with no value filter in the class. Two siblings because a
+# presence predicate cannot or across context fields and the two request
+# read spellings live in different fields: method-call accessors
+# ($request->validated(), $this->request->post()) emit call_path tokens,
+# while array access ($this->request->post['k'], $_POST['k']) emits only
+# subscript tokens in the raw source spelling -- measured: no
+# $this.request.post.__subscript token reaches node.context.callPath at
+# class scope.
+# The str_replace() read-modify-write splice is not treated as a filter
+# here, unlike the .env binding: the .env safe form filters the value
+# itself through str_replace() of the line terminators, while the env.php
+# rewrite idiom passes $search/$replace variables to splice into the file
+# body, and class scope cannot separate the two; a class that filters the
+# value through addslashes()/filter_var()/a filename sanitizer is not
+# reported. The escaping-encoder limit is inherited from class scope: a
+# var_export()/json_encode() elsewhere in the class does not clear the
+# write (the real controller's own dead writeConfig() var_export() must
+# not silence it), so a class that correctly encodes its env.php values
+# still reports.
+#
+# Measured on the real trees (three --cache off runs each, timeout 180,
+# --max-ram 6GB): the vulnerable checkout gains exactly one finding,
+# VYQL-INJ-156 at install/controller/index.php:46 (the class node), 454 ->
+# 455 findings, and the fixed checkout is back to the pre-change count with
+# zero VYQL-INJ-156. LinkAce (the .env binding's tree) is unchanged at 154
+# findings, 1 VYQL-INJ-156 on the same setup controller. The env.php
+# reachable set is four files on vvveb (two procedural includes, an updater
+# class with no request access, the installer) and zero on six other PHP
+# trees (typo3, cubecart v6, symfony/ux, tickets, ultimatemember,
+# user_oidc).
+
+test "rank1928: the installer splices the submitted subdir into a define() line of env.php"
+  lang php
+  file install/controller/index.php
+  expect VYQL-INJ-156
+  expect_review code.EnvFileVariableInjection
+  code
+  ```
+  <?php
+
+  namespace Vvveb\Controller;
+
+  class Index extends Base {
+  	private $subdir = '';
+
+  	function replaceInFile($file, $search, $replace) {
+  		$content = file_get_contents($file);
+
+  		if ($content) {
+  			$content = str_replace($search, $replace, $content);
+
+  			return file_put_contents($file, $content);
+  		}
+  	}
+
+  	function index() {
+  		$subdir = $this->request->post['subdir'] ?? $this->subdir ?? false;
+
+  		if ($subdir) {
+  			$subdir = '/' . trim($subdir, '/ ');
+
+  			//try to set subdir in env.php and .htaccess
+  			$this->replaceInFile(DIR_ROOT . 'env.php', "define('V_SUBDIR_INSTALL', false" , "define('V_SUBDIR_INSTALL', '{$subdir}'");
+  		}
+  	}
+  }
+  ```
+
+test "rank1928: the subdir passed through the filename sanitizer before the env.php write is not reported"
+  lang php
+  file install/controller/index-patched.php
+  reject VYQL-INJ-156
+  reject_review code.EnvFileVariableInjection
+  code
+  ```
+  <?php
+
+  namespace Vvveb\Controller;
+
+  class Index extends Base {
+  	private $subdir = '';
+
+  	function replaceInFile($file, $search, $replace) {
+  		$content = file_get_contents($file);
+
+  		if ($content) {
+  			$content = str_replace($search, $replace, $content);
+
+  			return file_put_contents($file, $content);
+  		}
+  	}
+
+  	function index() {
+  		$subdir = $this->request->post['subdir'] ?? $this->subdir ?? false;
+
+  		if ($subdir) {
+  			$subdir = sanitizeFileName($subdir);
+  			$subdir = '/' . trim($subdir, '/ ');
+
+  			//try to set subdir in env.php and .htaccess
+  			$this->replaceInFile(DIR_ROOT . 'env.php', "define('V_SUBDIR_INSTALL', false" , "define('V_SUBDIR_INSTALL', '{$subdir}'");
+  		}
+  	}
+  }
+  ```
+
+test "rank1928: env.php rewritten from a server-detected subdirectory never taken from the request is not reported"
+  lang php
+  file install/controller/index-detected.php
+  reject VYQL-INJ-156
+  reject_review code.EnvFileVariableInjection
+  code
+  ```
+  <?php
+
+  namespace Vvveb\Controller;
+
+  class Index extends Base {
+  	private $subdir;
+
+  	function __construct() {
+  		$this->subdir = detectSubDir();
+  	}
+
+  	function replaceInFile($file, $search, $replace) {
+  		$content = file_get_contents($file);
+
+  		if ($content) {
+  			$content = str_replace($search, $replace, $content);
+
+  			return file_put_contents($file, $content);
+  		}
+  	}
+
+  	function index() {
+  		$subdir = $this->subdir;
+
+  		if ($subdir) {
+  			$subdir = '/' . trim($subdir, '/ ');
+
+  			$this->replaceInFile(DIR_ROOT . 'env.php', "define('V_SUBDIR_INSTALL', false" , "define('V_SUBDIR_INSTALL', '{$subdir}'");
+  		}
+  	}
+  }
+  ```
+
+test "rank1928: a class that escapes the value out of the quote syntax before the env.php write is not reported"
+  lang php
+  file install/controller/index-escaped.php
+  reject VYQL-INJ-156
+  reject_review code.EnvFileVariableInjection
+  code
+  ```
+  <?php
+
+  namespace Vvveb\Controller;
+
+  class Index extends Base {
+  	private $subdir = '';
+
+  	function replaceInFile($file, $search, $replace) {
+  		$content = file_get_contents($file);
+
+  		if ($content) {
+  			$content = str_replace($search, $replace, $content);
+
+  			return file_put_contents($file, $content);
+  		}
+  	}
+
+  	function index() {
+  		$subdir = $this->request->post['subdir'] ?? $this->subdir ?? false;
+
+  		if ($subdir) {
+  			$subdir = addslashes($subdir);
+  			$subdir = '/' . trim($subdir, '/ ');
+
+  			$this->replaceInFile(DIR_ROOT . 'env.php', "define('V_SUBDIR_INSTALL', false" , "define('V_SUBDIR_INSTALL', '{$subdir}'");
+  		}
+  	}
+  }
+  ```

@@ -1,0 +1,217 @@
+# Rank 1138 / CVE-2026-40281: gotenberg forwards caller-supplied PDF
+# metadata tag names into go-exiftool with no character restriction.
+# go-exiftool drives exiftool with `-stay_open True -@ -`: every queued
+# argument is written to the process stdin as its own line
+# (`fmt.Fprintln(e.stdin, "-"+k+"="+v)`), so a newline in a tag name ends
+# the `-TAG=VALUE` argument and whatever follows is read as an argument of
+# its own -- an exiftool option such as `-if` with a Perl expression
+# (CWE-88). The tag is protocol syntax; the value is the document content
+# the write exists to carry, which is why only the tag position is bound.
+#
+# The fix (405f1069c026) adds an anchored allowlist, safeKeyPattern =
+# `^[a-zA-Z0-9\-_.:]+$`, rejecting every key that fails to match before the
+# dangerousTags denylist runs.
+#
+# The vulnerable function dispatches on the value's type inside a type
+# switch, whose arms the Go frontend does not lower (ENGINE-GAPS: "Go: a
+# type-switch case body is never lowered"), so the call-anchored sink route
+# cannot see the setters in that spelling and a function-scoped review
+# binding is what reaches the real code. The plain spelling, where the tag
+# reaches the setter outside a type switch, is bound as a line-protocol
+# command write and reports through VYQL-INJ-245 when untrusted data reaches
+# the tag argument.
+#
+# Known limitation, pinned by the fifth case: the taint route has no
+# recognised neutraliser for the tag position in Go -- neither an anchored
+# allowlist guard nor a strip of the line breaks clears it, because the rule
+# carries no unless clause and Go's strip helpers are not modelled as
+# character filters. The review route does recognise the guard.
+
+test "rank1138: metadata tag names reach the exiftool argument stream unvalidated"
+  lang go
+  file exiftool.go
+  expect VYQL-INJ-031
+  expect VYQL-VAL-004
+  expect_review code.CommandOptionInjection
+  code
+  ```
+  package exiftool
+
+  import (
+      "strings"
+
+      "github.com/barasher/go-exiftool"
+  )
+
+  func (engine *ExifTool) WriteMetadata(ctx context.Context, logger *slog.Logger, metadata map[string]any, inputPath string) error {
+      exifTool, err := exiftool.NewExiftool(exiftool.SetExiftoolBinaryPath(engine.binPath))
+      if err != nil {
+          return err
+      }
+      defer func(exifTool *exiftool.Exiftool) {
+          _ = exifTool.Close()
+      }(exifTool)
+
+      fileMetadata := exifTool.ExtractMetadata(inputPath)
+
+      dangerousTags := []string{"FileName", "Directory", "HardLink", "SymLink"}
+      for key := range metadata {
+          for _, tag := range dangerousTags {
+              if strings.EqualFold(key, tag) {
+                  delete(metadata, key)
+              }
+          }
+      }
+
+      for key, value := range metadata {
+          switch val := value.(type) {
+          case string:
+              fileMetadata[0].SetString(key, val)
+          case []string:
+              fileMetadata[0].SetStrings(key, val)
+          case bool:
+              fileMetadata[0].SetString(key, fmt.Sprintf("%t", val))
+          case int:
+              fileMetadata[0].SetInt(key, int64(val))
+          case float64:
+              fileMetadata[0].SetFloat(key, val)
+          }
+      }
+
+      exifTool.WriteMetadata(fileMetadata)
+      return nil
+  }
+  ```
+
+test "rank1138: an anchored allowlist rejects tag names that are not one line"
+  lang go
+  file exiftool.go
+  reject VYQL-INJ-031
+  reject VYQL-VAL-004
+  reject_review code.CommandOptionInjection
+  code
+  ```
+  package exiftool
+
+  import (
+      "regexp"
+      "strings"
+
+      "github.com/barasher/go-exiftool"
+  )
+
+  var safeKeyPattern = regexp.MustCompile(`^[a-zA-Z0-9\-_.:]+$`)
+
+  func (engine *ExifTool) WriteMetadata(ctx context.Context, logger *slog.Logger, metadata map[string]any, inputPath string) error {
+      exifTool, err := exiftool.NewExiftool(exiftool.SetExiftoolBinaryPath(engine.binPath))
+      if err != nil {
+          return err
+      }
+      defer func(exifTool *exiftool.Exiftool) {
+          _ = exifTool.Close()
+      }(exifTool)
+
+      fileMetadata := exifTool.ExtractMetadata(inputPath)
+
+      for key := range metadata {
+          if !safeKeyPattern.MatchString(key) {
+              return fmt.Errorf("invalid metadata key %q", key)
+          }
+      }
+
+      dangerousTags := []string{"FileName", "Directory", "HardLink", "SymLink"}
+      for key := range metadata {
+          for _, tag := range dangerousTags {
+              if strings.EqualFold(key, tag) {
+                  delete(metadata, key)
+              }
+          }
+      }
+
+      for key, value := range metadata {
+          switch val := value.(type) {
+          case string:
+              fileMetadata[0].SetString(key, val)
+          case []string:
+              fileMetadata[0].SetStrings(key, val)
+          case float64:
+              fileMetadata[0].SetFloat(key, val)
+          }
+      }
+
+      exifTool.WriteMetadata(fileMetadata)
+      return nil
+  }
+  ```
+
+test "rank1138: an untrusted tag reaches the setter outside a type switch"
+  lang go
+  profile library
+  file write.go
+  expect VYQL-INJ-245
+  code
+  ```
+  package writer
+
+  import "github.com/barasher/go-exiftool"
+
+  func Write(metadata map[string]string, inputPath string) error {
+      et, _ := exiftool.NewExiftool()
+      fms := et.ExtractMetadata(inputPath)
+      for key, value := range metadata {
+          fms[0].SetString(key, value)
+      }
+      et.WriteMetadata(fms)
+      return nil
+  }
+  ```
+
+test "rank1138: a fixed tag name with an untrusted value is ordinary usage"
+  lang go
+  profile library
+  file write.go
+  reject VYQL-INJ-245
+  code
+  ```
+  package writer
+
+  import "github.com/barasher/go-exiftool"
+
+  func Write(metadata map[string]string, inputPath string) error {
+      et, _ := exiftool.NewExiftool()
+      fms := et.ExtractMetadata(inputPath)
+      for _, value := range metadata {
+          fms[0].SetString("Title", value)
+      }
+      et.WriteMetadata(fms)
+      return nil
+  }
+  ```
+
+test "rank1138: a stripped tag still reports, pinned -- no neutraliser is modelled for the tag position"
+  lang go
+  profile library
+  file write.go
+  expect VYQL-INJ-245
+  code
+  ```
+  package writer
+
+  import (
+      "strings"
+
+      "github.com/barasher/go-exiftool"
+  )
+
+  func Write(metadata map[string]string, inputPath string) error {
+      et, _ := exiftool.NewExiftool()
+      fms := et.ExtractMetadata(inputPath)
+      for key, value := range metadata {
+          key = strings.ReplaceAll(key, "\n", "")
+          key = strings.ReplaceAll(key, "\r", "")
+          fms[0].SetString(key, value)
+      }
+      et.WriteMetadata(fms)
+      return nil
+  }
+  ```

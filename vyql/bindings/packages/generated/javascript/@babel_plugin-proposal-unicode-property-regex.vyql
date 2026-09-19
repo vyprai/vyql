@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m277d3c8c;
+
+binding regexCompile0 {
+  requires {
+    dependency("@babel/plugin-proposal-unicode-property-regex")
+  }
+  query pattern callExpr where callee.method == "default"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

@@ -1,0 +1,127 @@
+# Rank 1291 / CVE-2024-7042: GraphCypherQAChain turns a caller's
+# natural-language question into a Cypher statement through an LLM
+# generation sub-chain, then extracts and runs that statement against the
+# graph database in the same method, with nothing checking what the model
+# generated before it runs. A caller who can influence the question --
+# directly, or through a document the chain summarizes -- can steer the
+# model into emitting a write or delete statement that runs with whatever
+# privilege the graph connection holds, permitting unauthorized data
+# manipulation, exfiltration, or wholesale deletion.
+#
+The advisory's response commit ("docs: Adds warnings to cypher chain about
+# credentials") adds a security warning to the chain's
+# docstring and to the docs, and changes no code. Comparing that commit's
+# executing code stays byte-identical to the vulnerable revision: no code
+# fix exists, only the warning, so the vulnerable shape below is also the
+# current shape.
+#
+# Detection: nothing labelled either side (`vyql match` on the real file
+# reports no source and no relevant issue without this binding); the taint
+# would in any case dead-end at the LLM generation call, since the Cypher
+# the sink receives is model-synthesized text, not a data-preserving
+# transform of the question, so this is a review condition rather than a
+# taint path. The binding fires on a function that calls into a generation
+# sub-chain with both a question and the graph's schema (the two inputs
+# GraphCypherQAChain's prompt takes) and a direct graph query call, with no
+# call in between that validates, sanitizes, or restricts the generated
+# statement. The safe form below adds exactly that: a read-only assertion
+# on the extracted statement before it reaches the graph.
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 5GB):
+# scanning libs/langchain-community/src/chains/graph_qa at the vulnerable
+# state reports one finding, VYQL-INJ-242 at cypher.ts:159.
+
+test "rank1291: GraphCypherQAChain executes LLM-generated Cypher with no validation"
+  lang javascript
+  profile library
+  file cypher.ts
+  expect VYQL-INJ-242
+  expect_review code.GraphCypherChainMissingQueryValidation
+  code
+  ```
+  export class GraphCypherQAChain extends BaseChain {
+    private graph: Neo4jGraph;
+
+    private cypherGenerationChain: LLMChain;
+
+    private qaChain: LLMChain;
+
+    private inputKey = "query";
+
+    private topK = 10;
+
+    private extractCypher(text: string): string {
+      const pattern = /```(.*?)```/s;
+      const matches = text.match(pattern);
+      return matches ? matches[1] : text;
+    }
+
+    async _call(
+      values: ChainValues,
+      runManager?: CallbackManagerForChainRun
+    ): Promise<ChainValues> {
+      const question = values[this.inputKey];
+
+      const generatedCypher = await this.cypherGenerationChain.call(
+        { question, schema: this.graph.getSchema() },
+        runManager?.getChild()
+      );
+
+      const extractedCypher = this.extractCypher(generatedCypher.text);
+
+      const context = await this.graph.query(extractedCypher, {
+        topK: this.topK,
+      });
+
+      return { result: context };
+    }
+  }
+  ```
+
+test "rank1291: a read-only assertion on the generated statement before execution is safe"
+  lang javascript
+  profile library
+  file cypher.ts
+  reject VYQL-INJ-242
+  reject_review code.GraphCypherChainMissingQueryValidation
+  code
+  ```
+  export class GraphCypherQAChain extends BaseChain {
+    private graph: Neo4jGraph;
+
+    private cypherGenerationChain: LLMChain;
+
+    private qaChain: LLMChain;
+
+    private inputKey = "query";
+
+    private topK = 10;
+
+    private extractCypher(text: string): string {
+      const pattern = /```(.*?)```/s;
+      const matches = text.match(pattern);
+      return matches ? matches[1] : text;
+    }
+
+    async _call(
+      values: ChainValues,
+      runManager?: CallbackManagerForChainRun
+    ): Promise<ChainValues> {
+      const question = values[this.inputKey];
+
+      const generatedCypher = await this.cypherGenerationChain.call(
+        { question, schema: this.graph.getSchema() },
+        runManager?.getChild()
+      );
+
+      const extractedCypher = this.extractCypher(generatedCypher.text);
+      assertIsReadOnly(extractedCypher);
+
+      const context = await this.graph.query(extractedCypher, {
+        topK: this.topK,
+      });
+
+      return { result: context };
+    }
+  }
+  ```

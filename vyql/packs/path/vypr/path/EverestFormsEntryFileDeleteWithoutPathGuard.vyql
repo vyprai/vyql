@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule EverestFormsEntryFileDeleteWithoutPathGuard {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_22, CWE_73]
+    id: "VYQL-PATH-060"
+    severity: high
+  }
+  issue code.EverestFormsEntryFileDeleteWithoutPathGuard as delete
+}

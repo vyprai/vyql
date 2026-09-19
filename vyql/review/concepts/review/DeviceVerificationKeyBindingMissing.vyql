@@ -1,0 +1,8 @@
+module code;
+
+review code.DeviceVerificationKeyBindingMissing {
+  category: auth
+  expected: [core.AuthenticationCheck]
+  kind: attention
+  text: "review Matrix device verification completion so trust is committed with the keys observed during verification rather than the resolved device or cross-signing identifier"
+}

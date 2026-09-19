@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule TokenCacheAuthorizationBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862, CWE_863]
+    id: "VYQL-AUTH-039"
+    severity: high
+  }
+  issue code.TokenCacheAuthorizationBypass as cache
+}

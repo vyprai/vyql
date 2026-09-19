@@ -1,0 +1,11 @@
+module code;
+
+concept ChamiloUnsafeGuzzleUrlFetch : issue {
+  cwe: [CWE_918]
+  reviewAssumption: "the URL argument can originate from social-wall or profile form input and can target internal services"
+  reviewCategory: request_forgery
+  reviewCondition: "user-influenced social profile or wall URLs are fetched server-side without private/reserved IP rejection"
+  reviewConfidence: medium
+  reviewEvidence: "Chamilo URL verification context {pattern} performs a Guzzle GET before applying the fixed isUrlSafe guard"
+  vulnerableTo: [request_forgery.Ssrf]
+}

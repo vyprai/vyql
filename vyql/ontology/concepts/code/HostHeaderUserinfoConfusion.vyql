@@ -1,0 +1,11 @@
+module code;
+
+concept HostHeaderUserinfoConfusion : issue {
+  cwe: [CWE_444, CWE_20]
+  reviewAssumption: "the Host, X-Forwarded-Host, or :authority header can carry an embedded userinfo component and reaches this parser unmodified"
+  reviewCategory: request
+  reviewCondition: "a host/authority value is read from a request header and returned as the host without re-parsing through a URL/authority parser when it contains userinfo (@)"
+  reviewConfidence: medium
+  reviewEvidence: "host header parsing context {pattern} returns the header value as the host without accounting for an embedded userinfo component"
+  vulnerableTo: [injection.ProtocolStateConfusion, request_forgery.Ssrf]
+}

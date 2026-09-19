@@ -1,0 +1,9 @@
+module bindings.python.generated.m906d873f;
+
+binding deserialization0 {
+  requires {
+    dependency("pypdf")
+  }
+  query pattern callExpr where callee.method == "extract_text"
+  emit sink code.Deserialization at args[0]
+}

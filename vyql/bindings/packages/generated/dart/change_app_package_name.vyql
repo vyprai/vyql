@@ -1,0 +1,49 @@
+module bindings.dart.generated.mf2c48db6;
+
+binding cliArgument0 {
+  requires {
+    dependency("change_app_package_name")
+  }
+  query pattern callExpr where callee.method == "main"
+  emit source code.CliArgument at call.result
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("change_app_package_name")
+  }
+  query pattern callExpr where callee.method == "replaceInFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("change_app_package_name")
+  }
+  query pattern callExpr where callee.method == "replaceInFileRegex"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("change_app_package_name")
+  }
+  query pattern callExpr where callee.method == "readFileAsString"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("change_app_package_name")
+  }
+  query pattern callExpr where callee.method == "writeFileFromString"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("change_app_package_name")
+  }
+  query pattern callExpr where callee.method == "deleteOldDirectories"
+  emit sink code.FilePathAccess at args[0]
+}

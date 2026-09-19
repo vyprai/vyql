@@ -1,0 +1,7 @@
+module code;
+
+concept WeakCipher : issue {
+  cwe: [CWE_327, CWE_326]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [crypto.WeakCipher]
+}

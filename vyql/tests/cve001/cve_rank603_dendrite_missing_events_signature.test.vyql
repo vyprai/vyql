@@ -1,0 +1,67 @@
+test "rank603: Matrix missing events are cached without event signature verification"
+  lang go
+  file input_missing.go
+  expect VYQL-AUTH-037
+  expect_review code.UnverifiedFederationMissingEvents
+  code
+  ```
+  package input
+
+  import "context"
+
+  type Event struct{}
+  type EventList struct{}
+  type MissingResponse struct {
+      Events EventList
+  }
+  type RoomVersion string
+  type Inputer struct{}
+
+  func (e EventList) UntrustedEvents(version RoomVersion) []*Event { return nil }
+  func (t *Inputer) cacheAndReturn(ev *Event) *Event { return ev }
+
+  func (t *Inputer) processMissing(ctx context.Context, missingResp MissingResponse, roomVersion RoomVersion) ([]*Event, error) {
+      missingEvents := make([]*Event, 0, 8)
+      for _, ev := range missingResp.Events.UntrustedEvents(roomVersion) {
+          missingEvents = append(missingEvents, t.cacheAndReturn(ev))
+      }
+      return missingEvents, nil
+  }
+  ```
+
+test "rank603: Matrix missing events verify event signatures before caching"
+  lang go
+  file input_missing.go
+  reject VYQL-AUTH-037
+  reject_review code.UnverifiedFederationMissingEvents
+  code
+  ```
+  package input
+
+  import "context"
+
+  type Event struct{}
+  type EventList struct{}
+  type MissingResponse struct {
+      Events EventList
+  }
+  type RoomVersion string
+  type Inputer struct {
+      keys interface{}
+  }
+
+  func (e EventList) UntrustedEvents(version RoomVersion) []*Event { return nil }
+  func (e *Event) VerifyEventSignatures(ctx context.Context, keys interface{}) error { return nil }
+  func (t *Inputer) cacheAndReturn(ev *Event) *Event { return ev }
+
+  func (t *Inputer) processMissing(ctx context.Context, missingResp MissingResponse, roomVersion RoomVersion) ([]*Event, error) {
+      missingEvents := make([]*Event, 0, 8)
+      for _, ev := range missingResp.Events.UntrustedEvents(roomVersion) {
+          if err := ev.VerifyEventSignatures(ctx, t.keys); err != nil {
+              continue
+          }
+          missingEvents = append(missingEvents, t.cacheAndReturn(ev))
+      }
+      return missingEvents, nil
+  }
+  ```

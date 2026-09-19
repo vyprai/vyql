@@ -1,0 +1,54 @@
+module bindings.python.generated.m3efd800e;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("django-cors-headers")
+  }
+  query pattern callExpr where callee.method == "add_response_headers"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("django-cors-headers")
+  }
+  query pattern callExpr where callee.method == "check_preflight"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding storedDataRead2 {
+  requires {
+    dependency("django-cors-headers")
+  }
+  query pattern callExpr where callee.method == "CORS_ALLOW_HEADERS"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead3 {
+  requires {
+    dependency("django-cors-headers")
+  }
+  query pattern callExpr where callee.method == "CORS_EXPOSE_HEADERS"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead4 {
+  requires {
+    dependency("django-cors-headers")
+  }
+  query pattern callExpr where callee.method == "CORS_ALLOW_ALL_ORIGINS"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead5 {
+  requires {
+    dependency("django-cors-headers")
+  }
+  query pattern callExpr where callee.method == "CORS_ALLOWED_ORIGINS"
+  emit source code.StoredDataRead at call.result
+}

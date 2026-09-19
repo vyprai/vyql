@@ -1,0 +1,83 @@
+# Rank 1500 / CVE-2021-21428: the openapi-generator online bundle built each
+# generated project inside a temporary directory created through a deleted
+# temporary file (CWE-377, CWE-367, CWE-59). getTmpFolder in
+# modules/openapi-generator-online/src/main/java/org/openapitools/codegen/online/service/Generator.java
+# did
+#
+#   File outputFolder = File.createTempFile("codegen-", "-tmp");
+#   outputFolder.delete();
+#   outputFolder.mkdir();
+#
+# createTempFile guarantees an atomically created new file, but the delete and
+# mkdir calls give that guarantee up: between delete() and mkdir() the path is
+# free, and a local user who watches the shared temp directory can create it
+# first (or a symlink in its place), so the generated sources, which the online
+# generator writes and then serves back as a bundle, land in a directory the
+# attacker owns. The fixing commit carries the change despite the row's
+# nocommit flag: the advisory links no commit, but this one is titled "[online] use
+# Files.createTempFile to address security concerns" and its single hunk is
+# The fixing change replaces the three calls with
+# Files.createTempDirectory("codegen-tmp").toFile(), whose creation is atomic
+# and fails if the path exists. .
+#
+# CAUGHT by VYQL-PATH-055: the create-delete-mkdir shape is a review
+# concept (code.TempFileDirectoryCreationRace, added at rank 991 for the same
+# weakness in a different codebase), and this is another instance of it rather
+# than a new vocabulary item. Scanning the real Generator.java at the parent
+# reports VYQL-PATH-055 at high confidence on getTmpFolder, and the
+# same file at the fixed revision reports nothing, because the negating
+# Files.createTempDirectory term is present. The spec keeps both forms.
+#
+# verify_current_expected: caught-by-rule VYQL-PATH-055
+
+test "rank1500: a temp folder built by deleting a temp file and mkdir-ing it back"
+  lang java
+  file modules/openapi-generator-online/src/main/java/org/openapitools/codegen/online/service/Generator.java
+  expect VYQL-PATH-055
+  expect_review code.TempFileDirectoryCreationRace
+  code
+  ```
+  package org.openapitools.codegen.online.service;
+
+  import java.io.File;
+
+  class Generator {
+      private static File getTmpFolder() {
+          try {
+              File outputFolder = File.createTempFile("codegen-", "-tmp");
+              outputFolder.deleteOnExit();
+              outputFolder.delete();
+              outputFolder.mkdir();
+              outputFolder.deleteOnExit();
+              return outputFolder;
+          } catch (Exception e) {
+              throw new RuntimeException(e);
+          }
+      }
+  }
+  ```
+
+test "rank1500: the fixed revision creates the temporary directory atomically"
+  lang java
+  file modules/openapi-generator-online/src/main/java/org/openapitools/codegen/online/service/Generator.java
+  reject VYQL-PATH-055
+  reject_review code.TempFileDirectoryCreationRace
+  code
+  ```
+  package org.openapitools.codegen.online.service;
+
+  import java.io.File;
+  import java.nio.file.Files;
+
+  class Generator {
+      private static File getTmpFolder() {
+          try {
+              File outputFolder = Files.createTempDirectory("codegen-tmp").toFile();
+              outputFolder.deleteOnExit();
+              return outputFolder;
+          } catch (Exception e) {
+              throw new RuntimeException(e);
+          }
+      }
+  }
+  ```

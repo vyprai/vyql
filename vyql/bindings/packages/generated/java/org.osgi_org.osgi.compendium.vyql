@@ -1,0 +1,9 @@
+module bindings.java.generated.m05d609c4;
+
+binding networkConnect0 {
+  requires {
+    dependency("org.osgi:org.osgi.compendium")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.NetworkConnectSink at args[0]
+}

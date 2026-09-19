@@ -1,0 +1,34 @@
+module bindings.c.out_param_status_unchecked;
+
+// The C out-parameter contract: a call that hands its output back through a
+// pointer the caller owns reports in its return value whether that output is
+// usable, and the output can be half-built when the call fails -- the callee
+// returns along its own error path leaving whatever it had already stored in
+// place. Reading that output through a member access, inside a branch that
+// tests only the pointers' non-nullness, reads the half-built state: the
+// null guard proves the callee stored a pointer, not that the call
+// succeeded, so the fields behind it are the ones the failing call
+// abandoned mid-construction.
+//
+// The fact is emitted by the C frontend (ccOutParamStatusUnchecked-
+// Observations, internal/extract/frontend/treesitter/c.go) from the syntax
+// tree: the capture, the guard and the read all run over the compacted
+// function body, so prose and identifiers unrelated to the pairing cannot
+// satisfy them. The output is whichever identifier the call takes as an
+// argument and the branch then dereferences as `(*id)->`, so no library is
+// named and a cleanup that releases the handle instead of reading it is not
+// reported; the status is the variable the call's own result was captured
+// into, so a bare call whose result is discarded is out of reach here.
+//
+// Consulting the status is matched semantically rather than as a spelling:
+// any occurrence of the captured variable between the call and the read
+// clears the fact, so the guard's own extra conjunct, a dominating
+// `if (!ok)` and a `FAILED(...)` wrapper all read as consulting it.
+//
+// Residuals, all false-negative: a status check in a sibling branch that the
+// read does not depend on still clears the fact; only the plain assignment
+// form is recognised; and the read must sit in the guard's own consequence.
+binding outParamStatusUnchecked {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "out_param.status_unchecked"
+  emit issue code.MissingOutParamStatusCheck at node
+}

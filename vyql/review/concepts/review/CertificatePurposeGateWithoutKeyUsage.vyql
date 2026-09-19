@@ -1,0 +1,7 @@
+module code;
+
+review code.CertificatePurposeGateWithoutKeyUsage {
+  category: crypto
+  kind: attention
+  text: "review the certificate purpose gate for a key usage check alongside the extended key usage check"
+}

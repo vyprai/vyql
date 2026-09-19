@@ -1,0 +1,11 @@
+module code;
+
+concept JpegSetjmpConstructorEscape : issue {
+  cwe: [CWE_248, CWE_400, CWE_755]
+  reviewAssumption: "a malformed JPEG can trigger libjpeg error_exit during later read/write operations, causing a crash or undefined control transfer"
+  reviewCategory: resource
+  reviewCondition: "libjpeg error handling stores a setjmp target established inside a constructor that can be longjmped after the constructor frame has returned"
+  reviewConfidence: high
+  reviewEvidence: "JPEG wrapper constructor context {pattern} registers error_exit, calls setjmp on the instance error buffer, and then initializes libjpeg state"
+  vulnerableTo: [validation.ImproperInputValidation, dos.UncontrolledResourceConsumption]
+}

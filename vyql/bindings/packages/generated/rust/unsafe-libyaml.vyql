@@ -1,0 +1,25 @@
+module bindings.rust.generated.mf4b97603;
+
+binding deserialization0 {
+  requires {
+    dependency("unsafe-libyaml")
+  }
+  query pattern callExpr where callee.method == "yaml_parser_parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding stdinInput1 {
+  requires {
+    dependency("unsafe-libyaml")
+  }
+  query pattern callExpr where callee.method == "yaml_parser_set_input_string"
+  emit source code.StdinInput at call.result
+}
+
+binding stdinInput2 {
+  requires {
+    dependency("unsafe-libyaml")
+  }
+  query pattern callExpr where callee.method == "yaml_parser_set_input"
+  emit source code.StdinInput at call.result
+}

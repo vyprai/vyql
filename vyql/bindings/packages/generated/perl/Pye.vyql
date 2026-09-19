@@ -1,0 +1,9 @@
+module bindings.perl.generated.m00c8ad15;
+
+binding codeEval0 {
+  requires {
+    dependency("Pye")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.CodeEval at args[0]
+}

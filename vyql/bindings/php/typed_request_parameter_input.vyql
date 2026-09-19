@@ -1,0 +1,35 @@
+module bindings.php.typed_request_parameter_input;
+
+// A parameter type-hinted with the framework's base request class carries raw
+// request input. Laravel injects `Illuminate\Http\Request` into an action as a
+// plain `Request $request` parameter and documents the request instance as the
+// way to read input -- dynamic properties on the Laravel side, the property
+// bags on the Symfony side, and `\Illuminate\Http\Request` spelled in full when
+// no import aliases it. The type hint is also how a validated request arrives,
+// and that distinction is the reason for matching the type exactly: a form
+// request class runs its `rules()` before the action body, so a parameter
+// typed with a class *derived from* the request is not raw input. `in`, not
+// `contains`, holds that line -- `paramType contains "Request"` also matches
+// every `*Request` form class and labels validated input as raw.
+//
+// Labelling the parameter rather than each accessor is deliberate: a request
+// read is an attribute (`$request->name`) and an attribute has no call node,
+// so the parameter is the one node every read provably flows from.
+//
+// The `Closure` exclusion is the middleware pipeline contract. A middleware's
+// `handle($request, Closure $next)` receives the request in order to forward
+// it through `$next($request)`; the action that consumes the input is the one
+// the call lands in, and that action's own parameter is labelled by this same
+// binding when it takes the base type. Without the exclusion every flow
+// downstream of a middleware is reported once more with the middleware as its
+// source, which measured 39 extra findings on one mid-sized application's
+// single company middleware and 71 on another's API middleware.
+//
+// Residual, stated rather than hidden: `Request` unqualified is what a `use`
+// import leaves in the source, so an application's own class named `Request`
+// that is not an HTTP request is indistinguishable from the framework's and is
+// labelled as input.
+binding httpInputTypedRequestParameter {
+  query pattern presenceNode where node.analysis == "parameter.entry" and node.context.paramType in ["Request", "\\Illuminate\\Http\\Request"] and not (node.context.functionParamType contains "Closure")
+  emit source code.HttpInput at node
+}

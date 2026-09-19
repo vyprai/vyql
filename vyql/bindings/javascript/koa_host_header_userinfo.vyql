@@ -1,0 +1,16 @@
+module bindings.javascript.koa_host_header_userinfo;
+
+// A function that reads the Host, X-Forwarded-Host, or :authority header
+// and hands it back as "the host" via delimiter splitting alone treats an
+// embedded userinfo component (e.g. "evil.com:fake@legitimate.com") as part
+// of the host rather than stripping it: a comma or colon split is a no-op
+// on that shape, so the raw header text -- userinfo included -- comes back
+// unchanged. A URL/authority re-parse (`new URL('http://' + host).host`,
+// or an equivalent `.includes('@')` guard feeding one) recovers the actual
+// host component; its absence is what leaves the raw text exposed to
+// whatever downstream code trusts this function's return value as a bare
+// authority.
+binding hostHeaderUserinfoConfusion {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "this.get" and containsAny(node.context.literal, ["Host", "X-Forwarded-Host", ":authority"]) and not (node.context.callPath contains "URL") and not (node.context.callPath contains "includes")
+  emit issue code.HostHeaderUserinfoConfusion at node
+}

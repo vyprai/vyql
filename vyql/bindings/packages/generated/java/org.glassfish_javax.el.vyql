@@ -1,0 +1,9 @@
+module bindings.java.generated.md83186e0;
+
+binding codeEval0 {
+  requires {
+    dependency("org.glassfish:javax.el")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.CodeEval at args[0]
+}

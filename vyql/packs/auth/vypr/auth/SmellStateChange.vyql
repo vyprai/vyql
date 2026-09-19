@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SmellStateChange {
+  meta {
+    cwe: [CWE_862]
+    id: "VYQL-SMELL-STATE"
+    severity: info
+  }
+  taint core.UserControlledData -> code.StateChangeSmell
+  unless endpoint coveredBy core.AuthenticationCheck
+}

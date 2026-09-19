@@ -1,0 +1,33 @@
+module bindings.objc.generated.m85057eda;
+
+binding deserialization0 {
+  requires {
+    dependency("Flipper-DoubleConversion")
+  }
+  query pattern callExpr where callee.method == "Strtod"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("Flipper-DoubleConversion")
+  }
+  query pattern callExpr where callee.method == "Strtof"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("Flipper-DoubleConversion")
+  }
+  query pattern callExpr where callee.method == "StringToDouble"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("Flipper-DoubleConversion")
+  }
+  query pattern callExpr where callee.method == "StringToFloat"
+  emit sink code.Deserialization at args[0]
+}

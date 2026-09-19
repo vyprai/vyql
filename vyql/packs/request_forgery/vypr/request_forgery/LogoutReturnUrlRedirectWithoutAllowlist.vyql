@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule LogoutReturnUrlRedirectWithoutAllowlist {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_601]
+    id: "VYQL-RF-037"
+    severity: medium
+  }
+  issue code.LogoutReturnUrlRedirectWithoutAllowlist as redirect
+}

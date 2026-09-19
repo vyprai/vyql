@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule SamlAssertionReplayBypass {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_294, CWE_287]
+    id: "VYQL-AUTH-148"
+    severity: high
+  }
+  issue code.SamlAssertionReplayBypass as assertion
+}

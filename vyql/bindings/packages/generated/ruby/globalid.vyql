@@ -1,0 +1,49 @@
+module bindings.ruby.generated.m09350e3a;
+
+binding deserialization0 {
+  requires {
+    dependency("globalid")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("globalid")
+  }
+  query pattern callExpr where callee.method == "parse_encoded_gid"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("globalid")
+  }
+  query pattern callExpr where callee.method == "locate"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("globalid")
+  }
+  query pattern callExpr where callee.method == "locate_many"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("globalid")
+  }
+  query pattern callExpr where callee.method == "locate_signed"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("globalid")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

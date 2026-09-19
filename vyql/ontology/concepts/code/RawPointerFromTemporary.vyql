@@ -1,0 +1,11 @@
+module code;
+
+concept RawPointerFromTemporary : issue {
+  cwe: [CWE_416]
+  reviewAssumption: "the pointee is owned by the temporary and the pointer or an alias derived from it is used after the statement ends"
+  reviewCategory: memory
+  reviewCondition: "a raw pointer is taken from a value created and dropped within the same statement, so the pointer outlives its pointee"
+  reviewConfidence: medium
+  reviewEvidence: "an as_ptr/as_mut_ptr call reads a try-unwrapped temporary that the statement drops"
+  vulnerableTo: [memory.UseAfterFree]
+}

@@ -1,0 +1,351 @@
+# Rank 1703 / CVE-2026-41677 (GHSA-xmgf-hq76-4vx2): the invoke_passwd_cb
+# trampoline in rust-openssl's openssl/src/util.rs passed the user closure's
+# returned usize straight back to OpenSSL as the password length, without
+# checking it against the size of the scratch buffer it had handed out. A
+# safe-Rust callback returning more than buf.len() (the length of the
+# external secret rather than the bytes written) made EVP_BytesToKey read
+# past the buffer during key derivation on OpenSSL 1.1 and LibreSSL,
+# leaking adjacent stack bytes into the derived key. CWE-125 / CWE-1284.
+# Fix 5af6895 adds one match arm -- Ok(Ok(len)) if len > size as usize => 0
+# -- treating an oversized return as a callback error.
+#
+# Pool row verified in both directions: the unguarded forwarding
+# `Ok(Ok(len)) => len as c_int` is present at the parent (util.rs:57) and
+# the guard arm is present at the fixed revision. .
+#
+# What fires without this change: nothing in the file, on either revision
+# (132 findings on the parent tree, none in util.rs). Not caught by
+# VYQL-MEM-014/063 (same function, different axes: enum layout and panic
+# containment), and UncheckedFfiLengthNarrowing is the integer-width axis,
+# not the buffer-bound axis.
+#
+# Vocabulary: no concept expressed a callback-supplied length crossing an
+# FFI boundary unbounded, so UnboundedFfiCallbackLength is minted for the
+# class (after the UncaughtFfiUnwind / UncheckedFfiLengthNarrowing naming
+# family), consumed by VYQL-MEM-064. The anchor is the C-callback
+# trampoline shape and nothing from the fixing commit: the ABI declaration,
+# slice::from_raw_parts (the standard library's only raw-slice
+# constructors), the Ok-pattern arm a length-returning callback reports
+# success with, and the cast to an ABI-width integer that is the crossing
+# itself. The bound is read from the function's lowered comparison nodes
+# and its .min clamp, so the fixed revision's guard suppresses, and so would any other
+# spelling of the same bound -- renaming nothing in the patched form can
+# reintroduce the flag.
+#
+# Measured on the real tree over three --cache off runs each, byte-stable:
+# the parent reports 8 VYQL-MEM-064 (util.rs:41 plus five sibling
+# trampolines in ssl/callbacks.rs that forward callback lengths today --
+# raw_client_psk/raw_server_psk `psk_len as u32`, raw_alpn_select
+# `proto.len() as c_uchar`, raw_stateless_cookie_generate `len as size_t`,
+# raw_cookie_generate `len as c_uint` -- and bread/bwrite in ssl/bio.rs,
+# the same forwarding safe only by io::Read/Write's documented n <=
+# buf.len() contract, which is exactly what the review prompt asks to
+# confirm); the fixed revision reports 7, with util.rs the only difference.
+# Collateral across the sibling clones' reachable set (5867 Rust files, 41
+# extern-ABI functions containing from_raw_parts): one further row,
+# rusqlite's x_input (session.rs:700), the io::Read-contract instance of
+# the same crossing; zero on risc0, pulse-binding-rust, ruby/gc/mmtk and
+# matrix-rust-sdk.
+#
+# The cases: (a) is the real trampoline from util.rs at the parent, reduced
+# to language-level facts; (b) is the same function at both revisions --
+# the minimal pair, differing only in the guard arm; (c) is the bound
+# written as a .min clamp instead of a guard, which must also suppress;
+# (d) is the bound written as an if-condition, which must also suppress;
+# (e) proves the comparison clause is node-level: the bound in a comment
+# must not suppress; (f) proves it is function-scoped: a comparison in a
+# sibling function must not suppress.
+
+test "rank1703: rust extern C password callback trampoline forwards the closure's returned length with no bound"
+  lang rust
+  file openssl/src/util.rs
+  expect VYQL-MEM-064
+  code
+  ```
+  use std::panic::{self, AssertUnwindSafe};
+
+  pub struct CallbackState<F> {
+      pub cb: Option<F>,
+      pub panic_slot: Option<Box<dyn std::any::Any + Send + 'static>>,
+  }
+
+  pub unsafe extern "C" fn invoke_passwd_cb<F>(
+      buf: *mut libc::c_char,
+      size: libc::c_int,
+      _rwflag: libc::c_int,
+      cb_state: *mut libc::c_void,
+  ) -> libc::c_int
+  where
+      F: FnOnce(&mut [u8]) -> Result<usize, ErrorStack>,
+  {
+      let callback = &mut *(cb_state as *mut CallbackState<F>);
+
+      let result = panic::catch_unwind(AssertUnwindSafe(|| {
+          let pass_slice = std::slice::from_raw_parts_mut(buf as *mut u8, size as usize);
+          callback.cb.take().unwrap()(pass_slice)
+      }));
+
+      match result {
+          Ok(Ok(len)) => len as libc::c_int,
+          Ok(Err(_)) => 0,
+          Err(err) => {
+              callback.panic_slot = Some(err);
+              0
+          }
+      }
+  }
+
+  pub struct ErrorStack;
+  pub mod libc {
+      pub type c_char = i8;
+      pub type c_int = i32;
+      pub type c_void = u8;
+  }
+  ```
+
+test "rank1703: rust trampoline rejecting an oversized return with a match-arm guard"
+  lang rust
+  file openssl/src/util.rs
+  reject VYQL-MEM-064
+  code
+  ```
+  use std::panic::{self, AssertUnwindSafe};
+
+  pub struct CallbackState<F> {
+      pub cb: Option<F>,
+      pub panic_slot: Option<Box<dyn std::any::Any + Send + 'static>>,
+  }
+
+  pub unsafe extern "C" fn invoke_passwd_cb<F>(
+      buf: *mut libc::c_char,
+      size: libc::c_int,
+      _rwflag: libc::c_int,
+      cb_state: *mut libc::c_void,
+  ) -> libc::c_int
+  where
+      F: FnOnce(&mut [u8]) -> Result<usize, ErrorStack>,
+  {
+      let callback = &mut *(cb_state as *mut CallbackState<F>);
+
+      let result = panic::catch_unwind(AssertUnwindSafe(|| {
+          let pass_slice = std::slice::from_raw_parts_mut(buf as *mut u8, size as usize);
+          callback.cb.take().unwrap()(pass_slice)
+      }));
+
+      match result {
+          Ok(Ok(len)) if len > size as usize => 0,
+          Ok(Ok(len)) => len as libc::c_int,
+          Ok(Err(_)) => 0,
+          Err(err) => {
+              callback.panic_slot = Some(err);
+              0
+          }
+      }
+  }
+
+  pub struct ErrorStack;
+  pub mod libc {
+      pub type c_char = i8;
+      pub type c_int = i32;
+      pub type c_void = u8;
+  }
+  ```
+
+test "rank1703: rust trampoline clamping the returned length with min"
+  lang rust
+  file openssl/src/util.rs
+  reject VYQL-MEM-064
+  code
+  ```
+  use std::panic::{self, AssertUnwindSafe};
+
+  pub struct CallbackState<F> {
+      pub cb: Option<F>,
+      pub panic_slot: Option<Box<dyn std::any::Any + Send + 'static>>,
+  }
+
+  pub unsafe extern "C" fn invoke_passwd_cb<F>(
+      buf: *mut libc::c_char,
+      size: libc::c_int,
+      _rwflag: libc::c_int,
+      cb_state: *mut libc::c_void,
+  ) -> libc::c_int
+  where
+      F: FnOnce(&mut [u8]) -> Result<usize, ErrorStack>,
+  {
+      let callback = &mut *(cb_state as *mut CallbackState<F>);
+
+      let result = panic::catch_unwind(AssertUnwindSafe(|| {
+          let pass_slice = std::slice::from_raw_parts_mut(buf as *mut u8, size as usize);
+          callback.cb.take().unwrap()(pass_slice)
+      }));
+
+      match result {
+          Ok(Ok(len)) => len.min(size as usize) as libc::c_int,
+          Ok(Err(_)) => 0,
+          Err(err) => {
+              callback.panic_slot = Some(err);
+              0
+          }
+      }
+  }
+
+  pub struct ErrorStack;
+  pub mod libc {
+      pub type c_char = i8;
+      pub type c_int = i32;
+      pub type c_void = u8;
+  }
+  ```
+
+test "rank1703: rust trampoline bounding the returned length with an if-condition"
+  lang rust
+  file openssl/src/util.rs
+  reject VYQL-MEM-064
+  code
+  ```
+  use std::panic::{self, AssertUnwindSafe};
+
+  pub struct CallbackState<F> {
+      pub cb: Option<F>,
+      pub panic_slot: Option<Box<dyn std::any::Any + Send + 'static>>,
+  }
+
+  pub unsafe extern "C" fn invoke_passwd_cb<F>(
+      buf: *mut libc::c_char,
+      size: libc::c_int,
+      _rwflag: libc::c_int,
+      cb_state: *mut libc::c_void,
+  ) -> libc::c_int
+  where
+      F: FnOnce(&mut [u8]) -> Result<usize, ErrorStack>,
+  {
+      let callback = &mut *(cb_state as *mut CallbackState<F>);
+
+      let result = panic::catch_unwind(AssertUnwindSafe(|| {
+          let pass_slice = std::slice::from_raw_parts_mut(buf as *mut u8, size as usize);
+          callback.cb.take().unwrap()(pass_slice)
+      }));
+
+      match result {
+          Ok(Ok(len)) => {
+              if len > size as usize {
+                  0
+              } else {
+                  len as libc::c_int
+              }
+          }
+          Ok(Err(_)) => 0,
+          Err(err) => {
+              callback.panic_slot = Some(err);
+              0
+          }
+      }
+  }
+
+  pub struct ErrorStack;
+  pub mod libc {
+      pub type c_char = i8;
+      pub type c_int = i32;
+      pub type c_void = u8;
+  }
+  ```
+
+test "rank1703: rust trampoline with the bound only in a comment"
+  lang rust
+  file openssl/src/util.rs
+  expect VYQL-MEM-064
+  code
+  ```
+  use std::panic::{self, AssertUnwindSafe};
+
+  pub struct CallbackState<F> {
+      pub cb: Option<F>,
+      pub panic_slot: Option<Box<dyn std::any::Any + Send + 'static>>,
+  }
+
+  pub unsafe extern "C" fn invoke_passwd_cb<F>(
+      buf: *mut libc::c_char,
+      size: libc::c_int,
+      _rwflag: libc::c_int,
+      cb_state: *mut libc::c_void,
+  ) -> libc::c_int
+  where
+      F: FnOnce(&mut [u8]) -> Result<usize, ErrorStack>,
+  {
+      let callback = &mut *(cb_state as *mut CallbackState<F>);
+
+      let result = panic::catch_unwind(AssertUnwindSafe(|| {
+          let pass_slice = std::slice::from_raw_parts_mut(buf as *mut u8, size as usize);
+          callback.cb.take().unwrap()(pass_slice)
+      }));
+
+      match result {
+          // callers must return len > size as usize as an error
+          Ok(Ok(len)) => len as libc::c_int,
+          Ok(Err(_)) => 0,
+          Err(err) => {
+              callback.panic_slot = Some(err);
+              0
+          }
+      }
+  }
+
+  pub struct ErrorStack;
+  pub mod libc {
+      pub type c_char = i8;
+      pub type c_int = i32;
+      pub type c_void = u8;
+  }
+  ```
+
+test "rank1703: rust trampoline beside a sibling function carrying the comparison"
+  lang rust
+  file openssl/src/util.rs
+  expect VYQL-MEM-064
+  code
+  ```
+  use std::panic::{self, AssertUnwindSafe};
+
+  pub struct CallbackState<F> {
+      pub cb: Option<F>,
+      pub panic_slot: Option<Box<dyn std::any::Any + Send + 'static>>,
+  }
+
+  pub unsafe extern "C" fn invoke_passwd_cb<F>(
+      buf: *mut libc::c_char,
+      size: libc::c_int,
+      _rwflag: libc::c_int,
+      cb_state: *mut libc::c_void,
+  ) -> libc::c_int
+  where
+      F: FnOnce(&mut [u8]) -> Result<usize, ErrorStack>,
+  {
+      let callback = &mut *(cb_state as *mut CallbackState<F>);
+
+      let result = panic::catch_unwind(AssertUnwindSafe(|| {
+          let pass_slice = std::slice::from_raw_parts_mut(buf as *mut u8, size as usize);
+          callback.cb.take().unwrap()(pass_slice)
+      }));
+
+      match result {
+          Ok(Ok(len)) => len as libc::c_int,
+          Ok(Err(_)) => 0,
+          Err(err) => {
+              callback.panic_slot = Some(err);
+              0
+          }
+      }
+  }
+
+  fn bounded_elsewhere(a: usize, b: usize) -> bool {
+      a > b
+  }
+
+  pub struct ErrorStack;
+  pub mod libc {
+      pub type c_char = i8;
+      pub type c_int = i32;
+      pub type c_void = u8;
+  }
+  ```

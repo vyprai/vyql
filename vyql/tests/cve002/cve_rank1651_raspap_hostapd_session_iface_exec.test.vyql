@@ -1,0 +1,140 @@
+# Rank 1651 / CVE-2025-50428: RaspAP's SaveHostAPDConfig() accepted an
+# unvalidated `interface` POST field and both persisted it to
+# /etc/raspap/hostapd.ini and stored it in $_SESSION['ap_interface'];
+# getWifiInterface() then read the poisoned value back out of the ini file
+# into the session on the next request, and DisplayHostAPDConfig()
+# interpolated the session value straight into a shell command:
+#
+#   $cmd = "iw dev ".$_SESSION['ap_interface']." info | awk '$1==\"txpower\" {print $2}'";
+#   exec($cmd, $txpower);
+#   ...
+#   exec('iwgetid '.$_SESSION['wifi_client_interface']. ' -r', $wifiNetworkID);
+#
+# An authenticated admin could POST interface='; touch /tmp/pwn to
+# /hostapd_conf twice and get arbitrary commands run as the web user
+# (CWE-78, CVSS 8.6, GHSA/smarttecs write-up 2025-004). The fixing commit,
+# 36610ac519446e43215e34aa7533234f0d34b739 (merge of PR #1833, readable in
+# full via `git diff eda490e 36610ac5` because the combined diff of the merge
+# is empty -- the row's `nocommit` flag is that known symptom, not a missing
+# fix), wraps both session reads in escapeshellarg() and adds
+# validateInterface() so only a real system interface name is ever stored.
+#
+# The pool row is left as the merge: its parent eda490e is the fully
+# vulnerable tree, and repointing at the PR's single commit 52a4acc would
+# give a partially-patched parent.
+#
+# The miss is a source binding, not a sink or a rule. exec() and system()
+# are bound as code.CommandExecution, and the storage half of the
+# bug is reported (VYQL-CFG-014 on $_POST['interface'] flowing into
+# the $_SESSION write at hostapd.php:274) -- but a *read* from $_SESSION
+# produced no source at all, so the second half of the flow, which is the
+# half that executes, had nothing to trace. $_SESSION is documented PHP
+# server-side per-session state (php.net/manual/en/reserved.variables.
+# session.php), i.e. data read back from a store rather than data taken
+# straight off the request, and session reads arey bound to
+# code.StoredDataRead for Perl (Session, Apache-Session) and Spring Session.
+# The binding below widens that existing concept's language coverage to PHP
+# instead of minting a sibling -- the same second-order model PHP's own
+# get_results/get_var/get_row/get_col bindingsready implement for
+# code.DatabaseRead.
+#
+# code.StoredDataRead also misses from the entrypoint lists of the
+# library and web profiles, which is how this checkout profiles itself, so
+# the label alone would have changed nothing here. StoredDataRead entered
+# five profiles at once (cli, generic, mobile_android, mobile_ios, electron)
+# and skipped five (library, web, api, frontend, worker); library and web
+# are added here, and api/frontend/worker are left for a measured sweep.
+# Both added profiles list code.DatabaseRead, the sibling second-order
+# source, so a session read is the omission rather than the decision.
+#
+# Measured on the real checkout at 36610ac5^, sink-keyed, default profile:
+# 349 findings on the vulnerable revision against 347 on the patched one,
+# and the difference is exactly the two sinks below --
+#   code.StoredDataRead @ includes/hostapd.php:37 -> code.CommandExecution @ :38
+#   code.StoredDataRead @ includes/hostapd.php:79 -> code.CommandExecution @ :79
+# Collateral, sink-keyed, same profile each repo picks for itself:
+#   linkace (web) 137 -> 137, october (web) 931 -> 931,
+#   mantisbt (generic) 2222 -> 2224, postfixadmin (generic) 212 -> 226.
+# The mantisbt pair and six of the fourteen postfixadmin rows are
+# unset($_SESSION[...]) composed with a pre-existing frontend defect that
+# lowers unset_statement to a call named "echo"
+# (internal/extract/frontend/treesitter/php.go:220), which labels
+# every unset() argument code.HtmlRender: mantisbt's base scan carries 106
+# such findings without this change.
+#
+# Labelling a session read as a source does change one shipped expectation:
+# the patched LimeSurvey action in the rank 1322 spec carried its generated
+# path through $_SESSION and relied on that carrier being unlabelled. Its
+# reject case now uses an instance property, and records why.
+
+test "rank1651: a session-carried interface name reaches exec() unescaped"
+  lang php
+  file hostapd.php
+  expect VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  function DisplayHostAPDConfig()
+  {
+      exec("ip -o link show | awk -F': ' '{print $2}'", $interfaces);
+      sort($interfaces);
+
+      $cmd = "iw dev ".$_SESSION['ap_interface']." info | awk '$1==\"txpower\" {print $2}'";
+      exec($cmd, $txpower);
+      $txpower = intval($txpower[0]);
+  }
+  ```
+
+test "rank1651: the fixed revision escapes the session value before the shell sees it"
+  lang php
+  file hostapd.php
+  reject VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  function DisplayHostAPDConfig()
+  {
+      exec("ip -o link show | awk -F': ' '{print $2}'", $interfaces);
+      sort($interfaces);
+
+      $cmd = "iw dev ".escapeshellarg($_SESSION['ap_interface'])." info | awk '$1==\"txpower\" {print $2}'";
+      exec($cmd, $txpower);
+      $txpower = intval($txpower[0]);
+  }
+  ```
+
+test "rank1651: the second exec the fixed revision escapes, reading the client interface"
+  lang php
+  file hostapd.php
+  expect VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  function DisplayHostAPDConfig()
+  {
+      exec('cat '. RASPI_HOSTAPD_CONFIG, $hostapdconfig);
+      if (isset($_SESSION['wifi_client_interface'])) {
+          exec('iwgetid '.$_SESSION['wifi_client_interface']. ' -r', $wifiNetworkID);
+      }
+  }
+  ```
+
+test "rank1651: the fixed revision escapes the client interface read too"
+  lang php
+  file hostapd.php
+  reject VYQL-INJ-002
+  code
+  ```
+  <?php
+
+  function DisplayHostAPDConfig()
+  {
+      exec('cat '. RASPI_HOSTAPD_CONFIG, $hostapdconfig);
+      if (isset($_SESSION['wifi_client_interface'])) {
+          exec('iwgetid '.escapeshellarg($_SESSION['wifi_client_interface']). ' -r', $wifiNetworkID);
+      }
+  }
+  ```

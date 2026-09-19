@@ -1,0 +1,14 @@
+module bindings.kotlin.generated.me95f5e2c;
+
+binding inputValidation0 {
+  requires {
+    dependency("com.jolbox:bonecp")
+  }
+  query pattern callExpr where callee.method == "sanitize"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

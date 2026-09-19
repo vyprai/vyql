@@ -1,0 +1,7 @@
+module code;
+
+concept MessageInput : source {
+  coverageReservedSource: true
+  refines: core.UserControlledData
+  taint: [taint.UntrustedData]
+}

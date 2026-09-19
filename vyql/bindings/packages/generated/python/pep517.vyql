@@ -1,0 +1,25 @@
+module bindings.python.generated.md4eb2962;
+
+binding commandExecution0 {
+  requires {
+    dependency("pep517")
+  }
+  query pattern callExpr where callee.method == "default_subprocess_runner"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("pep517")
+  }
+  query pattern callExpr where callee.method == "quiet_subprocess_runner"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("pep517")
+  }
+  query pattern callExpr where callee.method == "subprocess_runner"
+  emit sink code.CommandExecution at args[0]
+}

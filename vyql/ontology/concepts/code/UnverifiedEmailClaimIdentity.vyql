@@ -1,0 +1,11 @@
+module code;
+
+concept UnverifiedEmailClaimIdentity : issue {
+  cwe: [CWE_287, CWE_290]
+  reviewAssumption: "the email address an identity provider returns is whatever the upstream account currently carries, and a relying party that names it as the account identity gives whoever sets that address the local account it resolves to"
+  reviewCategory: auth
+  reviewCondition: "an OpenID Connect relying party names the email claim as the account identity while requiring no email-verification attestation from the provider"
+  reviewConfidence: high
+  reviewEvidence: "identity claim selection {pattern} resolves the account to the provider's email address with no email-verification claim read anywhere on the authenticator"
+  vulnerableTo: [authentication.ImproperAuthentication, authentication.AuthenticationBypass]
+}

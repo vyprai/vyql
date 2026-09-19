@@ -1,0 +1,8 @@
+module code;
+
+review code.RequestPluginNamePathTraversal {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: target
+  text: "reject path separators in request-bound plugin or module names before code-generation file creation"
+}

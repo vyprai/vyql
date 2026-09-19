@@ -1,0 +1,55 @@
+module bindings.php.generated.m5d32eb5a;
+
+binding sqlExecution0 {
+  requires {
+    dependency("drupal/core")
+  }
+  query pattern callExpr where callee.method == "insert"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization1 {
+  requires {
+    dependency("drupal/core")
+  }
+  query pattern callExpr where callee.method == "prepareMachineName"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding nosqlQuery2 {
+  requires {
+    dependency("drupal/core")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding storedDataWrite3 {
+  requires {
+    dependency("drupal/core")
+  }
+  query pattern callExpr where callee.method == "settings"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding secretValue4 {
+  requires {
+    dependency("drupal/core")
+  }
+  query pattern callExpr where callee.method == "token"
+  emit source code.SecretValue at call.result
+}
+
+binding regexCompile5 {
+  requires {
+    dependency("drupal/core")
+  }
+  query pattern callExpr where callee.method == "RegExp"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

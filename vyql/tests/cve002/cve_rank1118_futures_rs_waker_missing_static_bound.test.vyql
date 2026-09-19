@@ -1,0 +1,224 @@
+# Rank 1118 / CVE-2020-35906: futures-rs's public waker() took Arc<W> with no
+# lifetime bound on W, erased it behind an untyped raw pointer and handed that
+# pointer to a raw vtable. The Waker keeps the pointer with no trace of W's
+# lifetime and can call back into it at any later time, so once the original
+# data is gone the wake is use after free (CWE-416). The fix adds + 'static to
+# the where clause; upstream later added the same bound to waker_ref(), which
+# keeps the identical cast shape.
+#
+# Detected by the type_erasure_missing_lifetime_bound fact
+# (rsTypeErasureMetadata, internal/extract/frontend/treesitter/rust.go) through
+# binding typeErasureMissingLifetimeBound
+# (vyql/bindings/rust/type_erasure_missing_lifetime_bound.vyql) emitting
+# code.TypeErasureMissingLifetimeBound / VYQL-MEM-070: a function's own generic
+# parameter is cast to *const () or *mut () while no type parameter it declares
+# carries a lifetime bound. Every clause reads the syntax tree, so prose and
+# comments satisfy neither side.
+#
+# The reject cases are the shapes that carry the same cast innocently: the
+# vtable constructor and the callbacks, which restore a type from the untyped
+# pointer rather than erasing one into it; the borrow-copy waker whose
+# obligation sits on the impl rather than the method; a non-generic function
+# erasing a concrete type, which has no lifetime to lose; and the three
+# spellings that do state the constraint -- the fix's own + 'static, an inline
+# named lifetime, and a where-clause lifetime bound.
+
+test "rank1118: waker erases its generic parameter behind an untyped pointer"
+  lang rust
+  file futures-task/src/waker.rs
+  expect VYQL-MEM-070
+  code
+  ```
+  use std::sync::Arc;
+  use std::task::{RawWaker, RawWakerVTable, Waker};
+
+  pub trait ArcWake {
+      fn wake(self: Arc<Self>);
+  }
+
+  pub fn waker<W>(wake: Arc<W>) -> Waker
+  where
+      W: ArcWake,
+  {
+      let ptr = Arc::into_raw(wake) as *const ();
+      unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) }
+  }
+  ```
+
+test "rank1118: comment asserting the bound does not satisfy the clause"
+  lang rust
+  file futures-task/src/waker.rs
+  expect VYQL-MEM-070
+  code
+  ```
+  use std::sync::Arc;
+  use std::task::{RawWaker, Waker};
+
+  pub fn waker<W>(wake: Arc<W>) -> Waker
+  where
+      // every caller passes a 'static type
+      W: ArcWake,
+  {
+      let ptr = Arc::into_raw(wake) as *const ();
+      unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) }
+  }
+  ```
+
+test "rank1118: borrow-copy waker keeps the same unbounded erasure"
+  lang rust
+  file futures-task/src/waker_ref.rs
+  expect VYQL-MEM-070
+  code
+  ```
+  use std::sync::Arc;
+  use std::task::{RawWaker, Waker};
+
+  pub trait ArcWake {
+      fn wake(self: Arc<Self>);
+  }
+
+  pub fn waker_ref<W>(wake: &Arc<W>) -> Waker
+  where
+      W: ArcWake,
+  {
+      let ptr = (&**wake as *const W) as *const ();
+      unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) }
+  }
+  ```
+
+test "rank1118: fix bounds the erased parameter by 'static"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-070
+  code
+  ```
+  use std::sync::Arc;
+  use std::task::{RawWaker, RawWakerVTable, Waker};
+
+  pub trait ArcWake {
+      fn wake(self: Arc<Self>);
+  }
+
+  pub fn waker<W>(wake: Arc<W>) -> Waker
+  where
+      W: ArcWake + 'static,
+  {
+      let ptr = Arc::into_raw(wake) as *const ();
+      unsafe { Waker::from_raw(RawWaker::new(ptr, waker_vtable::<W>())) }
+  }
+  ```
+
+test "rank1118: inline named lifetime bound on the erased parameter"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-070
+  code
+  ```
+  use std::sync::Arc;
+
+  pub fn waker<'a, W: ArcWake + 'a>(wake: Arc<W>) -> &'a ()
+  where
+      W: ArcWake + 'a,
+  {
+      let ptr = Arc::into_raw(wake) as *const ();
+      unsafe { &*(ptr as *const ()) }
+  }
+  ```
+
+test "rank1118: where-clause lifetime bound stated apart from the trait"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-070
+  code
+  ```
+  use std::sync::Arc;
+
+  pub fn waker<W>(wake: Arc<W>) -> &'static ()
+  where
+      W: ArcWake,
+      W: 'static,
+  {
+      let ptr = Arc::into_raw(wake) as *const ();
+      unsafe { &*ptr }
+  }
+  ```
+
+test "rank1118: vtable constructor is generic but erases nothing"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-070
+  code
+  ```
+  use std::task::RawWakerVTable;
+
+  pub fn waker_vtable<W: ArcWake>() -> &'static RawWakerVTable {
+      &RawWakerVTable::new(clone_raw::<W>, wake_raw::<W>, drop_raw::<W>)
+  }
+  ```
+
+test "rank1118: callbacks restore a type from the untyped pointer"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-070
+  code
+  ```
+  use std::sync::Arc;
+
+  pub fn wake_raw<T: ArcWake>(data: *const ()) {
+      let arc: Arc<T> = Arc::from_raw(data as *const T);
+      ArcWake::wake(arc);
+  }
+
+  pub fn clone_raw<T: ArcWake>(data: *const ()) -> *const () {
+      data
+  }
+  ```
+
+test "rank1118: non-generic erasure has no lifetime to lose"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-070
+  code
+  ```
+  use std::sync::Arc;
+
+  pub struct Unparker {
+      inner: Arc<Inner>,
+  }
+
+  pub fn into_raw(this: Unparker) -> *const () {
+      Arc::into_raw(this.inner) as *const ()
+  }
+  ```
+
+test "rank1118: method inherits its parameter from the surrounding impl"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-070
+  code
+  ```
+  use std::sync::Arc;
+
+  pub struct Packet<T> {
+      value: T,
+  }
+
+  impl<T> Packet<T> {
+      pub fn send(&self, msg: T, register: fn(*mut ())) {
+          let mut packet = Packet { value: msg };
+          register(&mut packet as *mut Packet<T> as *mut ());
+      }
+  }
+  ```
+
+test "rank1118: generic function casting a value with no parameter in it"
+  lang rust
+  file futures-task/src/waker.rs
+  reject VYQL-MEM-070
+  code
+  ```
+  pub fn trace<W>(pc: usize) -> usize {
+      let ptr = pc as *const ();
+      ptr as usize
+  }
+  ```

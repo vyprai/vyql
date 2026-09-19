@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m0911f3f3;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.lucene:lucene-queryparser")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

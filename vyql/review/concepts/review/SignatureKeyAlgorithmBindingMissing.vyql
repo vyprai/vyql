@@ -1,0 +1,7 @@
+module code;
+
+review code.SignatureKeyAlgorithmBindingMissing {
+  category: crypto
+  kind: attention
+  text: "review signature verification that dispatches on the signature's declared public-key algorithm while using the key's algorithm-specific parameters, for a check that the declared algorithm matches the key's own"
+}

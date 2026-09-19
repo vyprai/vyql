@@ -1,0 +1,189 @@
+# Rank 1182 / CVE-2026-31966: HTSlib's CRAM decoder copies reference bytes
+# into the output sequence and MD-tag buffers using a length checked against
+# the wrong bound (CWE-125, CWE-129).
+#
+# cram/cram_decode.c's cram_decode_seq() reads compressed alignment records
+# against a reference held in two different scopes: bfd->ref[cr->ref_id].len
+# is the full reference length for the whole container, while s->ref_start
+# and s->ref_end mark the (usually smaller) sub-range actually loaded for the
+# current slice. In the "implicit match" branch, when a record's features
+# leave bases unaccounted for, the vulnerable code computed
+#
+#   rlen = bfd->ref[cr->ref_id].len - ref_pos;
+#
+# checked only that rlen is positive, and then read rlen bytes starting at
+# s->ref[ref_pos - s->ref_start + 1] -- a pointer into the slice-scoped
+# buffer, bounded only by a length computed against the container-scoped one.
+# A record whose ref_pos sits close to the end of the slice's loaded range
+# but still well inside the container's full reference makes rlen span past
+# s->ref_end, so the copy reads past the end of the buffer actually allocated
+# for the slice, leaking adjacent heap memory into the SAM record or the MD
+# tag.
+#
+# Three commits close this advisory together (GHSA-5cj8-mj52-8vp3): 4a5ef25e
+# (rejects a record whose apos starts before the slice's reference segment),
+# 22ec5230 (fixes the off-by-one `>` -> `>=` checks against s->ref_end for
+# the BB/BA feature paths and adds the missing `ref_pos + rlen > s->ref_end`
+# guard this spec models), and 2a45eb12 (rejects negative-length D/H/P/N
+# features). The fixed revision this spec's second test models is
+# 22ec5230, the one that directly patches cram_decode_seq() (the function
+# GHSA-5cj8-mj52-8vp3 names as affected) with that bounds check; the other
+# two close the same advisory's remaining gaps in sibling feature paths.
+#
+# ATTENTION, engine gap, confirmed on recheck. VYQL-MEM-010
+# (vypr.memory.PotentialFieldDerivedIndexAccess) and VYQL-MEM-016
+# (vypr.memory.PotentialRawMemoryCopySize) label the vulnerable s->ref[...]
+# access and the memcpy's computed size on both revisions, and neither rule
+# carries an `unless`, so nothing is positioned to notice the added guard
+# even where one exists. Rechecked against the accumulated knowledge base:
+# three `--cache off` runs per revision on the real checkout (4a5ef25, the
+# fix's parent, against 22ec5230 itself) report a deterministic 6965
+# findings each run on both sides, with the rule-plus-file sets identical
+# once line numbers are normalized -- the only byte differences are the
+# fp= fingerprints that hash the three shifted lines. VYQL-MEM-003 stays at
+# 83 on both, and cram/cram_decode.c carries the same 18 VYQL-MEM-010, 12
+# VYQL-MEM-016 and 9 VYQL-MEM-003 rows on both. None of the rules minted
+# after the first review changes this: the destination-capacity observation
+# needs a strcpy/strcat into a destination whose capacity a libc pairing
+# declares, and cram_decode_seq has none.
+#
+# The frontend's guard recognition did gain the reject-if-larger spelling
+# since the first review -- ccHasUpperBoundGuard (c.go) now reads
+# `idx > BOUND` over the text preceding the access -- and it still does not
+# recognize this fix: the guard compares `ref_pos + rlen` against
+# s->ref_end and never contains the access's index text
+# `ref_pos-s->ref_start+1`, so the s->ref[...] subscript keeps its
+# field_derived_missing_upper_bound label on the patched revision too
+# (confirmed on the minimal pair: vyql match lists an identical label set
+# on both forms).
+#
+# The recheck also established why no presence-keyed route can separate the
+# revisions: the vulnerable revision already carries the byte-identical
+# guard at cram_decode.c:1208, added by efe502d98 for the sibling
+# implicit-match copy inside the feature loop -- which is exactly the check
+# the fix's own message says it copies. A function-scoped binary:/assign:
+# token naming `ref_pos+rlen>s->ref_end`, or any negation keyed on the
+# length variable meeting s->ref_end, is therefore satisfied by the
+# vulnerable function as well. The two copies sit in disjoint control
+# regions (the first inside the feature loop's `pos > seq_pos` branch, the
+# second after the loop ends), so the relation that does separate them is
+# site-attributed: a guard counts only where it dominates the specific copy
+# it bounds, on the same length variable and the same reference buffer.
+# That is the per-buffer bound-tracking relation -- alias resolution plus
+# knowing which of two same-named "reference" objects a given comparison
+# actually bounds -- recorded in ENGINE-GAPS.md alongside ranks
+# 1026/1032/1038 (the index-guard family) and 1096/1102/1151/1163 (the
+# cross-variable invariant family). Attributing by textual proximity
+# instead would key on the fixing commit's own layout, so this spec models
+# both copies: a fix that merely notices the guard's presence anywhere in
+# the function must fail it.
+#
+# No definition change attempted.
+#
+# verify_current_expected: attention-engine-gap, both revisions fire identically.
+
+test "rank1182: the implicit-match copy bounds its length against the container reference, not the slice"
+  lang c
+  file cram_decode.c
+  expect VYQL-MEM-010
+  expect VYQL-MEM-016
+  code
+  ```
+  int cram_decode_seq(cram_fd *fd, cram_container *c, cram_slice *s,
+                       cram_record *cr, sam_hdr_t *bfd, int cf,
+                       char *seq, char *qual) {
+      int ref_pos = cr->apos - 1;
+      int seq_pos = 1;
+      int pos = 0;
+
+      /* Feature loop, read-base branch: the same implicit-match copy,
+         already guarded. */
+      if (pos > seq_pos) {
+          if (pos > cr->len + 1)
+              return -1;
+          if (ref_pos + pos - seq_pos > bfd->ref[cr->ref_id].len) {
+              int rlen;
+              rlen = bfd->ref[cr->ref_id].len - ref_pos;
+              if (rlen > 0) {
+                  if (ref_pos + rlen > s->ref_end)
+                      goto beyond_slice;
+                  memcpy(&seq[seq_pos - 1],
+                         &s->ref[ref_pos - s->ref_start + 1], rlen);
+              }
+          }
+      }
+
+      /* Implicit match for the bases the features left unaccounted for:
+         the same copy again, after the loop, without the guard. */
+      if ((cr->flags & CRAM_FN) && cr->len >= seq_pos) {
+          if (s->ref && cr->ref_id >= 0) {
+              if (ref_pos + cr->len - seq_pos + 1 > bfd->ref[cr->ref_id].len) {
+                  int rlen;
+                  rlen = bfd->ref[cr->ref_id].len - ref_pos;
+                  if (rlen > 0) {
+                      if (seq_pos - 1 + rlen < cr->len)
+                          memcpy(&seq[seq_pos - 1],
+                                 &s->ref[ref_pos - s->ref_start + 1], rlen);
+                  }
+              }
+          }
+      }
+      return 0;
+   beyond_slice:
+      return -1;
+  }
+  ```
+
+test "rank1182: the fixed revision adds a slice-scoped bound before the second copy only"
+  lang c
+  file cram_decode.c
+  expect VYQL-MEM-010
+  expect VYQL-MEM-016
+  code
+  ```
+  int cram_decode_seq(cram_fd *fd, cram_container *c, cram_slice *s,
+                       cram_record *cr, sam_hdr_t *bfd, int cf,
+                       char *seq, char *qual) {
+      int ref_pos = cr->apos - 1;
+      int seq_pos = 1;
+      int pos = 0;
+
+      /* Feature loop, read-base branch: the same implicit-match copy,
+         already guarded. */
+      if (pos > seq_pos) {
+          if (pos > cr->len + 1)
+              return -1;
+          if (ref_pos + pos - seq_pos > bfd->ref[cr->ref_id].len) {
+              int rlen;
+              rlen = bfd->ref[cr->ref_id].len - ref_pos;
+              if (rlen > 0) {
+                  if (ref_pos + rlen > s->ref_end)
+                      goto beyond_slice;
+                  memcpy(&seq[seq_pos - 1],
+                         &s->ref[ref_pos - s->ref_start + 1], rlen);
+              }
+          }
+      }
+
+      /* Implicit match for the bases the features left unaccounted for:
+         the fixed revision guards this copy too. */
+      if ((cr->flags & CRAM_FN) && cr->len >= seq_pos) {
+          if (s->ref && cr->ref_id >= 0) {
+              if (ref_pos + cr->len - seq_pos + 1 > bfd->ref[cr->ref_id].len) {
+                  int rlen;
+                  rlen = bfd->ref[cr->ref_id].len - ref_pos;
+                  if (rlen > 0) {
+                      if (ref_pos + rlen > s->ref_end)
+                          goto beyond_slice;
+                      if (seq_pos - 1 + rlen < cr->len)
+                          memcpy(&seq[seq_pos - 1],
+                                 &s->ref[ref_pos - s->ref_start + 1], rlen);
+                  }
+              }
+          }
+      }
+      return 0;
+   beyond_slice:
+      return -1;
+  }
+  ```

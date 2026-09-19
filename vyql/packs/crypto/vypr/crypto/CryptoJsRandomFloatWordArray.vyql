@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule CryptoJsRandomFloatWordArray {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_330, CWE_331]
+    id: "VYQL-CRY-031"
+    severity: high
+  }
+  issue code.CryptoJsRandomFloatWordArray as r
+}

@@ -1,0 +1,7 @@
+module code;
+
+review code.EscapedTerminatorWrite {
+  category: memory
+  kind: attention
+  text: "review escape-decoder loops for an escaped terminator check before writing the decoded byte"
+}

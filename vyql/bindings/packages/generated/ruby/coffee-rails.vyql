@@ -1,0 +1,9 @@
+module bindings.ruby.generated.md38ae990;
+
+binding codeEval0 {
+  requires {
+    dependency("coffee-rails")
+  }
+  query pattern callExpr where callee.method == "TemplateHandler.call"
+  emit sink code.CodeEval at args[0]
+}

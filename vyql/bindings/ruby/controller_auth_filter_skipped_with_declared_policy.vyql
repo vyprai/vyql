@@ -1,0 +1,54 @@
+module bindings.ruby.controller_auth_filter_skipped_with_declared_policy;
+
+// A Rails controller that runs an authentication before_action can switch it
+// off per action, and `skip_before_action` documents the two scopes for that:
+// `only:` names the actions that lose the filter and `except:` names the ones
+// that keep it. Called with the filter alone, it switches the filter off for
+// every action in the controller. That is a legitimate arrangement when the
+// whole controller is public by design -- sign-in and password-reset
+// controllers have to be reachable before anyone is authenticated -- and it
+// undoes the policy of a controller that declares one.
+//
+// The declaration side is the same vocabulary the Ruby `core.AuthorizationCheck`
+// bindings treat as an access decision: Pundit's `authorize`, CanCanCan's
+// `authorize!` and `can?`, and the framework hooks `check_authorization`,
+// `action_auth_level`, `check_ownership`, `require_owner` and `owns_resource?`.
+// A class that registers an access level per action and then disables the
+// filter that consults the registry has a policy on paper only: whatever level
+// an action declares, any caller the base controller still authenticates gets
+// in. `scope.call` is the confining route for that conjunct -- it reads the
+// sibling calls of the same class body, so a controller with no authorization
+// declaration of its own does not report however publicly it is configured.
+//
+// The filter-name needle `authenticate` covers Rails' documented
+// `authenticate_or_request_with_*` family, Devise's `authenticate_user!`-style
+// filters and application hooks named for authentication; `verify_authenticity_token`
+// does not contain it, so the forgery filter keeps its own binding.
+//
+// Costs and residuals, stated rather than hidden.
+//
+//   * `args.count == 1` is the unscoped test, so any second argument removes
+//     the finding: an `only:`/`except:` scope, and equally Rails' `raise: false`
+//     alone. The presence of a scope is the discriminator, not its breadth --
+//     a skip scoped by a three-action `except:` over a controller whose other
+//     actions also declare levels stays unreported, because those actions keep
+//     declaring a policy the filter no longer consults.
+//   * A public-by-design controller that authorizes per resource inside its
+//     actions -- Pundit's `authorize` called in a method body -- reports too,
+//     because the declaration conjunct cannot tell a per-action level from a
+//     per-resource check.
+//   * The filter name is read from the call's arguments, so an application
+//     whose authentication hook is not named for authentication is invisible
+//     to the needle.
+//
+// On the reachable Ruby set: four controllers across one application fire, each
+// one declaring per-action authorization levels while skipping the
+// authentication filter for the whole class; the 154 controller files of a
+// second Rails application and five library checkouts report none.
+binding controllerAuthFilterSkippedWithDeclaredPolicy {
+  query pattern callExpr where callee.method == "skip_before_action"
+    and args.count == 1
+    and args.any.literal contains "authenticate"
+    and scope.call.method in ["authorize", "authorize!", "can?", "check_authorization", "action_auth_level", "check_ownership", "require_owner", "owns_resource?"]
+  emit issue code.AccessPolicyReview at call
+}

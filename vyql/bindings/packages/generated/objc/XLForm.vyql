@@ -1,0 +1,9 @@
+module bindings.objc.generated.mafaa3970;
+
+binding httpInput0 {
+  requires {
+    dependency("XLForm")
+  }
+  query pattern callExpr where callee.method == "httpParameters"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,65 @@
+module bindings.swift.generated.mc371d226;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/tsolomko/BitByteData")
+  }
+  query pattern callExpr where callee.method == "int"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/tsolomko/BitByteData")
+  }
+  query pattern callExpr where callee.method == "signedInt"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/tsolomko/BitByteData")
+  }
+  query pattern callExpr where callee.method == "bits"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/tsolomko/BitByteData")
+  }
+  query pattern callExpr where callee.method == "byte"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/tsolomko/BitByteData")
+  }
+  query pattern callExpr where callee.method == "uint16"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("github.com/tsolomko/BitByteData")
+  }
+  query pattern callExpr where callee.method == "uint32"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("github.com/tsolomko/BitByteData")
+  }
+  query pattern callExpr where callee.method == "uint64"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("github.com/tsolomko/BitByteData")
+  }
+  query pattern callExpr where callee.method == "bytes"
+  emit sink code.Deserialization at args[0]
+}

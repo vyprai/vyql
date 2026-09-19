@@ -1,0 +1,6 @@
+module code;
+
+concept WebViewJsInterface : issue {
+  cwe: [CWE_749]
+  vulnerableTo: [mobile.WebViewInjection]
+}

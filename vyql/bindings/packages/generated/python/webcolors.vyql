@@ -1,0 +1,25 @@
+module bindings.python.generated.m30b30630;
+
+binding deserialization0 {
+  requires {
+    dependency("webcolors")
+  }
+  query pattern callExpr where callee.method == "html5_parse_simple_color"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("webcolors")
+  }
+  query pattern callExpr where callee.method == "html5_parse_legacy_color"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("webcolors")
+  }
+  query pattern callExpr where callee.method == "name_to_hex"
+  emit sink code.Deserialization at args[0]
+}

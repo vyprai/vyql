@@ -1,0 +1,43 @@
+test "cve rank311 canto-curses: feed URL reaches shell command"
+  lang python
+  expect VYQL-INJ-053
+  expect_review code.CommandLineAssemblyReview
+  code
+  ```
+  import os
+
+  class GuiBase:
+      def _fork(self, path, href, text):
+          if "%u" in path:
+              path = path.replace("%u", href)
+          elif href:
+              path = path + " " + href
+          os.execv("/bin/sh", ["/bin/sh", "-c", path])
+
+      def _goto(self, urls):
+          for url in urls:
+              self._fork("browser %u", url, False)
+  ```
+
+test "cve rank311 canto-curses: shell-quoted feed URL is clean"
+  lang python
+  reject VYQL-INJ-053
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  import os
+  import shlex
+
+  class GuiBase:
+      def _fork(self, path, href, text):
+          href = shlex.quote(href)
+          if "%u" in path:
+              path = path.replace("%u", href)
+          elif href:
+              path = path + " " + href
+          os.execv("/bin/sh", ["/bin/sh", "-c", path])
+
+      def _goto(self, urls):
+          for url in urls:
+              self._fork("browser %u", url, False)
+  ```

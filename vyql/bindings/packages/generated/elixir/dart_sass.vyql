@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mbf4afdd1;
+
+binding commandExecution0 {
+  requires {
+    dependency("dart_sass")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.CommandExecution at args[0]
+}

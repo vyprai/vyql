@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mdcb94f8c;
+
+binding userControlledData0 {
+  requires {
+    dependency("mini_backtrace")
+  }
+  query pattern callExpr where callee.method == "MiniBacktrace::Unit.filter_backtrace_with_rails"
+  emit source core.UserControlledData at call.result
+}

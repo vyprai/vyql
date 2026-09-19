@@ -1,0 +1,8 @@
+module code;
+
+review code.CodeRedProtectedMediaPathTraversal {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: attention
+  text: "review CodeRed protected media serving for canonical containment under PROTECTED_MEDIA_ROOT before file access"
+}

@@ -1,0 +1,61 @@
+module bindings.python.generated.m8682123e;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("service-identity")
+  }
+  query pattern callExpr where callee.method == "verify_hostname"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("service-identity")
+  }
+  query pattern callExpr where callee.method == "verify_ip_address"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("service-identity")
+  }
+  query pattern callExpr where callee.method == "verify_service_identity"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck3 {
+  requires {
+    dependency("service-identity")
+  }
+  query pattern callExpr where callee.method == "verify_certificate_hostname"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck4 {
+  requires {
+    dependency("service-identity")
+  }
+  query pattern callExpr where callee.method == "verify_certificate_ip_address"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

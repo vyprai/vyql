@@ -1,0 +1,25 @@
+module bindings.java.jenkins_descriptor_ancestor_permission;
+
+// A Jenkins Descriptor's doCheck*/doFill* methods are reachable by any
+// authenticated user with Overall/Read: the stapler routing that exposes them
+// does not restrict the HTTP method or the caller's permission on the
+// underlying item. Every method on the documented field-validation and
+// dropdown-fill contract therefore takes the item it inspects through an
+// `@AncestorInPath` parameter and must permission-check that ancestor before
+// using it -- the Jenkins security documentation states the requirement for
+// exactly this method family.
+//
+// The binding names the requirement unmet: a doCheck/doFill method whose body
+// reads workspace, build, artifact, credential or SCM data through the
+// ancestor, with no permission check anywhere in the method. The check
+// spellings are the ACL API's own -- checkPermission, hasPermission,
+// verifyPermission -- and @RequirePOST gates the whole method, so a method
+// carrying any of them stays quiet. One check covers every use in the body.
+binding jenkinsDescriptorAncestorUseWithoutPermission8412 {
+  query pattern presenceNode where node.scope == "function"
+    and containsAny(node.context.functionName, ["doCheck", "doFill"])
+    and containsAny(node.context.callPath, ["getSomeWorkspace", "getWorkspace", "getSomeArtifact", "getLastSuccessfulBuild", "getBuildByNumber", "getCredential", "getScm"])
+    and not containsAny(node.context.scopeCall, ["checkPermission", "hasPermission", "verifyPermission", "assertPermission", "getACL"])
+    and not containsAny(node.context.annotation, ["RequirePOST"])
+  emit issue code.JenkinsDescriptorAncestorUseMissingPermission at node
+}

@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m9bd478b3;
+
+binding regexCompile0 {
+  requires {
+    dependency("is-regexp")
+  }
+  query pattern callExpr where callee.method == "isRegexp"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

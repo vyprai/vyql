@@ -1,0 +1,38 @@
+test "rank701: Blade raw echo renders content markdown without sanitization"
+  lang php
+  expect VYQL-INJ-155
+  expect_review code.BladeRawMarkdownRenderWithoutSanitizer
+  code
+  ```
+  <div class="max-w-none p-4 prose lg:prose-xl prose-primary dark:prose-invert">
+      {!! str($data['content'])->markdown() !!}
+  </div>
+  ```
+
+test "rank701: Blade raw echo strips content before markdown rendering"
+  lang php
+  reject VYQL-INJ-155
+  reject_review code.BladeRawMarkdownRenderWithoutSanitizer
+  code
+  ```
+  <div class="max-w-none p-4 prose lg:prose-xl prose-primary dark:prose-invert">
+      {!!
+          (new \Illuminate\Support\HtmlString(
+              str(strip_tags($data['content']))
+                  ->markdown()
+          ))
+          ->toHtml()
+       !!}
+  </div>
+  ```
+
+test "rank701: escaped Blade echo markdown remains out of raw-output finding"
+  lang php
+  reject VYQL-INJ-155
+  reject_review code.BladeRawMarkdownRenderWithoutSanitizer
+  code
+  ```
+  <div>
+      {{ str($data['content'])->markdown() }}
+  </div>
+  ```

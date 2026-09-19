@@ -1,0 +1,8 @@
+module code;
+
+review code.DerSignatureNonCanonicalImport {
+  category: crypto
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review DER/ECDSA signature import for canonical length parsing and rejection of unnecessary leading zeroes before BN construction"
+}

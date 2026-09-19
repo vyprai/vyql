@@ -1,0 +1,49 @@
+module bindings.php.generated.mcc603099;
+
+binding cliArgument0 {
+  requires {
+    dependency("laracasts/generators")
+  }
+  query pattern callExpr where callee.method == "fire"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("laracasts/generators")
+  }
+  query pattern callExpr where callee.method == "compileMigrationStub"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument2 {
+  requires {
+    dependency("laracasts/generators")
+  }
+  query pattern callExpr where callee.method == "replaceSchema"
+  emit source code.CliArgument at call.result
+}
+
+binding codeEval3 {
+  requires {
+    dependency("laracasts/generators")
+  }
+  query pattern callExpr where callee.method == "fire"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval4 {
+  requires {
+    dependency("laracasts/generators")
+  }
+  query pattern callExpr where callee.method == "compileMigrationStub"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval5 {
+  requires {
+    dependency("laracasts/generators")
+  }
+  query pattern callExpr where callee.method == "replaceSchema"
+  emit sink code.CodeEval at args[0]
+}

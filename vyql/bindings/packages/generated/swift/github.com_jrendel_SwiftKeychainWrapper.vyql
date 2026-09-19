@@ -1,0 +1,73 @@
+module bindings.swift.generated.mcec9a3ad;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/jrendel/SwiftKeychainWrapper")
+  }
+  query pattern callExpr where callee.method == "string"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/jrendel/SwiftKeychainWrapper")
+  }
+  query pattern callExpr where callee.method == "object"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("github.com/jrendel/SwiftKeychainWrapper")
+  }
+  query pattern callExpr where callee.method == "integer"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("github.com/jrendel/SwiftKeychainWrapper")
+  }
+  query pattern callExpr where callee.method == "float"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("github.com/jrendel/SwiftKeychainWrapper")
+  }
+  query pattern callExpr where callee.method == "double"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("github.com/jrendel/SwiftKeychainWrapper")
+  }
+  query pattern callExpr where callee.method == "bool"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue6 {
+  requires {
+    dependency("github.com/jrendel/SwiftKeychainWrapper")
+  }
+  query pattern callExpr where callee.method == "data"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue7 {
+  requires {
+    dependency("github.com/jrendel/SwiftKeychainWrapper")
+  }
+  query pattern callExpr where callee.method == "dataRef"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue8 {
+  requires {
+    dependency("github.com/jrendel/SwiftKeychainWrapper")
+  }
+  query pattern callExpr where callee.method == "set"
+  emit source code.SecretValue at call.result
+}

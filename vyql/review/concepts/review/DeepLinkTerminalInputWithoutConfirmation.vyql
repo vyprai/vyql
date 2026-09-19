@@ -1,0 +1,7 @@
+module code;
+
+review code.DeepLinkTerminalInputWithoutConfirmation {
+  category: command
+  kind: attention
+  text: "review deep-link driven terminal input for an interactive confirmation before the link's payload reaches the session"
+}

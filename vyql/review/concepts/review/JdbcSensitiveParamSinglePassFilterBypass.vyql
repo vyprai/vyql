@@ -1,0 +1,8 @@
+module code;
+
+review code.JdbcSensitiveParamSinglePassFilterBypass {
+  category: deserialization
+  expected: [core.SafeDeserialization]
+  kind: attention
+  text: "verify a JDBC connection-string sanitizer re-scans its result after each strip, since a single pass over the denylisted parameter names lets one occurrence nested inside another survive removal"
+}

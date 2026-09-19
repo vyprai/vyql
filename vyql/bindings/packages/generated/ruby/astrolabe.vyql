@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m8c549d57;
+
+binding deserialization0 {
+  requires {
+    dependency("astrolabe")
+  }
+  query pattern callExpr where callee.method == "n"
+  emit sink code.Deserialization at args[0]
+}

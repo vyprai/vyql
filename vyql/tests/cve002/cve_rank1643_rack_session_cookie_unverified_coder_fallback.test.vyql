@@ -1,0 +1,170 @@
+# CVE-2026-39324 (GHSA-33qg-7wpp-89cq): Rack::Session::Cookie fell back to
+# the unverified coder when decryption failed. In unpacked_cookie_data
+# (lib/rack/session/cookie.rb), a cookie the configured encryptors
+# could not decrypt left session_data nil, and the branch
+#
+#   elsif !session_data && coder
+#     session_data = coder.decode(cookie_data)
+#
+# handed the raw cookie to the coder -- Base64::Marshal by default,
+# whose decode runs ::Marshal.load(super(str)). A forged plain
+# Base64::Marshal cookie therefore deserialized unauthenticated in
+# any deployment that had configured :secrets (untrusted
+# deserialization, CWE-502). The fixed revision (f43638c, the commit
+# that names the advisory in releases.md) adds encryptors.empty? to
+# the guard, so a deployment with encryptors rejects the cookie
+# instead of falling back. The vulnerable construct is present at the
+# parent and the remediation at the commit; no pool correction.
+#
+# ATTENTION, engine gap plus a configuration-shaped guard, rechecked.
+#
+# 1. The taint chain is intact except for one hop. request.cookies[@key]
+#    is labelled code.HttpInput (cookie.rb:215) and ::Marshal.load is
+#    labelled code.Deserialization (cookie.rb:110 and :153), but
+#    coder.decode never resolves: Ruby dispatch reaches resolveTargets
+#    with no receiver type (nothing records the type of
+#    @coder = options[:coder] ||= Base64::Marshal.new -- an op-assign
+#    hides the constructor call at the Assign case in lowering, and the
+#    attr_reader spelling `coder` is not linked to the ivar), so the call
+#    falls to the unique-method-name-across-program fallback, which
+#    short-circuits ambiguous at the second same-named definition.
+#    `decode` is defined in six classes in cookie.rb (Base64,
+#    Base64::Marshal, Base64::JSON, Base64::ZipJSON, Identity, Marshal).
+#    Re-measured on the real file: `vyql trace -from HttpInput -to
+#    Deserialization` reports 0 reachable pairs and 8 dead-end sources;
+#    the identical file with five of the six `def decode` renamed
+#    reports 2 reachable pairs, cookie.rb:215 -> cookie.rb:110 in 6
+#    hops. The first two tests below pin that pair.
+# 2. The guard the fixed revision adds is runtime configuration, not dataflow.
+#    With the ambiguity removed (single decode definition), the
+#    patched form `elsif !session_data && encryptors.empty? && coder`
+#    still reports VYQL-DESER-001 critical from the cookie -- measured
+#    directly, not assumed, and pinned by the third test below. The
+#    encryptors.empty? the fix leaves inside the guarded method is this
+#    library's own attr_reader, so a core.SafeDeserialization binding
+#    keyed on it would be this patch's own vocabulary rather than
+#    anything derivable from the documentation, and a broad check
+#    concept would clear unrelated deserialization findings besides.
+#    Same family as the configuration-side fixes at 1514/1535/1540/
+#    1556/1557/1593.
+#
+# On the real tree at f43638c^ the scan reports 10 findings (2 x
+# VYQL-DESER-001 critical, 3 x VYQL-INJ-023, 2 x VYQL-CRY-003,
+# 3 x VYQL-CRY-001), byte-identical over three --cache off runs at the
+# parent and three at the fix, and identical between the revisions: the
+# Marshal.load rows source from library.param-source (the decode
+# parameter itself), not the cookie, and the one review flag
+# (code.ObjectLookupByUserInput) sits in a test file. When Ruby
+# receiver types land, test two starts reporting and must be
+# re-measured against the real revisions; test three already reports,
+# so the guard it names is the reason a resolution fix alone converts
+# nothing.
+# verify_current_expected: attention-engine-gap, both revisions report.
+
+test "rack session cookie fallback: a unique coder decode reports the unverified deserialization"
+  lang ruby
+  file lib/rack/session/cookie.rb
+  expect VYQL-DESER-001
+  code
+  ```
+  class Coder
+    def decode(str)
+      Marshal.load(super(str)) rescue nil
+    end
+  end
+
+  class Session
+    attr_reader :coder
+
+    def initialize(options = {})
+      @coder = options[:coder] ||= Coder.new
+    end
+
+    def unpacked_cookie_data(request)
+      if cookie_data = request.cookies["rack.session"]
+        session_data = coder.decode(cookie_data)
+      end
+      session_data || {}
+    end
+  end
+  ```
+
+test "rack session cookie fallback: a second decode definition silences the chain"
+  lang ruby
+  file lib/rack/session/cookie.rb
+  reject VYQL-DESER-001
+  code
+  ```
+  class CoderBase
+    def decode(str)
+      Base64.decode64(str)
+    end
+  end
+
+  class Coder < CoderBase
+    def decode(str)
+      Marshal.load(super(str)) rescue nil
+    end
+  end
+
+  class Session
+    attr_reader :coder
+
+    def initialize(options = {})
+      @coder = options[:coder] ||= Coder.new
+    end
+
+    def unpacked_cookie_data(request)
+      if cookie_data = request.cookies["rack.session"]
+        session_data = coder.decode(cookie_data)
+      end
+      session_data || {}
+    end
+  end
+  ```
+
+test "rack session cookie fallback: the fixed revision's encryptors.empty? guard does not clear the report"
+  lang ruby
+  file lib/rack/session/cookie.rb
+  expect VYQL-DESER-001
+  code
+  ```
+  class Coder
+    def decode(str)
+      Marshal.load(super(str)) rescue nil
+    end
+  end
+
+  class Encryptor
+    def decrypt(data)
+      raise "invalid message"
+    end
+  end
+
+  class Session
+    attr_reader :coder, :encryptors
+
+    def initialize(options = {})
+      @encryptors = [Encryptor.new]
+      @coder = options[:coder] ||= Coder.new
+    end
+
+    def unpacked_cookie_data(request)
+      if cookie_data = request.cookies["rack.session"]
+        session_data = nil
+        encryptors.each do |encryptor|
+          begin
+            session_data = encryptor.decrypt(cookie_data)
+            break
+          rescue
+            next
+          end
+        end
+        if !session_data && encryptors.empty? && coder
+          session_data = coder.decode(cookie_data)
+        end
+      end
+      session_data || {}
+    end
+  end
+  ```

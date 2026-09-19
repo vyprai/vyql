@@ -1,0 +1,179 @@
+# Rank 1476 / CVE-2023-3224 (GHSA-v72p-jf8f-9x3j): nuxt's dev-mode single
+# component renderer imports whatever module the request's query string names.
+# `app/components/nuxt-root.vue` mounts the wrapper for any URL under
+# `/__nuxt_component_test__/`, handing it `ssrContext.url` on the server and
+# `window.location.href` in the browser, and
+# `app/components/test-component-wrapper.ts` did:
+#
+#   const query = parseQuery(parseURL(url).search)
+#   const comp = await import(/* @vite-ignore */ query.path as string)
+#
+# so `?path=/etc/passwd` or `?path=../../any/file.js` loads and executes an
+# arbitrary module off the developer's disk. The fixed revision resolves the requested
+# path and refuses anything outside the project root (`devRootDir`, newly
+# taken from the generated nuxt config, and gates the whole
+# renderer on `process.test` so it does not exist in an ordinary `nuxt dev`.
+#
+# Step 0: no metadata flag, and the row is right. `git show` reads the commit,
+# the vulnerable construct is present at the parent (the unguarded
+# `import(query.path)`) and the remediation is present at the fixed revision (the
+# `resolve(...)`/`startsWith(devRootDir)` refusal). Recorded CWE-22; the sink
+# is a module loader, so CWE-829 is the closer match and is what
+# `code.DynamicCodeLoad` carries. No pool row correction.
+#
+# The vocabulary for this is complete: `window.location.href` is
+# `code.DomInput`, `import(...)` is `code.DynamicCodeLoad`, taint survives the
+# `parseURL`/`parseQuery` hops, and `VYQL-INJ-023` pairs them. Three things
+# keep the real file unreported, and the tests pin each.
+#
+# 1. A comment is not a call argument. tree-sitter makes a comment a named
+#    child of an argument list, and a call's arguments are the named children
+#    that are not comments, so `import(/* @vite-ignore */ query.path)` keeps the
+#    specifier at args[0] and the sink survives -- as does
+#    `code.CommandExecution` on `exec(/* nosemgrep */ cmd)`. Inline argument
+#    annotations are ordinary in bundler and linter directives (`@vite-ignore`,
+#    `webpackChunkName`, `#__PURE__`). The first and last tests are the positive
+#    half, and the second differs from the first only in the specifier being a
+#    constant.
+#
+# 2. The wrapper is a component factory -- `export default (url) =>
+#    defineComponent({ async setup () { … } })` -- and `c.expr`'s `object` case
+#    lowers `pair` and shorthand-property children only, so the body of a
+#    `method_definition` inside an object literal handed to a call is dead
+#    code. `callArgObjectMethodFuncDefs` exists for exactly this but runs only
+#    where the call is an expression *statement* or a variable declarator's
+#    value, and `returnedObjectMethodFuncDefs` only for an object literal
+#    returned directly, so neither reaches an object literal passed to a call in
+#    an arrow function's expression body. The third test holds the real shape and
+#    reports nothing.
+#
+# 3. Lowering those method bodies would still leave the file silent in a scan.
+#    The only source the wrapper's own file offers is the factory's `url`
+#    parameter, and a parameter is an entry point only under a profile that
+#    lists the concept: `library.param-source` labels it
+#    `code.ExternalEntryInput` under the `library` profile, while a project
+#    resolving an application profile gets nothing -- nuxt's
+#    `packages/nuxt/src` resolves `frontend`, because it ships `.vue` files, and
+#    `frontend`'s entrypoints do not name the concept. The fourth and fifth
+#    tests hold that boundary with one exported function: it reports under
+#    `library` and not under `frontend`.
+#
+# Beyond those, the patched revision is not distinguishable from the vulnerable
+# one either: `injection.UnsafeDynamicLoading`, the only threat
+# `code.DynamicCodeLoad` is vulnerableTo, is listed in
+# testdata/threats_without_controls.txt -- no concept declares it neutralized,
+# `VYQL-INJ-023` carries no `unless`, and the fixed revision's root-directory
+# refusal therefore cannot suppress anything. The refusal also guards a
+# resolved copy while the import still reads `query.path`, so with the method
+# bodies lowered and the `library` profile forced the wrapper reports
+# VYQL-INJ-023 on the vulnerable and the fixed revision alike. The generic
+# control that would close it -- calling every `startsWith` a
+# `core.PathAccessCheck` -- is a shape a precision review rejects, since it
+# would clear genuine VYQL-PATH-001/002 rows anywhere a string prefix is tested.
+
+test "rank1476: a request query parameter names the module a dynamic import loads, through an inline bundler annotation"
+  lang javascript
+  file src/app/components/test-component-wrapper.ts
+  expect VYQL-INJ-023
+  code
+  ```
+  import { parseURL } from 'ufo'
+  import { parseQuery } from 'vue-router'
+
+  export async function renderTestComponent () {
+    const url = window.location.href
+    const query = parseQuery(parseURL(url).search)
+    const comp = await import(/* @vite-ignore */ query.path as string).then(r => r.default)
+    return comp
+  }
+  ```
+
+test "rank1476: the same annotated dynamic import of a fixed module specifier is not a finding"
+  lang javascript
+  file src/app/components/test-component-wrapper.ts
+  reject VYQL-INJ-023
+  code
+  ```
+  import { parseURL } from 'ufo'
+  import { parseQuery } from 'vue-router'
+
+  export async function renderTestComponent () {
+    const url = window.location.href
+    const query = parseQuery(parseURL(url).search)
+    const comp = await import(/* @vite-ignore */ '#build/test-component.mjs').then(r => r.default)
+    return { comp, name: query.name }
+  }
+  ```
+
+test "rank1476: the wrapper as written, a component factory whose setup method is an object literal handed to a call"
+  lang javascript
+  file src/app/components/test-component-wrapper.ts
+  reject VYQL-INJ-023
+  code
+  ```
+  import { parseURL } from 'ufo'
+  import { defineComponent, h } from 'vue'
+  import { parseQuery } from 'vue-router'
+
+  export default (url: string) => defineComponent({
+    name: 'NuxtTestComponentWrapper',
+
+    async setup (props, { attrs }) {
+      const query = parseQuery(parseURL(url).search)
+      const urlProps = query.props ? JSON.parse(query.props as string) : {}
+      const comp = await import(/* @vite-ignore */ query.path as string).then(r => r.default)
+      return () => [
+        h('div', 'Component Test Wrapper for ' + query.path),
+        h('div', { id: 'nuxt-component-root' }, [
+          h(comp, { ...attrs, ...props, ...urlProps })
+        ])
+      ]
+    }
+  })
+  ```
+
+test "rank1476: a public-API parameter naming the imported module is a finding under the library profile"
+  lang javascript
+  file src/app/components/test-component-wrapper.ts
+  profile library
+  expect VYQL-INJ-023
+  code
+  ```
+  import { parseURL } from 'ufo'
+  import { parseQuery } from 'vue-router'
+
+  export function mountTestComponent (url: string) {
+    const query = parseQuery(parseURL(url).search)
+    return import(/* @vite-ignore */ query.path as string).then(r => r.default)
+  }
+  ```
+
+test "rank1476: the same exported function is not a finding under the frontend profile the nuxt tree resolves"
+  lang javascript
+  file src/app/components/test-component-wrapper.ts
+  profile frontend
+  reject VYQL-INJ-023
+  code
+  ```
+  import { parseURL } from 'ufo'
+  import { parseQuery } from 'vue-router'
+
+  export function mountTestComponent (url: string) {
+    const query = parseQuery(parseURL(url).search)
+    return import(/* @vite-ignore */ query.path as string).then(r => r.default)
+  }
+  ```
+
+test "rank1476: a command string reaching a child process behind an inline linter annotation"
+  lang javascript
+  file src/core/build.ts
+  expect VYQL-INJ-002
+  code
+  ```
+  import { exec } from 'child_process'
+
+  export function buildComponent (req: any) {
+    const target = req.query.target
+    exec(/* nosemgrep: js-child-process */ 'nuxi build --target ' + target)
+  }
+  ```

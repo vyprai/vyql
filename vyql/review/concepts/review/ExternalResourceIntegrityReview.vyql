@@ -1,0 +1,7 @@
+module code;
+
+review code.ExternalResourceIntegrityReview {
+  category: supply_chain
+  kind: attention
+  text: "review external script/style integrity handling for allowlist decisions before trusting provided SRI metadata"
+}

@@ -1,0 +1,70 @@
+# Rank 817 / CVE-2023-35925: FastAsyncWorldEdit accepted block coordinates
+# outside Minecraft's safe +/- 30,000,000 range before world access.
+
+test "rank817: world block access lacks safe coordinate range guard"
+  lang java
+  file BukkitWorld.java
+  expect VYQL-DOS-030
+  expect_review code.WorldCoordinateSafeRangeMissing
+  code
+  ```
+  package com.sk89q.worldedit.bukkit;
+
+  import com.sk89q.worldedit.math.BlockVector3;
+  import com.sk89q.worldedit.world.block.BlockState;
+
+  public class BukkitWorld {
+      public BlockState getBlock(BlockVector3 position) {
+          return getWorld().getBlockAt(
+              position.getBlockX(),
+              position.getBlockY(),
+              position.getBlockZ()
+          ).getState();
+      }
+
+      public org.bukkit.World getWorld() {
+          return null;
+      }
+  }
+  ```
+
+test "rank817: world block access checks safe coordinate range first"
+  lang java
+  file BukkitWorld.java
+  reject VYQL-DOS-030
+  reject_review code.WorldCoordinateSafeRangeMissing
+  code
+  ```
+  package com.sk89q.worldedit.bukkit;
+
+  import com.fastasyncworldedit.core.configuration.Settings;
+  import com.fastasyncworldedit.core.internal.exception.FaweException;
+  import com.sk89q.worldedit.math.BlockVector3;
+  import com.sk89q.worldedit.world.block.BlockState;
+
+  public class BukkitWorld {
+      public BlockState getBlock(BlockVector3 position) {
+          testCoords(position);
+          return getWorld().getBlockAt(
+              position.getBlockX(),
+              position.getBlockY(),
+              position.getBlockZ()
+          ).getState();
+      }
+
+      private void testCoords(BlockVector3 position) throws FaweException {
+          if (!Settings.settings().REGION_RESTRICTIONS_OPTIONS.RESTRICT_TO_SAFE_RANGE) {
+              return;
+          }
+          int x = position.getX();
+          int z = position.getZ();
+          if (x > 30000000 || z > 30000000 || x < -30000000 || z < -30000000) {
+              throw new FaweException(null, null);
+          }
+      }
+
+      public org.bukkit.World getWorld() {
+          return null;
+      }
+  }
+  ```

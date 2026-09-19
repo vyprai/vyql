@@ -1,0 +1,8 @@
+module code;
+
+review code.CentreonMyAccountContactXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review Centreon contact name and alias displays for the fixed illegal-character escape mode before rendering stored values"
+}

@@ -1,0 +1,132 @@
+# Rank 1020 / CVE-2026-26020: AutoGPT remote code execution through a disabled
+# block. BlockInstallationBlock writes caller-supplied Python into a file under
+# the backend's own package directory and imports it, and it is marked
+# disabled=True for that reason. The direct block-execution endpoint honoured
+# that flag, but graph validation did not, so an authenticated user embedded
+# the block as a node in a graph and reached the import anyway (CWE-285). The
+# fixed revision adds two guards, one in GraphModel validation and one in
+# execute_node, each raising when block.disabled is set.
+#
+# ATTENTION, on three faces of this CVE.
+#  - The fixed revision enforces a boolean flag on a path that skipped it. Detecting that
+#    generically means flagging any flag consulted on one path and not another,
+#    which describes ordinary feature flags everywhere, and nothing marks
+#    block.disabled as security-relevant rather than a normal capability switch.
+#    Measured on the real checkout (blocks/, data/ and executor/ — the whole
+#    tree and the whole backend abort at the --max-ram 6GB ceiling): 488
+#    findings on the vulnerable revision and 488 on the fixed one, identical
+#    per rule and per file once the fix's own line insertions are normalised
+#    out, so nothing separates the pair.
+#  - The dangerous primitive is half modelled and stays silent. In
+#    blocks/block.py the file write is labelled code.FilePathAccess and the
+#    dynamic import is labelled code.DynamicCodeLoad, but no source labels the
+#    block input, so VYQL-INJ-023 (the only rule consuming code.DynamicCodeLoad)
+#    never fires. Closing that would mean labelling a parameter typed as the
+#    framework's own BlockSchemaInput as untrusted — answerable to this
+#    project rather than to any library documentation, the measured-unshippable
+#    action-base family.
+#  - Even a completed path would not discriminate this fix, which changes
+#    graph.py and manager.py while blocks/block.py is untouched.
+#
+# Under the library profile, where every parameter is a source
+# (code.ExternalEntryInput), the path still dies: taint is lost at the walrus
+# operator. `search = re.search(...)` followed by `search.group(1)` into
+# __import__ reports; `if search := re.search(...)` with the same body reports
+# nothing. python.go's expression lowering has no named_expression case, so the
+# walrus target is never bound. The isolated pair below pins that (engine gap
+# recorded beside the ledger); the two real-code blocks pin the rank's miss.
+#
+# verify_current_expected: attention-no-discrimination; the assign/walrus pair
+# below additionally pins the named-expression propagation gap
+
+test "rank1020: block writes caller-supplied code into the package and imports it"
+  lang python
+  file autogpt_platform/backend/backend/blocks/block.py
+  reject VYQL-INJ-023
+  code
+  ```
+  import os
+  import re
+
+
+  class BlockInstallationBlock(Block):
+      async def run(self, input_data: Input, **kwargs) -> BlockOutput:
+          code = input_data.code
+
+          if search := re.search(r"class (\w+)\(Block\):", code):
+              class_name = search.group(1)
+          else:
+              raise RuntimeError("No class found in the code.")
+
+          if search := re.search(r"id=\"(\w+-\w+-\w+-\w+-\w+)\"", code):
+              file_name = search.group(1)
+          else:
+              raise RuntimeError("No UUID found in the code.")
+
+          block_dir = os.path.dirname(__file__)
+          file_path = f"{block_dir}/{file_name}.py"
+          module_name = f"backend.blocks.{file_name}"
+          with open(file_path, "w") as f:
+              f.write(code)
+
+          module = __import__(module_name, fromlist=[class_name])
+          block_class = getattr(module, class_name)
+          return block_class()
+  ```
+
+test "rank1020: fix refuses a disabled block during graph validation"
+  lang python
+  file autogpt_platform/backend/backend/data/graph.py
+  reject VYQL-INJ-023
+  code
+  ```
+  class GraphModel(Graph, GraphMeta):
+      def validate_graph(self, for_run: bool = False):
+          for node in self.nodes:
+              block = get_block(node.block_id)
+              if block is None:
+                  raise ValueError(f"Invalid block {node.block_id} for node #{node.id}")
+
+              if block.disabled:
+                  raise ValueError(
+                      f"Block {node.block_id} is disabled and cannot be used in graphs"
+                  )
+  ```
+
+# The isolated pair. Same request source, same regex capture, same f-string,
+# same __import__ sink; only the assignment form differs.
+
+test "rank1020: a tainted regex capture reaches __import__ through a plain assignment"
+  lang python
+  file assign_capture.py
+  expect VYQL-INJ-023
+  code
+  ```
+  import re
+
+
+  def handler(request):
+      code = request.GET.get("code")
+      search = re.search(r"class (\w+)\(Block\):", code)
+      file_name = search.group(1)
+      module_name = f"backend.blocks.{file_name}"
+      return __import__(module_name)
+  ```
+
+test "rank1020: the same capture through a walrus assignment stays silent"
+  lang python
+  file walrus_capture.py
+  reject VYQL-INJ-023
+  code
+  ```
+  import re
+
+
+  def handler(request):
+      code = request.GET.get("code")
+      if search := re.search(r"class (\w+)\(Block\):", code):
+          file_name = search.group(1)
+          module_name = f"backend.blocks.{file_name}"
+          return __import__(module_name)
+      return None
+  ```

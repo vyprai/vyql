@@ -1,0 +1,18 @@
+module bindings.go.backupstorage_reads;
+
+// vitess's backupstorage package documents BackupHandle as the handle on an
+// individual backup and its ReadFile as "starts reading a file from a
+// backup", over whichever BackupStorage implementation the operator pointed
+// the deployment at (a GCS or S3 bucket, or a plain directory). A file read
+// back out of that store is data some other writer put there -- whoever
+// took the backup, or anyone with write access to the bucket -- not a value
+// this process computed, so the read is a code.StoredDataRead source, the
+// same treatment redis reads, object stores and PHP session reads already
+// get. The restore path JSON-decodes the MANIFEST it fetches this way and
+// acts on the decoded fields, so a label here is what lets a stored field's
+// journey into a sink be traced; whether any particular use of a decoded
+// field is a problem stays the rules' call.
+binding backupHandleReadFileStoredData {
+  query pattern callExpr where callee.method == "ReadFile" and callee.receiver.type == "backupstorage.BackupHandle"
+  emit source code.StoredDataRead at call.result
+}

@@ -1,0 +1,220 @@
+# Rank 1293 / CVE-2026-28499 (GHSA-6jj5-j4j8-8473, CWE-79/80/116): leaf-kit's
+# own HTML-escaping helper skips escaping for every LeafData value that is not
+# a plain `.string`. `htmlEscaped()` (Sources/LeafKit/LeafData/LeafData.swift)
+# is what every `#(expr)` output goes through before being written to the
+# render buffer (LeafSerializer.serialize(expression:) calls
+# `leafData.htmlEscaped()` unconditionally):
+#
+#   func htmlEscaped() -> LeafData {
+#       guard let string = self.string else {
+#           return self
+#       }
+#       return string.htmlEscaped().leafData
+#   }
+#
+# `self.string` (LeafData.swift's `string` computed property) internally calls
+# `self.convert(to: .string)`, which defaults to the `.castable`
+# convertibility level. Arrays, dictionaries and `Data` are only
+# `.ambiguous`ly convertible to string (a debug-description-style rendering,
+# not a well-defined cast), so `self.string` returns `nil` for them and the
+# guard's `else` branch returns `self` -- the original, completely unescaped
+# LeafData -- straight back to the caller. LeafDataStorage.serialize(buffer:)
+# then writes that value's own string form (or, for `.data`, the raw bytes via
+# `buffer.writeData(d)`) directly into the response buffer with no escaping at
+# all. A template rendering `#(items)` where `items` is an array or dictionary
+# containing attacker-controlled strings reproduces the CWE-79 stored/reflected
+# XSS the fixed revision's own test demonstrates:
+# `render("#(foo)", ["foo": ["<img src=x onerror=alert(1337)>"]])` renders the
+# payload unescaped at the vulnerable revision and
+# `[&quot;&lt;img ... &gt;&quot;]` at the fixed one. The fixing diff changes
+# two things: `self.string` -> `self.convert(to: .string, .ambiguous).string`,
+# which lowers the required convertibility level so the same guard now
+# succeeds for arrays/dictionaries/data too and their (now-computed) string
+# form gets escaped like any other value; and LeafDataStorage.serialize
+# (buffer:) loses its `case .data(let d): buffer.writeData(d)` raw-byte branch
+# so every storage case goes through the escaped string form.
+#
+# ATTENTION, precision cost, rechecked. What the scanner sees, union over
+# three `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` runs per
+# revision (vulnerable parent 8ff0683, fixed 6044b84): 13 findings on each,
+# identical rule sets (2 VYQL-DOS-040 fatalError review, 11 VYQL-LIFE-001
+# lock findings) and identical finding locations modulo the line shift the
+# test-file change causes -- nothing XSS-shaped in the full findings view or
+# the `-flags only` view, on either revision. `vyql graph` on LeafData.swift
+# normalises to a byte-identical node list at the vulnerable and the fixed
+# revision: the two `htmlEscaped()` bodies lower to the same nodes because
+# swift.go drops a `guard`/`if` condition outright (the rank-1217 gap), so the
+# one-line change in the guard is invisible at node level in *both*
+# directions. The complete set of scanner-visible discriminators between the
+# two trees was enumerated with throwaway module-scope probe bindings and is
+# exactly three tokens: `selector:self.string` (vulnerable LeafData.swift
+# only -- `self.string` occurs exactly once in the file, inside the guard),
+# `callPath:self.convert.string` (fixed LeafData.swift only), and the
+# `buffer.writeData` call node plus `call:writeData` token (vulnerable
+# LeafDataStorage.swift only). `identifier:htmlEscaped` is present in both.
+#
+# Each of the three fails the genericity test, measured rather than asserted:
+# - `self.string` / `self.convert.string` are LeafData's own private property
+#   and method names, not derivable from Swift, SwiftNIO or Leaf's public
+#   template-authoring documentation; a binding keying on them is a
+#   literal-text fingerprint of this one diff and the next templating library
+#   with the same class of bug walks past it.
+# - `writeData` is SwiftNIO ByteBuffer's general-purpose byte write. Across
+#   the pool's 8604 .swift files `.writeData(` occurs four times outside this
+#   tree (a NIO unit test twice, a Foundation test HTTP server socket write,
+#   and a containerization archive writer) -- none of them a template output
+#   write -- and labelling it `code.HtmlRender` asserts "raw byte write is
+#   HTML rendering", which is false in every one of those. It also cannot
+#   produce a finding here even if labelled: leaf-kit is a library with no
+#   inbound source, so no `core.UserControlledData` reaches the write, and a
+#   review-shaped binding on "a serializer that writes raw bytes" is the
+#   ordinary safe spelling of every byte-pipeline writer.
+# - The remaining route -- recognising `.htmlEscaped()` as the neutralising
+#   control -- cannot discriminate either: it is called, unchanged, on both
+#   the vulnerable and the patched revision (cases 1 and 2 below pin exactly
+#   that: the shipped Swift vocabulary reports the write either way, because
+#   no binding maps any escaping spelling to `core.HtmlEscape`). The
+#   vulnerable-vs-patched distinction is which convertibility level
+#   (`.ambiguous` vs the `.castable` default) a private enum argument passes
+#   to LeafData's own internal `convert(to:_:)` -- a value-level fact with no
+#   dataflow or vocabulary representation.
+#
+# The rank-1217 guard-condition drop is therefore not the blocker here: it
+# hides the guard's operand on both revisions alike, and fixing it would
+# expose `Attr self.string` against `Call self.convert`, the same private
+# vocabulary. The blocker that would remain even with it fixed is the
+# rank-1792 one -- Swift emits no per-function context facts, so "the escape
+# helper whose fallback returns the unconverted original" is not expressible
+# at any scope, and the shipped module-scope surface can only see file-wide
+# co-presence.
+#
+# No definition change. OWASP Java and Python unchanged at +1.00 and +0.90.
+#
+# verify_current_expected: attention-precision-cost; cases 1 and 2 (the
+# shipped swift source/sink vocabulary the scanner does see, escaped or not)
+# expected, cases 3 and 4 pinned.
+
+test "rank1293: untrusted value written into the response buffer, the shipped swift vocabulary the scanner does see"
+  lang swift
+  file Sources/LeafKit/LeafSerialize/Renderer.swift
+  profile generic
+  expect VYQL-INJ-004
+  code
+  ```
+  import Foundation
+
+  struct Renderer {
+      var buffer: ByteBuffer
+
+      mutating func render(_ name: String) throws {
+          let value = readLine()
+          try buffer.write(value)
+      }
+  }
+  ```
+
+test "rank1293: the same write through leaf's escaping spelling, which no swift binding maps to core.HtmlEscape"
+  lang swift
+  file Sources/LeafKit/LeafSerialize/RendererEscaped.swift
+  profile generic
+  expect VYQL-INJ-004
+  code
+  ```
+  import Foundation
+
+  struct RendererEscaped {
+      var buffer: ByteBuffer
+
+      mutating func render(_ name: String) throws {
+          let value = readLine()
+          try buffer.write(value.htmlEscaped())
+      }
+  }
+  ```
+
+test "rank1293: htmlEscaped() falls back to the unescaped original when self.string is nil"
+  lang swift
+  file Sources/LeafKit/LeafData/LeafData.swift
+  reject VYQL-INJ-004
+  code
+  ```
+  public struct LeafData {
+      var storage: LeafDataStorage
+
+      public var string: String? {
+          if case .string(let s) = self.storage { return s }
+          guard case .string(let s) = self.convert(to: .string).storage else { return nil }
+          return s
+      }
+
+      func convert(to output: NaturalType, _ level: DataConvertible = .castable) -> LeafData {
+          guard celf != output else { return self }
+          guard let input = self.storage.unwrap,
+                let conversion = ConverterMap.symbols.get(input.concreteType, output),
+                conversion.is >= level
+          else {
+              return .trampoline
+          }
+          return conversion.via(input)
+      }
+
+      func htmlEscaped() -> LeafData {
+          guard let string = self.string else {
+              return self
+          }
+          return string.htmlEscaped().leafData
+      }
+  }
+
+  extension LeafDataStorage {
+      func serialize(buffer: inout ByteBuffer) throws {
+          switch self {
+          case .bool, .int, .double, .string, .optional, .array, .dictionary:
+              try buffer.writeString(self.serialize(), encoding: LeafConfiguration.encoding)
+          case .data(let d):
+              buffer.writeData(d)
+          }
+      }
+  }
+  ```
+
+test "rank1293: htmlEscaped() lowers the conversion level so non-string data is escaped too"
+  lang swift
+  file Sources/LeafKit/LeafData/LeafData.swift
+  reject VYQL-INJ-004
+  code
+  ```
+  public struct LeafData {
+      var storage: LeafDataStorage
+
+      public var string: String? {
+          if case .string(let s) = self.storage { return s }
+          guard case .string(let s) = self.convert(to: .string).storage else { return nil }
+          return s
+      }
+
+      func convert(to output: NaturalType, _ level: DataConvertible = .castable) -> LeafData {
+          guard celf != output else { return self }
+          guard let input = self.storage.unwrap,
+                let conversion = ConverterMap.symbols.get(input.concreteType, output),
+                conversion.is >= level
+          else {
+              return .trampoline
+          }
+          return conversion.via(input)
+      }
+
+      func htmlEscaped() -> LeafData {
+          guard let string = self.convert(to: .string, .ambiguous).string else {
+              return self
+          }
+          return string.htmlEscaped().leafData
+      }
+  }
+
+  extension LeafDataStorage {
+      func serialize(buffer: inout ByteBuffer) throws {
+          try buffer.writeString(self.serialize(), encoding: LeafConfiguration.encoding)
+      }
+  }
+  ```

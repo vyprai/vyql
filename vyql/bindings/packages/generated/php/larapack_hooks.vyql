@@ -1,0 +1,9 @@
+module bindings.php.generated.m896ecb36;
+
+binding commandExecution0 {
+  requires {
+    dependency("larapack/hooks")
+  }
+  query pattern callExpr where callee.method == "runComposer"
+  emit sink code.CommandExecution at args[0]
+}

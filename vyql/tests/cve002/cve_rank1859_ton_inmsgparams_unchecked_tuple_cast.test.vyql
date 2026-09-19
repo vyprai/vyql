@@ -1,0 +1,192 @@
+# TON's VM reads the "in msg params" entry of a smart contract's context
+# register (c7[0][17]) with a checked cast and hands the result straight to
+# the tuple indexing helper (crypto/vm/tonops.cpp at the parent of 9e5109d5):
+#
+#   Ref<Tuple> t = get_param(st, inmsgparams_idx).as_tuple();
+#   st->get_stack().push(tuple_index(t, idx));
+#
+# StackEntry::as_tuple() returns a null Ref<Tuple> whenever the entry is not
+# a tuple, and tuple_index() evaluates tup->size() before anything else
+# (crypto/vm/stack.cpp) with no null handling of its own -- unlike its
+# sibling tuple_extend_index(), which checks tup.is_null(). The register is
+# contract-writable: SETGLOB stores an arbitrary stack entry at any c7[0]
+# index (tuple_extend_set_index fills the gap with null entries), so a
+# malicious contract runs SETGLOB 17 with a non-tuple and then INMSGPARAM,
+# and the validator's TVM dereferences a null Ref in-process (CWE-476, node
+# crash, network-wide DoS). The fixed revision 9e5109d5 adds the guard every sibling in
+# the same file carries -- if (t.is_null()) throw VmError{Excno::
+# type_chk, ...} -- before the indexing call; nothing else changes.
+#
+# The row's recorded commit 8f99af784 is the archive-sync timeout raise
+# three commits later ("Increase timeouts in ArchiveImporterLocal"), not
+# this fix: GHSA-g989-fg9h-96pr references 9e5109d5 directly, and the
+# advisory's own description (INMSGPARAM null dereference) matches that
+# diff, not the timeout one. The row is repointed to 9e5109d5.
+#
+# What fires without this change: nothing, on either revision. The deref
+# itself is inside tuple_index() in stack.cpp, which the fixed revision does not touch,
+# so the VYQL-MEM-006 __deref rows there fire identically before and after;
+# the vulnerable function contains no deref expression of its own at all.
+#
+# The detection reuses code.UncheckedNullableResultDeref (VYQL-MEM-018),
+# the concept the V8 Call.ToLocalChecked binding feeds: a checked
+# cast whose nullable result is consumed before an observed null guard. No
+# concept, rule or ID is minted. The binding states TON's own contract from
+# its sources: as_tuple/as_tuple_range return null on mismatch, tuple_index
+# dereferences unchecked, and the null guards are td::Ref's is_null()/
+# not_null() -- the only two spellings used on Ref values anywhere in the
+# VM sources (214 and 151 uses in crypto/vm at the vulnerable parent; the
+# 15 raw nullptr comparisons there all test raw pointers, never a Ref).
+# Residual, in the false-positive direction: a guard spelled some other way
+# would still report, and a guard that runs after the indexing call
+# suppresses too, since presence is function-scoped.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off), three runs
+# per side, every count identical across its three runs. The full ton tree
+# does not finish inside 180s, so the tree-wide claim rests on an
+# exhaustive grep enumeration plus the crypto/ subtree scan: every function
+# in the tree carrying both an as_tuple-family cast and a tuple_index call
+# is enumerated -- ten functions in two files (crypto/vm/tonops.cpp and
+# crypto/vm/tupleops.cpp), nine of which null-check in the same body, and
+# the single deviation is exec_get_in_msg_param itself. On crypto/vm the
+# parent reports 303 findings with VYQL-MEM-018 at tonops.cpp:164 and the
+# fix reports 302 with none; without the binding both revisions report 302,
+# identical sets. On crypto/ (every enumerated file lives under it) the
+# parent reports 1327 with exactly one VYQL-MEM-018, again tonops.cpp:164,
+# and the baseline is 1326. The binding's two call names are TON-internal:
+# no other C++ corpus available carries either as_tuple or tuple_index at
+# all, and on the unrelated tigervnc tree it adds zero findings (1083
+# findings, no VYQL-MEM-018).
+#
+# verify_current_expected: fixed.
+
+test "rank1859: the INMSGPARAM cast indexed without a null guard"
+  lang cpp
+  file crypto/vm/tonops.cpp
+  expect VYQL-MEM-018
+  code
+  ```
+  #include "vm/stack.hpp"
+
+  namespace {
+  constexpr int inmsgparams_idx = 17;
+  }
+
+  int exec_get_in_msg_param(VmState* st, unsigned idx, const char* name) {
+    if (name) {
+      VM_LOG(st) << "execute " << name;
+    }
+    Ref<Tuple> t = get_param(st, inmsgparams_idx).as_tuple();
+    st->get_stack().push(tuple_index(t, idx));
+    return 0;
+  }
+  ```
+
+test "rank1859: the fixed form guards the cast with is_null before indexing"
+  lang cpp
+  file crypto/vm/tonops.cpp
+  reject VYQL-MEM-018
+  code
+  ```
+  #include "vm/stack.hpp"
+
+  namespace {
+  constexpr int inmsgparams_idx = 17;
+  }
+
+  int exec_get_in_msg_param(VmState* st, unsigned idx, const char* name) {
+    if (name) {
+      VM_LOG(st) << "execute " << name;
+    }
+    Ref<Tuple> t = get_param(st, inmsgparams_idx).as_tuple();
+    if (t.is_null()) {
+      throw VmError{Excno::type_chk, "intermediate value is not a tuple"};
+    }
+    st->get_stack().push(tuple_index(t, idx));
+    return 0;
+  }
+  ```
+
+test "rank1859: the sibling config reader carrying the same guard idiom"
+  lang cpp
+  file crypto/vm/tonops-sibling.cpp
+  reject VYQL-MEM-018
+  code
+  ```
+  #include "vm/stack.hpp"
+
+  static td::Ref<Tuple> get_unpacked_config_tuple(VmState* st) {
+    auto tuple = st->get_c7();
+    auto t1 = tuple_index(tuple, 0).as_tuple_range(255);
+    if (t1.is_null()) {
+      throw VmError{Excno::type_chk, "intermediate value is not a tuple"};
+    }
+    auto t2 = tuple_index(t1, 14).as_tuple_range(255);
+    if (t2.is_null()) {
+      throw VmError{Excno::type_chk, "intermediate value is not a tuple"};
+    }
+    return t2;
+  }
+  ```
+
+test "rank1859: the not_null spelling of the guard suppresses as well"
+  lang cpp
+  file crypto/vm/tonops-notnull.cpp
+  reject VYQL-MEM-018
+  code
+  ```
+  #include "vm/stack.hpp"
+
+  namespace {
+  constexpr int inmsgparams_idx = 17;
+  }
+
+  int exec_get_in_msg_param(VmState* st, unsigned idx, const char* name) {
+    Ref<Tuple> t = get_param(st, inmsgparams_idx).as_tuple();
+    if (t.not_null()) {
+      st->get_stack().push(tuple_index(t, idx));
+    } else {
+      throw VmError{Excno::type_chk, "intermediate value is not a tuple"};
+    }
+    return 0;
+  }
+  ```
+
+test "rank1859: an unchecked as_tuple_range cast indexed the same way"
+  lang cpp
+  file crypto/vm/tonops-range.cpp
+  expect VYQL-MEM-018
+  code
+  ```
+  #include "vm/stack.hpp"
+
+  int exec_get_prev_blocks_info(VmState* st, unsigned idx, const char* name) {
+    auto tuple = st->get_c7();
+    auto t1 = tuple_index(tuple, 0).as_tuple_range(255);
+    auto entry = tuple_index(t1, 13).as_tuple_range(255);
+    st->get_stack().push(tuple_index(entry, idx));
+    return 0;
+  }
+  ```
+
+test "rank1859: an unchecked cast that is never indexed stays unreported"
+  lang cpp
+  file crypto/vm/stack.cpp
+  reject VYQL-MEM-018
+  code
+  ```
+  #include "vm/stack.hpp"
+
+  Ref<Tuple> StackEntry::as_tuple() const& {
+    return as<Tuple, t_tuple>();
+  }
+
+  // the null result flows onward untouched -- no indexing helper in sight,
+  // so the unchecked-cast shape without the dereferencing consumer does
+  // not fire (the tree carries 48 as_tuple-family occurrences and only the
+  // ten functions that also index are in the binding's shape; this is the
+  // bound that keeps the binding to the one that dereferences)
+  Ref<Tuple> pass_through(const StackEntry& entry) {
+    return entry.as_tuple();
+  }
+  ```

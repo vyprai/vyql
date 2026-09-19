@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule PublicRestDataEndpointMissingAuthorization {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862, CWE_863, CWE_200]
+    id: "VYQL-AUTH-075"
+    severity: high
+  }
+  issue code.PublicRestDataEndpointMissingAuthorization as endpoint
+}

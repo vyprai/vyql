@@ -1,0 +1,33 @@
+module bindings.objc.generated.mda1db932;
+
+binding filePathAccess0 {
+  requires {
+    dependency("PubNub")
+  }
+  query pattern callExpr where callee.method == "encryptFileAtURL"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("PubNub")
+  }
+  query pattern callExpr where callee.method == "decryptFileAtURL"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding secretValue2 {
+  requires {
+    dependency("PubNub")
+  }
+  query pattern callExpr where callee.method == "parseAuthToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("PubNub")
+  }
+  query pattern callExpr where callee.method == "setAuthToken"
+  emit source code.SecretValue at call.result
+}

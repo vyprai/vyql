@@ -1,0 +1,13 @@
+module vypr.misconfig;
+
+rule TrustBoundary {
+  meta {
+    benchmark: trustbound
+    cwe: [CWE_501]
+    id: "VYQL-CFG-014"
+    severity: medium
+  }
+  taint core.UserControlledData -> code.TrustBoundary
+  unless path coveredBy core.InputValidation
+  unless v.dominates coveredBy core.InputValidation
+}

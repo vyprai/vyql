@@ -1,0 +1,65 @@
+test "rank712: ECDSA verify uses r and s before range checks"
+  lang java
+  expect VYQL-CRY-016
+  expect_review code.EcdsaSignatureScalarBoundsMissing
+  code
+  ```
+  import java.math.BigInteger;
+
+  class Ecdsa {
+      public static boolean verify(String message, Signature signature, PublicKey publicKey) {
+          Curve curve = publicKey.curve;
+          BigInteger r = signature.r;
+          BigInteger s = signature.s;
+          BigInteger w = Math.inv(s, curve.N);
+          Point u1 = Math.multiply(curve.G, BigInteger.ONE.multiply(w).mod(curve.N), curve.N, curve.A, curve.P);
+          Point u2 = Math.multiply(publicKey.point, r.multiply(w).mod(curve.N), curve.N, curve.A, curve.P);
+          Point point = Math.add(u1, u2, curve.A, curve.P);
+          return r.compareTo(point.x) == 0;
+      }
+  }
+
+  class Signature { BigInteger r; BigInteger s; }
+  class PublicKey { Curve curve; Point point; }
+  class Curve { BigInteger N; BigInteger A; BigInteger P; Point G; }
+  class Point { BigInteger x; }
+  ```
+
+test "rank712: ECDSA verify rejects out-of-range r and s"
+  lang java
+  reject VYQL-CRY-016
+  reject_review code.EcdsaSignatureScalarBoundsMissing
+  code
+  ```
+  import java.math.BigInteger;
+
+  class Ecdsa {
+      public static boolean verify(String message, Signature signature, PublicKey publicKey) {
+          Curve curve = publicKey.curve;
+          BigInteger r = signature.r;
+          BigInteger s = signature.s;
+          if (r.compareTo(new BigInteger(String.valueOf(1))) < 0) {
+              return false;
+          }
+          if (r.compareTo(curve.N) >= 0) {
+              return false;
+          }
+          if (s.compareTo(new BigInteger(String.valueOf(1))) < 0) {
+              return false;
+          }
+          if (s.compareTo(curve.N) >= 0) {
+              return false;
+          }
+          BigInteger w = Math.inv(s, curve.N);
+          Point u1 = Math.multiply(curve.G, BigInteger.ONE.multiply(w).mod(curve.N), curve.N, curve.A, curve.P);
+          Point u2 = Math.multiply(publicKey.point, r.multiply(w).mod(curve.N), curve.N, curve.A, curve.P);
+          Point point = Math.add(u1, u2, curve.A, curve.P);
+          return r.compareTo(point.x) == 0;
+      }
+  }
+
+  class Signature { BigInteger r; BigInteger s; }
+  class PublicKey { Curve curve; Point point; }
+  class Curve { BigInteger N; BigInteger A; BigInteger P; Point G; }
+  class Point { BigInteger x; }
+  ```

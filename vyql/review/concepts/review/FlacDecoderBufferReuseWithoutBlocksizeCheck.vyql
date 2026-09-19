@@ -1,0 +1,8 @@
+module code;
+
+review code.FlacDecoderBufferReuseWithoutBlocksizeCheck {
+  category: memory
+  expected: [core.MemoryBoundsCheck]
+  kind: target
+  text: "review FLAC decoder cached-buffer reuse for a blocksize check against the actual callback buffer capacity"
+}

@@ -1,0 +1,41 @@
+module bindings.javascript.generated.mb3b3eb92;
+
+binding userControlledData0 {
+  requires {
+    dependency("get-stream")
+  }
+  query pattern callExpr where callee.method == "getStreamAsBuffer"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("get-stream")
+  }
+  query pattern callExpr where callee.method == "getStreamAsArray"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("get-stream")
+  }
+  query pattern callExpr where callee.method == "getStreamAsArrayBuffer"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("get-stream")
+  }
+  query pattern callExpr where callee.method == "getStreamAsString"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("get-stream")
+  }
+  query pattern callExpr where callee.method == "getStreamContents"
+  emit source core.UserControlledData at call.result
+}

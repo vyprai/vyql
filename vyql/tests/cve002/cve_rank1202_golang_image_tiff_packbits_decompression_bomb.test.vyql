@@ -1,0 +1,160 @@
+# Rank 1202 / CVE-2026-46599: golang.org/x/image's TIFF decoder decompresses
+# PackBits-encoded strips and tiles through unpackBits (tiff/compress.go),
+# which accumulates decoded bytes into dst with a loop that has no output-size
+# limit at all. Every other TIFF compression path (LZW, Deflate, CCITT, the
+# uncompressed case) is decoded through readBuf or gated directly against
+# blockMaxDataSize (tiff/reader.go), a limit derived from the image's own
+# declared width and height; unpackBits is called with the section reader
+# alone and bypasses that cap entirely. A 2MB PackBits-compressed TIFF can
+# decompress to 745MB, a 372x amplification (CWE-770, GHSA-q675-qj96-32m9).
+#
+# The pool row carries `nocommit`; the diff reads fine anyway. fe8ae458fe is
+# the real, targeted fix, confirmed against the advisory's own reference
+# (`go.dev/cl/759960`, the Gerrit change this commit's `Reviewed-on:` trailer
+# names verbatim): it adds a `lim int64` parameter to unpackBits, threads
+# `blockMaxDataSize` through the one call site in reader.go's cPackBits case,
+# and returns a FormatError once `len(dst)` exceeds it -- the identical shape
+# `readBuf` enforces for the other four compression paths.
+#
+# A `for {}` loop that keeps growing a slice through `x = append(x, ...)`
+# runs until its input ends, and each iteration grows the output by whatever
+# the input says, so the peer chooses the total allocation. The Go frontend
+# records that construct as a per-loop fact (analysis.go.unbounded_append_
+# accumulation) only where the accumulated slice is not itself declared or
+# reset inside the loop and the enclosing function never compares its len or
+# cap against anything, and the
+# goUnboundedAppendAccumulation binding reports it through the existing
+# code.UnboundedAllocationReview concept and VYQL-DOS-041 rule. The first
+# test is the vulnerable shape and expects the finding; the second is the
+# patched shape, whose `if int64(len(dst)) > lim` comparison is exactly the
+# bound whose absence the fact states, and rejects it.
+
+test "rank1202: unpackBits accumulates decoded PackBits data with no output size limit"
+  lang go
+  file tiff/compress.go
+  expect VYQL-DOS-041
+  expect_review code.UnboundedAllocationReview
+  code
+  ```
+  package tiff
+
+  import (
+  	"bufio"
+  	"io"
+  )
+
+  type byteReader interface {
+  	io.Reader
+  	io.ByteReader
+  }
+
+  // unpackBits decodes the PackBits-compressed data in src and returns the
+  // uncompressed data.
+  //
+  // The PackBits compression format is described in section 9 (p. 42)
+  // of the TIFF spec.
+  func unpackBits(r io.Reader) ([]byte, error) {
+  	buf := make([]byte, 128)
+  	dst := make([]byte, 0, 1024)
+  	br, ok := r.(byteReader)
+  	if !ok {
+  		br = bufio.NewReader(r)
+  	}
+
+  	for {
+  		b, err := br.ReadByte()
+  		if err != nil {
+  			if err == io.EOF {
+  				return dst, nil
+  			}
+  			return nil, err
+  		}
+  		code := int(int8(b))
+  		switch {
+  		case code >= 0:
+  			n, err := io.ReadFull(br, buf[:code+1])
+  			if err != nil {
+  				return nil, err
+  			}
+  			dst = append(dst, buf[:n]...)
+  		case code == -128:
+  			// No-op.
+  		default:
+  			if b, err = br.ReadByte(); err != nil {
+  				return nil, err
+  			}
+  			for j := 0; j < 1-code; j++ {
+  				buf[j] = b
+  			}
+  			dst = append(dst, buf[:1-code]...)
+  		}
+  	}
+  }
+  ```
+
+test "rank1202: the fixed revision threads a lim parameter through and rejects once dst grows past it"
+  lang go
+  file tiff/compress.go
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  package tiff
+
+  import (
+  	"bufio"
+  	"io"
+  )
+
+  type byteReader interface {
+  	io.Reader
+  	io.ByteReader
+  }
+
+  // unpackBits decodes the PackBits-compressed data in src and returns the
+  // uncompressed data. The output size is limited to lim bytes to prevent
+  // decompression bombs.
+  //
+  // The PackBits compression format is described in section 9 (p. 42)
+  // of the TIFF spec.
+  func unpackBits(r io.Reader, lim int64) ([]byte, error) {
+  	buf := make([]byte, 128)
+  	dst := make([]byte, 0, 1024)
+  	br, ok := r.(byteReader)
+  	if !ok {
+  		br = bufio.NewReader(r)
+  	}
+
+  	for {
+  		b, err := br.ReadByte()
+  		if err != nil {
+  			if err == io.EOF {
+  				return dst, nil
+  			}
+  			return nil, err
+  		}
+  		code := int(int8(b))
+  		switch {
+  		case code >= 0:
+  			n, err := io.ReadFull(br, buf[:code+1])
+  			if err != nil {
+  				return nil, err
+  			}
+  			dst = append(dst, buf[:n]...)
+  		case code == -128:
+  			// No-op.
+  		default:
+  			if b, err = br.ReadByte(); err != nil {
+  				return nil, err
+  			}
+  			for j := 0; j < 1-code; j++ {
+  				buf[j] = b
+  			}
+  			dst = append(dst, buf[:1-code]...)
+  		}
+  		if int64(len(dst)) > lim {
+  			return nil, FormatError("PackBits: decompressed data too large")
+  		}
+  	}
+  }
+  ```

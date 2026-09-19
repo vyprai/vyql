@@ -1,0 +1,11 @@
+module code;
+
+concept WildcardPrefixEmptyMatch : issue {
+  cwe: [CWE_94, CWE_346]
+  reviewAssumption: "the allow-list entry comes from configuration or another source the matcher does not control, and the names it accepts reach a less-trusted context"
+  reviewCategory: input_validation
+  reviewCondition: "an allow-list entry's trailing wildcard is trimmed inside the prefix comparison without an emptiness check, so a bare wildcard trims to the empty prefix and the comparison accepts every name"
+  reviewConfidence: high
+  reviewEvidence: "allow-list match context {pattern} nests the trailing-star trim inside the prefix comparison"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

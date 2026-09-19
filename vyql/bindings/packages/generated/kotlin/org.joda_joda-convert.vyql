@@ -1,0 +1,17 @@
+module bindings.kotlin.generated.m7030157a;
+
+binding deserialization0 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.joda:joda-convert")
+  }
+  query pattern callExpr where callee.method == "convertFromString"
+  emit sink code.Deserialization at args[0]
+}

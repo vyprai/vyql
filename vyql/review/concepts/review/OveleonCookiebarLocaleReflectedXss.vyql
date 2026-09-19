@@ -1,0 +1,8 @@
+module code;
+
+review code.OveleonCookiebarLocaleReflectedXss {
+  category: xss
+  expected: [core.InputValidation, core.HtmlEscape]
+  kind: attention
+  text: "review Cookiebar block locale routing for Validator::isLocale before rendering the frontend template response"
+}

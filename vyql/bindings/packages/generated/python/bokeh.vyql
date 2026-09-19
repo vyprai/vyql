@@ -1,0 +1,9 @@
+module bindings.python.generated.mc4b1873d;
+
+binding deserialization0 {
+  requires {
+    dependency("bokeh")
+  }
+  query pattern callExpr where callee.method == "from_serializable"
+  emit sink code.Deserialization at args[0]
+}

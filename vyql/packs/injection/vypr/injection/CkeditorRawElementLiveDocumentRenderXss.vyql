@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule CkeditorRawElementLiveDocumentRenderXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-067"
+    severity: high
+  }
+  issue code.CkeditorRawElementLiveDocumentRenderXss as sink
+}

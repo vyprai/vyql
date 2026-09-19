@@ -1,0 +1,365 @@
+# log4j-core's message formatting asks Interpolator to resolve each `${prefix:name}`
+# variable: it reads the handler registered for the prefix from a map held at the
+# StrLookup interface type and calls `lookup(name)` on it. The jndi handler
+# (JndiLookup) hands the variable text it is given to JndiManager.lookup(String),
+# which passed it straight to javax.naming Context.lookup(String) -- so a name
+# carrying its own scheme and authority ("ldap://host/a") made the JVM fetch and
+# instantiate whatever a directory server outside the caller's control described.
+# The restriction that shipped for this weakness (log4j-core/.../net/JndiManager.java)
+# keeps that call and gates it: it parses `new URI(name)`, returns null unless the
+# scheme is in an allowed-protocol list, and for ldap/ldaps additionally requires
+# the host to be a local IP and the entry's javaClassName to be one of eight JDK
+# value classes, rejecting javaReferenceAddress/javaFactory entries outright.
+#
+# javax.naming Context.lookup carries the code.Deserialization label -- the concept
+# the readObject/Yaml.load/XMLDecoder sink family carries, since a naming service
+# outside the caller's control chooses what object gets instantiated. The expect
+# case holds the whole real path: an untrusted header value enters the
+# application's log call, the resolver's prefix registry hands back a handler held
+# at the interface type, and the dispatch on that interface-typed receiver reaches
+# the implementor's body, whose own indirection (convertJndiName, the manager's
+# lookup) ends at Context.lookup's argument. A call on an interface-typed receiver
+# routes to the implementors' bodies as reach-only targets: the arguments flow in
+# so a sink inside an implementor is coverable, while the call's own result keeps
+# the unresolved conservative semantics, so an implementor's shared return node
+# cannot merge taint from one call site into another.
+#
+# The reject case is the flow that remains once the resolver cannot be handed
+# variable text from a request: the resolver still exists and is still called on
+# every format, but only the configuration's own constant property name reaches
+# it, and the request-derived text is appended verbatim. That is a flow
+# distinction rather than a control one, because restricting the name instead of
+# removing the flow is not something this engine credits, and should not be
+# credited here even if it could: the allowlist gate above is a branch-sensitive
+# `return null` on a value derived from the same tainted variable (the
+# sanitize-or-return idiom the dataflow design records as out of scope for a
+# branch-insensitive solver), and it is itself bypassable -- the following release
+# removed the message-side lookup rather than narrowing the allowlist further. A
+# control meaning only "a name is checked against a list" would endorse exactly
+# the hole that restriction left open. Measured on the two real revisions of
+# JndiManager.java plus JndiLookup.java: VYQL-DESER-001 labels the Context.lookup
+# argument on both, so the restriction is not a discriminator.
+#
+# The last three cases isolate the dispatch construct itself, and deliberately
+# not on a lookup sink: the javax.naming sink pattern matches the bare method
+# name `lookup` whenever the receiver's type cannot be proven (recv_type unknown
+# is treated as "cannot disprove"), so the registry call would be labelled a sink
+# itself and hide the hop. With Runtime.exec instead, the pair differs in the
+# receiver's declared type alone -- the same registry read, the same single
+# implementation, the same argument -- and both carry taint into the
+# implementation's body: a receiver of a concrete class type through its own
+# method, a receiver of the interface type through the implementor's body. The
+# final case holds the boundary of that routing: a method with the same name on
+# a class that does not implement the interface receives nothing, because the
+# dispatch is driven by the type hierarchy, not by the method name.
+#
+# verify_current_expected: fixed, the interface-typed dispatch reaches the
+# implementor's body.
+
+test "rank1339: a registry dispatch on an interface-typed handler carries variable text to Context.lookup"
+  lang java
+  file JndiLookup.java
+  expect VYQL-DESER-001
+  code
+  ```
+  import java.util.HashMap;
+  import java.util.Map;
+  import java.util.Objects;
+
+  import javax.naming.Context;
+  import javax.naming.InitialContext;
+  import javax.naming.NamingException;
+
+  interface StrLookup {
+    String lookup(String name) throws NamingException;
+  }
+
+  class JndiManager {
+    private final Context context;
+
+    private JndiManager(final Context context) {
+      this.context = context;
+    }
+
+    public static JndiManager getDefaultManager() throws NamingException {
+      return new JndiManager(new InitialContext());
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T lookup(final String name) throws NamingException {
+      return (T) this.context.lookup(name);
+    }
+  }
+
+  class JndiLookup implements StrLookup {
+    static final String CONTAINER_JNDI_RESOURCE_PATH_PREFIX = "java:comp/env/";
+
+    public String lookup(final String key) throws NamingException {
+      if (key == null) {
+        return null;
+      }
+      final String jndiName = convertJndiName(key);
+      final JndiManager jndiManager = JndiManager.getDefaultManager();
+      return Objects.toString(jndiManager.lookup(jndiName), null);
+    }
+
+    private String convertJndiName(final String jndiName) {
+      if (!jndiName.startsWith(CONTAINER_JNDI_RESOURCE_PATH_PREFIX) && jndiName.indexOf(':') == -1) {
+        return CONTAINER_JNDI_RESOURCE_PATH_PREFIX + jndiName;
+      }
+      return jndiName;
+    }
+  }
+
+  class DateLookup implements StrLookup {
+    public String lookup(final String name) {
+      return "2021-12-10";
+    }
+  }
+
+  class Interpolator {
+    private final Map<String, StrLookup> strLookupMap = new HashMap<>();
+
+    Interpolator() {
+      strLookupMap.put("jndi", new JndiLookup());
+      strLookupMap.put("date", new DateLookup());
+    }
+
+    public String lookup(final String var) throws NamingException {
+      final int prefixPos = var.indexOf(':');
+      if (prefixPos < 0) {
+        return null;
+      }
+      final String prefix = var.substring(0, prefixPos).toLowerCase();
+      final String name = var.substring(prefixPos + 1);
+      final StrLookup lookup = strLookupMap.get(prefix);
+      if (lookup != null) {
+        return lookup.lookup(name);
+      }
+      return null;
+    }
+  }
+
+  class VersionServlet extends HttpServlet {
+    private final Interpolator resolver = new Interpolator();
+
+    public void doGet(HttpServletRequest request, StringBuilder toAppendTo) throws NamingException {
+      final String message = request.getHeader("X-Api-Version");
+      toAppendTo.append(resolver.lookup(message));
+    }
+  }
+
+  class HttpServlet {}
+  interface HttpServletRequest { String getHeader(String name); }
+  ```
+
+test "rank1339: a resolver reached only by a configured property name, with request text appended verbatim"
+  lang java
+  file JndiLookup.java
+  reject VYQL-DESER-001
+  code
+  ```
+  import java.util.HashMap;
+  import java.util.Map;
+  import java.util.Objects;
+
+  import javax.naming.Context;
+  import javax.naming.InitialContext;
+  import javax.naming.NamingException;
+
+  interface StrLookup {
+    String lookup(String name) throws NamingException;
+  }
+
+  class JndiManager {
+    private final Context context;
+
+    private JndiManager(final Context context) {
+      this.context = context;
+    }
+
+    public static JndiManager getDefaultManager() throws NamingException {
+      return new JndiManager(new InitialContext());
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T lookup(final String name) throws NamingException {
+      return (T) this.context.lookup(name);
+    }
+  }
+
+  class JndiLookup implements StrLookup {
+    static final String CONTAINER_JNDI_RESOURCE_PATH_PREFIX = "java:comp/env/";
+
+    public String lookup(final String key) throws NamingException {
+      if (key == null) {
+        return null;
+      }
+      final String jndiName = convertJndiName(key);
+      final JndiManager jndiManager = JndiManager.getDefaultManager();
+      return Objects.toString(jndiManager.lookup(jndiName), null);
+    }
+
+    private String convertJndiName(final String jndiName) {
+      if (!jndiName.startsWith(CONTAINER_JNDI_RESOURCE_PATH_PREFIX) && jndiName.indexOf(':') == -1) {
+        return CONTAINER_JNDI_RESOURCE_PATH_PREFIX + jndiName;
+      }
+      return jndiName;
+    }
+  }
+
+  class DateLookup implements StrLookup {
+    public String lookup(final String name) {
+      return "2021-12-10";
+    }
+  }
+
+  class Interpolator {
+    private final Map<String, StrLookup> strLookupMap = new HashMap<>();
+
+    Interpolator() {
+      strLookupMap.put("jndi", new JndiLookup());
+      strLookupMap.put("date", new DateLookup());
+    }
+
+    public String lookup(final String var) throws NamingException {
+      final int prefixPos = var.indexOf(':');
+      if (prefixPos < 0) {
+        return null;
+      }
+      final String prefix = var.substring(0, prefixPos).toLowerCase();
+      final String name = var.substring(prefixPos + 1);
+      final StrLookup lookup = strLookupMap.get(prefix);
+      if (lookup != null) {
+        return lookup.lookup(name);
+      }
+      return null;
+    }
+  }
+
+  class VersionServlet extends HttpServlet {
+    private static final String VERSION_PROPERTY = "jndi:java:comp/env/appVersion";
+
+    private final Interpolator resolver = new Interpolator();
+
+    public void doGet(HttpServletRequest request, StringBuilder toAppendTo) throws NamingException {
+      final String message = request.getHeader("X-Api-Version");
+      toAppendTo.append(message);
+      toAppendTo.append(resolver.lookup(VERSION_PROPERTY));
+    }
+  }
+
+  class HttpServlet {}
+  interface HttpServletRequest { String getHeader(String name); }
+  ```
+
+test "rank1339: a registry handler held at its concrete type carries taint into its body"
+  lang java
+  file Dispatcher.java
+  expect VYQL-INJ-002
+  code
+  ```
+  import java.util.HashMap;
+  import java.util.Map;
+
+  interface Handler {
+    void run(String cmd) throws Exception;
+  }
+
+  class ExecHandler implements Handler {
+    public void run(final String cmd) throws Exception {
+      Runtime.getRuntime().exec(cmd);
+    }
+  }
+
+  class Dispatcher extends HttpServlet {
+    private final Map<String, Handler> handlers = new HashMap<>();
+
+    Dispatcher() {
+      handlers.put("exec", new ExecHandler());
+    }
+
+    public void doGet(HttpServletRequest request) throws Exception {
+      final String t = request.getParameter("t");
+      final ExecHandler handler = (ExecHandler) handlers.get("exec");
+      handler.run(t);
+    }
+  }
+
+  class HttpServlet {}
+  interface HttpServletRequest { String getParameter(String name); }
+  ```
+
+test "rank1339: the same registry handler held at its interface type carries taint into its body"
+  lang java
+  file Dispatcher.java
+  expect VYQL-INJ-002
+  code
+  ```
+  import java.util.HashMap;
+  import java.util.Map;
+
+  interface Handler {
+    void run(String cmd) throws Exception;
+  }
+
+  class ExecHandler implements Handler {
+    public void run(final String cmd) throws Exception {
+      Runtime.getRuntime().exec(cmd);
+    }
+  }
+
+  class Dispatcher extends HttpServlet {
+    private final Map<String, Handler> handlers = new HashMap<>();
+
+    Dispatcher() {
+      handlers.put("exec", new ExecHandler());
+    }
+
+    public void doGet(HttpServletRequest request) throws Exception {
+      final String t = request.getParameter("t");
+      final Handler handler = handlers.get("exec");
+      handler.run(t);
+    }
+  }
+
+  class HttpServlet {}
+  interface HttpServletRequest { String getParameter(String name); }
+  ```
+
+test "rank1339: a same-named method on a class outside the interface's hierarchy receives nothing"
+  lang java
+  file Dispatcher.java
+  reject VYQL-INJ-002
+  code
+  ```
+  import java.util.HashMap;
+  import java.util.Map;
+
+  interface Handler {
+    void run(String cmd) throws Exception;
+  }
+
+  class Service {
+    void run(final String cmd) throws Exception {
+      Runtime.getRuntime().exec(cmd);
+    }
+  }
+
+  class Dispatcher extends HttpServlet {
+    private final Map<String, Handler> handlers = new HashMap<>();
+
+    Dispatcher() {
+      handlers.put("exec", null);
+    }
+
+    public void doGet(HttpServletRequest request) throws Exception {
+      final String t = request.getParameter("t");
+      final Handler handler = handlers.get("exec");
+      handler.run(t);
+    }
+  }
+
+  class HttpServlet {}
+  interface HttpServletRequest { String getParameter(String name); }
+  ```

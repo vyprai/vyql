@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m96d210d7;
+
+binding filePathAccess0 {
+  requires {
+    dependency("boost-dll")
+  }
+  query pattern callExpr where callee.method == "library_info"
+  emit sink code.FilePathAccess at args[0]
+}

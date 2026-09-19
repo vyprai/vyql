@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m4afb95b9;
+
+binding deserialization0 {
+  requires {
+    dependency("inja")
+  }
+  query pattern callExpr where callee.method == "LiteralNode"
+  emit sink code.Deserialization at args[0]
+}

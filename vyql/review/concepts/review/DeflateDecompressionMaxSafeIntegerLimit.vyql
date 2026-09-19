@@ -1,0 +1,8 @@
+module code;
+
+review code.DeflateDecompressionMaxSafeIntegerLimit {
+  category: resource
+  expected: [core.InputValidation]
+  kind: target
+  text: "verify deflate decompression output is capped to a small archive-entry limit instead of Number.MAX_SAFE_INTEGER"
+}

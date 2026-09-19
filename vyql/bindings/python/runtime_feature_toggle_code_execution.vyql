@@ -1,0 +1,49 @@
+module bindings.python.runtime_feature_toggle_code_execution;
+
+// Starlette documents `request.app.state` as the object an application hangs its
+// shared runtime state on, and an administrator-editable settings object kept
+// there is how a FastAPI service exposes a feature an operator can turn on and
+// off while the process runs. A route handler that reads that settings object
+// for a code-execution backend's endpoint, credentials and timeout is reading
+// the very namespace the feature's own on/off setting lives in, so the setting
+// is available to it; dispatching the caller's code without reading it leaves
+// the operator's "off" advisory, and every authenticated caller keeps the
+// feature.
+//
+// The neutralising control is any settings read whose name carries a toggle
+// word -- enable, disable, allow or permit -- because that is what consulting a
+// feature's switch looks like whatever the feature is named. A handler gated on
+// an admin-only dependency is not distinguishable here: Python emits no context
+// token for a parameter's default expression, so `Depends(get_admin_user)` is
+// invisible and such a handler still reports.
+//
+// The operation is split across two bindings because a presence `where` clause
+// takes no parenthesised alternation. This one covers the interpreter bridge a
+// service names for what it does -- executing code, a notebook or a cell -- and
+// spells each needle with enough of the name that it cannot fall inside an
+// unrelated one; a bare `exec` needle matches `ScopedSession.execute` and
+// reported a readiness probe.
+binding runtimeFeatureToggleNotReadBeforeInterpreterDispatch {
+  query pattern presenceNode where node.scope == "function"
+    and node.token contains "lang=python"
+    and containsAny(node.context.decoratorPath, ["router.post", "router.put", "router.patch", "router.get", "router.delete", "app.post", "app.put", "app.patch", "app.get", "app.delete"])
+    and node.context.selector contains "app.state"
+    and containsAny(node.context.callPath, ["execute_code", "run_code", "exec_code", "code_execute", "execute_python", "run_python", "execute_notebook", "run_notebook", "execute_cell", "run_cell", "execute_script", "run_script"])
+    and not containsAny(node.context.selector, ["ENABLE", "Enable", "enable", "DISABLE", "Disable", "disable", "ALLOW", "Allow", "allow", "PERMIT", "Permit", "permit"])
+  emit issue code.AccessPolicyReview at node
+}
+
+// The same handler shape where the code runs in this process instead of a
+// backend: Python's own `exec` and `eval`, and the process launchers of `os` and
+// `subprocess`. These are matched on the call's final segment by equality rather
+// than by substring, so `re.compile` and a session's `execute` are not read as
+// code execution.
+binding runtimeFeatureToggleNotReadBeforeInProcessExecution {
+  query pattern presenceNode where node.scope == "function"
+    and node.token contains "lang=python"
+    and containsAny(node.context.decoratorPath, ["router.post", "router.put", "router.patch", "router.get", "router.delete", "app.post", "app.put", "app.patch", "app.get", "app.delete"])
+    and node.context.selector contains "app.state"
+    and node.context.call in ["exec", "eval", "system", "popen", "Popen", "check_output", "check_call", "getoutput", "getstatusoutput"]
+    and not containsAny(node.context.selector, ["ENABLE", "Enable", "enable", "DISABLE", "Disable", "disable", "ALLOW", "Allow", "allow", "PERMIT", "Permit", "permit"])
+  emit issue code.AccessPolicyReview at node
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.UrlPolicyNotReappliedOnRedirect {
+  category: request_forgery
+  expected: [core.AllowlistValidation]
+  kind: target
+  text: "review whether the URL policy that guards this fetch is re-applied to every redirect hop, not only to the first request"
+}

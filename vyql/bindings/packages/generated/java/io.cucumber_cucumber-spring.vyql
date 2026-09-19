@@ -1,0 +1,9 @@
+module bindings.java.generated.md6887355;
+
+binding userControlledData0 {
+  requires {
+    dependency("io.cucumber:cucumber-spring")
+  }
+  query pattern callExpr where callee.method == "loadGlue"
+  emit source core.UserControlledData at call.result
+}

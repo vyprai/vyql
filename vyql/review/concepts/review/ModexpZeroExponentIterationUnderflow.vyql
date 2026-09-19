@@ -1,0 +1,8 @@
+module code;
+
+review code.ModexpZeroExponentIterationUnderflow {
+  category: numeric
+  expected: [core.IntegerOverflowGuard]
+  kind: target
+  text: "review modular exponentiation iteration-count arithmetic for zero-exponent underflow before gas accounting"
+}

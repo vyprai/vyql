@@ -1,0 +1,49 @@
+test "rank353: Cerebrate CRUD add unsets id before massaging input"
+  lang php
+  expect VYQL-INJ-058
+  expect_review code.IncompleteMassAssignmentIdUnset
+  code
+  ```
+  <?php
+  class CRUDComponent {
+      public function add(array $params = []): void {
+          $data = $this->Table->newEmptyEntity();
+          if ($this->request->is('post')) {
+              $patchEntityParams = [
+                  'associated' => [],
+                  'accessibleFields' => $data->getAccessibleFieldForNew(),
+              ];
+              if (!empty($params['id'])) {
+                  unset($params['id']);
+              }
+              $input = $this->__massageInput($params);
+              $data = $this->Table->patchEntity($data, $input, $patchEntityParams);
+          }
+      }
+  }
+  ```
+
+test "rank353: Cerebrate CRUD add removes id from normalized input"
+  lang php
+  reject VYQL-INJ-058
+  reject_review code.IncompleteMassAssignmentIdUnset
+  code
+  ```
+  <?php
+  class CRUDComponent {
+      public function add(array $params = []): void {
+          $data = $this->Table->newEmptyEntity();
+          if ($this->request->is('post')) {
+              $patchEntityParams = [
+                  'associated' => [],
+                  'accessibleFields' => $data->getAccessibleFieldForNew(),
+              ];
+              $input = $this->__massageInput($params);
+              if (!empty($input['id'])) {
+                  unset($input['id']);
+              }
+              $data = $this->Table->patchEntity($data, $input, $patchEntityParams);
+          }
+      }
+  }
+  ```

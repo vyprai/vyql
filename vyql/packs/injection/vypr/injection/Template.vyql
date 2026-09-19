@@ -1,0 +1,10 @@
+module vypr.injection;
+
+rule Template {
+  meta {
+    cwe: [CWE_1336]
+    id: "VYQL-INJ-008"
+    severity: high
+  }
+  taint core.UserControlledData -> code.TemplateRender
+}

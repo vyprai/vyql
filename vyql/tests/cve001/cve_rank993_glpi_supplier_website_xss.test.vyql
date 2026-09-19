@@ -1,0 +1,56 @@
+# Rank 993 / CVE-2026-25932: GLPI rendered a stored supplier website
+# field into an anchor href without URL sanitization and HTML attribute
+# escaping. The 10.0.24 patch sanitizes the URL and escapes the href value.
+
+test "rank993 php: stored supplier website href is not sanitized or escaped"
+  lang php
+  file Supplier.php
+  expect VYQL-INJ-195
+  expect_review code.StoredUrlHrefAttributeXss
+  code
+  ```
+  <?php
+  class Supplier
+  {
+      public $fields = [];
+
+      public function getLinks($withname = false)
+      {
+          $ret = '';
+          if (!empty($this->fields['website'])) {
+              $ret .= "<a href='" . Toolbox::formatOutputWebLink($this->fields['website']) . "' target='_blank'>web</a>";
+          }
+          return $ret;
+      }
+  }
+  ```
+
+test "rank993 php: stored supplier website href is sanitized and escaped"
+  lang php
+  file Supplier.php
+  reject VYQL-INJ-195
+  reject_review code.StoredUrlHrefAttributeXss
+  code
+  ```
+  <?php
+  class Supplier
+  {
+      public $fields = [];
+
+      public function getLinks($withname = false)
+      {
+          $ret = '';
+          if (!empty($this->fields['website'])) {
+              $website_url = URL::sanitizeURL(
+                  Toolbox::formatOutputWebLink(
+                      Sanitizer::unsanitize($this->fields['website'])
+                  )
+              );
+              if ($website_url !== '') {
+                  $ret .= "<a href='" . htmlspecialchars($website_url) . "' target='_blank'>web</a>";
+              }
+          }
+          return $ret;
+      }
+  }
+  ```

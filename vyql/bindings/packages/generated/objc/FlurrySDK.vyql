@@ -1,0 +1,49 @@
+module bindings.objc.generated.m1054d26a;
+
+binding secretValue0 {
+  requires {
+    dependency("FlurrySDK")
+  }
+  query pattern callExpr where callee.method == "startSession:"
+  emit source code.SecretValue at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("FlurrySDK")
+  }
+  query pattern callExpr where callee.method == "logEvent:"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("FlurrySDK")
+  }
+  query pattern callExpr where callee.method == "logError:message:exception:"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("FlurrySDK")
+  }
+  query pattern callExpr where callee.method == "logError:message:error:"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData4 {
+  requires {
+    dependency("FlurrySDK")
+  }
+  query pattern callExpr where callee.method == "setUserCookies:"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData5 {
+  requires {
+    dependency("FlurrySDK")
+  }
+  query pattern callExpr where callee.method == "setKeywordsForTargeting:"
+  emit source code.NetworkData at call.result
+}

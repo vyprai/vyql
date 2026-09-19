@@ -1,0 +1,368 @@
+# Rank 1838 / CVE-2018-20552 / Bug #520 (recorded language c; the axis is
+# CWE-20 input validation of a capture-file length, manifesting as CWE-125/
+# CWE-787 downstream). appneta/tcpreplay funnels every packet it reads
+# through two validating wrappers in src/common/utils.c,
+# _our_safe_pcap_next() and _our_safe_pcap_next_ex(), which call libpcap's
+# pcap_next()/pcap_next_ex() and then check the struct pcap_pkthdr those
+# calls fill. libpcap validates nothing: for a savefile, caplen and len are
+# whatever the file claims. At the parent (2595c903^) the wrappers rejected
+# only len > MAXPACKET and len < caplen, so a packet with len == 0 (and
+# caplen == 0) passed both guards, and every consumer downstream reads the
+# returned buffer at fixed offsets -- pktdata[0], pktdata[3], pktdata[4] in
+# src/common/flows.c and src/common/get.c, &pktdata[ETHER_ADDR_LEN] in
+# src/bridge.c, packet + SIZE_ETHERNET in src/tcpliveplay.c -- which on a
+# zero-length capture is an immediate heap out-of-bounds read. The fixed revision
+# 2595c903 prepends !pkthdr->len (and !(*pkthdr)->len) to the second guard
+# in both wrappers and touches nothing else: the consumers are unchanged
+# across the revision pair.
+#
+# What fires without this change: nothing on either wrapper. The scan of the
+# parent reports findings elsewhere in utils.c (three RawMemoryCopySize rows
+# on other functions' memcpy sizes) and none at lines 122-185, and no
+# binding anywhere labels a pcap symbol -- the generated libpcap package
+# file binds only recv/send/connect/random behind dependency(), which is
+# inert for C because the C frontend emits no code.Import (measured at an
+# earlier rank on mongoose).
+#
+# The detection is deliberately not a taint route, because no taint route
+# can discriminate this fix, and that is measured rather than assumed. With
+# a probe binding labelling pcap_next's return code.NetworkData, the
+# consumer shape (caller assigns the wrapper's result and indexes it) fires
+# VYQL-MEM-005 with byte-identical fingerprints at the parent and at the
+# fix -- a guard added inside the callee clears nothing caller-side. On the
+# real tree that route dead-ends even earlier: every consumer reaches the
+# wrappers through the safe_pcap_next/safe_pcap_next_ex macros, which the C
+# frontend does not expand, so the call sites do not resolve (the macro
+# family on file; the same wrapper-and-caller pair gives the
+# finding when spelled as a direct call and nothing through the macro). The
+# header's own length fields never become tainted at all: pcap_next is not
+# in the hardcoded out-parameter reader table, so pkthdr->len stays clean
+# (the out-param reader family, likewise on file). What discriminates is
+# the wrapper's own guard set, read by shape.
+#
+# The binding states the wrapper contract from libpcap's documentation: the
+# lengths a pcap reader hands out are the capture source's own claims, and
+# a wrapper that compares them only against a maximum, or against each
+# other, has not excluded zero. Nothing from the fixing commit is named --
+# pcap_next/pcap_next_ex are the library's reader API, and the zero
+# exclusion is recognised by shape (`!hdr->len`, a deref spelling, or a
+# comparison against a zero/one literal), so the guard's variable names do
+# not matter and a correctly-fixed wrapper spelled `if (hdr->len == 0)`,
+# `len < 1` or `caplen > 0` suppresses exactly like the shipped `!len ||`.
+# Residual, stated rather than hidden: a zero test standing alone as
+# `if (!hdr->len)` -- no disjunction, no literal -- emits no binary shape
+# token at all and is not recognised, so that one fix spelling still
+# reports; the decompression sibling (VYQL-MEM-056) carries the same
+# residual for `!size` spellings, and the needle philosophy here mirrors
+# its shipped list.
+#
+# Reuse is checked before minting. DecompressionOutputSizeMissingLowerBound
+# is the closest judgement -- a peer-controlled length compared against a
+# maximum with no comparison against zero -- but its reviewCondition names
+# a decompressor sizing an output buffer from the advertised size, with a
+# CWE-191/1284 axis; this weakness is a validation gate in front of
+# consumer reads, CWE-20/125/787, and widening the shipped concept would
+# rewrite VYQL-MEM-056's meaning and the spec that pins it. The remaining
+# candidates are per-incident shapes (ZeroLengthRadiusAttributeValueParse,
+# DhcpOptionLengthUncheckedRead) or different axes
+# (OffsetLengthBoundsOverflow, UncheckedEncodedLengthArithmetic), and
+# core.MemoryBoundsCheckIssue has no consuming rule. So the class gets its
+# second member, named for the class rather than the incident: any pcap
+# reader whose length validation omits the zero bound.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off): the parent
+# tree reports 2 (utils.c:125 and :150, the two wrappers) over three runs
+# and the fixed tree 0 over three runs; the tree total moves 1156 -> 1158 and
+# back. The reachable set outside this repo is enumerable -- every
+# pcap_next/pcap_next_ex call site across the clones under /tmp/cve-work/
+# is eight files (ntopng PcapInterface.cpp, resiprocate TestRtp.cxx, samba
+# ctdb/system_socket.c and examples/pcap2nbench/main.cpp, suricata
+# source-pcap-file-helper.c and fuzz_sigpcap.c, tcpdump addrtoname.c and
+# ether_ntohost.c); scanning each gives 0, and the suricata src subtree
+# scanned whole gives 0. tcpdump's pcap_next_etherent is a distinct exact
+# token and does not match; ntopng's `hdr->caplen > 0` is a zero exclusion
+# and suppresses; samba's unvalidated readers have no length comparison at
+# all and the validating-wrapper anchor declines them.
+#
+# The cases: (a) and (b) are the two wrappers as the parent had them, the
+# deref spelling pinned by (b); (c) is the fixed revision's own form; (d) is the _ex
+# fix; (e) and (f) prove the negation is not keyed on the fixed revision's `!`
+# spelling -- an equality against zero and a positive caplen bound both
+# suppress; (g) is a reader that validates nothing, which the anchor
+# declines (no validation is a different finding, not an incomplete one);
+# (h) and (i) pin the C++ spelling of the same header.
+
+test "rank1838: safe_pcap_next checks the packet length against caplen and a maximum but never against zero"
+  lang c
+  file src/common/utils.c
+  expect VYQL-MEM-067
+  code
+  ```
+  #include <pcap.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  #define MAXPACKET 65535
+
+  u_char *_our_safe_pcap_next(pcap_t *pcap, struct pcap_pkthdr *pkthdr,
+          const char *funcname, const int line, const char *file)
+  {
+      u_char *pktdata = (u_char *)pcap_next(pcap, pkthdr);
+
+      if (pktdata) {
+          if (pkthdr->len > MAXPACKET) {
+              fprintf(stderr, "safe_pcap_next ERROR: Invalid packet length in %s:%s() line %d: %u is greater than maximum %u\n",
+                      file, funcname, line, pkthdr->len, MAXPACKET);
+              exit(-1);
+          }
+
+          if (pkthdr->len < pkthdr->caplen) {
+              fprintf(stderr, "safe_pcap_next ERROR: Invalid packet length in %s:%s() line %d: packet length %u is less than capture length %u\n",
+                      file, funcname, line, pkthdr->len, pkthdr->caplen);
+              exit(-1);
+          }
+      }
+
+      return pktdata;
+  }
+  ```
+
+test "rank1838: safe_pcap_next_ex checks the dereferenced header the same incomplete way"
+  lang c
+  file src/common/utils_ex.c
+  expect VYQL-MEM-067
+  code
+  ```
+  #include <pcap.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  #define MAXPACKET 65535
+
+  int _our_safe_pcap_next_ex(pcap_t *pcap, struct pcap_pkthdr **pkthdr,
+          const u_char **pktdata, const char *funcname,
+          const int line, const char *file)
+  {
+      int res = pcap_next_ex(pcap, pkthdr, pktdata);
+
+      if (*pktdata && *pkthdr) {
+          if ((*pkthdr)->len > MAXPACKET) {
+              fprintf(stderr, "safe_pcap_next_ex ERROR: Invalid packet length in %s:%s() line %d: %u is greater than maximum %u\n",
+                      file, funcname, line, (*pkthdr)->len, MAXPACKET);
+              exit(-1);
+          }
+
+          if ((*pkthdr)->len < (*pkthdr)->caplen) {
+              fprintf(stderr, "safe_pcap_next_ex ERROR: Invalid packet length in %s:%s() line %d: packet length %u is less than capture length %u\n",
+                      file, funcname, line, (*pkthdr)->len, (*pkthdr)->caplen);
+              exit(-1);
+          }
+      }
+
+      return res;
+  }
+  ```
+
+test "rank1838: the fixed revision rejects a zero length in the disjunction"
+  lang c
+  file src/common/utils.c
+  reject VYQL-MEM-067
+  code
+  ```
+  #include <pcap.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  #define MAXPACKET 65535
+
+  u_char *_our_safe_pcap_next(pcap_t *pcap, struct pcap_pkthdr *pkthdr,
+          const char *funcname, const int line, const char *file)
+  {
+      u_char *pktdata = (u_char *)pcap_next(pcap, pkthdr);
+
+      if (pktdata) {
+          if (pkthdr->len > MAXPACKET) {
+              fprintf(stderr, "safe_pcap_next ERROR: Invalid packet length in %s:%s() line %d: %u is greater than maximum %u\n",
+                      file, funcname, line, pkthdr->len, MAXPACKET);
+              exit(-1);
+          }
+
+          if (!pkthdr->len || pkthdr->len < pkthdr->caplen) {
+              fprintf(stderr, "safe_pcap_next ERROR: Invalid packet length in %s:%s() line %d: packet length=%u capture length=%u\n",
+                      file, funcname, line, pkthdr->len, pkthdr->caplen);
+              exit(-1);
+          }
+      }
+
+      return pktdata;
+  }
+  ```
+
+test "rank1838: the _ex fix rejects a zero length through the dereference"
+  lang c
+  file src/common/utils_ex.c
+  reject VYQL-MEM-067
+  code
+  ```
+  #include <pcap.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  #define MAXPACKET 65535
+
+  int _our_safe_pcap_next_ex(pcap_t *pcap, struct pcap_pkthdr **pkthdr,
+          const u_char **pktdata, const char *funcname,
+          const int line, const char *file)
+  {
+      int res = pcap_next_ex(pcap, pkthdr, pktdata);
+
+      if (*pktdata && *pkthdr) {
+          if ((*pkthdr)->len > MAXPACKET) {
+              fprintf(stderr, "safe_pcap_next_ex ERROR: Invalid packet length in %s:%s() line %d: %u is greater than maximum %u\n",
+                      file, funcname, line, (*pkthdr)->len, MAXPACKET);
+              exit(-1);
+          }
+
+          if (!(*pkthdr)->len || (*pkthdr)->len < (*pkthdr)->caplen) {
+              fprintf(stderr, "safe_pcap_next_ex ERROR: Invalid packet length in %s:%s() line %d: packet length=%u capture length=%u\n",
+                      file, funcname, line, (*pkthdr)->len, (*pkthdr)->caplen);
+              exit(-1);
+          }
+      }
+
+      return res;
+  }
+  ```
+
+test "rank1838: a zero test spelled as an equality excludes zero just the same"
+  lang c
+  file src/common/utils_eq.c
+  reject VYQL-MEM-067
+  code
+  ```
+  #include <pcap.h>
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  #define MAXPACKET 65535
+
+  u_char *checked_safe_pcap_next(pcap_t *pcap, struct pcap_pkthdr *pkthdr)
+  {
+      u_char *pktdata = (u_char *)pcap_next(pcap, pkthdr);
+
+      if (pktdata) {
+          if (pkthdr->len > MAXPACKET)
+              exit(-1);
+          if (pkthdr->len == 0)
+              exit(-1);
+          if (pkthdr->len < pkthdr->caplen)
+              exit(-1);
+      }
+
+      return pktdata;
+  }
+  ```
+
+test "rank1838: a positive capture-length bound excludes the zero buffer"
+  lang c
+  file src/common/utils_caplen.c
+  reject VYQL-MEM-067
+  code
+  ```
+  #include <pcap.h>
+  #include <stdlib.h>
+
+  #define MAXPACKET 65535
+
+  u_char *caplen_guarded_pcap_next(pcap_t *pd, struct pcap_pkthdr *hdr)
+  {
+      u_char *pkt;
+      int rc;
+
+      if ((rc = pcap_next_ex(pd, &hdr, (const u_char **)&pkt)) > 0) {
+          if (pkt != NULL && hdr->caplen > 0) {
+              if (hdr->len > MAXPACKET)
+                  exit(-1);
+              return pkt;
+          }
+      }
+      return NULL;
+  }
+  ```
+
+test "rank1838: a reader that validates no length at all is not an incomplete validation"
+  lang c
+  file src/common/utils_bare.c
+  reject VYQL-MEM-067
+  code
+  ```
+  #include <pcap.h>
+
+  struct Packet {
+      const u_char *data;
+      unsigned int len;
+  };
+
+  int read_packets(pcap_t *cap)
+  {
+      struct pcap_pkthdr *pkt_hdr;
+      const u_char *data;
+      int frame = 0;
+
+      while (1 == pcap_next_ex(cap, &pkt_hdr, &data)) {
+          struct Packet packet = { data, pkt_hdr->len };
+          ++frame;
+      }
+      return frame;
+  }
+  ```
+
+test "rank1838: the C++ spelling of the incompletely validated reader"
+  lang cpp
+  file src/common/utils.cpp
+  expect VYQL-MEM-067
+  code
+  ```
+  #include <pcap.h>
+  #include <cstdlib>
+
+  static const unsigned int kMaxPacket = 65535;
+
+  unsigned char *SafePcapNext(pcap_t *pcap, struct pcap_pkthdr *pkthdr)
+  {
+      unsigned char *pktdata = reinterpret_cast<unsigned char *>(pcap_next(pcap, pkthdr));
+
+      if (pktdata != nullptr) {
+          if (pkthdr->len > kMaxPacket)
+              std::exit(-1);
+          if (pkthdr->len < pkthdr->caplen)
+              std::exit(-1);
+      }
+      return pktdata;
+  }
+  ```
+
+test "rank1838: the C++ spelling of the zero-excluding fix"
+  lang cpp
+  file src/common/utils.cpp
+  reject VYQL-MEM-067
+  code
+  ```
+  #include <pcap.h>
+  #include <cstdlib>
+
+  static const unsigned int kMaxPacket = 65535;
+
+  unsigned char *SafePcapNext(pcap_t *pcap, struct pcap_pkthdr *pkthdr)
+  {
+      unsigned char *pktdata = reinterpret_cast<unsigned char *>(pcap_next(pcap, pkthdr));
+
+      if (pktdata != nullptr) {
+          if (pkthdr->len > kMaxPacket)
+              std::exit(-1);
+          if (!pkthdr->len || pkthdr->len < pkthdr->caplen)
+              std::exit(-1);
+      }
+      return pktdata;
+  }
+  ```

@@ -1,0 +1,11 @@
+module code;
+
+concept CertificatePurposeGateWithoutKeyUsage : issue {
+  cwe: [CWE_295]
+  reviewAssumption: "the gated purpose corresponds to key operations the certificate's keyUsage extension bounds, so a certificate whose key usage forbids them must be rejected even when its extended key usage matches"
+  reviewCategory: crypto
+  reviewCondition: "a certificate-purpose gate consults the extended key usage extension without consulting the key usage extension"
+  reviewConfidence: medium
+  reviewEvidence: "certificate purpose gate context {pattern} reads the extended key usage flags and never the key usage flags nor the combined purpose check"
+  vulnerableTo: [crypto.ImproperCertValidation]
+}

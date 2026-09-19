@@ -1,0 +1,154 @@
+# Rank 1624 / CVE-2026-32597: PyJWT's JWS consumer accepted a token
+# whose JOSE header carried a crit (critical extensions) array naming
+# extensions the library does not implement -- RFC 7515 §4.1.11
+# requires a consumer to reject any token whose crit lists an
+# extension it does not understand, so the signature could verify
+# while a mandatory-to-process extension went unenforced (improper
+# verification of cryptographic signature, CWE-347; GHSA-752w-
+# 5fwx-jx9f). decode_complete in jwt/api_jws.py parsed the header,
+# handled the one supported extension (b64) and verified the
+# signature, but never called _validate_headers on the decode path,
+# and _validate_headers itself checked only kid.
+#
+# The pool row's first-recorded commit bd9700cca7f9 is NOT this
+# CVE's fix -- it is the PyJWK-algorithm-default fix (#1148)
+# committed 22 minutes after the security merge and touching the
+# same files, a same-release-window mislink (failure mode 3). The
+# real fix is 051ea341b5 ("Merge commit from fork", GHSA-752w-
+# 5fwx-jx9f): it adds self._validate_headers(header) to the decode
+# path, an encoding flag so encode keeps the old behaviour, and
+# _validate_crit rejecting a non-list, empty, non-string or
+# unsupported crit entry and any entry missing from the headers.
+# The pool row now names 051ea341b5; its parent 1451d70 is the
+# vulnerable state.
+#
+# code.UnsupportedCriticalExtensionAccepted / VYQL-CRY-060 holds
+# both directions. The anchor is the library's declared surface --
+# PyJWS and decode_complete are both in jwt/__init__.py's __all__ --
+# and the discriminator is the RFC-defined parameter name: a class
+# that nowhere reads the quoted "crit" key cannot reject on it, and
+# every implementation of the check, wherever in the class it lives,
+# reads that key. So the unvalidating form expects the finding and
+# the crit-checking form (the read may sit in a sibling helper --
+# the delegated-check shape the fix actually took) rejects it.
+# Measured on the real code, three --cache off runs per revision:
+# the vulnerable tree at 1451d70 goes 404 to 405 findings (the new
+# row lands on jwt/api_jws.py's decode_complete), the fixed tree at
+# 051ea34 stays 420, and no other class named PyJWS exists in the
+# review corpus or either benchmark corpus. Prose saying only
+# "critical" does not quiet the binding; a crit read in another
+# class of the same file does not either.
+
+test "rank1624: decode path never validates the crit header"
+  lang python
+  file jwt/api_jws.py
+  expect VYQL-CRY-060
+  expect_review code.UnsupportedCriticalExtensionAccepted
+  code
+  ```
+  import json
+
+
+  class PyJWS:
+      header_typ = "JWT"
+
+      def decode_complete(self, jwt, key="", algorithms=None, options=None,
+                          detached_payload=None):
+          merged_options = self.options if options is None else {
+              **self.options, **options
+          }
+          verify_signature = merged_options["verify_signature"]
+
+          payload, signing_input, header, signature = self._load(jwt)
+
+          if header.get("b64", True) is False:
+              if detached_payload is None:
+                  raise DecodeError(
+                      "pass in a value for the detached_payload argument"
+                  )
+              payload = detached_payload
+
+          if verify_signature:
+              self._verify_signature(
+                  signing_input, header, signature, key, algorithms
+              )
+
+          return {"payload": payload, "header": header, "signature": signature}
+
+      def get_unverified_header(self, jwt):
+          headers = self._load(jwt)[2]
+          self._validate_headers(headers)
+          return headers
+
+      def _validate_headers(self, headers):
+          if "kid" in headers:
+              self._validate_kid(headers["kid"])
+
+      def _validate_kid(self, kid):
+          if not isinstance(kid, str):
+              raise InvalidTokenError("Key ID header parameter must be a string")
+  ```
+
+test "rank1624: the fixed revision validates crit on the decode path"
+  lang python
+  file jwt/api_jws.py
+  reject VYQL-CRY-060
+  reject_review code.UnsupportedCriticalExtensionAccepted
+  code
+  ```
+  import json
+
+
+  class PyJWS:
+      header_typ = "JWT"
+      _supported_crit = {"b64"}
+
+      def decode_complete(self, jwt, key="", algorithms=None, options=None,
+                          detached_payload=None):
+          merged_options = self.options if options is None else {
+              **self.options, **options
+          }
+          verify_signature = merged_options["verify_signature"]
+
+          payload, signing_input, header, signature = self._load(jwt)
+
+          self._validate_headers(header)
+
+          if header.get("b64", True) is False:
+              if detached_payload is None:
+                  raise DecodeError(
+                      "pass in a value for the detached_payload argument"
+                  )
+              payload = detached_payload
+
+          if verify_signature:
+              self._verify_signature(
+                  signing_input, header, signature, key, algorithms
+              )
+
+          return {"payload": payload, "header": header, "signature": signature}
+
+      def _validate_headers(self, headers, *, encoding=False):
+          if "kid" in headers:
+              self._validate_kid(headers["kid"])
+          if not encoding and "crit" in headers:
+              self._validate_crit(headers)
+
+      def _validate_crit(self, headers):
+          crit = headers["crit"]
+          if not isinstance(crit, list) or len(crit) == 0:
+              raise InvalidTokenError(
+                  "Invalid 'crit' header: must be a non-empty list"
+              )
+          for ext in crit:
+              if not isinstance(ext, str):
+                  raise InvalidTokenError(
+                      "Invalid 'crit' header: values must be strings"
+                  )
+              if ext not in self._supported_crit:
+                  raise InvalidTokenError(f"Unsupported critical extension: {ext}")
+              if ext not in headers:
+                  raise InvalidTokenError(
+                      f"Critical extension '{ext}' is missing from headers"
+                  )
+  ```

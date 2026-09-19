@@ -1,0 +1,291 @@
+# Node's `node:vm` is not an isolation boundary: everything the context object
+# carries is a live host-realm value, and any one of them leads back to the host
+# `Function` constructor through its own prototype chain. A worker that compiles
+# author-supplied workflow script with `new Script(...)` and runs it through
+# `script.runInNewContext(context)` therefore has exactly one control -- what it
+# puts in `context`.
+#
+# nocobase's `plugin-workflow-javascript` worker put a `console` facade there.
+# The facade looked hardened: `Object.create(null)` for the container, an own
+# `constructor: null`, every function rebound to the host console, non-configurable
+# descriptors, and `Object.freeze` at the end. What it populates from is the
+# defect:
+#
+#     const allKeys = Reflect.ownKeys(originalConsole);
+#     for (const key of allKeys) {
+#       const descriptor = Object.getOwnPropertyDescriptor(originalConsole, key);
+#       ...
+#       Object.defineProperty(safe, key, descriptor);
+#     }
+#
+# `Reflect.ownKeys` is documented to return *every* own key, non-enumerable and
+# symbol keys included, and a descriptor copied verbatim re-exposes whatever value
+# it holds. Node's `Console` carries `_stdout` and `_stderr` -- host
+# `WritableWorkerStdio` objects, not functions, so the `wrap()` masking never
+# touched them. Sandboxed script reached
+# `console._stdout.constructor.constructor` for the host `Function`, then
+# `Function('return process')().mainModule.require('child_process')` for command
+# execution. The wrapping of function members had the same hole in the other
+# direction: masking `constructor` as an own property leaves
+# `Object.getPrototypeOf(fn).constructor` intact.
+#
+# Fix commit 24203d7a01ab09ce1ce1269cce1e0a4627fa92f3 replaces the reflective copy
+# with an explicit list of nineteen logging method names, and adds
+# `hardenFunction`, which calls `Object.setPrototypeOf(fn, null)` before masking
+# `constructor`. The construct is present at the parent and the remediation is
+# present at the fixed revision.
+#
+# Detection is a JavaScript module-scope binding,
+# `sandboxFacadeWholesaleMemberCopy1840`, emitting the new
+# `code.SandboxFacadeWholesaleMemberCopy` (VYQL-INJ-262, CWE-913). It reads six
+# facts, all of them documented built-ins and none from the fixed revision's vocabulary: the
+# module runs script through `runInNewContext` / `runInThisContext` /
+# `vm.runInContext`, and it builds a container with `Object.create`, enumerates a
+# source object's own keys with `Reflect.ownKeys` or `Object.getOwnPropertyNames`,
+# reads their descriptors with `Object.getOwnPropertyDescriptor`, installs them
+# with `Object.defineProperty`, and seals the result with `Object.freeze`. The
+# contradiction between building a restricted view and populating it wholesale is
+# the weakness; an allowlist removes the enumeration half and the flag with it.
+#
+# Measured on `packages/plugins/@nocobase/plugin-workflow-javascript` of both
+# revisions, `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`, three runs
+# each: 1 finding at 24203d7a01^ (`src/server/Vm.js`) and 0 at 24203d7a01,
+# identical across runs. Renaming the fixed revision's `hardenFunction` helper in the patched
+# file leaves it at 0, and rewriting the vulnerable file's
+# `script.runInNewContext(...)` as `vm.runInNewContext(code, ...)` leaves it at 1,
+# so neither side is keyed on a spelling this commit chose.
+#
+# Reachable set rather than a subtree sample, because nocobase is a monorepo: one
+# file in the whole tree carries all six needles, and it is `Vm.js`. Across the
+# ~170 other corpus clones the same enumeration finds 42 files, all of them
+# bundled or vendored (LimeSurvey webpack bundles, ace's coffee worker, three yarn
+# release bundles, next.js's `bundle5.js`); scanning the 18 distinct ones reports
+# 0. A first revision accepted a bare `runInContext` and did flag one of them --
+# lodash's own `_.runInContext()`, which has nothing to do with `node:vm` and only
+# co-occurs with the Object/Reflect calls because a bundle is one module. That
+# name is not exclusive to `node:vm`; `runInNewContext` and `runInThisContext`
+# are, and the dotted `vm.runInContext` keeps the third spelling without the
+# collision.
+#
+# Concepts considered before minting: `code.Vm2HostCallbackBridge` is the nearest
+# neighbour and its condition -- a sandbox exposing host callbacks or globals
+# while sandbox code runs -- describes this, but its name and its evidence text
+# are written about vm2's `VM`/`sandbox` API and would misreport a `node:vm`
+# module. `code.ExpressionEvaluatorPrototypeNameAccess` is about resolving a
+# caller-supplied *name* against a reachable prototype chain, not about which
+# members a facade exposes. `code.CodeEval` covers the execution itself and is
+# untouched here: both revisions compile and run the same author-supplied source,
+# so a sink label cannot separate them.
+
+test "rank1452: a vm sandbox console facade copies every own property descriptor of the host console"
+  lang javascript
+  file packages/plugins/@nocobase/plugin-workflow-javascript/src/server/Vm.js
+  expect VYQL-INJ-262
+  expect_review code.SandboxFacadeWholesaleMemberCopy
+  code
+  ```
+  const { parentPort, workerData } = require('node:worker_threads');
+  const { Script } = require('node:vm');
+
+  function createSafeConsole(originalConsole) {
+    const safe = Object.create(null);
+    Object.defineProperty(safe, 'constructor', {
+      value: null,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    });
+
+    const allKeys = Reflect.ownKeys(originalConsole);
+    for (const key of allKeys) {
+      const descriptor = Object.getOwnPropertyDescriptor(originalConsole, key);
+      if (!descriptor) {
+        continue;
+      }
+
+      const wrap = (fn) => {
+        const bound = fn.bind(originalConsole);
+        Object.defineProperty(bound, 'constructor', {
+          value: null,
+          writable: false,
+          enumerable: false,
+          configurable: false,
+        });
+        return bound;
+      };
+
+      if (typeof descriptor.value === 'function') {
+        descriptor.value = wrap(descriptor.value);
+      }
+      if (typeof descriptor.get === 'function') {
+        descriptor.get = wrap(descriptor.get);
+      }
+
+      descriptor.configurable = false;
+
+      Object.defineProperty(safe, key, descriptor);
+    }
+
+    return Object.freeze(safe);
+  }
+
+  async function main() {
+    const { source, args = {}, options = {} } = workerData;
+    const code = `
+      this.constructor = null;
+      async function __main() {
+        ${source}
+      }
+      __main();
+    `;
+    const script = new Script(code);
+    const context = {
+      ...args,
+      console: createSafeConsole(console),
+    };
+
+    return script.runInNewContext(context, { timeout: options.timeout });
+  }
+
+  main().then((result) => parentPort.postMessage({ type: 'result', result }));
+  ```
+
+test "rank1452: the sandbox console facade exposes an explicit allowlist of logging methods"
+  lang javascript
+  file packages/plugins/@nocobase/plugin-workflow-javascript/src/server/Vm.js
+  reject VYQL-INJ-262
+  reject_review code.SandboxFacadeWholesaleMemberCopy
+  code
+  ```
+  const { parentPort, workerData } = require('node:worker_threads');
+  const { Script } = require('node:vm');
+
+  function hardenFunction(fn) {
+    Object.setPrototypeOf(fn, null);
+    Object.defineProperty(fn, 'constructor', {
+      value: null,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    });
+    return fn;
+  }
+
+  function createSafeConsole(originalConsole) {
+    const safe = Object.create(null);
+
+    const allowedMethods = [
+      'log',
+      'info',
+      'warn',
+      'error',
+      'debug',
+      'trace',
+      'dir',
+      'table',
+      'time',
+      'timeEnd',
+      'group',
+      'groupEnd',
+      'clear',
+      'assert',
+    ];
+
+    for (const key of allowedMethods) {
+      if (typeof originalConsole[key] === 'function') {
+        const bound = originalConsole[key].bind(originalConsole);
+        hardenFunction(bound);
+        Object.defineProperty(safe, key, {
+          value: bound,
+          writable: false,
+          enumerable: true,
+          configurable: false,
+        });
+      }
+    }
+
+    Object.defineProperty(safe, 'constructor', {
+      value: null,
+      writable: false,
+      enumerable: false,
+      configurable: false,
+    });
+
+    return Object.freeze(safe);
+  }
+
+  async function main() {
+    const { source, args = {}, options = {} } = workerData;
+    const code = `
+      this.constructor = null;
+      async function __main() {
+        ${source}
+      }
+      __main();
+    `;
+    const script = new Script(code);
+    const context = {
+      ...args,
+      console: createSafeConsole(console),
+    };
+
+    return script.runInNewContext(context, { timeout: options.timeout });
+  }
+
+  main().then((result) => parentPort.postMessage({ type: 'result', result }));
+  ```
+
+test "rank1452: a descriptor-copying clone helper with no sandbox execution is not a sandbox facade"
+  lang javascript
+  file src/utils/freeze.js
+  reject VYQL-INJ-262
+  reject_review code.SandboxFacadeWholesaleMemberCopy
+  code
+  ```
+  // A null-prototype frozen copy of a plain options object. The same built-ins,
+  // but nothing here runs script against the result.
+  function frozenClone(source) {
+    const copy = Object.create(null);
+
+    for (const key of Reflect.ownKeys(source)) {
+      const descriptor = Object.getOwnPropertyDescriptor(source, key);
+      if (!descriptor) {
+        continue;
+      }
+      descriptor.configurable = false;
+      Object.defineProperty(copy, key, descriptor);
+    }
+
+    return Object.freeze(copy);
+  }
+
+  module.exports = { frozenClone };
+  ```
+
+test "rank1452: lodash's runInContext beside a descriptor copy is not a vm sandbox"
+  lang javascript
+  file assets/bundle.js
+  reject VYQL-INJ-262
+  reject_review code.SandboxFacadeWholesaleMemberCopy
+  code
+  ```
+  // `_.runInContext()` is lodash's own re-binding entry point, unrelated to
+  // `node:vm`. In a bundle it lands in the same module as an unrelated
+  // descriptor-copying helper.
+  const _ = require('lodash');
+
+  const lodash = _.runInContext();
+
+  function frozenClone(source) {
+    const copy = Object.create(null);
+
+    for (const key of Object.getOwnPropertyNames(source)) {
+      const descriptor = Object.getOwnPropertyDescriptor(source, key);
+      Object.defineProperty(copy, key, descriptor);
+    }
+
+    return Object.freeze(copy);
+  }
+
+  module.exports = { lodash, frozenClone };
+  ```

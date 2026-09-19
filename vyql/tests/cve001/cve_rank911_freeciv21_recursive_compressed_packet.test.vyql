@@ -1,0 +1,118 @@
+# Rank 911 / CVE-2026-33250: Freeciv21 recursively processed compressed
+# jumbo packets, allowing nested compressed packets to exhaust the stack.
+
+test "rank911: compressed packet handler recursively re-enters packet parsing"
+  lang cpp
+  file packets.cpp
+  expect VYQL-DOS-036
+  expect_review code.RecursiveCompressedPacketDecompression
+  code
+  ```
+  #define JUMBO_SIZE 0xffff
+  #define COMPRESSION_BORDER (16 * 1024 + 1)
+  typedef unsigned long uLong;
+  typedef unsigned char Bytef;
+  struct socket_packet_buffer { unsigned char *data; unsigned ndata; unsigned nsize; };
+  struct connection { socket_packet_buffer *buffer; };
+
+  void *fc_malloc(unsigned long size);
+  void *fc_realloc(void *ptr, unsigned long size);
+  int uncompress(Bytef *dest, unsigned long *dest_len, const Bytef *source, unsigned long source_len);
+  void memmove(void *dst, const void *src, unsigned long size);
+  void memcpy(void *dst, const void *src, unsigned long size);
+  void free(void *ptr);
+  void *get_packet_from_connection(connection *pc, int *ptype);
+
+  void *get_packet_from_connection_raw(connection *pc, int *ptype)
+  {
+      int len_read = JUMBO_SIZE;
+      int whole_packet_len = len_read;
+      int header_size = 0;
+      bool compressed_packet = false;
+      if (len_read == JUMBO_SIZE) {
+          compressed_packet = true;
+          header_size = 6;
+      } else if (len_read >= COMPRESSION_BORDER) {
+          compressed_packet = true;
+          header_size = 2;
+          whole_packet_len = len_read - COMPRESSION_BORDER;
+      }
+      if (compressed_packet) {
+          uLong compressed_size = whole_packet_len - header_size;
+          unsigned long decompressed_size = 80 * compressed_size;
+          void *decompressed = fc_malloc(decompressed_size);
+          uncompress(static_cast<Bytef *>(decompressed), &decompressed_size,
+                     pc->buffer->data + header_size, compressed_size);
+          decompressed = fc_realloc(decompressed, decompressed_size);
+          memmove(pc->buffer->data, pc->buffer->data + whole_packet_len, pc->buffer->ndata);
+          memmove(pc->buffer->data + decompressed_size, pc->buffer->data, pc->buffer->ndata);
+          memcpy(pc->buffer->data, decompressed, decompressed_size);
+          free(decompressed);
+          return get_packet_from_connection(pc, ptype);
+      }
+      return nullptr;
+  }
+  ```
+
+test "rank911: decompressed packets are checked for nested compression"
+  lang cpp
+  file packets.cpp
+  reject VYQL-DOS-036
+  reject_review code.RecursiveCompressedPacketDecompression
+  code
+  ```
+  #define JUMBO_SIZE 0xffff
+  #define COMPRESSION_BORDER (16 * 1024 + 1)
+  typedef unsigned long uLong;
+  typedef unsigned char Bytef;
+  struct socket_packet_buffer { unsigned char *data; unsigned ndata; unsigned nsize; };
+  struct connection { socket_packet_buffer *buffer; };
+
+  void *fc_malloc(unsigned long size);
+  void *fc_realloc(void *ptr, unsigned long size);
+  int uncompress(Bytef *dest, unsigned long *dest_len, const Bytef *source, unsigned long source_len);
+  void memmove(void *dst, const void *src, unsigned long size);
+  void memcpy(void *dst, const void *src, unsigned long size);
+  void free(void *ptr);
+  void connection_close(connection *pc, const char *reason);
+
+  int decompress_buffer(connection *pc, int len_read)
+  {
+      int whole_packet_len = len_read;
+      int header_size = 0;
+      if (len_read == JUMBO_SIZE) {
+          header_size = 6;
+      } else if (len_read >= COMPRESSION_BORDER) {
+          header_size = 2;
+          whole_packet_len = len_read - COMPRESSION_BORDER;
+      }
+      uLong compressed_size = whole_packet_len - header_size;
+      unsigned long decompressed_size = 80 * compressed_size;
+      void *decompressed = fc_malloc(decompressed_size);
+      uncompress(static_cast<Bytef *>(decompressed), &decompressed_size,
+                 pc->buffer->data + header_size, compressed_size);
+      decompressed = fc_realloc(decompressed, decompressed_size);
+      memmove(pc->buffer->data, pc->buffer->data + whole_packet_len, pc->buffer->ndata);
+      memcpy(pc->buffer->data, decompressed, decompressed_size);
+      free(decompressed);
+      return 1;
+  }
+
+  void *get_packet_from_connection_raw(connection *pc, int *ptype)
+  {
+      int len_read = JUMBO_SIZE;
+      if (len_read >= COMPRESSION_BORDER || len_read == JUMBO_SIZE) {
+          int code = decompress_buffer(pc, len_read);
+          if (code < 0) {
+              connection_close(pc, "decoding error");
+              return nullptr;
+          }
+          len_read = 32;
+          if (len_read >= COMPRESSION_BORDER || len_read == JUMBO_SIZE) {
+              connection_close(pc, "decoding error");
+              return nullptr;
+          }
+      }
+      return nullptr;
+  }
+  ```

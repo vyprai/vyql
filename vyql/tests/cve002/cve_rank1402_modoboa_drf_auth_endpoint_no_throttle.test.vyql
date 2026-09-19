@@ -1,0 +1,180 @@
+# Rank 1402 / CVE-2023-0777: a mail-hosting platform's REST API exposed its
+# authentication surface with no request-rate limit of any kind. Four Django REST
+# Framework views in modoboa/core/api/v2/views.py each decide an outcome from a
+# secret the caller submits -- TokenObtainPairView issues a JWT from a username
+# and password, EmailPasswordResetView mails a reset token, PasswordResetSmsTOTP
+# checks a texted one-time code, PasswordResetConfirmView applies a new password
+# against a reset token -- and every one of them could be driven at machine speed
+# until the secret is found. The advisory records CWE-305; the weakness is
+# CWE-307's, an authentication-sensitive endpoint that accepts attempts without a
+# throttle.
+#
+# The fixing commit is the merge of PR #2767 and reads in full via
+# `git diff 47d17ac6643f^1 47d17ac6643f`. It adds modoboa/lib/throttle.py with
+# SimpleRateThrottle subclasses per surface, declares `throttle_classes` on each of
+# the four views plus the components endpoint, adds a GetThrottleViewsetMixin to
+# the viewsets, and gives DEFAULT_THROTTLE_RATES a rate per scope. The row is
+# correct as recorded.
+#
+# code.RateLimitRequiredOp (CWE_307) and VYQL-AUTH-105 exist for exactly
+# this weakness, and roughly two dozen Python bindings emit the issue --
+# but every one keys on a handler's own name (`name=login`, `name=reset_password`)
+# or a route path. DRF dispatches an HTTP method to the class method of the same
+# name, so in a class-based view the handler is `post` and the endpoint's identity
+# is the class: none of that vocabulary reaches `class LoginView(APIView)`. The
+# two bindings added here read the class instead -- its name for the
+# authentication surface DRF projects expose, its bases to confirm it is one of
+# the framework's own views, and Simple JWT's and django.contrib.auth's own
+# credential views as bases in their own right -- and take DRF's documented
+# `throttle_classes` / `throttle_scope` / `get_throttles()` declaration as the
+# control.
+#
+# Measured on modoboa/{core,admin,lib}, union of three --cache off runs each
+# revision: 18 -> 22 at 47d17ac6643f^1, the four new rows being api/v2/views.py
+# lines 31, 88, 124 and 149, and 18 -> 18 identical at 47d17ac6643f. Renaming
+# every identifier the fixed revision introduces (LoginThrottle, PasswordResetRequestThrottle,
+# delete_cache_key) leaves the patched revision at 0, because the discriminator is
+# DRF's attribute name and not the fixed revision's vocabulary. An AST enumeration of the
+# shape's reachable set over every clone under /tmp/cve-work found one class
+# outside this repository, maxkb's LoginView(APIView), whose failed-attempt
+# captcha lives in a serializer the view calls; it reports on both of that
+# project's revisions, so it costs one review row and no discrimination.
+
+test "rank1402: DRF login and one-time-code views accept attempts with no throttle"
+  lang python
+  file modoboa/core/api/v2/views.py
+  expect VYQL-AUTH-105
+  code
+  ```
+  import logging
+
+  from django.contrib.auth import login
+  from django.utils.datastructures import MultiValueDictKeyError
+
+  from rest_framework import response, status
+  from rest_framework.views import APIView
+  from rest_framework_simplejwt import views as jwt_views
+  from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+
+  from . import serializers
+
+  logger = logging.getLogger("modoboa.auth")
+
+
+  class TokenObtainPairView(jwt_views.TokenObtainPairView):
+      """We overwrite this view to deal with password scheme update."""
+
+      def post(self, request, *args, **kwargs):
+          serializer = self.get_serializer(data=request.data)
+          try:
+              serializer.is_valid(raise_exception=True)
+          except TokenError as e:
+              raise InvalidToken(e.args[0])
+          user = serializer.user
+          login(request, user)
+          return response.Response(
+              serializer.validated_data, status=status.HTTP_200_OK)
+
+
+  class PasswordResetSmsTOTP(APIView):
+      """ Check SMS Totp code. """
+
+      def post(self, request, *args, **kwargs):
+          try:
+              if request.data["type"] == "confirm":
+                  klass = serializers.PasswordRecoverySmsConfirmSerializer
+              elif request.data["type"] == "resend":
+                  klass = serializers.PasswordRecoverySmsResendSerializer
+              serializer = klass(data=request.data, context={'request': request})
+          except (MultiValueDictKeyError, KeyError):
+              return response.Response({"reason": "No type provided."}, 400)
+          serializer.is_valid(raise_exception=True)
+          serializer.save()
+          return response.Response({"type": "resend"}, 200)
+  ```
+
+test "rank1402: each view declares the throttle classes that limit its rate"
+  lang python
+  file modoboa/core/api/v2/views.py
+  reject VYQL-AUTH-105
+  code
+  ```
+  import logging
+
+  from django.contrib.auth import login
+  from django.utils.datastructures import MultiValueDictKeyError
+
+  from rest_framework import response, status
+  from rest_framework.views import APIView
+  from rest_framework_simplejwt import views as jwt_views
+  from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
+
+  from modoboa.lib.throttle import LoginThrottle, PasswordResetTotpThrottle
+
+  from . import serializers
+
+  logger = logging.getLogger("modoboa.auth")
+
+
+  class TokenObtainPairView(jwt_views.TokenObtainPairView):
+      """We overwrite this view to deal with password scheme update."""
+
+      throttle_classes = [LoginThrottle]
+
+      def post(self, request, *args, **kwargs):
+          serializer = self.get_serializer(data=request.data)
+          try:
+              serializer.is_valid(raise_exception=True)
+          except TokenError as e:
+              raise InvalidToken(e.args[0])
+          user = serializer.user
+          login(request, user)
+          return response.Response(
+              serializer.validated_data, status=status.HTTP_200_OK)
+
+
+  class PasswordResetSmsTOTP(APIView):
+      """ Check SMS Totp code. """
+
+      throttle_classes = [PasswordResetTotpThrottle]
+
+      def post(self, request, *args, **kwargs):
+          try:
+              if request.data["type"] == "confirm":
+                  klass = serializers.PasswordRecoverySmsConfirmSerializer
+              elif request.data["type"] == "resend":
+                  klass = serializers.PasswordRecoverySmsResendSerializer
+              serializer = klass(data=request.data, context={'request': request})
+          except (MultiValueDictKeyError, KeyError):
+              return response.Response({"reason": "No type provided."}, 400)
+          serializer.is_valid(raise_exception=True)
+          serializer.save()
+          return response.Response({"type": "resend"}, 200)
+  ```
+
+test "rank1402: an unthrottled resource viewset is not an authentication endpoint"
+  lang python
+  file modoboa/admin/api/v1/viewsets.py
+  reject VYQL-AUTH-105
+  code
+  ```
+  from rest_framework import filters, viewsets
+  from rest_framework.permissions import DjangoModelPermissions, IsAuthenticated
+
+  from modoboa.lib import viewsets as lib_viewsets
+
+  from . import serializers
+
+
+  class DomainViewSet(lib_viewsets.RevisionModelMixin, viewsets.ModelViewSet):
+      """Domain viewset."""
+
+      permission_classes = [IsAuthenticated, DjangoModelPermissions, ]
+      serializer_class = serializers.DomainSerializer
+
+      def create(self, request, *args, **kwargs):
+          serializer = self.get_serializer(data=request.data)
+          serializer.is_valid(raise_exception=True)
+          serializer.save(creator=request.user)
+          return response.Response(serializer.data, status=201)
+  ```

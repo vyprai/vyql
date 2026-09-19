@@ -1,0 +1,9 @@
+module bindings.objc.generated.m6e14b3a4;
+
+binding networkSend0 {
+  requires {
+    dependency("GoogleWebRTC")
+  }
+  query pattern callExpr where callee.method == "sendData"
+  emit sink code.NetworkSend at args[0]
+}

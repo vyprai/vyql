@@ -1,0 +1,11 @@
+module code;
+
+concept AttestationPredicateVerificationBypass : issue {
+  cwe: [CWE_347]
+  reviewAssumption: "callers rely on the requested predicate type or policy match to decide whether the printed attestation is acceptable"
+  reviewCategory: crypto
+  reviewCondition: "signature-verified attestations are emitted after predicate filtering without requiring a non-empty predicate-matched subset"
+  reviewConfidence: high
+  reviewEvidence: "attestation verification context {pattern} filters payloads by predicate type but prints the full verified set"
+  vulnerableTo: [crypto.ImproperSignatureCheck]
+}

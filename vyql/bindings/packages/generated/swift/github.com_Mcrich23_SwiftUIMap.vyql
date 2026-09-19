@@ -1,0 +1,9 @@
+module bindings.swift.generated.m2f5001ed;
+
+binding weakHash0 {
+  requires {
+    dependency("github.com/Mcrich23/SwiftUIMap")
+  }
+  query pattern callExpr where callee.method == "hash"
+  emit issue code.WeakHash at call
+}

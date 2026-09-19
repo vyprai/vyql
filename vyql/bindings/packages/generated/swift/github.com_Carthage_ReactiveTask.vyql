@@ -1,0 +1,9 @@
+module bindings.swift.generated.m07b0cd90;
+
+binding commandExecution0 {
+  requires {
+    dependency("github.com/Carthage/ReactiveTask")
+  }
+  query pattern callExpr where callee.method == "launch"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.scala.generated.m4d998a7b;
+
+binding htmlRender0 {
+  requires {
+    dependency("org.thymeleaf:thymeleaf-spring4")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.HtmlRender at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m87a9868f;
+
+binding userControlledData0 {
+  requires {
+    dependency("Brannigan")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit source core.UserControlledData at call.result
+}

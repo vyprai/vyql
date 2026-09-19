@@ -1,0 +1,11 @@
+module code;
+
+concept PickleUnsafeImportBlocklistGap : issue {
+  cwe: [CWE_184, CWE_502]
+  reviewAssumption: "pickle analysis results are trusted to classify malicious pickle payloads before loading or accepting model artifacts"
+  reviewCategory: deserialization
+  reviewCondition: "a pickle safety analyzer blocklists dangerous imports but omits known code-execution modules"
+  reviewConfidence: high
+  reviewEvidence: "unsafe_imports context {pattern} includes existing dangerous modules such as runpy/cProfile while omitting ctypes and pydoc"
+  vulnerableTo: [deserialization.DeserializationAbuse, injection.CodeInjection]
+}

@@ -1,0 +1,7 @@
+module code;
+
+review code.DomainWalkMissingPublicSuffixBoundary {
+  category: request_forgery
+  kind: attention
+  text: "stop a domain-hierarchy walk at the registrable domain: test the shortened name against a public suffix list before resolving, fetching or trusting it"
+}

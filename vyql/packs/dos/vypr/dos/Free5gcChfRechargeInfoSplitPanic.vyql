@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule Free5gcChfRechargeInfoSplitPanic {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_129, CWE_400]
+    id: "VYQL-DOS-015"
+    severity: high
+  }
+  issue code.Free5gcChfRechargeInfoSplitPanic as s
+}

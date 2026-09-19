@@ -1,0 +1,65 @@
+module bindings.elixir.generated.mc8cf5d9a;
+
+binding httpInput0 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_http:parse"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_req:read_part"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_req:read_part_more"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_req:read_part_body"
+  emit source code.HttpInput at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_router:match"
+  emit source core.UserControlledData at call.result
+}
+
+binding responseHeaderWrite5 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_req:set_resp_headers_list"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_req:do_reply"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("cowboy")
+  }
+  query pattern callExpr where callee.method == "cowboy_http:sendfile"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept RefererBasedAdminUserCreation : issue {
+  cwe: [CWE_290, CWE_269, CWE_863]
+  reviewAssumption: "attackers can send a forged Referer header to the authenticated user-creation endpoint"
+  reviewCategory: auth
+  reviewCondition: "admin privilege for a newly created user is derived from the HTTP Referer header"
+  reviewConfidence: high
+  reviewEvidence: "user-creation context {pattern} checks req.header('Referer') for the setup route and sets isAdmin before inserting the user"
+  vulnerableTo: [access_control.PrivilegeEscalation, access_control.IncorrectAuthorization]
+}

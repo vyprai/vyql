@@ -1,0 +1,32 @@
+module bindings.go.hijackedConnRawWriteWithoutUpgrade;
+
+// net/http's Hijacker.Hijack hands the raw connection to the caller: the
+// server library stops reading, writing or closing it, and whatever the
+// function does next is plain byte I/O with no HTTP semantics left. A
+// protocol upgrade over a hijacked connection is only valid once the peer
+// has actually switched: a handler serving an upgrade writes
+// http.StatusSwitchingProtocols itself before hijacking, and a proxy
+// forwarding one reads the backend's response and compares it against the
+// same constant before wiring the connections together. Both idioms leave
+// the constant in the function. A function that hijacks and then pushes
+// bytes onto a connection (a Write or an io.Copy) with the constant
+// nowhere present has taken the connection over raw without either
+// performing or verifying the switch -- the client keeps an authenticated
+// connection that was never confirmed as upgraded.
+//
+// The constant is the documented spelling of 101 in net/http, so the
+// negation recognises both the writing side and the checking side of a
+// legitimate upgrade. A status test spelled against the numeric literal
+// 101 instead of the constant evades the negation and still reports --
+// the residual, in the noisy direction. Bytes moved only inside goroutine
+// closures are outside this binding's reach: a closure's calls contribute
+// no facts to the enclosing function, so the raw-write half is satisfied
+// by the write or copy that stays in the function body. The call matches
+// carry their leading dot because the token match is a substring over the
+// whole call path: a bare Write or Hijack also matches every identifier
+// ending in those letters, and a test helper named newFakeHijackingWriter
+// satisfied both halves without the connection being touched at all.
+binding hijackRawWriteWithoutUpgradeCheck {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and containsAny(node.context.callPath, [".Hijack"]) and containsAny(node.context.callPath, [".Write", "io.Copy"]) and not (containsAny(node.context.identifier, ["StatusSwitchingProtocols"]))
+  emit issue code.ProtocolStateReview at node
+}

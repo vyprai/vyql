@@ -1,0 +1,17 @@
+module bindings.cpp.generated.mebe89998;
+
+binding codeEval0 {
+  requires {
+    dependency("lazy-importer")
+  }
+  query pattern callExpr where callee.method == "lazy_function"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("lazy-importer")
+  }
+  query pattern callExpr where callee.method == "lazy_module"
+  emit sink code.CodeEval at args[0]
+}

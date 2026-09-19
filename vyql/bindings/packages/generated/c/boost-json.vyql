@@ -1,0 +1,9 @@
+module bindings.c.generated.m72ec4ee7;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-json")
+  }
+  query pattern callExpr where callee.method == "value"
+  emit sink code.Deserialization at args[0]
+}

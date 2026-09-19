@@ -1,0 +1,8 @@
+module code;
+
+review code.ProtocolFrameLengthUint16Wrap {
+  category: memory
+  expected: [core.InputValidation]
+  kind: target
+  text: "verify protocol frame-length calculations widen 16-bit wire lengths before adding header bytes and comparing against the available buffer"
+}

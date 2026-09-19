@@ -1,0 +1,11 @@
+module code;
+
+concept AuthCallbackAmbientPolicyReuse : issue {
+  cwe: [CWE_287]
+  reviewAssumption: "the framework caches the authorization policies an authentication callback returns and hands the cache back to the next invocation as its ambient policy parameter, and callers can reach the callback concurrently or in succession"
+  reviewCategory: auth
+  reviewCondition: "an authentication callback consults the ambient authorization policy collection it was handed, so its failure path can return the cached decision of a previous caller instead of refusing"
+  reviewConfidence: high
+  reviewEvidence: "authentication callback context {pattern} references its ambient authorization policy parameter, which carries prior cached decisions rather than this invocation's own"
+  vulnerableTo: [authentication.AuthenticationBypass, authentication.ImproperAuthentication]
+}

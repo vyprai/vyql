@@ -1,0 +1,9 @@
+module bindings.elixir.generated.mc47f011f;
+
+binding networkSend0 {
+  requires {
+    dependency("hound")
+  }
+  query pattern callExpr where callee.method == "make_req"
+  emit sink code.NetworkSend at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule UrlDomainFirstLabelAllowlistLookup {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_346, CWE_290]
+    id: "VYQL-AUTH-160"
+    severity: high
+  }
+  issue code.UrlDomainFirstLabelAllowlistLookup as sink
+}

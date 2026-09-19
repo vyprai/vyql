@@ -1,0 +1,33 @@
+module bindings.java.generated.mab1966f5;
+
+binding fileUse0 {
+  requires {
+    dependency("org.aspectj:aspectjweaver")
+  }
+  query pattern callExpr where callee.method == "FileUtil.write"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.aspectj:aspectjweaver")
+  }
+  query pattern callExpr where callee.method == "FileUtil.deleteContents"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("org.aspectj:aspectjweaver")
+  }
+  query pattern callExpr where callee.method == "FileUtil.copy"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("org.aspectj:aspectjweaver")
+  }
+  query pattern callExpr where callee.method == "FileUtil.createTempFile"
+  emit sink code.FilePathAccess at args[0]
+}

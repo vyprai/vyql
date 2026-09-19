@@ -1,0 +1,33 @@
+module bindings.groovy.generated.mc65de4ad;
+
+binding secretValue0 {
+  requires {
+    dependency("io.github.jhipster:jhipster-framework")
+  }
+  query pattern callExpr where callee.method == "generateRandomAlphanumericString"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("io.github.jhipster:jhipster-framework")
+  }
+  query pattern callExpr where callee.method == "generatePassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("io.github.jhipster:jhipster-framework")
+  }
+  query pattern callExpr where callee.method == "generateActivationKey"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("io.github.jhipster:jhipster-framework")
+  }
+  query pattern callExpr where callee.method == "generateResetKey"
+  emit source code.SecretValue at call.result
+}

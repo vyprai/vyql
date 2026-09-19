@@ -1,0 +1,17 @@
+module bindings.ruby.generated.m26029b62;
+
+binding deserialization0 {
+  requires {
+    dependency("fabrication")
+  }
+  query pattern callExpr where callee.method == "to_params"
+  emit sink code.Deserialization at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("fabrication")
+  }
+  query pattern callExpr where callee.method == "sequence"
+  emit source core.UserControlledData at call.result
+}

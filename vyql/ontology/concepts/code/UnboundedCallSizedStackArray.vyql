@@ -1,0 +1,11 @@
+module code;
+
+concept UnboundedCallSizedStackArray : issue {
+  cwe: [CWE_121, CWE_770]
+  reviewAssumption: "the call that sized the array can report a length beyond what the stack holds"
+  reviewCategory: memory
+  reviewCondition: "a variable-length array takes its size from a call reporting the length of received data, while no comparison in the function bounds that length"
+  reviewConfidence: medium
+  reviewEvidence: "allocation context {pattern} sizes a stack array by an unbounded call result with no comparison naming the size identifier"
+  vulnerableTo: [memory.OobWrite]
+}

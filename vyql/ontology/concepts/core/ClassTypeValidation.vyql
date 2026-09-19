@@ -1,0 +1,8 @@
+module core;
+
+concept ClassTypeValidation : check {
+  applies: path
+  covers: [dominates]
+  cwe: [CWE_470]
+  neutralizes: [deserialization.UnsafeReflection]
+}

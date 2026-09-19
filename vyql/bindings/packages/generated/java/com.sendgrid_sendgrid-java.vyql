@@ -1,0 +1,57 @@
+module bindings.java.generated.m2d435933;
+
+binding secretValue0 {
+  requires {
+    dependency("com.sendgrid:sendgrid-java")
+  }
+  query pattern callExpr where callee.method == "SendGrid"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("com.sendgrid:sendgrid-java")
+  }
+  query pattern callExpr where callee.method == "TwilioEmail"
+  emit source code.SecretValue at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("com.sendgrid:sendgrid-java")
+  }
+  query pattern callExpr where callee.method == "addPathParam"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("com.sendgrid:sendgrid-java")
+  }
+  query pattern callExpr where callee.method == "addHeaderParam"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("com.sendgrid:sendgrid-java")
+  }
+  query pattern callExpr where callee.method == "addQueryParam"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("com.sendgrid:sendgrid-java")
+  }
+  query pattern callExpr where callee.method == "addBody"
+  emit source core.UserControlledData at call.result
+}
+
+binding networkSend6 {
+  requires {
+    dependency("com.sendgrid:sendgrid-java")
+  }
+  query pattern callExpr where callee.method == "makeCall"
+  emit sink code.NetworkSend at args[0]
+}

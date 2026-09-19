@@ -1,0 +1,8 @@
+module code;
+
+review code.ReactNativeCliOpenUrlMiddlewareCommandExecution {
+  category: command
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review React Native CLI URL-opening middleware for http/https protocol allowlisting before open(url)"
+}

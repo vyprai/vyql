@@ -1,0 +1,33 @@
+module bindings.groovy.generated.md2683009;
+
+binding httpInput0 {
+  requires {
+    dependency("io.netty:netty-codec-http")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("io.netty:netty-codec-http")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit source code.HttpInput at call.result
+}
+
+binding deserialization2 {
+  requires {
+    dependency("io.netty:netty-codec-http")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding urlFetch3 {
+  requires {
+    dependency("io.netty:netty-codec-http")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,25 @@
+module bindings.objc.generated.m3e54372e;
+
+binding deserialization0 {
+  requires {
+    dependency("GoogleDataTransport")
+  }
+  query pattern callExpr where callee.method == "GDTCORDecodeArchiveAtPath"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("GoogleDataTransport")
+  }
+  query pattern callExpr where callee.method == "GDTCORDecodeArchive"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("GoogleDataTransport")
+  }
+  query pattern callExpr where callee.method == "GDTCORWriteDataToFile"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,45 @@
+# Rank 944 / CVE-2016-15025: generator-hottowel let asset-like paths fall
+# through to the SPA index.html fallback.
+
+test "rank944: express spa fallback lacks asset 404 guards"
+  lang javascript
+  file _app.js
+  expect VYQL-INJ-187
+  expect_review code.ExpressSpaAssetFallbackReflectedXss
+  code
+  ```
+  var express = require('express');
+  var app = express();
+
+  app.use(express.static('./build/'));
+  app.use('/app/*', function(req, res, next) {
+    four0four.send404(req, res);
+  });
+  app.use('/*', express.static('./build/index.html'));
+  ```
+
+test "rank944: express spa fallback has asset 404 guards"
+  lang javascript
+  file _app.js
+  reject VYQL-INJ-187
+  reject_review code.ExpressSpaAssetFallbackReflectedXss
+  code
+  ```
+  var express = require('express');
+  var app = express();
+
+  app.use(express.static('./build/'));
+  app.use('/app/*', function(req, res, next) {
+    four0four.send404(req, res);
+  });
+  app.use('/js/*', function(req, res, next) {
+    four0four.send404(req, res);
+  });
+  app.use('/images/*', function(req, res, next) {
+    four0four.send404(req, res);
+  });
+  app.use('/styles/*', function(req, res, next) {
+    four0four.send404(req, res);
+  });
+  app.use('/*', express.static('./build/index.html'));
+  ```

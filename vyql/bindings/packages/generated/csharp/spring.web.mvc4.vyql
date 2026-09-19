@@ -1,0 +1,9 @@
+module bindings.csharp.generated.mcd06d79a;
+
+binding urlFetch0 {
+  requires {
+    dependency("spring.web.mvc4")
+  }
+  query pattern callExpr where callee.method == "Application_BeginRequest"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,41 @@
+module bindings.kotlin.generated.m83926d3f;
+
+binding xmlParse0 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.XmlParse at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "invoke"
+  emit sink code.Deserialization at args[0]
+}
+
+binding xmlParse2 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "getPayload"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse3 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "setPayload"
+  emit sink code.XmlParse at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "setPayload"
+  emit sink code.Deserialization at args[0]
+}

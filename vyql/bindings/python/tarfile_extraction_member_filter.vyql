@@ -1,0 +1,26 @@
+module bindings.python.tarfile_extraction_member_filter;
+
+// tarfile's documented extraction behaviour is to reproduce whatever the archive
+// declares. TarFile.extractall and TarFile.extract write a member named with an
+// absolute path to that absolute path, follow a member name's `..` components
+// out of the destination directory, and recreate a symlink or hard-link member
+// with the target the archive names -- so a later member routed through that
+// link lands outside the destination too. The module documents this itself
+// ("never extract archives from untrusted sources without prior inspection"),
+// and PEP 706 added the `filter=` argument for it, with the safe "data" value
+// becoming the default only in Python 3.14. A function that opens a tarball and
+// extracts it without constraining where entries may land is therefore an
+// extraction that cannot keep its own destination root (CWE-22/CWE-59).
+//
+// The documented ways to constrain it are all read here, and any one of them
+// means entry destinations are decided by the extracting code rather than by the
+// archive: the `filter=` keyword or a `tarfile.data_filter`/`tarfile.tar_filter`
+// reference, a `members=` sequence the caller assembled, and an inline
+// inspection of the entries before extracting -- getmembers or getnames, a
+// member's issym or islnk type test, or its linkname. None of those forms
+// reports. The `tarfile.open` requirement keeps this off zipfile, whose own
+// extractall sanitises member names before joining them to the destination.
+binding pythonTarfileExtractWithoutMemberConstraint {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and node.context.callPath contains "tarfile.open" and containsAny(node.context.call, ["extractall", "extract"]) and not (node.context.identifier == "filter") and not (node.context.identifier == "members") and not (node.context.identifier == "linkname") and not (containsAny(node.context.call, ["getmembers", "getnames", "issym", "islnk"])) and not (containsAny(node.context.selector, ["tarfile.data_filter", "tarfile.tar_filter"]))
+  emit issue code.ArchiveSymlinkFilterBypass at node
+}

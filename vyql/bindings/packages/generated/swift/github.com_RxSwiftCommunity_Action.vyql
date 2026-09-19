@@ -1,0 +1,25 @@
+module bindings.swift.generated.m73c4a9ef;
+
+binding expressionEval0 {
+  requires {
+    dependency("github.com/RxSwiftCommunity/Action")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding stdinInput1 {
+  requires {
+    dependency("github.com/RxSwiftCommunity/Action")
+  }
+  query pattern callExpr where callee.method == "inputs"
+  emit source code.StdinInput at call.result
+}
+
+binding logOutput2 {
+  requires {
+    dependency("github.com/RxSwiftCommunity/Action")
+  }
+  query pattern callExpr where callee.method == "errors"
+  emit sink code.LogOutput at args[0]
+}

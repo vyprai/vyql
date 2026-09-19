@@ -1,0 +1,9 @@
+module bindings.dart.generated.mf9a0b1bc;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("random_string")
+  }
+  query pattern callExpr where callee.method == "nextDouble"
+  emit issue code.WeakRandomValue at call
+}

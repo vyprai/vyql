@@ -1,0 +1,25 @@
+module bindings.groovy.generated.m6c80aedb;
+
+binding deserialization0 {
+  requires {
+    dependency("io.jsonwebtoken:jjwt-jackson")
+  }
+  query pattern callExpr where callee.method == "doDeserialize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("io.jsonwebtoken:jjwt-jackson")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("io.jsonwebtoken:jjwt-jackson")
+  }
+  query pattern callExpr where callee.method == "doSerialize"
+  emit sink code.Deserialization at args[0]
+}

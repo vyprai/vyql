@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m6e82798d;
+
+binding storedDataWrite0 {
+  requires {
+    dependency("aws-sdk-ecr")
+  }
+  query pattern callExpr where callee.method == "put_image"
+  emit sink code.StoredDataWrite at args[0]
+}

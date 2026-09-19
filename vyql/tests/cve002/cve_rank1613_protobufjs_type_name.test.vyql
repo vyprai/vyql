@@ -1,0 +1,206 @@
+# Rank 1613 / CVE-2026-41242 (GHSA-xq3m-2v4x-88gg): protobufjs spliced a
+# schema-controlled type name into JavaScript source it then evaluated, so a
+# .proto definition or JSON descriptor whose message name carried statement
+# syntax executed arbitrary code in the loading process (code injection,
+# CWE-94). The chain, verbatim from the vulnerable parent 086b19d: the Type
+# constructor (src/type.js:31) stores the parsed name through
+# `Namespace.call(this, name, options)`; Type.generateConstructor
+# (src/type.js:197) builds the generated constructor with
+# `util.codegen(["p"], mtype.name)` (src/type.js:199), where the vendored
+# @protobufjs/codegen splices its second argument into the function source
+# -- `"function " + (functionNameOverride || functionName || "") + "("`
+# (lib/codegen/index.js:78) -- and evaluates it with `Function(source)()`
+# (lib/codegen/index.js:52) or `Function.apply(null, scopeParams)`
+# (lib/codegen/index.js:50); the ctor getter invokes it
+# (`Type.generateConstructor(this)()`, src/type.js:157). The fixing commit
+# ff7b2afef8 ("fix: filter invalid characters from the type name (#2127)",
+# +1 line) strips the name to word characters in the constructor --
+# `name = name.replace(/\W/g, "")` before the Namespace.call -- so a name
+# can no longer carry statement syntax into the splice. The advisory's
+# preconditions say the same thing from the outside: the application must
+# let an attacker control the schema or descriptor being loaded. (The
+# parent commit 086b19d is a different, already-landed fix -- #2126's
+# __proto__ key filter in the Message constructor -- which is why this
+# rank's earlier prototype-pollution reading did not match the advisory:
+# the advisory is CWE-94 code generation, not CWE-1321.)
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision (timeout 180, --max-ram 6GB) over the
+# real checkout: the vulnerable parent reports 122 findings every run and
+# the fixed revision 122/121/122 (union 122 both sides); the union diff is
+# six findings shifting one line down as the fix inserts its line -- nothing
+# appears or disappears. Among them VYQL-INJ-003 (core.UserControlledData
+# -> code.CodeEval, CWE-94) reports CRITICAL on the exact evaluation site:
+# cli/pbjs.js:221 (the CLI reading the schema from stdin) ->
+# lib/codegen/index.js:50 and :52, through protobuf.parse and the
+# tokenizer. `vyql trace -from ExternalEntryInput -to CodeEval` adds the
+# name-specific route: generateConstructor#param#mtype (src/type.js:197,
+# code.ExternalEntryInput on the exported parameter) -> Attr mtype.name
+# (src/type.js:199) -> codegen#param#functionName -> the "function " +
+# functionName splice -> Function(). That row is the deduplicated
+# representative of both routes -- findings collapse to one per (rule,
+# sink), measured: 122 findings, 122 unique rule+sink pairs, none with two
+# sources.
+#
+# The report is therefore present on the vulnerable tree and equally
+# present on the fixed tree, and the pair below pins exactly that:
+#
+# 1. The constructor's word-character strip never connects to the splice.
+#    Type#param#name dead-ends at `Namespace.call(this, ...)` ("callee not
+#    traced"): the prototype-style inheritance call does not resolve into
+#    the callee's body, so the stored name has no path from the filter to
+#    the read. The consumption-side taint arrives wholesale from the
+#    object parameter (mtype), which the constructor's local filtering
+#    cannot touch -- the same constructor-control-at-a-distance family the
+#    engine-gap notes record for PHP (rank 1198) and Python (rank 1629),
+#    here on the `X.call(this, ...)` form.
+# 2. The strip would not clear even if it were on the path: String.replace
+#    is bound as threat.CharFilter for JavaScript, but code.CodeEval
+#    declares no excluded_chars, so the filter never neutralises it
+#    (explain prints "finding holds unless the filter neutralizes by other
+#    means"). Measured directly: the strip applied at the splice itself --
+#    codegen(["p"], mtype.name.replace(/\W/g, "")) -- still reports.
+#
+# When the constructor-to-field hop resolves and an identifier-strip filter
+# is recognised as neutralising for generated-source splices, the second
+# block must flip to reject while the first stays expecting. The third
+# block holds the fix's own form: the filtered constructor alone reports
+# nothing, because the name store is not itself a sink -- the evaluation
+# lives in the codegen call.
+#
+# The fourth block pins what the earlier review of this rank could not
+# see: under the library profile the exported method's parameter is an
+# entry point, so the computed-key store this corpus's first pass pinned
+# as silent -- `this.fields[field.name] = field` -- does report
+# VYQL-INJ-013 today (source add#param#field, sink the subscript write,
+# measured on the snippet and on the real tree, where src/type.js carries
+# one such row at :373 vulnerable and :374 fixed). It keys on FIELD names,
+# which this fix never filters (the advisory scopes the code-generation
+# fix to type names and type references), so it fires identically at both
+# revisions and is a coverage pin, not a discriminator.
+
+test "rank1613: the schema-controlled type name is spliced into the evaluated function source"
+  lang javascript
+  profile library
+  file src/type.js
+  expect VYQL-INJ-003
+  code
+  ```
+  var util = require("./util");
+
+  function Type(name, options) {
+      Namespace.call(this, name, options);
+      this.fields = {};
+  }
+
+  Type.generateConstructor = function generateConstructor(mtype) {
+      var gen = codegen(["p"], mtype.name);
+      for (var i = 0, field; i < mtype.fieldsArray.length; ++i)
+          if ((field = mtype._fieldsArray[i]).map)
+              gen("this%s={}", util.safeProp(field.name));
+      return gen;
+  };
+
+  function codegen(functionParams, functionName) {
+      var body = [];
+      function toString(functionNameOverride) {
+          return "function " + (functionNameOverride || functionName || "") + "(" + (functionParams && functionParams.join(",") || "") + "){\n  " + body.join("\n  ") + "\n}";
+      }
+      function Codegen(formatStringOrScope) {
+          if (typeof formatStringOrScope !== "string") {
+              var source = toString();
+              source = "return " + source;
+              return Function(source)();
+          }
+          body.push(formatStringOrScope);
+          return Codegen;
+      }
+      return Codegen;
+  }
+
+  module.exports = Type;
+  module.exports.codegen = codegen;
+  ```
+
+test "rank1613: the word-character strip in the constructor is invisible at the splice"
+  lang javascript
+  profile library
+  file src/type.js
+  expect VYQL-INJ-003
+  code
+  ```
+  var util = require("./util");
+
+  function Type(name, options) {
+      name = name.replace(/\W/g, "");
+      Namespace.call(this, name, options);
+      this.fields = {};
+  }
+
+  Type.generateConstructor = function generateConstructor(mtype) {
+      var gen = codegen(["p"], mtype.name);
+      for (var i = 0, field; i < mtype.fieldsArray.length; ++i)
+          if ((field = mtype._fieldsArray[i]).map)
+              gen("this%s={}", util.safeProp(field.name));
+      return gen;
+  };
+
+  function codegen(functionParams, functionName) {
+      var body = [];
+      function toString(functionNameOverride) {
+          return "function " + (functionNameOverride || functionName || "") + "(" + (functionParams && functionParams.join(",") || "") + "){\n  " + body.join("\n  ") + "\n}";
+      }
+      function Codegen(formatStringOrScope) {
+          if (typeof formatStringOrScope !== "string") {
+              var source = toString();
+              source = "return " + source;
+              return Function(source)();
+          }
+          body.push(formatStringOrScope);
+          return Codegen;
+      }
+      return Codegen;
+  }
+
+  module.exports = Type;
+  module.exports.codegen = codegen;
+  ```
+
+test "rank1613: the filtered constructor stores a name, not an evaluation"
+  lang javascript
+  profile library
+  file src/type.js
+  reject VYQL-INJ-003
+  reject VYQL-INJ-013
+  code
+  ```
+  function Type(name, options) {
+      name = name.replace(/\W/g, "");
+      Namespace.call(this, name, options);
+      this.fields = {};
+  }
+
+  module.exports = Type;
+  ```
+
+test "rank1613: a schema-controlled field name reaches the computed-key store"
+  lang javascript
+  profile library
+  file src/type.js
+  expect VYQL-INJ-013
+  code
+  ```
+  function Type(name, options) {
+      name = name.replace(/\W/g, "");
+      Namespace.call(this, name, options);
+      this.fields = {};
+  }
+
+  Type.prototype.add = function add(field) {
+      this.fields[field.name] = field;
+      return this;
+  };
+
+  module.exports = Type;
+  ```

@@ -1,0 +1,290 @@
+# `JSON.parse(text, reviver)` walks the parsed value and hands every property to a
+# function the script supplies. That function is arbitrary JavaScript: it can add
+# properties, delete them, or drop the last reference to the object it is handed.
+# Any raw pointer into the object's property storage that the walker holding
+# when it called out is therefore stale on return.
+#
+# njs's iterative walker held exactly such a pointer. `njs_json_parse_iterator`
+# resolved a property with `njs_property_query()`, kept the resulting
+# `njs_object_prop_t *` in `state->prop`, and descended into the property's value;
+# `njs_json_parse_iterator_call` later read that saved pointer back out, invoked
+# the reviver through `njs_function_apply()`, and then wrote the reviver's result
+# straight into the slot:
+#
+#     prop = state->prop;
+#     ...
+#     arguments[2] = prop->value;
+#     ret = njs_function_apply(vm, parse->function, arguments, 3, &parse->retval);
+#     ...
+#     if (njs_is_undefined(&parse->retval)) {
+#         prop->type = NJS_WHITEOUT;
+#     } else {
+#         prop->value = parse->retval;
+#     }
+#
+# Property slots live in the object's `njs_lvlhsh`, which any property addition
+# may reallocate, and for a parent state the pointer stays live across the whole
+# child subtree -- so every reviver call in that subtree runs with the parent's
+# slot pointer cached. A reviver that mutates the object being revived leaves
+# `prop` dangling, and the two writes above then land in freed memory. That is the
+# segmentation fault the advisory reports in `njs_json_parse_iterator_call`.
+#
+# Fix commit 2ad0ea24a58d570634e09c2e58c3b314505eaa6a replaces the hand-rolled
+# state stack with `njs_json_internalize_property()`, which re-resolves the entry
+# by key after the callback returns -- `njs_value_property_set()` /
+# `njs_value_property_delete()` -- and never holds an `njs_object_prop_t *` at
+# all. The remediation is present at the fixed revision and the construct is present at its
+# parent; the commit landed in 0.7.4.
+#
+# Detection is a C binding, `reentrantCallbackStaleSlotWrite700`, emitting the new
+# `code.ReentrantCallbackStaleSlotWrite` (VYQL-MEM-060, CWE-416). It reads three
+# facts out of the function's own context, none of them from the fixed revision's vocabulary:
+# the body declares the raw entry type `njs_object_prop_t`, it invokes script
+# through `njs_function_apply`/`njs_function_call`, it writes into a field of a
+# pointer local (`assign_shape:ID.FIELD=`), and it does *not* resolve the entry
+# itself (`njs_property_query` / `njs_lvlhsh_find` absent) -- so the slot pointer
+# it writes through came from somewhere else and has outlived a callback.
+#
+# Measured on `src/` of both revisions, `timeout 180 ./bin/vyql scan --cache off
+# --max-ram 6GB`, three runs each: VYQL-MEM-060 is 1 at 2ad0ea24a5^ (sole hit
+# `njs_json.c:980`, `njs_json_parse_iterator_call`) and 0 at 2ad0ea24a5, with the
+# tree at 970/45 findings and 961/42 at or above high respectively, identical
+# across runs. Each clause is ablated on the same pair: dropping the
+# `njs_object_prop_t` requirement gives 18 and 17, dropping the
+# "not resolved in this body" negation gives 4 and 3 -- `njs_value_property`,
+# `njs_value_property_set` and `njs_value_property_delete`, which do call a getter
+# through `njs_function_apply` but re-query the slot in the same body. Dropping the
+# field-write requirement leaves 1 and 0 on njs; it is kept because without it a
+# body that only *reads* a cached slot across a callback would report, and the
+# write-back is the defect. Confinement checked with a sibling-function pair --
+# the `njs_object_prop_t` write in one function and the `njs_function_apply` in
+# its neighbour report 0.
+#
+# Collateral: `njs_object_prop_t` appears in no other C or C++ source across the
+# 160 corpus clones under /tmp/cve-work, so the binding is inert outside njs and
+# anything vendoring it.
+#
+# Concepts considered before minting `code.ReentrantCallbackStaleSlotWrite`:
+# `code.ReentrantQueueCleanupReview` is the nearest neighbour (a callback
+# reentering a traversal that still owns entries) but its condition is written
+# about queue cancel/cleanup ownership and its evidence text would misdescribe a
+# property-table write; `code.ClosureUnwindStaleLength` is about a length left
+# stale when caller code unwinds, not a pointer left stale when caller code
+# returns normally; `code.PointerFree`/`code.PointerUse` need a release, and
+# calling a reviver is not one -- labelling `njs_function_apply` a release would
+# make every getter dispatch in the engine a double-free candidate.
+
+test "rank1449: a JSON reviver is invoked with a property-table slot pointer cached across the call"
+  lang c
+  file src/njs_json.c
+  expect VYQL-MEM-060
+  expect_review code.ReentrantCallbackStaleSlotWrite
+  code
+  ```
+  #include <njs_main.h>
+
+  static njs_int_t
+  njs_json_parse_iterator_call(njs_vm_t *vm, njs_json_parse_t *parse,
+      njs_json_state_t *state)
+  {
+      njs_int_t          ret;
+      njs_value_t        arguments[3], *value;
+      njs_object_prop_t  *prop;
+
+      prop = state->prop;
+
+      arguments[0] = state->value;
+      arguments[1] = state->keys->start[state->index++];
+
+      switch (prop->type) {
+      case NJS_PROPERTY:
+          arguments[2] = prop->value;
+
+          ret = njs_function_apply(vm, parse->function, arguments, 3,
+                                   &parse->retval);
+          if (njs_slow_path(ret != NJS_OK)) {
+              return ret;
+          }
+
+          if (njs_is_undefined(&parse->retval)) {
+              prop->type = NJS_WHITEOUT;
+
+          } else {
+              prop->value = parse->retval;
+          }
+
+          break;
+
+      case NJS_PROPERTY_REF:
+          value = prop->value.data.u.value;
+          arguments[2] = *value;
+
+          ret = njs_function_apply(vm, parse->function, arguments, 3,
+                                   &parse->retval);
+          if (njs_slow_path(ret != NJS_OK)) {
+              return ret;
+          }
+
+          if (njs_is_undefined(&parse->retval)) {
+              ret = njs_value_property_i64_delete(vm, &state->value,
+                                                  state->index - 1, NULL);
+
+          } else {
+              ret = njs_value_property_i64_set(vm, &state->value,
+                                               state->index - 1, &parse->retval);
+          }
+
+          if (njs_slow_path(ret == NJS_ERROR)) {
+              return NJS_ERROR;
+          }
+
+          break;
+
+      default:
+          njs_internal_error(vm, "njs_json_parse_iterator_call() unexpected "
+                           "property type:%s", njs_prop_type_string(prop->type));
+      }
+
+      return NJS_OK;
+  }
+  ```
+
+test "rank1449: the reviver's result is written back by re-resolving the entry by key"
+  lang c
+  file src/njs_json.c
+  reject VYQL-MEM-060
+  reject_review code.ReentrantCallbackStaleSlotWrite
+  code
+  ```
+  #include <njs_main.h>
+
+  static njs_int_t
+  njs_json_internalize_property(njs_vm_t *vm, njs_function_t *reviver,
+      njs_value_t *holder, njs_value_t *name, njs_int_t depth,
+      njs_value_t *retval)
+  {
+      int64_t       k, length;
+      njs_int_t     ret;
+      njs_value_t   val, new_elem, index;
+      njs_value_t   arguments[3];
+      njs_array_t   *keys;
+
+      if (njs_slow_path(depth++ >= NJS_JSON_MAX_DEPTH)) {
+          njs_type_error(vm, "Nested too deep or a cyclic structure");
+          return NJS_ERROR;
+      }
+
+      ret = njs_value_property(vm, holder, name, &val);
+      if (njs_slow_path(ret == NJS_ERROR)) {
+          return NJS_ERROR;
+      }
+
+      keys = NULL;
+
+      if (njs_is_object(&val)) {
+          if (!njs_is_array(&val)) {
+              keys = njs_array_keys(vm, &val, 0);
+              if (njs_slow_path(keys == NULL)) {
+                  return NJS_ERROR;
+              }
+
+              for (k = 0; k < keys->length; k++) {
+                  ret = njs_json_internalize_property(vm, reviver, &val,
+                                                      &keys->start[k], depth,
+                                                      &new_elem);
+
+                  if (njs_slow_path(ret != NJS_OK)) {
+                      goto done;
+                  }
+
+                  if (njs_is_undefined(&new_elem)) {
+                      ret = njs_value_property_delete(vm, &val, &keys->start[k],
+                                                      NULL, 0);
+
+                  } else {
+                      ret = njs_value_property_set(vm, &val, &keys->start[k],
+                                                   &new_elem);
+                  }
+
+                  if (njs_slow_path(ret == NJS_ERROR)) {
+                      goto done;
+                  }
+              }
+
+          } else {
+              ret = njs_object_length(vm, &val, &length);
+              if (njs_slow_path(ret == NJS_ERROR)) {
+                  return NJS_ERROR;
+              }
+
+              for (k = 0; k < length; k++) {
+                  ret = njs_int64_to_string(vm, &index, k);
+                  if (njs_slow_path(ret != NJS_OK)) {
+                      return NJS_ERROR;
+                  }
+
+                  ret = njs_json_internalize_property(vm, reviver, &val, &index,
+                                                      depth, &new_elem);
+
+                  if (njs_slow_path(ret != NJS_OK)) {
+                      return NJS_ERROR;
+                  }
+
+                  if (njs_is_undefined(&new_elem)) {
+                      ret = njs_value_property_delete(vm, &val, &index, NULL, 0);
+
+                  } else {
+                      ret = njs_value_property_set(vm, &val, &index, &new_elem);
+                  }
+
+                  if (njs_slow_path(ret == NJS_ERROR)) {
+                      return NJS_ERROR;
+                  }
+              }
+          }
+      }
+
+      njs_value_assign(&arguments[0], holder);
+      njs_value_assign(&arguments[1], name);
+      njs_value_assign(&arguments[2], &val);
+
+      ret = njs_function_apply(vm, reviver, arguments, 3, retval);
+
+  done:
+
+      if (keys != NULL) {
+          njs_array_destroy(vm, keys);
+      }
+
+      return ret;
+  }
+  ```
+
+test "rank1449: a property-slot write and a reviver call in sibling functions are not a stale-slot write"
+  lang c
+  file src/njs_json.c
+  reject VYQL-MEM-060
+  reject_review code.ReentrantCallbackStaleSlotWrite
+  code
+  ```
+  #include <njs_main.h>
+
+  static njs_int_t
+  njs_json_slot_reset(njs_json_state_t *state)
+  {
+      njs_object_prop_t  *prop;
+
+      prop = state->prop;
+      prop->type = NJS_WHITEOUT;
+
+      return NJS_OK;
+  }
+
+  static njs_int_t
+  njs_json_call_reviver(njs_vm_t *vm, njs_json_parse_t *parse,
+      njs_value_t *arguments)
+  {
+      return njs_function_apply(vm, parse->function, arguments, 3,
+                                &parse->retval);
+  }
+  ```

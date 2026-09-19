@@ -1,0 +1,11 @@
+module code;
+
+concept AbsentExtendedHeaderOverride : issue {
+  cwe: [CWE_436, CWE_20]
+  reviewAssumption: "another implementation of the same archive format applies the extended header's size record, so the same archive frames an entry differently for each reader and one of them can be made to stop an entry where the other keeps reading"
+  reviewCategory: input_validation
+  reviewCondition: "an archive parser sizes an entry's data read from the base header's size field alone and never consults the extended-header records for that entry, where the format gives those records precedence over the base field"
+  reviewConfidence: medium
+  reviewEvidence: "archive parsing context {pattern} reads an entry size from the base header and bounds the entry's data read with it while no extended-header consult appears in the function"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

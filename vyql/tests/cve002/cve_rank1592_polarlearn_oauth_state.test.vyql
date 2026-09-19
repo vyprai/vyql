@@ -1,0 +1,175 @@
+# Rank 1592 / CVE-2026-25221: PolarLearn's OAuth logins for Google and
+# GitHub carried no state parameter, so an attacker could complete a login
+# flow in the victim's browser and attach the attacker's own account (login
+# CSRF / session fixation, CWE-352/CWE-384; GHSA-fhhm-574m). The GitHub route
+# in src/app/api/v1/auth/github/route.ts did `const url = await
+# getGithubAuthUrl(); return Response.redirect(url, 302);` -- no state
+# generation -- and the callback branch exchanged the code with no
+# verification that the flow began in this browser (the Google twin the
+# same). The fixing commit 44669bbb5b generates randomBytes(32).toString
+# ("hex"), sets it as an httpOnly/sameSite cookie with a 15-minute max-age,
+# threads it into the authorization URL, and rejects with invalid_state
+# unless stateParam === stateCookie before any code exchange.
+#
+# Detected on the callback handler: a server route that reads the
+# authorization code out of the request URL, finishes the login itself from
+# the token response, and never reads the state parameter anywhere in the
+# scope. The reject cases pin the neutraliser and the two boundaries rather
+# than the fix's own layout: reading and comparing state (the generic
+# protected form), proving the flow with PKCE, and handing the exchange to
+# a library that owns the flow binding.
+
+test "rank1592: the oauth callback finishes the login with no state read"
+  lang javascript
+  file src/app/api/v1/auth/github/route.ts
+  expect VYQL-RF-032
+  expect_review code.OAuthStateCookieValidationMissing
+  code
+  ```
+  export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code");
+
+    const baseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
+
+    if (!code) {
+      const url = await getGithubAuthUrl();
+      return Response.redirect(url, 302);
+    }
+
+    const tokenResponse = await getGithubTokens(code);
+    const accessToken = tokenResponse.access_token;
+    if (!accessToken) {
+      return new Response("No access_token", { status: 400 });
+    }
+
+    const githubProfile = await getGithubUser(accessToken);
+    const user = await findUserByEmail(githubProfile.email);
+
+    await createSession(user.id);
+
+    const response = NextResponse.redirect(new URL("/dashboard", baseUrl), 302);
+    return response;
+  }
+  ```
+
+test "rank1592: the fixed revision reads state and compares it before the exchange"
+  lang javascript
+  file src/app/api/v1/auth/github/route.ts
+  reject VYQL-RF-032
+  reject_review code.OAuthStateCookieValidationMissing
+  code
+  ```
+  export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code");
+    const stateParam = searchParams.get("state");
+    const requestCookies = await cookies();
+
+    const baseUrl = process.env.NEXT_PUBLIC_URL || "http://localhost:3000";
+
+    if (!code) {
+      const state = randomBytes(32).toString("hex");
+      const url = await getGithubAuthUrl(state);
+      const response = NextResponse.redirect(url, 302);
+      response.cookies.set("polarlearn.oauth_state_github", state, {
+        httpOnly: true,
+        sameSite: "lax",
+        path: "/api/v1/auth",
+        maxAge: 60 * 15,
+      });
+      return response;
+    }
+
+    const stateCookie = requestCookies.get("polarlearn.oauth_state_github")?.value;
+    if (!stateParam || !stateCookie || stateParam !== stateCookie) {
+      return NextResponse.redirect(
+        new URL("/auth/sign-in?error=invalid_state&provider=github", baseUrl),
+        302
+      );
+    }
+
+    const tokenResponse = await getGithubTokens(code);
+    const accessToken = tokenResponse.access_token;
+    const githubProfile = await getGithubUser(accessToken);
+    const user = await findUserByEmail(githubProfile.email);
+
+    await createSession(user.id);
+
+    const response = NextResponse.redirect(new URL("/dashboard", baseUrl), 302);
+    return response;
+  }
+  ```
+
+test "rank1592: a callback that compares state against the stored value is protected"
+  lang javascript
+  file src/app/api/v1/auth/provider/route.ts
+  reject VYQL-RF-032
+  reject_review code.OAuthStateCookieValidationMissing
+  code
+  ```
+  export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code");
+    const state = searchParams.get("state");
+    const stored = request.headers.get("cookie")?.match(/state=([^;]+)/)?.[1];
+
+    if (!state || !stored || state !== stored) {
+      return new Response("invalid_state", { status: 403 });
+    }
+
+    const tokenResponse = await provider.exchangeCode(code);
+    const accessToken = tokenResponse.access_token;
+
+    const response = NextResponse.redirect("/dashboard", 302);
+    return response;
+  }
+  ```
+
+test "rank1592: a callback that proves the flow with PKCE is bound to the browser"
+  lang javascript
+  file src/app/api/v1/auth/provider/route.ts
+  reject VYQL-RF-032
+  reject_review code.OAuthStateCookieValidationMissing
+  code
+  ```
+  export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code");
+    const verifier = requestCookies.get("provider.verifier")?.value;
+
+    const tokenResponse = await provider.exchangeCode(code, {
+      grant_type: "authorization_code",
+      code_verifier: verifier,
+    });
+    const accessToken = tokenResponse.access_token;
+
+    const response = NextResponse.redirect("/dashboard", 302);
+    return response;
+  }
+  ```
+
+test "rank1592: a callback that hands the exchange to a library keeps no response fields in scope"
+  lang javascript
+  file src/app/api/v1/auth/provider/route.ts
+  reject VYQL-RF-032
+  reject_review code.OAuthStateCookieValidationMissing
+  code
+  ```
+  export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const code = searchParams.get("code");
+
+    if (!code) {
+      return NextResponse.redirect("/auth/sign-in", 302);
+    }
+
+    const { error } = await authClient.exchangeCodeForSession(code);
+    if (error) {
+      return NextResponse.redirect("/auth/auth-code-error", 302);
+    }
+
+    const response = NextResponse.redirect("/dashboard", 302);
+    return response;
+  }
+  ```

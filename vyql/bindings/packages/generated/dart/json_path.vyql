@@ -1,0 +1,9 @@
+module bindings.dart.generated.m373390a7;
+
+binding deserialization0 {
+  requires {
+    dependency("json_path")
+  }
+  query pattern callExpr where callee.method == "JsonPathParser.parse"
+  emit sink code.Deserialization at args[0]
+}

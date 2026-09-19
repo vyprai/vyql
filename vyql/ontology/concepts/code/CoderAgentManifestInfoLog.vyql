@@ -1,0 +1,11 @@
+module code;
+
+concept CoderAgentManifestInfoLog : issue {
+  cwe: [CWE_532]
+  reviewAssumption: "workspace agent manifests may contain sensitive environment variables and operator logs are accessible to lower-trust readers"
+  reviewCategory: secret
+  reviewCondition: "Coder workspace-agent manifest protobuf is logged at info level without redaction"
+  reviewConfidence: high
+  reviewEvidence: "agent manifest fetch log {pattern} writes slog field \"manifest\" with the raw manifest protobuf"
+  vulnerableTo: [secrets.SecretLeak]
+}

@@ -1,0 +1,80 @@
+# Rank 914 / CVE-2026-7423: FreeRTOS+TCP subtracted the ICMPv6 echo header
+# size from a short IPv6 payload length before verifying the payload was large enough.
+
+test "rank914: ICMPv6 echo payload length subtracts header before minimum guard"
+  lang c
+  file FreeRTOS_ND.c
+  expect VYQL-MEM-045
+  expect_review code.IcmpEchoPayloadLengthUnderflow
+  code
+  ```
+  void prvProcessICMPMessage_IPv6(NetworkBufferDescriptor_t *pxNetworkBuffer)
+  {
+      switch (pxICMPHeader_IPv6->ucType)
+      {
+      case ipICMP_PING_REPLY_IPv6:
+      {
+          ePingReplyStatus_t eStatus = eSuccess;
+          const ICMPEcho_IPv6_t * pxICMPEchoHeader = ( ( const ICMPEcho_IPv6_t * ) pxICMPHeader_IPv6 );
+          size_t uxDataLength, uxCount;
+          const uint8_t * pucByte;
+          uxDataLength = ipNUMERIC_CAST( size_t, FreeRTOS_ntohs( pxICMPPacket->xIPHeader.usPayloadLength ) );
+          uxDataLength = uxDataLength - sizeof( *pxICMPEchoHeader );
+          pucByte = ( const uint8_t * ) pxICMPEchoHeader;
+          pucByte = &( pucByte[ sizeof( *pxICMPEchoHeader ) ] );
+          for( uxCount = 0; uxCount < uxDataLength; uxCount++ )
+          {
+              if( *pucByte != ( uint8_t ) ipECHO_DATA_FILL_BYTE )
+              {
+                  eStatus = eInvalidData;
+                  break;
+              }
+              pucByte++;
+          }
+          vApplicationPingReplyHook( eStatus, pxICMPEchoHeader->usIdentifier );
+          break;
+      }
+      }
+  }
+  ```
+
+test "rank914: ICMPv6 echo payload checks minimum before subtracting header"
+  lang c
+  file FreeRTOS_ND.c
+  reject VYQL-MEM-045
+  reject_review code.IcmpEchoPayloadLengthUnderflow
+  code
+  ```
+  void prvProcessICMPMessage_IPv6(NetworkBufferDescriptor_t *pxNetworkBuffer)
+  {
+      switch (pxICMPHeader_IPv6->ucType)
+      {
+      case ipICMP_PING_REPLY_IPv6:
+      {
+          ePingReplyStatus_t eStatus = eSuccess;
+          const ICMPEcho_IPv6_t * pxICMPEchoHeader = ( ( const ICMPEcho_IPv6_t * ) pxICMPHeader_IPv6 );
+          size_t uxDataLength, uxCount;
+          const uint8_t * pucByte;
+          uxDataLength = ipNUMERIC_CAST( size_t, FreeRTOS_ntohs( pxICMPPacket->xIPHeader.usPayloadLength ) );
+          if( uxDataLength < sizeof( *pxICMPEchoHeader ) )
+          {
+              break;
+          }
+          uxDataLength = uxDataLength - sizeof( *pxICMPEchoHeader );
+          pucByte = ( const uint8_t * ) pxICMPEchoHeader;
+          pucByte = &( pucByte[ sizeof( *pxICMPEchoHeader ) ] );
+          for( uxCount = 0; uxCount < uxDataLength; uxCount++ )
+          {
+              if( *pucByte != ( uint8_t ) ipECHO_DATA_FILL_BYTE )
+              {
+                  eStatus = eInvalidData;
+                  break;
+              }
+              pucByte++;
+          }
+          vApplicationPingReplyHook( eStatus, pxICMPEchoHeader->usIdentifier );
+          break;
+      }
+      }
+  }
+  ```

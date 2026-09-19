@@ -1,0 +1,210 @@
+# Rank 1224 / CVE-2024-37358 (GHSA-56jp-w6vw-j3jw): Apache James's IMAP
+# frame reader consumed a request line one byte at a time with no cap on
+# how long that line could grow. NettyImapRequestLineReader.nextChar()
+# increments a per-connection `read` counter on every byte pulled off the
+# Netty ChannelBuffer but never compares it against anything -- a
+# pre-authentication client that keeps sending bytes without a CRLF or a
+# declared IMAP literal drives the frame decoder's cumulation buffer
+# arbitrarily large, since ImapRequestLineReader's tag/command/argument
+# parsers all loop by repeatedly calling nextChar() until a delimiter
+# appears. The fix (b2f3c06e, the 3.7.x backport of PR #2282) threads a
+# maxFrameLength constructor parameter down to nextChar(), which now
+# throws once `read > maxFrameLength`, and the same change shipped on the
+# 3.8 line; the first tagged releases carrying it are 3.7.6 and 3.8.2.
+#
+# The weakness is inside the library, so the application embedding the
+# IMAP server is correct code -- the report that belongs to this CVE is
+# the dependency finding: a Maven pin of the carrying artifact below the
+# first line-bounded release. The advisory attributes the vulnerability
+# to org.apache.james.protocols:protocols-imap, but the vulnerable class
+# org.apache.james.imapserver.netty.NettyImapRequestLineReader ships in
+# org.apache.james:james-server-protocols-imap4 (jar contents verified on
+# Maven Central at 3.7.5, 3.7.6, 3.8.1 and 3.8.2; the protocols-imap jar
+# carries only the org.apache.james.imap and org.apache.james.mailbox
+# packages), so the advisory row pins the carrying coordinate. The
+# advisory fixes two branches (everything below 3.7.6, then 3.8.0 and
+# 3.8.1) and the row carries a single min_safe of 3.8.2: a 3.7.6 pin,
+# fixed on the 3.7 branch, still reports, the same single-floor residual
+# every two-branch advisory has. The advisory's own CWE-770 label
+# (repeated allocation without a limit) is accurate, so the row keeps it.
+#
+# Code-level detection stays absent on both revisions of nextChar(): the
+# method's only names are read, buffer and readable, ordinary field and
+# method names that also appear in any byte-counting read loop, safe or
+# not, and no Java analysis fact correlates the counter that is
+# incremented with a bound it is or is not compared against -- the Java
+# loop-identity gap the ENGINE-GAPS "1192" entry records, with this as
+# its second confirmed instance.
+
+test "rank1224: a james-server-protocols-imap4 pin below the first line-bounded release is a dependency finding"
+  lang java
+  file src/main/java/example/App.java
+  code
+  ```
+  package example;
+
+  import org.apache.james.imapserver.netty.IMAPServer;
+
+  public class App {
+      public void configure(IMAPServer server) {
+          server.setPort(1143);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>org.apache.james</groupId>
+        <artifactId>james-server-protocols-imap4</artifactId>
+        <version>3.8.1</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2024-37358
+
+test "rank1224: a james-server-protocols-imap4 pin at the first line-bounded release is clean"
+  lang java
+  file src/main/java/example/App.java
+  code
+  ```
+  package example;
+
+  import org.apache.james.imapserver.netty.IMAPServer;
+
+  public class App {
+      public void configure(IMAPServer server) {
+          server.setPort(1143);
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>org.apache.james</groupId>
+        <artifactId>james-server-protocols-imap4</artifactId>
+        <version>3.8.2</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  reject VYQL-SCA-001
+
+# The line reader itself is not a resource finding whatever the pin: the
+# counting loop's shape is inside the library, and detecting it in source
+# needs the Java loop-identity analysis fact the engine does not have
+# (ENGINE-GAPS "1192"). Both revisions are held verbatim from the fix
+# diff, both rejecting the unbounded-allocation review.
+
+test "rank1224: the byte-counting line reader is not a resource finding on a vulnerable pin"
+  lang java
+  file NettyImapRequestLineReader.java
+  code
+  ```
+  public class NettyImapRequestLineReader extends AbstractNettyImapRequestLineReader {
+
+      private final ChannelBuffer buffer;
+      private int read = 0;
+      private final int maxLiteralSize;
+
+      public NettyImapRequestLineReader(Channel channel, ChannelBuffer buffer, boolean retry, int maxLiteralSize) {
+          super(channel, retry);
+          this.buffer = buffer;
+          this.maxLiteralSize = maxLiteralSize;
+      }
+
+      @Override
+      public char nextChar() throws DecodingException {
+          if (!nextSeen) {
+              int next;
+
+              if (buffer.readable()) {
+                  next = buffer.readByte();
+                  read++;
+              } else {
+                  throw new NotEnoughDataException();
+              }
+              nextSeen = true;
+              nextChar = (char) next;
+          }
+          return nextChar;
+      }
+  }
+  ```
+  file pom.xml
+  code
+  ```
+  <project xmlns="http://maven.apache.org/POM/4.0.0">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>example</groupId>
+    <artifactId>app</artifactId>
+    <version>1.0.0</version>
+    <dependencies>
+      <dependency>
+        <groupId>org.apache.james</groupId>
+        <artifactId>james-server-protocols-imap4</artifactId>
+        <version>3.8.1</version>
+      </dependency>
+    </dependencies>
+  </project>
+  ```
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview
+
+test "rank1224: the bounded line reader rejects once the counter passes maxFrameLength"
+  lang java
+  file NettyImapRequestLineReader.java
+  code
+  ```
+  public class NettyImapRequestLineReader extends AbstractNettyImapRequestLineReader {
+
+      private final ChannelBuffer buffer;
+      private int read = 0;
+      private final int maxLiteralSize;
+      private final int maxFrameLength;
+
+      public NettyImapRequestLineReader(Channel channel, ChannelBuffer buffer, boolean retry, int maxLiteralSize, int maxFrameLength) {
+          super(channel, retry);
+          this.buffer = buffer;
+          this.maxLiteralSize = maxLiteralSize;
+          this.maxFrameLength = maxFrameLength;
+      }
+
+      @Override
+      public char nextChar() throws DecodingException {
+          if (!nextSeen) {
+              int next;
+
+              if (buffer.readable()) {
+                  next = buffer.readByte();
+                  read++;
+                  if (read > maxFrameLength) {
+                      throw new DecodingException(HumanReadableText.FAILED, "Line length exceeded.");
+                  }
+              } else {
+                  throw new NotEnoughDataException();
+              }
+              nextSeen = true;
+              nextChar = (char) next;
+          }
+          return nextChar;
+      }
+  }
+  ```
+  reject VYQL-DOS-041
+  reject_review code.UnboundedAllocationReview

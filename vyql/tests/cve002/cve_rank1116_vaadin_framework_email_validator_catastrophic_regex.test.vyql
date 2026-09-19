@@ -1,0 +1,84 @@
+# Rank 1116 / CVE-2021-31409: Vaadin Framework's legacy EmailValidator passed a
+# catastrophic-backtracking email regex straight into RegexpValidator's
+# constructor, which compiles it and runs a complete match over every
+# user-supplied address, so a crafted address burns the validating thread
+# (CWE-400):
+#
+#   public EmailValidator(String errorMessage) {
+#       super("^([a-zA-Z0-9_\\.\\-+])+@(([a-zA-Z0-9-])+\\.)+([a-zA-Z0-9]{2,4})+$",
+#               true, errorMessage);
+#   }
+#
+# The fix's own regression test hangs the parent on
+# "a@a.m5qRt8zLxQG4mMeu9yKZ...KZ&": the tld group ([a-zA-Z0-9]{2,4})+ partitions
+# the 48-character alphanumeric tail into 2-4 character chunks in exponentially
+# many ways before the trailing & fails the match. The fix replaces the whole
+# pattern with one dot literal and one bounded tail class,
+# ^([a-zA-Z0-9_\.\-+])+@[a-zA-Z0-9-.]+\.[a-zA-Z0-9-]{2,}$, held in a static
+# final field built by concatenation.
+#
+# ATTENTION, engine gap, re-measured. Scanning the real checkout three times
+# per revision reports 359 findings (226 at or above high) on both the
+# vulnerable and the fixed revision, none on EmailValidator; vyql match on the
+# file reports no source, sink or control in either revision. The engine now
+# has a shared structural detector (regexambig.Ambiguous), stamped at lowering
+# as analysis.dos.catastrophic_regex for Python re.* calls and for C# Regex
+# constructions and consumed by callee.analysis ~= "dos.catastrophic_regex"
+# bindings -- but for neither of those languages nor Java would it discriminate
+# this pair: measured directly, Ambiguous returns true for the vulnerable
+# pattern AND for the fixed one, because regexBodyHasRepeat scans group bodies
+# for + and * without tracking character classes, so the literal + inside
+# [a-zA-Z0-9_\.\-+] -- a class both revisions keep -- is read as a quantifier.
+# The shape that actually blows up here, a bounded-range quantifier wrapped in
+# an unbounded repeat over a multi-character class (([a-zA-Z0-9]{2,4})+),
+# returns false from Ambiguous by design: regexSplitsOneCharRun restricts the
+# adjacent-repeat report to single-character sets because wide-class repeats
+# are ordinary, and modeling chunk-partition ambiguity over a wide class is a
+# design call, not a correction. And the code shape needs more than wiring
+# anyway: the pattern literal reaches Pattern.compile only through a
+# project-local constructor parameter (super(...) -> RegexpValidator(String
+# regexp, ...) -> Pattern.compile(regexp)), so the stamp site, which requires
+# the literal on a recognized regex API, can never fire without
+# interprocedural constant tracking, while a binding naming RegexpValidator
+# with a pattern-fragment needle is the per-CVE literal match this weakness
+# class has already rejected twice.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1116: the domain group nests an unbounded repetition inside another"
+  lang java
+  file EmailValidator.java
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.v7.data.validator;
+
+  public class EmailValidator extends RegexpValidator {
+
+      public EmailValidator(String errorMessage) {
+          super("^([a-zA-Z0-9_\\.\\-+])+@(([a-zA-Z0-9-])+\\.)+([a-zA-Z0-9]{2,4})+$",
+                  true, errorMessage);
+      }
+  }
+  ```
+
+test "rank1116: the domain suffix is one dot literal and a bounded tail class"
+  lang java
+  file EmailValidator.java
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  package com.vaadin.v7.data.validator;
+
+  public class EmailValidator extends RegexpValidator {
+
+      private static final String PATTERN = "^" + "([a-zA-Z0-9_\\.\\-+])+" // local
+              + "@" + "[a-zA-Z0-9-.]+" // domain
+              + "\\." + "[a-zA-Z0-9-]{2,}" // tld
+              + "$";
+
+      public EmailValidator(String errorMessage) {
+          super(PATTERN, true, errorMessage);
+      }
+  }
+  ```

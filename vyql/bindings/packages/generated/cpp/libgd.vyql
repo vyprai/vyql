@@ -1,0 +1,73 @@
+module bindings.cpp.generated.m9eba5595;
+
+binding deserialization0 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromPng"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromQoi"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromGif"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromWBMP"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromWBMPCtx"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromJpeg"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromJpegCtx"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromWebp"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("libgd")
+  }
+  query pattern callExpr where callee.method == "gdImageCreateFromWebpCtx"
+  emit sink code.Deserialization at args[0]
+}

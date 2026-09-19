@@ -1,0 +1,63 @@
+# Rank 848 / CVE-2022-1849: FileGator kept existing sessions valid after
+# mutable authorization fields changed because the session hash used only password.
+
+test "rank848: session hash omits authorization state"
+  lang php
+  file JsonFile.php
+  expect VYQL-AUTH-058
+  expect_review code.SessionHashMissingAuthorizationState
+  code
+  ```
+  <?php
+  class JsonFile {
+      const SESSION_HASH = 'json_auth_hash';
+      protected $session;
+
+      public function authenticate($username, $password): bool
+      {
+          foreach ($this->getUsers() as &$u) {
+              if ($u['username'] == $username && $this->verifyPassword($password, $u['password'])) {
+                  $this->session->set(self::SESSION_HASH, $u['password']);
+                  return true;
+              }
+          }
+          return false;
+      }
+
+      public function update($username, User $user, $password = ''): User
+      {
+          foreach ($this->getUsers() as &$u) {
+              if ($u['username'] == $username) {
+                  $u['role'] = $user->getRole();
+                  $u['homedir'] = $user->getHomeDir();
+                  $u['permissions'] = $user->getPermissions(true);
+              }
+          }
+      }
+  }
+  ```
+
+test "rank848: session hash includes authorization state"
+  lang php
+  file JsonFile.php
+  reject VYQL-AUTH-058
+  reject_review code.SessionHashMissingAuthorizationState
+  code
+  ```
+  <?php
+  class JsonFile {
+      const SESSION_HASH = 'json_auth_hash';
+      protected $session;
+
+      public function authenticate($username, $password): bool
+      {
+          foreach ($this->getUsers() as &$u) {
+              if ($u['username'] == $username && $this->verifyPassword($password, $u['password'])) {
+                  $this->session->set(self::SESSION_HASH, $u['password'].$u['permissions'].$u['homedir'].$u['role']);
+                  return true;
+              }
+          }
+          return false;
+      }
+  }
+  ```

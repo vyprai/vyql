@@ -1,0 +1,238 @@
+# RIOT's l2filter keeps one fixed-capacity slot array per device:
+# `uint8_t addr[CONFIG_L2FILTER_ADDR_MAXLEN]` (default 8 bytes) inside each
+# `l2filter_t`. `l2filter_add(list, addr, addr_len)` stores the caller's
+# address with a raw `memcpy(list[i].addr, addr, addr_len)`, and the only
+# bound on `addr_len` is a precondition the header documents as
+# `@pre addr_maxlen <= CONFIG_L2FILTER_ADDR_MAXLEN` plus one line in the
+# implementation:
+#
+#   assert(list && addr && (addr_len <= CONFIG_L2FILTER_ADDR_MAXLEN));
+#
+# `assert()` compiles to nothing in a production (NDEBUG) build, so the bound
+# holds only in debug images and a caller that passes a longer address writes
+# past the 8-byte slot (CWE-787 out-of-bounds write). The module is a public
+# API (`sys/include/net/l2filter.h`) documented for arbitrary callers, and fix
+# commit f6f7de4ccc107c018630e4c15500825caf02e1c2 ("net/l2filter: fix incorrect
+# length check") splits the assert and adds a runtime check that returns:
+#
+#   assert(list && addr);
+#   if (addr_len > CONFIG_L2FILTER_ADDR_MAXLEN) {
+#       assert(0);
+#       return -EINVAL;
+#   }
+#
+# The two revisions differ only in the construct that carries the comparison,
+# which is the write-length/capacity correlation family in a new spelling: the
+# bound exists at both, and what changes is whether it lives inside `assert()`.
+#
+# Detected by the assert_only_length_bound fact
+# (ccAssertOnlyLengthCopyObservations,
+# internal/extract/frontend/treesitter/c.go) through binding
+# assertOnlyLengthCopy in vyql/bindings/c/assert_only_length_copy.vyql, judged
+# by VYQL-MEM-079. The fact reports a copy whose count is a bare identifier
+# that the function relates to something with a relational operator inside
+# `assert(...)` and nowhere else: every assert call in the body is blanked
+# before the comparison is looked for again, so the same comparison moved into
+# an if, a switch case or a loop condition reads as consulted while the one
+# inside the macro does not. That a comparison exists at all is what carries
+# the reading -- the bound was meant to hold -- and it is also what keeps the
+# rule off the far larger set of copies nobody compared. The unconditional
+# VYQL-MEM-016 raw-copy smell fires on both revisions and separates nothing.
+#
+# Measured on the real checkout, 3 x --cache off runs per revision (timeout
+# 180, --max-ram 6GB) over sys/net/link_layer/l2filter: VYQL-MEM-079 reports
+# 1 at the parent (l2filter.c:54) and 0 at the fix, every other rule count
+# identical across all six runs. Collateral, same bounds: 3 more in RIOT
+# sys/ (nanocoap _decode_uint's `assert(nbytes <= 4)` before a copy into a
+# 4-byte local, gnrc_ipv6_auto_subnets' assert-bounded `eui_len`, isotp's
+# `assert(len && len <= MAX_MSG_LENGTH)` before a copy into a buffer that
+# call itself sized by `len` -- the one false positive of the set), 2 in RIOT
+# drivers/netdev (ieee802154's `assert(len <= sizeof(dev->short_addr))` and
+# its long-address twin, the same construct as this CVE), 2 in redis/src and
+# 1 in radare2's aarch64 disassembler (`assert(len < 8)` before a strncpy into
+# a caller's buffer), with 0 across px4-autopilot/src, protobuf/src and
+# qemu/hw; radare2/libr whole is not measurable under the 180s bound.
+#
+# The last case pins a defect this rule does not share: the index-access guard
+# route reads an assert-wrapped comparison as a bound, so a field-derived
+# index whose only bound is `assert(p->len <= CAP)` is silent where the
+# comparison-free form reports VYQL-MEM-010. Crediting asserts as guards
+# blanket-credits them in release builds too, so the deliberate form is
+# assert-aware credit gated on build configuration, not a wholesale change.
+
+test "rank1676: l2filter_add copies a caller-chosen length with the bound only inside assert()"
+  lang c
+  file sys/net/link_layer/l2filter/l2filter.c
+  expect VYQL-MEM-079
+  expect VYQL-MEM-016
+  code
+  ```
+  #include <string.h>
+
+  #define CONFIG_L2FILTER_ADDR_MAXLEN (8U)
+  #define CONFIG_L2FILTER_LISTSIZE    (8U)
+
+  typedef struct {
+      uint8_t addr[CONFIG_L2FILTER_ADDR_MAXLEN];
+      size_t addr_len;
+  } l2filter_t;
+
+  int l2filter_add(l2filter_t *list, const void *addr, size_t addr_len)
+  {
+      assert(list && addr && (addr_len <= CONFIG_L2FILTER_ADDR_MAXLEN));
+
+      int res = -ENOMEM;
+
+      for (unsigned i = 0; i < CONFIG_L2FILTER_LISTSIZE; i++) {
+          if (list[i].addr_len == 0) {
+              list[i].addr_len = addr_len;
+              memcpy(list[i].addr, addr, addr_len);
+              res = 0;
+              break;
+          }
+      }
+
+      return res;
+  }
+  ```
+
+test "rank1676: the fix bounds the copy length with a runtime check that returns before the copy"
+  lang c
+  file sys/net/link_layer/l2filter/l2filter.c
+  reject VYQL-MEM-079
+  expect VYQL-MEM-016
+  code
+  ```
+  #include <string.h>
+
+  #define CONFIG_L2FILTER_ADDR_MAXLEN (8U)
+  #define CONFIG_L2FILTER_LISTSIZE    (8U)
+
+  typedef struct {
+      uint8_t addr[CONFIG_L2FILTER_ADDR_MAXLEN];
+      size_t addr_len;
+  } l2filter_t;
+
+  int l2filter_add(l2filter_t *list, const void *addr, size_t addr_len)
+  {
+      assert(list && addr);
+      if (addr_len > CONFIG_L2FILTER_ADDR_MAXLEN) {
+          assert(0);
+          return -EINVAL;
+      }
+
+      int res = -ENOMEM;
+
+      for (unsigned i = 0; i < CONFIG_L2FILTER_LISTSIZE; i++) {
+          if (list[i].addr_len == 0) {
+              list[i].addr_len = addr_len;
+              memcpy(list[i].addr, addr, addr_len);
+              res = 0;
+              break;
+          }
+      }
+
+      return res;
+  }
+  ```
+
+test "rank1676: a copy nobody compared is the larger set and is not reported"
+  lang c
+  file sys/net/link_layer/l2filter/l2filter.c
+  reject VYQL-MEM-079
+  code
+  ```
+  #include <string.h>
+
+  #define CONFIG_L2FILTER_ADDR_MAXLEN (8U)
+  #define CONFIG_L2FILTER_LISTSIZE    (8U)
+
+  typedef struct {
+      uint8_t addr[CONFIG_L2FILTER_ADDR_MAXLEN];
+      size_t addr_len;
+  } l2filter_t;
+
+  int l2filter_add(l2filter_t *list, const void *addr, size_t addr_len)
+  {
+      int res = -ENOMEM;
+
+      for (unsigned i = 0; i < CONFIG_L2FILTER_LISTSIZE; i++) {
+          if (list[i].addr_len == 0) {
+              list[i].addr_len = addr_len;
+              memcpy(list[i].addr, addr, addr_len);
+              res = 0;
+              break;
+          }
+      }
+
+      return res;
+  }
+  ```
+
+test "rank1676: a nonzero test in an assert is not a bound"
+  lang c
+  file sys/net/link_layer/l2filter/l2filter.c
+  reject VYQL-MEM-079
+  code
+  ```
+  #include <string.h>
+
+  #define CONFIG_L2FILTER_ADDR_MAXLEN (8U)
+
+  typedef struct {
+      uint8_t addr[CONFIG_L2FILTER_ADDR_MAXLEN];
+      size_t addr_len;
+  } l2filter_t;
+
+  int l2filter_add(l2filter_t *list, const void *addr, size_t addr_len)
+  {
+      assert(list && addr && addr_len > 0);
+
+      memcpy(list[0].addr, addr, addr_len);
+      return 0;
+  }
+  ```
+
+test "rank1676: a count the compiler fixes states its own capacity"
+  lang c
+  file sys/net/link_layer/l2filter/l2filter.c
+  reject VYQL-MEM-079
+  code
+  ```
+  #include <string.h>
+
+  #define CONFIG_L2FILTER_ADDR_MAXLEN (8U)
+
+  typedef struct {
+      uint8_t addr[CONFIG_L2FILTER_ADDR_MAXLEN];
+      size_t addr_len;
+  } l2filter_t;
+
+  int l2filter_reset(l2filter_t *f)
+  {
+      assert(f != NULL);
+      memcpy(f->addr, "\0\0\0\0\0\0\0\0", sizeof(f->addr));
+      return 0;
+  }
+  ```
+
+test "rank1676: the index-access guard route reads an assert-wrapped comparison as a bound"
+  lang c
+  file sys/net/link_layer/l2filter/l2filter.c
+  reject VYQL-MEM-010
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #define CAP (64U)
+
+  typedef struct {
+      unsigned len;
+      uint8_t data[CAP];
+  } pkt_t;
+
+  int read_last(pkt_t *p)
+  {
+      assert(p->len <= CAP);
+      return p->data[p->len];
+  }
+  ```

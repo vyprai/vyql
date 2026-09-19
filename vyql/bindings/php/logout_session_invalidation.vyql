@@ -1,0 +1,30 @@
+module bindings.php.logout_session_invalidation;
+
+// A PHP logout handler tears the current session's data down with the
+// vocabulary that empties the store -- Session::flush() / ->flush() on a
+// framework session object, session_unset() in the core -- and nothing in
+// the handler ends the session itself. Flush is Laravel's documented
+// "remove all of the session data" and leaves the identifier and its
+// backing record live; the identifier-rotating vocabulary is what a real
+// logout needs -- Session::invalidate() / ->invalidate(),
+// Session::regenerate() / ->regenerate(), session_regenerate_id() and
+// session_destroy() in the core, an invalidateSession*/destroy*/revoke*
+// sweep, or a delegated logout -- and their absence means a cookie
+// captured before logout names a session slot the next login repopulates,
+// which is what the logout was taken to prevent.
+//
+// The function name is the endpoint's own spelling of the flow (logout is
+// the near-universal action name in PHP frameworks and CMSes). Residual,
+// stated: a handler that clears data through a spelling outside the
+// documented set is invisible, which is the false-negative direction; a
+// session_regenerate()->regenerateToken() chain reads as a control through
+// its regenerate prefix although it rotates the CSRF token rather than the
+// session identifier; and full delegation to another logout implementation
+// is accepted as handled without seeing into the callee.
+binding logoutWithoutSessionInvalidation {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php"
+    and containsAny(node.context.functionName, ["logout", "logOut", "Logout"])
+    and containsAny(node.context.callPath, ["Session.flush", "session.flush", "session_unset", "session_flush", "SESSION_FLUSH"])
+    and not (containsAny(node.context.callPath, ["Session.invalidate", "session.invalidate", "Session.regenerate", "session.regenerate", "Session.destroy", "session.destroy", "session_destroy", "session_regenerate_id", "invalidateSession", "destroySession", "deleteAllSessions", "destroyAllSessions", "revokeAllTokens", "revokeAllSessions", "revokeRefreshTokens", "logout", "logOut"]))
+  emit issue code.LogoutWithoutSessionInvalidation at node
+}

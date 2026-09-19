@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m663a74b3;
+
+binding deserialization0 {
+  requires {
+    dependency("manifold")
+  }
+  query pattern callExpr where callee.method == "unpack_message"
+  emit sink code.Deserialization at args[0]
+}

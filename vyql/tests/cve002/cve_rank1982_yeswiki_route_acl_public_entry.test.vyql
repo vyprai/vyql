@@ -1,0 +1,182 @@
+# YesWiki publishes API routes with a Symfony @Route annotation whose
+# options carry the site's ACL list, and ApiService::isAuthorized() is the
+# single gate in front of every controller method:
+#
+#     $acl = $this->loadACL($requestParams, $routes);
+#     $publicMode = in_array('public', $acl);
+#     $acl = array_diff($acl, ['public']);
+#     $hasAcl = !empty(implode(' ', $acl)) && $this->aclService->check(implode("\n", $acl));
+#     return $publicMode || $hasAcl || (...bearer keys...);
+#
+# The list is disjunctive and 'public' short-circuits it, so an annotation
+# reading options={"acl":{"public","@admins"}} grants everyone: the admin
+# entry is dead text. The core ApiController and the templates ApiController
+# carried that spelling on 27 routes, including the archive endpoints
+# (/api/archives POST to start a backup, /api/archives/{id} GET to fetch it,
+# both with no in-body guard), which is an unauthenticated full-site backup
+# download. The developer docs even described {"public","@mygroup"} as
+# group-only access, so the contradiction reads as intentional; the fixed revision
+# removes the "public" entry from every list that also named an audience
+# ({"acl":{"@admins"}}, {"acl":{"+"}}) and corrects the docs. Lists that
+# hold "public" alone are the documented way to publish a route without a
+# bearer and are fine.
+#
+# Detection reads the annotation the framework reads: a route ACL list that
+# puts the permissive entry first with a restrictive entry after it. The
+# fragment is matched over the whitespace-stripped class body, so both
+# spellings in the tree ({"public","@admins"} and {"public", "@"admins})
+# resolve to the same text and the anchored "acl":{ prefix keeps an
+# unrelated list of strings containing "public" from reading as an ACL.
+# Measured on the real checkout: the binding labels the two ApiController
+# classes at the vulnerable revision and neither after, and the multi-entry shape
+# ("public" followed by a comma) occurs on no line of any other clone in
+# the corpus.
+
+test "rank1982: a route ACL lists public alongside a restrictive audience"
+  lang php
+  file ApiController.php
+  expect VYQL-AUTH-080
+  code
+  ```
+  <?php
+
+  namespace YesWiki\Core\Controller;
+
+  use Symfony\Component\Routing\Annotation\Route;
+  use YesWiki\Core\ApiResponse;
+  use YesWiki\Core\Controller\ArchiveController;
+  use YesWiki\Core\YesWikiController;
+
+  class ApiController extends YesWikiController
+  {
+      /**
+       * @Route("/api/archives/{id}", methods={"GET"}, options={"acl":{"public", "@admins"}})
+       */
+      public function getArchive($id)
+      {
+          return $this->getService(ArchiveController::class)->getArchive($id);
+      }
+
+      /**
+       * @Route("/api/archives/{id}", methods={"POST"}, options={"acl":{"public","@admins"}})
+       */
+      public function archiveAction($id)
+      {
+          return $this->getService(ArchiveController::class)->manageArchiveAction($id);
+      }
+
+      /**
+       * @Route("/api/comments/{tag}",methods={"POST"}, options={"acl":{"public","+"}})
+       */
+      public function postComment()
+      {
+          return $this->getService(CommentService::class)->delete();
+      }
+  }
+  ```
+
+test "rank1982: the audience list without the public entry keeps the gate"
+  lang php
+  file ApiControllerPatched.php
+  reject VYQL-AUTH-080
+  code
+  ```
+  <?php
+
+  namespace YesWiki\Core\Controller;
+
+  use Symfony\Component\Routing\Annotation\Route;
+  use YesWiki\Core\ApiResponse;
+  use YesWiki\Core\Controller\ArchiveController;
+  use YesWiki\Core\YesWikiController;
+
+  class ApiControllerPatched extends YesWikiController
+  {
+      /**
+       * @Route("/api/archives/{id}", methods={"GET"}, options={"acl":{"@admins"}})
+       */
+      public function getArchive($id)
+      {
+          return $this->getService(ArchiveController::class)->getArchive($id);
+      }
+
+      /**
+       * @Route("/api/archives/{id}", methods={"POST"}, options={"acl":{"@admins"}})
+       */
+      public function archiveAction($id)
+      {
+          return $this->getService(ArchiveController::class)->manageArchiveAction($id);
+      }
+
+      /**
+       * @Route("/api/comments/{tag}",methods={"POST"}, options={"acl":{"+"}})
+       */
+      public function postComment()
+      {
+          return $this->getService(CommentService::class)->delete();
+      }
+  }
+  ```
+
+test "rank1982: a route published as public alone is the documented form"
+  lang php
+  file ApiControllerPublicOnly.php
+  reject VYQL-AUTH-080
+  code
+  ```
+  <?php
+
+  namespace YesWiki\Core\Controller;
+
+  use Symfony\Component\Routing\Annotation\Route;
+  use YesWiki\Core\ApiResponse;
+  use YesWiki\Core\Service\UserManager;
+  use YesWiki\Core\YesWikiController;
+
+  class ApiControllerPublicOnly extends YesWikiController
+  {
+      /**
+       * @Route("/api/users",methods={"GET"}, options={"acl":{"public"}})
+       */
+      public function getUsers()
+      {
+          return new ApiResponse($this->getService(UserManager::class)->getAll());
+      }
+
+      /**
+       * @Route("/api/groups",methods={"GET"}, options={"acl":{"public"}})
+       */
+      public function getGroups()
+      {
+          return new ApiResponse([]);
+      }
+  }
+  ```
+
+test "rank1982: a plain list of strings holding public is not an ACL annotation"
+  lang php
+  file VisibilityModes.php
+  reject VYQL-AUTH-080
+  code
+  ```
+  <?php
+
+  namespace YesWiki\Core\Controller;
+
+  use Symfony\Component\Routing\Annotation\Route;
+  use YesWiki\Core\YesWikiController;
+
+  class VisibilityModes extends YesWikiController
+  {
+      private $modes = ["public", "draft", "private"];
+
+      /**
+       * @Route("/api/visibility",methods={"GET"})
+       */
+      public function getVisibility()
+      {
+          $current = in_array("public", $this->modes) ? "public" : "private";
+          return new ApiResponse(['visibility' => $current]);
+      }
+  }
+  ```

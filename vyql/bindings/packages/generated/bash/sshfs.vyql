@@ -1,0 +1,9 @@
+module bindings.bash.generated.m9bc9eced;
+
+binding commandExecution0 {
+  requires {
+    dependency("sshfs")
+  }
+  query pattern callExpr where callee.method == "Sshfs.install"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,86 @@
+# Storm's topology credentials reach Nimbus through the Thrift submit call as a
+# plain map an authenticated submitter fills in. AutoTGT is the auto-credential
+# plugin that round-trips a Kerberos TGT through that map: the client base64-
+# encodes a serialized KerberosTicket into credentials["TGT"], and every daemon
+# that later populates a subject from the topology's credentials pulls the value
+# back out and hands the decoded bytes to
+# ClientAuthUtils.deserializeKerberosTicket(byte[]). That helper wrapped whatever
+# it is given in a ByteArrayInputStream and read the object graph back with a
+# plain ObjectInputStream, so the classes the stream names are bounded by
+# nothing at all -- the submitter of the topology chose them.
+#
+# The fixed revision keeps the signature and installs a JEP 290 filter on the stream before
+# the read: ObjectInputFilter.Config.createFilter over the kerberos and address
+# types plus "!*", set with setObjectInputFilter. The decoder is otherwise
+# unchanged, including its try/catch and the KerberosTicket cast, so the filter
+# hooks in the same scope are the whole difference between the revisions.
+#
+# The shape the binding labels is the byte[] decoder itself, which is exactly
+# what this helper is: a public static method taking the serialized bytes as a
+# byte[] parameter, building a ByteArrayInputStream over them and calling
+# readObject. Its callers -- topology credentials here -- are the source, so the
+# helper carries the whole obligation to bound the class set, and the rule's
+# SafeDeserialization clauses clear the filtered form.
+
+test "rank1797: a credential-blob decoder reads the object graph with no class allowlist"
+  lang java
+  file org/apache/storm/security/auth/ClientAuthUtils.java
+  expect VYQL-DESER-023
+  code
+  ```
+  package org.apache.storm.security.auth;
+
+  import java.io.ByteArrayInputStream;
+  import java.io.ObjectInputStream;
+  import javax.security.auth.kerberos.KerberosTicket;
+
+  public class ClientAuthUtils {
+
+      public static KerberosTicket deserializeKerberosTicket(byte[] tgtBytes) {
+          KerberosTicket ret;
+          try {
+              ByteArrayInputStream bin = new ByteArrayInputStream(tgtBytes);
+              ObjectInputStream in = new ObjectInputStream(bin);
+              ret = (KerberosTicket) in.readObject();
+              in.close();
+          } catch (Exception e) {
+              throw new RuntimeException(e);
+          }
+          return ret;
+      }
+  }
+  ```
+
+test "rank1797: the decoder with a JEP 290 filter on the stream is bounded"
+  lang java
+  file org/apache/storm/security/auth/ClientAuthUtils.java
+  reject VYQL-DESER-023
+  code
+  ```
+  package org.apache.storm.security.auth;
+
+  import java.io.ByteArrayInputStream;
+  import java.io.ObjectInputFilter;
+  import java.io.ObjectInputStream;
+  import javax.security.auth.kerberos.KerberosTicket;
+
+  public class ClientAuthUtils {
+
+      public static KerberosTicket deserializeKerberosTicket(final byte[] tgtBytes) {
+          final ObjectInputFilter filter =
+                  ObjectInputFilter.Config.createFilter(
+                          "javax.security.auth.kerberos.*;"
+                                  + "java.net.InetAddress;"
+                                  + "java.util.Date;"
+                                  + "[B;"
+                                  + "!*");
+          try (ByteArrayInputStream bin = new ByteArrayInputStream(tgtBytes);
+               ObjectInputStream in = new ObjectInputStream(bin)) {
+              in.setObjectInputFilter(filter);
+              return (KerberosTicket) in.readObject();
+          } catch (final Exception e) {
+              throw new RuntimeException(e);
+          }
+      }
+  }
+  ```

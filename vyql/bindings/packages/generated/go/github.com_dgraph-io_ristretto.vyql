@@ -1,0 +1,57 @@
+module bindings.go.generated.m4ae4b627;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/dgraph-io/ristretto")
+  }
+  query pattern callExpr where callee.method == "parseFlag"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("github.com/dgraph-io/ristretto")
+  }
+  query pattern callExpr where callee.method == "OpenMmapFileUsing"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("github.com/dgraph-io/ristretto")
+  }
+  query pattern callExpr where callee.method == "OpenMmapFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("github.com/dgraph-io/ristretto")
+  }
+  query pattern callExpr where callee.method == "Mmap"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("github.com/dgraph-io/ristretto")
+  }
+  query pattern callExpr where callee.method == "NewTreePersistent"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("github.com/dgraph-io/ristretto")
+  }
+  query pattern callExpr where callee.method == "NewBufferPersistent"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("github.com/dgraph-io/ristretto")
+  }
+  query pattern callExpr where callee.method == "NewBufferTmp"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,81 @@
+module bindings.perl.generated.m27397705;
+
+binding networkConnect0 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "meta"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "meta"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "rmeta"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "rmeta"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "tika"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "tika"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect6 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "detect_stream"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "detect_stream"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect8 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "language_stream"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("Apache-Tika")
+  }
+  query pattern callExpr where callee.method == "language_stream"
+  emit sink code.NetworkSend at args[0]
+}

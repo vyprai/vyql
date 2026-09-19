@@ -1,0 +1,11 @@
+module code;
+
+concept HttpEndpointMissingHostValidation : issue {
+  cwe: [CWE_290, CWE_346]
+  reviewAssumption: "the endpoint is reachable from browsers at a hostname the attacker's DNS can rebind onto the listener's address, which is the normal state of a locally-bound server that never reads the Host header"
+  reviewCategory: access_control
+  reviewCondition: "a web-server module mounts a protocol endpoint whose framework documents Host-header validation against DNS rebinding, and the module carries neither the validating middleware nor the transport-level enablement"
+  reviewConfidence: medium
+  reviewEvidence: "server module {pattern} builds the web app and constructs the protocol transport while naming no Host-header validation"
+  vulnerableTo: [access_control.OriginValidationError]
+}

@@ -1,0 +1,10 @@
+module vypr.numeric;
+
+rule TaintedSizeComputation {
+  meta {
+    cwe: [CWE_190]
+    id: "VYQL-NUM-001"
+    severity: medium
+  }
+  taint core.UserControlledData -> code.SizeComputation
+}

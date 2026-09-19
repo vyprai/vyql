@@ -1,0 +1,41 @@
+module bindings.php.generated.m22e9362e;
+
+binding filePathAccess0 {
+  requires {
+    dependency("laminas/laminas-config")
+  }
+  query pattern callExpr where callee.method == "fromFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("laminas/laminas-config")
+  }
+  query pattern callExpr where callee.method == "fromString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("laminas/laminas-config")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("laminas/laminas-config")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("laminas/laminas-config")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit sink code.Deserialization at args[0]
+}

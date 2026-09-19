@@ -1,0 +1,122 @@
+# Rank 1149 / CVE-2026-34838: Group-Office deserializes stored settings values
+# with PHP's `unserialize()` and no `allowed_classes` restriction, so a value an
+# authenticated user can set (a per-user or per-controller setting persisted with
+# a `serialized:` prefix) can carry a PHP Object Injection gadget chain reaching
+# remote code execution once read back and deserialized (CWE-502).
+#
+# The fix (aceedacb5fe) adds `['allowed_classes' => false]` as unserialize()'s
+# second argument at all three call sites: AbstractSettingsCollection's setting
+# loader (www/go/base/model/AbstractSettingsCollection.php:89),
+# AbstractExportController's column-selection cache, and Crypt's session-token
+# unserialize (www/go/core/util/Crypt.php:145), restricting deserialization to
+# scalars and arrays only.
+#
+# On the real checkout the source does reach the sinks: a full-tree scan of the
+# vulnerable revision reports VYQL-DESER-001 at AbstractSettingsCollection.php:89
+# and Crypt.php:145 with code.HttpInput at ExternalController.php:15 as the
+# source, stable across runs (the taint crosses through StringHelper::substr's
+# body, which the request-fed `{GOCRYPT}` guard in ExternalController::actionIndex
+# also enters). The 1st pass's "no source reaches the sink" was measured on a
+# single-file extraction that omitted every caller. What actually failed to
+# discriminate was the control side: core.SafeDeserialization had no PHP binding,
+# so the patched revision reported identically (2 == 2 on a 495-file extraction
+# holding all three fixed sites and their callers).
+#
+# The bindings/php/unserialize_allowed_classes.vyql binding credits the manual's
+# own restriction — a literal `allowed_classes` option at the call — as the
+# core.SafeDeserialization control, which clears VYQL-DESER-001's path and
+# endpoint clauses. Measured on that extraction: 2 -> 0 across the fix, 3/3 runs
+# per revision with --cache off.
+#
+# The distilled pair below is the Crypt chain, the one site whose source reaches
+# the sink through its own two static hops (controller -> Crypt::decrypt ->
+# self::decrypt1) rather than through the shared substr body. The caller uses
+# the `use`-imported spelling because a fully-qualified `\GO\Base\Util\Crypt::decrypt()`
+# static call does not resolve today — the known PHP gap recorded beside rank
+# 1879 (the callee key keeps the leading `\` and namespace separators while
+# methods register under the bare class name); that spelling stays a pinned miss.
+#
+# verify_current_expected: fixed, 2 -> 0 across the real fix, expect fires and
+# patched form rejects.
+
+test "rank1149: a request-fed session token is unserialized with PHP's default class-instantiation behavior"
+  lang php
+  file Crypt.php
+  expect VYQL-DESER-001
+  code
+  ```
+  <?php
+  namespace go\core\util;
+
+  use go\core\util\Crypt;
+
+  class ExternalController {
+      protected function actionIndex($params) {
+          if (substr($_REQUEST['f'], 0, 9) == '{GOCRYPT}')
+              $funcParams = Crypt::decrypt($_REQUEST['f']);
+          else
+              $funcParams = json_decode(base64_decode($_REQUEST['f']), true);
+      }
+  }
+
+  class Crypt {
+      public static function decrypt(string $ciphertext, $password = null) : string {
+          if (empty($ciphertext)) {
+              return "";
+          }
+          if (substr($ciphertext, 0, 9) == '{GOCRYPT}') {
+              return self::decrypt1($ciphertext, $password);
+          }
+          return $ciphertext;
+      }
+
+      private static function decrypt1(string $msg, ?string $k = null, bool $base64 = true) {
+          if ($base64)
+              $msg = base64_decode($msg);
+          $msg = phpseclib_mdecrypt_generic(null, $msg);
+          $msg = unserialize($msg);
+          return $msg;
+      }
+  }
+  ```
+
+test "rank1149: the same token is unserialized with deserialization restricted to scalars and arrays"
+  lang php
+  file Crypt.php
+  reject VYQL-DESER-001
+  code
+  ```
+  <?php
+  namespace go\core\util;
+
+  use go\core\util\Crypt;
+
+  class ExternalController {
+      protected function actionIndex($params) {
+          if (substr($_REQUEST['f'], 0, 9) == '{GOCRYPT}')
+              $funcParams = Crypt::decrypt($_REQUEST['f']);
+          else
+              $funcParams = json_decode(base64_decode($_REQUEST['f']), true);
+      }
+  }
+
+  class Crypt {
+      public static function decrypt(string $ciphertext, $password = null) : string {
+          if (empty($ciphertext)) {
+              return "";
+          }
+          if (substr($ciphertext, 0, 9) == '{GOCRYPT}') {
+              return self::decrypt1($ciphertext, $password);
+          }
+          return $ciphertext;
+      }
+
+      private static function decrypt1(string $msg, ?string $k = null, bool $base64 = true) {
+          if ($base64)
+              $msg = base64_decode($msg);
+          $msg = phpseclib_mdecrypt_generic(null, $msg);
+          $msg = unserialize($msg, ['allowed_classes' => false]);
+          return $msg;
+      }
+  }
+  ```

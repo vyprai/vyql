@@ -1,0 +1,11 @@
+module code;
+
+concept RestrictedEvalNestedScopeNameFilterGap : issue {
+  cwe: [CWE_94, CWE_95]
+  reviewAssumption: "the evaluated expression text is authored outside the program, such as a stored template, a configured message format, or a user-supplied formula"
+  reviewCategory: code_execution
+  reviewCondition: "a compiled expression's names are filtered against an allowlist by reading only the top-level code object's name tuple, so names referenced inside nested code objects are never checked before the expression runs"
+  reviewConfidence: medium
+  reviewEvidence: "restricted eval context {pattern} compiles an expression, filters its names against an allowlist from the code object's co_names, and never reads co_consts, where a lambda body or a generator expression compiles to a separate code object whose own names the filter never sees"
+  vulnerableTo: [injection.CodeInjection]
+}

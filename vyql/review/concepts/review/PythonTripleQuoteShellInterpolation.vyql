@@ -1,0 +1,8 @@
+module code;
+
+review code.PythonTripleQuoteShellInterpolation {
+  category: code_execution
+  expected: [core.CodeExecutionValidation]
+  kind: attention
+  text: "review shell scripts that interpolate captured input into Python triple-quoted source strings"
+}

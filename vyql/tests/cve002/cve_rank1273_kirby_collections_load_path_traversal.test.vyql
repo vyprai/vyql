@@ -1,0 +1,245 @@
+# Rank 1273 / CVE-2025-31493: Kirby's Collections::load() builds the path to a
+# collection file straight from the caller-supplied collection name and only
+# confirms a file sits there before pulling it in:
+#
+#   $file = $kirby->root('collections') . '/' . $name . '.php';
+#   if (is_file($file) === true) {
+#       $collection = F::load($file, allowOutput: false);
+#       ...
+#   }
+#
+# where F::load(), stripped to its essentials, is:
+#
+#   public static function load(string $file, ...) {
+#       if (is_file($file) === false) { return $fallback; }
+#       return static::loadIsolated($file, $data);
+#   }
+#   protected static function loadIsolated(string $file, array $data = []) {
+#       $___file___ = $file;
+#       extract($data);
+#       return include $___file___;
+#   }
+#
+# is_file only confirms a file exists at the attacker-influenced path; it does
+# not restrict which file that can be, so a collection name walking outside
+# `site/collections` reaches include (CWE-22/CWE-98). The fixed revision
+# replaces the is_file() check with F::exists($file, $root), which resolves
+# both paths with realpath() and rejects anything outside $root before
+# F::load() runs.
+#
+# Two separate gaps in internal/extract/frontend/treesitter/php.go compound
+# to hide this shape; both are closed in the engine:
+#
+# 1. `expr()` carries the same case as `exprStmt()` for include_expression/
+#    include_once_expression/require_expression/require_once_expression, so
+#    `return include $f;` (the shape loadIsolated() actually uses) builds
+#    the include Call node in expression position too; the isolating pair
+#    lives in
+#    cve_rank1201_ilias_import_component_file_inclusion.test.vyql's own
+#    pair.
+# 2. `dotted()` substitutes the enclosing class name for `self`/`static`
+#    before building the path, the same way `$this` resolves, so
+#    `static::loadIsolated(...)` resolves to `<Class>.loadIsolated`. An
+#    explicit class name (`F::loadIsolated(...)`) resolves the same way;
+#    without the substitution, late static binding and self-reference --
+#    PHP's ordinary way to call a sibling method on the current class --
+#    break the call graph. `parent::` is untouched: the superclass is a
+#    different, unresolved target, not a wrong extraction of this one.
+#
+# Confirmed below with an isolating pair naming no CVE-specific API for gap
+# 2 alone: the same tainted include, reached through an explicit class name,
+# reports either way; routed through `static::` or `self::`, it reports the
+# same way.
+#
+# CAUGHT by rule VYQL-PATH-002 (FileInclusion) once both gaps are fixed.
+# F::exists() is not recognised as a core.PathAccessCheck either -- no
+# binding names it, and it is a Kirby-specific wrapper around realpath(),
+# not documented API a generic binding could justify -- so the reject case
+# below uses a collection name that carries no taint at all, the same way
+# rank1034 and rank1222 do for a source-side fix VYQL-PATH-002 has no clause
+# to recognise.
+
+test "rank1273: a collection name from the query string reaches include through F::load"
+  lang php
+  file src/Filesystem/F.php
+  code
+  ```
+  <?php
+
+  namespace Kirby\Filesystem;
+
+  class F
+  {
+      public static function load(string $file, mixed $fallback = null, array $data = [])
+      {
+          if (is_file($file) === false) {
+              return $fallback;
+          }
+
+          return static::loadIsolated($file, $data);
+      }
+
+      protected static function loadIsolated(string $file, array $data = [])
+      {
+          $___file___ = $file;
+          extract($data);
+          return include $___file___;
+      }
+  }
+  ```
+  file src/Cms/Collections.php
+  expect VYQL-PATH-002
+  code
+  ```
+  <?php
+
+  namespace Kirby\Cms;
+
+  use Kirby\Filesystem\F;
+
+  class Collections
+  {
+      public function load(string $name): mixed
+      {
+          $root = '/site/collections';
+          $file = $root . '/' . $name . '.php';
+
+          if (is_file($file) === true) {
+              return F::load($file, allowOutput: false);
+          }
+
+          return null;
+      }
+  }
+
+  $collections = new Collections();
+  $collections->load($_GET['collection']);
+  ```
+
+test "rank1273: a collection name that carries no taint is not a finding"
+  lang php
+  file src/Filesystem/F.php
+  code
+  ```
+  <?php
+
+  namespace Kirby\Filesystem;
+
+  class F
+  {
+      public static function load(string $file, mixed $fallback = null, array $data = [])
+      {
+          if (is_file($file) === false) {
+              return $fallback;
+          }
+
+          return static::loadIsolated($file, $data);
+      }
+
+      protected static function loadIsolated(string $file, array $data = [])
+      {
+          $___file___ = $file;
+          extract($data);
+          return include $___file___;
+      }
+  }
+  ```
+  file src/Cms/Collections.php
+  reject VYQL-PATH-002
+  code
+  ```
+  <?php
+
+  namespace Kirby\Cms;
+
+  use Kirby\Filesystem\F;
+
+  class Collections
+  {
+      public function load(string $name): mixed
+      {
+          $root = '/site/collections';
+          $file = $root . '/' . $name . '.php';
+
+          if (is_file($file) === true) {
+              return F::load($file, allowOutput: false);
+          }
+
+          return null;
+      }
+  }
+
+  $collections = new Collections();
+  $collections->load('articles');
+  ```
+
+# The isolating pair for gap 2 alone: bare `include $file;` statements only,
+# so neither side depends on gap 1. Same source ($_GET), same include sink,
+# same tainted path; only whether the sibling call names the class
+# explicitly or through `static::`/`self::` differs.
+
+test "rank1273: an explicit class name on the sibling call resolves"
+  lang php
+  file loader.php
+  expect VYQL-PATH-002
+  code
+  ```
+  <?php
+  class Loader
+  {
+      public static function load(string $file)
+      {
+          Loader::run($file);
+      }
+
+      public static function run(string $file)
+      {
+          include $file;
+      }
+  }
+  Loader::load($_GET['name']);
+  ```
+
+test "rank1273: static:: on the sibling call resolves the same way"
+  lang php
+  file loader.php
+  expect VYQL-PATH-002
+  code
+  ```
+  <?php
+  class Loader
+  {
+      public static function load(string $file)
+      {
+          static::run($file);
+      }
+
+      public static function run(string $file)
+      {
+          include $file;
+      }
+  }
+  Loader::load($_GET['name']);
+  ```
+
+test "rank1273: self:: on the sibling call resolves the same way"
+  lang php
+  file loader.php
+  expect VYQL-PATH-002
+  code
+  ```
+  <?php
+  class Loader
+  {
+      public static function load(string $file)
+      {
+          self::run($file);
+      }
+
+      public static function run(string $file)
+      {
+          include $file;
+      }
+  }
+  Loader::load($_GET['name']);
+  ```

@@ -1,0 +1,8 @@
+module code;
+
+review code.ArrayBufferTransferMaxLengthBypass {
+  category: memory
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review ArrayBuffer transfer length checks against resizable-buffer maxByteLength before allocation"
+}

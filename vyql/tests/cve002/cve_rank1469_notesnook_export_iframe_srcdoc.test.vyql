@@ -1,0 +1,121 @@
+# A note export builds a whole HTML document from the note's own fields and
+# hands it to `exportToPDF`, which drops it into a hidden frame by assigning
+# `iframe.srcdoc` and calling `print()`. The frame carries no `sandbox`
+# attribute, so it keeps the embedder's origin and the markup's own scripts
+# run with `window.parent` in reach -- on the desktop build that parent is an
+# Electron renderer, which turns stored markup in a note title into code
+# execution. The fixed revision sandboxes the frame (`iframe.sandbox.add(...)`, keeping
+# only `allow-same-origin` and `allow-modals`, so script execution is
+# withheld) and, in the template builder, escapes the note fields before
+# interpolating them; either control alone stops the markup from reaching a
+# parser that can run it.
+#
+# `srcdoc` is the inline-markup sibling of the `contentDocument.write` route
+# the same concept covers, and the same two controls apply. Over
+# 662 TypeScript/TSX files of the application (apps/web/src, packages/core/src
+# and packages/editor/src) the unpatched revision reports 2 VYQL-INJ-243 rows
+# against the patched revision's 1: the export frame above disappears, the
+# other frame is a download helper that assigns `srcdoc` in the same
+# unsandboxed shape and is unchanged at both revisions. The JSX embed frame in
+# packages/editor, which passes `sandbox={getSandboxFeatures(src)}` beside its
+# `srcDoc`, reports on neither revision.
+
+test "rank1469: an export frame's srcdoc is assigned unsandboxed markup"
+  lang javascript
+  file apps/web/src/common/export.ts
+  expect VYQL-INJ-243
+  expect_review code.UnsanitizedFrameDocumentWrite
+  code
+  ```
+  export async function exportToPDF(
+    title: string,
+    content: string
+  ): Promise<boolean> {
+    if (!content) return false;
+
+    return new Promise<boolean>((resolve) => {
+      const iframe = document.createElement("iframe");
+
+      iframe.srcdoc = content;
+      iframe.style.position = "fixed";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.loading = "eager";
+
+      iframe.onload = async () => {
+        if (!iframe.contentWindow) return;
+        if (iframe.contentDocument) iframe.contentDocument.title = title;
+        iframe.contentWindow.print();
+      };
+
+      document.body.appendChild(iframe);
+    });
+  }
+  ```
+
+test "rank1469: an export frame is sandboxed before its srcdoc is assigned"
+  lang javascript
+  file apps/web/src/common/export.ts
+  reject VYQL-INJ-243
+  reject_review code.UnsanitizedFrameDocumentWrite
+  code
+  ```
+  export async function exportToPDF(
+    title: string,
+    content: string
+  ): Promise<boolean> {
+    if (!content) return false;
+
+    return new Promise<boolean>((resolve) => {
+      const iframe = document.createElement("iframe");
+
+      iframe.srcdoc = content;
+      iframe.style.position = "fixed";
+      iframe.style.width = "0";
+      iframe.style.height = "0";
+      iframe.loading = "eager";
+      iframe.sandbox.add("allow-same-origin", "allow-modals");
+
+      iframe.onload = async () => {
+        if (!iframe.contentWindow) return;
+        if (iframe.contentDocument) iframe.contentDocument.title = title;
+        iframe.contentWindow.print();
+      };
+
+      document.body.appendChild(iframe);
+    });
+  }
+  ```
+
+test "rank1469: a frame's srcdoc is assigned markup a sanitizer produced"
+  lang javascript
+  file apps/web/src/common/preview.ts
+  reject VYQL-INJ-243
+  reject_review code.UnsanitizedFrameDocumentWrite
+  code
+  ```
+  import DOMPurify from "dompurify";
+
+  export function preview(content: string) {
+    const iframe = document.createElement("iframe");
+    iframe.srcdoc = DOMPurify.sanitize(content);
+    iframe.loading = "eager";
+    document.body.appendChild(iframe);
+  }
+  ```
+
+test "rank1469: a frame carries a sandbox attribute before its srcdoc is assigned"
+  lang javascript
+  file apps/web/src/common/preview.ts
+  reject VYQL-INJ-243
+  reject_review code.UnsanitizedFrameDocumentWrite
+  code
+  ```
+  export function preview(content: string) {
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("sandbox", "");
+    iframe.srcdoc = content;
+    iframe.loading = "eager";
+    document.body.appendChild(iframe);
+  }
+  ```

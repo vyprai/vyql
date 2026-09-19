@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule AccessPolicyReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_863]
+    id: "VYQL-AUTH-080"
+    severity: high
+  }
+  issue code.AccessPolicyReview as sink
+}

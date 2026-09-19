@@ -1,0 +1,351 @@
+# Rank 1330 / CVE-2025-1793: eight llama_index vector-store integrations built
+# their SQL by interpolating caller-supplied values straight into the statement
+# text (CWE-89, CVSS 9.8). The canonical instance is the Lantern store's
+# delete():
+#
+#   stmt = sqlalchemy.text(
+#       f"DELETE FROM {self.schema_name}.data_{self.table_name} where "
+#       f"(metadata_->>'doc_id')::text = '{ref_doc_id}' "
+#   )
+#   session.execute(stmt)
+#
+# with sibling instances in clickhouse (self._client.command(f"... doc_id=
+# '{ref_doc_id}'")), couchbase (self._scope.query(f"... = '{ref_doc_id}'")),
+# jaguar (plain "+" concatenation into self.run(q)), deeplake, nile, oracledb
+# and singlestoredb. Because the stores are library entry points, the value
+# arrives from whatever application drives them, which is what the advisory
+# means by "when llama-index is integrated into web applications".
+#
+The fixing commit is
+# 201d3f5408055c5c6825bc37304b9dcc9d46e5ab, "fix: patch multiple sql-injection
+# vulnerabilities" (#18316), which switches Lantern to
+# text(...).bindparams(ref_doc_id=ref_doc_id), clickhouse to a %(name)s
+# placeholder plus parameters=, couchbase to a $name placeholder plus a query
+# kwarg, nile to psycopg sql.SQL placeholders, singlestoredb to an
+# alphanumeric-identifier allowlist, and jaguar/deeplake to hand-rolled
+# escapers.
+#
+# CAUGHT. On the vulnerable checkout of the Lantern package VYQL-INJ-001
+# (taint core.UserControlledData -> code.SqlExecution) reports base.py:656
+# with the path delete#param#ref_doc_id -> Format -> Arg, and VYQL-INJ-203
+# reports the same line from code.DynamicSqlQuery. The nile, oracledb and
+# singlestoredb interpolations the same commit rewrites are reported too.
+#
+# Two limits are worth knowing rather than re-deriving:
+#
+#   * VYQL-INJ-203 is presence-based, so it also fires on the patched line:
+#     the fixed revision keeps interpolating the schema and table identifiers, which is
+#     the part that cannot be parameterised. Discrimination comes from
+#     VYQL-INJ-001, whose taint path ends when the value moves into a bind
+#     parameter -- the first two tests below.
+#   * Under `profile library` a public method's `self` is an entry point as
+#     well, so `{self.schema_name}` keeps the patched f-string tainted and
+#     both revisions report 17 findings. The application shape -- a route that
+#     hands a request value to the store, which is the advisory's own threat
+#     model -- is where the two revisions separate.
+#
+# The clickhouse and couchbase instances are missed: clickhouse-connect's
+# Client.command and Couchbase's Scope.query carry no code.SqlExecution
+# binding, so nothing is labelled at those calls and neither rule can see
+# them. A dependency-gated method binding for both is measured
+# against the real packages, and rejected: `callee.method == "query"` under
+# dependency("couchbase") does report couchbase/base.py:316, but it reports
+# the identical 7 findings on the patched revision -- the patched statement
+# still interpolates {self._collection_name}, so under the library profile
+# `self` keeps it tainted -- plus 6 rows in the package's own tests. The shape
+# does not tell fixed from vulnerable on the code it derives from. The
+# clickhouse half could not be measured at all: the store receives its client
+# by injection and never imports clickhouse_connect, and the only other
+# evidence for dependency("clickhouse-connect") is the poetry pyproject.toml,
+# which internal/extract/sca/discover.go's manifestParsers table does not
+# read. The last four tests pin both misses so a later sweep flips them.
+#
+# verify_current_expected: caught-by-VYQL-INJ-001, patched bindparams form
+# rejected, clickhouse/couchbase shapes pinned as misses.
+
+test "rank1330: a route hands a request value to a store that interpolates it into text()"
+  lang python
+  file base.py
+  expect VYQL-INJ-001
+  code
+  ```
+  import logging
+  from typing import Any, List, NamedTuple, Optional, Type
+
+  import sqlalchemy
+  from flask import Flask, request
+
+  from llama_index.core.vector_stores.types import BasePydanticVectorStore
+
+  app = Flask(__name__)
+
+
+  class LanternVectorStore(BasePydanticVectorStore):
+      schema_name: str = "public"
+      table_name: str = "llamaindex"
+
+      def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
+          import sqlalchemy
+
+          self._initialize()
+          with self._session() as session, session.begin():
+              stmt = sqlalchemy.text(
+                  f"DELETE FROM {self.schema_name}.data_{self.table_name} where "
+                  f"(metadata_->>'doc_id')::text = '{ref_doc_id}' "
+              )
+
+              session.execute(stmt)
+              session.commit()
+
+
+  @app.route("/documents/delete", methods=["POST"])
+  def delete_document():
+      store = LanternVectorStore()
+      store.delete(request.form["doc_id"])
+      return "deleted"
+  ```
+
+test "rank1330: the value moves into a bind parameter and only the identifiers stay interpolated"
+  lang python
+  file base.py
+  reject VYQL-INJ-001
+  code
+  ```
+  import logging
+  from typing import TYPE_CHECKING, Any, List, NamedTuple, Optional, Type
+
+  import sqlalchemy
+  from flask import Flask, request
+
+  from llama_index.core.vector_stores.types import BasePydanticVectorStore
+
+  app = Flask(__name__)
+
+
+  class LanternVectorStore(BasePydanticVectorStore):
+      schema_name: str = "public"
+      table_name: str = "llamaindex"
+
+      def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
+          from sqlalchemy import text
+
+          self._initialize()
+          with self._session() as session, session.begin():
+              # Use parameterized query with bind parameters
+              stmt = text(
+                  f"DELETE FROM {self.schema_name}.data_{self.table_name} "
+                  "WHERE (metadata_->>'doc_id')::text = :ref_doc_id"
+              ).bindparams(ref_doc_id=ref_doc_id)
+
+              session.execute(stmt)
+              session.commit()
+
+
+  @app.route("/documents/delete", methods=["POST"])
+  def delete_document():
+      store = LanternVectorStore()
+      store.delete(request.form["doc_id"])
+      return "deleted"
+  ```
+
+test "rank1330: the store's own delete interpolates its parameter into text()"
+  lang python
+  file base.py
+  profile library
+  expect VYQL-INJ-001
+  code
+  ```
+  import logging
+  from typing import Any, List, NamedTuple, Optional, Type
+
+  import sqlalchemy
+
+  from llama_index.core.vector_stores.types import BasePydanticVectorStore
+
+
+  class LanternVectorStore(BasePydanticVectorStore):
+      schema_name: str = "public"
+      table_name: str = "llamaindex"
+
+      def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
+          import sqlalchemy
+
+          self._initialize()
+          with self._session() as session, session.begin():
+              stmt = sqlalchemy.text(
+                  f"DELETE FROM {self.schema_name}.data_{self.table_name} where "
+                  f"(metadata_->>'doc_id')::text = '{ref_doc_id}' "
+              )
+
+              session.execute(stmt)
+              session.commit()
+  ```
+
+test "rank1330: a fully static statement executed through text() is not this weakness"
+  lang python
+  file base.py
+  profile library
+  reject VYQL-INJ-001
+  reject VYQL-INJ-203
+  code
+  ```
+  import logging
+  from typing import Any, List, NamedTuple, Optional, Type
+
+  import sqlalchemy
+
+  from llama_index.core.vector_stores.types import BasePydanticVectorStore
+
+
+  class LanternVectorStore(BasePydanticVectorStore):
+      def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
+          from sqlalchemy import text
+
+          self._initialize()
+          with self._session() as session, session.begin():
+              stmt = text(
+                  "DELETE FROM public.data_llamaindex "
+                  "WHERE (metadata_->>'doc_id')::text = :ref_doc_id"
+              ).bindparams(ref_doc_id=ref_doc_id)
+
+              session.execute(stmt)
+              session.commit()
+  ```
+
+test "rank1330: a clickhouse-connect command() carrying an interpolated value is not labelled"
+  lang python
+  file base.py
+  reject VYQL-INJ-001
+  reject VYQL-INJ-203
+  code
+  ```
+  import logging
+  from typing import Any, Dict, List, Optional, cast
+
+  import clickhouse_connect
+  from flask import Flask, request
+
+  from llama_index.core.vector_stores.types import BasePydanticVectorStore
+
+  app = Flask(__name__)
+
+
+  class ClickHouseVectorStore(BasePydanticVectorStore):
+      def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
+          self._client.command(
+              f"DELETE FROM {self._config.database}.{self._config.table} WHERE doc_id='{ref_doc_id}'"
+          )
+
+
+  @app.route("/documents/delete", methods=["POST"])
+  def delete_document():
+      store = ClickHouseVectorStore()
+      store.delete(request.form["doc_id"])
+      return "deleted"
+  ```
+
+test "rank1330: the clickhouse-connect placeholder plus parameters= form"
+  lang python
+  file base.py
+  reject VYQL-INJ-001
+  code
+  ```
+  import logging
+  from typing import Any, Dict, List, Optional, cast
+
+  import clickhouse_connect
+  from flask import Flask, request
+
+  from llama_index.core.vector_stores.types import BasePydanticVectorStore
+
+  app = Flask(__name__)
+
+
+  class ClickHouseVectorStore(BasePydanticVectorStore):
+      def delete(self, ref_doc_id: str, **delete_kwargs: Any) -> None:
+          query = f"DELETE FROM {self._config.database}.{self._config.table} WHERE doc_id = %(ref_doc_id)s"
+          self._client.command(query, parameters={"ref_doc_id": ref_doc_id})
+
+
+  @app.route("/documents/delete", methods=["POST"])
+  def delete_document():
+      store = ClickHouseVectorStore()
+      store.delete(request.form["doc_id"])
+      return "deleted"
+  ```
+
+test "rank1330: a couchbase scope query carrying an interpolated value is not labelled"
+  lang python
+  file base.py
+  reject VYQL-INJ-001
+  reject VYQL-INJ-203
+  code
+  ```
+  import logging
+  from typing import Any, Dict, List, Optional
+
+  from flask import Flask, request
+
+  from llama_index.core.vector_stores.types import BasePydanticVectorStore
+
+  app = Flask(__name__)
+  logger = logging.getLogger(__name__)
+
+
+  class CouchbaseVectorStore(BasePydanticVectorStore):
+      def _connect(self) -> Any:
+          from couchbase.cluster import Cluster
+
+          self._cluster = Cluster(self._connection_string)
+          return self._cluster
+
+      def delete(self, ref_doc_id: str, **kwargs: Any) -> None:
+          document_field = self._metadata_key + ".ref_doc_id"
+          self._scope.query(
+              f"DELETE FROM `{self._collection_name}` WHERE {document_field} = '{ref_doc_id}'"
+          ).execute()
+
+
+  @app.route("/documents/delete", methods=["POST"])
+  def delete_document():
+      store = CouchbaseVectorStore()
+      store.delete(request.form["doc_id"])
+      return "deleted"
+  ```
+
+test "rank1330: the couchbase named-parameter form"
+  lang python
+  file base.py
+  reject VYQL-INJ-001
+  code
+  ```
+  import logging
+  from typing import Any, Dict, List, Optional
+
+  from flask import Flask, request
+
+  from llama_index.core.vector_stores.types import BasePydanticVectorStore
+
+  app = Flask(__name__)
+  logger = logging.getLogger(__name__)
+
+
+  class CouchbaseVectorStore(BasePydanticVectorStore):
+      def _connect(self) -> Any:
+          from couchbase.cluster import Cluster
+
+          self._cluster = Cluster(self._connection_string)
+          return self._cluster
+
+      def delete(self, ref_doc_id: str, **kwargs: Any) -> None:
+          document_field = self._metadata_key + ".ref_doc_id"
+          query = f"DELETE FROM `{self._collection_name}` WHERE {document_field} = $ref_doc_id"
+          self._scope.query(query, ref_doc_id=ref_doc_id).execute()
+
+
+  @app.route("/documents/delete", methods=["POST"])
+  def delete_document():
+      store = CouchbaseVectorStore()
+      store.delete(request.form["doc_id"])
+      return "deleted"
+  ```

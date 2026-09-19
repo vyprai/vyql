@@ -1,0 +1,50 @@
+module bindings.python.urlSchemeDenylistWithoutDecoding;
+
+// urllib.parse.urlparse and urlsplit answer with the components of the
+// URL as it stands: percent-escapes and HTML entities stay inside the
+// components, and the consumer of the URL -- a browser following a
+// redirect or rendering a link -- decodes them after the check. A
+// validator that decides whether a URL belongs to the site by parsing
+// it and comparing host and path, while the only scheme filtering it
+// does is a comparison against script-scheme literals ('javascript:'
+// and its browser-scripting siblings), carries both halves of the
+// weakness a denylist names: every scheme that is not enumerated is
+// allowed, and every payload that decodes to something else after the
+// check survives it -- '%2e%2e' walks a path-prefix comparison out of
+// the site as surely as a scheme the list never named.
+//
+// The gate is the conjunction of the three readings, in one function.
+// A URL parse call alone is ordinary URL handling, and a script-scheme
+// literal alone may be defending something other than a redirect
+// target; together, in the function that also decides containment,
+// they are the membership check a redirect target passes through. The
+// literal is read from the function's own expression tokens -- the
+// comparison that tests it -- so a denylist compared in a sibling
+// function credits nothing here, and a module-level denylist table the
+// function iterates does not satisfy the clause either: the iteration
+// compares a variable, and the literal is not in the function at all.
+//
+// The decode step is credited by operation rather than by name.
+// Obtaining the decoded form (urllib.parse.unquote and unquote_plus,
+// html.unescape) and re-encoding the value on the way out
+// (urllib.parse.quote) both make the comparison run on the form the
+// consumer will see, so a validator that does either is not reported.
+// A validator that allowlists schemes and never decodes still is: the
+// scheme half of the weakness is closed and the escape half is not,
+// and the path-prefix comparison remains walkable with encoded
+// segments.
+//
+// Residual, in the silent direction: a decode or quote call on an
+// unrelated value in the same function silences the report, and a
+// validator that normalizes by other means -- replacing the escapes by
+// hand, recursing on a rewritten copy built without the standard
+// decoders -- is not credited. The operation spellings credited are
+// the standard library's, which is the reliable subset.
+binding pyUrlSchemeDenylistWithoutDecoding {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "python"
+    and containsAny(node.context.callPath, ["urlparse", "urlsplit"])
+    and containsAny(node.context.expr, ["javascript:", "vbscript:", "jscript:", "livescript:"])
+    and not containsAny(node.context.callPath, ["unescape", "quote"])
+  emit issue code.WeakRedirectUrlValidation at node
+}

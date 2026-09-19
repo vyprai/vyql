@@ -1,0 +1,25 @@
+module bindings.cpp.generated.m7c455364;
+
+binding deserialization0 {
+  requires {
+    dependency("marble")
+  }
+  query pattern callExpr where callee.method == "GeoUriParser.parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("marble")
+  }
+  query pattern callExpr where callee.method == "OsmParser.read"
+  emit sink code.Deserialization at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("marble")
+  }
+  query pattern callExpr where callee.method == "HttpJob.execute"
+  emit sink code.UrlFetch at args[0]
+}

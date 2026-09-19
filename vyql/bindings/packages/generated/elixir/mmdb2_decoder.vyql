@@ -1,0 +1,73 @@
+module bindings.elixir.generated.mc9bf9bf6;
+
+binding deserialization0 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "parse_database"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "decode_binary"
+  emit sink code.Deserialization at args[0]
+}
+
+binding databaseRead3 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "lookup"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead4 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "lookup!"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead5 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "lookup_pointer"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead6 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "lookup_pointer!"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead7 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "pipe_lookup"
+  emit sink code.DatabaseReadSink at args[0]
+}
+
+binding databaseRead8 {
+  requires {
+    dependency("mmdb2_decoder")
+  }
+  query pattern callExpr where callee.method == "pipe_lookup!"
+  emit sink code.DatabaseReadSink at args[0]
+}

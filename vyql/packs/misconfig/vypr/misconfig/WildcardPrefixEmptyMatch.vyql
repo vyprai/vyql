@@ -1,0 +1,11 @@
+module vypr.misconfig;
+
+rule WildcardPrefixEmptyMatch {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_94, CWE_346]
+    id: "VYQL-CFG-026"
+    severity: high
+  }
+  issue code.WildcardPrefixEmptyMatch as c
+}

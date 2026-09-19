@@ -1,0 +1,113 @@
+# Rank 1587 / CVE-2026-32096: Plunk's SNS webhook fetched the
+# SubscribeURL straight from the request body, so any poster chose
+# the URL the server fetched -- internal addresses included
+# (server-side request forgery, CWE-918). handleWebhook in
+# apps/api/src/controllers/Webhooks.ts did `const confirmResponse =
+# await fetch(req.body.SubscribeURL);` on a SubscriptionConfirmation
+# -- the SNS contract says that URL belongs to Amazon, but nothing
+# checked. The fixing commit b8f1ad9ab5 ("fix: Verify SNS URL before
+# sending fetch request"): the value is type-checked, parsed with
+# new URL, and the protocol must be https with the hostname matching
+# /^sns\.[a-z0-9-]+\.amazonaws\.com$/ -- otherwise 400 -- before the
+# fetch.
+#
+# The vulnerability is already reported: VYQL-RF-001 carries
+# code.HttpInput at Webhooks.ts:41 into code.UrlFetch at :41, the
+# bare fetch of the request's own SubscribeURL. What the fix adds is
+# the guard credit: jsParsedUrlHostnamePatternCheck
+# (vyql/bindings/javascript/parsed_url_hostname_pattern_check.vyql)
+# reads the three parts of a destination filter in one function --
+# the WHATWG URL construction, the parsed hostname, and a pattern
+# applied to it -- and emits core.AllowlistValidation at the function,
+# which satisfies the rule's `unless endpoint coveredBy
+# core.AllowlistValidation`. The fix's fetch keeps taking the original
+# string rather than the parsed object, so the taint path itself is
+# unchanged; the guard is the whole discriminator.
+#
+# The third case holds the scope: a filter factored into a sibling
+# function is a different shape, and its readings do not reach the
+# handler that fetches, so that handler still reports.
+
+test "rank1587: the webhook fetches the url it is posted"
+  lang javascript
+  file apps/api/src/controllers/Webhooks.ts
+  expect VYQL-RF-001
+  code
+  ```
+  export async function handleWebhook(req, res) {
+      if (req.body.Type === 'SubscriptionConfirmation') {
+          signale.info('SNS Subscription Confirmation received');
+          signale.info('Subscribe URL:', req.body.SubscribeURL);
+
+          const confirmResponse = await fetch(req.body.SubscribeURL);
+          if (confirmResponse.ok) {
+              signale.success('SNS subscription confirmed successfully');
+              return res.status(200).json({ success: true });
+          }
+      }
+      return res.status(200).json({ success: true });
+  }
+  ```
+
+test "rank1587: the parsed hostname is tested before the fetch"
+  lang javascript
+  file apps/api/src/controllers/Webhooks.ts
+  reject VYQL-RF-001
+  code
+  ```
+  export async function handleWebhook(req, res) {
+      if (req.body.Type === 'SubscriptionConfirmation') {
+          const subscribeURL = req.body.SubscribeURL;
+          if (typeof subscribeURL !== 'string') {
+              return res.status(400).json({ success: false, message: 'Invalid SubscribeURL' });
+          }
+
+          let parsedURL;
+          try {
+              parsedURL = new URL(subscribeURL);
+          } catch {
+              return res.status(400).json({ success: false, message: 'Invalid SubscribeURL' });
+          }
+
+          const SNS_HOST_RE = /^sns\.[a-z0-9-]+\.amazonaws\.com$/;
+          if (parsedURL.protocol !== 'https:' || !SNS_HOST_RE.test(parsedURL.hostname)) {
+              return res.status(400).json({ success: false, message: 'Invalid SubscribeURL' });
+          }
+
+          const confirmResponse = await fetch(subscribeURL);
+          if (confirmResponse.ok) {
+              signale.success('SNS subscription confirmed successfully');
+              return res.status(200).json({ success: true });
+          }
+      }
+      return res.status(200).json({ success: true });
+  }
+  ```
+
+test "rank1587: a filter in a sibling function does not cover this one"
+  lang javascript
+  file apps/api/src/controllers/Webhooks.ts
+  expect VYQL-RF-001
+  code
+  ```
+  export function isSnsSubscribeUrl(subscribeURL) {
+      let parsedURL;
+      try {
+          parsedURL = new URL(subscribeURL);
+      } catch {
+          return false;
+      }
+      const SNS_HOST_RE = /^sns\.[a-z0-9-]+\.amazonaws\.com$/;
+      return parsedURL.protocol === 'https:' && SNS_HOST_RE.test(parsedURL.hostname);
+  }
+
+  export async function handleWebhook(req, res) {
+      if (req.body.Type === 'SubscriptionConfirmation') {
+          const confirmResponse = await fetch(req.body.SubscribeURL);
+          if (confirmResponse.ok) {
+              return res.status(200).json({ success: true });
+          }
+      }
+      return res.status(200).json({ success: true });
+  }
+  ```

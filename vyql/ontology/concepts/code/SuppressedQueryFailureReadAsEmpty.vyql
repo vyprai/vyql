@@ -1,0 +1,11 @@
+module code;
+
+concept SuppressedQueryFailureReadAsEmpty : issue {
+  cwe: [CWE_754, CWE_20]
+  reviewAssumption: "the read's documentation declares a falsy failure return -- wpdb's get_var and get_row return null on failure and get_results null when the query does not run -- so the falsy spellings of failure and of an empty result are the same value"
+  reviewCategory: validation
+  reviewCondition: "a function suppresses database errors and tests one of those reads directly by truthiness, so a query that failed or never ran decides the branch an empty result set was meant to decide"
+  reviewConfidence: medium
+  reviewEvidence: "suppressed query context {pattern} tests an uncaptured get_results/get_var/get_row result by truthiness"
+  vulnerableTo: [validation.ImproperInputValidation]
+}

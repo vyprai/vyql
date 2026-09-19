@@ -1,0 +1,9 @@
+module bindings.dart.generated.mb3ca5359;
+
+binding sqlExecution0 {
+  requires {
+    dependency("sqflite")
+  }
+  query pattern callExpr where callee.method == "invokeMethod"
+  emit sink code.SqlExecution at args[0]
+}

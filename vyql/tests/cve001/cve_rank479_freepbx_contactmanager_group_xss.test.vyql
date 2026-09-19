@@ -1,0 +1,53 @@
+# Rank 479 / CVE-2019-16966: FreePBX Contactmanager reflected a
+# request-supplied group value in generated Contactmanager action links. The
+# security fix casts the group parameter before embedding it in the href.
+
+test "rank479: FreePBX Contactmanager action links use raw request group"
+  lang php
+  file Contactmanager.class.php
+  expect VYQL-INJ-102
+  expect_review code.FreePbxContactManagerGroupLinkXss
+  code
+  ```
+  <?php
+  class Contactmanager
+  {
+      public function ajaxHandler()
+      {
+          switch ($_REQUEST['command']) {
+              case 'grid':
+                  $group = $this->getGroupByID($_REQUEST['group']);
+                  $entries = $this->getEntriesByGroupID($_REQUEST['group']);
+                  foreach ($entries as $entry) {
+                      $final[$i]['actions'] = '<a href="config.php?display=contactmanager&amp;action=showentry&amp;group='.$_REQUEST['group'].'&amp;entry='.$entry['uid'].'">Edit</a>';
+                  }
+                  return $final;
+          }
+      }
+  }
+  ```
+
+test "rank479: FreePBX Contactmanager action links cast request group"
+  lang php
+  file Contactmanager.class.php
+  reject VYQL-INJ-102
+  reject_review code.FreePbxContactManagerGroupLinkXss
+  code
+  ```
+  <?php
+  class Contactmanager
+  {
+      public function ajaxHandler()
+      {
+          switch ($_REQUEST['command']) {
+              case 'grid':
+                      $group = $this->getGroupByID((int) $_REQUEST['group']);
+                      $entries = $this->getEntriesByGroupID((int) $_REQUEST['group']);
+                  foreach ($entries as $entry) {
+                      $final[$i]['actions'] = '<a href="config.php?display=contactmanager&amp;action=showentry&amp;group='.(int) $_REQUEST['group'].'&amp;entry='.$entry['uid'].'">Edit</a>';
+                  }
+                  return $final;
+          }
+      }
+  }
+  ```

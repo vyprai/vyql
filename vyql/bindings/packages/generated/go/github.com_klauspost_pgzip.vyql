@@ -1,0 +1,17 @@
+module bindings.go.generated.m84b45dc6;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/klauspost/pgzip")
+  }
+  query pattern callExpr where callee.method == "NewReader"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/klauspost/pgzip")
+  }
+  query pattern callExpr where callee.method == "NewReaderN"
+  emit sink code.Deserialization at args[0]
+}

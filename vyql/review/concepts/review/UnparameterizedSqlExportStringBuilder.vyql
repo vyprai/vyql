@@ -1,0 +1,8 @@
+module code;
+
+review code.UnparameterizedSqlExportStringBuilder {
+  category: sql
+  expected: [core.SqlParameterization, core.InputValidation]
+  kind: attention
+  text: "review database export query builders for parameterized values and quoted identifiers"
+}

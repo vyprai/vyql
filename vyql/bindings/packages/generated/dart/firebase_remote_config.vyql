@@ -1,0 +1,33 @@
+module bindings.dart.generated.m38547978;
+
+binding networkData0 {
+  requires {
+    dependency("firebase_remote_config")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("firebase_remote_config")
+  }
+  query pattern callExpr where callee.method == "fetch"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("firebase_remote_config")
+  }
+  query pattern callExpr where callee.method == "fetchAndActivate"
+  emit source code.NetworkData at call.result
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("firebase_remote_config")
+  }
+  query pattern callExpr where callee.method == "fetchAndActivate"
+  emit sink code.NetworkConnectSink at args[0]
+}

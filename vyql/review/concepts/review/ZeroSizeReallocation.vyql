@@ -1,0 +1,7 @@
+module code;
+
+review code.ZeroSizeReallocation {
+  category: memory
+  kind: attention
+  text: "review reallocation size guards and zero-size lifetime behavior"
+}

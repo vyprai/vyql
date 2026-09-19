@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule EncapsulatedMiddlewarePathReprefixed {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_863, CWE_436]
+    id: "VYQL-AUTH-119"
+    severity: critical
+  }
+  issue code.EncapsulatedMiddlewarePathReprefixed as event
+}

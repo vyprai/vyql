@@ -1,0 +1,60 @@
+# Rank 989 / CVE-2026-33284: GlobaLeaks support requests accepted a
+# user-supplied URL and forwarded it in administrator support emails.
+
+test "rank989: support email forwards request URL as site identity"
+  lang python
+  file backend/globaleaks/handlers/support.py
+  expect VYQL-VAL-018
+  expect_review code.UntrustedSupportUrlNotification
+  code
+  ```
+  from globaleaks.handlers.base import BaseHandler
+  from globaleaks.rest import requests
+  from globaleaks.utils.log import log
+
+  class SupportHandler(BaseHandler):
+      check_roles = 'any'
+
+      def post(self):
+          request = self.validate_request(self.request.content.read(),
+                                          requests.SupportDesc)
+
+          email = "From: %s\n\n" % request['mail_address']
+          email += "Site: %s\n\n" % request['url']
+          email += "Request:\n%s" % request['text']
+          self.state.schedule_support_email(self.request.tid, email)
+          log.debug("Received support request and forwarded to administrators")
+  ```
+
+test "rank989: support email uses trusted host and defangs untrusted fields"
+  lang python
+  file backend/globaleaks/handlers/support.py
+  reject VYQL-VAL-018
+  reject_review code.UntrustedSupportUrlNotification
+  code
+  ```
+  from globaleaks.handlers.base import BaseHandler
+  from globaleaks.rest import requests
+  from globaleaks.utils.log import log
+  from globaleaks.utils.defang import defang
+
+  def generate_support_email(mail_address, hostname, request):
+      email = "From: %s\n\n" % defang(mail_address)
+      email += "Site: %s\n\n" % hostname
+      email += "Request:\n%s" % defang(request)
+      return email
+
+  class SupportHandler(BaseHandler):
+      check_roles = 'any'
+
+      def post(self):
+          request = self.validate_request(self.request.content.read(),
+                                          requests.SupportDesc)
+
+          email = generate_support_email(request['mail_address'],
+                                         self.request.hostname,
+                                         request['text'])
+
+          self.state.schedule_support_email(self.request.tid, email)
+          log.debug("Received support request and forwarded to administrators")
+  ```

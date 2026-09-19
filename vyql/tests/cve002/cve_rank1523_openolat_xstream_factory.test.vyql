@@ -1,0 +1,170 @@
+# Rank 1523 / CVE-2021-39181: OpenOLAT handed out XStream instances
+# with no type restrictions, so deserializing a crafted XML file
+# instantiated arbitrary classes (unsafe deserialization to remote
+# code execution, CWE-502; OO-5548; the pool records CWE-91, which is
+# the XML-injection reading of the same document-handling flaw).
+# XStreamHelper in src/main/java/org/olat/core/util/xml/ held a plain
+# `new XStream()` it read every document through, and its factories
+# did `return new EnhancedXStream(false);` -- no setupDefaultSecurity,
+# no allowTypes -- so every manager stream built the same way. The
+# fixing commit 3f219ac45 ("OO-5548: setup security of XStream by
+# default", 73 files) runs XStream.setupDefaultSecurity on the shared
+# instance and on both factory products, adds an allowDefaultPackage
+# helper applying allowTypesByWildcard for the project's own packages,
+# and audits every manager to the factory or to permissions.
+#
+# The first pass pinned this against VYQL-DESER-007, whose shape
+# requires registerConverter and so cannot see a bare factory. The
+# recheck span tip carries the vocabulary that closes it: binding
+# unrestrictedClassDeserialization990
+# (vyql/bindings/java/xstream_type_permissions.vyql) emits
+# code.UnrestrictedClassDeserialization on the class context of any
+# class that reads through fromXML while none of its members
+# configures a type permission, and VYQL-DESER-023 judges it. That is
+# the observation the first pass called missing -- "an XStream
+# instance is returned from a factory without any
+# addPermission/setupDefaultSecurity" -- expressed over the class that
+# deserializes, which is the unit the obligation actually attaches to.
+#
+# Measured 3x --cache off / timeout 180 / --max-ram 6GB per revision
+# on the real checkout, vulnerable parent 6b191a591 against fix
+# 3f219ac45: the file reports VYQL-DESER-023 (HIGH) on the class node
+# at XStreamHelper.java:84 at the parent and nothing at the fix. On
+# org/olat/core (1545 java files, the largest subtree that finishes
+# inside the bound; the full src/main/java tree of 8234 files does not
+# complete in 180s) the same three runs give 621/621/621 findings at
+# the parent and 620/620/620 at the fix, and VYQL-DESER-023 is the
+# only rule that moves, 9 -> 8: the parent reports the helper plus
+# five manager classes the fix went on to audit (LicenseXStreamHelper,
+# PersistentTaskDAO, MapperDAO, SiteDefinitions thrice, HistoryManager,
+# DbStorage), the fix clears exactly the helper row, and every other
+# rule count is identical between revisions.
+#
+# Residual, not this rank's to fix: the five manager classes still
+# report at the fixed revision. They harden by delegating to the
+# factory -- `XStreamHelper.createXStreamInstance()` now configures
+# the instance -- plus `XStreamHelper.allowDefaultPackage(xstream)`,
+# and the binding's negation reads only the class's own member call
+# tokens, so a permission configured in the factory class does not
+# decline a consumer. That is the documented per-class scope of the
+# shipped binding, the same cross-class control attribution family as
+# the deserialization entries before it; a consumer that names the
+# documented permission API itself is the reject form below.
+
+test "rank1523: the helper reads every document through an unrestricted stream"
+  lang java
+  file src/main/java/org/olat/core/util/xml/XStreamHelper.java
+  expect VYQL-DESER-023
+  code
+  ```
+  package org.olat.core.util.xml;
+
+  import com.thoughtworks.xstream.XStream;
+
+  public class XStreamHelper {
+
+      private static XStream unconfiguredXStream = new XStream();
+
+      public static XStream createXStreamInstance() {
+          return new EnhancedXStream(false);
+      }
+
+      public static Object fromXML(String xml) {
+          return unconfiguredXStream.fromXML(xml);
+      }
+  }
+  ```
+
+test "rank1523: the fixed helper restricts the shared instance and both factories"
+  lang java
+  file src/main/java/org/olat/core/util/xml/XStreamHelper.java
+  reject VYQL-DESER-023
+  code
+  ```
+  package org.olat.core.util.xml;
+
+  import com.thoughtworks.xstream.XStream;
+
+  public class XStreamHelper {
+
+      private static final String[] DEFAULT_PACKAGES = new String[] {
+              "org.olat.**",
+              "de.bps.**",
+              "at.ac.uibk.**",
+              "org.hibernate.**"
+          };
+      private static final XStream unconfiguredXStream = new XStream();
+      static {
+          XStream.setupDefaultSecurity(unconfiguredXStream);
+          allowDefaultPackage(unconfiguredXStream);
+      }
+
+      public static final void allowDefaultPackage(XStream xstream) {
+          xstream.allowTypesByWildcard(DEFAULT_PACKAGES);
+      }
+
+      public static XStream createXStreamInstance() {
+          XStream xstream = new EnhancedXStream(false);
+          XStream.setupDefaultSecurity(xstream);
+          return xstream;
+      }
+
+      public static Object fromXML(String xml) {
+          return unconfiguredXStream.fromXML(xml);
+      }
+  }
+  ```
+
+test "rank1523: a manager reading a persisted document through a factory-fresh stream"
+  lang java
+  file src/main/java/org/olat/core/dispatcher/mapper/manager/MapperDAO.java
+  expect VYQL-DESER-023
+  code
+  ```
+  package org.olat.core.dispatcher.mapper.manager;
+
+  import java.io.Serializable;
+  import org.olat.core.util.xml.XStreamHelper;
+
+  public class MapperDAO {
+
+      public String persistMapper(Serializable mapper) {
+          return XStreamHelper.createXStreamInstance().toXML(mapper);
+      }
+
+      public Object readConfiguration(String configuration) {
+          Object obj = XStreamHelper.createXStreamInstance().fromXML(configuration);
+          return obj;
+      }
+  }
+  ```
+
+test "rank1523: the same manager restricting its instance with the documented permission API"
+  lang java
+  file src/main/java/org/olat/core/dispatcher/mapper/manager/MapperDAO.java
+  reject VYQL-DESER-023
+  code
+  ```
+  package org.olat.core.dispatcher.mapper.manager;
+
+  import java.io.Serializable;
+  import com.thoughtworks.xstream.XStream;
+  import org.olat.core.util.xml.XStreamHelper;
+
+  public class MapperDAO {
+
+      private static final XStream xstream = XStreamHelper.createXStreamInstance();
+      static {
+          xstream.allowTypesByWildcard(new String[] { "org.olat.core.dispatcher.**" });
+      }
+
+      public String persistMapper(Serializable mapper) {
+          return xstream.toXML(mapper);
+      }
+
+      public Object readConfiguration(String configuration) {
+          Object obj = xstream.fromXML(configuration);
+          return obj;
+      }
+  }
+  ```

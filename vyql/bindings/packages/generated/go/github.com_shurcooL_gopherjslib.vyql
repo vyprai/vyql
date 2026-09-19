@@ -1,0 +1,9 @@
+module bindings.go.generated.m14d7a95c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/shurcooL/gopherjslib")
+  }
+  query pattern callExpr where callee.method == "BuildPackage"
+  emit sink code.FilePathAccess at args[0]
+}

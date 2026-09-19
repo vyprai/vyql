@@ -1,0 +1,38 @@
+# Rank 58 / CVE-2022-26533: Alist raw response body XSS.
+# Fresh scan evidence includes VYQL-INJ-004 touching server/controllers/other.go.
+
+test "rank58: Alist writes request value into raw response"
+  lang go
+  expect VYQL-INJ-004
+  code
+  ```
+  package p
+
+  import (
+    "fmt"
+    "github.com/gin-gonic/gin"
+  )
+
+  func other(ctx *gin.Context) {
+    name := ctx.Query("name")
+    ctx.Writer.WriteString(fmt.Sprintf("<span>%s</span>", name))
+  }
+  ```
+
+test "rank58: Alist escapes request value before response"
+  lang go
+  reject VYQL-INJ-004
+  code
+  ```
+  package p
+
+  import (
+    "html"
+    "github.com/gin-gonic/gin"
+  )
+
+  func other(ctx *gin.Context) {
+    name := ctx.Query("name")
+    ctx.Writer.WriteString(html.EscapeString(name))
+  }
+  ```

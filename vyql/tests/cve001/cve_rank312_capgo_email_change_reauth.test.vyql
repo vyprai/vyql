@@ -1,0 +1,36 @@
+test "rank312: Cap-go Supabase email change requires reauthentication"
+  lang javascript
+  expect VYQL-AUTH-090
+  expect_review code.EmailChangeReauthMissingReview
+  code
+  ```
+  async function submit(form) {
+    if (main.user.email !== form.email) {
+      const data = await supabase.auth.updateUser({ email: form.email })
+      if (data.error)
+        return toast.error('email already taken')
+      updateData.email = form.email
+    }
+    await supabase.from('users').upsert(updateData)
+  }
+  ```
+
+test "rank312: email change with same-flow password check is clean"
+  lang javascript
+  reject VYQL-AUTH-090
+  reject_review code.EmailChangeReauthMissingReview
+  code
+  ```
+  async function submit(form) {
+    const auth = await supabase.auth.signInWithPassword({
+      email: main.user.email,
+      password: form.currentPassword,
+    })
+    if (auth.error)
+      return
+    if (main.user.email !== form.email) {
+      await supabase.auth.updateUser({ email: form.email })
+      updateData.email = form.email
+    }
+  }
+  ```

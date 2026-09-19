@@ -1,0 +1,8 @@
+module code;
+
+review code.ResponseWriterScriptWindowIdXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review JSF ResponseWriter script output for writeText or equivalent escaping around window identifiers"
+}

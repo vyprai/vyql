@@ -1,0 +1,6 @@
+module code;
+
+concept AccessPolicyReview : issue {
+  cwe: [CWE_863]
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

@@ -1,0 +1,25 @@
+test "rank891: DOM value concatenated into jQuery replaceWith HTML is XSS"
+  lang javascript
+  expect VYQL-INJ-004
+  code
+  ```
+  function turn_textarea_switch(checkbox) {
+    var id = checkbox.id.replace(/hidden_value$/, "value");
+    var source = document.getElementById(id);
+    var target = '<textarea id="' + id + '">' + source.value + '</textarea>';
+    $(source).replaceWith(target);
+  }
+  ```
+
+test "rank891: jQuery object construction with attr value is clean"
+  lang javascript
+  reject VYQL-INJ-004
+  code
+  ```
+  function turn_textarea_switch(checkbox) {
+    var id = checkbox.id.replace(/hidden_value$/, "value");
+    var source = document.getElementById(id);
+    var target = $('<textarea/>').attr({ id: id, value: $(source).val() });
+    $(source).replaceWith(target);
+  }
+  ```

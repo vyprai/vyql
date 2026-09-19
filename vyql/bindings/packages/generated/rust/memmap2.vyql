@@ -1,0 +1,9 @@
+module bindings.rust.generated.m093b908d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("memmap2")
+  }
+  query pattern callExpr where callee.method == "make_read_only"
+  emit sink code.FilePathAccess at args[0]
+}

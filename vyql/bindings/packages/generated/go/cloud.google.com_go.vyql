@@ -1,0 +1,25 @@
+module bindings.go.generated.mc4e52506;
+
+binding deserialization0 {
+  requires {
+    dependency("cloud.google.com/go")
+  }
+  query pattern callExpr where callee.method == "ParseDate"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("cloud.google.com/go")
+  }
+  query pattern callExpr where callee.method == "ParseTime"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("cloud.google.com/go")
+  }
+  query pattern callExpr where callee.method == "ParseDateTime"
+  emit sink code.Deserialization at args[0]
+}

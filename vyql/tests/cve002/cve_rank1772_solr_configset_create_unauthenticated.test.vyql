@@ -1,0 +1,258 @@
+# Rank 1772 / CVE-2020-13957 (SOLR-14663, CWE-306):
+# apache/solr's ConfigSets API dispatches each action to a constant-specific
+# body of ConfigSetsHandler.ConfigSetOperation overriding `call`. The CREATE
+# constant
+# (solr/core/src/java/org/apache/solr/handler/admin/ConfigSetsHandler.java:272
+# at the parent) reads the request-controlled `baseConfigSet` parameter and
+# returns props the overseer applies by copying that base configset into a
+# new one -- with no authentication anywhere in the body. The UPLOAD action
+# does authenticate: `getTrusted(req)` (the same file, :191) returns true only
+# when `authcPlugin != null && req.getUserPrincipal() != null`, and the
+# configset's trust flag decides whether its config may declare executable
+# components (RunExecutableListener et al). An unauthenticated CREATE from a
+# trusted base produced a configset that inherited nothing of the base's root
+# node (the `{"trusted": ...}` marker is never copied) and so landed with the
+# permissive default, handing an unauthenticated caller the trusted-configset
+# path to arbitrary component execution.
+#
+# e001c2221812a0ba9e9378855040ce72f93eced4 (SOLR-14663) fixes it inside the
+# same enum-constant body: CREATE_OP.call gains
+#
+#   if (!DISABLE_CREATE_AUTH_CHECKS &&
+#           !isTrusted(req, h.coreContainer.getAuthenticationPlugin()) &&
+#           isCurrentlyTrusted(h.coreContainer.getZkController().getZkClient(),
+#                              ZkConfigManager.CONFIGS_ZKNODE + "/" + baseConfigSetName)) {
+#     throw new SolrException(ErrorCode.UNAUTHORIZED, ...);
+#   }
+#
+# plus existence checks on the new and base names, and ZkConfigManager.copyConfigDir
+# now copies the base's root node data so the trust flag propagates. The
+# remediation is present at the commit and absent at its parent a50c10843, so
+# both halves of the 1390 check hold and the pool row is correct in every
+# field; no correction needed.
+#
+# What fires. The enum-constant body lowers as a class named for the constant
+# (java.go stmtOne, the enum_constant case), so its `call` method is a real
+# function carrying class_base:ConfigSetOperation. The Solr binding
+# solrConfigSetOpWithoutAuthentication
+# (vyql/bindings/java/solr_configset_operation_authentication.vyql) emits
+# code.AuthenticationRequiredOp for a configset operation body that reads
+# request parameters through SolrParams and never consults the authentication
+# state -- CoreContainer.getAuthenticationPlugin, the documented way handler
+# code asks which plugin is installed, or the servlet identity accessor
+# getUserPrincipal, the two spellings this file's own upload-side helper
+# getTrusted already uses. VYQL-AUTH-001 reports it: measured on
+# solr/core/src/java/org/apache/solr/handler/admin, three --cache off runs per
+# side, identical every run, the parent reports VYQL-AUTH-001 at
+# ConfigSetsHandler.java:273 (CREATE_OP.call, the row the advisory is about)
+# and :282 (DELETE_OP.call -- the same unauthenticated config-mutating shape,
+# present at both revisions), and the fix reports only :320 (DELETE_OP.call):
+# 12 findings against 11, the CREATE row 1 -> 0, nothing else moves. Whole
+# solr-core (1347 files) adds exactly those two rows and removes none.
+#
+# The four cases: (a) is the vulnerable CREATE body and expects the finding;
+# (b) is the fixed body, whose inline getAuthenticationPlugin consult keeps it
+# quiet, and rejects; (c) is the same vulnerable body as a named method of the
+# handler -- a plain method is not the enum dispatch the binding names, and a
+# generic any-request-reading-method shape is the measured-unshippable
+# endpoint family, so it rejects; (d) is a LIST-shaped constant body that
+# reads no request parameters, and rejects -- the operation must be driven by
+# request input for the missing authentication to decide anything.
+#
+# verify_current_expected: fixed, 1 -> 0.
+
+test "rank1772: (a) the ConfigSets CREATE action body reads the request-controlled base configset and performs no authenticated-principal check, so an unauthenticated request creates a trusted-derived configset"
+  lang java
+  file solr/core/src/java/org/apache/solr/handler/admin/ConfigSetsHandler.java
+  expect VYQL-AUTH-001
+  code
+  ```
+  package org.apache.solr.handler.admin;
+
+  import java.util.Map;
+  import org.apache.solr.common.params.SolrParams;
+  import org.apache.solr.request.SolrQueryRequest;
+  import org.apache.solr.response.SolrQueryResponse;
+
+  public class ConfigSetsHandler {
+    protected void invokeAction(SolrQueryRequest req, SolrQueryResponse rsp, String action) throws Exception {
+      ConfigSetOperation operation = ConfigSetOperation.get(action);
+      Map<String, Object> result = operation.call(req, rsp, this);
+    }
+
+    static Map<String, Object> copyPropertiesWithPrefix(SolrParams params, Map<String, Object> props, String prefix) {
+      // The configset created via an API should be mutable.
+      props.put("immutable", "false");
+      return props;
+    }
+
+    enum ConfigSetOperation {
+      CREATE_OP("create") {
+        @Override
+        Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception {
+          String baseConfigSetName = req.getParams().get("baseConfigSet", "_default");
+          Map<String, Object> props = CollectionsHandler.copy(req.getParams().required(), null, "name");
+          props.put("baseConfigSet", baseConfigSetName);
+          return copyPropertiesWithPrefix(req.getParams(), props, "property.");
+        }
+      },
+      DELETE_OP("delete") {
+        @Override
+        Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception {
+          return CollectionsHandler.copy(req.getParams().required(), null, "name");
+        }
+      };
+
+      String action;
+      ConfigSetOperation(String action) { this.action = action; }
+      abstract Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception;
+      static ConfigSetOperation get(String action) { return CREATE_OP; }
+    }
+  }
+  ```
+
+test "rank1772: (b) the fixed revision rejects an unauthenticated CREATE from a trusted base inside the same enum-constant body"
+  lang java
+  file solr/core/src/java/org/apache/solr/handler/admin/ConfigSetsHandler.java
+  reject VYQL-AUTH-001
+  code
+  ```
+  package org.apache.solr.handler.admin;
+
+  import java.util.Map;
+  import org.apache.solr.common.SolrException;
+  import org.apache.solr.common.cloud.ZkConfigManager;
+  import org.apache.solr.common.params.SolrParams;
+  import org.apache.solr.request.SolrQueryRequest;
+  import org.apache.solr.response.SolrQueryResponse;
+
+  public class ConfigSetsHandler {
+    final static boolean DISABLE_CREATE_AUTH_CHECKS = Boolean.getBoolean("solr.disableConfigSetsCreateAuthChecks");
+
+    static class CoreContainer {
+      Object getAuthenticationPlugin() { return null; }
+      Object getZkController() { return null; }
+    }
+
+    static boolean isTrusted(SolrQueryRequest req, Object authPlugin) {
+      if (authPlugin != null && req.getUserPrincipal() != null) {
+        return true;
+      }
+      return false;
+    }
+
+    static boolean isCurrentlyTrusted(Object zkClient, String configSetZkPath) {
+      return true;
+    }
+
+    protected void invokeAction(SolrQueryRequest req, SolrQueryResponse rsp, String action) throws Exception {
+      ConfigSetOperation operation = ConfigSetOperation.get(action);
+      Map<String, Object> result = operation.call(req, rsp, this);
+    }
+
+    static Map<String, Object> copyPropertiesWithPrefix(SolrParams params, Map<String, Object> props, String prefix) {
+      props.put("immutable", "false");
+      return props;
+    }
+
+    enum ConfigSetOperation {
+      CREATE_OP("create") {
+        @Override
+        Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception {
+          String baseConfigSetName = req.getParams().get("baseConfigSet", "_default");
+          String newConfigSetName = req.getParams().get("name");
+          if (newConfigSetName == null || newConfigSetName.length() == 0) {
+            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "ConfigSet name not specified");
+          }
+          ZkConfigManager zkConfigManager = new ZkConfigManager(new CoreContainer().getZkController());
+          if (zkConfigManager.configExists(newConfigSetName)) {
+            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "ConfigSet already exists: " + newConfigSetName);
+          }
+          if (!zkConfigManager.configExists(baseConfigSetName)) {
+            throw new SolrException(SolrException.ErrorCode.BAD_REQUEST, "Base ConfigSet does not exist: " + baseConfigSetName);
+          }
+          if (!DISABLE_CREATE_AUTH_CHECKS &&
+                  !isTrusted(req, new CoreContainer().getAuthenticationPlugin()) &&
+                  isCurrentlyTrusted(new CoreContainer().getZkController(), "/configs/" + baseConfigSetName)) {
+            throw new SolrException(SolrException.ErrorCode.UNAUTHORIZED,
+                "Can't create a configset with an unauthenticated request from a trusted baseConfigSet");
+          }
+          Map<String, Object> props = CollectionsHandler.copy(req.getParams().required(), null, "name");
+          props.put("baseConfigSet", baseConfigSetName);
+          return copyPropertiesWithPrefix(req.getParams(), props, "property.");
+        }
+      };
+
+      String action;
+      ConfigSetOperation(String action) { this.action = action; }
+      abstract Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception;
+      static ConfigSetOperation get(String action) { return CREATE_OP; }
+    }
+  }
+  ```
+
+test "rank1772: (c) the same vulnerable action body as a named method of the handler -- not the enum dispatch, so nothing marks it"
+  lang java
+  file solr/core/src/java/org/apache/solr/handler/admin/ConfigSetsHandler.java
+  reject VYQL-AUTH-001
+  code
+  ```
+  package org.apache.solr.handler.admin;
+
+  import java.util.Map;
+  import org.apache.solr.common.params.SolrParams;
+  import org.apache.solr.request.SolrQueryRequest;
+  import org.apache.solr.response.SolrQueryResponse;
+
+  public class ConfigSetsHandler {
+    Map<String, Object> createOp(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception {
+      String baseConfigSetName = req.getParams().get("baseConfigSet", "_default");
+      Map<String, Object> props = CollectionsHandler.copy(req.getParams().required(), null, "name");
+      props.put("baseConfigSet", baseConfigSetName);
+      return copyPropertiesWithPrefix(req.getParams(), props, "property.");
+    }
+
+    static Map<String, Object> copyPropertiesWithPrefix(SolrParams params, Map<String, Object> props, String prefix) {
+      props.put("immutable", "false");
+      return props;
+    }
+  }
+  ```
+
+test "rank1772: (d) a constant-specific body that reads no request parameters -- the operation's effect is not decided by the caller"
+  lang java
+  file solr/core/src/java/org/apache/solr/handler/admin/ConfigSetsHandler.java
+  reject VYQL-AUTH-001
+  code
+  ```
+  package org.apache.solr.handler.admin;
+
+  import java.util.List;
+  import java.util.Map;
+  import org.apache.solr.common.util.NamedList;
+  import org.apache.solr.request.SolrQueryRequest;
+  import org.apache.solr.response.SolrQueryResponse;
+
+  public class ConfigSetsHandler {
+    static class ZkConfigManager {
+      List<String> listConfigs() { return null; }
+    }
+
+    enum ConfigSetOperation {
+      LIST_OP("list") {
+        @Override
+        Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception {
+          NamedList<Object> results = new NamedList<>();
+          ZkConfigManager zkConfigManager = new ZkConfigManager();
+          List<String> configSetsList = zkConfigManager.listConfigs();
+          results.add("configSets", configSetsList);
+          return results;
+        }
+      };
+
+      String action;
+      ConfigSetOperation(String action) { this.action = action; }
+      abstract Map<String, Object> call(SolrQueryRequest req, SolrQueryResponse rsp, ConfigSetsHandler h) throws Exception;
+    }
+  }
+  ```

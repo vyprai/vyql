@@ -1,0 +1,9 @@
+module bindings.python.generated.mecea7c67;
+
+binding sqlExecution0 {
+  requires {
+    dependency("sqlalchemy")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

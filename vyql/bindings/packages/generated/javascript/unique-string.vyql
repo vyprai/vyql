@@ -1,0 +1,9 @@
+module bindings.javascript.generated.md3d2ac70;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("unique-string")
+  }
+  query pattern callExpr where callee.method == "uniqueString"
+  emit issue code.WeakRandomValue at call
+}

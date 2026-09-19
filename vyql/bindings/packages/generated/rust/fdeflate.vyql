@@ -1,0 +1,17 @@
+module bindings.rust.generated.ma810090d;
+
+binding deserialization0 {
+  requires {
+    dependency("fdeflate")
+  }
+  query pattern callExpr where callee.method == "decompress_to_vec"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("fdeflate")
+  }
+  query pattern callExpr where callee.method == "decompress_to_vec_bounded"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept DeviceVerificationKeyBindingMissing : issue {
+  cwe: [CWE_287, CWE_322]
+  reviewAssumption: "the remote side chooses the key identifiers offered during verification, and a device identifier can be made to collide with the user's cross-signing key identifier"
+  reviewCategory: auth
+  reviewCondition: "a device verification flow commits device trust from the identifier it resolved instead of the trust call that rechecks the key material observed during verification"
+  reviewConfidence: high
+  reviewEvidence: "device verification context {pattern} resolves both a stored device and the user's cross-signing identity for the offered key identifiers and then marks the device verified by identifier alone, with no trust call carrying the verified keys"
+  vulnerableTo: [authentication.ImproperAuthentication, crypto.ImproperSignatureCheck]
+}

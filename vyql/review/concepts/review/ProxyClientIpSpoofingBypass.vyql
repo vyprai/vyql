@@ -1,0 +1,8 @@
+module code;
+
+review code.ProxyClientIpSpoofingBypass {
+  category: auth
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  kind: attention
+  text: "review gateway proxy handlers for source-IP header normalization before forwarding to backends that trust client IP"
+}

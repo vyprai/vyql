@@ -1,0 +1,204 @@
+# Rank 1848 / CVE-2025-34282: thingsboard's image download built the response
+# in ImageController.downloadIfChanged with the content type the uploader
+# recorded and served the bytes inline:
+#
+#   var result = ResponseEntity.ok()
+#           .header("Content-Type", descriptor.getMediaType())
+#           .eTag(descriptor.getEtag());
+#   if (!cacheKey.isPublic()) {
+#       result.header(HttpHeaders.CONTENT_DISPOSITION, "attachment;filename=" + fileName);
+#   }
+#   ...
+#   return result.body(new ByteArrayResource(responseData));
+#
+# The media type comes from the stored descriptor, so an image uploaded as
+# image/svg+xml is served as image/svg+xml. SVG is active content a browser
+# parses and scripts when it loads the response directly, and the attachment
+# disposition only covers the non-public branch, so a public image URL is a
+# stored XSS payload in the serving origin (CWE-79, CWE-434). The fixing commit
+# 8e400fa2 is the merge of the fixing change and its whole content is one line
+# added to the builder chain:
+#
+#           .header("Content-Security-Policy", "default-src 'none'")
+#
+# The taint rule reported this endpoint before any change here:
+# VYQL-INJ-004 taints core.UserControlledData into code.HtmlRender, the
+# parameter of the @RestController's private helper is the source, and the
+# gzip stream that writes the served bytes is the sink. What it could not do
+# is stop reporting once the response is hardened -- its endpoint guard is
+# `unless endpoint coveredBy core.SafeResponseContentType`, and that check
+# concept had no Java binding at all, so the fixed revision's own control is invisible
+# and the patched revision reported identically to the vulnerable one
+# (measured on both repro revisions before the binding: VYQL-INJ-004 x1 each).
+#
+# core.SafeResponseContentType names the guarantee, not the mechanism: the
+# response is constrained so a browser will not execute what it carries. The
+# Go bindings deliver it with an inert content-type literal; a
+# Content-Security-Policy response header delivers the same guarantee by a
+# different documented mechanism, which is why it belongs under the same
+# concept rather than under a new one. responseContentSecurityPolicy binds
+# Spring's ResponseEntity.HeadersBuilder.header(String, String...) and the
+# servlet HttpServletResponse.setHeader/addHeader pair -- the two documented
+# ways a Java handler sets a response header -- restricted to the
+# Content-Security-Policy name.
+#
+# Content-Security-Policy-Report-Only is declined explicitly: that header
+# only reports violations, it does not block them, so a response carrying it
+# is not hardened and the fourth case pins that it does not neutralise.
+#
+# Collateral enumerated across the 464 rank clones: eight Java files mention
+# content-security-policy at all, of which the netty ones define the header
+# name as a constant and a static table rather than setting it, solr's is a
+# test, and the one live setter (silverpeas MassiveWebSecurityFilter) uses the
+# servlet setHeader route this binding covers. Nothing is over-suppressed.
+#
+# verify_current_expected: fixed
+
+test "rank1848: an image download serving the uploader's media type inline reports the response render"
+  lang java
+  expect VYQL-INJ-004
+  code
+  ```
+  import java.io.ByteArrayOutputStream;
+  import java.util.zip.GZIPOutputStream;
+  import org.springframework.core.io.ByteArrayResource;
+  import org.springframework.http.ResponseEntity;
+  import org.springframework.web.bind.annotation.RestController;
+
+  @RestController
+  public class ImageController {
+
+  	private ResponseEntity<ByteArrayResource> downloadIfChanged(String key, String etag, String acceptEncodingHeader) throws Exception {
+  		ImageDescriptor descriptor = imageService.getDescriptor(key);
+  		byte[] data = imageService.getImageData(key);
+  		var result = ResponseEntity.ok()
+  				.header("Content-Type", descriptor.getMediaType())
+  				.eTag(descriptor.getEtag());
+  		var responseData = data;
+  		if (descriptor.getMediaType().contains("svg") &&
+  				acceptEncodingHeader != null && acceptEncodingHeader.contains("gzip")) {
+  			result.header("Content-Encoding", "gzip");
+  			var outputStream = new ByteArrayOutputStream();
+  			try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream)) {
+  				gzipOutputStream.write(data);
+  				gzipOutputStream.finish();
+  			}
+  			responseData = outputStream.toByteArray();
+  		}
+  		result.contentLength(responseData.length);
+  		return result.body(new ByteArrayResource(responseData));
+  	}
+  }
+  ```
+
+test "rank1848: the same download with a Content-Security-Policy response header is hardened"
+  lang java
+  reject VYQL-INJ-004
+  code
+  ```
+  import java.io.ByteArrayOutputStream;
+  import java.util.zip.GZIPOutputStream;
+  import org.springframework.core.io.ByteArrayResource;
+  import org.springframework.http.ResponseEntity;
+  import org.springframework.web.bind.annotation.RestController;
+
+  @RestController
+  public class ImageController {
+
+  	private ResponseEntity<ByteArrayResource> downloadIfChanged(String key, String etag, String acceptEncodingHeader) throws Exception {
+  		ImageDescriptor descriptor = imageService.getDescriptor(key);
+  		byte[] data = imageService.getImageData(key);
+  		var result = ResponseEntity.ok()
+  				.header("Content-Type", descriptor.getMediaType())
+  				.header("Content-Security-Policy", "default-src 'none'")
+  				.eTag(descriptor.getEtag());
+  		var responseData = data;
+  		if (descriptor.getMediaType().contains("svg") &&
+  				acceptEncodingHeader != null && acceptEncodingHeader.contains("gzip")) {
+  			result.header("Content-Encoding", "gzip");
+  			var outputStream = new ByteArrayOutputStream();
+  			try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream)) {
+  				gzipOutputStream.write(data);
+  				gzipOutputStream.finish();
+  			}
+  			responseData = outputStream.toByteArray();
+  		}
+  		result.contentLength(responseData.length);
+  		return result.body(new ByteArrayResource(responseData));
+  	}
+  }
+  ```
+
+test "rank1848: the servlet setHeader spelling hardens the same download"
+  lang java
+  reject VYQL-INJ-004
+  code
+  ```
+  import java.io.ByteArrayOutputStream;
+  import java.util.zip.GZIPOutputStream;
+  import jakarta.servlet.http.HttpServletResponse;
+  import org.springframework.web.bind.annotation.RestController;
+
+  @RestController
+  public class ImageController {
+
+  	private void downloadIfChanged(String key, String etag, String acceptEncodingHeader,
+  			HttpServletResponse response) throws Exception {
+  		ImageDescriptor descriptor = imageService.getDescriptor(key);
+  		byte[] data = imageService.getImageData(key);
+  		response.setHeader("Content-Type", descriptor.getMediaType());
+  		response.setHeader("Content-Security-Policy", "default-src 'none'");
+  		var responseData = data;
+  		if (descriptor.getMediaType().contains("svg") &&
+  				acceptEncodingHeader != null && acceptEncodingHeader.contains("gzip")) {
+  			response.setHeader("Content-Encoding", "gzip");
+  			var outputStream = new ByteArrayOutputStream();
+  			try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream)) {
+  				gzipOutputStream.write(data);
+  				gzipOutputStream.finish();
+  			}
+  			responseData = outputStream.toByteArray();
+  		}
+  		response.setContentLength(responseData.length);
+  		response.getOutputStream().write(responseData);
+  	}
+  }
+  ```
+
+test "rank1848: a report-only policy does not harden the response"
+  lang java
+  expect VYQL-INJ-004
+  code
+  ```
+  import java.io.ByteArrayOutputStream;
+  import java.util.zip.GZIPOutputStream;
+  import org.springframework.core.io.ByteArrayResource;
+  import org.springframework.http.ResponseEntity;
+  import org.springframework.web.bind.annotation.RestController;
+
+  @RestController
+  public class ImageController {
+
+  	private ResponseEntity<ByteArrayResource> downloadIfChanged(String key, String etag, String acceptEncodingHeader) throws Exception {
+  		ImageDescriptor descriptor = imageService.getDescriptor(key);
+  		byte[] data = imageService.getImageData(key);
+  		var result = ResponseEntity.ok()
+  				.header("Content-Type", descriptor.getMediaType())
+  				.header("Content-Security-Policy-Report-Only", "default-src 'none'")
+  				.eTag(descriptor.getEtag());
+  		var responseData = data;
+  		if (descriptor.getMediaType().contains("svg") &&
+  				acceptEncodingHeader != null && acceptEncodingHeader.contains("gzip")) {
+  			result.header("Content-Encoding", "gzip");
+  			var outputStream = new ByteArrayOutputStream();
+  			try (GZIPOutputStream gzipOutputStream = new GZIPOutputStream(outputStream)) {
+  				gzipOutputStream.write(data);
+  				gzipOutputStream.finish();
+  			}
+  			responseData = outputStream.toByteArray();
+  		}
+  		result.contentLength(responseData.length);
+  		return result.body(new ByteArrayResource(responseData));
+  	}
+  }
+  ```

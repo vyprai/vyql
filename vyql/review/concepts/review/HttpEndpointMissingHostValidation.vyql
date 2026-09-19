@@ -1,0 +1,8 @@
+module code;
+
+review code.HttpEndpointMissingHostValidation {
+  category: access_control
+  expected: [core.AuthenticationCheck]
+  kind: target
+  text: "validate the request Host header (DNS rebinding protection) or authenticate the endpoint before serving it"
+}

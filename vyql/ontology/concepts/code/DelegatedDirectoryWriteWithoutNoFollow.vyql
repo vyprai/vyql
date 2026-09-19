@@ -1,0 +1,11 @@
+module code;
+
+concept DelegatedDirectoryWriteWithoutNoFollow : issue {
+  cwe: [CWE_59, CWE_276]
+  reviewAssumption: "the function runs with privileges its caller lacks, as setuid helpers and container or device managers do, and the chown hands the written-through directory to an owner who can therefore relax its mode and plant entries"
+  reviewCategory: path
+  reviewCondition: "a file is created or truncated under a directory whose ownership the same function delegates to another uid, without no-follow protection on the open"
+  reviewConfidence: medium
+  reviewEvidence: "delegated-ownership write context {pattern} chowns a path to a looked-up owner and opens a file for creation under it without an observed O_NOFOLLOW flag"
+  vulnerableTo: [path.LinkFollowing]
+}

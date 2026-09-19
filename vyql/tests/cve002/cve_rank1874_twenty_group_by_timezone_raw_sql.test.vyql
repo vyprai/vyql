@@ -1,0 +1,195 @@
+# Rank 1874 / CVE-2026-46624: Twenty CRM's group-by date expressions
+# interpolated the `timeZone` field of the group_by query parameter straight
+# into raw SQL, so a crafted timezone broke out of the string literal and
+# injected SQL (chained to PostgreSQL COPY TO PROGRAM for RCE on superuser
+# deployments; SQL injection, CWE-89; GHSA-jgx4-6mr9-9573). The vulnerable
+# interpolation in
+# packages/twenty-server/src/engine/api/graphql/graphql-query-runner/group-by/resolvers/utils/get-group-by-expression.util.ts:
+#   const timeZoneAsDateTruncParameter = `, '${groupByField.timeZone}'`;
+#   const timeZoneAsToCharParameter = ` AT TIME ZONE '${groupByField.timeZone}'`;
+# fed TO_CHAR(DATE_TRUNC(...)) expressions into the TypeORM query builder's
+# addSelect/groupBy in common-group-by-query-runner.service.ts, where the
+# expression argument is raw SQL. The REST source is
+# parse-group-by-rest-request.util.ts's JSON.parse(request.query.group_by).
+# The pool row named 7d68868df5373c7be76b29a7eb3ae8e3b4a1768a, an unrelated
+# junction-toggle/documentation commit -- the fixing change is c44d61f324a018ac65b93d967bdb1e49b9b831b5,
+# "Validate timezone input in group-by date queries (#17777)", which throws
+# unless the timezone is in the IANA_TIME_ZONES set before interpolating.
+#
+# The TypeORM SelectQueryBuilder raw-expression entry points (addSelect,
+# groupBy, addGroupBy, addOrderBy) carried no SqlExecution sink, so the
+# injection surface lacks labels. The bindings below ship those sinks;
+# VYQL-INJ-001 then reports the timezone chain end to end. Measured on the
+# real tree (whole packages/twenty-server/src scan): 0 INJ-001 rows at the
+# group-by query-builder sinks before, +5 after -- three at the CVE's own
+# addSelect/groupBy/addGroupBy lines (common-group-by-query-runner.service.ts
+# :137/:140/:142) plus two sibling raw-expression selects
+# (graphql-query.parser.ts:162, process-nested-relations-v2.helper.ts:355),
+# all sourced from code.HttpInput in the MCP tool-call body. The patched
+# revision keeps the same three rows one line down: the IANA Set.has + throw
+# guard is a project-local allowlist no binding can credit as a control --
+# the same guard-uncredited shape recorded for drizzle's sanitizePathSegment
+# (regex-allowlist guards as credited controls remain the generic gap).
+#
+# The REST request.query.group_by source does not itself reach the sink on
+# the real tree: its flow dies at rest-api-group-by.handler.ts:103
+# ("callee not traced -- external or cross-package") because the handler
+# hands the parsed group_by to the query runner through a NestJS
+# dependency-injected constructor parameter property
+# (`constructor(private readonly commonGroupByQueryRunnerService: ...)`
+# then `this.commonGroupByQueryRunnerService.execute(...)`), and a member
+# call on such a receiver never resolves to the injected class -- the JS
+# frontend's this-field walk records only explicit `this.x = y` assignments.
+# The last two blocks are the isolating pair (identical source, sink and
+# chain, differing only in the receiver spelling): the `new`-receiver chain
+# reports, the DI-receiver chain reports nothing. Aliased `src/*` imports
+# are NOT the blocker -- the same chain through an aliased free-function
+# import reports (probed). Recorded as an ENGINE-GAPS row.
+# verify_current_expected: attention-engine-gap. A receiver-resolution fix
+# must flip the DI-receiver block to expect; when allowlist-guard controls
+# land the IANA-guard block must flip to reject; the spliced and
+# constant-timezone blocks must keep their current behaviour.
+
+test "rank1874: timezone from the group_by query param is spliced into a raw select expression"
+  lang javascript
+  file get-group-by-expression.util.js
+  expect VYQL-INJ-001
+  code
+  ```
+  const getGroupByExpression = ({
+    groupByField,
+    columnNameWithQuotes,
+  }) => {
+    const timeZoneAsDateTruncParameter = `, '${groupByField.timeZone}'`;
+    const timeZoneAsToCharParameter = ` AT TIME ZONE '${groupByField.timeZone}'`;
+
+    return `TO_CHAR(DATE_TRUNC('DAY', ${columnNameWithQuotes}${timeZoneAsDateTruncParameter})${timeZoneAsToCharParameter}, 'YYYY-MM-DD')`;
+  };
+
+  const runGroupBy = async (request, queryBuilder) => {
+    const groupByQuery = request.query.group_by;
+    const groupByField = JSON.parse(groupByQuery);
+
+    const expression = getGroupByExpression({
+      groupByField,
+      columnNameWithQuotes: '"company"."createdAt"',
+    });
+
+    queryBuilder.addSelect(expression, 'createdAt_DAY');
+    queryBuilder.groupBy(expression);
+  };
+  ```
+
+test "rank1874: the fixed revision validates the timezone against the IANA set before splicing"
+  lang javascript
+  file get-group-by-expression.util.js
+  expect VYQL-INJ-001
+  code
+  ```
+  const VALID_IANA_TIMEZONES = new Set(IANA_TIME_ZONES);
+
+  const getGroupByExpression = ({
+    groupByField,
+    columnNameWithQuotes,
+  }) => {
+    if (!VALID_IANA_TIMEZONES.has(groupByField.timeZone)) {
+      throw new Error(`Invalid timezone: ${groupByField.timeZone}`);
+    }
+
+    const timeZoneAsDateTruncParameter = `, '${groupByField.timeZone}'`;
+    const timeZoneAsToCharParameter = ` AT TIME ZONE '${groupByField.timeZone}'`;
+
+    return `TO_CHAR(DATE_TRUNC('DAY', ${columnNameWithQuotes}${timeZoneAsDateTruncParameter})${timeZoneAsToCharParameter}, 'YYYY-MM-DD')`;
+  };
+
+  const runGroupBy = async (request, queryBuilder) => {
+    const groupByQuery = request.query.group_by;
+    const groupByField = JSON.parse(groupByQuery);
+
+    const expression = getGroupByExpression({
+      groupByField,
+      columnNameWithQuotes: '"company"."createdAt"',
+    });
+
+    queryBuilder.addSelect(expression, 'createdAt_DAY');
+  };
+  ```
+  # The rule fires on the guarded form today: the interpolation remains and
+  # the Set.has allowlist is a project-local control no binding credits.
+  # When allowlist-guard controls land, this block must flip to reject.
+
+test "rank1874: a constant timezone keeps the raw select expression untainted"
+  lang javascript
+  file get-group-by-expression.util.js
+  reject VYQL-INJ-001
+  code
+  ```
+  const runGroupBy = async (queryBuilder) => {
+    const expression = `TO_CHAR(DATE_TRUNC('DAY', "company"."createdAt", 'UTC') AT TIME ZONE 'UTC', 'YYYY-MM-DD')`;
+
+    queryBuilder.addSelect(expression, 'createdAt_DAY');
+    queryBuilder.groupBy(expression);
+  };
+  ```
+
+test "rank1874: minimal pair, direct-instance receiver -- the chain reports"
+  lang javascript
+  file rest-api-group-by.handler.js
+  expect VYQL-INJ-001
+  code
+  ```
+  const parseGroupByRestRequest = (request) => {
+    const groupByQuery = request.query.group_by;
+    return JSON.parse(groupByQuery);
+  };
+
+  class CommonGroupByQueryRunnerService {
+    async execute(queryRunnerContext, queryBuilder) {
+      const groupByField = queryRunnerContext.groupBy;
+      const expression = `TO_CHAR(DATE_TRUNC('DAY', "company"."createdAt", '${groupByField.timeZone}'), 'YYYY-MM-DD')`;
+      queryBuilder.addSelect(expression, 'createdAt_DAY');
+    }
+  }
+
+  class RestApiGroupByHandler {
+    async handle(request, queryBuilder) {
+      const groupBy = parseGroupByRestRequest(request);
+      const runner = new CommonGroupByQueryRunnerService();
+      return await runner.execute({ groupBy }, queryBuilder);
+    }
+  }
+  ```
+
+test "rank1874: minimal pair, dependency-injected receiver -- the call never links"
+  lang javascript
+  file rest-api-group-by.handler.js
+  reject VYQL-INJ-001
+  code
+  ```
+  const parseGroupByRestRequest = (request) => {
+    const groupByQuery = request.query.group_by;
+    return JSON.parse(groupByQuery);
+  };
+
+  class CommonGroupByQueryRunnerService {
+    async execute(queryRunnerContext, queryBuilder) {
+      const groupByField = queryRunnerContext.groupBy;
+      const expression = `TO_CHAR(DATE_TRUNC('DAY', "company"."createdAt", '${groupByField.timeZone}'), 'YYYY-MM-DD')`;
+      queryBuilder.addSelect(expression, 'createdAt_DAY');
+    }
+  }
+
+  class RestApiGroupByHandler {
+    constructor(
+      private readonly commonGroupByQueryRunnerService = new CommonGroupByQueryRunnerService(),
+    ) {}
+
+    async handle(request, queryBuilder) {
+      const groupBy = parseGroupByRestRequest(request);
+      return await this.commonGroupByQueryRunnerService.execute(
+        { groupBy },
+        queryBuilder,
+      );
+    }
+  }
+  ```

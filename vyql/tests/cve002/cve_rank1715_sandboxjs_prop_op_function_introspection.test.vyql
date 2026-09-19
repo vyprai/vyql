@@ -1,0 +1,215 @@
+# Rank 1715 / CVE-2026-43898 (GHSA-g8f2-4f4f-5jqw, CWE-94): SandboxJS runs
+# author-supplied JavaScript by compiling it to an internal s-expression form
+# and interpreting it with executor ops, so a sandbox-defined function is
+# invoked by one of those ops -- and a native function invoked from inside
+# another function has a `caller`. The interpreter's property-read operation
+# (src/executor/ops/prop.ts, addOps(LispType.Prop, ...)) performs
+# `const val = a[b]` for the receiver `a` and the compiled key `b`, and the
+# name guards around that read deny `prototype` (for functions outside
+# sandboxedFunctions) and `__proto__` (for objects whose constructor is not
+# sandboxed) by throwing SandboxAccessError -- but nothing denies the
+# introspection properties. A sandboxed `(function fn() { return fn.caller;
+# })()` therefore recovers the internal LispType.Call / LispType.Prop runtime
+# callback itself: a host function holding host privileges. Invoking that
+# callback directly with a crafted op object performs property reads and calls
+# outside every guard, which walks to Object.getOwnPropertyDescriptor,
+# defineProperty and finally a host `Function` constructor call -- arbitrary
+# code execution on the host (CVSS 10.0).
+#
+# The fixed revision (8268652, "Merge commit from fork" -- a root commit; the vulnerable
+# tree is 1e67856) keeps the guards in place and adds, inside the
+# `typeof a === 'function'` branch:
+#   if (['caller', 'callee', 'arguments'].includes(b as string)) {
+#     throw new SandboxAccessError(`Access to '${b as string}' property is not permitted`);
+#   }
+# `caller`, `callee` and `arguments` are the JavaScript specification's own
+# introspection trio (Function.prototype.caller, Function.prototype.arguments,
+# arguments.callee -- the poison pills strict mode and CSP disable), not names
+# this incident coined: every JS sandbox that hands live functions across the
+# boundary has to deny them, and MDN documents why.
+#
+# Detection is a JavaScript function-scope binding,
+# `sandboxFunctionIntrospectionPropertyNotDenied`, emitting the existing
+# `code.SandboxHostObjectMemberDenylistGap` (VYQL-INJ-271, CWE-749/CWE-184):
+# the prop op forwards every property read of a live host object to sandboxed
+# code except a fixed list of names, and that list covers the prototype
+# machinery while omitting the documented members of a function object that
+# hand back a more privileged object. The binding reads three facts: the
+# function throws the library's own access-denial signal (SandboxAccessError,
+# exported and documented as what the sandbox raises when access is
+# refused), it compares the computed key against both `prototype` and
+# `__proto__`, and no string literal in the function names any of
+# `caller`/`callee`/`arguments`. The omission clause is matched exactly
+# (`in`, not `contains`) so a name list entry, a Set lookup and an explicit
+# comparison all satisfy it equally -- the discriminator is which names the
+# guard covers, not the layout the fixing commit happened to choose.
+#
+# Concepts considered before reusing: `code.SandboxHostObjectMemberDenylistGap`
+# is the same weakness class -- an incomplete property-name denylist at a
+# sandbox boundary, its reviewCondition wording the omission as
+# "documented members of the same API which return or spawn a more privileged
+# object", and `caller` returns the host runtime callback itself. Minting a
+# sibling for the introspection trio would be the per-CVE concept the campaign
+# budget forbids. `code.Vm2HostCallbackBridge` describes a vm2 context
+# bridging host callbacks while sandbox code runs, which is SandboxJS's normal
+# operation at both revisions rather than the defect. `SandboxFacadeWholesaleMemberCopy`
+# is about a facade populated by copying descriptors, and nothing is copied
+# here. The prototype-pollution guard concepts (`core.PrototypePollutionGuard`)
+# label this function's hasOwnProperty walk and judge a different
+# weakness on plain objects.
+#
+# Measured on the whole checkout of both revisions (121 JavaScript files,
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`, three runs each):
+# 151 findings before the binding, none touching src/executor/ops/prop.ts;
+# with it, 152 at the vulnerable revision 1e67856 and 151 at the fixed revision 8268652,
+# identical across all three runs on each side, the single fingerprint delta
+# being VYQL-INJ-271 (HIGH) on src/executor/ops/prop.ts:1. Exactly one file
+# in the tree carries the anchor conjunction (`prototype` and `__proto__`
+# literals together with a SandboxAccessError construction), and the reachable
+# set outside this library is zero -- no other corpus checkout mentions
+# SandboxAccessError at all. A doc comment naming the denied trio does not
+# silence the flag: all three clauses read AST-derived tokens, so only a
+# quoted string literal counts.
+
+test "rank1715: the sandbox property-read op denies prototype names but not the function introspection trio"
+  lang javascript
+  file src/executor/ops/prop.ts
+  expect VYQL-INJ-271
+  expect_review code.SandboxHostObjectMemberDenylistGap
+  code
+  ```
+  import { addOps } from '../executorUtils';
+  import { LispType, Prop, SandboxAccessError, resolveSandboxProp } from '../../utils';
+
+  // The interpreter's property-read operation: the receiver and the
+  // property key both arrive from the compiled sandboxed program.
+  addOps<unknown, PropertyKey>(LispType.Prop, ({ done, a, b, context }) => {
+    if (a === null || a === undefined) {
+      throw new TypeError(`Cannot read properties of ${a} (reading '${b?.toString()}')`);
+    }
+
+    const val = a[b as keyof typeof a] as unknown;
+    if (typeof a === 'function') {
+      if (b === 'prototype' && !context.ctx.sandboxedFunctions.has(a)) {
+        throw new SandboxAccessError(`Access to prototype of global object is not permitted`);
+      }
+    }
+
+    if (b === '__proto__' && !context.ctx.sandboxedFunctions.has(val?.constructor as any)) {
+      throw new SandboxAccessError(`Access to prototype of global object is not permitted`);
+    }
+
+    const p = resolveSandboxProp(val, context, new Prop(a, b, false, false));
+    done(undefined, p || new Prop(a, b, false, false));
+  });
+  ```
+
+test "rank1715: the op denies the introspection trio before reading the property"
+  lang javascript
+  file src/executor/ops/prop.ts
+  reject VYQL-INJ-271
+  reject_review code.SandboxHostObjectMemberDenylistGap
+  code
+  ```
+  import { addOps } from '../executorUtils';
+  import { LispType, Prop, SandboxAccessError, resolveSandboxProp } from '../../utils';
+
+  addOps<unknown, PropertyKey>(LispType.Prop, ({ done, a, b, context }) => {
+    if (a === null || a === undefined) {
+      throw new TypeError(`Cannot read properties of ${a} (reading '${b?.toString()}')`);
+    }
+
+    if (typeof a === 'function') {
+      if (b === 'prototype' && !context.ctx.sandboxedFunctions.has(a)) {
+        throw new SandboxAccessError(`Access to prototype of global object is not permitted`);
+      }
+      if (['caller', 'callee', 'arguments'].includes(b as string)) {
+        throw new SandboxAccessError(`Access to '${b as string}' property is not permitted`);
+      }
+    }
+    const val = a[b as keyof typeof a] as unknown;
+
+    if (b === '__proto__' && !context.ctx.sandboxedFunctions.has(val?.constructor as any)) {
+      throw new SandboxAccessError(`Access to prototype of global object is not permitted`);
+    }
+
+    const p = resolveSandboxProp(val, context, new Prop(a, b, false, false));
+    done(undefined, p || new Prop(a, b, false, false));
+  });
+  ```
+
+test "rank1715: a name-set denial without the introspection trio is the same gap"
+  lang javascript
+  file src/executor/ops/prop.ts
+  expect VYQL-INJ-271
+  expect_review code.SandboxHostObjectMemberDenylistGap
+  code
+  ```
+  import { addOps } from '../executorUtils';
+  import { LispType, SandboxAccessError } from '../../utils';
+
+  const DENIED_PROPERTIES = new Set(['prototype', '__proto__', 'constructor']);
+
+  addOps<unknown, PropertyKey>(LispType.Prop, ({ done, a, b, context }) => {
+    if (typeof a === 'function' && DENIED_PROPERTIES.has(b as string)) {
+      throw new SandboxAccessError(`Access to '${b as string}' property is not permitted`);
+    }
+    if (!context.ctx.sandboxedFunctions.has(a)) {
+      done(undefined, a[b as keyof typeof a]);
+      return;
+    }
+    done(undefined, a[b as keyof typeof a]);
+  });
+  ```
+
+test "rank1715: a name-set denial that names the introspection trio is guarded"
+  lang javascript
+  file src/executor/ops/prop.ts
+  reject VYQL-INJ-271
+  reject_review code.SandboxHostObjectMemberDenylistGap
+  code
+  ```
+  import { addOps } from '../executorUtils';
+  import { LispType, SandboxAccessError } from '../../utils';
+
+  const DENIED_PROPERTIES = new Set([
+    'prototype',
+    '__proto__',
+    'constructor',
+    'caller',
+    'callee',
+    'arguments',
+  ]);
+
+  addOps<unknown, PropertyKey>(LispType.Prop, ({ done, a, b, context }) => {
+    if (typeof a === 'function' && DENIED_PROPERTIES.has(b as string)) {
+      throw new SandboxAccessError(`Access to '${b as string}' property is not permitted`);
+    }
+    done(undefined, a[b as keyof typeof a]);
+  });
+  ```
+
+test "rank1715: an ordinary dunder-key sanitizer is not a sandbox access guard"
+  lang javascript
+  file src/utils/sanitize.ts
+  reject VYQL-INJ-271
+  reject_review code.SandboxHostObjectMemberDenylistGap
+  code
+  ```
+  // Ordinary hardening for untrusted JSON: an object-walking sanitizer that
+  // skips the prototype-machinery keys. It mentions the same names, but
+  // nothing here decides whether sandboxed code may read a property.
+  const UNSAFE_KEYS = new Set(['__proto__', 'prototype', 'constructor']);
+
+  function stripUnsafeKeys(input: unknown): unknown {
+    if (input === null || typeof input !== 'object') {
+      return input;
+    }
+    for (const key of Object.keys(input)) {
+      if (UNSAFE_KEYS.has(key)) {
+        delete input[key];
+      }
+    }
+    return input;
+  }
+  ```

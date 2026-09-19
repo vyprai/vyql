@@ -1,0 +1,172 @@
+# Openfire did not remove a deleted user's multi-user-chat affiliations, so a
+# user registering the same username inherited the old user's room privileges
+# (privilege inheritance on identity reuse, CWE-269). Rooms carry
+# owner/admin/member/outcast affiliations keyed by bare JID, and MUCRoom in
+# `xmppserver/src/main/java/org/jivesoftware/openfire/muc/MUCRoom.java`
+# registered with the group lifecycle dispatcher (`GroupEventListener`) but
+# never with the user one, so a user deletion reached only the database cleanup
+# in `MultiUserChatManager.userDeleting` and no loaded room: in-memory
+# affiliations survived, and the registration path matched a new account to
+# them by bare JID.
+#
+# Fix `d66bddd29dbf56aa9b822635619fa66cca6f2112`
+# ("OF-2795 / OF-2166: Remove MUC affiliation of a user that is being deleted.
+# (#2420)") makes MUCRoom implement `UserEventListener`: `userDeleting()` takes
+# the chat-room lock, keeps a room owned by replacing a sole owner with an
+# administrative account, `addNone()`s the deleted user's JID and syncs the
+# room. `LocalMUCRoomManager` registers and unregisters each room with
+# `UserEventDispatcher`, and `MultiUserChatManager` keeps only the
+# database-side removal.
+#
+# Held miss. The weakness is a missing revocation on an identity lifecycle
+# event: no input flows anywhere, no operation runs on attacker-controlled
+# data, and the vulnerable class is silent exactly where the fix adds a
+# handler. Nothing in the vocabulary states "this per-identity privilege store
+# must react to identity deletion", and the third block below is the reason no
+# function-scope shape can be written instead: `MultiUserChatManager
+# .userDeleting` is byte-for-byte the same body before and after the fix --
+# one `removeAffiliationFromDB` call -- and it is correct after it, because
+# what differs is which class holds the handler, not anything in the function.
+
+test "rank1513: the room keeps affiliations when their user is deleted"
+  lang java
+  file xmppserver/src/main/java/org/jivesoftware/openfire/muc/MUCRoom.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.jivesoftware.openfire.muc;
+
+  import java.util.Map;
+  import java.util.concurrent.ConcurrentHashMap;
+  import org.jivesoftware.openfire.event.GroupEventListener;
+  import org.xmpp.packet.JID;
+
+  public class MUCRoom implements GroupEventListener {
+      private final Map<JID, MUCRole.Affiliation> affiliations = new ConcurrentHashMap<>();
+
+      public MUCRole.Affiliation getAffiliation(JID userJid) {
+          return affiliations.getOrDefault(userJid, MUCRole.Affiliation.none);
+      }
+
+      public void addNone(JID userJid) {
+          affiliations.put(userJid, MUCRole.Affiliation.none);
+      }
+
+      public void groupCreated(String groupName, Map params) {}
+      public void groupDeleting(String groupName, Map params) {}
+      public void groupModified(String groupName, Map params) {}
+  }
+  ```
+
+test "rank1513: the fixed revision revokes affiliations on user deletion"
+  lang java
+  file xmppserver/src/main/java/org/jivesoftware/openfire/muc/MUCRoom.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.jivesoftware.openfire.muc;
+
+  import java.util.Map;
+  import java.util.concurrent.locks.Lock;
+  import org.jivesoftware.openfire.event.GroupEventListener;
+  import org.jivesoftware.openfire.event.UserEventListener;
+  import org.jivesoftware.openfire.user.User;
+
+  public class MUCRoom implements GroupEventListener, UserEventListener {
+      public void userDeleting(User user, Map<String, Object> params) {
+          final JID userJid = XMPPServer.getInstance().createJID(user.getUsername(), null);
+          final Lock lock = getMUCService().getChatRoomLock(getJID().getNode());
+          try {
+              lock.lock();
+              if (getAffiliation(userJid) == MUCRole.Affiliation.none) {
+                  return;
+              }
+              if (getOwners().contains(userJid) && getOwners().size() == 1) {
+                  final JID adminJid = XMPPServer.getInstance().getAdmins().iterator().next();
+                  addOwner(adminJid, getRole());
+              }
+              addNone(userJid, getRole());
+              getMUCService().syncChatRoom(this);
+          } finally {
+              lock.unlock();
+          }
+      }
+
+      public void userCreated(User user, Map<String, Object> params) {}
+      public void userModified(User user, Map<String, Object> params) {}
+      public void groupCreated(String groupName, Map params) {}
+      public void groupDeleting(String groupName, Map params) {}
+      public void groupModified(String groupName, Map params) {}
+  }
+  ```
+
+test "rank1513: the manager's deletion handler body is the remediation-neutral form"
+  lang java
+  file xmppserver/src/main/java/org/jivesoftware/openfire/muc/MultiUserChatManager.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  package org.jivesoftware.openfire.muc;
+
+  import java.util.Map;
+  import org.jivesoftware.openfire.XMPPServer;
+  import org.jivesoftware.openfire.event.UserEventListener;
+  import org.jivesoftware.openfire.user.User;
+
+  public class MultiUserChatManager implements UserEventListener {
+      public void userDeleting(User user, Map<String, Object> params) {
+          MUCPersistenceManager
+                  .removeAffiliationFromDB(XMPPServer.getInstance().createJID(user.getUsername(), null, true));
+      }
+
+      public void userCreated(User user, Map<String, Object> params) {}
+      public void userModified(User user, Map<String, Object> params) {}
+  }
+  ```
+
+# ## Recheck measurements
+#
+# Re-measured against the knowledge base as it stands, at the span tip.
+# Three `--cache off` runs on the `org/jivesoftware/openfire/muc` package at
+# `d66bddd29dbf^` and at `d66bddd29dbf`, `timeout 180` and `--max-ram 6GB`:
+# **2 findings at both revisions, all six runs** -- `VYQL-AUTH-079`
+# (`code.SensitiveOperation` by `auditreview.marks` on `role.setRole`) at
+# MUCRoom.java:1803/1830 before and 1806/1833 after, the fix's three added
+# import lines being the only difference. The whole tree gives **2888 findings
+# at both revisions, all six runs, with an empty rule-count diff**, and the only
+# rows on the three files the fix touches are those same two. Nothing
+# later-shipped fires, and the earlier zero was not a misread: the full
+# `-flags with` view was read too, 98 flags before and 100 after, where the
+# +2 are the fix's own `code.LockAcquire`/`core.LockRelease` at
+# MUCRoom.java:3838/3858 inside the new handler -- no auth flag touches the
+# deletion path at either revision.
+#
+# The class-scope shape was probed and measured rather than asserted. Java does
+# emit `class_base:` from the implements list (`java.go`, `walkTypes` over the
+# `interfaces` field), so a scratch presence binding -- implements
+# GroupEventListener, not UserEventListener -- is writable, and it discriminates
+# **3 -> 2**: at `d66bddd29dbf^` it labels GroupEventAdapter.java:26,
+# MUCRoom.java:63 and GroupTest.java:540, and at the fix only the adapter and
+# the test remain. One true positive in three, and the two survivors are
+# correct not to implement `UserEventListener`: `GroupEventAdapter` is the
+# library's own no-op base class, and the third is a test. No documented anchor
+# refines it -- `UserEventListener`'s javadoc says only "Interface to listen
+# for group events. Use the addListener method to register" (a copy-paste from
+# the group listener that never even says *user*), so nothing ties user-event
+# listening to holding per-user state, and the pairing itself is ontology: 30
+# classes under `src/main` implement some `*EventListener` across 18 interface
+# kinds. A binding on Openfire's own listener interfaces detects this
+# application's class layout, not the weakness.
+#
+# Function scope is impossible for a second, decisive reason:
+# `MultiUserChatManager.userDeleting`, the only deletion handler that exists at
+# the parent, is byte-identical minus comments across the fix (verified by
+# diff), and correct after it -- the in-memory revocation lives in each room's
+# own new handler. The nearest lifecycle vocabulary is still one step away on
+# both edges: `code.LogoutWithoutSessionInvalidation` (`VYQL-AUTH-177`) has a
+# PHP session emitter only, and `code.PublicVisibilityCacheInvalidationMissing`
+# keys on visibility caches; no binding anywhere names `UserEventListener`,
+# `UserEventDispatcher` or `GroupEventDispatcher` outside this spec.
+#
+# No definition is touched, so the OWASP Java and Python numbers are unaffected
+# by this rank.

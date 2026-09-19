@@ -1,0 +1,9 @@
+module bindings.dart.generated.m191d16a5;
+
+binding userControlledData0 {
+  requires {
+    dependency("pinput")
+  }
+  query pattern callExpr where callee.method == "autofill"
+  emit source core.UserControlledData at call.result
+}

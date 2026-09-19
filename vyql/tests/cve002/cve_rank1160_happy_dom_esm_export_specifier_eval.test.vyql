@@ -1,0 +1,75 @@
+# Rank 1160 / CVE-2026-33943: ECMAScriptModuleCompiler compiles a module's
+# `export { a as b }` statement by splitting the specifier text on `as` and
+# splicing the raw import half straight into a generated assignment,
+# `$happy_dom.exports['${exportName}'] = ${importName}`. That generated line
+# is handed to window[PropertySymbol.evaluateScript](newCode, ...), which
+# resolves to `this.eval(code)` in one window implementation and to
+# `new VM.Script(code, ...).runInContext(this)` in another — an eval-like
+# sink reached through a Symbol-keyed property, not a plain `eval(...)`
+# call, so the sink itself sits outside this file. Nothing here checks that
+# importName looks like an identifier, so a module exporting
+#   export { require('child_process').execSync('id') }
+# turns importName into `require('child_process').execSync('id')`, and the
+# generated line executes that expression as code the moment the module
+# runs. The fixed revision adds a
+# VALID_VARIABLE_NAME_REGEXP.test(importName) guard beside the
+# `exportName && importName` check in
+# packages/happy-dom/src/module/ECMAScriptModuleCompiler.ts, so a specifier
+# that is not a plain identifier is dropped from the generated code instead
+# of spliced into it.
+
+test "rank1160: an unvalidated export specifier is spliced into generated module code"
+  lang javascript
+  file module/ECMAScriptModuleCompiler.js
+  expect VYQL-INJ-206
+  code
+  ```
+  import * as PropertySymbol from '../PropertySymbol.js';
+
+  export default class ECMAScriptModuleCompiler {
+      compile(moduleURL, code, window) {
+          let newCode = '';
+          const parts = this.removeMultilineComments(code).split(/\s*,\s*/);
+          const exportCode = [];
+          for (const part of parts) {
+              const nameParts = part.trim().split(/\s+as\s+/);
+              const exportName = (nameParts[1] || nameParts[0]).replace(/["']/g, '');
+              const importName = nameParts[0].replace(/["']/g, '');
+              if (exportName && importName) {
+                  exportCode.push(`$happy_dom.exports['${exportName}'] = ${importName}`);
+              }
+          }
+          newCode += exportCode.join(';\n');
+          return window[PropertySymbol.evaluateScript](newCode, { filename: moduleURL });
+      }
+  }
+  ```
+
+test "rank1160: validating the specifier is a plain identifier before splicing it in is safe"
+  lang javascript
+  file module/ECMAScriptModuleCompiler.js
+  reject VYQL-INJ-206
+  code
+  ```
+  import * as PropertySymbol from '../PropertySymbol.js';
+
+  const VALID_VARIABLE_NAME_REGEXP = /^[a-zA-Z_$][a-zA-Z0-9_$]*$/;
+
+  export default class ECMAScriptModuleCompiler {
+      compile(moduleURL, code, window) {
+          let newCode = '';
+          const parts = this.removeMultilineComments(code).split(/\s*,\s*/);
+          const exportCode = [];
+          for (const part of parts) {
+              const nameParts = part.trim().split(/\s+as\s+/);
+              const exportName = (nameParts[1] || nameParts[0]).replace(/["']/g, '');
+              const importName = nameParts[0].replace(/["']/g, '');
+              if (exportName && importName && VALID_VARIABLE_NAME_REGEXP.test(importName)) {
+                  exportCode.push(`$happy_dom.exports['${exportName}'] = ${importName}`);
+              }
+          }
+          newCode += exportCode.join(';\n');
+          return window[PropertySymbol.evaluateScript](newCode, { filename: moduleURL });
+      }
+  }
+  ```

@@ -1,0 +1,9 @@
+module bindings.php.generated.ma2590398;
+
+binding urlFetch0 {
+  requires {
+    dependency("php-webdriver/webdriver")
+  }
+  query pattern callExpr where callee.method == "get"
+  emit sink code.UrlFetch at args[0]
+}

@@ -1,0 +1,6 @@
+module crypto;
+
+threat ObservableDiscrepancy {
+  cwe: [CWE_203, CWE_208]
+  desc: "Secret-dependent comparison may expose observable or timing differences"
+}

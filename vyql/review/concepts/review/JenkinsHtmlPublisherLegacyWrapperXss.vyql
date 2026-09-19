@@ -1,0 +1,8 @@
+module code;
+
+review code.JenkinsHtmlPublisherLegacyWrapperXss {
+  category: xss
+  expected: [core.HtmlEscape]
+  kind: attention
+  text: "review the HTML Publisher legacy wrapper file for HTML escaping of the job name, root URL, job URL and zip-link target before they reach links-data-holder"
+}

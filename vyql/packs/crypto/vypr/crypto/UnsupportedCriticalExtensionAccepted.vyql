@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule UnsupportedCriticalExtensionAccepted {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_347]
+    id: "VYQL-CRY-060"
+    severity: high
+  }
+  issue code.UnsupportedCriticalExtensionAccepted as consumer
+}

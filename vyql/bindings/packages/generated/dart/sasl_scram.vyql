@@ -1,0 +1,9 @@
+module bindings.dart.generated.m9e40c0e3;
+
+binding secretValue0 {
+  requires {
+    dependency("sasl_scram")
+  }
+  query pattern callExpr where callee.method == "UsernamePasswordCredential.password"
+  emit source code.SecretValue at call.result
+}

@@ -1,0 +1,226 @@
+# Rank 1696 / CVE-2018-1000076: Gem::Package#verify walked a .gem's tar
+# entries collecting per-name facts -- digests into @digests keyed by
+# entry.full_name, signatures into @signatures keyed by the signed name --
+# so a duplicate entry name let a later copy overwrite an earlier one, while
+# extract_files consumed the FIRST data.tar.gz it met and returned. A gem
+# carrying a second data.tar.gz ahead of the signed one therefore had the
+# last copy verified and the first copy installed. The fixed revision rejects duplicate
+# entry names in verify_files before the membership assertion (group_by over
+# the collected names); the sibling hardening in tar_writer raises when a
+# signed write has no digest for the signer's algorithm.
+
+test "gem package verification walks entries and asserts the payload member without rejecting duplicates"
+  lang ruby
+  expect VYQL-VAL-030
+  code
+  ```
+  class Gem::Package
+    def verify
+      @files = []
+      @digests = Hash.new { |h, algorithm| h[algorithm] = {} }
+
+      @gem.with_read_io do |io|
+        TarReader.new io do |reader|
+          read_checksums reader
+          verify_files reader
+        end
+      end
+
+      verify_checksums @digests, @checksums
+
+      @security_policy.verify_signatures @spec, @digests, @signatures if
+        @security_policy
+
+      true
+    end
+
+    def verify_files gem
+      gem.each do |entry|
+        verify_entry entry
+      end
+
+      unless @spec then
+        raise FormatError.new 'package metadata is missing', @gem
+      end
+
+      unless @files.include? 'data.tar.gz' then
+        raise FormatError.new 'package content (data.tar.gz) is missing', @gem
+      end
+    end
+
+    def verify_entry entry
+      file_name = entry.full_name
+      @files << file_name
+
+      case file_name
+      when /\.sig$/ then
+        @signatures[$`] = entry.read if @security_policy
+        return
+      else
+        digest entry
+      end
+    end
+
+    def digest entry
+      digester = OpenSSL::Digest.new 'SHA256'
+
+      digester << entry.read(16384) until entry.eof?
+
+      entry.rewind
+
+      @digests['SHA256'][entry.full_name] = digester
+    end
+  end
+  ```
+
+test "the fixed revision's duplicate-name rejection silences the report"
+  lang ruby
+  reject VYQL-VAL-030
+  code
+  ```
+  class Gem::Package
+    def verify
+      @files = []
+      @digests = Hash.new { |h, algorithm| h[algorithm] = {} }
+
+      @gem.with_read_io do |io|
+        TarReader.new io do |reader|
+          read_checksums reader
+          verify_files reader
+        end
+      end
+
+      verify_checksums @digests, @checksums
+
+      @security_policy.verify_signatures @spec, @digests, @signatures if
+        @security_policy
+
+      true
+    end
+
+    def verify_files gem
+      gem.each do |entry|
+        verify_entry entry
+      end
+
+      if duplicates = @files.group_by {|f| f }.select {|k,v| v.size > 1 }.map(&:first) and duplicates.any?
+        raise SecurityError.new "duplicate files in the package: (#{duplicates.map(&:inspect).join(', ')})"
+      end
+
+      unless @spec then
+        raise FormatError.new 'package metadata is missing', @gem
+      end
+
+      unless @files.include? 'data.tar.gz' then
+        raise FormatError.new 'package content (data.tar.gz) is missing', @gem
+      end
+    end
+
+    def verify_entry entry
+      file_name = entry.full_name
+      @files << file_name
+
+      case file_name
+      when /\.sig$/ then
+        @signatures[$`] = entry.read if @security_policy
+        return
+      else
+        digest entry
+      end
+    end
+
+    def digest entry
+      digester = OpenSSL::Digest.new 'SHA256'
+
+      digester << entry.read(16384) until entry.eof?
+
+      entry.rewind
+
+      @digests['SHA256'][entry.full_name] = digester
+    end
+  end
+  ```
+
+test "a uniq-spelled duplicate rejection also silences the report"
+  lang ruby
+  reject VYQL-VAL-030
+  code
+  ```
+  class Gem::Package
+    def verify
+      @files = []
+      @digests = Hash.new { |h, algorithm| h[algorithm] = {} }
+
+      @gem.with_read_io do |io|
+        TarReader.new io do |reader|
+          read_checksums reader
+          verify_files reader
+        end
+      end
+
+      verify_checksums @digests, @checksums
+
+      @security_policy.verify_signatures @spec, @digests, @signatures if
+        @security_policy
+
+      true
+    end
+
+    def verify_files gem
+      gem.each do |entry|
+        verify_entry entry
+      end
+
+      unless @files.size == @files.uniq.size then
+        raise SecurityError.new 'duplicate files in the package'
+      end
+
+      unless @spec then
+        raise FormatError.new 'package metadata is missing', @gem
+      end
+
+      unless @files.include? 'data.tar.gz' then
+        raise FormatError.new 'package content (data.tar.gz) is missing', @gem
+      end
+    end
+
+    def verify_entry entry
+      file_name = entry.full_name
+      @files << file_name
+
+      case file_name
+      when /\.sig$/ then
+        @signatures[$`] = entry.read if @security_policy
+        return
+      else
+        digest entry
+      end
+    end
+
+    def digest entry
+      digester = OpenSSL::Digest.new 'SHA256'
+
+      digester << entry.read(16384) until entry.eof?
+
+      entry.rewind
+
+      @digests['SHA256'][entry.full_name] = digester
+    end
+  end
+  ```
+
+test "an ordinary collection walk without a package member name does not report"
+  lang ruby
+  reject VYQL-VAL-030
+  code
+  ```
+  class Index
+    def build docs
+      docs.each do |doc|
+        process doc
+      end
+
+      raise 'index is missing its root' unless @names.include? 'index.html'
+    end
+  end
+  ```

@@ -1,0 +1,8 @@
+module code;
+
+review code.ArrayIdentityStringCoercionBypass {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: attention
+  text: "review identity comparisons that coerce a string-or-array field with String(...) before matching it against a fixed identity host, since an array value collapses to a joined string that a per-element check would still see"
+}

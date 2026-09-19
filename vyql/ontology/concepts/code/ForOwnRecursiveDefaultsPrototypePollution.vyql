@@ -1,0 +1,11 @@
+module code;
+
+concept ForOwnRecursiveDefaultsPrototypePollution : issue {
+  cwe: [CWE_1321]
+  reviewAssumption: "a caller can pass attacker-controlled objects containing __proto__ keys to the deep defaults API"
+  reviewCategory: prototype_pollution
+  reviewCondition: "recursive defaults merge copies forOwn callback keys into target object properties without skipping prototype-mutating names"
+  reviewConfidence: high
+  reviewEvidence: "defaults merge context {pattern} iterates source keys with forOwn, writes target[key], and recurses into nested objects"
+  vulnerableTo: [injection.PrototypePollution]
+}

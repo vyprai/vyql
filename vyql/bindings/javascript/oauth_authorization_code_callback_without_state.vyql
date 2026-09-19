@@ -1,0 +1,40 @@
+module bindings.javascript.oauthAuthorizationCodeCallbackWithoutState;
+
+// RFC 6749's authorization-code flow runs in two halves a third party can
+// walk a browser through: the redirect to the authorization endpoint, and
+// the callback that brings `code` and `state` back as query parameters
+// (section 4.1.2). `state` is the half that binds them: the client picks it
+// before the redirect, keeps it where only this browser returns it, and
+// compares the callback's copy against its own before exchanging the code
+// (section 10.12). A callback that reads `code` and never reads `state` has
+// no binding at all -- the browser landing on it may be finishing a flow
+// somebody else started, which is login CSRF: the attacker completes a login
+// as themselves in the victim's browser, and the victim's next request runs
+// as the attacker's account.
+//
+// The function-scope shape reads the protocol's own vocabulary, plus the one
+// platform API every token of it travels through. A handler that takes the
+// documented `code` parameter out of the request URL with the WHATWG
+// `searchParams.get` API, redirects the browser as the dance's other half
+// does, reads the token response's documented `access_token` or `id_token`
+// member (RFC 6749 section 5.1, OpenID Connect Core section 2) rather than
+// handing the whole exchange to a library that owns it, and never once reads
+// the documented `state` parameter in the same scope. Every conjunct is
+// load-bearing: a query read alone serves any parameter, `code` alone also
+// names discount codes and email verification links, a redirect alone is
+// ordinary routing, and a library-mediated exchange keeps the response
+// fields -- and the flow binding -- out of this scope. Reading the code,
+// finishing the login here, and never reading `state` is the authorization
+// code dance with its browser binding absent.
+//
+// Two residuals are stated rather than hidden. A handler that reads `state`
+// but never compares it does not match -- that is the other half of this
+// weakness, and a sibling binding covers it where the library hands the
+// parameter back. And a callback that proves itself with PKCE instead
+// (RFC 7636 -- the `code_verifier` the client sends with the exchange) does
+// not match either, because an injected authorization code fails the
+// verifier, so the flow is already bound to the browser that started it.
+binding oauthCallbackStateReadMissing {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.selector contains "searchParams.get" and node.context.literal in ["code"] and node.context.call in ["redirect"] and containsAny(node.context.selector, ["access_token", "id_token"]) and not (node.context.literal in ["state"]) and not (containsAny(node.context.literal, ["code_verifier"])) and not (containsAny(node.context.prop, ["code_verifier"]))
+  emit issue code.OAuthStateCookieValidationMissing at node
+}

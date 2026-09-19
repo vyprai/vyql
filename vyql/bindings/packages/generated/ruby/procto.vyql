@@ -1,0 +1,17 @@
+module bindings.ruby.generated.m2a623fcb;
+
+binding expressionEval0 {
+  requires {
+    dependency("procto")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval1 {
+  requires {
+    dependency("procto")
+  }
+  query pattern callExpr where callee.method == "initialize"
+  emit sink code.ExpressionEval at args[0]
+}

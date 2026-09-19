@@ -1,0 +1,73 @@
+module bindings.perl.generated.md518033e;
+
+binding networkConnect0 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "req"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "req"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding nosqlQuery2 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery3 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "queryRange"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery4 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery5 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "createObjects"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery6 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "updateObjects"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery7 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery8 {
+  requires {
+    dependency("Persevere-Client")
+  }
+  query pattern callExpr where callee.method == "deleteById"
+  emit sink code.NosqlQuery at args[0]
+}

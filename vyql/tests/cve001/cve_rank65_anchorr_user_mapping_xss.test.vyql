@@ -1,0 +1,12 @@
+# Rank 65 / CVE-2026-32890: Anchorr user-mapping dropdown/avatar data reaches
+# browser-visible HTML.
+
+test "rank65: user mapping data reaches HTML rendering"
+  expect VYQL-INJ-004
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.HtmlRender
+  edge FLOWS src -> sink
+  ```
+

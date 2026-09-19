@@ -1,0 +1,17 @@
+module bindings.groovy.generated.m29c3c7a4;
+
+binding userControlledData0 {
+  requires {
+    dependency("pl.pragmatists:JUnitParams")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("pl.pragmatists:JUnitParams")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}

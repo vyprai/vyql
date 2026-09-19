@@ -1,0 +1,39 @@
+# Rank 325 / CVE-2025-10713: WSO2 carbon-mediation localentry XXE.
+# Ledger verification: VYQL-DESER-004 catches unhardened XML parser setup.
+
+test "rank325: carbon mediation parses localentry XML without doctype hardening"
+  lang java
+  expect VYQL-DESER-004
+  code
+  ```
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.xml.sax.InputSource;
+
+  class LocalEntryAdmin {
+      void parse(InputSource input) throws Exception {
+          DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+          DocumentBuilder builder = factory.newDocumentBuilder();
+          builder.parse(input);
+      }
+  }
+  ```
+
+test "rank325: carbon mediation disallows XML doctype"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import javax.xml.parsers.DocumentBuilder;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import org.xml.sax.InputSource;
+
+  class LocalEntryAdmin {
+      void parse(InputSource input) throws Exception {
+          DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+          factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+          DocumentBuilder builder = factory.newDocumentBuilder();
+          builder.parse(input);
+      }
+  }
+  ```

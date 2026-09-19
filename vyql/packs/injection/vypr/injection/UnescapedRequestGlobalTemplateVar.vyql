@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedRequestGlobalTemplateVar {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_79]
+    id: "VYQL-INJ-039"
+    severity: high
+  }
+  issue code.UnescapedRequestGlobalTemplateVar as sink
+}

@@ -1,0 +1,268 @@
+# CVE-2022-39248 (GHSA-fpgf-pjjv-2qgm, CWE-287 + CWE-322): matrix-android-sdk2's
+# megolm decryptor imported any `m.forwarded_room_key` a homeserver delivered,
+# with no check that the key answered a request the client had made and no check
+# on the device that sent it.
+#
+# MXMegolmDecryption.onRoomKeyEvent, in
+# matrix-sdk-android/.../crypto/algorithms/megolm/MXMegolmDecryption.kt, took the
+# forwarded payload's own `sender_key` and `sender_claimed_ed25519_key` fields at
+# face value -- `senderKey = forwardedRoomKeyContent.senderKey` -- and handed them
+# straight to olmDevice.addInboundGroupSession as the identity the stored megolm
+# session belongs to. The only gate on the branch is
+# cryptoStore.isKeyGossipingEnabled(), a user preference, not an authentication
+# step. Every event that session later decrypts is then attributed to whoever the
+# payload claimed, so a malicious homeserver could forward a session key of its
+# own and make messages appear to come from another user; the same acceptance of
+# unauthenticated to-device key material also lets it spoof key-backup content.
+# The read of the claims through event.getClearContent(), which fell back to the
+# unencrypted wire content when no Olm decryption result exists, is the second
+# half of the same defect: nothing requires the key to have arrived inside an Olm
+# envelope at all.
+#
+# The fixing commit is the advisory's own reference 77df720a238d
+# -- the release/1.5.1 merge into develop -- whose content-bearing parent
+# 28f670d1d88f ("Import v1.5.1 from Element Android") carries the change; the
+# advisory names the merge SHA.
+# squashed imports, so no finer-grained commit exists here.
+#
+# The fixed revision adds the two lookups that turn the payload's claims into a decision:
+# cryptoStore.getOutgoingRoomKeyRequest(...) establishes that the key answers the
+# client's own m.room_key_request, and cryptoStore.deviceWithIdentityKey(...)
+# resolves the Olm envelope's Curve25519 key to a known device whose `isVerified`
+# state and `identityKey()` are then compared against the session initiator. An
+# unrequested forward is parked in the new UnRequestedForwardManager instead of
+# being imported, and the accessors become getDecryptedContent/getDecryptedType,
+# which return null rather than falling back to wire content.
+#
+# Caught at the concept layer by code.ProtocolStateReview (rule VYQL-AUTH-082),
+# which covers unauthenticated protocol data accepted without the state
+# check that is supposed to gate it and carries CWE-287 among its CWEs. The new
+# binding kotlinForwardedMegolmKeyImportWithoutSenderAuthentication in
+# vyql/bindings/kotlin/forwardedRoomKeyImportSenderTrust.vyql reads off the Matrix
+# E2EE specification's own contract for m.forwarded_room_key -- act on one only
+# when it answers your own key request and comes from a device you trust -- so a
+# handler that reaches MXOlmDevice.addInboundGroupSession on the forwarded path
+# without either store lookup in scope is importing session key material on the
+# sender's unverified word.
+
+test "rank1361: a forwarded megolm session is imported on the payload's claimed sender key alone"
+  lang kotlin
+  file matrix-sdk-android/src/main/java/org/matrix/android/sdk/internal/crypto/algorithms/megolm/MXMegolmDecryption.kt
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  internal class MXMegolmDecryption(
+          private val olmDevice: MXOlmDevice,
+          private val outgoingKeyRequestManager: OutgoingKeyRequestManager,
+          private val cryptoStore: IMXCryptoStore
+  ) : IMXDecrypting {
+
+      override fun onRoomKeyEvent(event: Event, defaultKeysBackupService: DefaultKeysBackupService) {
+          var exportFormat = false
+          val roomKeyContent = event.getClearContent().toModel<RoomKeyContent>() ?: return
+
+          var senderKey: String? = event.getSenderKey()
+          var keysClaimed: MutableMap<String, String> = HashMap()
+          val forwardingCurve25519KeyChain: MutableList<String> = ArrayList()
+
+          if (roomKeyContent.roomId.isNullOrEmpty() || roomKeyContent.sessionId.isNullOrEmpty()) {
+              return
+          }
+          if (event.getClearType() == EventType.FORWARDED_ROOM_KEY) {
+              if (!cryptoStore.isKeyGossipingEnabled()) {
+                  return
+              }
+              val forwardedRoomKeyContent = event.getClearContent().toModel<ForwardedRoomKeyContent>()
+                      ?: return
+
+              forwardedRoomKeyContent.forwardingCurve25519KeyChain?.let {
+                  forwardingCurve25519KeyChain.addAll(it)
+              }
+
+              if (senderKey == null) {
+                  return
+              }
+              forwardingCurve25519KeyChain.add(senderKey)
+
+              exportFormat = true
+              senderKey = forwardedRoomKeyContent.senderKey
+              if (null == senderKey) {
+                  return
+              }
+              if (null == forwardedRoomKeyContent.senderClaimedEd25519Key) {
+                  return
+              }
+              keysClaimed["ed25519"] = forwardedRoomKeyContent.senderClaimedEd25519Key
+          } else {
+              keysClaimed = event.getKeysClaimed().toMutableMap()
+          }
+
+          val addSessionResult = olmDevice.addInboundGroupSession(
+                  sessionId = roomKeyContent.sessionId,
+                  sessionKey = roomKeyContent.sessionKey,
+                  roomId = roomKeyContent.roomId,
+                  senderKey = senderKey,
+                  forwardingCurve25519KeyChain = forwardingCurve25519KeyChain,
+                  keysClaimed = keysClaimed,
+                  exportFormat = exportFormat,
+                  sharedHistory = roomKeyContent.getSharedKey()
+          )
+
+          when (addSessionResult) {
+              is MXOlmDevice.AddSessionResult.Imported -> addSessionResult.ratchetIndex
+              is MXOlmDevice.AddSessionResult.NotImportedHigherIndex -> addSessionResult.newIndex
+              else -> null
+          }?.let { index ->
+              if (event.getClearType() == EventType.FORWARDED_ROOM_KEY) {
+                  val fromDevice = (event.content?.get("sender_key") as? String)?.let { senderDeviceIdentityKey ->
+                      cryptoStore.getUserDeviceList(event.senderId ?: "")
+                              ?.firstOrNull {
+                                  it.identityKey() == senderDeviceIdentityKey
+                              }
+                  }?.deviceId
+
+                  outgoingKeyRequestManager.onRoomKeyForwarded(
+                          sessionId = roomKeyContent.sessionId,
+                          algorithm = roomKeyContent.algorithm ?: "",
+                          roomId = roomKeyContent.roomId,
+                          senderKey = senderKey,
+                          fromIndex = index,
+                          fromDevice = fromDevice,
+                          event = event
+                  )
+                  cryptoStore.saveIncomingForwardKeyAuditTrail(
+                          roomId = roomKeyContent.roomId,
+                          sessionId = roomKeyContent.sessionId,
+                          senderKey = senderKey,
+                          algorithm = roomKeyContent.algorithm ?: "",
+                          userId = event.senderId ?: "",
+                          deviceId = fromDevice ?: "",
+                          chainIndex = index.toLong()
+                  )
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1361: a forwarded megolm session is imported only when it answers this client's request and the sending device resolves"
+  lang kotlin
+  file matrix-sdk-android/src/main/java/org/matrix/android/sdk/internal/crypto/algorithms/megolm/MXMegolmDecryption.kt
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  internal class MXMegolmDecryption(
+          private val olmDevice: MXOlmDevice,
+          private val myUserId: String,
+          private val outgoingKeyRequestManager: OutgoingKeyRequestManager,
+          private val cryptoStore: IMXCryptoStore,
+          private val unrequestedForwardManager: UnRequestedForwardManager,
+          private val cryptoConfig: MXCryptoConfig
+  ) : IMXDecrypting {
+
+      override fun onRoomKeyEvent(event: Event, defaultKeysBackupService: DefaultKeysBackupService, forceAccept: Boolean) {
+          var exportFormat = false
+          val roomKeyContent = event.getDecryptedContent()?.toModel<RoomKeyContent>() ?: return
+
+          val eventSenderKey: String = event.getSenderKey() ?: return
+          val fromDevice = cryptoStore.deviceWithIdentityKey(eventSenderKey)
+
+          lateinit var sessionInitiatorSenderKey: String
+          val trusted: Boolean
+          var keysClaimed: MutableMap<String, String> = HashMap()
+          val forwardingCurve25519KeyChain: MutableList<String> = ArrayList()
+
+          if (roomKeyContent.roomId.isNullOrEmpty() || roomKeyContent.sessionId.isNullOrEmpty()) {
+              return
+          }
+          if (event.getDecryptedType() == EventType.FORWARDED_ROOM_KEY) {
+              if (!cryptoStore.isKeyGossipingEnabled()) {
+                  return
+              }
+              val forwardedRoomKeyContent = event.getDecryptedContent()?.toModel<ForwardedRoomKeyContent>()
+                      ?: return
+
+              forwardedRoomKeyContent.forwardingCurve25519KeyChain?.let {
+                  forwardingCurve25519KeyChain.addAll(it)
+              }
+              forwardingCurve25519KeyChain.add(eventSenderKey)
+
+              exportFormat = true
+              sessionInitiatorSenderKey = forwardedRoomKeyContent.senderKey ?: return
+              if (null == forwardedRoomKeyContent.senderClaimedEd25519Key) {
+                  return
+              }
+              keysClaimed["ed25519"] = forwardedRoomKeyContent.senderClaimedEd25519Key
+
+              val wasNotRequested = cryptoStore.getOutgoingRoomKeyRequest(
+                      roomId = forwardedRoomKeyContent.roomId.orEmpty(),
+                      sessionId = forwardedRoomKeyContent.sessionId.orEmpty(),
+                      algorithm = forwardedRoomKeyContent.algorithm.orEmpty(),
+                      senderKey = forwardedRoomKeyContent.senderKey.orEmpty()
+              ).isEmpty()
+
+              trusted = false
+
+              if (!forceAccept && wasNotRequested) {
+                  unrequestedForwardManager.onUnRequestedKeyForward(roomKeyContent.roomId, event, 0L)
+                  return
+              }
+
+              val sessionThatIsSharing = cryptoStore.deviceWithIdentityKey(eventSenderKey) ?: return
+              val isOwnDevice = myUserId == sessionThatIsSharing.userId
+              val isDeviceVerified = sessionThatIsSharing.isVerified
+              val isFromSessionInitiator = sessionThatIsSharing.identityKey() == sessionInitiatorSenderKey
+
+              val isLegitForward = (isOwnDevice && isDeviceVerified) ||
+                      (!cryptoConfig.limitRoomKeyRequestsToMyDevices && isFromSessionInitiator)
+
+              if (!(forceAccept || isLegitForward)) {
+                  return
+              }
+          } else {
+              trusted = true
+              sessionInitiatorSenderKey = eventSenderKey
+              keysClaimed = event.getKeysClaimed().toMutableMap()
+          }
+
+          val addSessionResult = olmDevice.addInboundGroupSession(
+                  sessionId = roomKeyContent.sessionId,
+                  sessionKey = roomKeyContent.sessionKey,
+                  roomId = roomKeyContent.roomId,
+                  senderKey = sessionInitiatorSenderKey,
+                  forwardingCurve25519KeyChain = forwardingCurve25519KeyChain,
+                  keysClaimed = keysClaimed,
+                  exportFormat = exportFormat,
+                  sharedHistory = roomKeyContent.getSharedKey(),
+                  trusted = trusted
+          )
+
+          when (addSessionResult) {
+              is MXOlmDevice.AddSessionResult.Imported -> addSessionResult.ratchetIndex
+              is MXOlmDevice.AddSessionResult.NotImportedHigherIndex -> addSessionResult.newIndex
+              else -> null
+          }?.let { index ->
+              if (event.getClearType() == EventType.FORWARDED_ROOM_KEY) {
+                  outgoingKeyRequestManager.onRoomKeyForwarded(
+                          sessionId = roomKeyContent.sessionId,
+                          algorithm = roomKeyContent.algorithm ?: "",
+                          roomId = roomKeyContent.roomId,
+                          senderKey = sessionInitiatorSenderKey,
+                          fromIndex = index,
+                          fromDevice = fromDevice?.deviceId,
+                          event = event
+                  )
+                  cryptoStore.saveIncomingForwardKeyAuditTrail(
+                          roomId = roomKeyContent.roomId,
+                          sessionId = roomKeyContent.sessionId,
+                          senderKey = sessionInitiatorSenderKey,
+                          algorithm = roomKeyContent.algorithm ?: "",
+                          userId = event.senderId.orEmpty(),
+                          deviceId = fromDevice?.deviceId.orEmpty(),
+                          chainIndex = index.toLong()
+                  )
+              }
+          }
+      }
+  }
+  ```

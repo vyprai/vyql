@@ -1,0 +1,17 @@
+module bindings.python.generated.m59432bee;
+
+binding deserialization0 {
+  requires {
+    dependency("jsonpatch")
+  }
+  query pattern callExpr where callee.method == "apply_patch"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("jsonpatch")
+  }
+  query pattern callExpr where callee.method == "from_string"
+  emit sink code.Deserialization at args[0]
+}

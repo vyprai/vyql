@@ -1,0 +1,79 @@
+module bindings.python.deserialization;
+
+binding jwtDecodeIsNotObjectDeserialization673 {
+  query pattern callExpr where callee.path == "jwt.decode"
+  emit check core.SafeDeserialization at args[0] {
+    covers path {
+      from: args[0]
+      to: call
+    }
+  }
+}
+
+// json.loads builds only str/int/float/bool/None/list/dict — it cannot instantiate
+// arbitrary types or execute code, so it is not CWE-502 unsafe deserialization. It was
+// being flagged because the pickle/marshal sink patterns match loosely on the `loads`
+// method name whenever the receiver is unresolved. Exact path match so this never
+// covers pickle.loads / dill.loads / marshal.loads.
+binding jsonLoadsIsNotObjectDeserialization902 {
+  query pattern callExpr where callee.path == "json.loads"
+  emit check core.SafeDeserialization at args[0] {
+    covers path {
+      from: args[0]
+      to: call
+    }
+  }
+}
+
+// itsdangerous signed serializers verify an HMAC signature BEFORE deserializing and raise
+// BadSignature otherwise, so `s.loads(cookie)` is not attacker-controlled deserialization
+// (the standard signed session/token pattern — Flask's own open_session). The receiver is a
+// local variable, so anchor the check on the enclosing function context when that function
+// builds a signed serializer. The negative clause keeps a genuinely unsafe loader in the
+// same function reportable, so this never suppresses pickle/marshal/yaml deserialization.
+binding itsdangerousSignedLoads903 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.callPath, ["URLSafeTimedSerializer", "URLSafeSerializer", "TimedSerializer", "TimestampSigner", "get_signing_serializer"]) and not (containsAny(node.context.callPath, ["pickle.loads", "pickle.load", "cPickle.loads", "_pickle.loads", "marshal.loads", "marshal.load", "dill.loads", "cloudpickle.loads", "jsonpickle.decode", "yaml.load", "yaml.unsafe_load"]))
+  emit check core.SafeDeserialization at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}
+
+// numpy.load only unpickles when the caller opts in, and since NumPy 1.16.3
+// the flag's own default is allow_pickle=False precisely because loading a
+// pickled object array executes whatever the artifact's pickle stream names.
+// A wrapper class whose constructor defaults that opt-in to True re-enables
+// the hazard for every caller that never mentions the flag: the bytes the
+// wrapper is handed decide which classes run. The shape labelled here is that
+// wrapper -- a method handing bytes to numpy.load inside a class whose body
+// carries a True default for the flag -- and it is the unrestricted form of
+// the same weakness the Java arm of this concept covers: the stream may name
+// any class, with no filter standing between it and the unpickler.
+//
+// The default is a constructor signature, which Python emits no structured
+// token for, so it is read from the enclosing class's body text -- the same
+// route the DRF throttle declaration uses -- spelled with the punctuation the
+// signature itself carries: `allow_pickle=True):` is the def-line default
+// with the flag trailing, not prose about the flag, and not the call-site
+// opt-in `np.load(f, allow_pickle=True)`, which closes with `)` and no colon.
+// A class defaulting the flag to True in a non-trailing parameter position is
+// not reached: that spelling is textually identical to the call-site opt-in
+// inside the same class body, and flagging every documented call-site opt-in
+// is the wrong trade -- sibling trees carry it on genuinely local artifacts
+// (ray's numpy_datasource and rllib serialization, torch's numpy test suite).
+// Both np.load and numpy.load are matched because both spellings are numpy's
+// own documented import forms. The text route carries the usual two-sided
+// residual, stated rather than hidden: a comment or docstring quoting the
+// exact signature spelling fires (the class body keeps comments, and the
+// module's string literals share the context node), and a default True in a
+// non-trailing position is missed. Across every Python file under this
+// campaign's sibling trees the signature spelling appears once -- the wrapper
+// this was measured on -- so both sides of the residual are rare beside it.
+binding numpyPickleDefaultDeserializer {
+  query pattern presenceNode where node.scope == "function"
+    and node.token contains "lang=python"
+    and node.context.callPath in ["np.load", "numpy.load"]
+    and node.token contains "allow_pickle=True):"
+  emit issue code.UnrestrictedClassDeserialization at node
+}

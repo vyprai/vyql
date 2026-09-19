@@ -1,0 +1,73 @@
+module bindings.objc.generated.mabbfe7a7;
+
+binding userControlledData0 {
+  requires {
+    dependency("UMCommon")
+  }
+  query pattern callExpr where callee.method == "profileSignInWithPUID"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("UMCommon")
+  }
+  query pattern callExpr where callee.method == "userProfile"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("UMCommon")
+  }
+  query pattern callExpr where callee.method == "userProfileMobile"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("UMCommon")
+  }
+  query pattern callExpr where callee.method == "userProfileEMail"
+  emit source core.UserControlledData at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("UMCommon")
+  }
+  query pattern callExpr where callee.method == "setSecret"
+  emit source code.SecretValue at call.result
+}
+
+binding urlFetch5 {
+  requires {
+    dependency("UMCommon")
+  }
+  query pattern callExpr where callee.method == "handleUrl"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch6 {
+  requires {
+    dependency("UMCommon")
+  }
+  query pattern callExpr where callee.method == "handleOpenURL"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("UMCommon")
+  }
+  query pattern callExpr where callee.method == "didResolveDeepLink"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData8 {
+  requires {
+    dependency("UMCommon")
+  }
+  query pattern callExpr where callee.method == "getInstallParams"
+  emit source core.UserControlledData at call.result
+}

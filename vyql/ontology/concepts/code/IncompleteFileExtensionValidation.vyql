@@ -1,0 +1,11 @@
+module code;
+
+concept IncompleteFileExtensionValidation : issue {
+  cwe: [CWE_434]
+  reviewAssumption: "an attacker can preserve or submit a stored filename value that later controls an uploaded or served file extension"
+  reviewCategory: upload
+  reviewCondition: "upload validation admits a file without checking the extension the stored file keeps"
+  reviewConfidence: medium
+  reviewEvidence: "upload validation context {pattern} admits a file by media type or uploaded-file metadata with no observed extension allowlist check"
+  vulnerableTo: [injection.UnrestrictedUpload]
+}

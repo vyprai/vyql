@@ -1,0 +1,9 @@
+module bindings.bash.generated.m9905ede1;
+
+binding cliArgument0 {
+  requires {
+    dependency("cfn-lint")
+  }
+  query pattern callExpr where callee.path ~= "cfn-lint.argv"
+  emit source code.CliArgument at call.result
+}

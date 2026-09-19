@@ -1,0 +1,17 @@
+module bindings.php.generated.mf6cd8f52;
+
+binding networkData0 {
+  requires {
+    dependency("amphp/sync")
+  }
+  query pattern callExpr where callee.method == "AmpSyncChannel::receive"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("amphp/sync")
+  }
+  query pattern callExpr where callee.method == "AmpSyncChannel::send"
+  emit sink code.NetworkSend at args[0]
+}

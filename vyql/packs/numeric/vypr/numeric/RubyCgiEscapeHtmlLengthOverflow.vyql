@@ -1,0 +1,11 @@
+module vypr.numeric;
+
+rule RubyCgiEscapeHtmlLengthOverflow {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_190, CWE_787]
+    id: "VYQL-NUM-009"
+    severity: high
+  }
+  issue code.RubyCgiEscapeHtmlLengthOverflow as overflow
+}

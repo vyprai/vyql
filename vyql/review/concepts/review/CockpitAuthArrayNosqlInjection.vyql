@@ -1,0 +1,8 @@
+module code;
+
+review code.CockpitAuthArrayNosqlInjection {
+  category: nosql
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review Cockpit Auth::check for scalar is_string guards before auth arrays reach the authentication query"
+}

@@ -1,0 +1,41 @@
+module bindings.javascript.parsedUrlHostnamePatternCheck;
+
+// The WHATWG URL constructor is the documented way to take a string apart
+// into the parts an outbound request is actually issued against, and
+// `hostname` is the part a destination filter has to decide on: it is the
+// name that will be resolved and connected to, with no userinfo, port or
+// path to hide a target in. RegExp.prototype.test answers exactly one
+// question about a string -- does it match this pattern -- so a function
+// that parses a URL, reads the parsed hostname and applies a pattern to it
+// has judged the destination the request will use, which is what an
+// allowlist or a private-range filter consists of before the transport
+// carries it out.
+//
+// The gate is the conjunction of all three readings, in one function. A
+// hostname is read for a dozen unrelated reasons in ordinary code -- virtual
+// host routing, link rewriting, logging -- and `.test` is the ordinary way
+// to match any value, so neither reading alone says anything about a
+// destination. The URL construction is what ties them together: it is the
+// only reading in the set that produces a hostname worth validating rather
+// than one already known. Function scope because the validation and the
+// request it licenses are statements of one handler; a filter factored into
+// a sibling function is a different shape, and the sibling's tokens do not
+// reach the handler (a `new URL` in one function credits nothing in
+// another).
+//
+// Residual, in two directions. The pattern itself is not classified: an
+// anchored list of literal hosts and a private-range exclusion are the same
+// three readings, and both are host filters, so both are credited -- the
+// distinction between an allowlist and a denylist is not recoverable from a
+// pattern reliably enough to gate on. And the reading is not tied to the
+// value that is fetched: a handler that validates one URL and requests
+// another in the same function is credited for both, the same function-wide
+// credit a canonicalising path check carries.
+binding jsParsedUrlHostnamePatternCheck {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.call in ["URL"] and node.context.call in ["test"] and node.context.selector contains ".hostname"
+  emit check core.AllowlistValidation at node {
+    covers endpoint {
+      anchor: node
+    }
+  }
+}

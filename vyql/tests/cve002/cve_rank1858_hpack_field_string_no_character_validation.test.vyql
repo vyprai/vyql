@@ -1,0 +1,249 @@
+# Tomcat's HTTP/2 HPACK decoder accepted any bytes a client sent in a header
+# field name or value. HpackDecoder.readHpackString decoded the length-prefixed
+# string literal straight off the connection's ByteBuffer and
+# HPackHuffman.decode walked the Huffman tree appending each decoded
+# character, and neither path asked whether the character is legal in an HTTP
+# field: names are not checked against the token grammar or rejected for
+# upper case, values are not checked against field-vchar/field-content, so
+# control characters and forbidden bytes reached the header store that every
+# downstream consumer (logging, proxying, the servlet API) trusts. The HTTP/1.1
+# parser had enforced exactly this via HttpParser for years; the HTTP/2 path
+# never validated at all, so over HTTP/2 the container accepted headers it
+# would have rejected over HTTP/1.1 (CWE-20, CWE-113 adjacent).
+#
+# The fix 19f17a257 threads an isFieldName flag through both decode paths and
+# validates every character before appending it: HttpParser.isToken plus a
+# lower-case test for names, HttpParser.isFieldVChar / isFieldContent for
+# values. It also moves the lower-case check out of Stream.emitHeader into the
+# decoder, where the grammar check now lives.
+#
+# Detected by VYQL-VAL-038 (code.StructuredInputDecode), on a Java binding
+# that asks for the decode shape rather than for any Tomcat name: a method
+# holding a java.nio.ByteBuffer that reads bytes out of it and appends into a
+# builder, with no character-grammar check anywhere in the method. No library
+# documents a private decode helper, so there is no callee to bind and the
+# shape is the API. The ByteBuffer restriction is what makes the shape
+# shippable: the wider trigger the first pass measured -- any loop appending
+# characters read from a source into a builder, Reader and iterator included
+# -- selects 406 methods in Tomcat's own java tree alone, because string
+# building and accumulator loops are ordinary code. Restricting the input to
+# a ByteBuffer keeps it on binary wire decoding.
+#
+# Measured, --cache off, three runs per revision over the whole java/ subtree
+# at 19f17a257^ and at 19f17a257: 1902 findings at both revisions before the
+# binding, identical fingerprints; 1905 at the parent and 1903 at the fix with
+# it, stable across all six runs. The delta is exactly the two decode methods
+# -- HpackDecoder.readHpackString and HPackHuffman.decode -- which report at
+# the parent and go to zero at the fix, plus one site the fix does not touch:
+# WsWebSocketContainer.readLine, which reads an HTTP response header line off
+# a ByteBuffer during the client handshake and splits on ':' with no character
+# check at either revision. That is the same weakness in the same repository,
+# not collateral against the pair.
+#
+# Collateral across the sibling Java clones, one bounded run each, reported as
+# the delta over the same tree without the binding: undertow +14 (its own
+# HpackDecoder.readHpackString and HPackHuffman.decode, HTTP/1.1 header value
+# and reason-phrase and status-code and query-parameter readers, AJP request
+# and response parsers, the chunked-trailer reader, the proxy-protocol
+# reader, one test helper), quarkus resteasy-reactive +1 (the form-urlencoded
+# body parser), and zero on woodstox, protobuf, batik, publiccms, cloudfoundry
+# uaa, vert.x, zookeeper, xstream and spring-security -- about 8,600
+# application Java files reporting nothing. protobuf and silverpeas-core were
+# not measured to a count: protobuf aborts at the 6GB ceiling and
+# silverpeas-core with it, and tika dies in the scanner's existing slice-bounds
+# crash, all before this binding is reached. Two of the fourteen undertow rows
+# are false positives worth naming: handlePath does validate, through the
+# ALLOWED_TARGET_CHARACTER boolean-array lookup rather than a call, and
+# MimeDecodingTestCase is a test. A table-driven check is invisible to a
+# call-token negation; that is the known residual and it is the
+# false-positive direction.
+#
+# The negation lists the character checks such a loop can consult -- the RFC's
+# own rule names, the JDK's java.lang.Character classification they are
+# usually written with, and the validator names the Java HTTP implementations
+# publish -- and any of them in any position in the method discharges the
+# obligation. The fourth case below pins the one that matters most: a guard
+# sitting in the loop condition rather than around the append suppresses the
+# finding, which is the spelling HTTP/1.1 uses, and which no Call node records
+# (vyql query for isToken in HttpParser.java returns the two if-statement call
+# sites and neither while condition) while the method context token does. The
+# fifth case pins the confinement: the Reader-backed HTTP/1.1 token loop,
+# textually the same append, is not reported because it does not hold a
+# ByteBuffer.
+#
+# The residual on the other side is unchanged from the first pass: validation
+# that lives in the caller or in the store the decoded text is handed to is
+# invisible to a method-scoped negation, so a design that centralises the
+# check downstream of the decoder is reported at the decoder and cleared
+# nowhere. VYQL-INJ-247 stays rejected on every case below -- this code
+# disables no flag, and that concept is a header store constructed with
+# validation switched off, not a decoder that never had one.
+
+test "rank1858: an HPACK field string decoded straight off the request bytes"
+  lang java
+  expect VYQL-VAL-038
+  reject VYQL-INJ-247
+  code
+  ```
+  import java.nio.ByteBuffer;
+
+  class HpackDecoder {
+      // Decodes a HPACK string literal -- an HTTP/2 header field name or
+      // value -- from the request bytes.
+      private String readHpackString(ByteBuffer buffer) {
+          byte data = buffer.get(buffer.position());
+          int length = Hpack.decodeInteger(buffer, 7);
+          boolean huffman = (data & 0b10000000) != 0;
+          if (huffman) {
+              return readHuffmanString(length, buffer);
+          }
+          StringBuilder stringBuilder = new StringBuilder(length);
+          for (int i = 0; i < length; ++i) {
+              stringBuilder.append((char) buffer.get());
+          }
+          return stringBuilder.toString();
+      }
+
+      private String readHuffmanString(int length, ByteBuffer buffer) {
+          StringBuilder stringBuilder = new StringBuilder(length);
+          HPackHuffman.decode(buffer, length, stringBuilder);
+          return stringBuilder.toString();
+      }
+  }
+  ```
+
+test "rank1858: the Huffman walk appends each decoded character with no grammar check"
+  lang java
+  expect VYQL-VAL-038
+  code
+  ```
+  import java.nio.ByteBuffer;
+
+  class HPackHuffman {
+      private static final int[] DECODING_TABLE = new int[256];
+      private static final int LOW_MASK = 0xFFFF;
+      private static final int LOW_TERMINAL_BIT = 1 << 16;
+      private static final int HIGH_TERMINAL_BIT = 1 << 31;
+
+      public static void decode(ByteBuffer data, int length, StringBuilder target) {
+          int treePos = 0;
+          for (int i = 0; i < length; ++i) {
+              byte b = data.get();
+              int bitPos = 7;
+              while (bitPos >= 0) {
+                  int val = DECODING_TABLE[treePos];
+                  if (((1 << bitPos) & b) == 0) {
+                      if ((val & LOW_TERMINAL_BIT) == 0) {
+                          treePos = val & LOW_MASK;
+                      } else {
+                          target.append((char) (val & LOW_MASK));
+                          treePos = 0;
+                      }
+                  } else {
+                      if ((val & HIGH_TERMINAL_BIT) == 0) {
+                          treePos = (val >> 16) & LOW_MASK;
+                      } else {
+                          target.append((char) ((val >> 16) & LOW_MASK));
+                          treePos = 0;
+                      }
+                  }
+                  bitPos--;
+              }
+          }
+      }
+  }
+  ```
+
+test "rank1858: the fix validates every character before appending it"
+  lang java
+  reject VYQL-VAL-038
+  reject VYQL-INJ-247
+  code
+  ```
+  import java.nio.ByteBuffer;
+
+  class HpackDecoder {
+      private String readHpackString(ByteBuffer buffer, boolean isFieldName) {
+          byte data = buffer.get(buffer.position());
+          int length = Hpack.decodeInteger(buffer, 7);
+          boolean huffman = (data & 0b10000000) != 0;
+          if (huffman) {
+              return readHuffmanString(length, buffer, isFieldName);
+          }
+          StringBuilder stringBuilder = new StringBuilder(length);
+          for (int i = 0; i < length; ++i) {
+              char c = (char) (buffer.get() & 0xFF);
+              if (isFieldName) {
+                  if (HttpParser.isToken(c) && !Character.isUpperCase(c)) {
+                      stringBuilder.append(c);
+                  } else {
+                      throw new IllegalArgumentException("illegal character in name");
+                  }
+              } else {
+                  if ((i == 0 || i == length - 1) && HttpParser.isFieldVChar(c) ||
+                          i > 0 && i < length - 1 && HttpParser.isFieldContent(c)) {
+                      stringBuilder.append(c);
+                  } else {
+                      throw new IllegalArgumentException("illegal character in value");
+                  }
+              }
+          }
+          return stringBuilder.toString();
+      }
+
+      private String readHuffmanString(int length, ByteBuffer buffer, boolean isFieldName) {
+          StringBuilder stringBuilder = new StringBuilder(length);
+          HPackHuffman.decode(buffer, length, stringBuilder, isFieldName);
+          return stringBuilder.toString();
+      }
+  }
+  ```
+
+test "rank1858: a guard in the loop condition is as good as one around the append"
+  lang java
+  reject VYQL-VAL-038
+  code
+  ```
+  import java.nio.ByteBuffer;
+
+  class FieldReader {
+      // The HTTP/1.1 spelling of the same obligation, moved onto a buffer:
+      // the grammar test gates the loop rather than the append.
+      static String readToken(ByteBuffer buffer) {
+          StringBuilder result = new StringBuilder();
+          int c = buffer.get();
+          while (c != -1 && HttpParser.isToken(c)) {
+              result.append((char) c);
+              c = buffer.get();
+          }
+          return result.toString();
+      }
+  }
+  ```
+
+test "rank1858: the Reader-backed token loop is string building, not wire decoding"
+  lang java
+  reject VYQL-VAL-038
+  code
+  ```
+  import java.io.IOException;
+  import java.io.Reader;
+
+  class HttpParser {
+      // HttpParser.readToken as it ships: same append, same guard in the loop
+      // condition, but the input is a Reader and not a ByteBuffer.
+      static String readToken(Reader input) throws IOException {
+          StringBuilder result = new StringBuilder();
+          int c = input.read();
+          while (c != -1 && isToken(c)) {
+              result.append((char) c);
+              c = input.read();
+          }
+          return result.toString();
+      }
+
+      static boolean isToken(int c) {
+          return c > 0x20 && c < 0x7f;
+      }
+  }
+  ```

@@ -1,0 +1,246 @@
+# kitty's graphics protocol takes a compose command's rectangle from the
+# client and bounds it before compositing: handle_compose_command in
+# kitty/graphics.c (CVE-2026-33642) declares width/height/dest_x/dest_y/
+# src_x/src_y as `unsigned int` locals read off the GraphicsCommand, then
+# checks `dest_x + width > img->width` (and the src/height equivalents)
+# before touching the frame. The addition the check exists to bound is itself
+# the addition that wraps: a 32-bit pair large enough passes as a small sum,
+# the check discharges nothing, and the compositing reads out of bounds
+# (CWE-190/CWE-125). Fix e9661f0f widens the six locals to `uint64_t` at
+# their declaration and touches nothing else -- the comparison text is
+# byte-for-byte identical between the revisions, so a detector that diffs the
+# comparison's own text cannot separate them.
+#
+# Detected by the narrow_width.bounds_check fact
+# (ccNarrowDeclaredBoundsCheckObservations,
+# internal/extract/frontend/treesitter/c.go) through binding
+# narrowDeclaredBoundsCheck in vyql/bindings/c/narrow_declared_bounds_check.vyql,
+# judged by VYQL-NUM-014. The fact correlates the comparison's two additive
+# operands with the function's own declarations over the compacted body, and
+# reports only when both are locals declared at a 32-bit integer width with
+# no widening anywhere: redeclaring either operand wide at the declaration
+# (kitty's fix) or casting either operand to a wider type at the addition --
+# any long-family or 64-bit spelling, multi-word and abbreviated forms
+# included -- both leave it unemitted, while a cast at the checked width
+# changes nothing. The comparison is read in any spelling: the sum
+# parenthesized on either side, and a comparison opened by a return
+# statement, fire the same as the bare form. Widths narrower than int are
+# promoted before the addition and a promoted pair cannot overflow the int
+# the sum is computed in, so they are not reported either.
+#
+# Residuals, all false-negative: only locals declared in the function count,
+# so the sibling construct -- the same check written over narrow parameters
+# -- is not reached; the correlation is by identifier within the function, so
+# a local whose name a same-named member shadows at the operand is still
+# read as the local; and the compacted body keeps comments, so a
+# commented-out wide redeclaration still counts as narrow.
+
+test "rank1275: compose rectangle bounds check adds at the declared 32-bit width"
+  lang c
+  file graphics.c
+  expect VYQL-NUM-014
+  expect_review code.OffsetLengthBoundsOverflow
+  code
+  ```
+  typedef struct { unsigned int width, height; } Image;
+  typedef struct { unsigned int width, height, x_offset, y_offset, cell_x_offset, cell_y_offset; } GraphicsCommand;
+  void set_command_failed_response(const char *code, const char *fmt, ...);
+
+  static void
+  handle_compose_command(bool *is_dirty, const GraphicsCommand *g, Image *img) {
+      const unsigned int width = g->width ? g->width : img->width;
+      const unsigned int height = g->height ? g->height : img->height;
+      const unsigned int dest_x = g->x_offset, dest_y = g->y_offset, src_x = g->cell_x_offset, src_y = g->cell_y_offset;
+      if (dest_x + width > img->width || dest_y + height > img->height) {
+          set_command_failed_response("EINVAL", "The destination rectangle is out of bounds");
+          return;
+      }
+      if (src_x + width > img->width || src_y + height > img->height) {
+          set_command_failed_response("EINVAL", "The source rectangle is out of bounds");
+          return;
+      }
+  }
+  ```
+
+test "rank1275: the six locals redeclared wide make the same check stand"
+  lang c
+  file graphics.c
+  reject VYQL-NUM-014
+  reject_review code.OffsetLengthBoundsOverflow
+  code
+  ```
+  #include <stdint.h>
+  typedef struct { unsigned int width, height; } Image;
+  typedef struct { unsigned int width, height, x_offset, y_offset, cell_x_offset, cell_y_offset; } GraphicsCommand;
+  void set_command_failed_response(const char *code, const char *fmt, ...);
+
+  static void
+  handle_compose_command(bool *is_dirty, const GraphicsCommand *g, Image *img) {
+      // Use uint64_t to avoid overflow when testing for validity. All dimensions are 32bit numbers.
+      const uint64_t width = g->width ? g->width : img->width;
+      const uint64_t height = g->height ? g->height : img->height;
+      const uint64_t dest_x = g->x_offset, dest_y = g->y_offset, src_x = g->cell_x_offset, src_y = g->cell_y_offset;
+      if (dest_x + width > img->width || dest_y + height > img->height) {
+          set_command_failed_response("EINVAL", "The destination rectangle is out of bounds");
+          return;
+      }
+      if (src_x + width > img->width || src_y + height > img->height) {
+          set_command_failed_response("EINVAL", "The source rectangle is out of bounds");
+          return;
+      }
+  }
+  ```
+
+test "rank1275: a widening cast at the addition is the other fix spelling"
+  lang c
+  file graphics.c
+  reject VYQL-NUM-014
+  code
+  ```
+  #include <stdint.h>
+  typedef struct { unsigned int width, height; } Image;
+  typedef struct { unsigned int width, height, x_offset, y_offset; } GraphicsCommand;
+
+  static void
+  compose_offset_bounds_check(const GraphicsCommand *g, Image *img) {
+      const unsigned int width = g->width ? g->width : img->width;
+      const unsigned int dest_x = g->x_offset;
+      if ((uint64_t)dest_x + (uint64_t)width > img->width) {
+          return;
+      }
+  }
+  ```
+
+test "rank1275: the abbreviated and multi-word widening casts read the same"
+  lang c
+  file graphics.c
+  reject VYQL-NUM-014
+  reject_review code.OffsetLengthBoundsOverflow
+  code
+  ```
+  typedef unsigned long u64;
+  typedef struct { unsigned int width, height; } Image;
+  typedef struct { unsigned int width, height, x_offset, y_offset; } GraphicsCommand;
+
+  static void
+  compose_u64_cast(const GraphicsCommand *g, Image *img) {
+      const unsigned int width = g->width, dest_x = g->x_offset;
+      if ((u64)dest_x + width > img->width) {
+          return;
+      }
+  }
+
+  static void
+  compose_long_int_cast(const GraphicsCommand *g, Image *img) {
+      const unsigned int width = g->width, dest_x = g->x_offset;
+      if ((long int)dest_x + width > img->width) {
+          return;
+      }
+  }
+
+  static void
+  compose_unsigned_long_int_cast(const GraphicsCommand *g, Image *img) {
+      const unsigned int width = g->width, dest_x = g->x_offset;
+      if ((unsigned long int)dest_x + width > img->width) {
+          return;
+      }
+  }
+  ```
+
+test "rank1275: a cast at the checked width does not widen anything"
+  lang c
+  file graphics.c
+  expect VYQL-NUM-014
+  code
+  ```
+  typedef struct { unsigned int width, height; } Image;
+  typedef struct { unsigned int width, height, x_offset, y_offset; } GraphicsCommand;
+
+  static void
+  compose_narrow_cast(const GraphicsCommand *g, Image *img) {
+      const unsigned int width = g->width, dest_x = g->x_offset;
+      if ((unsigned int)dest_x + width > img->width) {
+          return;
+      }
+  }
+  ```
+
+test "rank1275: the parenthesized sum and the return comparison fire too"
+  lang c
+  file graphics.c
+  expect VYQL-NUM-014
+  code
+  ```
+  typedef struct { unsigned int width, height; } Image;
+  typedef struct { unsigned int width, height, x_offset, y_offset; } GraphicsCommand;
+
+  static void
+  compose_parenthesized_sum(const GraphicsCommand *g, Image *img) {
+      const unsigned int width = g->width, dest_x = g->x_offset;
+      if ((dest_x + width) > img->width) {
+          return;
+      }
+  }
+
+  static int
+  compose_returned_comparison(const GraphicsCommand *g, Image *img) {
+      const unsigned int width = g->width, dest_x = g->x_offset;
+      return dest_x + width > img->width;
+  }
+  ```
+
+test "rank1275: a zero literal operand is not a declared local"
+  lang c
+  file graphics.c
+  reject VYQL-NUM-014
+  code
+  ```
+  #include <stdint.h>
+  typedef struct { unsigned int width, height; } Image;
+  typedef struct { unsigned int width, height, x_offset, y_offset; } GraphicsCommand;
+
+  static void
+  compose_zero_operand(const GraphicsCommand *g, Image *img) {
+      const unsigned int width = g->width, dest_x = g->x_offset;
+      if (dest_x + 0 > img->width) {
+          return;
+      }
+      if ((uint64_t)0 + width > img->width) {
+          return;
+      }
+  }
+  ```
+
+test "rank1275: the same check over narrow parameters is a sibling construct"
+  lang c
+  file graphics.c
+  reject VYQL-NUM-014
+  code
+  ```
+  #include <stdint.h>
+  typedef struct { unsigned int width, height; } Image;
+
+  static void
+  compose_offset_bounds_check(unsigned int dest_x, unsigned int width, Image *img) {
+      if (dest_x + width > img->width) {
+          return;
+      }
+  }
+  ```
+
+test "rank1275: promoted widths cannot overflow the int the sum is computed in"
+  lang c
+  file graphics.c
+  reject VYQL-NUM-014
+  code
+  ```
+  typedef struct { unsigned int width, height; } Image;
+
+  static void
+  compose_offset_bounds_check(unsigned short dest_x, unsigned short src_width, Image *img) {
+      unsigned short width = src_width ? src_width : img->width;
+      if (dest_x + width > img->width) {
+          return;
+      }
+  }
+  ```

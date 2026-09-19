@@ -1,0 +1,17 @@
+module bindings.c.ctype_signed_char_index;
+
+// The ctype.h contract: tolower, toupper and the is* classifiers accept and
+// return values representable as unsigned char (or EOF), and every C
+// reference documents that indexing a lookup table with a plain char -- or
+// with the un-cast return of tolower -- is undefined once the char is
+// negative, which it is on every platform where plain char is signed. The
+// table then reads out of bounds at a negative offset (CWE-190/197); the
+// canonical fix everywhere is an (unsigned char) cast at the index site.
+//
+// The binding names the unguarded shape: a subscript whose index uses ctype
+// results or bare char indexing without the (unsigned char) cast. The cast
+// satisfies the negation, exactly as the fix commit adds it.
+binding ctypeSignedCharIndex8416 {
+  query pattern presenceNode where node.analysis ~= "signed_char.index"
+  emit issue code.SignedCharIndexReview at node
+}

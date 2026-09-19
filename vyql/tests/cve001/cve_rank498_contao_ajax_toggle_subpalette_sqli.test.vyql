@@ -1,0 +1,60 @@
+# Rank 498 / CVE-2012-4383: Contao Ajax toggleSubpalette used a
+# posted field name as a SQL UPDATE identifier before selector/permission checks.
+
+test "rank498: Contao Ajax toggleSubpalette updates posted field identifier"
+  lang php
+  file Ajax.php
+  expect VYQL-INJ-112
+  expect_review code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection
+  code
+  ```
+  <?php
+  class Ajax extends Backend {
+      public function executePostActions($dc) {
+          switch ($this->Input->post('action')) {
+              case 'toggleSubpalette':
+                  if ($dc instanceof DC_Table) {
+                      if ($this->Input->get('act') == 'editAll') {
+                          $this->strAjaxId = preg_replace('/.*_([0-9a-zA-Z]+)$/i', '$1', $this->Input->post('id'));
+                          $this->Database->prepare("UPDATE " . $dc->table . " SET " . $this->Input->post('field') . "='" . (intval($this->Input->post('state') == 1) ? 1 : '') . "' WHERE id=?")->execute($this->strAjaxId);
+                      } else {
+                          $this->Database->prepare("UPDATE " . $dc->table . " SET " . $this->Input->post('field') . "='" . (intval($this->Input->post('state') == 1) ? 1 : '') . "' WHERE id=?")->execute($dc->id);
+                      }
+                  }
+                  break;
+          }
+      }
+  }
+  ```
+
+test "rank498: Contao Ajax toggleSubpalette validates selector field access"
+  lang php
+  file Ajax.php
+  reject VYQL-INJ-112
+  reject_review code.ContaoAjaxToggleSubpaletteSqlIdentifierInjection
+  code
+  ```
+  <?php
+  class Ajax extends Backend {
+      public function executePostActions($dc) {
+          switch ($this->Input->post('action')) {
+              case 'toggleSubpalette':
+                  $this->import('BackendUser', 'User');
+
+                  if (!is_array($GLOBALS['TL_DCA'][$dc->table]['palettes']['__selector__']) || !in_array($this->Input->post('field'), $GLOBALS['TL_DCA'][$dc->table]['palettes']['__selector__']) || ($GLOBALS['TL_DCA'][$dc->table]['fields'][$this->Input->post('field')]['exclude'] && !$this->User->hasAccess($dc->table . '::' . $this->Input->post('field'), 'alexf'))) {
+                      die('Bad Request');
+                  }
+
+                  if ($dc instanceof DC_Table) {
+                      if ($this->Input->get('act') == 'editAll') {
+                          $this->strAjaxId = preg_replace('/.*_([0-9a-zA-Z]+)$/i', '$1', $this->Input->post('id'));
+                          $this->Database->prepare("UPDATE " . $dc->table . " SET " . $this->Input->post('field') . "='" . (intval($this->Input->post('state') == 1) ? 1 : '') . "' WHERE id=?")->execute($this->strAjaxId);
+                      } else {
+                          $this->Database->prepare("UPDATE " . $dc->table . " SET " . $this->Input->post('field') . "='" . (intval($this->Input->post('state') == 1) ? 1 : '') . "' WHERE id=?")->execute($dc->id);
+                      }
+                  }
+                  break;
+          }
+      }
+  }
+  ```

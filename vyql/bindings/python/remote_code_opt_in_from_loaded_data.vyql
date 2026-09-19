@@ -1,0 +1,34 @@
+module bindings.python.remote_code_opt_in_from_loaded_data;
+
+// HuggingFace's from_pretrained / from_config loaders accept trust_remote_code
+// as the caller's explicit, documented trust decision: when it is True the
+// loader downloads the model repository's own Python files and executes them.
+// Reading the flag back out of the configuration object being loaded hands
+// that decision to the artifact itself -- a repository's config.json sets
+// "trust_remote_code": true and its code runs without the caller ever opting
+// in, which is the documented reason the flag exists as a per-call choice.
+//
+// The second conjunct separates this from the two spellings that are the
+// caller's own choice: the auto-class API forwarding its own trust_remote_code
+// parameter (models/auto/*, zero findings), and an explicit
+// trust_remote_code=True literal in conversion tooling. Neither reads the flag
+// from an attribute of the object being loaded, so neither carries the
+// ".trust_remote_code" argument text. The negation declines the argparse
+// spelling -- HuggingFace's own example scripts read the flag the operator
+// typed as args./model_args./data_args.trust_remote_code, which is the
+// documented per-call choice made by a human, not by the artifact (24 findings
+// on examples/pytorch/language-modeling before the decline, 0 after). The
+// substring also covers kwargs.trust_remote_code, whose provenance is likewise
+// the caller's keyword arguments.
+//
+// Residual, stated rather than hidden: transformers' CLI server stores the
+// operator's --trust_remote-code option as self.trust_remote_code
+// (cli/serve.py), textually identical to a config class reading its own field,
+// so its two loader calls still read through -- one review flag per tree on a
+// shape a reviewer closes by seeing where the field is assigned. And an opt-in
+// a caller deliberately derives from a configuration object of a different
+// provenance still fires; that spelling deserves the review this raises.
+binding remoteCodeOptInFromLoadedData {
+  query pattern callExpr where callee.method in ["from_pretrained", "from_config"] and args.any.literal contains "trust_remote_code=" and args.any.literal contains ".trust_remote_code" and not (args.any.literal contains "args.trust_remote_code")
+  emit issue code.LoadedDataControlsCodeExecutionOptIn at call
+}

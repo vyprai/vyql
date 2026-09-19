@@ -1,0 +1,170 @@
+module bindings.python.authorization;
+
+binding routeTargetDirectLookup666 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and containsAny(args.any.literal, ["decorator_method:route", "decorator_method:get", "decorator_method:post", "decorator_method:put", "decorator_method:patch", "decorator_method:delete"])
+    and args.any.literal contains "call_path:session.get"
+    and (
+      (args.any.literal contains "param_name:order_id"
+        and args.any.literal contains ".query.get(order_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_blocks_return:use=order;guard_kind=mismatch;guard_target=order.owner;counterpart_source=session;", "terminal_guard_blocks_return:use=order;guard_kind=mismatch;guard_target=order.owner_id;counterpart_source=session;", "terminal_guard_blocks_return:use=order;guard_kind=mismatch;guard_target=order.user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=order;guard_kind=mismatch;guard_target=order.tenant_id;counterpart_source=session;", "terminal_guard_blocks_return:use=order;guard_kind=mismatch;guard_target=order.company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=order_id;guard_kind=mismatch;guard_target=order_id;counterpart_source=session;", "terminal_guard_blocks_return:use=order;guard_kind=mismatch;guard_target=order_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=order_id;guard_kind=non_null;guard_target=order_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=order;guard_kind=non_null;guard_target=order_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=order;guard_kind=non_null;guard_target=order;counterpart_source=literal;"])))
+      or (args.any.literal contains "param_name:record_id"
+        and args.any.literal contains ".query.get(record_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_blocks_return:use=record;guard_kind=mismatch;guard_target=record.owner;counterpart_source=session;", "terminal_guard_blocks_return:use=record;guard_kind=mismatch;guard_target=record.owner_id;counterpart_source=session;", "terminal_guard_blocks_return:use=record;guard_kind=mismatch;guard_target=record.user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=record;guard_kind=mismatch;guard_target=record.tenant_id;counterpart_source=session;", "terminal_guard_blocks_return:use=record;guard_kind=mismatch;guard_target=record.company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=record_id;guard_kind=mismatch;guard_target=record_id;counterpart_source=session;", "terminal_guard_blocks_return:use=record;guard_kind=mismatch;guard_target=record_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=record_id;guard_kind=non_null;guard_target=record_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=record;guard_kind=non_null;guard_target=record_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=record;guard_kind=non_null;guard_target=record;counterpart_source=literal;"])))
+      or (args.any.literal contains "param_name:resource_id"
+        and args.any.literal contains ".query.get(resource_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_blocks_return:use=resource;guard_kind=mismatch;guard_target=resource.owner;counterpart_source=session;", "terminal_guard_blocks_return:use=resource;guard_kind=mismatch;guard_target=resource.owner_id;counterpart_source=session;", "terminal_guard_blocks_return:use=resource;guard_kind=mismatch;guard_target=resource.user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=resource;guard_kind=mismatch;guard_target=resource.tenant_id;counterpart_source=session;", "terminal_guard_blocks_return:use=resource;guard_kind=mismatch;guard_target=resource.company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=resource_id;guard_kind=mismatch;guard_target=resource_id;counterpart_source=session;", "terminal_guard_blocks_return:use=resource;guard_kind=mismatch;guard_target=resource_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=resource_id;guard_kind=non_null;guard_target=resource_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=resource;guard_kind=non_null;guard_target=resource_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=resource;guard_kind=non_null;guard_target=resource;counterpart_source=literal;"])))
+      or (args.any.literal contains "param_name:object_id"
+        and args.any.literal contains ".query.get(object_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_blocks_return:use=object;guard_kind=mismatch;guard_target=object.owner;counterpart_source=session;", "terminal_guard_blocks_return:use=object;guard_kind=mismatch;guard_target=object.owner_id;counterpart_source=session;", "terminal_guard_blocks_return:use=object;guard_kind=mismatch;guard_target=object.user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=object;guard_kind=mismatch;guard_target=object.tenant_id;counterpart_source=session;", "terminal_guard_blocks_return:use=object;guard_kind=mismatch;guard_target=object.company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=object_id;guard_kind=mismatch;guard_target=object_id;counterpart_source=session;", "terminal_guard_blocks_return:use=object;guard_kind=mismatch;guard_target=object_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=object_id;guard_kind=non_null;guard_target=object_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=object;guard_kind=non_null;guard_target=object_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=object;guard_kind=non_null;guard_target=object;counterpart_source=literal;"])))
+      or (args.any.literal contains "param_name:item_id"
+        and args.any.literal contains ".query.get(item_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_blocks_return:use=item;guard_kind=mismatch;guard_target=item.owner;counterpart_source=session;", "terminal_guard_blocks_return:use=item;guard_kind=mismatch;guard_target=item.owner_id;counterpart_source=session;", "terminal_guard_blocks_return:use=item;guard_kind=mismatch;guard_target=item.user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=item;guard_kind=mismatch;guard_target=item.tenant_id;counterpart_source=session;", "terminal_guard_blocks_return:use=item;guard_kind=mismatch;guard_target=item.company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=item_id;guard_kind=mismatch;guard_target=item_id;counterpart_source=session;", "terminal_guard_blocks_return:use=item;guard_kind=mismatch;guard_target=item_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=item_id;guard_kind=non_null;guard_target=item_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=item;guard_kind=non_null;guard_target=item_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=item;guard_kind=non_null;guard_target=item;counterpart_source=literal;"])))
+      or (args.any.literal contains "param_name:document_id"
+        and args.any.literal contains ".query.get(document_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner;counterpart_source=session;", "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.owner_id;counterpart_source=session;", "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.tenant_id;counterpart_source=session;", "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document.company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=document_id;guard_kind=mismatch;guard_target=document_id;counterpart_source=session;", "terminal_guard_blocks_return:use=document;guard_kind=mismatch;guard_target=document_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=document_id;guard_kind=non_null;guard_target=document_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=document;guard_kind=non_null;guard_target=document_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=document;guard_kind=non_null;guard_target=document;counterpart_source=literal;"])))
+      or (args.any.literal contains "param_name:invoice_id"
+        and args.any.literal contains ".query.get(invoice_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_blocks_return:use=invoice;guard_kind=mismatch;guard_target=invoice.owner;counterpart_source=session;", "terminal_guard_blocks_return:use=invoice;guard_kind=mismatch;guard_target=invoice.owner_id;counterpart_source=session;", "terminal_guard_blocks_return:use=invoice;guard_kind=mismatch;guard_target=invoice.user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=invoice;guard_kind=mismatch;guard_target=invoice.tenant_id;counterpart_source=session;", "terminal_guard_blocks_return:use=invoice;guard_kind=mismatch;guard_target=invoice.company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=invoice_id;guard_kind=mismatch;guard_target=invoice_id;counterpart_source=session;", "terminal_guard_blocks_return:use=invoice;guard_kind=mismatch;guard_target=invoice_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=invoice_id;guard_kind=non_null;guard_target=invoice_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=invoice;guard_kind=non_null;guard_target=invoice_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=invoice;guard_kind=non_null;guard_target=invoice;counterpart_source=literal;"])))
+      or (args.any.literal contains "param_name:account_id"
+        and args.any.literal contains ".query.get(account_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_blocks_return:use=account;guard_kind=mismatch;guard_target=account.owner;counterpart_source=session;", "terminal_guard_blocks_return:use=account;guard_kind=mismatch;guard_target=account.owner_id;counterpart_source=session;", "terminal_guard_blocks_return:use=account;guard_kind=mismatch;guard_target=account.user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=account;guard_kind=mismatch;guard_target=account.tenant_id;counterpart_source=session;", "terminal_guard_blocks_return:use=account;guard_kind=mismatch;guard_target=account.company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=account_id;guard_kind=mismatch;guard_target=account_id;counterpart_source=session;", "terminal_guard_blocks_return:use=account;guard_kind=mismatch;guard_target=account_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=account_id;guard_kind=non_null;guard_target=account_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=account;guard_kind=non_null;guard_target=account_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=account;guard_kind=non_null;guard_target=account;counterpart_source=literal;"])))
+      or (args.any.literal contains "param_name:company_id"
+        and args.any.literal contains ".query.get(company_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_blocks_return:use=company;guard_kind=mismatch;guard_target=company.owner;counterpart_source=session;", "terminal_guard_blocks_return:use=company;guard_kind=mismatch;guard_target=company.owner_id;counterpart_source=session;", "terminal_guard_blocks_return:use=company;guard_kind=mismatch;guard_target=company.user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=company;guard_kind=mismatch;guard_target=company.tenant_id;counterpart_source=session;", "terminal_guard_blocks_return:use=company;guard_kind=mismatch;guard_target=company.company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=company_id;guard_kind=mismatch;guard_target=company_id;counterpart_source=session;", "terminal_guard_blocks_return:use=company;guard_kind=mismatch;guard_target=company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=company_id;guard_kind=non_null;guard_target=company_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=company;guard_kind=non_null;guard_target=company_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=company;guard_kind=non_null;guard_target=company;counterpart_source=literal;"])))
+      or (args.any.literal contains "param_name:user_id"
+        and args.any.literal contains ".query.get(user_id)"
+        and not (containsAny(args.any.literal, ["terminal_guard_blocks_return:use=user;guard_kind=mismatch;guard_target=user.owner;counterpart_source=session;", "terminal_guard_blocks_return:use=user;guard_kind=mismatch;guard_target=user.owner_id;counterpart_source=session;", "terminal_guard_blocks_return:use=user;guard_kind=mismatch;guard_target=user.user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=user;guard_kind=mismatch;guard_target=user.tenant_id;counterpart_source=session;", "terminal_guard_blocks_return:use=user;guard_kind=mismatch;guard_target=user.company_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=user_id;guard_kind=mismatch;guard_target=user_id;counterpart_source=session;", "terminal_guard_blocks_return:use=user;guard_kind=mismatch;guard_target=user_id;counterpart_source=session;", "terminal_guard_blocks_call:operation=query.get;args=user_id;guard_kind=non_null;guard_target=user_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=user;guard_kind=non_null;guard_target=user_id;counterpart_source=literal;", "terminal_guard_blocks_return:use=user;guard_kind=non_null;guard_target=user;counterpart_source=literal;"])))
+    )
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding routeTargetMutation667 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and containsAny(args.any.literal, ["decorator_method:route", "decorator_method:get", "decorator_method:post", "decorator_method:put", "decorator_method:patch", "decorator_method:delete"])
+    and args.any.literal contains "reachable_call_method:commit"
+    and (
+      (args.any.literal contains "param_name:order_id" and args.any.literal contains "==order_id).first_or_404()")
+      or (args.any.literal contains "param_name:record_id" and args.any.literal contains "==record_id).first_or_404()")
+      or (args.any.literal contains "param_name:resource_id" and args.any.literal contains "==resource_id).first_or_404()")
+      or (args.any.literal contains "param_name:object_id" and args.any.literal contains "==object_id).first_or_404()")
+      or (args.any.literal contains "param_name:item_id" and args.any.literal contains "==item_id).first_or_404()")
+      or (args.any.literal contains "param_name:document_id" and args.any.literal contains "==document_id).first_or_404()")
+      or (args.any.literal contains "param_name:invoice_id" and args.any.literal contains "==invoice_id).first_or_404()")
+      or (args.any.literal contains "param_name:account_id" and args.any.literal contains "==account_id).first_or_404()")
+      or (args.any.literal contains "param_name:company_id" and args.any.literal contains "==company_id).first_or_404()")
+      or (args.any.literal contains "param_name:user_id" and args.any.literal contains "==user_id).first_or_404()")
+    )
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding headerSelectedStoredPrincipal668 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and containsAny(args.any.literal, ["decorator_method:route", "decorator_method:get", "decorator_method:post", "decorator_method:put", "decorator_method:patch", "decorator_method:delete"])
+    and args.any.literal contains "assignment_flow_reaches_operation:source_category=request;source=request.headers.get;previous_source=session;operation_category=query;operation=query."
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding decodedPrincipalTargetMutation669 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and containsAny(args.any.literal, ["decorator_method:route", "decorator_method:get", "decorator_method:post", "decorator_method:put", "decorator_method:patch", "decorator_method:delete"])
+    and args.any.literal contains "call_path:jwt.decode"
+    and args.any.literal contains "call_path:payload.get"
+    and args.any.literal contains "literal:sub"
+    and args.any.literal contains "reachable_call_method:commit"
+    and (
+      (args.any.literal contains "param_name:company_id"
+        and args.any.literal contains "get_company(db,company_id)"
+        and args.any.literal contains "assign:company."
+        and not (containsAny(args.any.literal, ["iftoken_company_id!=company_id:raise", "ifcompany_id!=token_company_id:raise"])))
+      or (args.any.literal contains "param_name:account_id"
+        and args.any.literal contains "get_account(db,account_id)"
+        and args.any.literal contains "assign:account."
+        and not (containsAny(args.any.literal, ["iftoken_account_id!=account_id:raise", "ifaccount_id!=token_account_id:raise"])))
+      or (args.any.literal contains "param_name:tenant_id"
+        and args.any.literal contains "get_tenant(db,tenant_id)"
+        and args.any.literal contains "assign:tenant."
+        and not (containsAny(args.any.literal, ["iftoken_tenant_id!=tenant_id:raise", "iftenant_id!=token_tenant_id:raise"])))
+      or (args.any.literal contains "param_name:user_id"
+        and args.any.literal contains "get_user(db,user_id)"
+        and args.any.literal contains "assign:user."
+        and not (containsAny(args.any.literal, ["iftoken_user_id!=user_id:raise", "ifuser_id!=token_user_id:raise"])))
+    )
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding graphqlIdentityArgumentLookup670 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "class_base:graphene.ObjectType"
+    and args.any.literal contains "function_name:resolve_"
+    and (
+      (args.any.literal contains "param_name:user_id"
+        and args.any.literal contains "filter_by(user_id=user_id)"
+        and not (containsAny(args.any.literal, ["ifinfo.context.user.id!=user_id:return", "ifuser_id!=info.context.user.id:return", "info.context.user.id!=user_idandinfo.context.user.username!=\"admin\":return", "info.context.user.id!=user_idandinfo.context.user.username!='admin':return", "info.context.user.id!=user_idandinfo.context.user.username!=\"admin\"):return", "info.context.user.id!=user_idandinfo.context.user.username!='admin'):return", "ifcurrent_user.id!=user_id:return", "ifuser_id!=current_user.id:return", "ifinfo.context.user.id!=user_id:raise", "ifuser_id!=info.context.user.id:raise", "ifcurrent_user.id!=user_id:raise", "ifuser_id!=current_user.id:raise"])))
+      or (args.any.literal contains "param_name:account_id"
+        and args.any.literal contains "filter_by(account_id=account_id)"
+        and not (containsAny(args.any.literal, ["ifinfo.context.user.id!=account_id:return", "ifaccount_id!=info.context.user.id:return", "ifcurrent_user.id!=account_id:return", "ifaccount_id!=current_user.id:return", "ifinfo.context.user.id!=account_id:raise", "ifaccount_id!=info.context.user.id:raise", "ifcurrent_user.id!=account_id:raise", "ifaccount_id!=current_user.id:raise"])))
+      or (args.any.literal contains "param_name:tenant_id"
+        and args.any.literal contains "filter_by(tenant_id=tenant_id)"
+        and not (containsAny(args.any.literal, ["ifinfo.context.user.id!=tenant_id:return", "iftenant_id!=info.context.user.id:return", "ifcurrent_user.id!=tenant_id:return", "iftenant_id!=current_user.id:return", "ifinfo.context.user.id!=tenant_id:raise", "iftenant_id!=info.context.user.id:raise", "ifcurrent_user.id!=tenant_id:raise", "iftenant_id!=current_user.id:raise"])))
+      or (args.any.literal contains "param_name:owner_id"
+        and args.any.literal contains "filter_by(owner_id=owner_id)"
+        and not (containsAny(args.any.literal, ["ifinfo.context.user.id!=owner_id:return", "ifowner_id!=info.context.user.id:return", "ifcurrent_user.id!=owner_id:return", "ifowner_id!=current_user.id:return", "ifinfo.context.user.id!=owner_id:raise", "ifowner_id!=info.context.user.id:raise", "ifcurrent_user.id!=owner_id:raise", "ifowner_id!=current_user.id:raise"])))
+    )
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding graphqlIdentityArgumentMutation670 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and args.any.literal contains "class_base:graphene.Mutation"
+    and args.any.literal contains "function_name:mutate"
+    and args.any.literal contains "reachable_call_method:commit"
+    and (
+      (args.any.literal contains "param_name:user_id"
+        and args.any.literal contains "user_id=user_id"
+        and not (containsAny(args.any.literal, ["ifinfo.context.user.id!=user_id:return", "ifuser_id!=info.context.user.id:return", "info.context.user.id!=user_idandinfo.context.user.username!=\"admin\":return", "info.context.user.id!=user_idandinfo.context.user.username!='admin':return", "info.context.user.id!=user_idandinfo.context.user.username!=\"admin\"):return", "info.context.user.id!=user_idandinfo.context.user.username!='admin'):return", "ifcurrent_user.id!=user_id:return", "ifuser_id!=current_user.id:return", "ifinfo.context.user.id!=user_id:raise", "ifuser_id!=info.context.user.id:raise", "ifcurrent_user.id!=user_id:raise", "ifuser_id!=current_user.id:raise"])))
+      or (args.any.literal contains "param_name:account_id"
+        and args.any.literal contains "account_id=account_id"
+        and not (containsAny(args.any.literal, ["ifinfo.context.user.id!=account_id:return", "ifaccount_id!=info.context.user.id:return", "ifcurrent_user.id!=account_id:return", "ifaccount_id!=current_user.id:return", "ifinfo.context.user.id!=account_id:raise", "ifaccount_id!=info.context.user.id:raise", "ifcurrent_user.id!=account_id:raise", "ifaccount_id!=current_user.id:raise"])))
+      or (args.any.literal contains "param_name:tenant_id"
+        and args.any.literal contains "tenant_id=tenant_id"
+        and not (containsAny(args.any.literal, ["ifinfo.context.user.id!=tenant_id:return", "iftenant_id!=info.context.user.id:return", "ifcurrent_user.id!=tenant_id:return", "iftenant_id!=current_user.id:return", "ifinfo.context.user.id!=tenant_id:raise", "iftenant_id!=info.context.user.id:raise", "ifcurrent_user.id!=tenant_id:raise", "iftenant_id!=current_user.id:raise"])))
+      or (args.any.literal contains "param_name:owner_id"
+        and args.any.literal contains "owner_id=owner_id"
+        and not (containsAny(args.any.literal, ["ifinfo.context.user.id!=owner_id:return", "ifowner_id!=info.context.user.id:return", "ifcurrent_user.id!=owner_id:return", "ifowner_id!=current_user.id:return", "ifinfo.context.user.id!=owner_id:raise", "ifowner_id!=info.context.user.id:raise", "ifcurrent_user.id!=owner_id:raise", "ifowner_id!=current_user.id:raise"])))
+    )
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding requestSelectedSessionIdentity671 {
+  query pattern callExpr where callee.analysis == "function.local.end"
+    and containsAny(args.any.literal, ["decorator_method:route", "decorator_method:get", "decorator_method:post", "decorator_method:put", "decorator_method:patch", "decorator_method:delete"])
+    and args.any.literal contains "assignment_flow_reaches_store:source_category=request;store=session;source=request."
+    and args.any.literal contains ".query.filter_by("
+    and args.any.literal contains "password=password"
+    and args.any.literal contains ".first()"
+  emit issue code.UnboundAuthorizationTarget at call
+}
+
+binding reversibleIdentityCredential672 {
+  query pattern callExpr where callee.analysis == "function.context.end"
+    and containsAny(args.any.literal, ["call_path:verify_password", "call_path:check_password_hash", "call_path:bcrypt.checkpw", "call_path:pwd_context.verify"])
+    and containsAny(args.any.literal, ["module_call_path:base64.b64encode", "module_call_path:base64.urlsafe_b64encode"])
+    and containsAny(args.any.literal, ["module_call_path:base64.b64decode", "module_call_path:base64.urlsafe_b64decode"])
+    and args.any.literal contains "module_call_path:response.set_cookie"
+    and args.any.literal contains "module_call_path:request.cookies.get"
+    and (
+      (args.any.literal contains "module_literal:user_token"
+        and args.any.literal contains "module_selector:company.id")
+      or (args.any.literal contains "module_literal:identity"
+        and args.any.literal contains "module_selector:account.id")
+      or (args.any.literal contains "module_literal:access_token"
+        and args.any.literal contains "module_selector:user.id")
+      or (args.any.literal contains "module_literal:auth_token"
+        and args.any.literal contains "module_selector:principal.id")
+      or (args.any.literal contains "module_literal:credential"
+        and args.any.literal contains "module_selector:identity.id")
+    )
+    and not (containsAny(args.any.literal, ["module_call_path:jwt.encode", "module_call_path:hmac.new", "module_call_path:hmac.digest", "module_call_path:itsdangerous.dumps", "module_call_path:serializer.dumps", "module_call_path:Fernet.encrypt"]))
+  emit issue code.ForgeableIdentityToken at call
+}

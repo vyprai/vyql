@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m7f33ebf4;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework:spring-oxm")
+  }
+  query pattern callExpr where callee.method == "unmarshal"
+  emit sink code.Deserialization at args[0]
+}

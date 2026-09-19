@@ -1,0 +1,11 @@
+module code;
+
+concept UnsupportedCriticalExtensionAccepted : issue {
+  cwe: [CWE_347]
+  reviewAssumption: "the token's JOSE header is attacker-chosen JSON, and a relying party can key a security control on an extension the producer declares mandatory to process"
+  reviewCategory: crypto
+  reviewCondition: "a JWS consumer returns verified token material while its class nowhere reads the RFC 7515 crit header parameter"
+  reviewConfidence: high
+  reviewEvidence: "JOSE decode routine {pattern} consumes the parsed header while the class body never reads the crit parameter"
+  vulnerableTo: [crypto.ImproperSignatureCheck]
+}

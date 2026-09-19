@@ -1,0 +1,10 @@
+# Rank 14 / CVE-2020-2302: Jenkins Active Directory status/testing operations
+# were exposed without the ADMINISTER permission guard added by the fix.
+
+test "rank14: Active Directory status endpoint performs sensitive operation"
+  expect VYQL-AUTH-079
+  graph
+  ```
+  node op code.SensitiveOperation
+  ```
+

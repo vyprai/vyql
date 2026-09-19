@@ -1,0 +1,200 @@
+# Rank 1153 / CVE-2022-29248: Guzzle's cookie jar stored every Set-Cookie
+# header from a response with no check that the cookie's domain matched the
+# request the response answered, so a response from a domain the application
+# does not intend to trust could plant or overwrite a cookie that a later
+# request to an unrelated domain then sent, leaking it across origins
+# (CWE-200, CWE-565). CookieJar::extractCookies filled a missing Domain
+# attribute from the request's own host and called setCookie() unconditionally;
+# the fix inserts a matchesDomain() check between the two, so a cookie whose
+# domain does not match the request host is dropped instead of stored.
+#
+# The middleware is off by default: an application that enables it with
+# `['cookies' => true]` or a jar is using the client exactly as documented, so
+# the caller is correct code and the report that belongs to this CVE is the
+# dependency finding. GHSA-cwmx-hcrq-mhc3 names two affected branches -- every
+# release below 6.5.6 (first fixed 6.5.6), and 7.0.0 through 7.4.2 (first
+# fixed 7.4.3) -- so the feed carries a floor for the 6.x branch and one row
+# per named 7.x release, because a single floor cannot express a range that
+# starts at 7.0.0 without also covering the fixed 6.5.6+ line.
+#
+# VYQL-SEC-025 (a rendered external link lacking rel=noreferrer) is the
+# nearest code-level theme and is deliberately not this CVE's report: the leak
+# is the client library's own cookie-jar bookkeeping, not markup the
+# application renders, and nothing in the jar code states the origin boundary
+# on its own. The last two tests pin that boundary on the library's own
+# vulnerable and fixed forms.
+
+test "rank1153: a guzzle pin on a 7.x release the advisory names is a dependency finding"
+  lang php
+  file sync.php
+  code
+  ```
+  <?php
+  use GuzzleHttp\Client;
+  use GuzzleHttp\Cookie\CookieJar;
+
+  function fetchProfile($baseUrl, $username)
+  {
+      $jar = new CookieJar();
+      $client = new Client(['base_uri' => $baseUrl, 'cookies' => $jar]);
+      $response = $client->get('/users/' . $username);
+      return (string) $response->getBody();
+  }
+  ```
+  file composer.lock
+  code
+  ```
+  {
+    "packages": [
+      {"name": "guzzlehttp/guzzle", "version": "7.4.2"}
+    ]
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2022-29248
+  reject VYQL-SEC-025
+
+test "rank1153: a guzzle pin at the 7.x first fixed release is clean"
+  lang php
+  file sync.php
+  code
+  ```
+  <?php
+  use GuzzleHttp\Client;
+  use GuzzleHttp\Cookie\CookieJar;
+
+  function fetchProfile($baseUrl, $username)
+  {
+      $jar = new CookieJar();
+      $client = new Client(['base_uri' => $baseUrl, 'cookies' => $jar]);
+      $response = $client->get('/users/' . $username);
+      return (string) $response->getBody();
+  }
+  ```
+  file composer.lock
+  code
+  ```
+  {
+    "packages": [
+      {"name": "guzzlehttp/guzzle", "version": "7.4.3"}
+    ]
+  }
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SEC-025
+
+test "rank1153: a guzzle pin below the 6.x first fixed release is a dependency finding"
+  lang php
+  file sync.php
+  code
+  ```
+  <?php
+  use GuzzleHttp\Client;
+  use GuzzleHttp\Cookie\CookieJar;
+
+  function fetchProfile($baseUrl, $username)
+  {
+      $jar = new CookieJar();
+      $client = new Client(['base_uri' => $baseUrl, 'cookies' => $jar]);
+      $response = $client->get('/users/' . $username);
+      return (string) $response->getBody();
+  }
+  ```
+  file composer.lock
+  code
+  ```
+  {
+    "packages": [
+      {"name": "guzzlehttp/guzzle", "version": "6.5.5"}
+    ]
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2022-29248
+  reject VYQL-SEC-025
+
+test "rank1153: a guzzle pin at the 6.x first fixed release is clean"
+  lang php
+  file sync.php
+  code
+  ```
+  <?php
+  use GuzzleHttp\Client;
+  use GuzzleHttp\Cookie\CookieJar;
+
+  function fetchProfile($baseUrl, $username)
+  {
+      $jar = new CookieJar();
+      $client = new Client(['base_uri' => $baseUrl, 'cookies' => $jar]);
+      $response = $client->get('/users/' . $username);
+      return (string) $response->getBody();
+  }
+  ```
+  file composer.lock
+  code
+  ```
+  {
+    "packages": [
+      {"name": "guzzlehttp/guzzle", "version": "6.5.6"}
+    ]
+  }
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SEC-025
+
+test "rank1153: the library's vulnerable jar code has no pin and is not the report"
+  lang php
+  file CookieJar.php
+  code
+  ```
+  <?php
+  namespace GuzzleHttp\Cookie;
+
+  class CookieJar
+  {
+      public function extractCookies($request, $response)
+      {
+          if ($cookieHeader = $response->getHeader('Set-Cookie')) {
+              foreach ($cookieHeader as $cookie) {
+                  $sc = SetCookie::fromString($cookie);
+                  if (!$sc->getDomain()) {
+                      $sc->setDomain($request->getUri()->getHost());
+                  }
+                  $this->setCookie($sc);
+              }
+          }
+      }
+  }
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SEC-025
+
+test "rank1153: the library's fixed jar code drops a cookie whose domain does not match"
+  lang php
+  file CookieJar.php
+  code
+  ```
+  <?php
+  namespace GuzzleHttp\Cookie;
+
+  class CookieJar
+  {
+      public function extractCookies($request, $response)
+      {
+          if ($cookieHeader = $response->getHeader('Set-Cookie')) {
+              foreach ($cookieHeader as $cookie) {
+                  $sc = SetCookie::fromString($cookie);
+                  if (!$sc->getDomain()) {
+                      $sc->setDomain($request->getUri()->getHost());
+                  }
+                  if (!$sc->matchesDomain($request->getUri()->getHost())) {
+                      continue;
+                  }
+                  $this->setCookie($sc);
+              }
+          }
+      }
+  }
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SEC-025

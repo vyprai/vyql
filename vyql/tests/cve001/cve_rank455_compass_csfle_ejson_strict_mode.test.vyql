@@ -1,0 +1,66 @@
+# Rank 455 / CVE-2024-6376: MongoDB Compass parsed CSFLE encrypted field
+# config text with the shell/query parser. The fix switches to
+# parseShellStringToEJSON with ParseMode.Strict.
+
+test "rank455: Compass CSFLE EJSON parser uses shell parseFilter"
+  lang javascript
+  expect VYQL-INJ-094
+  expect_review code.CompassCsfleEjsonParserMissingStrictMode
+  code
+  ```
+  import { parseFilter, toJSString } from 'mongodb-query-parser';
+
+  export function textToEncryptedFieldConfig(text) {
+    if (!text.trim()) {
+      return undefined;
+    }
+
+    let parsed = {};
+    try {
+      parsed = parseFilter(text);
+      parsed['$compass.error'] = null;
+    } catch (err: unknown) {
+      parsed['$compass.error'] = (err as Error).message;
+    }
+
+    parsed['$compass.rawText'] = text;
+    return parsed;
+  }
+
+  export function encryptedFieldConfigToText(config) {
+    return toJSString(config) || '';
+  }
+  ```
+
+test "rank455: Compass CSFLE EJSON parser uses strict mode"
+  lang javascript
+  reject VYQL-INJ-094
+  reject_review code.CompassCsfleEjsonParserMissingStrictMode
+  code
+  ```
+  import parseShellStringToEJSON, { ParseMode } from 'ejson-shell-parser';
+  import { toJSString } from 'mongodb-query-parser';
+
+  export function textToEncryptedFieldConfig(text) {
+    if (!text.trim()) {
+      return undefined;
+    }
+
+    let parsed = {};
+    try {
+      parsed = parseShellStringToEJSON(text, {
+        mode: ParseMode.Strict,
+      });
+      parsed['$compass.error'] = null;
+    } catch (err: unknown) {
+      parsed['$compass.error'] = (err as Error).message;
+    }
+
+    parsed['$compass.rawText'] = text;
+    return parsed;
+  }
+
+  export function encryptedFieldConfigToText(config) {
+    return toJSString(config) || '';
+  }
+  ```

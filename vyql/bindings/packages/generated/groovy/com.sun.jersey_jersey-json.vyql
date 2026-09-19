@@ -1,0 +1,17 @@
+module bindings.groovy.generated.m846711fb;
+
+binding deserialization0 {
+  requires {
+    dependency("com.sun.jersey:jersey-json")
+  }
+  query pattern callExpr where callee.method == "unmarshalFromJSON"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.sun.jersey:jersey-json")
+  }
+  query pattern callExpr where callee.method == "unmarshal"
+  emit sink code.Deserialization at args[0]
+}

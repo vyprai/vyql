@@ -1,0 +1,73 @@
+module bindings.groovy.generated.mb7479ee5;
+
+binding deserialization0 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters$StringResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters$BooleanResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters$ByteResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters$CharacterResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters$DoubleResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters$FloatResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters$IntegerResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters$LongResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization8 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-scalars")
+  }
+  query pattern callExpr where callee.method == "ScalarResponseBodyConverters$ShortResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,79 @@
+# Rank 1108 / CVE-2025-55293: Meshtastic's NodeDB handler treats a NodeInfo
+# update whose public key field is omitted as proof that no key change was
+# intended, when omission is exactly what an attacker controls. The preserve
+# that copies the already-pinned key back into the incoming packet sits inside
+# a guard on the incoming packet's own key field, so a packet with
+# public_key.size == 0 skips the preserve entirely and the whole-record store
+# that follows overwrites the node's pinned key with the empty one (CWE-287).
+# The fix hoists the stored-key guard out of the incoming-field guard and
+# restores the length field it copies into.
+#
+# ATTENTION: the discriminator is control dependence, and no binding predicate
+# reads it. Both revisions carry the same presence guards, the same memcpy and
+# the same whole-record store, so every context clause that matches the
+# vulnerable function matches the fixed one (binary "p.public_key.size>0",
+# binary "info->user.public_key.size>0", selector "p.public_key.size",
+# call memcpy, assign "info.user=lite" all measured on both). The one token
+# only the fixed revision emits is the assignment the fix itself adds
+# ("p.public_key.size=32"), which keys on the fixing commit's layout rather
+# than the weakness. Presence bindings also cannot name the function: an
+# out-of-line C++ member definition registers with an empty name token.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1108: the pinned key is preserved only when the incoming packet also carries one"
+  lang cpp
+  file src/mesh/NodeDB.cpp
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  bool NodeDB::updateUser(uint32_t nodeId, meshtastic_User &p, uint8_t channelIndex)
+  {
+      meshtastic_NodeInfoLite *info = getOrCreateMeshNode(nodeId);
+      if (!info) {
+          return false;
+      }
+
+      if (p.public_key.size > 0) {
+          printBytes("Incoming Pubkey: ", p.public_key.bytes, 32);
+          if (info->user.public_key.size > 0) { // if we have a key for this user already, don't overwrite with a new one
+              // we copy the key into the incoming packet, to prevent overwrite
+              memcpy(p.public_key.bytes, info->user.public_key.bytes, 32);
+          }
+      }
+
+      auto lite = TypeConversions::ConvertToUserLite(p);
+      info->user = lite;
+      info->has_user = true;
+      return true;
+  }
+  ```
+
+test "rank1108: the pinned key is preserved regardless of what the incoming packet carries"
+  lang cpp
+  file src/mesh/NodeDB.cpp
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  bool NodeDB::updateUser(uint32_t nodeId, meshtastic_User &p, uint8_t channelIndex)
+  {
+      meshtastic_NodeInfoLite *info = getOrCreateMeshNode(nodeId);
+      if (!info) {
+          return false;
+      }
+
+      if (p.public_key.size > 0) {
+          printBytes("Incoming Pubkey: ", p.public_key.bytes, 32);
+      }
+      if (info->user.public_key.size > 0) { // if we have a key for this user already, don't overwrite with a new one
+          // we copy the key into the incoming packet, to prevent overwrite
+          p.public_key.size = 32;
+          memcpy(p.public_key.bytes, info->user.public_key.bytes, 32);
+      }
+
+      auto lite = TypeConversions::ConvertToUserLite(p);
+      info->user = lite;
+      info->has_user = true;
+      return true;
+  }
+  ```

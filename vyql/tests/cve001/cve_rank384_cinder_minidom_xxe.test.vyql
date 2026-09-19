@@ -1,0 +1,44 @@
+# Rank 384 / CVE-2013-4202: Cinder extension XML deserializers used raw
+# minidom.parseString on request XML, leaving entity-expansion DoS reachable.
+
+test "rank384: Cinder XML deserializer uses raw minidom parseString"
+  lang python
+  expect VYQL-DESER-012
+  expect_review code.CinderUnsafeMinidomXmlDeserializer
+  code
+  ```
+  from xml.dom import minidom
+
+  class wsgi:
+      class MetadataXMLDeserializer:
+          pass
+
+  class CreateDeserializer(wsgi.MetadataXMLDeserializer):
+      def default(self, string):
+          dom = minidom.parseString(string)
+          return {"body": {"backup": self._extract_backup(dom)}}
+
+      def _extract_backup(self, node):
+          return node
+  ```
+
+test "rank384: Cinder XML deserializer uses the safe minidom helper"
+  lang python
+  reject VYQL-DESER-012
+  reject_review code.CinderUnsafeMinidomXmlDeserializer
+  code
+  ```
+  from cinder import utils
+
+  class wsgi:
+      class MetadataXMLDeserializer:
+          pass
+
+  class CreateDeserializer(wsgi.MetadataXMLDeserializer):
+      def default(self, string):
+          dom = utils.safe_minidom_parse_string(string)
+          return {"body": {"backup": self._extract_backup(dom)}}
+
+      def _extract_backup(self, node):
+          return node
+  ```

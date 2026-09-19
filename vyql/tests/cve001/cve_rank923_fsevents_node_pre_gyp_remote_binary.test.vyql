@@ -1,0 +1,50 @@
+# Rank 923 / CVE-2023-45311: fsevents removed node-pre-gyp remote
+# native-binary installation metadata from package.json.
+
+test "rank923: npm package installs remote node-pre-gyp binary"
+  lang config
+  file package.json
+  expect VYQL-INJ-181
+  expect_review code.NodePreGypRemoteBinaryInstall
+  code
+  ```
+  {
+    "name": "fsevents",
+    "version": "1.2.10",
+    "scripts": {
+      "install": "node install",
+      "node-pre-gyp": "node-pre-gyp"
+    },
+    "dependencies": {
+      "node-pre-gyp": "^0.12.0",
+      "nan": "^2.12.1"
+    },
+    "binary": {
+      "module_name": "fse",
+      "module_path": "./lib/binding/{configuration}/{node_abi}-{platform}-{arch}/",
+      "remote_path": "./v{version}/",
+      "package_name": "{module_name}-v{version}-{node_abi}-{platform}-{arch}.tar.gz",
+      "host": "https://fsevents-binaries.s3-us-west-2.amazonaws.com"
+    }
+  }
+  ```
+
+test "rank923: npm package without node-pre-gyp remote binary is clean"
+  lang config
+  file package.json
+  reject VYQL-INJ-181
+  reject_review code.NodePreGypRemoteBinaryInstall
+  code
+  ```
+  {
+    "name": "fsevents",
+    "version": "1.2.11",
+    "scripts": {
+      "test": "node ./test/fsevents.js"
+    },
+    "dependencies": {
+      "bindings": "^1.5.0",
+      "nan": "^2.12.1"
+    }
+  }
+  ```

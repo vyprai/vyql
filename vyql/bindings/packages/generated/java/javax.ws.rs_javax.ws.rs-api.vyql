@@ -1,0 +1,17 @@
+module bindings.java.generated.m94375256;
+
+binding httpInput0 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "Cookie"
+  emit source code.HttpInput at call.result
+}
+
+binding xmlParse1 {
+  requires {
+    dependency("javax.ws.rs:javax.ws.rs-api")
+  }
+  query pattern callExpr where callee.method == "readEntity"
+  emit sink code.XmlParse at args[0]
+}

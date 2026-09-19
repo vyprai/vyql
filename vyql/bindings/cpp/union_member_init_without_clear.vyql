@@ -1,0 +1,26 @@
+module bindings.cpp.union_member_init_without_clear;
+
+// fbthrift's table-based serializer drives Thrift unions through the UnionExt
+// table (thrift/lib/cpp2/protocol/TableBasedSerializer.h), which documents
+// both halves of the contract: clear is "Clear union before setting a field",
+// and each initMember entry "Value initializes using placement new into the
+// member". A member initialization whose branch does not clear the union
+// first constructs over storage that may already hold a live member, so
+// duplicate serialized union data leaks the previous member and a truncated
+// re-read unwinds through the destructor of whichever member the active-field
+// id still names.
+//
+// The clear counts when it sits in the initialization's own branch or nested
+// under it -- where an active-member guard puts it -- and does not count from
+// a sibling branch such as the empty-union early return, whose path cannot
+// reach the initialization. Residual, both false-negative: a release spelled
+// through some other construct than the table's clear, and an initialization
+// reached through a locally named extension table rather than a unionExt
+// member, stay out of reach.
+
+binding unionMemberInitWithoutClear {
+  query pattern presenceNode where node.kind == "call"
+    and node.path contains "unionExt.initMember"
+    and not (node.scopeCall.path contains "unionExt.clear")
+  emit issue code.UnionMemberOverwriteWithoutClear at node
+}

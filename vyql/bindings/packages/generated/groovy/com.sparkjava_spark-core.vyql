@@ -1,0 +1,73 @@
+module bindings.groovy.generated.m389ac90a;
+
+binding httpInput0 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "Request.body"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "Request.bodyAsBytes"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput2 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "Request.params"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "Request.queryParams"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "Request.headers"
+  emit source code.HttpInput at call.result
+}
+
+binding cookie5 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "Request.cookie"
+  emit source code.Cookie at call.result
+}
+
+binding httpInput6 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "Request.uri"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput7 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "Request.url"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput8 {
+  requires {
+    dependency("com.sparkjava:spark-core")
+  }
+  query pattern callExpr where callee.method == "Request.splat"
+  emit source code.HttpInput at call.result
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept PreservedRequestHiddenInputValueXss : issue {
+  cwe: [CWE_79]
+  reviewAssumption: "preserved request parameters can be attacker-controlled and the generated hidden fields are rendered into a browser response"
+  reviewCategory: xss
+  reviewCondition: "PHP code preserves request/plugin parameters in hidden input values without HTML escaping"
+  reviewConfidence: high
+  reviewEvidence: "hidden-input builder context {pattern} appends piVars-derived values into value attributes and lacks an escaping or sanitizer call"
+  vulnerableTo: [injection.Xss]
+}

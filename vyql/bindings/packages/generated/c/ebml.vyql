@@ -1,0 +1,33 @@
+module bindings.c.generated.m26a84cad;
+
+binding deserialization0 {
+  requires {
+    dependency("ebml")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("ebml")
+  }
+  query pattern callExpr where callee.method == "ReadData"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("ebml")
+  }
+  query pattern callExpr where callee.method == "Read"
+  emit sink code.Deserialization at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("ebml")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

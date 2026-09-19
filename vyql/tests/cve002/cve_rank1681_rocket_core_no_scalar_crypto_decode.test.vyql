@@ -1,0 +1,215 @@
+# Rank 1681 / CVE-2022-34632: the unreviewed advisory (GHSA-hg7j-9h3g-36x3,
+# July 2022, one of the bulk filings against RISC-V core generators) says
+# rocket-chip commit 4f81143 "was discovered to contain insufficient
+# cryptography via the component /rocket/RocketCore.scala" (recorded CWE-327,
+# CVSS 9.1). The advisory's reference is the fix, not the defect: 4f81143 is
+# titled "Add aes64ks1i exception" and adds exactly one term to RocketCore's
+# decode-legality chain, so its parent carries the weakness. The ground truth
+# is the PR #2950 discussion the advisory also cites -- a co-simulation fuzzer
+# run reports that spike traps aes64ks1i with rcon 0xf while rocket executes
+# it, and the author replies "I did not implement this mechanism. I will fix
+# this issue later."
+#
+# The weakness, from the fix diff: the aes64ks1i encoding's 4-bit round
+# constant (instruction bits 23:20, values 0..15) is never checked against the
+# architectural maximum 0xA, so encodings with rcon 0xB..0xF execute and yield
+# a zero round constant instead of raising an illegal-instruction exception.
+# The RISC-V scalar-cryptography specification is the authority for the 0xA
+# bound. The recorded CWE-327 class does not describe it: the AES/SHA-2/SM3/SM4
+# primitives implemented at both revisions are the standard ones, and the defect
+# is a missing input bound on an instruction encoding (CWE-20 / CWE-1284
+# territory), not a broken or risky algorithm in use.
+#
+# The pool row points at 4ecc497, the 2098-line squash-merge of PR #2950 into
+# master. That commit does carry the remediation, but its parent 4ecc497^
+# contains no Zk/Zb code at all -- the whole extension landed in that one
+# squash -- so the vulnerable construct is absent at `<fix>^` and the row gives
+# no scannable pair. The advisory's own 4f81143 resolves from the live
+# refs/heads/Zk-chisel-fixes branch in a plain clone, and its parent does carry
+# the construct, so the row is corrected to it.
+#
+# ATTENTION, cross-file guard the defect site cannot see. Measured with
+# --cache off and --max-ram 6GB on the real pair 4f81143^ / 4f81143 (3 runs per
+# side, timeout 180): src/main/scala reports 4 findings and 3 review flags at
+# both revisions -- three VYQL-AUTH-079 on io.dmem.perf.grant /
+# io.cpu.perf.grant reads via auditreview.marks, plus VYQL-CRY-003
+# WeakRandomness on the cache-replacement LCG in util/Replacement.scala, its
+# fingerprint identical across the pair. The full repo root reports 38 findings
+# at both revisions, deterministic within each side (3 of 3 identical), and the
+# entire cross-side fingerprint diff is one VYQL-AUTH-079 row on RocketCore.scala
+# whose line moves 855 -> 856 as the file gains a line. The defect site itself
+# is byte-identical across the pair (CryptoNIST.scala blob a75b4c6e at both),
+# because the fix touches RocketCore.scala only, +2/-1.
+#
+# That byte-identity is why no binding can separate the revisions. Labelling
+# the defect site -- the Scala frontend does resolve it; `vyql graph` on a
+# minimal repro shows Attr(io.rcon) flowing as an argument into Call(VecInit) --
+# fires identically at both revisions and so proves detection of the file, not
+# of the weakness. The one discriminating construct is the *absence* of the
+# bound term in RocketCore's decode-legality chain, 120 lines and one class
+# away from the index it guards, in a different pipeline stage. Expressing that
+# needs the instruction's name, the field's bit range and the 0xA bound -- every
+# one of them the fixing commit's own vocabulary -- and fires on the other 28
+# instruction-bitfield extractions in this tree (0 of which carry any bound at
+# the parent, so the shape cannot separate conformant from non-conformant
+# decoders either). No ENGINE-GAPS.md entry: the frontend parses all 343 files
+# and resolves the construct -- `vyql graph` on the pinned pair below shows the
+# bound as a `__binop.gt` node in the fixed form and no `__binop.gt` node at all
+# in the vulnerable one, so the discriminator is node-visible and extracted.
+# What is missing is an ISA-conformance judgement no rule class carries, which
+# is ontology design this campaign measured against shipping. Spec cve_rank1681
+# pins the unvalidated round-constant read, the
+# decode-legality chain without and with its bound term, and asserts every block
+# rejects -- no weak-primitive, index-access or bounds finding may appear on a
+# standard-primitive datapath or on a guard that does exist.
+#
+# verify_current_expected: attention-cross-file-guard, all blocks rejected.
+
+test "rank1681: the aes64ks1i round constant is read from an unpadded instruction bitfield"
+  lang scala
+  file src/main/scala/rocket/CryptoNIST.scala
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-MEM-005
+  code
+  ```
+  package rocket
+
+  import chisel3._
+  import chisel3.util._
+
+  class CryptoNISTInterface extends Bundle {
+    val zkn_fn = Input(UInt(7.W))
+    val valid  = Input(Bool())
+    val hl     = Input(Bool())
+    val bs     = Input(UInt(2.W))
+    val rcon   = Input(UInt(4.W))
+    val rs1    = Input(UInt(64.W))
+    val rs2    = Input(UInt(64.W))
+    val rd     = Output(UInt(64.W))
+  }
+
+  object AES {
+    val rcon: Seq[Int] = Seq(
+      0x01, 0x02, 0x04, 0x08,
+      0x10, 0x20, 0x40, 0x80,
+      0x1b, 0x36, 0x00, 0x00,
+      0x00, 0x00, 0x00, 0x00
+    )
+  }
+
+  class CryptoNIST(val xLen: Int) extends Module {
+    val io = IO(new CryptoNISTInterface)
+    val sr = io.rs1 ^ io.rs2
+    val tmp1 = io.rs1(63,32)
+    val tmp2 = Mux(io.rcon === 0xA.U, tmp1, tmp1.rotateRight(8))
+    val si = Mux(io.zkn_fn === ZKN.FN_AES_KS1, Cat(0.U(32.W), tmp2), sr)
+    val so = si
+    val rc = VecInit(AES.rcon.map(_.U(8.W)).toSeq)(io.rcon)
+    val tmp4 = so(31,0) ^ rc
+    val ks1 = Cat(tmp4, tmp4)
+    io.rd := ks1
+  }
+  ```
+
+test "rank1681: the decode legality chain carries no round-constant bound"
+  lang scala
+  file src/main/scala/rocket/RocketCore.scala
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-MEM-005
+  code
+  ```
+  package rocket
+
+  import chisel3._
+  import chisel3.util._
+
+  class RocketDecodeSignals extends Bundle {
+    val legal = Input(Bool())
+    val zkn   = Input(Bool())
+    val alu_fn = Input(UInt(7.W))
+    val csr   = Input(UInt(3.W))
+    val rocc  = Input(Bool())
+    val scie  = Input(Bool())
+  }
+
+  class CsrDecode extends Bundle {
+    val rocc_illegal = Input(Bool())
+    val read_illegal = Input(Bool())
+    val write_illegal = Input(Bool())
+    val system_illegal = Input(Bool())
+  }
+
+  class Rocket extends Module {
+    val io = IO(new Bundle {
+      val csr = Flipped(new CsrDecode)
+      val ctrl = Input(new RocketDecodeSignals)
+      val inst = Input(UInt(32.W))
+      val csr_en = Input(Bool())
+      val system_insn = Input(Bool())
+      val csr_ren = Input(Bool())
+      val rvc = Input(Bool())
+    })
+
+    val id_illegal_insn = !io.ctrl.legal ||
+      io.ctrl.rocc && io.csr.rocc_illegal ||
+      io.ctrl.scie && !io.csr.read_illegal ||
+      io.csr_en && (io.csr.read_illegal || !io.csr_ren && io.csr.write_illegal) ||
+      !io.rvc && (io.system_insn && io.csr.system_illegal)
+  }
+  ```
+
+test "rank1681: the fixed revision bounds the round constant in the decode legality chain"
+  lang scala
+  file src/main/scala/rocket/RocketCore.scala
+  reject VYQL-CRY-001
+  reject VYQL-CRY-002
+  reject VYQL-MEM-005
+  code
+  ```
+  package rocket
+
+  import chisel3._
+  import chisel3.util._
+
+  object ZKN {
+    val FN_Len = 7
+    val FN_AES_KS1 = 11.U(FN_Len.W)
+  }
+
+  class RocketDecodeSignals extends Bundle {
+    val legal = Input(Bool())
+    val zkn   = Input(Bool())
+    val alu_fn = Input(UInt(7.W))
+    val csr   = Input(UInt(3.W))
+    val rocc  = Input(Bool())
+    val scie  = Input(Bool())
+  }
+
+  class CsrDecode extends Bundle {
+    val rocc_illegal = Input(Bool())
+    val read_illegal = Input(Bool())
+    val write_illegal = Input(Bool())
+    val system_illegal = Input(Bool())
+  }
+
+  class Rocket extends Module {
+    val io = IO(new Bundle {
+      val csr = Flipped(new CsrDecode)
+      val ctrl = Input(new RocketDecodeSignals)
+      val inst = Input(UInt(32.W))
+      val csr_en = Input(Bool())
+      val system_insn = Input(Bool())
+      val csr_ren = Input(Bool())
+      val rvc = Input(Bool())
+    })
+
+    val id_illegal_insn = !io.ctrl.legal ||
+      io.ctrl.rocc && io.csr.rocc_illegal ||
+      io.ctrl.scie && !io.csr.read_illegal ||
+      io.csr_en && (io.csr.read_illegal || !io.csr_ren && io.csr.write_illegal) ||
+      !io.rvc && (io.system_insn && io.csr.system_illegal) ||
+      io.ctrl.zkn && io.ctrl.alu_fn(ZKN.FN_Len-1,0) === ZKN.FN_AES_KS1 && io.inst(23,20) > 0xA.U(4.W)
+  }
+  ```

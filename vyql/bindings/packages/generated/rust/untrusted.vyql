@@ -1,0 +1,41 @@
+module bindings.rust.generated.md4a5a880;
+
+binding deserialization0 {
+  requires {
+    dependency("untrusted")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("untrusted")
+  }
+  query pattern callExpr where callee.method == "read_byte"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("untrusted")
+  }
+  query pattern callExpr where callee.method == "read_bytes"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("untrusted")
+  }
+  query pattern callExpr where callee.method == "read_bytes_to_end"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("untrusted")
+  }
+  query pattern callExpr where callee.method == "as_slice_less_safe"
+  emit sink code.Deserialization at args[0]
+}

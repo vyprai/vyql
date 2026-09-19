@@ -1,0 +1,56 @@
+# Rank 768 / CVE-2022-23457: ESAPI compared canonical paths with
+# String.startsWith, allowing sibling-prefix directory bypasses.
+
+test "rank768: canonical path string prefix is used for directory containment"
+  lang java
+  file DefaultValidator.java
+  expect VYQL-PATH-040
+  expect_review code.CanonicalPathStringPrefixContainment
+  code
+  ```
+  import java.io.File;
+
+  class DefaultValidator {
+      public String getValidDirectoryPath(String context, String input, File parent, boolean allowNull) throws Exception {
+          File dir = new File(input);
+          if (!dir.exists()) {
+              throw new ValidationException();
+          }
+          if (!parent.isDirectory()) {
+              throw new ValidationException();
+          }
+          if (!dir.getCanonicalPath().startsWith(parent.getCanonicalPath())) {
+              throw new ValidationException();
+          }
+          return dir.getCanonicalPath();
+      }
+  }
+  class ValidationException extends Exception {}
+  ```
+
+test "rank768: filesystem-aware path containment validates canonical directory"
+  lang java
+  file DefaultValidator.java
+  reject VYQL-PATH-040
+  reject_review code.CanonicalPathStringPrefixContainment
+  code
+  ```
+  import java.io.File;
+
+  class DefaultValidator {
+      public String getValidDirectoryPath(String context, String input, File parent, boolean allowNull) throws Exception {
+          File dir = new File(input);
+          if (!dir.exists()) {
+              throw new ValidationException();
+          }
+          if (!parent.isDirectory()) {
+              throw new ValidationException();
+          }
+          if (!dir.getCanonicalFile().toPath().startsWith(parent.getCanonicalFile().toPath())) {
+              throw new ValidationException();
+          }
+          return dir.getCanonicalPath();
+      }
+  }
+  class ValidationException extends Exception {}
+  ```

@@ -1,0 +1,11 @@
+module code;
+
+concept UnsafeExpressionContextEvaluation : issue {
+  cwe: [CWE_917, CWE_94]
+  reviewAssumption: "the evaluated expression string arrives from configuration or a caller rather than program source"
+  reviewCategory: code_execution
+  reviewCondition: "an expression-language string is parsed and evaluated under the engine's unrestricted evaluation context, which resolves host type references and reflective method invocation, instead of the engine's documented restricted context"
+  reviewConfidence: high
+  reviewEvidence: "expression parsed by {pattern} is evaluated under an unrestricted evaluation context; no restricted context is constructed in scope"
+  vulnerableTo: [injection.ExpressionLanguageInjection, injection.CodeInjection]
+}

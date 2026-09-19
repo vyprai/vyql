@@ -1,0 +1,9 @@
+module bindings.groovy.generated.maacab1ff;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.data:spring-data-mongodb")
+  }
+  query pattern callExpr where callee.method == "BindableMongoExpression.parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,319 @@
+# URI.js (CVE-2021-27516, CWE-20/CWE-918) decides the scheme-authority
+# delimiter on a raw substring. URI.parse (src/URI.js:529 at the parent of
+# a1ad8bc) tests `string.substring(pos + 1, pos + 3) === '//'` to take the
+# authority branch, while URI.parseHost twenty lines below normalises its
+# input with `string.replace(/\\/g, '/')` and cites Chrome/IE/Opera
+# backslash handling in its own comment -- so `https:/\attacker.com` falls
+# into the urn branch, parts.hostname stays null, and every consumer
+# allowlisting on the parsed hostname is bypassed against a browser or fetch
+# that resolves the same string to https://attacker.com/. The fix
+# a1ad8bcbc39a4d136d7e252e76e957f3ece70839 normalises the compared
+# substring with .replace(/\\/g, '/') before the test. First released in
+# v1.19.6, parent v1.19.5, matching the advisory's affected range; the
+# construct is present at the parent and the remediation at the fixed
+# revision, so the pool row is correct.
+#
+# The authority-split vocabulary that arrived afterwards covers the sibling
+# weakness and not this one. code.UrlAuthoritySplitWithoutBackslashNormalization
+# (VYQL-RF-053) flags a module that splits URL authority components off the
+# raw string while performing no backslash-to-slash replacement anywhere:
+# measured here on the url-parse pair it reports index.js:1 at the
+# vulnerable revision and nothing at the fixed one. On this library it
+# reports nothing at either revision (three --cache off runs each, timeout
+# 180, --max-ram 6GB; the default findings view is 133 findings with a
+# byte-identical rule histogram on both sides, none inside URI.parse,
+# parseAuthority or parseHost), and the blocker is the neutraliser's scope:
+# src/URI.js makes 26 .replace( calls, so the module-wide
+# `not (node.context.call in ["replace", "replaceAll"])` clause is satisfied
+# by the very normalisation whose absence from the delimiter decision is the
+# defect. Two probes isolate it. Renaming every .replace( call in src/URI.js
+# makes the flag appear at src/URI.js:1, so no positive clause fails; and
+# deleting the negation from the binding makes it appear at src/URI.js:1 and
+# src/URI.min.js:1 at both revisions, so the module scope cannot attribute a
+# normaliser to the decision that lacks one -- the second snippet pins that
+# non-discrimination. Naming the normaliser is not expressible either: the
+# JavaScript frontend emits no call-argument tokens, and a backslash in the
+# literal token set is not a signal -- a probe matching
+# `node.context.literal contains "\"` fires on 35 of the 61 JavaScript
+# modules in this repository, escape sequences included.
+#
+# A function-scoped sibling keyed on the delimiter test itself is not
+# shippable: the deciding function carries no URL-component literals (they
+# live in the accessor table at src/URI.js:1185 and the property list at
+# :2155), so the anchor degrades to "compares a string against '//'", whose
+# reachable set across 50,653 non-minified JavaScript files in the rank
+# clones includes a line-comment prefix check
+# (react compiler/scripts/enable-feature-flag.js:192
+# `firstLine.trim().startsWith('//')`), a macro delimiter comparison
+# (`name === '//'`), and an open-redirect guard that is the safe code
+# (signalk-server src/tokensecurity.js:191 `dest.startsWith('//')`).
+#
+# Held. When a per-decision-point normalisation vocabulary lands, the first
+# snippet must flip to expect and the third must stay reject.
+
+test "rank1895: the delimiter test reads the raw substring while the module normalises the authority split"
+  lang javascript
+  file src/URI.js
+  reject VYQL-RF-053
+  reject_review code.UrlAuthoritySplitWithoutBackslashNormalization
+  code
+  ```
+  var URI = function() {};
+
+  URI.parse = function(string, parts) {
+    var pos = string.indexOf('?');
+    if (pos > -1) {
+      parts.query = string.substring(pos + 1) || null;
+      string = string.substring(0, pos);
+    }
+
+    if (string.substring(0, 2) === '//') {
+      parts.protocol = null;
+      string = URI.parseAuthority(string.substring(2), parts);
+    } else {
+      pos = string.indexOf(':');
+      if (pos > -1) {
+        parts.protocol = string.substring(0, pos) || null;
+        if (string.substring(pos + 1, pos + 3) === '//') {
+          string = URI.parseAuthority(string.substring(pos + 3), parts);
+        } else {
+          string = string.substring(pos + 1);
+          parts.urn = true;
+        }
+      }
+    }
+
+    parts.path = string;
+    return parts;
+  };
+
+  // Copy chrome, IE, opera backslash-handling behavior.
+  // Back slashes before the query string get converted to forward slashes
+  URI.parseHost = function(string, parts) {
+    string = string.replace(/\\/g, '/');
+
+    var pos = string.indexOf('/');
+    if (pos === -1) {
+      pos = string.length;
+    }
+
+    var t = string.substring(0, pos).split(':');
+    parts.hostname = t[0] || null;
+    parts.port = t[1] || null;
+    return parts;
+  };
+
+  URI.parseAuthority = function(string, parts) {
+    var pos = string.indexOf('@');
+    if (pos > -1) {
+      parts.username = string.substring(0, pos) || null;
+      string = string.substring(pos + 1);
+    }
+    return URI.parseHost(string, parts);
+  };
+
+  // accessor table: the component names reach the module as string literals
+  var p = URI.prototype;
+  p.protocol = generateSimpleAccessor('protocol');
+  p.username = generateSimpleAccessor('username');
+  p.password = generateSimpleAccessor('password');
+  p.hostname = generateSimpleAccessor('hostname');
+  p.port = generateSimpleAccessor('port');
+  p.pathname = generateAccessor('pathname', p.pathname);
+
+  function generateSimpleAccessor(key) {
+    return function(value) {
+      if (value === undefined) {
+        return this._parts[key] || null;
+      }
+      this._parts[key] = value || null;
+      return this;
+    };
+  }
+
+  function generateAccessor(key, fn) {
+    return function(value) {
+      var result = fn.call(this, value);
+      return result === undefined ? this._parts[key] : result;
+    };
+  }
+
+  return URI;
+  ```
+
+test "rank1895: the identical parser with no replacement in the module is flagged"
+  lang javascript
+  file src/URI.js
+  expect VYQL-RF-053
+  expect_review code.UrlAuthoritySplitWithoutBackslashNormalization
+  code
+  ```
+  var URI = function() {};
+
+  URI.parse = function(string, parts) {
+    var pos = string.indexOf('?');
+    if (pos > -1) {
+      parts.query = string.substring(pos + 1) || null;
+      string = string.substring(0, pos);
+    }
+
+    if (string.substring(0, 2) === '//') {
+      parts.protocol = null;
+      string = URI.parseAuthority(string.substring(2), parts);
+    } else {
+      pos = string.indexOf(':');
+      if (pos > -1) {
+        parts.protocol = string.substring(0, pos) || null;
+        if (string.substring(pos + 1, pos + 3) === '//') {
+          string = URI.parseAuthority(string.substring(pos + 3), parts);
+        } else {
+          string = string.substring(pos + 1);
+          parts.urn = true;
+        }
+      }
+    }
+
+    parts.path = string;
+    return parts;
+  };
+
+  // no backslash handling at all: the host is split off the raw string
+  URI.parseHost = function(string, parts) {
+    var pos = string.indexOf('/');
+    if (pos === -1) {
+      pos = string.length;
+    }
+
+    var t = string.substring(0, pos).split(':');
+    parts.hostname = t[0] || null;
+    parts.port = t[1] || null;
+    return parts;
+  };
+
+  URI.parseAuthority = function(string, parts) {
+    var pos = string.indexOf('@');
+    if (pos > -1) {
+      parts.username = string.substring(0, pos) || null;
+      string = string.substring(pos + 1);
+    }
+    return URI.parseHost(string, parts);
+  };
+
+  // accessor table: the component names reach the module as string literals
+  var p = URI.prototype;
+  p.protocol = generateSimpleAccessor('protocol');
+  p.username = generateSimpleAccessor('username');
+  p.password = generateSimpleAccessor('password');
+  p.hostname = generateSimpleAccessor('hostname');
+  p.port = generateSimpleAccessor('port');
+  p.pathname = generateAccessor('pathname', p.pathname);
+
+  function generateSimpleAccessor(key) {
+    return function(value) {
+      if (value === undefined) {
+        return this._parts[key] || null;
+      }
+      this._parts[key] = value || null;
+      return this;
+    };
+  }
+
+  function generateAccessor(key, fn) {
+    return function(value) {
+      var result = fn.call(this, value);
+      return result === undefined ? this._parts[key] : result;
+    };
+  }
+
+  return URI;
+  ```
+
+test "rank1895: the fixed revision normalises the compared substring"
+  lang javascript
+  file src/URI.js
+  reject VYQL-RF-053
+  reject_review code.UrlAuthoritySplitWithoutBackslashNormalization
+  code
+  ```
+  var URI = function() {};
+
+  URI.parse = function(string, parts) {
+    var pos = string.indexOf('?');
+    if (pos > -1) {
+      parts.query = string.substring(pos + 1) || null;
+      string = string.substring(0, pos);
+    }
+
+    if (string.substring(0, 2) === '//') {
+      parts.protocol = null;
+      string = URI.parseAuthority(string.substring(2), parts);
+    } else {
+      pos = string.indexOf(':');
+      if (pos > -1) {
+        parts.protocol = string.substring(0, pos) || null;
+        if (string.substring(pos + 1, pos + 3).replace(/\\/g, '/') === '//') {
+          string = URI.parseAuthority(string.substring(pos + 3), parts);
+        } else {
+          string = string.substring(pos + 1);
+          parts.urn = true;
+        }
+      }
+    }
+
+    parts.path = string;
+    return parts;
+  };
+
+  // Copy chrome, IE, opera backslash-handling behavior.
+  // Back slashes before the query string get converted to forward slashes
+  URI.parseHost = function(string, parts) {
+    string = string.replace(/\\/g, '/');
+
+    var pos = string.indexOf('/');
+    if (pos === -1) {
+      pos = string.length;
+    }
+
+    var t = string.substring(0, pos).split(':');
+    parts.hostname = t[0] || null;
+    parts.port = t[1] || null;
+    return parts;
+  };
+
+  URI.parseAuthority = function(string, parts) {
+    var pos = string.indexOf('@');
+    if (pos > -1) {
+      parts.username = string.substring(0, pos) || null;
+      string = string.substring(pos + 1);
+    }
+    return URI.parseHost(string, parts);
+  };
+
+  // accessor table: the component names reach the module as string literals
+  var p = URI.prototype;
+  p.protocol = generateSimpleAccessor('protocol');
+  p.username = generateSimpleAccessor('username');
+  p.password = generateSimpleAccessor('password');
+  p.hostname = generateSimpleAccessor('hostname');
+  p.port = generateSimpleAccessor('port');
+  p.pathname = generateAccessor('pathname', p.pathname);
+
+  function generateSimpleAccessor(key) {
+    return function(value) {
+      if (value === undefined) {
+        return this._parts[key] || null;
+      }
+      this._parts[key] = value || null;
+      return this;
+    };
+  }
+
+  function generateAccessor(key, fn) {
+    return function(value) {
+      var result = fn.call(this, value);
+      return result === undefined ? this._parts[key] : result;
+    };
+  }
+
+  return URI;
+  ```

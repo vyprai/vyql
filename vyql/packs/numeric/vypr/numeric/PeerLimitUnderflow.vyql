@@ -1,0 +1,11 @@
+module vypr.numeric;
+
+rule PeerLimitUnderflow {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_191]
+    id: "VYQL-NUM-013"
+    severity: medium
+  }
+  issue code.PeerLimitUnderflow as underflow
+}

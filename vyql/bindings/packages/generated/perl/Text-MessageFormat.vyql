@@ -1,0 +1,9 @@
+module bindings.perl.generated.m4eb2b69f;
+
+binding deserialization0 {
+  requires {
+    dependency("Text-MessageFormat")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.Deserialization at args[0]
+}

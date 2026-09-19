@@ -1,0 +1,12 @@
+# Rank 791 / CVE-2022-25923: exec-local-bin forwarded caller-controlled binary
+# names to local command execution.
+
+test "rank791: local binary name reaches command execution"
+  expect VYQL-INJ-002
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.CommandExecution
+  edge FLOWS src -> sink
+  ```
+

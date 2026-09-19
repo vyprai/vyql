@@ -1,0 +1,7 @@
+module code;
+
+concept XmlParserCreate : issue {
+  cwe: [CWE_611]
+  internalRoles: [same_receiver_guard_target]
+  vulnerableTo: [deserialization.XxeUnhardened]
+}

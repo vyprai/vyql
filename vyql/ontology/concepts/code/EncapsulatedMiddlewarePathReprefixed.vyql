@@ -1,0 +1,11 @@
+module code;
+
+concept EncapsulatedMiddlewarePathReprefixed : issue {
+  cwe: [CWE_863, CWE_436]
+  reviewAssumption: "the middleware paths a plugin has stored are already absolute, because the registration function that stored them prepended the registering scope's route prefix"
+  reviewCategory: access_control
+  reviewCondition: "a plugin propagates its stored middleware into a new encapsulation scope by calling its own prefix-prepending registration function on that scope, so every inherited path gains the child scope's prefix a second time"
+  reviewConfidence: high
+  reviewEvidence: "plugin context {pattern} registers middleware through a function that prepends the current scope's route prefix, installs the encapsulation hook that hands it each child scope, and re-registers the inherited middleware through that same prefixing function instead of the middleware engine underneath it"
+  vulnerableTo: [access_control.IncorrectAuthorization, access_control.BrokenAccess]
+}

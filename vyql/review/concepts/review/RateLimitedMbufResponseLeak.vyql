@@ -1,0 +1,8 @@
+module code;
+
+review code.RateLimitedMbufResponseLeak {
+  category: resource
+  expected: [core.ResourceRelease]
+  kind: attention
+  text: "review rate-limited TCP response helpers to ensure mbufs are consumed or freed on every return path"
+}

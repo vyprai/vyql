@@ -1,0 +1,25 @@
+module bindings.scala.generated.mbb3face7;
+
+binding deserialization0 {
+  requires {
+    dependency("org.assertj:assertj-core")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.assertj:assertj-core")
+  }
+  query pattern callExpr where callee.method == "parseDateWithDefaultDateFormats"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.assertj:assertj-core")
+  }
+  query pattern callExpr where callee.method == "parseDateWith"
+  emit sink code.Deserialization at args[0]
+}

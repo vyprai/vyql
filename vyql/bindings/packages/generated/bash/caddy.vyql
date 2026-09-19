@@ -1,0 +1,9 @@
+module bindings.bash.generated.m2082a3cf;
+
+binding httpInput0 {
+  requires {
+    dependency("caddy")
+  }
+  query pattern callExpr where callee.method == "caddy"
+  emit source code.HttpInput at call.result
+}

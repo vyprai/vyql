@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ProtocolFrameBindingReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_287]
+    id: "VYQL-AUTH-087"
+    severity: high
+  }
+  issue code.ProtocolFrameBindingReview as sink
+}

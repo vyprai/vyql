@@ -1,0 +1,33 @@
+module bindings.java.generated.m9ba99d32;
+
+binding httpInput0 {
+  requires {
+    dependency("org.springframework:spring-webmvc")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("org.springframework:spring-webmvc")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("org.springframework:spring-webmvc")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding responseHeaderWrite3 {
+  requires {
+    dependency("org.springframework:spring-webmvc")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.UnvalidatedRouteIdentifier {
+  category: input_validation
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review standard-identifier route parameter reads for the ecosystem format validator before the value is forwarded into downstream request construction"
+}

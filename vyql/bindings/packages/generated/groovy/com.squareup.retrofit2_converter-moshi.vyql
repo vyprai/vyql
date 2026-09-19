@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m5aa0d838;
+
+binding deserialization0 {
+  requires {
+    dependency("com.squareup.retrofit2:converter-moshi")
+  }
+  query pattern callExpr where callee.method == "MoshiResponseBodyConverter.convert"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.objc.generated.mc92852c5;
+
+binding weakHash0 {
+  requires {
+    dependency("AnyCodable-FlightSchool")
+  }
+  query pattern presenceNode where node.path ~= "anycodable.flightschool.hash"
+  emit issue code.WeakHash at node
+}

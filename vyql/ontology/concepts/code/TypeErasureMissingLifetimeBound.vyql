@@ -1,0 +1,11 @@
+module code;
+
+concept TypeErasureMissingLifetimeBound : issue {
+  cwe: [CWE_416]
+  reviewAssumption: "the erased pointer, or a type restored from it, is reachable after the value it points at can be gone"
+  reviewCategory: memory
+  reviewCondition: "a function's own generic parameter is cast to an untyped raw pointer while no type parameter it declares carries a lifetime bound"
+  reviewConfidence: medium
+  reviewEvidence: "an untyped pointer cast over a value named by the function's own parameters, with no lifetime bound anywhere in the signature"
+  vulnerableTo: [memory.UseAfterFree]
+}

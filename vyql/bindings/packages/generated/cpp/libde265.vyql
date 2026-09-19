@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m001d5abe;
+
+binding deserialization0 {
+  requires {
+    dependency("libde265")
+  }
+  query pattern callExpr where callee.method == "de265_push_data"
+  emit sink code.Deserialization at args[0]
+}

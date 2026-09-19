@@ -1,0 +1,171 @@
+# Rank 1716 / CVE-2018-3740: the sanitize gem's element cleaner allowlisted
+# attribute names but let the values it kept reach serialization exactly as
+# the parser produced them. Nokogiri is built on libxml2, and libxml2 >= 2.9.2
+# deliberately leaves comment sequences unescaped inside serialized
+# attributes to preserve server-side includes (libxml2 commit 960f0e27), so an
+# href value carrying `<!--" onmouseover=...-->` serialises with its double
+# quote intact, re-opens the attribute, and injects attributes the allowlist
+# had removed (CWE-79). The fixed revision keeps the allowlist loop and additionally
+# rewrites the URL-bearing values it keeps -- attr.value.strip, then
+# attr.value = attr.value.gsub(/[ "]/, ' ' => '%20', '"' => '%22') on
+# href/src/action everywhere and name on <a> -- so the escaped value is what
+# libxml2 serialises.
+#
+# The weakness class is vocabulary: code.HtmlSanitizerLogicReview and
+# VYQL-INJ-200, whose review condition names "raw-text, comment-preservation,
+# and serialization behavior" -- this is the comment-preservation case, and
+# the Python, JavaScript and C# bindings for the concept had no Ruby twin.
+# The Ruby binding (bindings/ruby/nokogiri_attribute_allowlist_without_
+# value_rewrite.vyql) keys on Nokogiri's documented attribute API only:
+# Node#attribute_nodes enumerates a node's attribute objects, Node#unlink
+# (alias #remove) detaches one, and a #value read marks a pass that keeps
+# attributes on their content. The discriminator is the absence of any
+# value-rewrite primitive in the pass's scope -- the gsub/sub/tr families,
+# Nokogiri's Node#set_attribute, and the escape/url-encode spellings -- which
+# is how both sanitize's fix and loofah's CVE-2018-8048 twin
+# (force_correct_attribute_escaping!, attr_node.value =
+# attr_node.value.gsub(/[ "]/)) spell taking responsibility for what is kept.
+# The anchor is the attribute_nodes call itself because Ruby's
+# analysis.function.context statement is emitted as a sibling of the method's
+# FuncDef and carries no lexical region, so scope filters over a
+# function-scope presence node degrade to file scope there; the call node
+# carries the method's region and confines the conjuncts to the pass.
+#
+# Measured on the sanitize checkout at 01629a1^ (0eee92e, vulnerable) and
+# 01629a1 (fixed): 1 VYQL-INJ-200 at
+# lib/sanitize/transformers/clean_element.rb:92 (the allowlist loop's
+# attribute_nodes call) before, the only delta in a 33 -> 34 finding set,
+# stable over three --cache off runs per side; 0 after, stable over three
+# runs. The reachable set of the shape across the clones under /tmp/cve-work/
+# is 13 Ruby files naming both attribute_nodes and an unlink/#remove call:
+# loofah's scrub.rb clears (its own gsub), rails-html-sanitizer's scrubbers
+# and open-build-service report nothing, the metasploit exploit is untouched,
+# and the one collateral is Nokogiri's own
+# add_child_node_and_reparent_attrs, which re-adds each removed attribute as
+# node[attr_node.name] = attr_node.value -- a write the discriminator cannot
+# credit, one medium review flag per Nokogiri tree, stated in the binding.
+#
+# The values arrive as parsed markup rather than from a labelled source, so
+# this is the review direction: the flag names the pass for a caller audit,
+# and the taint rules stay silent until a source reaches them.
+
+test "rank1716: an attribute allowlist pass that never rewrites the values it keeps"
+  lang ruby
+  profile library
+  expect VYQL-INJ-200
+  expect_review code.HtmlSanitizerLogicReview
+  file lib/sanitize/transformers/clean_element.rb
+  code
+  ```
+  class Sanitize; module Transformers; class CleanElement
+
+    REGEX_DATA_ATTR = /\Adata-(?!xml)[a-z_][\w.à-öø-ſǝ-ʯ-]*\z/u
+
+    def call(env)
+      node = env[:node]
+      name = env[:node_name]
+      attr_whitelist = @attributes[name] || @attributes[:all]
+      allow_data_attributes = attr_whitelist.include?(:data)
+
+      node.attribute_nodes.each do |attr|
+        attr_name = attr.name.downcase
+
+        if attr_whitelist.include?(attr_name)
+          if @protocols.include?(name) && @protocols[name].include?(attr_name)
+            attr_protocols = @protocols[name][attr_name]
+
+            if attr.value =~ REGEX_PROTOCOL
+              attr.unlink unless attr_protocols.include?($1.downcase)
+            else
+              attr.unlink unless attr_protocols.include?(:relative)
+            end
+          end
+        else
+          if allow_data_attributes && attr_name.start_with?('data-')
+            attr.unlink unless attr_name =~ REGEX_DATA_ATTR
+          else
+            attr.unlink
+          end
+        end
+      end
+    end
+
+  end; end; end
+  ```
+
+test "rank1716: the same pass rewriting the values it keeps clears"
+  lang ruby
+  profile library
+  reject VYQL-INJ-200
+  reject_review code.HtmlSanitizerLogicReview
+  file lib/sanitize/transformers/clean_element.rb
+  code
+  ```
+  require 'set'
+
+  class Sanitize; module Transformers; class CleanElement
+
+    REGEX_DATA_ATTR = /\Adata-(?!xml)[a-z_][\w.à-öø-ſǝ-ʯ-]*\z/u
+
+    UNSAFE_LIBXML_ATTRS_A = Set.new(%w[
+      name
+    ])
+
+    UNSAFE_LIBXML_ATTRS_GLOBAL = Set.new(%w[
+      action
+      href
+      src
+    ])
+
+    UNSAFE_LIBXML_ESCAPE_CHARS = {
+      ' ' => '%20',
+      '"' => '%22'
+    }
+
+    UNSAFE_LIBXML_ESCAPE_REGEX = /[ "]/
+
+    def call(env)
+      node = env[:node]
+      name = env[:node_name]
+      attr_whitelist = @attributes[name] || @attributes[:all]
+      allow_data_attributes = attr_whitelist.include?(:data)
+
+      node.attribute_nodes.each do |attr|
+        attr_name = attr.name.downcase
+
+        unless attr_whitelist.include?(attr_name)
+          if allow_data_attributes && attr_name.start_with?('data-')
+            next if attr_name =~ REGEX_DATA_ATTR
+          end
+
+          attr.unlink
+          next
+        end
+
+        if @protocols.include?(name) && @protocols[name].include?(attr_name)
+          attr_protocols = @protocols[name][attr_name]
+
+          if attr.value =~ REGEX_PROTOCOL
+            unless attr_protocols.include?($1.downcase)
+              attr.unlink
+              next
+            end
+          else
+            unless attr_protocols.include?(:relative)
+              attr.unlink
+              next
+            end
+          end
+
+          attr.value = attr.value.strip
+        end
+
+        if UNSAFE_LIBXML_ATTRS_GLOBAL.include?(attr_name) ||
+            (name == 'a' && UNSAFE_LIBXML_ATTRS_A.include?(attr_name))
+          attr.value = attr.value.gsub(UNSAFE_LIBXML_ESCAPE_REGEX, UNSAFE_LIBXML_ESCAPE_CHARS)
+        end
+      end
+    end
+
+  end; end; end
+  ```

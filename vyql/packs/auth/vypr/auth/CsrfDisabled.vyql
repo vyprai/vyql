@@ -1,0 +1,10 @@
+module vypr.auth;
+
+rule CsrfDisabled {
+  meta {
+    cwe: [CWE_352]
+    id: "VYQL-AUTH-103"
+    severity: medium
+  }
+  issue code.CsrfDisabledSink as c
+}

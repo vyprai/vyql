@@ -1,0 +1,29 @@
+module bindings.c.self_sized_copy_declared_array;
+
+// memcpy(3) and memmove(3) copy exactly the count they are handed, so a copy
+// whose count is the copied object's own length field -- the source and the
+// count reading two fields of one object, `pkt->payload` with `pkt->len` --
+// is bounded by that object, never by the destination. When the destination
+// is an array the function declares with a constant size, that declaration is
+// the only statement of its capacity, and a function that never relates the
+// destination's size to anything has no bound on the copy at all. A lower
+// bound on the source (`if (pkt->len >= 4)`) proves the source suffices and
+// does not discharge it, and neither does a clamp on an unrelated length.
+//
+// The fact is emitted by the C frontend
+// (ccSelfSizedCopyIntoDeclaredArrayObservations,
+// internal/extract/frontend/treesitter/c.go) from the syntax tree and is
+// callee-neutral, so which spellings count as raw copies is decided here, in
+// data: the two C standard byte-copy primitives and documented library
+// aliases of the same signature (pjlib's pj_memcpy, SDL's SDL_memcpy). The
+// next project's prefixed spelling is a binding edit, not an engine change.
+//
+// Residuals, all false-negative: the guard is semantic rather than a
+// spelling, so a comparison naming the destination's size clears every copy
+// in the function including a sibling branch's, and a comparison that bounds
+// an unrelated value against that size clears it too; and the compacted body
+// keeps comments, so a commented-out bound check still clears.
+binding selfSizedCopyDeclaredArray {
+  query pattern presenceNode where node.kind == "any" and node.analysis == "copy.self_sized_declared_array" and containsAny(node.token, ["callee=memcpy", "callee=memmove", "callee=pj_memcpy", "callee=SDL_memcpy"])
+  emit issue code.SelfSizedCopyIntoDeclaredArray at node
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.ma54cac56;
+
+binding commandExecution0 {
+  requires {
+    dependency("git_cli")
+  }
+  query pattern callExpr where callee.method == "execute_command"
+  emit sink code.CommandExecution at args[0]
+}

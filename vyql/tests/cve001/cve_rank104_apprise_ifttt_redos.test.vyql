@@ -1,0 +1,8 @@
+# Rank 104 / CVE-2021-39229: Apprise IFTTT static ReDoS.
+
+test "rank104: catastrophic regex is a CVE anchor"
+  expect VYQL-DOS-003
+  graph
+  ```
+  node regex code.CatastrophicRegex
+  ```

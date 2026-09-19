@@ -1,0 +1,7 @@
+module code;
+
+review code.DeserializableInvocationHandler {
+  category: deserialization
+  kind: attention
+  text: "review serializable dynamic-proxy invocation handlers that dispatch reflected or scripted methods without a deserialization rejection hook"
+}

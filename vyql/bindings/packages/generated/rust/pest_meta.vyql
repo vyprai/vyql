@@ -1,0 +1,9 @@
+module bindings.rust.generated.m70ec6976;
+
+binding deserialization0 {
+  requires {
+    dependency("pest_meta")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

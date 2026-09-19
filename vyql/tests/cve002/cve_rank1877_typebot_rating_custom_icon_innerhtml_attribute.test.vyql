@@ -1,0 +1,259 @@
+# A chatbot flow definition is authored data: every block option string in it --
+# a rating input's custom icon SVG, a file input's placeholder label -- is
+# written by whoever builds the flow, and the flow can be shared, published as
+# a template, or imported, so the widget that renders it to a visitor is
+# rendering another author's markup. The widget learns the definition from the
+# chat API's startChat response and renders two of those strings straight into
+# the DOM: RatingForm's RatingButton does
+# `<div innerHTML={props.customIcon.svg}>` and FileUploadForm does
+# `<p innerHTML={props.block.options?.labels?.placeholder}>`. Nothing between
+# the flow author and the visitor's browser escapes or filters either string,
+# so a rating icon of `<svg onload=...>` executes in the visitor's session.
+# CWE-79.
+#
+# The fixed revision adds a dompurify wrapper (sanitizeSvgFragment / sanitizeHtmlFragment)
+# and routes both attributes through it, and additionally sanitises the same
+# two options at save time in the builder.
+#
+# The JSX-attribute spelling of a raw-markup DOM write is now lowered to the
+# same call node the imperative spelling produces, so `callee.path ~=
+# "innerHTML"` (htmlRender407) and `"outerHTML"` (htmlRender408) label it and
+# VYQL-INJ-004 judges it. Before that, javascript.go's `case "jsx_attribute"`
+# returned only the attribute's value expression and dropped the attribute
+# name, so no binding could see that an innerHTML write had happened -- React's
+# `dangerouslySetInnerHTML` had a hard-coded extraction for exactly this
+# reason, and the DOM's own spelling had none. Cases f and g are the
+# imperative controls: the same icon expression through `el.innerHTML = ...`
+# and the same font-css write in injectFont both fire without any frontend
+# change.
+#
+# Measured on the real checkout, timeout 180 / --max-ram 6GB / --cache off:
+# the whole tree at the vulnerable revision goes 191 -> 193 findings and the
+# two new VYQL-INJ-004 rows are exactly the two lines the upstream fix
+# changes (RatingForm.tsx:155, FileUploadForm.tsx:242); at the patched
+# revision the tree is back to the identical 191-finding set, because the
+# domPurify.sanitize inside the fixed revision's wrapper supplies core.HtmlEscape.
+# Renaming that wrapper leaves the row absent, so detection rides on the
+# sanitizer call, not on the fixed revision's own names. Collateral is enumerated rather
+# than sampled: across all 71 rank clones, 6156 .tsx/.jsx files, exactly six
+# carry a JSX innerHTML/outerHTML attribute -- the three typebot files (two
+# of them this fix's own, the third StreamingBubble.tsx:82 whose content path
+# passes through escaping controls and reports nothing) and three
+# scratch copies of this shape.
+
+test "rank1877: (a) a flow-authored icon svg rendered through a JSX innerHTML attribute"
+  lang javascript
+  file packages/embeds/js/src/features/blocks/inputs/rating/components/RatingForm.tsx
+  expect VYQL-INJ-004
+  code
+  ```
+  import { isEmpty } from "@typebot.io/lib/utils";
+
+  type RatingInputBlock = {
+    options?: { customIcon?: { isEnabled: boolean; svg: string } };
+  };
+
+  const defaultIcon = `<svg xmlns="http://www.w3.org/2000/svg"></svg>`;
+
+  export const RatingForm = async (props: { typebotId: string }) => {
+    const res = await fetch(`/api/v1/typebots/${props.typebotId}/startChat`, {
+      method: "POST",
+    });
+    const data = (await res.json()) as { input: RatingInputBlock };
+    const icon = data.input.options?.customIcon;
+    return (
+      <label class="cursor-pointer">
+        <div
+          class="rating-icon-container"
+          innerHTML={
+            icon?.isEnabled && !isEmpty(icon.svg) ? icon.svg : defaultIcon
+          }
+        />
+      </label>
+    );
+  };
+  ```
+
+test "rank1877: (b) the patched form routes the same attribute through dompurify"
+  lang javascript
+  file packages/embeds/js/src/features/blocks/inputs/rating/components/RatingForm.tsx
+  reject VYQL-INJ-004
+  code
+  ```
+  import { isEmpty } from "@typebot.io/lib/utils";
+  import domPurify from "dompurify";
+
+  const normalizeSanitizedMarkup = (sanitizedMarkup: string) => {
+    const trimmedMarkup = sanitizedMarkup.trim();
+    return isEmpty(trimmedMarkup) ? undefined : trimmedMarkup;
+  };
+
+  const sanitizeSvgFragment = (svgMarkup?: string) =>
+    normalizeSanitizedMarkup(
+      domPurify.sanitize(svgMarkup ?? "", {
+        USE_PROFILES: { svg: true },
+        FORBID_TAGS: ["foreignObject"],
+      }),
+    );
+
+  type RatingInputBlock = {
+    options?: { customIcon?: { isEnabled: boolean; svg: string } };
+  };
+
+  const defaultIcon = `<svg xmlns="http://www.w3.org/2000/svg"></svg>`;
+
+  export const RatingForm = async (props: { typebotId: string }) => {
+    const res = await fetch(`/api/v1/typebots/${props.typebotId}/startChat`, {
+      method: "POST",
+    });
+    const data = (await res.json()) as { input: RatingInputBlock };
+    const icon = data.input.options?.customIcon;
+    const iconMarkup = () =>
+      sanitizeSvgFragment(icon?.isEnabled ? icon.svg : undefined) ?? defaultIcon;
+    return (
+      <label class="cursor-pointer">
+        <div
+          class="rating-icon-container"
+          innerHTML={
+            icon?.isEnabled && !isEmpty(icon.svg) ? iconMarkup() : defaultIcon
+          }
+        />
+      </label>
+    );
+  };
+  ```
+
+test "rank1877: (c) dompurify called in place, no wrapper, is the same control"
+  lang javascript
+  file packages/embeds/js/src/features/blocks/inputs/rating/components/RatingForm.tsx
+  reject VYQL-INJ-004
+  code
+  ```
+  import domPurify from "dompurify";
+
+  type RatingInputBlock = {
+    options?: { customIcon?: { isEnabled: boolean; svg: string } };
+  };
+
+  const defaultIcon = `<svg xmlns="http://www.w3.org/2000/svg"></svg>`;
+
+  export const RatingForm = async (props: { typebotId: string }) => {
+    const res = await fetch(`/api/v1/typebots/${props.typebotId}/startChat`, {
+      method: "POST",
+    });
+    const data = (await res.json()) as { input: RatingInputBlock };
+    const icon = data.input.options?.customIcon;
+    return (
+      <label class="cursor-pointer">
+        <div
+          class="rating-icon-container"
+          innerHTML={
+            icon?.isEnabled
+              ? domPurify.sanitize(icon.svg, { USE_PROFILES: { svg: true } })
+              : defaultIcon
+          }
+        />
+      </label>
+    );
+  };
+  ```
+
+test "rank1877: (d) the file input's placeholder label through the same attribute"
+  lang javascript
+  file packages/embeds/js/src/features/blocks/inputs/fileUpload/components/FileUploadForm.tsx
+  expect VYQL-INJ-004
+  code
+  ```
+  type FileInputBlock = {
+    options?: { labels?: { placeholder?: string } };
+  };
+
+  const defaultFileInputOptions = {
+    labels: { placeholder: "Upload a file" },
+  };
+
+  export const FileUploadForm = async (props: { typebotId: string }) => {
+    const res = await fetch(`/api/v1/typebots/${props.typebotId}/startChat`, {
+      method: "POST",
+    });
+    const data = (await res.json()) as { input: FileInputBlock };
+    return (
+      <form class="flex flex-col w-full gap-2" onSubmit={() => undefined}>
+        <p
+          class="text-sm text-gray-500 text-center"
+          innerHTML={
+            data.input.options?.labels?.placeholder ??
+            defaultFileInputOptions.labels.placeholder
+          }
+        />
+      </form>
+    );
+  };
+  ```
+
+test "rank1877: (e) an innerHTML attribute fed only literal markup is not a finding"
+  lang javascript
+  file packages/embeds/js/src/features/blocks/inputs/rating/components/RatingForm.tsx
+  reject VYQL-INJ-004
+  code
+  ```
+  const defaultIcon = `<svg xmlns="http://www.w3.org/2000/svg"></svg>`;
+
+  export const RatingForm = () => {
+    return (
+      <label class="cursor-pointer">
+        <input type="radio" name="rating" value={5} />
+        <div class="rating-icon-container" innerHTML={defaultIcon} />
+      </label>
+    );
+  };
+  ```
+
+test "rank1877: (f) the imperative spelling of the same write, covered"
+  lang javascript
+  file packages/embeds/js/src/utils/injectFont.ts
+  expect VYQL-INJ-004
+  code
+  ```
+  type Font = { type: string; css: string };
+
+  export const injectFontFromTheme = async (themeUrl: string) => {
+    const res = await fetch(themeUrl);
+    const theme = (await res.json()) as { font: Font };
+    const font = theme.font;
+    const existing = document.getElementById("typebot-font");
+    if (existing?.innerHTML === font.css) return;
+    existing?.remove();
+    const style = document.createElement("style");
+    style.innerHTML = font.css;
+    document.head.appendChild(style);
+  };
+  ```
+
+test "rank1877: (g) the same icon expression through an imperative innerHTML write"
+  lang javascript
+  file packages/embeds/js/src/features/blocks/inputs/rating/components/RatingForm.tsx
+  expect VYQL-INJ-004
+  code
+  ```
+  import { isEmpty } from "@typebot.io/lib/utils";
+
+  type RatingInputBlock = {
+    options?: { customIcon?: { isEnabled: boolean; svg: string } };
+  };
+
+  const defaultIcon = `<svg xmlns="http://www.w3.org/2000/svg"></svg>`;
+
+  export const RatingForm = async (props: { typebotId: string }) => {
+    const res = await fetch(`/api/v1/typebots/${props.typebotId}/startChat`, {
+      method: "POST",
+    });
+    const data = (await res.json()) as { input: RatingInputBlock };
+    const icon = data.input.options?.customIcon;
+    const container = document.createElement("div");
+    container.className = "rating-icon-container";
+    container.innerHTML =
+      icon?.isEnabled && !isEmpty(icon.svg) ? icon.svg : defaultIcon;
+    return container;
+  };
+  ```

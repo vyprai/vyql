@@ -1,0 +1,7 @@
+module code;
+
+review code.AbsolutePathDisclosure {
+  category: secret
+  kind: attention
+  text: "review externally visible identifiers or diagnostics for resolved local filesystem paths"
+}

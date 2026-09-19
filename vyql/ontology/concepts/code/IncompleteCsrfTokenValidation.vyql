@@ -1,0 +1,6 @@
+module code;
+
+concept IncompleteCsrfTokenValidation : issue {
+  cwe: [CWE_352]
+  vulnerableTo: [request_forgery.Csrf]
+}

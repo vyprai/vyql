@@ -1,0 +1,17 @@
+module bindings.swift.generated.mffa042d5;
+
+binding networkConnect0 {
+  requires {
+    dependency("github.com/nerdishbynature/RequestKit")
+  }
+  query pattern callExpr where callee.method == "dataTask"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("github.com/nerdishbynature/RequestKit")
+  }
+  query pattern callExpr where callee.method == "uploadTask"
+  emit sink code.NetworkSend at args[0]
+}

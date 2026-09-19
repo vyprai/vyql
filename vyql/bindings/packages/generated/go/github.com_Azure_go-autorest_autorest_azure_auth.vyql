@@ -1,0 +1,129 @@
+module bindings.go.generated.mf6f70c16;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "GetClientCredentials"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "GetUsernamePassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "ServicePrincipalTokenFromClientCredentials"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "ClientCredentialsAuthorizer"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue4 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "ServicePrincipalTokenFromClientCredentialsWithResource"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "ClientCredentialsAuthorizerWithResource"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue6 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "ServicePrincipalTokenFromClientCertificate"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue7 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "ClientCertificateAuthorizer"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue8 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "ServicePrincipalTokenFromClientCertificateWithResource"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue9 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "ClientCertificateAuthorizerWithResource"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue10 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "NewClientCredentialsConfig"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue11 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "NewClientCertificateConfig"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue12 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "NewUsernamePasswordConfig"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue13 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "Authorizer"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue14 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "ServicePrincipalToken"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue15 {
+  requires {
+    dependency("github.com/Azure/go-autorest/autorest/azure/auth")
+  }
+  query pattern callExpr where callee.method == "MultiTenantServicePrincipalToken"
+  emit source code.SecretValue at call.result
+}

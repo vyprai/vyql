@@ -1,0 +1,28 @@
+module bindings.cpp.generated.m8748d7e9;
+
+binding regexCompile0 {
+  requires {
+    dependency("ctre")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile1 {
+  requires {
+    dependency("ctre")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile2 {
+  requires {
+    dependency("ctre")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

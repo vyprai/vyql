@@ -1,0 +1,244 @@
+# Rank 1806 / CVE-2026-29103 (CWE-94, CWE-358): the Module Loader
+# screens every PHP file inside an uploaded package before it can be
+# installed, and the screen is a hand-rolled linear walk over
+# token_get_all() output. A name token found in the blacklist arms a
+# state flag ($checkFunction) and the violation is recorded only when
+# the next token is '(' or ']'; the inner switch skips T_WHITESPACE
+# but every other token -- T_COMMENT included -- falls to the default
+# arm and resets the flag. So a call the screen exists to stop is
+# invisible the moment a comment sits between the name and the
+# parenthesis: system /* c */ ('id') passes, the package installs,
+# and the file executes on the next request. 7f2b384d ("SuiteCRM
+# 7.15.1 Release") deletes the walk and delegates to a private
+# scanFileAST() built on nikic/php-parser, after which token_get_all
+# is absent from the tree.
+#
+# Detection covers the screen's inert-token asymmetry, not the
+# machinery swap. The binding (vyql/bindings/php/
+# token_walk_code_screen_comment_blind.vyql -> VYQL-INJ-282 /
+# code.IncompleteCommentTokenCodeScreen) keys on four PHP-documented
+# token constants readable in one function scope: the tokenize
+# assignment (the exact assign_call: token for token_get_all, which
+# comments cannot satisfy), the eval arm that marks the walk as a
+# code screen (T_EVAL), the whitespace skip (T_WHITESPACE), and the
+# absence of any comment-token handling (no T_COMMENT). The second
+# test pins the in-place fix -- a walk that also skips T_COMMENT and
+# T_DOC_COMMENT -- and stays silent, so the discriminator is the
+# documented inert token the screen fails to skip, not the parser
+# the fixing release happened to adopt.
+#
+# Measurements: exhaustive enumeration of every token_get_all PHP
+# file across 278 campaign clones finds 22 besides this scanner, all
+# development tooling (collectors, extractors, comment-strippers,
+# highlighters); the four-clause shape is unique to
+# ModuleInstall/ModuleScanner.php, and the whole suitecrm tree holds
+# exactly one token_get_all file. The two nearest shapes, a
+# silverstripe translation collector and a Cake extract task (both
+# whitespace-skip, no comment handling), scan to 0 because neither
+# screens eval. Three --cache off scans of the ModuleInstall subtree
+# at the parent give 33 findings (the 32 baseline plus VYQL-INJ-282
+# on ModuleScanner.php:590); three at the fixed revision give the
+# unchanged 32. The identifiers are absent from both OWASP benchmark
+# corpora. Known residuals, measured: a comment inside the function
+# naming T_COMMENT silences the flag (false-negative direction), a
+# function that genuinely tokenizes can pick up T_EVAL and
+# T_WHITESPACE from body prose (the tokenize clause itself is
+# comment-proof), and a walk that iterates token_get_all output
+# without assigning it is not matched. The clauses stay
+# function-confined (node.token), which is why the file-wide
+# identifier route is not used.
+#
+# verify_current_expected: expect-on-vulnerable-walk with in-place-fix and ast rejections.
+
+test "rank1806: the uploaded-code screen walks tokens, skips whitespace and screens eval but has no comment-token handling"
+  lang php
+  file ModuleInstall/ModuleScanner.php
+  expect VYQL-INJ-282
+  expect_review code.IncompleteCommentTokenCodeScreen
+  code
+  ```
+  <?php
+
+  class ModuleScanner
+  {
+      public $blackList = array('exec', 'system', 'passthru', 'shell_exec', 'popen', 'proc_open');
+
+      public function scanFile($file)
+      {
+          $issues = array();
+          $contents = file_get_contents($file);
+          $tokens = @token_get_all($contents);
+          $checkFunction = false;
+          $possibleIssue = '';
+          foreach ($tokens as $index => $token) {
+              if (is_string($token[0])) {
+                  switch ($token[0]) {
+                      case '`':
+                          $issues['backtick'] = 'invalid function ` backtick`';
+                          // no break
+                      case '(':
+                          if ($checkFunction) {
+                              $issues[] = $possibleIssue;
+                          }
+                          break;
+                      case ']':
+                          if ($checkFunction) {
+                              $issues[] = $possibleIssue;
+                          }
+                  }
+                  $checkFunction = false;
+                  $possibleIssue = '';
+              } else {
+                  switch ($token[0]) {
+                      case T_WHITESPACE:
+                          break;
+                      case T_EVAL:
+                          $issues[] = 'invalid function eval()';
+                          break;
+                      case T_STRING:
+                      case T_CONSTANT_ENCAPSED_STRING:
+                          $token[1] = trim(strtolower($token[1]), '\'"');
+                          if (!in_array($token[1], $this->blackList)) {
+                              break;
+                          }
+                          // no break
+                      case T_VARIABLE:
+                          $checkFunction = true;
+                          $possibleIssue = 'invalid function ' . $token[1] . '()';
+                          break;
+
+                      default:
+                          $checkFunction = false;
+                          $possibleIssue = '';
+                  }
+              }
+          }
+          return $issues;
+      }
+  }
+  ```
+
+test "rank1806: the walk that also skips comment tokens keeps its match state across a comment"
+  lang php
+  file ModuleInstall/ModuleScanner.php
+  reject VYQL-INJ-282
+  reject_review code.IncompleteCommentTokenCodeScreen
+  code
+  ```
+  <?php
+
+  class ModuleScanner
+  {
+      public $blackList = array('exec', 'system', 'passthru', 'shell_exec', 'popen', 'proc_open');
+
+      public function scanFile($file)
+      {
+          $issues = array();
+          $contents = file_get_contents($file);
+          $tokens = @token_get_all($contents);
+          $checkFunction = false;
+          $possibleIssue = '';
+          foreach ($tokens as $index => $token) {
+              if (is_string($token[0])) {
+                  switch ($token[0]) {
+                      case '`':
+                          $issues['backtick'] = 'invalid function ` backtick`';
+                          // no break
+                      case '(':
+                          if ($checkFunction) {
+                              $issues[] = $possibleIssue;
+                          }
+                          break;
+                      case ']':
+                          if ($checkFunction) {
+                              $issues[] = $possibleIssue;
+                          }
+                  }
+                  $checkFunction = false;
+                  $possibleIssue = '';
+              } else {
+                  switch ($token[0]) {
+                      case T_WHITESPACE:
+                      case T_COMMENT:
+                      case T_DOC_COMMENT:
+                          break;
+                      case T_EVAL:
+                          $issues[] = 'invalid function eval()';
+                          break;
+                      case T_STRING:
+                      case T_CONSTANT_ENCAPSED_STRING:
+                          $token[1] = trim(strtolower($token[1]), '\'"');
+                          if (!in_array($token[1], $this->blackList)) {
+                              break;
+                          }
+                          // no break
+                      case T_VARIABLE:
+                          $checkFunction = true;
+                          $possibleIssue = 'invalid function ' . $token[1] . '()';
+                          break;
+
+                      default:
+                          $checkFunction = false;
+                          $possibleIssue = '';
+                  }
+              }
+          }
+          return $issues;
+      }
+  }
+  ```
+
+test "rank1806: the screen parses the file into an AST and flags every dynamic call form from the visitor"
+  lang php
+  file ModuleInstall/ModuleScanner.php
+  reject VYQL-INJ-282
+  reject_review code.IncompleteCommentTokenCodeScreen
+  code
+  ```
+  <?php
+
+  use PhpParser\NodeTraverser;
+
+  class ModuleScanner
+  {
+      public $blackList = array('exec', 'system', 'passthru', 'shell_exec', 'popen', 'proc_open');
+
+      public function scanFile($file)
+      {
+          $issues = array();
+          $contents = file_get_contents($file);
+          $issues = $this->scanFileAST($contents);
+          return $issues;
+      }
+
+      private function scanFileAST(string $contents): array
+      {
+          $issues = array();
+          $parser = (new \PhpParser\ParserFactory())->createForHostVersion();
+          $traverser = new NodeTraverser();
+
+          require_once __DIR__ . '/ModuleScannerVisitor.php';
+
+          $visitor = new ModuleScannerVisitor(
+              $this->blackList,
+              array(),
+              array(),
+              array(),
+              array()
+          );
+          $traverser->addVisitor($visitor);
+
+          try {
+              $stmts = $parser->parse($contents);
+              if ($stmts !== null) {
+                  $traverser->traverse($stmts);
+              }
+              $issues = $visitor->getIssues();
+          } catch (\PhpParser\Error $e) {
+              $issues[] = 'invalid php file (parse error: ' . $e->getMessage() . ')';
+          }
+
+          return $issues;
+      }
+  }
+  ```

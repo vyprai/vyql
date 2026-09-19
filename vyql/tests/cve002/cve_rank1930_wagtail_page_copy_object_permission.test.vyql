@@ -1,0 +1,181 @@
+# Rank 1930 / CVE-2026-44200 wagtail/wagtail: the admin page-copy view
+# fetched the page to copy by its URL id and authorized the request only with
+# the @user_passes_test(user_has_any_page_permission) decorator, a check that
+# any page permission anywhere satisfies. PagePermissionTester.can_copy()
+# answered `not self.page_is_root`, consulting no permission at all, and
+# CopyForm validated only add-permission at the destination, so a user with
+# any page permission could copy — and, with publish rights anywhere, publish
+# — a page they hold no edit permission on (CWE-639, CWE-863). Fix commit
+# 624586612e44f700264f811eebf8089eeb08ef3e makes can_copy() return
+# can_edit(), and the view now fetches with get_object_or_404 and raises
+# PermissionDenied unless page.permissions_for_user(request.user).can_copy()
+# holds.
+#
+# FIXED with two Python bindings in
+# vyql/bindings/python/django_orm_object_permission.vyql, no new concept or
+# rule. objectLookupByUserInputKwarg extends the existing objects.get lookup
+# sink to the keyword spelling: a keyword argument lowers to a pair-shaped
+# argument slot that a plain args[0] / args.any selection never targets, so
+# the canonical Model.objects.get(id=...) fetch lacks a label while the rare
+# positional spelling reported. ownershipCheckCopyPermission credits a
+# can_copy / can_copy_to tester call anywhere in the enclosing function as
+# core.OwnershipCheck, because the documented per-object permission idiom —
+# fetch the object, build its permission tester, branch on the answer — can
+# only run after the fetch it guards, so a call-anchored control never
+# dominates the lookup. VYQL-AUTH-002 then fires on the vulnerable view and
+# not on the fixed one.
+#
+# Measured on the real checkout, bounded (timeout 180, --max-ram 6GB,
+# --cache off), three runs per side, all three identical.
+# wagtail/admin/views/pages at the vulnerable parent reports 20 findings with
+# 5 VYQL-AUTH-002, two of them in copy.py (the page_id fetch at line 18 and
+# the new_parent_page POST refetch at line 42); the same subtree at the fixed revision
+# commit reports 18 findings with 3 VYQL-AUTH-002 and none in copy.py — the
+# can_copy tester call suppresses both lookups in the fixed view, including
+# the refetch that keeps its objects.get spelling. Sweeping every other
+# wagtail subtree that contains the shape adds 53 VYQL-AUTH-002 rows
+# tree-wide (14 outside test files), the same param-taint artifact family as
+# the 38 non-test rows the rule reports on that tree through the
+# positional and get_object_or_404 spellings; no other clone under
+# /tmp/cve-work/rank*/ contains objects.get at all, so wagtail is the whole
+# reachable set. The commented-out-check and sibling-function cases below pin
+# the control's comment-proofness and function confinement.
+
+test "rank1930: the copy view fetches the page by id with only a global permission decorator"
+  lang python
+  file copy.py
+  profile library
+  expect VYQL-AUTH-002
+  code
+  ```
+  from django.shortcuts import redirect
+
+  from wagtail.actions.copy_page import CopyPageAction
+  from wagtail.admin.auth import user_has_any_page_permission, user_passes_test
+  from wagtail.models import Page
+
+
+  @user_passes_test(user_has_any_page_permission)
+  def copy(request, page_id):
+      page = Page.objects.get(id=page_id)
+
+      parent_page = page.get_parent()
+      can_publish = parent_page.permissions_for_user(request.user).can_publish_subpage()
+
+      action = CopyPageAction(
+          page=page,
+          to=parent_page,
+          update_attrs={"title": page.title, "slug": page.slug},
+          keep_live=can_publish,
+          user=request.user,
+      )
+      new_page = action.execute()
+      return redirect("wagtailadmin_explore", parent_page.id)
+  ```
+
+test "rank1930: the fixed revision requires the source page's own copy permission"
+  lang python
+  file copy.py
+  profile library
+  reject VYQL-AUTH-002
+  code
+  ```
+  from django.core.exceptions import PermissionDenied
+  from django.shortcuts import get_object_or_404, redirect
+
+  from wagtail.actions.copy_page import CopyPageAction
+  from wagtail.models import Page
+
+
+  def copy(request, page_id):
+      page = get_object_or_404(Page, id=page_id)
+      page_perms = page.permissions_for_user(request.user)
+      if not page_perms.can_copy():
+          raise PermissionDenied
+
+      parent_page = page.get_parent()
+      action = CopyPageAction(
+          page=page,
+          to=parent_page,
+          update_attrs={"title": page.title, "slug": page.slug},
+          user=request.user,
+      )
+      new_page = action.execute()
+      return redirect("wagtailadmin_explore", parent_page.id)
+  ```
+
+test "rank1930: the copy-permission check also guards the original objects.get fetch"
+  lang python
+  file copy.py
+  profile library
+  reject VYQL-AUTH-002
+  code
+  ```
+  from django.core.exceptions import PermissionDenied
+  from django.shortcuts import redirect
+
+  from wagtail.actions.copy_page import CopyPageAction
+  from wagtail.models import Page
+
+
+  def copy(request, page_id):
+      page = Page.objects.get(id=page_id)
+      page_perms = page.permissions_for_user(request.user)
+      if not page_perms.can_copy():
+          raise PermissionDenied
+
+      parent_page = page.get_parent()
+      action = CopyPageAction(
+          page=page,
+          to=parent_page,
+          update_attrs={"title": page.title, "slug": page.slug},
+          user=request.user,
+      )
+      new_page = action.execute()
+      return redirect("wagtailadmin_explore", parent_page.id)
+  ```
+
+test "rank1930: a commented-out copy-permission check does not guard the fetch"
+  lang python
+  file copy.py
+  profile library
+  expect VYQL-AUTH-002
+  code
+  ```
+  from django.shortcuts import redirect
+
+  from wagtail.actions.copy_page import CopyPageAction
+  from wagtail.models import Page
+
+
+  @user_passes_test(user_has_any_page_permission)
+  def copy(request, page_id):
+      page = Page.objects.get(id=page_id)
+      # page_perms = page.permissions_for_user(request.user)
+      # if not page_perms.can_copy():
+      #     raise PermissionDenied
+
+      parent_page = page.get_parent()
+      action = CopyPageAction(page=page, to=parent_page, user=request.user)
+      new_page = action.execute()
+      return redirect("wagtailadmin_explore", parent_page.id)
+  ```
+
+test "rank1930: a copy-permission tester consulted in a sibling function is not credited"
+  lang python
+  file hooks.py
+  profile library
+  expect VYQL-AUTH-002
+  code
+  ```
+  from wagtail.models import Page
+
+
+  def copy(request, page_id):
+      page = Page.objects.get(id=page_id)
+      return page
+
+
+  def page_copy_menu_item(request, page):
+      return page.permissions_for_user(request.user).can_copy()
+  ```

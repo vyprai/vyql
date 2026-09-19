@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule UnescapedQueueQueryStringXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-131"
+    severity: high
+  }
+  issue code.UnescapedQueueQueryStringXss as sink
+}

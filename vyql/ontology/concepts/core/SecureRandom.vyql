@@ -1,0 +1,7 @@
+module core;
+
+concept SecureRandom : check {
+  applies: scope
+  cwe: [CWE_331]
+  neutralizes: [crypto.InsufficientEntropy]
+}

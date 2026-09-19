@@ -1,0 +1,65 @@
+# Rank 895 / CVE-2026-43616: Formats extracted archive records by joining
+# the stored original name into the destination path before opening it for write.
+
+test "rank895: formats writes archive original names without containment check"
+  lang cpp
+  file xformats.cpp
+  expect VYQL-PATH-014
+  expect_review code.ManualZipEntryFileWrite
+  code
+  ```
+  bool XFormats::extractArchiveRecordsToFolder(QList<XBinary::ARCHIVERECORD> *pListRecords, QString sFolderName)
+  {
+      for (qint32 i = 0; i < pListRecords->count(); i++) {
+          QString sPrefName = pListRecords->at(i).mapProperties.value(XBinary::FPART_PROP_ORIGINALNAME).toString();
+          QString sResultFileName = sFolderName + QDir::separator() + sPrefName;
+          QFileInfo fi(sResultFileName);
+
+          if (XBinary::createDirectory(fi.absolutePath())) {
+              QFile file;
+              file.setFileName(sResultFileName);
+
+              if (file.open(QIODevice::ReadWrite)) {
+                  return true;
+              }
+          }
+      }
+
+      return false;
+  }
+  ```
+
+test "rank895: formats rejects archive paths outside the canonical root"
+  lang cpp
+  file xformats.cpp
+  reject VYQL-PATH-014
+  reject_review code.ManualZipEntryFileWrite
+  code
+  ```
+  bool XFormats::extractArchiveRecordsToFolder(QList<XBinary::ARCHIVERECORD> *pListRecords, QString sFolderName)
+  {
+      QString sCanonicalRoot = QDir::cleanPath(QDir(sFolderName).absolutePath());
+
+      for (qint32 i = 0; i < pListRecords->count(); i++) {
+          QString sPrefName = pListRecords->at(i).mapProperties.value(XBinary::FPART_PROP_ORIGINALNAME).toString();
+          QString sResultFileName = QDir::cleanPath(sFolderName + QDir::separator() + sPrefName);
+
+          if (!sResultFileName.startsWith(sCanonicalRoot + "/")) {
+              continue;
+          }
+
+          QFileInfo fi(sResultFileName);
+
+          if (XBinary::createDirectory(fi.absolutePath())) {
+              QFile file;
+              file.setFileName(sResultFileName);
+
+              if (file.open(QIODevice::ReadWrite)) {
+                  return true;
+              }
+          }
+      }
+
+      return false;
+  }
+  ```

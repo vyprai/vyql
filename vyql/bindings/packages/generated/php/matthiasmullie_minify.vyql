@@ -1,0 +1,41 @@
+module bindings.php.generated.mfcc3a662;
+
+binding filePathAccess0 {
+  requires {
+    dependency("matthiasmullie/minify")
+  }
+  query pattern callExpr where callee.method == "addFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("matthiasmullie/minify")
+  }
+  query pattern callExpr where callee.method == "minify"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("matthiasmullie/minify")
+  }
+  query pattern callExpr where callee.method == "gzip"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("matthiasmullie/minify")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("matthiasmullie/minify")
+  }
+  query pattern callExpr where callee.method == "importFiles"
+  emit sink code.FilePathAccess at args[0]
+}

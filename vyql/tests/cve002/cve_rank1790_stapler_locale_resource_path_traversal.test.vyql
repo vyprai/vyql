@@ -1,0 +1,183 @@
+# Rank 1790 / CVE-2018-1999002: Stapler's locale-driven resource
+# selector concatenated the preferred locale's subtags straight into
+# the resource path it resolves
+#   map(base + '_' + locale.getLanguage() + '_' + locale.getCountry()
+#       + '_' + locale.getVariant() + ext)
+# (LocaleDrivenResourceSelector.open, CWE-22). The locale comes from
+# HttpServletRequest.getLocale(), parsed from the Accept-Language
+# header, and a header value whose subtags carry '/' or '..' escapes
+# the resource root when the joined path reaches
+# ServletContext.getResource / new URL. The fixed revision validates each subtag
+# against the locale syntax documented in the Locale JavaDoc before
+# joining. What clears the finding is subtag validation inside the
+# joining function -- a syntax check on the subtag values or a
+# locale-parsing API that throws on malformed tags -- in any spelling,
+# not the helper's name. ResourceBundle.getBundle is the documented
+# safe alternative: it applies the locale fallback chain itself and
+# never lets the caller build the bundle path.
+
+test "rank1790: locale subtags joined into a resource path with no subtag validation"
+  lang java
+  file LocaleDrivenResourceSelector.java
+  expect VYQL-PATH-011
+  expect_review code.UnvalidatedLocaleFileInclude
+  code
+  ```
+  import java.io.IOException;
+  import java.net.URL;
+  import java.util.Locale;
+
+  public class LocaleDrivenResourceSelector {
+    abstract URL map(String path) throws IOException;
+
+    OpenConnection open(String path, Locale locale, URL fallback) throws IOException {
+      int idx = path.lastIndexOf('.');
+      String base = path.substring(0, idx);
+      String ext = path.substring(idx);
+      if (ext.indexOf('/') >= 0)
+        return openURL(fallback);
+
+      OpenConnection con;
+      con = openURL(map(base + '_' + locale.getLanguage() + '_' + locale.getCountry() + '_' + locale.getVariant() + ext));
+      if (con != null) return con;
+      con = openURL(map(base + '_' + locale.getLanguage() + '_' + locale.getCountry() + ext));
+      if (con != null) return con;
+      con = openURL(map(base + '_' + locale.getLanguage() + ext));
+      if (con != null) return con;
+      return openURL(fallback);
+    }
+
+    OpenConnection openURL(URL url) { return null; }
+  }
+  ```
+
+test "rank1790: subtag syntax validation before the join"
+  lang java
+  file LocaleDrivenResourceSelectorValidated.java
+  reject VYQL-PATH-011
+  reject_review code.UnvalidatedLocaleFileInclude
+  code
+  ```
+  import java.io.IOException;
+  import java.net.URL;
+  import java.util.Locale;
+
+  public class LocaleDrivenResourceSelectorValidated {
+    abstract URL map(String path) throws IOException;
+
+    OpenConnection open(String path, Locale locale, URL fallback) throws IOException {
+      int idx = path.lastIndexOf('.');
+      String base = path.substring(0, idx);
+      String ext = path.substring(idx);
+      if (ext.indexOf('/') >= 0)
+        return openURL(fallback);
+
+      String language = locale.getLanguage();
+      boolean languageOk = language.matches("^[a-zA-Z]{2,8}$");
+      String country = locale.getCountry();
+      boolean countryOk = country.matches("^[a-zA-Z]{2}|[0-9]{3}$");
+      String variant = locale.getVariant();
+      boolean variantOk = variant.matches("^(?:[0-9][0-9a-zA-Z]{3}|[0-9a-zA-Z]{5,8})$");
+
+      OpenConnection con;
+      if (languageOk && countryOk && variantOk) {
+        con = openURL(map(base + '_' + language + '_' + country + '_' + variant + ext));
+        if (con != null) return con;
+      }
+      if (languageOk && countryOk) {
+        con = openURL(map(base + '_' + language + '_' + country + ext));
+        if (con != null) return con;
+      }
+      if (languageOk) {
+        con = openURL(map(base + '_' + language + ext));
+        if (con != null) return con;
+      }
+      return openURL(fallback);
+    }
+
+    OpenConnection openURL(URL url) { return null; }
+  }
+  ```
+
+test "rank1790: inline subtag checks around an unchanged join"
+  lang java
+  file LocaleDrivenResourceSelectorInlineGuard.java
+  reject VYQL-PATH-011
+  reject_review code.UnvalidatedLocaleFileInclude
+  code
+  ```
+  import java.io.IOException;
+  import java.net.URL;
+  import java.util.Locale;
+
+  public class LocaleDrivenResourceSelectorInlineGuard {
+    abstract URL map(String path) throws IOException;
+
+    OpenConnection open(String path, Locale locale, URL fallback) throws IOException {
+      int idx = path.lastIndexOf('.');
+      String base = path.substring(0, idx);
+      String ext = path.substring(idx);
+      if (ext.indexOf('/') >= 0)
+        return openURL(fallback);
+
+      OpenConnection con;
+      if (locale.getLanguage().matches("^[a-zA-Z]{2,8}$")
+          && locale.getCountry().matches("^[a-zA-Z]{2}|[0-9]{3}$")) {
+        con = openURL(map(base + '_' + locale.getLanguage() + '_' + locale.getCountry() + ext));
+        if (con != null) return con;
+      }
+      return openURL(fallback);
+    }
+
+    OpenConnection openURL(URL url) { return null; }
+  }
+  ```
+
+test "rank1790: ResourceBundle applies the locale fallback chain itself"
+  lang java
+  file LocalizedMessages.java
+  reject VYQL-PATH-011
+  reject_review code.UnvalidatedLocaleFileInclude
+  code
+  ```
+  import java.util.Locale;
+  import java.util.ResourceBundle;
+
+  public class LocalizedMessages {
+    String message(String baseName, Locale locale, String key) {
+      ResourceBundle bundle = ResourceBundle.getBundle(baseName, locale);
+      return bundle.getString(key);
+    }
+  }
+  ```
+
+test "rank1790: subtag validation in a sibling method does not clear the join"
+  lang java
+  file LocaleDrivenResourceSelectorSiblingGuard.java
+  expect VYQL-PATH-011
+  expect_review code.UnvalidatedLocaleFileInclude
+  code
+  ```
+  import java.io.IOException;
+  import java.net.URL;
+  import java.util.Locale;
+
+  public class LocaleDrivenResourceSelectorSiblingGuard {
+    abstract URL map(String path) throws IOException;
+
+    boolean subtagsAreSyntactic(Locale locale) {
+      return locale.getLanguage().matches("^[a-zA-Z]{2,8}$")
+          && locale.getCountry().matches("^[a-zA-Z]{2}|[0-9]{3}$")
+          && locale.getVariant().matches("^(?:[0-9][0-9a-zA-Z]{3}|[0-9a-zA-Z]{5,8})$");
+    }
+
+    OpenConnection open(String path, Locale locale, URL fallback) throws IOException {
+      int idx = path.lastIndexOf('.');
+      String base = path.substring(0, idx);
+      String ext = path.substring(idx);
+      return openURL(map(base + '_' + locale.getLanguage() + '_' + locale.getCountry() + ext));
+    }
+
+    OpenConnection openURL(URL url) { return null; }
+  }
+  ```

@@ -1,0 +1,73 @@
+module bindings.cpp.generated.m9209981e;
+
+binding weakHash0 {
+  requires {
+    dependency("cityhash")
+  }
+  query pattern callExpr where callee.method == "CityHash64"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("cityhash")
+  }
+  query pattern callExpr where callee.method == "CityHash64WithSeed"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash2 {
+  requires {
+    dependency("cityhash")
+  }
+  query pattern callExpr where callee.method == "CityHash64WithSeeds"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash3 {
+  requires {
+    dependency("cityhash")
+  }
+  query pattern callExpr where callee.method == "CityHash128"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash4 {
+  requires {
+    dependency("cityhash")
+  }
+  query pattern callExpr where callee.method == "CityHash128WithSeed"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash5 {
+  requires {
+    dependency("cityhash")
+  }
+  query pattern callExpr where callee.method == "CityHash32"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash6 {
+  requires {
+    dependency("cityhash")
+  }
+  query pattern callExpr where callee.method == "CityHashCrc128"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash7 {
+  requires {
+    dependency("cityhash")
+  }
+  query pattern callExpr where callee.method == "CityHashCrc128WithSeed"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash8 {
+  requires {
+    dependency("cityhash")
+  }
+  query pattern callExpr where callee.method == "CityHashCrc256"
+  emit issue code.WeakHash at call
+}

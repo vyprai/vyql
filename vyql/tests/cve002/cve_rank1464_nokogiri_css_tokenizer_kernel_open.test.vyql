@@ -1,0 +1,90 @@
+# CVE-2019-5477: the rexical-generated CSS tokenizer opened its input file
+# through Ruby's receiverless `open`. `Kernel#open` is mixed into Object, so
+# `open path, "r"` is `Kernel.open path, "r"`, and Ruby documents that method as
+# running the path as a subprocess command line whenever its first character is
+# `|`. `Tokenizer#load_file` takes the path straight from its caller and
+# `scan_file` forwards to it, so an application that tokenises a caller-named
+# stylesheet runs `id` for a path spelled `|id` (CWE-78). The fixed revision regenerates the
+# lexer with rexical 1.0.7, which emits `File.open` -- the spelling that has no
+# pipe behaviour.
+#
+# The weakness class is existing vocabulary: code.RubyPipeOpenCommandExecution,
+# its review twin and VYQL-INJ-042. The receiverless spelling is bound exactly
+# (callee.path == "open"), because `~=` is segment-aware in both directions and
+# would otherwise pull in the patched `File.open` as well.
+#
+# The path arrives as a library method parameter rather than from a labelled
+# source, so this is the review direction: the flag names the call for a caller
+# audit, and the taint rule stays silent until a source reaches it.
+
+test "rank1464: a lexer input path opened through bare open can run a piped path"
+  lang ruby
+  profile library
+  expect_review code.RubyPipeOpenCommandExecution
+  file lib/nokogiri/css/tokenizer.rb
+  code
+  ```
+  module Nokogiri
+  module CSS
+  class Tokenizer
+    require 'strscan'
+
+    attr_reader :filename
+
+    def scan_setup(str)
+      @ss = StringScanner.new(str)
+      @lineno = 1
+      @state = nil
+    end
+
+    def load_file( filename )
+      @filename = filename
+      open(filename, "r") do |f|
+        scan_setup(f.read)
+      end
+    end
+
+    def scan_file( filename )
+      load_file(filename)
+      do_parse
+    end
+  end
+  end
+  end
+  ```
+
+test "rank1464: the regenerated lexer opens the same path through File.open"
+  lang ruby
+  profile library
+  reject_review code.RubyPipeOpenCommandExecution
+  file lib/nokogiri/css/tokenizer.rb
+  code
+  ```
+  module Nokogiri
+  module CSS
+  class Tokenizer
+    require 'strscan'
+
+    attr_reader :filename
+
+    def scan_setup(str)
+      @ss = StringScanner.new(str)
+      @lineno = 1
+      @state = nil
+    end
+
+    def load_file( filename )
+      @filename = filename
+      File.open(filename, "r") do |f|
+        scan_setup(f.read)
+      end
+    end
+
+    def scan_file( filename )
+      load_file(filename)
+      do_parse
+    end
+  end
+  end
+  end
+  ```

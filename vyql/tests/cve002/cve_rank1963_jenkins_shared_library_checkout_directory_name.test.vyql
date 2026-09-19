@@ -1,0 +1,126 @@
+# Rank 1963 / CVE-2022-25174 (SECURITY-2463): the deprecated shared Groovy
+# libraries plugin keyed the SCM checkout workspace directory on the library
+# *name*, the free-text string a Pipeline author (or a folder administrator
+# with Item/Configure) supplies:
+#
+#     FilePath baseWorkspace = node.getWorkspaceFor((TopLevelItem) run.getParent());
+#     dir = baseWorkspace.withSuffix(getFilePathSuffix() + "libs").child(name);
+#     try (WorkspaceList.Lease lease = computer.getWorkspaceList().allocate(dir)) {
+#         delegate.checkout(run, lease.path, listener, node.createLauncher(listener));
+#
+# WorkspaceList leases are reused across builds, so two differently
+# configured SCMs for the same library name check out into one directory and
+# each loads the other's Groovy on the controller. The fixed revision
+# (ace0de3c2d691662021ea10306eeb407da6b6365, released as 561.va_ce0de3c2d69)
+# re-keys the leaf on an opaque MAC of the SCM's identity:
+#
+#     String checkoutDirName = LibraryRecord.directoryNameFor(scm.getKey());
+#     dir = baseWorkspace.withSuffix(getFilePathSuffix() + "libs").child(checkoutDirName);
+#
+# `vyql match` on the vulnerable checkout labels nothing at the derivation:
+# FilePath.child has no sink. With filePathChildNameSink9173 labelling the
+# child() argument as code.FilePathAccess, VYQL-PATH-001 reports the site with
+# the exact defect path, measured on src/main of the real revision pair
+# (`--cache off`, three runs, identical inside each revision):
+#
+#   fix^ (vulnerable): the checkout-directory child() at
+#       SCMSourceRetriever.java:188 fires with source
+#       SCMRetriever.retrieve#param#name -- the library name the caller
+#       chose -- through doRetrieve's parameter and the child leaf.
+#   fix: the same line still carries a flag, but its source is the version
+#       parameter reaching the leaf through scm.fetch -> scm.build ->
+#       scm.getKey -> directoryNameFor: the engine models the keyed digest
+#       as an argument-to-return passthrough and never routes the callee
+#       body, so a check bound at the digest call inside directoryNameFor
+#       cannot cover the path (probed: the label lands, the finding stays).
+#       That is the stated residual, not the discriminator; the version ->
+#       revision chain is identical in both revisions and is held out of
+#       both snippets so the pair isolates the leaf derivation, which is the
+#       only thing the change modifies.
+#
+# The sibling sites the same sink lights up on this tree are real members of
+# the same fix commit: LibraryAdder.java:204 keys the controller-root store
+# on the raw name (`child("libs/" + name)`, the SECURITY-2586 cache
+# directory) and :307 keys a resource read on `library.name + "/" + rootName`
+# (the SECURITY-2476 libraryResource path), both unvalidated in both
+# revisions. An earlier rank pinned a credentials-binding child() call as a
+# reject on the grounds that `callee.method == "child"` names every tree-API
+# accessor; measured, `.child(` occurs in none of the 160 sibling clones
+# under /tmp/cve-work/rank*/ and neither OWASP corpus, and that spec's
+# snippet has no labelled source in it, so it still reports nothing.
+#
+# verify_current_expected: fixed, filePathChildNameSink9173 on
+# FilePath.child arguments.
+
+test "rank1963: the checkout workspace directory leaf is the caller-supplied library name"
+  lang java
+  profile library
+  file src/main/java/org/jenkinsci/plugins/workflow/libs/SCMSourceRetriever.java
+  expect VYQL-PATH-001
+  code
+  ```
+  package org.jenkinsci.plugins.workflow.libs;
+
+  import hudson.FilePath;
+  import hudson.model.Computer;
+  import hudson.model.Run;
+  import hudson.model.TaskListener;
+  import hudson.scm.SCM;
+  import hudson.slaves.WorkspaceList;
+
+  public class SCMSourceRetriever extends LibraryRetriever {
+
+      private final SCMSource scm;
+      private String libraryPath;
+
+      @Override public void retrieve(String name, String version, boolean changelog, FilePath target, Run<?, ?> run, TaskListener listener) throws Exception {
+          doRetrieve(name, changelog, scm.build(null, null), libraryPath, target, run, listener);
+      }
+
+      static void doRetrieve(String name, boolean changelog, SCM scm, String libraryPath, FilePath target, Run<?, ?> run, TaskListener listener) throws Exception {
+          FilePath baseWorkspace = Computer.currentComputer().getWorkspace();
+          FilePath dir = baseWorkspace.withSuffix("@libs").child(name);
+          try (WorkspaceList.Lease lease = Computer.currentComputer().getWorkspaceList().allocate(dir)) {
+              scm.checkout(run, null, lease.path, listener);
+              lease.path.child(libraryPath).copyRecursiveTo("src/**/*.groovy,vars/*.groovy", null, target);
+          }
+      }
+  }
+  ```
+
+test "rank1963: the checkout workspace directory leaf is keyed on the SCM's own identity"
+  lang java
+  profile library
+  file src/main/java/org/jenkinsci/plugins/workflow/libs/SCMSourceRetriever.java
+  reject VYQL-PATH-001
+  code
+  ```
+  package org.jenkinsci.plugins.workflow.libs;
+
+  import hudson.FilePath;
+  import hudson.model.Computer;
+  import hudson.model.Run;
+  import hudson.model.TaskListener;
+  import hudson.scm.SCM;
+  import hudson.slaves.WorkspaceList;
+
+  public class SCMSourceRetriever extends LibraryRetriever {
+
+      private final SCMSource scm;
+      private String libraryPath;
+
+      @Override public void retrieve(String name, String version, boolean changelog, FilePath target, Run<?, ?> run, TaskListener listener) throws Exception {
+          doRetrieve(name, changelog, scm.build(null, null), libraryPath, target, run, listener);
+      }
+
+      static void doRetrieve(String name, boolean changelog, SCM scm, String libraryPath, FilePath target, Run<?, ?> run, TaskListener listener) throws Exception {
+          FilePath baseWorkspace = Computer.currentComputer().getWorkspace();
+          String checkoutDirName = LibraryRecord.directoryNameFor(scm.getKey());
+          FilePath dir = baseWorkspace.withSuffix("@libs").child(checkoutDirName);
+          try (WorkspaceList.Lease lease = Computer.currentComputer().getWorkspaceList().allocate(dir)) {
+              scm.checkout(run, null, lease.path, listener);
+              lease.path.child(libraryPath).copyRecursiveTo("src/**/*.groovy,vars/*.groovy", null, target);
+          }
+      }
+  }
+  ```

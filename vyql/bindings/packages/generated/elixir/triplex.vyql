@@ -1,0 +1,65 @@
+module bindings.elixir.generated.me859b561;
+
+binding sqlExecution0 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.method == "create"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.method == "create_schema"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.method == "drop"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.method == "rename"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.method == "migrate"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution5 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.path ~= "mix.tasks.triplex.gen.migration.run"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution6 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.path ~= "mix.tasks.triplex.migrate.run"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution7 {
+  requires {
+    dependency("triplex")
+  }
+  query pattern callExpr where callee.path ~= "mix.tasks.triplex.rollback.run"
+  emit sink code.SqlExecution at args[0]
+}

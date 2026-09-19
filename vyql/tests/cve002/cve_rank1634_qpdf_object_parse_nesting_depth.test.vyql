@@ -1,0 +1,383 @@
+# Rank 1634 / CVE-2018-9918: qpdf's direct-object parser drove its
+# nesting stacks without any depth ceiling, so a PDF whose object body
+# is hundreds of thousands of opening brackets built a direct object
+# that deep and exhausts the native stack the moment the tree is
+# walked (denial of service through unbounded parse depth, CWE-400/
+# CWE-674 family; qpdf issue #202). parseInternal in
+# libqpdf/QPDFObjectHandle.cc is an iterative state machine over
+# QPDFTokenizer tokens -- olist_stack, state_stack and offset_stack
+# are pushed on every tt_array_open/tt_dict_open and popped on the
+# matching close -- and the open case pushed unconditionally, so the
+# depth of the parsed tree is bounded by nothing but the file. The
+# fixing commit b4d6cf6836 ("Limit depth of nesting in direct objects
+# (fixes #202)", naming this CVE): the open case first checks
+# olist_stack.size() > 500 and, past the bound, warns about
+# excessively deeply nested data and folds to null at st_top instead
+# of pushing. The remediation is present at the fixed revision
+# (QPDFObjectHandle.cc:1490).
+#
+# ATTENTION, parse nesting-depth budgets in the C++ explicit-stack
+# form, held on recheck. Re-measured at the span tip (3 x --cache off
+# per revision, timeout 180, --max-ram 6GB): QPDFObjectHandle.cc
+# reports the same 15 findings at the fix parent and the fix (14
+# VYQL-MEM-006, 1 VYQL-MEM-016, the in-function rows sitting on the
+# dictionary-conversion tail and shifting only with the inserted
+# guard's line offset), the full findings view and the -flags only
+# view both leave the nesting push unlabelled, and the whole tree
+# reports 509 findings at both revisions. The only in-loop review
+# flags are IntegerSizeArithmetic on olist.size() - 1 / - 2 in the
+# indirect-reference branch -- size arithmetic the vulnerable body
+# already carries. The depth-ceiling vocabulary that landed since the
+# first pass does not reach C++: NestedParamExpansionWithoutDepthLimit
+# (ruby, with its php sibling), NestedExtglobExpansionWithoutDepthLimit
+# (javascript) and the YARA ast_build_without_level_budget binding are
+# each library-bound, and nothing in bindings/cpp emits
+# code.UnboundedResourceOperation. The YARA control shape cannot
+# transfer either: qpdf documents no nesting budget anywhere at the
+# vulnerable revision (no depth or nesting constant in libqpdf/ or
+# include/), so there is no documented cap for a negation to key on,
+# and keying on the fix's own olist_stack.size() > 500 is the fixing
+# commit's own layout. The generic shape is unshippable and is now
+# measured narrower than at the first pass: across the 220 sibling
+# clones, 38474 C/C++ files, 220 carry the vector-stack idiom
+# (push_back beside pop_back/.back()) and 90 of those carry no size()
+# or depth comparison at all; even the narrowest spelling -- while +
+# switch + case + push_back + pop_back with no size()/depth comparison
+# anywhere in the file -- matches 8 files, and not this one, because
+# parseInternal's own body already compares olist.size() >= 2 on the
+# inner vector. A control clause keyed on the generic size-comparison
+# spelling is therefore satisfied at both revisions, and only the
+# identifier-linked spelling discriminates. Minting a fourth
+# per-shape depth sibling concept beside the three existing ones is
+# the ontology-rot move the campaign rejects. No ENGINE-GAPS.md entry:
+# the loop, the pushes and the size comparisons all extract, so the
+# missing piece is the depth-budget relation between the pushed
+# container and the compared one, not a localised construct. No
+# definition change shipped. Spec cve_rank1634 holds three cases off
+# the real code, all rejecting VYQL-DOS-029: the unbounded open case,
+# the unbounded open case with the sibling-vector size guard in the
+# same body (a size comparison on the inner vector is not the nesting
+# budget, so it must not neutralise when depth-budget vocabulary
+# lands), and the olist_stack.size()-guarded form, which must stay
+# rejected.
+
+test "rank1634: the object parser nests without a depth budget"
+  lang cpp
+  file libqpdf/QPDFObjectHandle.cc
+  reject VYQL-DOS-029
+  code
+  ```
+  QPDFObjectHandle
+  QPDFObjectHandle::parseInternal(PointerHolder<InputSource> input,
+                                  std::string const& object_description,
+                                  QPDFTokenizer& tokenizer, bool& empty,
+                                  StringDecrypter* decrypter, QPDF* context,
+                                  bool content_stream)
+  {
+      empty = false;
+
+      QPDFObjectHandle object;
+
+      std::vector<std::vector<QPDFObjectHandle> > olist_stack;
+      olist_stack.push_back(std::vector<QPDFObjectHandle>());
+      std::vector<parser_state_e> state_stack;
+      state_stack.push_back(st_top);
+      std::vector<qpdf_offset_t> offset_stack;
+      qpdf_offset_t offset = input->tell();
+      offset_stack.push_back(offset);
+      bool done = false;
+      while (! done)
+      {
+          std::vector<QPDFObjectHandle>& olist = olist_stack.back();
+          parser_state_e state = state_stack.back();
+          offset = offset_stack.back();
+
+          object = QPDFObjectHandle();
+
+          QPDFTokenizer::Token token =
+              tokenizer.readToken(input, object_description, true);
+
+          switch (token.getType())
+          {
+            case QPDFTokenizer::tt_array_open:
+            case QPDFTokenizer::tt_dict_open:
+              olist_stack.push_back(std::vector<QPDFObjectHandle>());
+              state = st_start;
+              offset_stack.push_back(input->tell());
+              state_stack.push_back(
+                  (token.getType() == QPDFTokenizer::tt_array_open) ?
+                  st_array : st_dictionary);
+              break;
+
+            case QPDFTokenizer::tt_bool:
+              object = newBool((token.getValue() == "true"));
+              break;
+
+            case QPDFTokenizer::tt_null:
+              object = newNull();
+              break;
+
+            default:
+              object = newNull();
+              break;
+          }
+
+          switch (state)
+          {
+            case st_array:
+            case st_dictionary:
+              olist.push_back(object);
+              break;
+
+            case st_stop:
+            {
+                if ((state_stack.size() < 2) || (olist_stack.size() < 2))
+                {
+                    throw std::logic_error(
+                        "QPDFObjectHandle::parseInternal: st_stop encountered "
+                        "with insufficient stack");
+                }
+                parser_state_e old_state = state_stack.back();
+                state_stack.pop_back();
+                offset_stack.pop_back();
+                if (old_state == st_array)
+                {
+                    object = newArray(olist);
+                }
+                else
+                {
+                    object = newDictionary(olist);
+                }
+                olist_stack.pop_back();
+                olist_stack.back().push_back(object);
+                break;
+            }
+
+            case st_top:
+              done = true;
+              break;
+
+            default:
+              break;
+          }
+      }
+      return object;
+  }
+  ```
+
+test "rank1634: a size guard on the inner vector is not the nesting budget"
+  lang cpp
+  file libqpdf/QPDFObjectHandle.cc
+  reject VYQL-DOS-029
+  code
+  ```
+  QPDFObjectHandle
+  QPDFObjectHandle::parseInternal(PointerHolder<InputSource> input,
+                                  std::string const& object_description,
+                                  QPDFTokenizer& tokenizer, bool& empty,
+                                  StringDecrypter* decrypter, QPDF* context,
+                                  bool content_stream)
+  {
+      empty = false;
+
+      QPDFObjectHandle object;
+
+      std::vector<std::vector<QPDFObjectHandle> > olist_stack;
+      olist_stack.push_back(std::vector<QPDFObjectHandle>());
+      std::vector<parser_state_e> state_stack;
+      state_stack.push_back(st_top);
+      std::vector<qpdf_offset_t> offset_stack;
+      qpdf_offset_t offset = input->tell();
+      offset_stack.push_back(offset);
+      bool done = false;
+      while (! done)
+      {
+          std::vector<QPDFObjectHandle>& olist = olist_stack.back();
+          parser_state_e state = state_stack.back();
+          offset = offset_stack.back();
+
+          object = QPDFObjectHandle();
+
+          QPDFTokenizer::Token token =
+              tokenizer.readToken(input, object_description, true);
+
+          switch (token.getType())
+          {
+            case QPDFTokenizer::tt_array_open:
+            case QPDFTokenizer::tt_dict_open:
+              // The push is unbounded: the only comparison in this body
+              // reads olist, the vector at the stack's top, not the
+              // stack whose growth is the defect.
+              olist_stack.push_back(std::vector<QPDFObjectHandle>());
+              state = st_start;
+              offset_stack.push_back(input->tell());
+              state_stack.push_back(
+                  (token.getType() == QPDFTokenizer::tt_array_open) ?
+                  st_array : st_dictionary);
+              break;
+
+            case QPDFTokenizer::tt_word:
+            {
+                std::string const& value = token.getValue();
+                if ((value == "R") && (state != st_top) &&
+                    (olist.size() >= 2) &&
+                    (! olist.at(olist.size() - 1).isIndirect()) &&
+                    (olist.at(olist.size() - 1).isInteger()) &&
+                    (! olist.at(olist.size() - 2).isIndirect()) &&
+                    (olist.at(olist.size() - 2).isInteger()))
+                {
+                    object = newIndirect(
+                        context,
+                        olist.at(olist.size() - 2).getIntValue(),
+                        olist.at(olist.size() - 1).getIntValue());
+                    olist.pop_back();
+                    olist.pop_back();
+                }
+                else
+                {
+                    object = newNull();
+                }
+                break;
+            }
+
+            default:
+              object = newNull();
+              break;
+          }
+
+          switch (state)
+          {
+            case st_array:
+            case st_dictionary:
+              olist.push_back(object);
+              break;
+
+            case st_top:
+              done = true;
+              break;
+
+            default:
+              break;
+          }
+      }
+      return object;
+  }
+  ```
+
+test "rank1634: the fixed revision bounds the nesting depth"
+  lang cpp
+  file libqpdf/QPDFObjectHandle.cc
+  reject VYQL-DOS-029
+  code
+  ```
+  QPDFObjectHandle
+  QPDFObjectHandle::parseInternal(PointerHolder<InputSource> input,
+                                  std::string const& object_description,
+                                  QPDFTokenizer& tokenizer, bool& empty,
+                                  StringDecrypter* decrypter, QPDF* context,
+                                  bool content_stream)
+  {
+      empty = false;
+
+      QPDFObjectHandle object;
+
+      std::vector<std::vector<QPDFObjectHandle> > olist_stack;
+      olist_stack.push_back(std::vector<QPDFObjectHandle>());
+      std::vector<parser_state_e> state_stack;
+      state_stack.push_back(st_top);
+      std::vector<qpdf_offset_t> offset_stack;
+      qpdf_offset_t offset = input->tell();
+      offset_stack.push_back(offset);
+      bool done = false;
+      while (! done)
+      {
+          std::vector<QPDFObjectHandle>& olist = olist_stack.back();
+          parser_state_e state = state_stack.back();
+          offset = offset_stack.back();
+
+          object = QPDFObjectHandle();
+
+          QPDFTokenizer::Token token =
+              tokenizer.readToken(input, object_description, true);
+
+          switch (token.getType())
+          {
+            case QPDFTokenizer::tt_array_open:
+            case QPDFTokenizer::tt_dict_open:
+              if (olist_stack.size() > 500)
+              {
+                  QTC::TC("qpdf", "QPDFObjectHandle too deep");
+                  warn(context,
+                       QPDFExc(qpdf_e_damaged_pdf, input->getName(),
+                               object_description,
+                               input->getLastOffset(),
+                               "ignoring excessively deeply nested data structure"));
+                  object = newNull();
+                  state = st_top;
+              }
+              else
+              {
+                  olist_stack.push_back(std::vector<QPDFObjectHandle>());
+                  state = st_start;
+                  offset_stack.push_back(input->tell());
+                  state_stack.push_back(
+                      (token.getType() == QPDFTokenizer::tt_array_open) ?
+                      st_array : st_dictionary);
+              }
+              break;
+
+            case QPDFTokenizer::tt_bool:
+              object = newBool((token.getValue() == "true"));
+              break;
+
+            case QPDFTokenizer::tt_null:
+              object = newNull();
+              break;
+
+            default:
+              object = newNull();
+              break;
+          }
+
+          switch (state)
+          {
+            case st_array:
+            case st_dictionary:
+              olist.push_back(object);
+              break;
+
+            case st_stop:
+            {
+                if ((state_stack.size() < 2) || (olist_stack.size() < 2))
+                {
+                    throw std::logic_error(
+                        "QPDFObjectHandle::parseInternal: st_stop encountered "
+                        "with insufficient stack");
+                }
+                parser_state_e old_state = state_stack.back();
+                state_stack.pop_back();
+                offset_stack.pop_back();
+                if (old_state == st_array)
+                {
+                    object = newArray(olist);
+                }
+                else
+                {
+                    object = newDictionary(olist);
+                }
+                olist_stack.pop_back();
+                olist_stack.back().push_back(object);
+                break;
+            }
+
+            case st_top:
+              done = true;
+              break;
+
+            default:
+              break;
+          }
+      }
+      return object;
+  }
+  ```

@@ -1,0 +1,7 @@
+module code;
+
+review code.CallFutureRawWeakStateRef {
+  category: resource
+  kind: attention
+  text: "review call future polling that creates a raw weak state reference before confirming a new callback registration is needed"
+}

@@ -1,0 +1,17 @@
+module bindings.csharp.generated.m5af6e3b4;
+
+binding codeEval0 {
+  requires {
+    dependency("shaderc.net")
+  }
+  query pattern callExpr where callee.method == "Compile"
+  emit sink code.CodeEval at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("shaderc.net")
+  }
+  query pattern callExpr where callee.method == "TryParseVersionProfile"
+  emit source core.UserControlledData at call.result
+}

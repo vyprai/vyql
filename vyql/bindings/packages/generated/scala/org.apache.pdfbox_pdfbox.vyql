@@ -1,0 +1,25 @@
+module bindings.scala.generated.mda6a07ad;
+
+binding filePathAccess0 {
+  requires {
+    dependency("org.apache.pdfbox:pdfbox")
+  }
+  query pattern callExpr where callee.method == "loadFDF"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("org.apache.pdfbox:pdfbox")
+  }
+  query pattern callExpr where callee.method == "loadXFDF"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.apache.pdfbox:pdfbox")
+  }
+  query pattern callExpr where callee.method == "parseHex"
+  emit sink code.Deserialization at args[0]
+}

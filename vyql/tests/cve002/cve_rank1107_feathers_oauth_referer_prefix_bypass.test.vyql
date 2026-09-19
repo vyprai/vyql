@@ -1,0 +1,189 @@
+# Rank 1107 / CVE-2026-27192: Feathers' OAuth strategy validated the Referer
+# header against its configured allowed origins with a plain string prefix
+# check, so a referer whose string happens to start with an allowed origin
+# passed even when its actual origin was different (CWE-346). The fix also
+# stops persisting every request header into the session: the strategy needs
+# only the referer, and the raw headers object crossing into session state is
+# a trust-boundary violation (CWE-501) the same commit removes.
+
+test "rank1107: persisting every request header into the session is a trust-boundary crossing"
+  lang javascript
+  file packages/authentication-oauth/src/service.ts
+  code
+  ```
+  import type { Application } from '@feathersjs/feathers'
+
+  export class OAuthService {
+    async authenticate(data: any, params: any) {
+      const { headers } = params
+      const session: any = {}
+
+      session.headers = headers
+
+      return this.handler('GET', params, {})
+    }
+
+    async handler(method: string, params: any, args: any) {
+      return null
+    }
+  }
+
+  export function registerOauthRoute(app: Application, service: OAuthService) {
+    app.use('/oauth', (req: any, res: any) => {
+      service.authenticate({ strategy: 'github' }, {
+        headers: req.headers
+      })
+    })
+  }
+  ```
+  expect VYQL-CFG-014
+
+test "rank1107: persisting only the referer the strategy validates is clean"
+  lang javascript
+  file packages/authentication-oauth/src/service.ts
+  code
+  ```
+  import type { Application } from '@feathersjs/feathers'
+
+  export class OAuthService {
+    async authenticate(data: any, params: any) {
+      const { headers } = params
+      const session: any = {}
+
+      session.headers = {
+        referer: headers?.referer
+      }
+
+      return this.handler('GET', params, {})
+    }
+
+    async handler(method: string, params: any, args: any) {
+      return null
+    }
+  }
+
+  export function registerOauthRoute(app: Application, service: OAuthService) {
+    app.use('/oauth', (req: any, res: any) => {
+      service.authenticate({ strategy: 'github' }, {
+        headers: req.headers
+      })
+    })
+  }
+  ```
+  reject VYQL-CFG-014
+
+# The origin-validation bypass itself lives inside the framework, so the
+# report that reaches a Feathers application is the dependency finding: a
+# pin below 5.0.40, the release the advisory names as first fixed.
+
+test "rank1107: an authentication-oauth pin below the first fixed release is a dependency finding"
+  lang javascript
+  file app.js
+  code
+  ```
+  const { oauth } = require('@feathersjs/authentication-oauth');
+
+  function configureAuth(app) {
+    app.configure(oauth({ origins: ['https://app.example.com'] }));
+  }
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "profile-app",
+    "dependencies": {
+      "@feathersjs/authentication-oauth": "5.0.39"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2026-27192
+
+test "rank1107: an authentication-oauth pin at the first fixed release is clean"
+  lang javascript
+  file app.js
+  code
+  ```
+  const { oauth } = require('@feathersjs/authentication-oauth');
+
+  function configureAuth(app) {
+    app.configure(oauth({ origins: ['https://app.example.com'] }));
+  }
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "profile-app",
+    "dependencies": {
+      "@feathersjs/authentication-oauth": "5.0.40"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+
+# The prefix-matched referer check itself stays unpinned by the wildcard
+# prefix rule: Feathers prefix-matches the raw referer against a raw allowed
+# origin, which is a sibling of the CORS wildcard truncation shape, not the
+# shape itself.
+
+test "rank1107: the referer is compared to allowed origins by string prefix"
+  lang javascript
+  file packages/authentication-oauth/src/strategy.ts
+  code
+  ```
+  export class OAuthStrategy {
+    async getRedirectUrl(params: Params): Promise<string> {
+      const { origins } = this.authentication.configuration.oauth
+
+      if (Array.isArray(origins)) {
+        const referer = params?.headers?.referer || origins[0]
+        const allowedOrigin = origins.find((current) =>
+          referer.toLowerCase().startsWith(current.toLowerCase())
+        )
+
+        if (!allowedOrigin) {
+          throw new NotAuthenticated(`Referer "${referer}" is not allowed.`)
+        }
+      }
+
+      return origins[0]
+    }
+  }
+  ```
+  reject VYQL-CFG-018
+
+test "rank1107: the referer is parsed to a URL and its origin compared exactly"
+  lang javascript
+  file packages/authentication-oauth/src/strategy.ts
+  code
+  ```
+  export class OAuthStrategy {
+    async getRedirectUrl(params: Params): Promise<string> {
+      const { origins } = this.authentication.configuration.oauth
+
+      if (Array.isArray(origins)) {
+        const referer = params?.headers?.referer || origins[0]
+
+        let refererOrigin: string
+        try {
+          refererOrigin = new URL(referer).origin
+        } catch {
+          throw new NotAuthenticated(`Invalid referer "${referer}".`)
+        }
+
+        const allowedOrigin = origins.find(
+          (current) => refererOrigin.toLowerCase() === current.toLowerCase()
+        )
+
+        if (!allowedOrigin) {
+          throw new NotAuthenticated(`Referer "${referer}" is not allowed.`)
+        }
+      }
+
+      return origins[0]
+    }
+  }
+  ```
+  reject VYQL-CFG-018

@@ -1,0 +1,57 @@
+module bindings.perl.generated.m7b5a4479;
+
+binding networkData0 {
+  requires {
+    dependency("ZeroMQ")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("ZeroMQ")
+  }
+  query pattern callExpr where callee.method == "zmq_recv"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend2 {
+  requires {
+    dependency("ZeroMQ")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("ZeroMQ")
+  }
+  query pattern callExpr where callee.method == "zmq_send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect4 {
+  requires {
+    dependency("ZeroMQ")
+  }
+  query pattern callExpr where callee.method == "zmq_bind"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("ZeroMQ")
+  }
+  query pattern callExpr where callee.method == "zmq_connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("ZeroMQ")
+  }
+  query pattern callExpr where callee.method == "register_read_type"
+  emit sink code.Deserialization at args[0]
+}

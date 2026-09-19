@@ -1,0 +1,35 @@
+module bindings.javascript.matrix_device_verification_key_binding;
+
+// A Matrix client SDK finishes an interactive verification (SAS emoji/decimal,
+// or a QR scan) by turning the key set the other side MACed into device trust.
+// The key set arrives keyed by Matrix key identifiers, `<algorithm>:<id>`, so
+// the flow first has to work out what each identifier names: a device the
+// client already stores, resolved with `getStoredDevice`, or the user's
+// cross-signing identity, resolved with `getStoredCrossSigningForUser`. Both
+// lookups are keyed by the same string, and the homeserver is what supplies
+// the device list, so nothing about an identifier says which of the two
+// namespaces it belongs to.
+//
+// That is why the trust call matters. `MatrixClient.setDeviceVerified(userId,
+// deviceId)` is documented to mark a device verified from the identifier
+// alone; `Crypto.setDeviceVerification`'s trailing `keys` argument is
+// documented as "the list of keys that was present during the device
+// verification", to "be double checked with the list of keys the given device
+// has currently". Committing trust with the identifier-only call throws away
+// the one thing the verification actually established -- which key the peer
+// proved possession of -- so a device whose identifier collides with the
+// cross-signing key identifier gets the trust that was earned by the other
+// namespace's key.
+//
+// The binding therefore looks for a single function that resolves both
+// namespaces from the offered identifiers and then commits trust by
+// identifier, with no key-checking trust call anywhere in it. Each method name
+// is matched as a whole `call:` token rather than a substring, so
+// `getStoredDevicesForUser` does not stand in for `getStoredDevice` and the
+// key-checking `setDeviceVerification` is not read as the identifier-only
+// `setDeviceVerified`. A flow that passes the observed keys to
+// `setDeviceVerification` satisfies the control and is not reported.
+binding matrixDeviceVerificationKeyBindingMissing {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.call == "getStoredDevice" and node.context.call == "getStoredCrossSigningForUser" and node.context.call == "setDeviceVerified" and not (node.context.call == "setDeviceVerification")
+  emit issue code.DeviceVerificationKeyBindingMissing at node
+}

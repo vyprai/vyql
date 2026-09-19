@@ -1,0 +1,49 @@
+module bindings.elixir.generated.mbeb9ff45;
+
+binding userControlledData0 {
+  requires {
+    dependency("reverse_proxy_plug")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit source core.UserControlledData at call.result
+}
+
+binding stdinInput1 {
+  requires {
+    dependency("reverse_proxy_plug")
+  }
+  query pattern callExpr where callee.method == "read_body"
+  emit source code.StdinInput at call.result
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("reverse_proxy_plug")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("reverse_proxy_plug")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding responseHeaderWrite4 {
+  requires {
+    dependency("reverse_proxy_plug")
+  }
+  query pattern callExpr where callee.method == "response"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding urlFetch5 {
+  requires {
+    dependency("reverse_proxy_plug")
+  }
+  query pattern callExpr where callee.method == "prepare_url"
+  emit sink code.UrlFetch at args[0]
+}

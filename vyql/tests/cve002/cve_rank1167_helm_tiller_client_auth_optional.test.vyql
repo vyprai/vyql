@@ -1,0 +1,119 @@
+# Rank 1167 / CVE-2019-1010275: Helm's Tiller gRPC server built its TLS
+# server config with ClientAuth: tls.VerifyClientCertIfGiven, so a client
+# connecting without any certificate at all was still accepted -- mutual TLS
+# was effectively optional, letting an unauthenticated or self-signed caller
+# reach Tiller (CWE-295).
+#
+# cmd/tiller/tiller.go's tlsOptions() set opts.ClientAuth to
+# tls.VerifyClientCertIfGiven when -tls-verify was passed, and that Options
+# value crossed into pkg/tlsutil's ServerConfig(), which built
+# &tls.Config{..., ClientAuth: opts.ClientAuth, ...} -- the weak constant
+# never appears inside the tls.Config composite literal itself, only two
+# functions upstream, in a plain field assignment on a wrapper struct. The
+# fix (1096813bf9a425e2aa4ac755b6c991b626dfab50) changes exactly one token,
+# tlsOptions()'s tls.VerifyClientCertIfGiven to tls.RequireAndVerifyClientCert,
+# which both requires a client certificate and validates it against the
+# configured CA pool.
+#
+# code.CertValidationDisabled (VYQL-CFG-004) already carries CWE_295 and
+# already has a Go binding for crypto/tls's other weak-validation shape,
+# InsecureSkipVerify, but that binding is engine-assisted: it observes the
+# literal only when it sits directly inside a tls.Config{} composite literal
+# (internal/extract/frontend/golang/golang.go's goSecurityObservations), so
+# it would not see this CVE's real shape, where the constant is assigned to
+# an intermediate Options struct field and only reaches a tls.Config two
+# function calls later.
+#
+# FIXED at the binding layer, no engine change: three new Go bindings
+# (tlsWeakClientAuth345-347 in vyql/bindings/go/m48a985c1.vyql) match
+# node.kind == "any" and node.path ~= "tls.RequestClientCert" /
+# "tls.RequireAnyClientCert" / "tls.VerifyClientCertIfGiven" -- a presenceNode
+# pattern with kind "any" ranges over every code.Attr/code.Name node the Go
+# frontend already emits for a plain selector or identifier expression, not
+# only call callees, so it labels the constant wherever it is referenced --
+# a composite-literal field, a plain assignment, a struct literal field on a
+# caller-defined wrapper type, or a function argument -- which is exactly
+# what reaches the real vulnerable line without depending on the constant
+# sitting inside a tls.Config literal. crypto/tls documents ClientAuthType's
+# five constants directly: RequireAndVerifyClientCert is the only one that
+# both requires and verifies a client certificate; NoClientCert (the zero
+# value, and the ordinary default for a server that never wanted mutual TLS)
+# is deliberately left unbound, since flagging it would fire on every plain
+# HTTPS server that never mentions client certificates at all.
+#
+# verify_current_expected: reachable via a two-hop Options/ServerConfig
+# indirection identical in shape to the real code, both directions.
+
+test "rank1167: server ClientAuth accepts connections with no client cert"
+  lang go
+  expect VYQL-CFG-004
+  code
+  ```
+  package main
+
+  import "crypto/tls"
+
+  type Options struct {
+      CertFile   string
+      KeyFile    string
+      CaCertFile string
+      ClientAuth tls.ClientAuthType
+  }
+
+  func tlsOptions(tlsVerify bool, certFile, keyFile, caCertFile string) Options {
+      opts := Options{CertFile: certFile, KeyFile: keyFile}
+      if tlsVerify {
+          opts.CaCertFile = caCertFile
+          opts.ClientAuth = tls.VerifyClientCertIfGiven
+      }
+      return opts
+  }
+
+  func ServerConfig(opts Options, cert tls.Certificate) *tls.Config {
+      return &tls.Config{MinVersion: tls.VersionTLS12, ClientAuth: opts.ClientAuth, Certificates: []tls.Certificate{cert}}
+  }
+  ```
+
+test "rank1167: server ClientAuth requires and verifies a client cert"
+  lang go
+  reject VYQL-CFG-004
+  code
+  ```
+  package main
+
+  import "crypto/tls"
+
+  type Options struct {
+      CertFile   string
+      KeyFile    string
+      CaCertFile string
+      ClientAuth tls.ClientAuthType
+  }
+
+  func tlsOptions(tlsVerify bool, certFile, keyFile, caCertFile string) Options {
+      opts := Options{CertFile: certFile, KeyFile: keyFile}
+      if tlsVerify {
+          opts.CaCertFile = caCertFile
+          opts.ClientAuth = tls.RequireAndVerifyClientCert
+      }
+      return opts
+  }
+
+  func ServerConfig(opts Options, cert tls.Certificate) *tls.Config {
+      return &tls.Config{MinVersion: tls.VersionTLS12, ClientAuth: opts.ClientAuth, Certificates: []tls.Certificate{cert}}
+  }
+  ```
+
+test "rank1167: server with no ClientAuth field set at all is an ordinary TLS server"
+  lang go
+  reject VYQL-CFG-004
+  code
+  ```
+  package main
+
+  import "crypto/tls"
+
+  func ServerConfig(cert tls.Certificate) *tls.Config {
+      return &tls.Config{MinVersion: tls.VersionTLS12, Certificates: []tls.Certificate{cert}}
+  }
+  ```

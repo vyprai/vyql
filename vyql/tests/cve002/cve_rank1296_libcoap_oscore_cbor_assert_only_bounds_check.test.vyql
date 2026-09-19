@@ -1,0 +1,163 @@
+# libcoap's OSCORE CBOR decoder (src/oscore/oscore_cbor.c) walks a
+# network-derived byte buffer with get_byte_inc(), which bounds-checked the
+# remaining length with nothing but `assert((*buf_len) > 0)` before
+# decrementing it and dereferencing the buffer pointer. assert() compiles to
+# a no-op in an NDEBUG release build, so a crafted CoAP request whose OSCORE
+# option encodes a CBOR length/array count larger than the option actually
+# carries walks get_byte_inc() past the end of the buffer once buf_len
+# reaches zero -- an out-of-bounds read reachable straight from the wire,
+# CWE-125/CWE-617. get_byte() has the same defect one function above it, and
+# oscore_cbor_get_element_size() calls get_byte_inc() in a loop (up to 8
+# times, once per length byte the attacker claims), so a single crafted
+# option can walk arbitrarily far past the buffer. Commit
+# a89ae8ea7cc1e33bf7b6358b86504f0b3ed824f0 ("OSCORE: Be more rigorous in
+# boundary checking") replaces the assert in both readers with a real
+# `if (*buf_len < 1) return 0;` runtime check, and adds the same runtime
+# check under every assert() in the CBOR encoders and skip path.
+#
+# Measured miss (recheck, three --cache off runs per revision, timeout 180,
+# --max-ram 6GB, deterministic within each revision): the pre-fix src tree
+# reports 1001 rule-at-location rows and the fixed tree 1012, and every
+# difference between them is a line-number shift of the same rules -- the
+# fix's added `if` statements yield eleven MORE low-confidence
+# VYQL-MEM-006 (code.NullableDeref) rows on oscore_cbor.c (79 before, 90
+# after; the 2 VYQL-MEM-007 and 2 VYQL-MEM-016 rows are identical in kind at
+# both revisions). No rule discriminates the vulnerable revision:
+# nothing reports the assert-only bound at 4f98e79, and the fixed revision
+# reports strictly more, not less. The flags-only view names the same six
+# flag kinds on the file at both revisions (PointerUse, NullableDeref,
+# IntegerSizeArithmetic, IndexAccess, RawMemoryCopySize, PointerFree) --
+# no assertion flag exists to carry. vyql match on the repro labels no
+# source at all for the network buffer parameter, and the `assert` call is
+# unresolved (no callee body, not a known source/sink/control).
+#
+# code.ReachableAssertionReview / VYQL-DOS-040 (CWE-617) is the right
+# concept and rule, but its C binding
+# (reachableAssertionReview129 in bindings/c/mce54b166.vyql) routes through
+# `node.analysis ~= "assertion.avahi_publish_flag_pair_reachable"`, an
+# observation ccAvahiReachableAssertionObservations
+# (internal/extract/frontend/treesitter/c.go) emits only for a body
+# containing AVAHI_FLAGS_VALID + AVAHI_PUBLISH_USE_WIDE_AREA +
+# AVAHI_PUBLISH_USE_MULTICAST + transport_flags_from_domain; the C++ sibling
+# (reachableAssertionReview77) is likewise spelled to visitBrOn +
+# validateTypeAnnotation. Matching "assert() is the only bounds check on a
+# decrementing length counter" generically needs a new extraction capability
+# plus provenance for the counter, and the assert-observation alone measures
+# unshippable: across the C clones, 108 sites in 63 files pair a bounds
+# assert with an offset/subscript use of the same identifier to essentially
+# every one a loop counter whose non-negativity holds by construction, and
+# labelling every assert call produces a hundred-plus high review rows on
+# idiomatic trees for one true positive. A third per-library extractor
+# sibling keyed on oscore_cbor/get_byte_inc would be a repro-shaped patch.
+# Not confined to one function or a known construct's edge case, so not
+# mechanical. Held ATTENTION, engine gap: generic assert-only bounds-check
+# recognition for code.ReachableAssertionReview (C), plus the wire path
+# (a source for the CoAP option parameter and taint through `&ptr`, the
+# address-of operator erased in lowering).
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+# When C gains a generic assert-only bounds-check observation (and the
+# wire path), case 1 must flip to expect VYQL-DOS-040 while the fixed
+# case 2 stays rejected; case 3 passes today and is the non-vacuity proof
+# that C specs are scanned and the DOS-040 vocabulary works.
+
+test "rank1296: get_byte_inc's only bounds check is assert(), reachable from a network-controlled CBOR length"
+  lang c
+  file oscore_cbor.c
+  reject VYQL-DOS-040
+  code
+  ```
+  #include <assert.h>
+  #include <stddef.h>
+  #include <stdint.h>
+
+  static uint8_t
+  get_byte_inc(const uint8_t **buffer, size_t *buf_len) {
+      assert((*buf_len) > 0);
+      (*buf_len)--;
+      return ((*buffer)++)[0];
+  }
+
+  static size_t
+  oscore_cbor_get_element_size(const uint8_t **buffer, size_t *buf_len) {
+      uint8_t control = get_byte_inc(buffer, buf_len) & 0x1f;
+      size_t size = 0;
+      if (control >= 0x18) {
+          int num = 1 << (control & 0x3);
+          for (int i = 0; i < num; i++) {
+              size = (size << 8) + get_byte_inc(buffer, buf_len);
+          }
+      }
+      return size;
+  }
+
+  size_t
+  coap_oscore_decrypt_pdu(const uint8_t *option_value, size_t option_len) {
+      const uint8_t *ptr = option_value;
+      size_t length = option_len;
+      return oscore_cbor_get_element_size(&ptr, &length);
+  }
+  ```
+
+test "rank1296: fix replaces the assert with a runtime check that returns instead of reading past the buffer"
+  lang c
+  file oscore_cbor.c
+  reject VYQL-DOS-040
+  code
+  ```
+  #include <stddef.h>
+  #include <stdint.h>
+
+  static uint8_t
+  get_byte_inc(const uint8_t **buffer, size_t *buf_len) {
+      if (*buf_len < 1)
+          return 0;
+      (*buf_len)--;
+      return ((*buffer)++)[0];
+  }
+
+  static size_t
+  oscore_cbor_get_element_size(const uint8_t **buffer, size_t *buf_len) {
+      uint8_t control = get_byte_inc(buffer, buf_len) & 0x1f;
+      size_t size = 0;
+      if (control >= 0x18) {
+          int num = 1 << (control & 0x3);
+          for (int i = 0; i < num; i++) {
+              size = (size << 8) + get_byte_inc(buffer, buf_len);
+          }
+      }
+      return size;
+  }
+
+  size_t
+  coap_oscore_decrypt_pdu(const uint8_t *option_value, size_t option_len) {
+      const uint8_t *ptr = option_value;
+      size_t length = option_len;
+      return oscore_cbor_get_element_size(&ptr, &length);
+  }
+  ```
+
+test "rank1296: the reachable-assertion vocabulary reports the recognized C shape today"
+  lang c
+  file avahi_publish.c
+  expect VYQL-DOS-040
+  expect_review code.ReachableAssertionReview
+  code
+  ```
+  #include <assert.h>
+  #define AVAHI_PUBLISH_USE_MULTICAST 1
+  #define AVAHI_PUBLISH_USE_WIDE_AREA 2
+  #define AVAHI_ERR_INVALID_FLAGS -1
+  static void transport_flags_from_domain(void *s, int *flags, const char *domain) {
+      assert(flags);
+      assert(domain);
+      assert(!((*flags & AVAHI_PUBLISH_USE_MULTICAST) && (*flags & AVAHI_PUBLISH_USE_WIDE_AREA)));
+      if (*flags & (AVAHI_PUBLISH_USE_MULTICAST|AVAHI_PUBLISH_USE_WIDE_AREA))
+          return;
+  }
+  int server_add_internal(void *s, int flags, void *r) {
+      AVAHI_CHECK_VALIDITY_RETURN_NULL(s, AVAHI_FLAGS_VALID(flags, AVAHI_PUBLISH_USE_WIDE_AREA|AVAHI_PUBLISH_USE_MULTICAST), AVAHI_ERR_INVALID_FLAGS);
+      transport_flags_from_domain(s, &flags, "example.com");
+      return 0;
+  }
+  ```

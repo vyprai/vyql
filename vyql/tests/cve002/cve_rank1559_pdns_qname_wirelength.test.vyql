@@ -1,0 +1,158 @@
+# Rank 1559 / CVE-2016-5426: PowerDNS's DNS name parser accepted qnames
+# whose wire length exceeded the 255-byte protocol limit, so a crafted
+# query with many labels (or a compression chain) drove oversized names
+# into downstream handling (improper input validation, CWE-128/CWE-400
+# family). getLabelFromContent in pdns/dnsparser.cc walked the packet's
+# labels in a conditionless `for(;;)` whose compression-pointer branch
+# recursed -- `return getLabelFromContent(content, offset, ret,
+# ++recurs)` -- and the walk's only bounds were the depth counter
+# (`recurs > 100`) and a cap on the assembled string checked *after*
+# appending (`if (ret.length() > 1024) throw MOADNSException("Total
+# name too long")`), both already present at the parent. Pool commit
+# 881b5b03a5 is the real fix (COMMIT_OK -- "Reject qname's wirelength >
+# 255, chopOff() handle dot inside labels"): a `size_t& wirelength`
+# reference threads through the walk, incremented once per label and
+# grown by `labellen`, with `if (wirelength + labellen > 255) throw`
+# before each append; the compression branch decrements first because a
+# pointer costs no wire bytes. chopOff/chopOffDotted in pdns/misc.cc
+# additionally stop treating an escaped dot as a label separator. No
+# pool correction.
+#
+# ## Re-measured at the current tip (span r1500-1599 recheck)
+#
+# Three `--cache off` runs per revision (timeout 180, --max-ram 6GB):
+# the three files the fix touches report 48 findings each at both
+# revisions -- 9 VYQL-MEM-016, 8 VYQL-MEM-006 plus VYQL-MEM-002 rows,
+# every difference a line-number shift inside the two edited files --
+# and a whole-tree scan of the checkout reports 2203 findings at both
+# revisions with an identical (rule, file) multiset over three runs per
+# side. The `-flags only` view is empty at both revisions on the whole
+# tree, so this is a real zero and not a `-flags` replacement misread.
+#
+# ## Why the nearest shipped vocabulary does not reach it
+#
+# The one relevant later-shipped item is goUnboundedAppendAccumulation
+# (bindings/go/unboundedAppendAccumulation.vyql, rank 1202's recheck),
+# which reports a conditionless `for {}` loop growing a slice whose
+# enclosing function never compares that slice's len or cap, through
+# code.UnboundedAllocationReview / VYQL-DOS-041. Its frontend fact is
+# Go-only, and porting its semantics to C++ verbatim -- a function
+# context that grows a container through append/push_back/strcat and
+# never consults its length or size -- was probed as a throwaway
+# binding on this checkout: it reports 177 findings on the pdns tree,
+# the same 177 at both revisions, and does not label
+# getLabelFromContent at either. The reason is in the source above: the
+# *vulnerable* walk already consults the accumulated name's own length
+# inside the loop. The defect is not a missing budget but a wrong one --
+# 1024 where RFC 1035 caps a wire name at 255 -- and the correct number
+# is protocol knowledge no construct-level predicate carries.
+#
+# The only formulations that do separate the two revisions key on what
+# the fix introduced. Counting any loop-grown variable as the budget
+# suppresses both sides, because the parent's `recurs > 100` compares a
+# variable the walk increments; excluding constant-grown counters so
+# that only data-dependent growth (the fix's `wirelength += labellen`)
+# counts as the budget does separate them, but that refinement is
+# reverse-engineered from this diff -- the fix's own layout, not the
+# weakness. Naming `wirelength` or the constant 255 names PowerDNS.
+#
+# Pin both revisions as a double miss. When protocol-budget vocabulary
+# that can express "the decoder enforces the wire limit its own protocol
+# documents" lands, the first block must flip to expect.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1559: the label walk bounds depth and a 1024 cap, not the wire budget"
+  lang cpp
+  file pdns/dnsparser.cc
+  reject VYQL-DOS-041
+  reject VYQL-DOS-029
+  code
+  ```
+  #include <cstdint>
+  #include <string>
+  #include <vector>
+
+  void getLabelFromContent(const std::vector<uint8_t>& content, uint16_t& frompos,
+                           std::string& ret, int recurs)
+  {
+      if (recurs > 100)
+          return;
+
+      for (;;) {
+          unsigned char labellen = content.at(frompos++);
+
+          if (!labellen) {
+              if (ret.empty())
+                  ret.append(1, '.');
+              break;
+          }
+          else if ((labellen & 0xc0) == 0xc0) {
+              uint16_t offset = content.at(frompos++);
+              return getLabelFromContent(content, offset, ret, ++recurs);
+          }
+          else if (labellen > 63) {
+              return;
+          }
+          else {
+              for (unsigned n = 0; n < labellen; ++n, frompos++)
+                  ret.append(1, content[frompos]);
+              ret.append(1, '.');
+          }
+          if (ret.length() > 1024)
+              return;
+      }
+  }
+  ```
+
+test "rank1559: the fixed revision charges every label byte against the wire budget"
+  lang cpp
+  file pdns/dnsparser.cc
+  reject VYQL-DOS-041
+  reject VYQL-DOS-029
+  code
+  ```
+  #include <cstddef>
+  #include <cstdint>
+  #include <string>
+  #include <vector>
+
+  void getLabelFromContent(const std::vector<uint8_t>& content, uint16_t& frompos,
+                           std::string& ret, int recurs, size_t& wirelength)
+  {
+      if (recurs > 100)
+          return;
+
+      for (;;) {
+          unsigned char labellen = content.at(frompos++);
+
+          wirelength++;
+          if (wirelength > 255)
+              return;
+
+          if (!labellen) {
+              if (ret.empty())
+                  ret.append(1, '.');
+              break;
+          }
+          else if ((labellen & 0xc0) == 0xc0) {
+              uint16_t offset = content.at(frompos++);
+              /* the compression pointer does not count into the wire length */
+              return getLabelFromContent(content, offset, ret, ++recurs, --wirelength);
+          }
+          else if (labellen > 63) {
+              return;
+          }
+          else {
+              if (wirelength + labellen > 255)
+                  return;
+              wirelength += labellen;
+              for (unsigned n = 0; n < labellen; ++n, frompos++)
+                  ret.append(1, content[frompos]);
+              ret.append(1, '.');
+          }
+          if (ret.length() > 1024)
+              return;
+      }
+  }
+  ```

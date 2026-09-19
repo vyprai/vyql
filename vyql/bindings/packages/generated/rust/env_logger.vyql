@@ -1,0 +1,9 @@
+module bindings.rust.generated.md28d1dba;
+
+binding userControlledData0 {
+  requires {
+    dependency("env_logger")
+  }
+  query pattern callExpr where callee.method == "parse_default_env"
+  emit source core.UserControlledData at call.result
+}

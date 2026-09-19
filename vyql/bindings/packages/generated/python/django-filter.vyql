@@ -1,0 +1,9 @@
+module bindings.python.generated.mf3f003c2;
+
+binding sqlExecution0 {
+  requires {
+    dependency("django-filter")
+  }
+  query pattern callExpr where callee.method == "filter"
+  emit sink code.SqlExecution at args[0]
+}

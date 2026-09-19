@@ -1,0 +1,349 @@
+# Rank 1422 / CVE-2025-48949 (navidrome, CWE-89): the native REST API's list
+# endpoints accept a `_filters` JSON object in the query string. deluan/rest's GetAll
+# decodes it into rest.QueryOptions.Filters and navidrome's
+# persistence/sql_restful.go parseRestFilters walks the map, looking each key up in
+# the repository's filterMappings table and calling the registered filterFunc with
+# the client's value:
+#
+#	if ff, ok := r.filterMappings[f]; ok {
+#		if filter := ff(f, v); filter != nil {
+#			filters = append(filters, filter)
+#		}
+#
+# NewArtistRepository registers "role" -> roleFilter, and roleFilter reads:
+#
+#	func roleFilter(_ string, role any) Sqlizer {
+#		return NotEq{fmt.Sprintf("stats ->> '$.%v'", role): nil}
+#	}
+#
+# squirrel's NotEq is a map whose *key is the SQL expression* and whose value is the
+# bound argument -- `sq.Eq{"id": 1}` renders `id = ?` with 1 in the argument list --
+# so only the value half is ever parameterised and the key is copied into the
+# statement as SQL text. Here the key is built with fmt.Sprintf from the client's
+# filter value, and that value lands inside a quoted JSON path in a comparison the
+# builder emits unquoted, so closing the quote and the parenthesis continues the
+# statement. The fixed revision's own regression test names the payload: a role of
+# `artist') SELECT LIKE(CHAR(65,66,67,68,69,70,71),UPPER(HEX(RANDOMBLOB(500000000/2))))--`
+# reaches SQLite as executable SQL. Any authenticated user can send it; there is no
+# admin gate on GET /api/artist.
+#
+# The fixed revision (b19d5f0d3e079639904cac95735228f445c798b6) adds the allowlist the
+# identifier slot has always needed -- there is no placeholder form for a column,
+# table or JSON-path identifier in any dialect -- and fails closed:
+#
+#	if role, ok := role.(string); ok {
+#		if _, ok := model.AllRoles[role]; ok {
+#			return NotEq{fmt.Sprintf("stats ->> '$.%v'", role): nil}
+#		}
+#	}
+#	return Eq{"1": 2}
+#
+# Detection is code.UnvalidatedSqlIdentifierInterpolation (VYQL-INJ-152, CWE-89),
+# which existed for Python  and is emitted for Go as well by the new
+# goSqlBuilderConditionKeyInterpolation binding in
+# vyql/bindings/go/sqlBuilderConditionKeyInterpolation.vyql. Nothing is minted: no
+# new concept, no new rule, no new rule ID.
+#
+# The binding is written from squirrel's documentation, not from this repository. It
+# asks three things of a Go function: a
+# condition-map type is named (Eq, NotEq, Lt, LtOrEq, Gt, GtOrEq, Like, NotLike,
+# ILike, NotILike -- matched as exact identifier tokens, so strings.EqualFold does not
+# satisfy "Eq"); a composite-literal *key* in that function is a formatting call
+# (fmt.Sprintf, fmt.Sprint, fmt.Sprintln, strings.Join, strings.Replace,
+# strings.ReplaceAll) rather than a string literal; and the body contains no allowlist
+# -- no indexed set-membership lookup, no slices.Contains / slices.Index /
+# sort.SearchStrings, no lib/pq identifier quoter. The Go frontend records a
+# composite-literal key only when it resolves to a path, which is what makes the
+# "key is computed" fact available at all: `NotEq{fmt.Sprintf(...): nil}` carries
+# `field:fmt.Sprintf` and `NotEq{"stats ->> '$.artist'": nil}` carries no field token.
+# A key built by `+` concatenation carries none either, so that spelling is outside
+# the shape's reach; it is a stated gap, not a claim that concatenation is safe.
+#
+# The binding also carries `dependency("github.com/Masterminds/squirrel")`, which names
+# the builder the shape is written from but is measured not to narrow anything: a Go
+# module path's package root is its hostname (extract/sca/identity.go PackageRoot), and
+# packageGate.matches tests the hostname prefix, so a go.mod requiring only
+# github.com/deluan/rest satisfies a requirement naming github.com/Masterminds/squirrel.
+# A minimal module with the vulnerable function and that one unrelated requirement
+# reports; the same module with no go.mod at all does not, because there is then no
+# package evidence of any kind. Precision therefore rests on the match, not the gate,
+# and is measured that way.
+#
+# Measured with `--cache off`, counts as the union of three runs. The whole navidrome
+# tree at the vulnerable revision b19d5f0d3e^ reports 182 findings and the fixed revision
+# b19d5f0d3e reports 181; the single difference is one VYQL-INJ-152 row at
+# persistence/artist_repository.go:131, roleFilter. Removing the binding gives 181 on
+# the vulnerable revision too, so the delta is the binding and nothing else.
+#
+# Collateral is enumerated exhaustively rather than sampled, because the shape's
+# reachable set is small and greppable: a map literal whose key is a formatting call.
+# Across all 985 repository clones under /tmp/cve-work, 165 Go composite literals hold
+# a formatting call at all and exactly 9 hold one in the *key* position; deduplicated,
+# that is three real sources plus this rank's own repros, and all three are squirrel
+# condition maps.
+#
+# kubeflow pipelines' getPipelineVersionByCol
+# (backend/src/apiserver/storage/pipeline_store.go:1109,
+# `sq.Eq{fmt.Sprintf("pipeline_versions.%s", colName): colVal}`) is declined, because
+# the same function indexes `versions[0]` and the allowlist negation is deliberately
+# generous about an indexed lookup. mattermost-plugin-playbooks' buildTeamLimitExpr
+# (server/sqlstore/playbook_run.go:1060,
+# `sq.Eq{fmt.Sprintf("%s.TeamID", tableName): teamID}`) is reported, 1 row of 48
+# findings on that tree -- a genuine instance of the same construct, a table
+# identifier formatted into a condition key with no name check in the function, which
+# is exactly what the concept's reviewCondition describes.
+#
+# Sixteen Go trees are scanned whole for the same rule and hold one row between them,
+# the playbooks one: argo-cd (0 of 7296 findings), minder (0 of 348), mcp-toolbox
+# (0 of 78), chaos-mesh (0 of 119), grpc-gateway (0 of 158),
+# exposure-notifications-server (0 of 171), nats-server (0 of 148), memos (0 of 40),
+# localai, melange, mailpit, oidc, jwt and the msteams, jira and playbooks
+# mattermost plugins. lxd and waypoint exceed the 180s scan budget whole and are
+# covered by the grep enumeration instead; neither holds an occurrence of the shape.
+#
+# Pool row: correct as recorded. It is a "Merge commit from fork" security merge and
+# `git show` reads it in full -- two files, the one-function fix and its regression
+# test. The vulnerable construct is present at b19d5f0d3e^ and the allowlist is
+# present at b19d5f0d3e.
+
+test "rank1422: a squirrel condition-map key formatted from a filter value is an unvalidated SQL identifier"
+  lang go
+  file persistence/artist_repository.go
+  expect VYQL-INJ-152
+  expect_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  package persistence
+
+  import (
+  	"fmt"
+
+  	. "github.com/Masterminds/squirrel"
+  )
+
+  func roleFilter(_ string, role any) Sqlizer {
+  	return NotEq{fmt.Sprintf("stats ->> '$.%v'", role): nil}
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module github.com/navidrome/navidrome
+
+  go 1.24
+
+  require (
+      github.com/Masterminds/squirrel v1.5.4
+      github.com/deluan/rest v0.0.0-20211102003136-6260bc399cbf
+  )
+  ```
+
+test "rank1422: the same key behind a role-name allowlist is not reported"
+  lang go
+  file persistence/artist_repository.go
+  reject VYQL-INJ-152
+  reject_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  package persistence
+
+  import (
+  	"fmt"
+
+  	. "github.com/Masterminds/squirrel"
+  	"github.com/navidrome/navidrome/model"
+  )
+
+  func roleFilter(_ string, role any) Sqlizer {
+  	if role, ok := role.(string); ok {
+  		if _, ok := model.AllRoles[role]; ok {
+  			return NotEq{fmt.Sprintf("stats ->> '$.%v'", role): nil}
+  		}
+  	}
+  	return Eq{"1": 2}
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module github.com/navidrome/navidrome
+
+  go 1.24
+
+  require (
+      github.com/Masterminds/squirrel v1.5.4
+      github.com/deluan/rest v0.0.0-20211102003136-6260bc399cbf
+  )
+  ```
+
+test "rank1422: a literal condition-map key is the documented usage and is not reported"
+  lang go
+  file persistence/artist_repository.go
+  reject VYQL-INJ-152
+  reject_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  package persistence
+
+  import (
+  	. "github.com/Masterminds/squirrel"
+  )
+
+  func starredFilter(_ string, value any) Sqlizer {
+  	return NotEq{"annotation.starred_at": nil}
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module github.com/navidrome/navidrome
+
+  go 1.24
+
+  require (
+      github.com/Masterminds/squirrel v1.5.4
+  )
+  ```
+
+test "rank1422: an ordered-list allowlist on the identifier is not reported either"
+  lang go
+  file store/query.go
+  reject VYQL-INJ-152
+  reject_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  package store
+
+  import (
+  	"fmt"
+  	"slices"
+
+  	sq "github.com/Masterminds/squirrel"
+  )
+
+  var sortableColumns = []string{"name", "created_at", "size"}
+
+  func byColumn(column string, value any) sq.Sqlizer {
+  	if !slices.Contains(sortableColumns, column) {
+  		return sq.Eq{"1": 2}
+  	}
+  	return sq.Eq{fmt.Sprintf("track.%s", column): value}
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module example.com/store
+
+  go 1.24
+
+  require (
+      github.com/Masterminds/squirrel v1.5.4
+  )
+  ```
+
+test "rank1422: a table identifier formatted into a condition key in unrelated code is the same weakness"
+  lang go
+  file server/sqlstore/playbook_run.go
+  expect VYQL-INJ-152
+  expect_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  package sqlstore
+
+  import (
+  	"fmt"
+
+  	sq "github.com/Masterminds/squirrel"
+  )
+
+  func buildTeamLimitExpr(userID, teamID, tableName string) sq.Sqlizer {
+  	filterToSelectedTeam := sq.Eq{fmt.Sprintf("%s.TeamID", tableName): teamID}
+  	onlyTeamsUserIsAMember := sq.Expr(fmt.Sprintf(`
+  		EXISTS(SELECT 1 FROM TeamMembers as tm
+  			WHERE tm.TeamId = %s.TeamID AND tm.DeleteAt = 0 AND tm.UserId = ?)
+  		`, tableName), userID)
+  	if teamID != "" {
+  		return filterToSelectedTeam
+  	}
+  	return onlyTeamsUserIsAMember
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module github.com/mattermost/mattermost-plugin-playbooks
+
+  go 1.24
+
+  require (
+      github.com/Masterminds/squirrel v1.5.4
+  )
+  ```
+
+test "rank1422: a formatted map key with no condition-map type in scope is not a SQL identifier"
+  lang go
+  file internal/labels/labels.go
+  reject VYQL-INJ-152
+  reject_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  package labels
+
+  import (
+  	"fmt"
+  	"strings"
+  )
+
+  func describe(kind, name string) map[string]string {
+  	out := map[string]string{fmt.Sprintf("%s/%s", kind, name): name}
+  	if strings.EqualFold(kind, "artist") {
+  		out["kind"] = "artist"
+  	}
+  	return out
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module example.com/labels
+
+  go 1.24
+
+  require (
+      github.com/Masterminds/squirrel v1.5.4
+  )
+  ```
+
+test "rank1422: a driver identifier quoter on the interpolated name is not reported"
+  lang go
+  file store/query.go
+  reject VYQL-INJ-152
+  reject_review code.UnvalidatedSqlIdentifierInterpolation
+  code
+  ```
+  package store
+
+  import (
+  	"fmt"
+
+  	"github.com/lib/pq"
+  	sq "github.com/Masterminds/squirrel"
+  )
+
+  func byColumn(column string, value any) sq.Sqlizer {
+  	return sq.Eq{fmt.Sprintf("track.%s", pq.QuoteIdentifier(column)): value}
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module example.com/store
+
+  go 1.24
+
+  require (
+      github.com/Masterminds/squirrel v1.5.4
+      github.com/lib/pq v1.10.9
+  )
+  ```

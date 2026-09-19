@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule UnvalidatedDeserializedCollection {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20, CWE_248, CWE_1287]
+    id: "VYQL-VAL-021"
+    severity: medium
+  }
+  issue code.UnvalidatedDeserializedCollection as parsed
+}

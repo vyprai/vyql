@@ -1,0 +1,8 @@
+module code;
+
+review code.RecursiveCompressedPacketDecompression {
+  category: resource
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review compressed packet handlers for nested compressed or jumbo packet rejection before re-entering packet parsing"
+}

@@ -1,0 +1,38 @@
+module bindings.rust.session_auth_state_owner_binding_missing;
+
+// A multi-step login keeps its progress in an authentication state bound to
+// the session: the first request that names a principal creates the state,
+// and every later request on that session resolves it again by the session
+// key alone. The request also names the principal its own credential is
+// verified against, and the verified credential is credited to the resolved
+// state -- so unless the state's owner is compared with the principal the
+// request names, one account's valid credential completes another account's
+// login. The account the state was created for is the account that gets
+// authorized when the state verifies.
+//
+// The auth-state API publishes every atom of the flow this recognises:
+// get_auth_state_for_request resolves the state through the session for a
+// request-named principal, validate_credential verifies a credential for a
+// named principal, and add_valid_credential credits the verified credential
+// to the state. AuthState::username is the owner read. What is matched here
+// is the login function that performs all three steps while never reading
+// the state's owner. The atoms are the API's own names, present in every
+// revision, and the owner read is the idiom the OTP login and the SSO login
+// already use to bind the state's owner to the principal they name.
+//
+// The judgement lives in the pack rule; this binding only recognises the
+// atoms. Every clause is an exact call token over the consuming function's
+// own context, so prose in a comment satisfies neither side and an owner
+// read in a sibling function does not clear the login.
+//
+// Within one codebase the shape is rare by construction: a protocol
+// implementation that resolves its state through the session, verifies a
+// request-named principal's credential and credits it to that state has
+// exactly one function per login method, and any login method that binds
+// the owner -- by validating against the state's own username or by
+// comparing the two -- is not matched.
+
+binding sessionAuthStateOwnerBindingMissing {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["get_auth_state_for_request"] and node.context.call in ["validate_credential"] and node.context.call in ["add_valid_credential"] and not (node.context.call in ["username"])
+  emit issue code.SessionAuthStateOwnerBindingMissing at node
+}

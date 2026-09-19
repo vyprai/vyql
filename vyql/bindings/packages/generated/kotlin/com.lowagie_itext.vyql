@@ -1,0 +1,51 @@
+module bindings.kotlin.generated.m8e564aef;
+
+binding urlFetch0 {
+  requires {
+    dependency("com.lowagie:itext")
+  }
+  query pattern callExpr where callee.method == "Jpeg.<init>(java.net.URL)"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch1 {
+  requires {
+    dependency("com.lowagie:itext")
+  }
+  query pattern callExpr where callee.method == "Image.<init>(java.net.URL)"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding urlFetch2 {
+  requires {
+    dependency("com.lowagie:itext")
+  }
+  query pattern callExpr where callee.method == "Image.getInstance(java.net.URL)"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding redirectTarget3 {
+  requires {
+    dependency("com.lowagie:itext")
+  }
+  query pattern callExpr where callee.method == "Chunk.setRemoteGoto"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding redirectTarget4 {
+  requires {
+    dependency("com.lowagie:itext")
+  }
+  query pattern callExpr where callee.method == "Chunk.setAnchor"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("com.lowagie:itext")
+  }
+  query pattern callExpr where callee.method == "DocWriter.write"
+  emit sink code.FilePathAccess at args[0]
+}

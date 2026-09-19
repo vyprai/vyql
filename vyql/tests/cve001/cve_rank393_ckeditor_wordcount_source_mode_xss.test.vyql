@@ -1,0 +1,46 @@
+# Rank 393 / CVE-2023-37905: CKEditor WordCount assigned source-mode HTML to
+# a live temporary element's innerHTML before parsing it as inert text.
+
+test "rank393: CKEditor WordCount source HTML reaches live innerHTML during strip"
+  lang javascript
+  file wordcount/plugin.js
+  expect VYQL-INJ-004
+  code
+  ```
+  function filter( html ) {
+    return html;
+  }
+
+  function strip( html ) {
+    var tmp = document.createElement( "div" );
+
+    html = filter( html );
+
+    tmp.innerHTML = html;
+
+    var parsed = new DOMParser().parseFromString( html, "text/html" );
+    return parsed.body.textContent || parsed.body.innerText;
+  }
+
+  strip( location.hash );
+  ```
+
+test "rank393: CKEditor WordCount parses source HTML without live innerHTML"
+  lang javascript
+  file wordcount/plugin.js
+  reject VYQL-INJ-004
+  code
+  ```
+  function filter( html ) {
+    return html;
+  }
+
+  function strip( html ) {
+    html = filter( html );
+
+    var parsed = new DOMParser().parseFromString( html, "text/html" );
+    return parsed.body.textContent || parsed.body.innerText;
+  }
+
+  strip( location.hash );
+  ```

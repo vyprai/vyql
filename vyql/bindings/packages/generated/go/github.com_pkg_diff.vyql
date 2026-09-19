@@ -1,0 +1,33 @@
+module bindings.go.generated.m447b4385;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/pkg/diff")
+  }
+  query pattern callExpr where callee.method == "Text"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/pkg/diff")
+  }
+  query pattern callExpr where callee.method == "Text"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("github.com/pkg/diff")
+  }
+  query pattern callExpr where callee.method == "Slices"
+  emit source core.UserControlledData at call.result
+}
+
+binding fileUse3 {
+  requires {
+    dependency("github.com/pkg/diff")
+  }
+  query pattern callExpr where callee.method == "Unified"
+  emit sink code.FileUseSink at args[0]
+}

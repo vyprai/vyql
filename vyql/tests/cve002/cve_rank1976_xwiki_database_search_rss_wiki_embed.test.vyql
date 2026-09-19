@@ -1,0 +1,124 @@
+# Rank 1976 / CVE-2024-31982 (GHSA-2858-8cfx-69m9, CWE-94/95): the
+# Main.DatabaseSearch page builds its RSS feed from the raw search text
+# (`#set ($text = "$request.text")` feeding `$feed.setTitle`/`setDescription`)
+# and then embeds the rendered feed into the wiki page inside the
+# `{{{...}}}` escape block (DatabaseSearch.xml:124 at fix parent
+# 3c9e4bb04286de94ad24854026a09fa967538e31^):
+#
+#     {{{$xwiki.feed.getFeedOutput($feed, $xwiki.getXWikiPreference('feed_type', 'rss_2.0'))}}}
+#
+# The page output goes back through the XWiki rendering transformations, and
+# the advisory's PoC closes the escape block from inside the feed title
+# (`}}}`) and ships `{{async}}{{groovy}}...{{/groovy}}{{/async}}` in the
+# `text` parameter, executing Groovy unauthenticated. The fixed revision computes the
+# feed output and writes it straight to the response writer
+# (`$response.writer.print($feedOutput)` plus `$xcontext.setFinished(true)`),
+# so the value never re-enters the wiki renderer. The weakness shape: a
+# velocity reference embedded as wiki content (`{{{$expr}}}`), whose value
+# reaches the rendering transformations unescaped for the wiki parser.
+#
+# Shipped (bindings/config/m2b6375a9.vyql): a `wiki_embed` line event for the
+# `{{{$` construct emitted as `code.StoredHtmlWrite` (VYQL-INJ-028, the rule
+# that consumes the svelte `{@html`, django `|safe` and erb raw-print
+# scopes), beside an `escape` line event for the construct's escaped spelling
+# `{{{$escapetool.` credited as `core.HtmlEscape` -- both escape functions are
+# documented to escape `{` ("to protect against {{/html}}": XMLUtils.escape
+# javadoc, which escapetool.xml wraps, and the escapetool.html override added
+# by the sibling library fix). No new concept, rule or rule ID.
+#
+# Kinship with rank 1975 / CVE-2024-31996 (xwiki-commons escapetool.html):
+# this repository owns the call sites, and this ships the wiki-render sink
+# half of the pair 1975 prescribed, with the escape control beside it. The
+# escape control is only instantiated at the embed spelling, where it
+# dominates the sink on the same line; a value-level escape on an ordinary
+# print line (the Panels.PanelLayoutUpdate.xml:54
+# `$escapetool.html($place)` shape 1975's PoC rides) still cannot be tied to
+# the value it wraps, which is the engine gap 1975 filed (config
+# text-template escape nodes) -- named here, not re-filed.
+#
+# Measured on the xwiki-platform checkout at the fixed revision commit:
+#   - reachable set of the xwiki_velocity config scope, enumerated by grep:
+#     152 xml files carry `<content`, `$request.` and `#`. The `{{{$` embed
+#     spelling occurs in 5 of them at the vulnerable revision (4 at the fixed revision); the
+#     escaped spelling `{{{$escapetool` occurs 0 times tree-wide.
+#   - staged scan of all 152 files: 0 findings before the events, 5 after
+#     (3 runs, stable) -- DatabaseSearch.xml:124 (this CVE),
+#     XWiki/SearchSuggestSourceSheet.xml:73 and ExtensionSheet.xml:93/95/145,
+#     the same construct embedding stored document values. At the fixed revision: 4,
+#     the fixed revision's own delta being exactly the DatabaseSearch finding.
+#   - the real DatabaseSearch.xml alone: 1 finding at the parent, 0 at the
+#     fix. Bounded real-tree scan of the change-carrying search-ui module: 1
+#     finding (SearchSuggestSourceSheet), no other rule moved.
+# Residuals, stated rather than hidden: an escaped embed silences later
+# plain embeds in the same file (the escape dominates every later statement;
+# 0 instances tree-wide today), and two embed-carrying files
+# (XWikiSyntaxTables.fr.xml, XWiki/UIExtensionSheet.xml) fall outside the
+# scope gate because they hold no `$request.` reference. The bare
+# `$xwiki.feed.getFeedOutput(...)` print at Main/SolrSearchMacros.xml:936
+# embeds request-derived feed content the same way but carries no
+# `{{{$` marker; a line-start-anchored match is not expressible in the
+# line-contains event kind.
+#
+# verify_current_expected: fixed.
+
+test "rank1976: feed output embedded as wiki content reports a stored render write"
+  lang config
+  file DatabaseSearch.xml
+  expect VYQL-INJ-028
+  code
+  ```
+  <xwikidoc>
+    <web>Main</web>
+    <name>DatabaseSearch</name>
+    <content><![CDATA[
+  #set ($text = "$request.text")
+  #set ($feed = $xwiki.feed.getDocumentFeed($list, {}))
+  #set ($discard = $feed.setTitle($services.localization.render('search.rss', [$text])))
+  #set ($discard = $feed.setDescription($services.localization.render('search.rss', [$text])))
+  #set ($discard = $response.setContentType('application/rss+xml'))
+  {{{$xwiki.feed.getFeedOutput($feed, $xwiki.getXWikiPreference('feed_type', 'rss_2.0'))}}}
+    ]]></content>
+  </xwikidoc>
+  ```
+
+test "rank1976: writing the feed output straight to the response is clean"
+  lang config
+  file DatabaseSearchFixed.xml
+  reject VYQL-INJ-028
+  code
+  ```
+  <xwikidoc>
+    <web>Main</web>
+    <name>DatabaseSearch</name>
+    <content><![CDATA[
+  #set ($text = "$request.text")
+  #set ($feed = $xwiki.feed.getDocumentFeed($list, {}))
+  #set ($discard = $feed.setTitle($services.localization.render('search.rss', [$text])))
+  #set ($discard = $feed.setDescription($services.localization.render('search.rss', [$text])))
+  #set ($feedOutput = $xwiki.feed.getFeedOutput($feed, $xwiki.getXWikiPreference('feed_type', 'rss_2.0')))
+  #set ($discard = $response.setContentType('application/rss+xml'))
+  #set ($characterEncoding = 'utf-8')
+  #set ($discard = $response.setCharacterEncoding($characterEncoding))
+  #set ($discard = $response.writer.print($feedOutput))
+  #set ($discard = $response.setContentLength($feedOutput.getBytes($characterEncoding).size()))
+  #set ($discard = $response.flushBuffer())
+  #set ($discard = $xcontext.setFinished(true))
+    ]]></content>
+  </xwikidoc>
+  ```
+
+test "rank1976: an embed escaped for the wiki parser is clean"
+  lang config
+  file SheetEscapedEmbed.xml
+  reject VYQL-INJ-028
+  code
+  ```
+  <xwikidoc>
+    <web>Main</web>
+    <name>Sheet</name>
+    <content><![CDATA[
+  #set ($text = "$request.text")
+  {{{$escapetool.xml($xwiki.feed.getFeedOutput($feed, 'rss_2.0'))}}}
+    ]]></content>
+  </xwikidoc>
+  ```

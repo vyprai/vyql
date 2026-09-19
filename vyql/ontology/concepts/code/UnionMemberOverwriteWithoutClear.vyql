@@ -1,0 +1,11 @@
+module code;
+
+concept UnionMemberOverwriteWithoutClear : issue {
+  cwe: [CWE_763, CWE_401]
+  reviewAssumption: "duplicate or re-entrant serialized data can reach the member initialization while another member of the same union is already active"
+  reviewCategory: memory
+  reviewCondition: "a tagged-union member is constructed into union storage without the union clear that releases whichever member is already active"
+  reviewEvidence: "union member initialization {pattern} runs with no union clear in its branch"
+  reviewConfidence: medium
+  vulnerableTo: [memory.TypeConfusion, resource.ResourceLeak]
+}

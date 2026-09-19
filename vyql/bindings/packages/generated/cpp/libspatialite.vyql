@@ -1,0 +1,121 @@
+module bindings.cpp.generated.m26768a6c;
+
+binding filePathAccess0 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "dump_shapefile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "dump_shapefile_ex"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "dump_shapefile_ex2"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_shapefile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_shapefile_ex"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_shapefile_ex2"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_shapefile_ex3"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_zip_shapefile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_dbf"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_dbf_ex"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess10 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_dbf_ex2"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess11 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_dbf_ex3"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess12 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "load_zip_dbf"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess13 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "dump_dbf"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess14 {
+  requires {
+    dependency("libspatialite")
+  }
+  query pattern callExpr where callee.method == "dump_dbf_ex"
+  emit sink code.FilePathAccess at args[0]
+}

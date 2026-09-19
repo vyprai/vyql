@@ -1,0 +1,89 @@
+# Rank 1635 / CVE-2022-24999: qs's query-string parser wrote every
+# bracket-segment key it hands into the object it buildsg, so
+# with prototype keys permitted a query like
+# ?categories[__proto__][polluted]=x reached the assignment
+# `obj[cleanRoot] = leaf` with cleanRoot === '__proto__' and set the
+# new object's [[Prototype]] instead of an own property (prototype
+# pollution, CWE-1321; GHSA-hrpp-h998-j3pp). parseObject in lib/parse.js
+# builds each nesting level from the key chain. The fixing commit 732052599
+# ("[Fix] `parse`: ignore `__proto__` keys (#428)",
+# +1/-1 in lib/parse.js): the write branch becomes
+# `else if (cleanRoot !== '__proto__')`, so the dunder-proto segment
+# does not reach the write.
+#
+# VYQL-INJ-013 reports the write in both the snippet and the
+# real checkout (sink code.ProtoPollute at lib/parse.js:119, taint
+# from the exported parse's `str` parameter through parseValues,
+# parseKeys and parseObject). The guard half is the generic idiom:
+# the parse-time key check against '__proto__' is the documented way
+# to keep a computed-key write from reaching the prototype machinery,
+# and the JavaScript frontend carries both facts
+# (prototype_key_guard, dynamic_property_write). One binding emits
+# core.PrototypePollutionGuard for a function that has both, which
+# satisfies VYQL-INJ-013's existing `unless endpoint coveredBy` on
+# the guarded form only -- the unguarded function has no comparison
+# to credit. Measured on the real checkout: the finding at
+# lib/parse.js:119 reports on the vulnerable revision and is
+# suppressed on the fixed one.
+
+test "rank1635: the parser writes every bracket segment it is given"
+  lang javascript
+  profile library
+  expect VYQL-INJ-013
+  code
+  ```
+  var parseObject = function (chain, val) {
+      var leaf = val;
+      for (var i = chain.length - 1; i >= 0; --i) {
+          var obj = {};
+          var root = chain[i];
+          var cleanRoot = root.charAt(0) === '[' && root.charAt(root.length - 1) === ']' ? root.slice(1, -1) : root;
+          obj[cleanRoot] = leaf;
+          leaf = obj;
+      }
+      return leaf;
+  };
+
+  export default function (str, opts) {
+      var result = [];
+      var parts = str.split('&');
+      for (var i = 0; i < parts.length; ++i) {
+          var pair = parts[i].split('=');
+          var chain = pair[0].replace(/\]/g, '').split('[');
+          result.push(parseObject(chain, pair[1]));
+      }
+      return result;
+  }
+  ```
+
+test "rank1635: the fixed revision refuses the dunder-proto segment"
+  lang javascript
+  profile library
+  reject VYQL-INJ-013
+  code
+  ```
+  var parseObject = function (chain, val) {
+      var leaf = val;
+      for (var i = chain.length - 1; i >= 0; --i) {
+          var obj = {};
+          var root = chain[i];
+          var cleanRoot = root.charAt(0) === '[' && root.charAt(root.length - 1) === ']' ? root.slice(1, -1) : root;
+          if (cleanRoot !== '__proto__') {
+              obj[cleanRoot] = leaf;
+          }
+          leaf = obj;
+      }
+      return leaf;
+  };
+
+  export default function (str, opts) {
+      var result = [];
+      var parts = str.split('&');
+      for (var i = 0; i < parts.length; ++i) {
+          var pair = parts[i].split('=');
+          var chain = pair[0].replace(/\]/g, '').split('[');
+          result.push(parseObject(chain, pair[1]));
+      }
+      return result;
+  }
+  ```

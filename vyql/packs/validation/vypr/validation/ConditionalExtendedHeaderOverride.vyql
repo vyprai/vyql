@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule ConditionalExtendedHeaderOverride {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_436, CWE_20]
+    id: "VYQL-VAL-033"
+    severity: medium
+  }
+  issue code.ConditionalExtendedHeaderOverride as sink
+}

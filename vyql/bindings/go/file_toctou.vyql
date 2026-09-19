@@ -1,0 +1,43 @@
+module bindings.go.file_toctou;
+
+// path/filepath documents EvalSymlinks as returning "the path name after
+// the resolution of any symbolic links" -- a snapshot of where the links
+// point at the moment of the call -- and os.Readlink as returning the
+// destination of the named link. Both observe link state, which is the
+// check half of the file TOCTOU pair: the existing code.FileCheck issue
+// the C bindings already use for stat/lstat/access.
+//
+// The use half is the act on a named path: os.Open and os.OpenFile follow
+// a symbolic link at the final component unless O_NOFOLLOW is in the
+// flags, and os.Create, os.ReadFile and os.WriteFile wrap the same open;
+// os.Remove, os.RemoveAll, os.Rename, os.Chmod, os.Chown and os.Truncate
+// act on whatever the name resolves to when the kernel handles it. None
+// of them re-consults the snapshot an EvalSymlinks call took earlier, so
+// a link swapped between the two is followed at the use -- the race
+// VYQL-RACE-001 reports, with the ordering the rule supplies (CWE-367).
+//
+// The open forms carry the documented escape: an O_NOFOLLOW literal in
+// the call's arguments makes the open itself refuse to follow the final
+// link, so those do not report. A flag value assembled away from the call
+// and holding O_NOFOLLOW is not visible to the guard, which is a
+// false-negative residual, as are os.Create/os.ReadFile/os.WriteFile,
+// which hide the flags inside the stdlib.
+//
+// os.Stat and os.Lstat are deliberately not check anchors here: the C
+// family labels them, but in Go the stat-then-open existence idiom is
+// ordinary code on every configuration and data-file reader, and the
+// link-resolution probes above already carry the race. The reachability
+// relation that consumes these labels is region-scoped, so a check in one
+// function cannot reach a use in a sibling -- a validator extracted into
+// its own helper, with every open elsewhere, is a residual gap rather
+// than a covered form.
+
+binding goSymlinkResolutionCheck {
+  query pattern callExpr where callee.path in ["filepath.EvalSymlinks", "os.Readlink"]
+  emit issue code.FileCheck at call
+}
+
+binding goPathActingFileUse {
+  query pattern callExpr where callee.path in ["os.Open", "os.OpenFile", "os.Create", "os.ReadFile", "os.WriteFile", "os.Remove", "os.RemoveAll", "os.Rename", "os.Chmod", "os.Chown", "os.Truncate"] and not (args.any.literal contains "O_NOFOLLOW")
+  emit issue code.FileUse at call
+}

@@ -1,0 +1,73 @@
+# CVE-2022-1813: reNgine's CMSDetector API view passed the raw `url`
+# query parameter to get_cms_details, which interpolated it into a
+# shell command string with str.format and executed it through
+# os.system -- a semicolon in the url ran as part of the command
+# (CWE-78). The fixed revision drops the interpolation and hands a split
+# argument list to subprocess.Popen, where the url is one argv entry
+# and never re-parsed by a shell.
+
+test "rank1667: the cms url query parameter is formatted into an os.system command"
+  lang python
+  file views.py
+  expect VYQL-INJ-202
+  code
+  ```
+  import os
+
+
+  def get_cms_details(url):
+      response = {}
+      cms_detector_command = 'python3 /usr/src/github/CMSeeK/cmseek.py -u {} --random-agent --batch --follow-redirect'.format(url)
+      os.system(cms_detector_command)
+
+      response['status'] = False
+      response['message'] = 'Could not detect CMS!'
+      return response
+
+
+  class CMSDetector(APIView):
+      def get(self, request):
+          req = self.request
+          url = req.query_params.get('url')
+          response = {'status': False}
+          try:
+              response = get_cms_details(url)
+          except Exception as e:
+              response = {'status': False, 'message': str(e)}
+          return Response(response)
+  ```
+
+test "rank1667: the cms url is passed as a separate argv entry to subprocess.Popen"
+  lang python
+  file views.py
+  reject VYQL-INJ-202
+  code
+  ```
+  import subprocess
+
+
+  def get_cms_details(url):
+      response = {}
+      cms_detector_command = 'python3 /usr/src/github/CMSeeK/cmseek.py --random-agent --batch --follow-redirect'
+      subprocess_splitted_command = cms_detector_command.split()
+      subprocess_splitted_command.append('-u')
+      subprocess_splitted_command.append(url)
+      process = subprocess.Popen(subprocess_splitted_command)
+      process.wait()
+
+      response['status'] = False
+      response['message'] = 'Could not detect CMS!'
+      return response
+
+
+  class CMSDetector(APIView):
+      def get(self, request):
+          req = self.request
+          url = req.query_params.get('url')
+          response = {'status': False}
+          try:
+              response = get_cms_details(url)
+          except Exception as e:
+              response = {'status': False, 'message': str(e)}
+          return Response(response)
+  ```

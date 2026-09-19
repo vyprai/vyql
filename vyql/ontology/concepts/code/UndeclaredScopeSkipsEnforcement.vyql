@@ -1,0 +1,11 @@
+module code;
+
+concept UndeclaredScopeSkipsEnforcement : issue {
+  cwe: [CWE_285, CWE_863]
+  reviewAssumption: "a caller can reach the guarded operation while the requirement it enforces is left undeclared, such as an endpoint whose descriptor omits the required permission"
+  reviewCategory: auth
+  reviewCondition: "a membership test over a granted permission collection is conjoined with the bare presence of the requirement it compares against, so an undeclared requirement makes the whole guard false and skips the check instead of denying"
+  reviewConfidence: medium
+  reviewEvidence: "guard {pattern} pairs the declared requirement with a negated membership test over a granted permission collection, and no branch of the same condition names the requirement's absence"
+  vulnerableTo: [access_control.IncorrectAuthorization]
+}

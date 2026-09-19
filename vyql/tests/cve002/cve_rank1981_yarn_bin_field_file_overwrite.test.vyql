@@ -1,0 +1,278 @@
+# A package manager's install-time link creation reads two paths it did not
+# choose out of every installed manifest's `bin` map: the command name (the
+# key) and the script it points at (the value). The consumer walks the map,
+# joins each name under the install root's `.bin` directory and each target
+# under the package directory, and creates a symlink there (a cmd-shim file on
+# Windows). Both joins resolve `..`, so a manifest declaring
+# `"bin": {"../../.bashrc": "cli.js"}` or `"bin": {"cli": "../../.bashrc"}`
+# makes the installer write outside the project — the advisory's arbitrary
+# file overwrite. The fixed revision does not touch the consumers; it adds validation to
+# the manifest normalizer the pipeline runs before linking:
+#
+#   src/util/normalize-manifest/fix.js (vulnerable parent):
+#     if (typeof info.name === 'string' && typeof info.bin === 'string' && info.bin.length > 0) {
+#       const name = info.name.replace(/^@[^\/]+\//, '');
+#       info.bin = {[name]: info.bin};
+#     }
+#     // ... and, from directories.bin, `bin[scriptName] = path.join('.', binDir, scriptName)`
+#
+#   src/util/normalize-manifest/fix.js (fix):
+#     const VALID_BIN_KEYS = /^[a-z0-9_-]+$/i;
+#     ...
+#     for (const key of Object.keys(bin)) {
+#       const target = bin[key];
+#       if (!VALID_BIN_KEYS.test(key) || !isValidBin(target)) {
+#         delete bin[key];
+#         warn(reporter.lang('invalidBinEntry', info.name, key));
+#       } else {
+#         bin[key] = path.normalize(target);
+#       }
+#     }
+#
+#   src/util/normalize-manifest/util.js (fix):
+#     export function isValidBin(bin: string): boolean {
+#       return !path.isAbsolute(bin) && !PARENT_PATH.test(path.normalize(bin));
+#     }
+#
+# The consumers stay byte-identical across the fixed revision
+# (src/package-linker.js linkSelfDependencies -> linkBin -> fs.symlink/src,
+# src/fetchers/base-fetcher.js `${binDest}/${binName}`), so a binding keyed on
+# the link creation cannot separate the revisions by construction.
+#
+# Held at attention, re-measured on the current ruleset. The fix is entirely
+# inside the normalizer: `diff -rq` between the fix parent and the fix shows
+# exactly three changed files (reporters/lang/en.js, util/normalize-manifest/
+# fix.js, util/normalize-manifest/util.js), so both consumers of the bin map
+# are byte-identical across it and a consumer-keyed binding cannot separate
+# the revisions by construction.
+#
+#   - three `--cache off` runs per revision of the whole src/ tree (timeout
+#     180, --max-ram 6GB): 14 findings on each side under the generic profile
+#     and 20 under `-profile library`, stable within a revision and identical
+#     across it (the same 22 and 34 location rows). Nothing lands in
+#     util/normalize-manifest/fix.js, util/normalize-manifest/util.js,
+#     package-linker.js or fetchers/base-fetcher.js; the findings sit in
+#     constants.js, fetchers/tarball-fetcher.js, util/fs.js,
+#     util/generate-pnp-map-api.tpl.js and util/git.js.
+#   - `vyql match` on the normalizer directory, generic and library profiles,
+#     both revisions: fix.js carries only the three `require()` DynamicCodeLoad
+#     labels (lines 11-13) and nothing at the bin handling. Under the library
+#     profile the directory's only difference across the fix is that util.js
+#     exports one more function, whose parameter then takes the param-source
+#     label.
+#   - `fs.symlink` (package-linker.js:43, fetchers/base-fetcher.js:89) and
+#     `cmdShim` (package-linker.js:37) carry no label: the generated JavaScript
+#     FilePathAccess set covers writeFile/writeFileSync/createWriteStream/
+#     rename/mkdir/open/appendFile/unlink/readdir/readFile, not symlink.
+#     `vyql trace -from ExternalEntryInput -to FilePathAccess` on
+#     package-linker.js under the library profile reports one source, none
+#     reaching a sink, dead-ending at linkBin's parameter. Binding the symlink
+#     destination as a path sink would fire on both revisions anyway, since
+#     the linker is unchanged.
+#   - the archive-link binding shipped since binds symlink/symlinkSync/
+#     ensureSymlink/createSymlink but requires a tar `linkname` selector and a
+#     module-scope containment negation — an archive extractor's shape, not a
+#     package-manifest linker's — and does not fire here. The pip twin's
+#     concept, code.PackageEntryPointScriptWrite, still has a Python emitter
+#     only, so VYQL-PATH-005 cannot fire on JavaScript at all.
+#   - atoms re-enumerated on the real fix.js at both revisions: Object.keys,
+#     delete, .test(, .startsWith(, path.join and .replace( are all present at
+#     the parent — a filename regex at line 221 and license-prefix checks at
+#     lines 267/285/314 — so a module- or function-level "no name check"
+#     negation is satisfied while the bin entries stay unvalidated. The fixed
+#     module's only additions are VALID_BIN_KEYS and its `[a-z0-9_-]` literal,
+#     isValidBin, Object.keys(bin), delete bin[key] and path.normalize(target);
+#     the two documentation-answerable containment atoms, path.isAbsolute and
+#     a parent-path test, live in the sibling module util.js, outside fix.js's
+#     module scope, and path.normalize preserves a leading `..` so keying on
+#     it credits a non-validating normalizer.
+#   - the JavaScript frontend still emits no call-argument tokens (no call_arg
+#     in internal/extract/frontend/treesitter/javascript.go), and landing them
+#     would still not separate these revisions: the only generic per-argument
+#     atom the fix adds is the argument of Object.keys(bin), which is iteration
+#     rather than containment, so a negation keyed on it credits a normalizer
+#     that walks the map and checks nothing. Which field a guard is applied to
+#     stays a non-fact, so a guard for `license` and a guard for `bin` remain
+#     indistinguishable in the same module.
+#   - `grep -rln --include=*.js '(pkg|manifest|info|json|data|dep)\.bin\b'`
+#     across every rank clone under /tmp/cve-work: 11 files besides this rank's
+#     own clone, all vendored bundles, release docs or fixtures (one a bundled
+#     pre-fix yarn-1.19.1). No independent consumer of the shape exists to test
+#     a consumer-side binding against.
+#
+# Kinship: the pip twin of this weakness class has vocabulary —
+# code.PackageEntryPointScriptWrite / VYQL-PATH-005 ("a package can provide an
+# entry point name with path separators or parent-directory components").
+# pip's fix landed in the consumer and left a documented call inside it, which
+# is what that binding keys on; here the fixed revision leaves nothing inside
+# the consumer and moved all checking into the normalizer, two pipeline stages
+# earlier, behind a name the fixing commit minted. A future binding should
+# reuse that concept rather than mint a sibling.
+#
+# verify_current_expected: attention-vocabulary-granularity, all four tests
+# rejected. Tests one and two are the normalizer pair, the minimal pair for
+# this fix; tests three and four are the consumer pair, the minimal pair for
+# the write primitive. When call-argument facts (or an equivalent per-field
+# guard attribution) land for JavaScript, test one must flip to
+# expect VYQL-PATH-005 and test two must stay reject; with a consumer-side
+# route instead, test three must flip and test four stay reject.
+
+test "the manifest normalizer expands bin entries with no name or target validation"
+  lang javascript
+  file normalize-manifest-fix.js
+  reject VYQL-PATH-005
+  code
+  ```
+  const path = require('path');
+
+  export default (async function(
+    info: Object,
+    moduleLoc: string,
+    isRoot: boolean,
+    warn: WarnFunction,
+    looseSemver: boolean,
+  ): Promise<void> {
+    // if the `bin` field is as string then expand it to an object with a single property
+    // based on the original `bin` field and `name field`
+    if (typeof info.name === 'string' && typeof info.bin === 'string' && info.bin.length > 0) {
+      const name = info.name.replace(/^@[^\/]+\//, '');
+      info.bin = {[name]: info.bin};
+    }
+
+    const dirs = info.directories;
+    if (dirs && typeof dirs === 'object') {
+      const binDir = dirs.bin;
+      if (!info.bin && binDir && typeof binDir === 'string') {
+        const bin = (info.bin = {});
+        const fullBinDir = path.join(moduleLoc, binDir);
+        for (const scriptName of await fs.readdir(fullBinDir)) {
+          bin[scriptName] = path.join('.', binDir, scriptName);
+        }
+      }
+    }
+
+    // sibling manifest fields already carry the generic validation vocabulary,
+    // which is what defeats a module-level "no name check" negation:
+    for (const filename of await fs.readdir(moduleLoc)) {
+      if (/^(.*?)\.[0-9]$/.test(filename)) {
+        continue;
+      }
+    }
+    const lower = info.license.toLowerCase();
+    if (lower === 'license' || lower.startsWith('license.') || lower.startsWith('unlicense.')) {
+      info.license = lower;
+    }
+  });
+  ```
+
+test "the patched normalizer drops bin entries whose name or target escapes the package"
+  lang javascript
+  file normalize-manifest-fixed.js
+  reject VYQL-PATH-005
+  code
+  ```
+  const path = require('path');
+
+  const VALID_BIN_KEYS = /^[a-z0-9_-]+$/i;
+
+  export default (async function(
+    info: Object,
+    moduleLoc: string,
+    isRoot: boolean,
+    warn: WarnFunction,
+    looseSemver: boolean,
+  ): Promise<void> {
+    if (typeof info.name === 'string' && typeof info.bin === 'string' && info.bin.length > 0) {
+      const name = info.name.replace(/^@[^\/]+\//, '');
+      info.bin = {[name]: info.bin};
+    }
+
+    // Validate that the bin entries reference only files within their package, and that
+    // their name is a valid file name
+    if (typeof info.bin === 'object' && info.bin !== null) {
+      const bin: Object = info.bin;
+      for (const key of Object.keys(bin)) {
+        const target = bin[key];
+        if (!VALID_BIN_KEYS.test(key) || !isValidBin(target)) {
+          delete bin[key];
+          warn(reporter.lang('invalidBinEntry', info.name, key));
+        } else {
+          bin[key] = path.normalize(target);
+        }
+      }
+    }
+  });
+  ```
+
+test "the installer joins manifest bin names and targets into link paths"
+  lang javascript
+  file package-linker.js
+  reject VYQL-PATH-005
+  code
+  ```
+  const path = require('path');
+
+  export async function linkBin(src: string, dest: string): Promise<void> {
+    if (process.platform === 'win32') {
+      await cmdShim(src, dest, {createPwshFile: false});
+    } else {
+      await fs.mkdirp(path.dirname(dest));
+      await fs.symlink(src, dest);
+      await fs.chmod(dest, '755');
+    }
+  }
+
+  export default class PackageLinker {
+    async linkSelfDependencies(
+      pkg: Manifest,
+      pkgLoc: string,
+      targetBinLoc: string,
+      override: boolean = false,
+    ): Promise<void> {
+      targetBinLoc = path.join(targetBinLoc, '.bin');
+      await fs.mkdirp(targetBinLoc);
+      targetBinLoc = await fs.realpath(targetBinLoc);
+      pkgLoc = await fs.realpath(pkgLoc);
+      for (const [scriptName, scriptCmd] of entries(pkg.bin)) {
+        const dest = path.join(targetBinLoc, scriptName);
+        const src = path.join(pkgLoc, scriptCmd);
+        if (!await fs.exists(src)) {
+          if (!override) {
+            continue;
+          }
+        }
+        await linkBin(src, dest);
+      }
+    }
+  }
+  ```
+
+test "an installer that validates the manifest entry before joining is clean"
+  lang javascript
+  file package-linker-checked.js
+  reject VYQL-PATH-005
+  code
+  ```
+  const path = require('path');
+
+  const VALID_BIN_KEYS = /^[a-z0-9_-]+$/i;
+
+  export default class PackageLinker {
+    async linkSelfDependencies(
+      pkg: Manifest,
+      pkgLoc: string,
+      targetBinLoc: string,
+      override: boolean = false,
+    ): Promise<void> {
+      targetBinLoc = path.join(targetBinLoc, '.bin');
+      for (const [scriptName, scriptCmd] of entries(pkg.bin)) {
+        if (!VALID_BIN_KEYS.test(scriptName) || path.isAbsolute(scriptCmd)) {
+          continue;
+        }
+        const dest = path.join(targetBinLoc, scriptName);
+        const src = path.join(pkgLoc, scriptCmd);
+        await linkBin(src, dest);
+      }
+    }
+  }
+  ```

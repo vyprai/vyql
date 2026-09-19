@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.mc50d7148;
+
+binding httpInput0 {
+  requires {
+    dependency("org.jboss.resteasy:resteasy-jaxrs")
+  }
+  query pattern callExpr where callee.path ~= "org.jboss.resteasy.resteasy.jaxrs.cookie"
+  emit source code.HttpInput at call.result
+}

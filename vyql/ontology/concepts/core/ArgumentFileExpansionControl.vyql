@@ -1,0 +1,8 @@
+module core;
+
+concept ArgumentFileExpansionControl : check {
+  applies: endpoint
+  covers: [endpoint, path]
+  cwe: [CWE_22, CWE_200]
+  neutralizes: [path.ArgumentFileExpansionUnrestricted]
+}

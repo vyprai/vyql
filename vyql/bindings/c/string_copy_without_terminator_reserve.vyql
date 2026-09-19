@@ -1,0 +1,53 @@
+module bindings.c.string_copy_without_terminator_reserve;
+
+// strncpy(3) stops at the source's NUL or after n bytes, whichever comes
+// first, and writes a terminator only in the bytes it does not need -- so a
+// copy whose bound is the destination's full capacity leaves the destination
+// with no terminator at all whenever the source is at least that long. The
+// two spellings of that bound are the ones strncpy's own manual warns about
+// under -Wstringop-truncation: the capacity named directly,
+// `strncpy(dst, src, sizeof(dst))`, and the capacity clamped in,
+// `strncpy(dst, src, MIN(sizeof(dst), n))`. Every string operation on the
+// destination afterwards -- strlen, printf %s, another copy -- reads past
+// its end, and a length computed from that read walks further still.
+//
+// The reserve-room remediations are matched by token, not by name: the
+// conventional `sizeof(dst) - k` bound (and the same reserve inside the
+// clamp) puts `)-k` inside the argument token, and the conventional
+// explicit terminator `dst[n] = '\0'` / `dst[len - 1] = '\0'` on a plain
+// local is an assign_shape storing a literal. A rejection guard
+// `n >= sizeof(x)` also clears, the shape this file's motivating fix uses.
+//
+// The strncpy anchor is prefix-exact so bounded-copy wrappers
+// (`safe_strncpy`, `vim_strncpy`) do not inherit the finding -- their own
+// contracts terminate, and the ones in the wild that do not deserve their
+// own binding naming their contract. Token matching is case-folded, so the
+// `MIN` needle reads `min(...)` as well.
+//
+// Residuals, all false-negative: a terminator written through a member
+// expression (`ctx->field[n] = '\0'`) shares its assign_shape with an
+// unrelated buffer's terminator in the same function, so it cannot be
+// credited without pairing the destination by name; the `sizeof(dst) - 1`
+// subscript terminator emits no assign_shape at all (sizeof extracts to
+// nothing), so it clears only through another argument token carrying the
+// reserve; the guard shape is matched with its `>=` spelling only, because
+// the `>` spelling appears in the same functions as an unrelated
+// header-length check; and a commented-out reserve still clears, the
+// standing whole-token caveat.
+binding stringCopyClampWithoutTerminatorReserve2270 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and (node.context.callArgAt startsWith "strncpy:2:MIN") and containsAny(node.context.callArgAt, ["MIN:0:sizeof(", "MIN:1:sizeof("]) and not (node.context.callArgAt endsWith "-1") and not (node.context.callArgAt endsWith "-2") and not (node.context.callArgAt endsWith "-3") and not (containsAny(node.context.binary, [">=sizeof("])) and not (containsAny(node.context.assignShape, ["[]=NUM", "[]=0", "ID[ID]=NUM", "ID[ID]=0", "ID[ID-1]=NUM", "ID[ID-1]=0", "FIELD[ID-1]=NUM", "FIELD[ID-1]=0"]))
+  emit issue code.StringCopyWithoutTerminatorReserve at node
+}
+
+// The unclamped spelling: the bound is a buffer's capacity named directly.
+// The reserve form `sizeof(dst) - 1` keeps the prefix and only differs by
+// the trailing `-k`, hence the suffix exclusion rather than a needle. The
+// sizeof's operand names the destination in the overwhelming majority of
+// real sites, but the token cannot pair the two arguments, so a bound
+// naming the source's capacity or a typedef's size is reported too --
+// copying a capacity-sized string into a same-sized destination has the
+// same unterminated result, so the review question is the same either way.
+binding stringCopySizeofWithoutTerminatorReserve2271 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and (node.context.callArgAt startsWith "strncpy:2:sizeof(") and not (node.context.callArgAt endsWith "-1") and not (node.context.callArgAt endsWith "-2") and not (node.context.callArgAt endsWith "-3") and not (containsAny(node.context.binary, [">=sizeof("])) and not (containsAny(node.context.assignShape, ["[]=NUM", "[]=0", "ID[ID]=NUM", "ID[ID]=0", "ID[ID-1]=NUM", "ID[ID-1]=0", "FIELD[ID-1]=NUM", "FIELD[ID-1]=0"]))
+  emit issue code.StringCopyWithoutTerminatorReserve at node
+}

@@ -1,0 +1,9 @@
+module bindings.php.generated.md319717d;
+
+binding secretValue0 {
+  requires {
+    dependency("defuse/php-encryption")
+  }
+  query pattern callExpr where callee.method == "getRawBytes"
+  emit source code.SecretValue at call.result
+}

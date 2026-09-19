@@ -1,0 +1,25 @@
+module bindings.elixir.generated.m5c536299;
+
+binding userControlledData0 {
+  requires {
+    dependency("absinthe_phoenix")
+  }
+  query pattern callExpr where callee.method == "handle_in"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("absinthe_phoenix")
+  }
+  query pattern callExpr where callee.method == "parse_variables"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("absinthe_phoenix")
+  }
+  query pattern callExpr where callee.method == "do_parse_variables"
+  emit source core.UserControlledData at call.result
+}

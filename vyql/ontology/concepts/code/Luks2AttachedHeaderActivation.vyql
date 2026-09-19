@@ -1,0 +1,11 @@
+module code;
+
+concept Luks2AttachedHeaderActivation : issue {
+  cwe: [CWE_347, CWE_200]
+  reviewAssumption: "the block device and attached LUKS2 metadata may be supplied by an untrusted host while guest secrets are written after mount"
+  reviewCategory: crypto
+  reviewCondition: "confidential-guest persistent storage opens host-provided LUKS2 volumes only after detached-header extraction and metadata validation"
+  reviewConfidence: high
+  reviewEvidence: "cryptsetup activation context {pattern} opens a LUKS2 data device directly without detached-header validation"
+  vulnerableTo: [crypto.ImproperSignatureCheck, secrets.SecretLeak]
+}

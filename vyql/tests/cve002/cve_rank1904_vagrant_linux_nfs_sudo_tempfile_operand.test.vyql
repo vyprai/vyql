@@ -1,0 +1,168 @@
+# Rank 1904 / CVE-2022-42717: the Linux host's NFS export writer built the
+# sudo commands that install /etc/exports over the path of a tempfile created
+# by the tempfile API (CWE-269 with a CWE-377 contributing factor):
+#
+#   new_exports_file = Tempfile.create('vagrant')
+#   new_exports_file.puts(new_exports_content)
+#   new_exports_file.close
+#   new_exports_path = new_exports_file.path
+#   ...
+#   chown_cmd = "sudo chown #{existing_stat.uid}:#{existing_stat.gid} #{new_exports_path}"
+#   result = Vagrant::Util::Subprocess.execute(*Shellwords.split(chown_cmd))
+#   sudo_command = "sudo " if !exports_path.writable? || !exports_path.dirname.writable?
+#   mv_cmd = "#{sudo_command}mv -f #{new_exports_path} #{NFS_EXPORTS_PATH}"
+#   result = Vagrant::Util::Subprocess.execute(*Shellwords.split(mv_cmd))
+#
+# The tempfile API generates a random name under the shared temp directory, so
+# the passwordless sudoers entries the documentation shipped to authorize
+# `chown`/`mv` had to wildcard the directory (`/bin/mv -f /tmp/* /etc/exports`,
+# `/tmp/vagrant[a-z0-9-]*`), and HCSEC-2022-23 shows any local user exploiting
+# that wildcard to run the whitelisted command as root against a file of their
+# own. Fix 716694e7 pins the operand to a fixed name --
+# `File.join(Dir.tmpdir, "vagrant-exports")` written through `File.open` --
+# so the grant can name one path and the documentation drops every wildcard.
+# The sudo commands themselves are present at both revisions; the tempfile
+# assignment is the whole discrimination.
+#
+# The two conjuncts both read the function's own `assign:` tokens, which are
+# matched against the function context's own facts and nothing else: a
+# tempfile-API assignment on one side, a sudo-prefixed command string on the
+# other. The guest-cap pattern that dominates the reachable set does not
+# satisfy the second conjunct: `machine.communicate.sudo("mv /tmp/... ...")`
+# passes its command as a call argument, and that sudo runs inside the guest
+# VM rather than through a local sudoers grant. The block form
+# `Tempfile.open("...") do |f|` emits no `assign:` token, so the reject cases
+# pin both distinctions.
+#
+# Residual, stated rather than hidden: the two facts combine by co-occurrence,
+# so a function that creates a tempfile for one purpose and builds a sudo
+# command for an unrelated one reports as well -- measured on this tree,
+# plugins/providers/docker/communicator.rb's `execute` wraps a shell in
+# `sudo -E -H` while its tempfile is uploaded by path, and is the one row of
+# that kind.
+
+test "rank1904: sudo install commands take the tempfile's generated path"
+  lang ruby
+  file plugins/hosts/linux/cap/nfs.rb
+  expect VYQL-AUTH-165
+  expect_review code.SudoCommandTempFileOperand
+  code
+  ```
+  module VagrantPlugins
+    module Hosts
+      module Linux
+        module Cap
+          class NFS
+            def self.nfs_write_exports(new_exports_content)
+              new_exports_file = Tempfile.create('vagrant')
+              new_exports_file.puts(new_exports_content)
+              new_exports_file.close
+              new_exports_path = new_exports_file.path
+
+              existing_stat = File.stat("/etc/exports")
+              chown_cmd = "sudo chown #{existing_stat.uid}:#{existing_stat.gid} #{new_exports_path}"
+              result = Vagrant::Util::Subprocess.execute(*Shellwords.split(chown_cmd))
+              raise "chown failed" if result.exit_code != 0
+
+              sudo_command = "sudo " if !File.writable?("/etc/exports")
+              mv_cmd = "#{sudo_command}mv -f #{new_exports_path} /etc/exports"
+              result = Vagrant::Util::Subprocess.execute(*Shellwords.split(mv_cmd))
+              raise "mv failed" if result.exit_code != 0
+            ensure
+              File.unlink(new_exports_path) if File.exist?(new_exports_path)
+            end
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1904: the operand path is pinned so the grant names one file"
+  lang ruby
+  file plugins/hosts/linux/cap/nfs.rb
+  reject VYQL-AUTH-165
+  reject_review code.SudoCommandTempFileOperand
+  code
+  ```
+  module VagrantPlugins
+    module Hosts
+      module Linux
+        module Cap
+          class NFS
+            def self.nfs_write_exports(new_exports_content)
+              new_exports_path = File.join(Dir.tmpdir, "vagrant-exports")
+              FileUtils.rm_f(new_exports_path)
+              new_exports_file = File.open(new_exports_path, "w+")
+              new_exports_file.puts(new_exports_content)
+              new_exports_file.close
+
+              existing_stat = File.stat("/etc/exports")
+              chown_cmd = "sudo chown #{existing_stat.uid}:#{existing_stat.gid} #{new_exports_path}"
+              result = Vagrant::Util::Subprocess.execute(*Shellwords.split(chown_cmd))
+              raise "chown failed" if result.exit_code != 0
+
+              sudo_command = "sudo " if !File.writable?("/etc/exports")
+              mv_cmd = "#{sudo_command}mv -f #{new_exports_path} /etc/exports"
+              result = Vagrant::Util::Subprocess.execute(*Shellwords.split(mv_cmd))
+              raise "mv failed" if result.exit_code != 0
+            ensure
+              File.unlink(new_exports_path) if !new_exports_path.nil? && File.exist?(new_exports_path)
+            end
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1904: a tempfile assigned for upload does not meet a remote sudo call"
+  lang ruby
+  file plugins/guests/coreos/cap/configure_networks.rb
+  reject VYQL-AUTH-165
+  reject_review code.SudoCommandTempFileOperand
+  code
+  ```
+  module VagrantPlugins
+    module GuestCoreOS
+      module Cap
+        class ConfigureNetworks
+          def self.configure_networks(machine, networks)
+            f = Tempfile.new("vagrant-coreos-network")
+            f.write("network config")
+            f.close
+            machine.communicate.upload(f.path, "/tmp/vagrant-network")
+
+            machine.communicate.sudo("chown root:root '/tmp/vagrant-network'")
+            machine.communicate.sudo("mv '/tmp/vagrant-network' '/etc/NetworkManager/vagrant.network'")
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1904: the block form creates the tempfile without an assignment"
+  lang ruby
+  file plugins/guests/debian/cap/configure_networks.rb
+  reject VYQL-AUTH-165
+  reject_review code.SudoCommandTempFileOperand
+  code
+  ```
+  module VagrantPlugins
+    module GuestDebian
+      module Cap
+        class ConfigureNetworks
+          def self.configure_networks(machine, networks)
+            Tempfile.open("vagrant-debian-configure-networks") do |f|
+              f.write("network config")
+              f.close
+              machine.communicate.upload(f.path, "/tmp/vagrant-network-entry")
+            end
+            machine.communicate.sudo("mv /tmp/vagrant-network-entry /etc/network/interfaces.d/vagrant")
+          end
+        end
+      end
+    end
+  end
+  ```

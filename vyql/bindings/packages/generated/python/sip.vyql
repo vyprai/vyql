@@ -1,0 +1,41 @@
+module bindings.python.generated.m189a9e7e;
+
+binding commandExecution0 {
+  requires {
+    dependency("sip")
+  }
+  query pattern callExpr where callee.method == "read_command_pipe"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("sip")
+  }
+  query pattern callExpr where callee.method == "run_command"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("sip")
+  }
+  query pattern callExpr where callee.method == "toml_load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("sip")
+  }
+  query pattern callExpr where callee.method == "toml_loads"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("sip")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

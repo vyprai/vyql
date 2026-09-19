@@ -1,0 +1,91 @@
+# A PHP-serialization reader walks a caller-supplied payload and writes each
+# parsed property name straight onto a plain object literal, so a payload
+# naming `__proto__` reaches `Object.prototype` through the assignment's
+# setter. Routing the write through `Object.defineProperty` is what makes the
+# key a plain own property: `defineProperty` never invokes an inherited
+# accessor, so the same payload lands on the result object instead.
+
+test "rank1336 serialization reader assigns parsed property names onto a plain object"
+  lang javascript
+  file unserialize.ts
+  profile library
+  expect VYQL-INJ-013
+  code
+  ```
+  type UnserializedValue = unknown
+  type UnserializedObject = Record<string, UnserializedValue>
+
+  export function unserialize(str: string): UnserializedValue {
+    return expectObject(String(str))[0]
+  }
+
+  function expectObject(str: string): [UnserializedValue, number] {
+    const obj: UnserializedObject = {}
+    const objLength = Number(expectInt(str)[0])
+    let rest = str.substr(String(objLength).length)
+    let totalOffset = 0
+
+    for (let i = 0; i < objLength; i++) {
+      const prop = expectKeyOrIndex(rest)
+      rest = rest.substr(prop[1])
+      totalOffset += prop[1]
+      const value = expectType(rest)
+      rest = rest.substr(value[1])
+      totalOffset += value[1]
+
+      obj[String(prop[0])] = value[0]
+    }
+
+    return [obj, totalOffset]
+  }
+  ```
+
+test "rank1336 serialization reader defines parsed property names as own properties"
+  lang javascript
+  file unserialize.ts
+  profile library
+  reject VYQL-INJ-013
+  code
+  ```
+  type UnserializedValue = unknown
+  type UnserializedObject = Record<string, UnserializedValue>
+  const DANGEROUS_UNSERIALIZE_KEYS = new Set(['__proto__', 'constructor', 'prototype'])
+
+  function setUnserializedProperty(target: UnserializedObject, key: string, value: UnserializedValue): void {
+    if (DANGEROUS_UNSERIALIZE_KEYS.has(key)) {
+      Object.defineProperty(target, key, {
+        value,
+        writable: true,
+        enumerable: true,
+        configurable: true,
+      })
+      return
+    }
+
+    target[key] = value
+  }
+
+  export function unserialize(str: string): UnserializedValue {
+    return expectObject(String(str))[0]
+  }
+
+  function expectObject(str: string): [UnserializedValue, number] {
+    const obj: UnserializedObject = {}
+    const objLength = Number(expectInt(str)[0])
+    let rest = str.substr(String(objLength).length)
+    let totalOffset = 0
+
+    for (let i = 0; i < objLength; i++) {
+      const prop = expectKeyOrIndex(rest)
+      rest = rest.substr(prop[1])
+      totalOffset += prop[1]
+      const value = expectType(rest)
+      rest = rest.substr(value[1])
+      totalOffset += value[1]
+
+      setUnserializedProperty(obj, String(prop[0]), value[0])
+    }
+
+    return [obj, totalOffset]
+  }
+  ```

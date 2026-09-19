@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule PythonDunderPathClassPollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_915]
+    id: "VYQL-INJ-143"
+    severity: critical
+  }
+  issue code.PythonDunderPathClassPollution as sink
+}

@@ -1,0 +1,87 @@
+test "rank257: bootstrap-select data-content option HTML is rendered without sanitizer"
+  lang javascript
+  expect VYQL-INJ-041
+  expect_review code.UnescapedHtmlOptionRenderer
+  code
+  ```
+  (function () {
+    var generateOption = {
+      text: function (options) {
+        var textElement = document.createElement('span');
+        if (options.optionContent) {
+          textElement.innerHTML = options.optionContent;
+        } else {
+          textElement.textContent = options.text;
+        }
+        return textElement;
+      }
+    };
+
+    function render(selectedOptions, buttonInner) {
+      var titleFragment = document.createDocumentFragment();
+      for (var selectedIndex = 0; selectedIndex < selectedOptions.length; selectedIndex++) {
+        var option = selectedOptions[selectedIndex];
+        var thisData = {
+          content: option.getAttribute('data-content'),
+          icon: option.getAttribute('data-icon')
+        };
+        var titleOptions = {};
+        if (thisData.content) {
+          titleOptions.optionContent = thisData.content.toString();
+        } else {
+          titleOptions.text = option.textContent.trim();
+        }
+        titleFragment.appendChild(generateOption.text(titleOptions, true));
+      }
+      buttonInner.innerHTML = '';
+      buttonInner.appendChild(titleFragment);
+    }
+  }());
+  ```
+
+test "rank257: bootstrap-select data-content option HTML is sanitized"
+  lang javascript
+  reject VYQL-INJ-041
+  reject_review code.UnescapedHtmlOptionRenderer
+  code
+  ```
+  (function () {
+    function sanitizeHtml(elements, whiteList, sanitizeFn) {}
+    var generateOption = {
+      text: function (options) {
+        var textElement = document.createElement('span');
+        if (options.optionContent) {
+          textElement.innerHTML = options.optionContent;
+        } else {
+          textElement.textContent = options.text;
+        }
+        return textElement;
+      }
+    };
+
+    function render(selectedOptions, buttonInner, whiteList, sanitizeFn) {
+      var titleFragment = document.createDocumentFragment();
+      var hasContent = false;
+      for (var selectedIndex = 0; selectedIndex < selectedOptions.length; selectedIndex++) {
+        var option = selectedOptions[selectedIndex];
+        var thisData = {
+          content: option.getAttribute('data-content'),
+          icon: option.getAttribute('data-icon')
+        };
+        var titleOptions = {};
+        if (thisData.content) {
+          titleOptions.optionContent = thisData.content.toString();
+          hasContent = true;
+        } else {
+          titleOptions.text = option.textContent.trim();
+        }
+        titleFragment.appendChild(generateOption.text(titleOptions, true));
+      }
+      if (hasContent) {
+        sanitizeHtml([titleFragment], whiteList, sanitizeFn);
+      }
+      buttonInner.innerHTML = '';
+      buttonInner.appendChild(titleFragment);
+    }
+  }());
+  ```

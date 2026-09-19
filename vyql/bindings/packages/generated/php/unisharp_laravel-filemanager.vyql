@@ -1,0 +1,26 @@
+module bindings.php.generated.mb6100542;
+
+binding filePathAccess0 {
+  requires {
+    dependency("unisharp/laravel-filemanager")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("unisharp/laravel-filemanager")
+  }
+  query pattern callExpr where callee.method == "move"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding fileUpload2 {
+  requires {
+    dependency("unisharp/laravel-filemanager")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit issue code.FileUpload at call
+  emit source code.FileUploadSource at call
+}

@@ -1,0 +1,178 @@
+# A clustered database node builds the two `crypto/tls` configs it hands to the
+# Dqlite application: one the node listens with, one it dials its peers with.
+# Both are built from the controller CA and the controller's own key pair, which
+# reads like mutual TLS, but neither half actually authenticates the other end.
+# The dial config sets `InsecureSkipVerify: true`, so a node connecting outwards
+# accepts any certificate for the peer address and a machine on the path can
+# impersonate a cluster member. The listen config sets `ClientCAs` but never sets
+# `ClientAuth`, whose zero value is `tls.NoClientCert`, so the pool is never
+# consulted and the server accepts a connection that presents no client
+# certificate at all. `crypto/tls` documents this: `ClientCAs` is only used "if
+# required to verify a client certificate by the policy in ClientAuth". Anyone
+# who can reach the cluster port therefore joins the replicated database and
+# reads and writes every row in it (CWE-295, CWE-306).
+#
+# The fixed form builds both configs in one helper: the listener gains
+# `ClientAuth: tls.RequireAndVerifyClientCert` so the CA pool is enforced, and
+# the dial config drops `InsecureSkipVerify` in favour of a concrete `ServerName`
+# read out of the controller certificate's first DNS name, so the ordinary chain
+# and hostname check runs.
+#
+# code.CertValidationDisabled (VYQL-CFG-004, CWE_295) reports the dial config on
+# the vulnerable form with no definition change: the Go frontend emits a
+# structural fact for a `tls.Config` composite literal whose `InsecureSkipVerify`
+# field is the constant `true`, and the binding labels it.
+#
+# The last two cases are a minimal pair over the listener half. A `tls.Config`
+# that sets `ClientCAs` and omits `ClientAuth` is not reported, because deciding
+# it needs the absence of a field inside a composite literal and the Go frontend
+# has no structural fact for that. The same literal written with
+# `ClientAuth: tls.VerifyClientCertIfGiven` is reported, because that constant is
+# a token the binding can match wherever it appears.
+
+test "rank1246: clustered node dials its database peers with certificate verification off"
+  lang go
+  file node.go
+  expect VYQL-CFG-004
+  code
+  ```
+  package database
+
+  import (
+  	"crypto/tls"
+  	"crypto/x509"
+
+  	"github.com/canonical/go-dqlite/app"
+  )
+
+  func (m *NodeManager) WithTLSOption() (app.Option, error) {
+  	stateInfo, ok := m.cfg.ControllerAgentInfo()
+  	if !ok {
+  		return nil, errors.NotSupportedf("Dqlite node initialisation on non-controller machine/container")
+  	}
+
+  	caCertPool := x509.NewCertPool()
+  	caCertPool.AppendCertsFromPEM([]byte(m.cfg.CACert()))
+
+  	controllerCert, err := tls.X509KeyPair([]byte(stateInfo.Cert), []byte(stateInfo.PrivateKey))
+  	if err != nil {
+  		return nil, errors.Annotate(err, "parsing controller certificate")
+  	}
+
+  	listen := &tls.Config{
+  		ClientCAs:    caCertPool,
+  		Certificates: []tls.Certificate{controllerCert},
+  	}
+
+  	dial := &tls.Config{
+  		RootCAs:            caCertPool,
+  		Certificates:       []tls.Certificate{controllerCert},
+  		InsecureSkipVerify: true,
+  	}
+
+  	return app.WithTLS(listen, dial), nil
+  }
+  ```
+
+test "rank1246: clustered node requires a peer certificate on both sides"
+  lang go
+  file node.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package database
+
+  import (
+  	"crypto/tls"
+  	"crypto/x509"
+
+  	"github.com/canonical/go-dqlite/app"
+  )
+
+  func dqliteTLSConfig(caCertPEM, certPEM, privateKeyPEM string) (*tls.Config, *tls.Config, error) {
+  	caCertPool := x509.NewCertPool()
+  	if !caCertPool.AppendCertsFromPEM([]byte(caCertPEM)) {
+  		return nil, nil, errors.New("failed to append controller CA cert to pool")
+  	}
+
+  	controllerCert, err := tls.X509KeyPair([]byte(certPEM), []byte(privateKeyPEM))
+  	if err != nil {
+  		return nil, nil, errors.Annotate(err, "parsing controller certificate")
+  	}
+
+  	x509Cert, err := x509.ParseCertificate(controllerCert.Certificate[0])
+  	if err != nil {
+  		return nil, nil, errors.Annotate(err, "parsing controller x509 certificate")
+  	}
+  	if len(x509Cert.DNSNames) == 0 {
+  		return nil, nil, errors.New("controller certificate has no DNS names")
+  	}
+
+  	listen := &tls.Config{
+  		MinVersion:   tls.VersionTLS12,
+  		Certificates: []tls.Certificate{controllerCert},
+  		RootCAs:      caCertPool,
+  		ClientCAs:    caCertPool,
+  		ClientAuth:   tls.RequireAndVerifyClientCert,
+  	}
+
+  	dial := &tls.Config{
+  		MinVersion:         tls.VersionTLS12,
+  		RootCAs:            caCertPool,
+  		Certificates:       []tls.Certificate{controllerCert},
+  		ClientSessionCache: tls.NewLRUClientSessionCache(0),
+  		ServerName:         x509Cert.DNSNames[0],
+  	}
+
+  	return listen, dial, nil
+  }
+  ```
+
+test "rank1246: listener sets a client CA pool and leaves ClientAuth at its zero value"
+  lang go
+  file node.go
+  reject VYQL-CFG-004
+  code
+  ```
+  package database
+
+  import (
+  	"crypto/tls"
+  	"crypto/x509"
+  )
+
+  func listenConfig(caCertPEM string, controllerCert tls.Certificate) *tls.Config {
+  	caCertPool := x509.NewCertPool()
+  	caCertPool.AppendCertsFromPEM([]byte(caCertPEM))
+
+  	return &tls.Config{
+  		ClientCAs:    caCertPool,
+  		Certificates: []tls.Certificate{controllerCert},
+  	}
+  }
+  ```
+
+test "rank1246: listener sets a client CA pool and verifies a client certificate only if one is offered"
+  lang go
+  file node.go
+  expect VYQL-CFG-004
+  code
+  ```
+  package database
+
+  import (
+  	"crypto/tls"
+  	"crypto/x509"
+  )
+
+  func listenConfig(caCertPEM string, controllerCert tls.Certificate) *tls.Config {
+  	caCertPool := x509.NewCertPool()
+  	caCertPool.AppendCertsFromPEM([]byte(caCertPEM))
+
+  	return &tls.Config{
+  		ClientCAs:    caCertPool,
+  		ClientAuth:   tls.VerifyClientCertIfGiven,
+  		Certificates: []tls.Certificate{controllerCert},
+  	}
+  }
+  ```

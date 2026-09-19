@@ -1,0 +1,7 @@
+module code;
+
+review code.SuppressedQueryFailureReadAsEmpty {
+  category: validation
+  kind: attention
+  text: "capture a database read taken under suppressed errors and decide on its documented failure return, not on truthiness, which reads a query that failed or never ran as an empty result set"
+}

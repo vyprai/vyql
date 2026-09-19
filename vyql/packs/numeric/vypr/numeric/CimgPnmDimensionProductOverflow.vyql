@@ -1,0 +1,11 @@
+module vypr.numeric;
+
+rule CimgPnmDimensionProductOverflow {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_190, CWE_787]
+    id: "VYQL-NUM-012"
+    severity: high
+  }
+  issue code.CimgPnmDimensionProductOverflow as overflow
+}

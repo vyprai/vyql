@@ -1,0 +1,9 @@
+module bindings.perl.generated.mea916520;
+
+binding commandExecution0 {
+  requires {
+    dependency("forks")
+  }
+  query pattern callExpr where callee.method == "_fork"
+  emit sink code.CommandExecution at args[0]
+}

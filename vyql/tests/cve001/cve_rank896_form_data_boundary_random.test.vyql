@@ -1,0 +1,39 @@
+# Rank 896 / CVE-2026-12143: form-data generated multipart boundaries with
+# Math.random digits, making boundary prediction practical.
+
+test "rank896: form-data multipart boundary uses Math.random"
+  lang javascript
+  file lib/form_data.js
+  expect VYQL-CRY-003
+  code
+  ```
+  'use strict';
+
+  function FormData() {}
+
+  FormData.prototype._generateBoundary = function () {
+    var boundary = '--------------------------';
+    for (var i = 0; i < 24; i++) {
+      boundary += Math.floor(Math.random() * 10).toString(16);
+    }
+
+    this._boundary = boundary;
+  };
+  ```
+
+test "rank896: form-data multipart boundary uses crypto random bytes"
+  lang javascript
+  file lib/form_data.js
+  reject VYQL-CRY-003
+  code
+  ```
+  'use strict';
+
+  var crypto = require('crypto');
+
+  function FormData() {}
+
+  FormData.prototype._generateBoundary = function () {
+    this._boundary = '--------------------------' + crypto.randomBytes(12).toString('hex');
+  };
+  ```

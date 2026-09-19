@@ -1,0 +1,218 @@
+# Rank 1114 / CVE-2020-15222: fosite's private_key_jwt client authentication
+# requires the client_assertion JWT to carry a jti (RFC 7519's one-time JWT
+# ID) but never records which jti values it has already accepted, so a
+# captured, still-valid assertion authenticates the client again and again
+# until it expires (CWE-287, CWE-294).
+#
+# At the parent of 0c9e0f6d6549 (35a1558) Fosite.AuthenticateClient parses the
+# assertion with jwt.ParseWithClaims and a keyFunc that enforces the client's
+# registered signing algorithm, then checks the claims in order -- iss via
+# claims.VerifyIssuer, sub against the client_id, jti for non-emptiness, aud
+# against the token endpoint -- and returns the client. Every one of those is
+# a check on the assertion's shape; none of them remembers the assertion. The
+# fix adds the store round trip the interface did not have:
+# f.Store.ClientAssertionJWTValid(ctx, jti) rejecting with ErrJTIKnown, and
+# f.Store.SetClientAssertionJWT(ctx, jti, time.Unix(expiry, 0)) recording this
+# jti until the assertion's own exp, both declared on ClientManager in the
+# same commit (client_manager.go).
+#
+# The first pass recorded a vocabulary gap and a zero on both revisions. Both
+# halves have moved and neither converts the rank:
+#
+#  * Both revisions now report 11 findings (3 x --cache off runs each, timeout
+#    180, --max-ram 6GB, identical fingerprint sets across the six runs) --
+#    pkce test grants, an introspector delimiter split, header writes,
+#    cleartext channels -- and none of them touches client_authentication.go.
+#    `vyql scan -flags only` and `vyql match` label no review concept on that
+#    file either, so the zero is real, not a flags-view misread.
+#  * The anchor vocabulary exists today and is precise. A probe binding on
+#    containsAny(node.context.index, [":\"jti\""]) plus
+#    containsAny(node.context.binary, ["len(jti)==0"]) -- the registered
+#    claim name (RFC 7519 4.1.7) read out of the claims map, plus the
+#    presence check the code makes on it -- labels exactly the
+#    AuthenticateClient function-context node on both revisions and nothing
+#    else in the tree: the issuer-side ret["jti"] = c.JTI writes in
+#    token/jwt/claims_jwt.go and claims_id_token.go carry the index token but
+#    no len() presence check, and the same pair fires on none of the eight
+#    other Go files in the corpus that mention "jti" (argo-cd's
+#    StringField(claims, "jti") reads and revokeToken, wings' denylist.Store,
+#    vikunja's claim construction, authelia's claim-name list, distribution's
+#    json tag, smallstep's issuer-side tests).
+#  * The discriminator is what the engine cannot say. "The extracted
+#    identifier is an argument to no call" -- not (node.context.callArg
+#    contains ":jti") -- is satisfied on the vulnerable revision too, because
+#    the presence check's own len(jti) emits call_arg:len:jti, a token
+#    indistinguishable in kind from f.Store.ClientAssertionJWTValid's
+#    call_arg:f.Store.ClientAssertionJWTValid:jti. Measured: the probe fires
+#    on neither revision. There is no per-token conjunction and no way to
+#    exclude one callee from a contains negation, so "reaches no call except
+#    the emptiness check" is inexpressible; keying the variable name instead
+#    of the claim name does not help, since the variable is what both the
+#    len() and the store call receive.
+#  * The one form that discriminates today is a store-verb negation -- not
+#    containsAny(node.context.call, ["Set", "Store", "Save", "Record",
+#    "Revoke", ...]). Measured 1 -> 0 on this tree with zero collateral on
+#    the enumerated reachable set, and rejected: it neutralises the fixed
+#    revision only because f.Store.SetClientAssertionJWT begins with "Set",
+#    which is the fixing commit's own vocabulary, and a correct
+#    implementation that records via a map write (seen[jti] = true) or an
+#    un-verbish helper (alreadySeen(jti)) is still reported. That is the
+#    fixing-commit's-own-layout failure, not a binding worth shipping.
+#
+# The fix that would convert this rank is an engine fact, not vocabulary: an
+# argument token that belongs to a call other than the length builtins (a
+# call_arg sibling emitted from the CallExpr case of goFunctionTokens in
+# internal/extract/frontend/golang/golang.go, with a predicate field beside
+# callArg in internal/bindings/compile_presence.go). With it, the binding is
+# the anchor pair above plus "the one-time identifier reaches no real call",
+# which is reference-answerable: RFC 7519 gives jti no purpose except
+# one-time use, so a relying party that requires it and never records it has
+# not implemented what the claim is for.
+#
+# verify_current_expected: attention-engine-gap. A future fix must flip
+# jti_presence_only to expect_review code.PasswordResetTokenReplay (or the
+# sibling concept a fix mints for one-time-credential replay) and must keep
+# jti_recorded rejecting it; both blocks must stay silent under the
+# store-verb negation form.
+
+test "rank1114: the jti claim is required and never recorded"
+  lang go
+  file client_authentication.go
+  reject_review code.PasswordResetTokenReplay
+  code
+  ```
+  package fosite
+
+  func (f *Fosite) AuthenticateClient(ctx context.Context, r *http.Request, form url.Values) (Client, error) {
+      assertion := form.Get("client_assertion")
+      if len(assertion) == 0 {
+          return nil, errors.WithStack(ErrInvalidRequest.WithHintf("The client_assertion request parameter must be set when using client_assertion_type of \"%s\".", clientAssertionJWTBearerType))
+      }
+
+      clientID := form.Get("client_id")
+      token, err := jwt.ParseWithClaims(assertion, &jwt.MapClaims{}, func(t *jwt.Token) (interface{}, error) {
+          oidcClient, err := f.Store.GetClient(ctx, clientID)
+          if err != nil {
+              return nil, errors.WithStack(ErrInvalidClient.WithDebug(err.Error()))
+          }
+          if _, ok := t.Method.(*jwt.SigningMethodRSA); ok {
+              return f.findClientPublicJWK(oidcClient, t)
+          }
+          return nil, errors.WithStack(ErrInvalidClient.WithHintf(`The client_assertion request parameter uses unsupported signing algorithm "%s".`, t.Header["alg"]))
+      })
+      if err != nil {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Unable to verify the integrity of the \"client_assertion\" value.").WithDebug(err.Error()))
+      } else if err := token.Claims.Valid(); err != nil {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Unable to verify the request object because its claims could not be validated, check if the expiry time is set correctly.").WithDebug(err.Error()))
+      }
+
+      claims, ok := token.Claims.(*jwt.MapClaims)
+      if !ok {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Unable to type assert claims from request parameter \"client_assertion\"."))
+      }
+
+      if !claims.VerifyIssuer(clientID, true) {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Claim \"iss\" from \"client_assertion\" must match the \"client_id\" of the OAuth 2.0 Client."))
+      } else if f.TokenURL == "" {
+          return nil, errors.WithStack(ErrMisconfiguration.WithHint("The authorization server's token endpoint URL has not been set."))
+      } else if sub, ok := (*claims)["sub"].(string); !ok || sub != clientID {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Claim \"sub\" from \"client_assertion\" must match the \"client_id\" of the OAuth 2.0 Client."))
+      } else if jti, ok := (*claims)["jti"].(string); !ok || len(jti) == 0 {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Claim \"jti\" from \"client_assertion\" must be set but is not."))
+      }
+
+      if auds, ok := (*claims)["aud"].([]interface{}); !ok {
+          if !claims.VerifyAudience(f.TokenURL, true) {
+              return nil, errors.WithStack(ErrInvalidClient.WithHintf("Claim \"audience\" from \"client_assertion\" must match the authorization server's token endpoint \"%s\".", f.TokenURL))
+          }
+      }
+
+      client, err := f.Store.GetClient(ctx, clientID)
+      if err != nil {
+          return nil, errors.WithStack(ErrInvalidClient.WithDebug(err.Error()))
+      }
+      return client, nil
+  }
+  ```
+
+test "rank1114: the jti claim is checked against and recorded in the store"
+  lang go
+  file client_authentication.go
+  reject_review code.PasswordResetTokenReplay
+  code
+  ```
+  package fosite
+
+  func (f *Fosite) AuthenticateClient(ctx context.Context, r *http.Request, form url.Values) (Client, error) {
+      assertion := form.Get("client_assertion")
+      if len(assertion) == 0 {
+          return nil, errors.WithStack(ErrInvalidRequest.WithHintf("The client_assertion request parameter must be set when using client_assertion_type of \"%s\".", clientAssertionJWTBearerType))
+      }
+
+      clientID := form.Get("client_id")
+      token, err := jwt.ParseWithClaims(assertion, &jwt.MapClaims{}, func(t *jwt.Token) (interface{}, error) {
+          oidcClient, err := f.Store.GetClient(ctx, clientID)
+          if err != nil {
+              return nil, errors.WithStack(ErrInvalidClient.WithDebug(err.Error()))
+          }
+          if _, ok := t.Method.(*jwt.SigningMethodRSA); ok {
+              return f.findClientPublicJWK(oidcClient, t)
+          }
+          return nil, errors.WithStack(ErrInvalidClient.WithHintf(`The client_assertion request parameter uses unsupported signing algorithm "%s".`, t.Header["alg"]))
+      })
+      if err != nil {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Unable to verify the integrity of the \"client_assertion\" value.").WithDebug(err.Error()))
+      } else if err := token.Claims.Valid(); err != nil {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Unable to verify the request object because its claims could not be validated, check if the expiry time is set correctly.").WithDebug(err.Error()))
+      }
+
+      claims, ok := token.Claims.(*jwt.MapClaims)
+      if !ok {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Unable to type assert claims from request parameter \"client_assertion\"."))
+      }
+
+      var jti string
+      if !claims.VerifyIssuer(clientID, true) {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Claim \"iss\" from \"client_assertion\" must match the \"client_id\" of the OAuth 2.0 Client."))
+      } else if f.TokenURL == "" {
+          return nil, errors.WithStack(ErrMisconfiguration.WithHint("The authorization server's token endpoint URL has not been set."))
+      } else if sub, ok := (*claims)["sub"].(string); !ok || sub != clientID {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Claim \"sub\" from \"client_assertion\" must match the \"client_id\" of the OAuth 2.0 Client."))
+      } else if jti, ok = (*claims)["jti"].(string); !ok || len(jti) == 0 {
+          return nil, errors.WithStack(ErrInvalidClient.WithHint("Claim \"jti\" from \"client_assertion\" must be set but is not."))
+      } else if f.Store.ClientAssertionJWTValid(context.Background(), jti) != nil {
+          return nil, errors.WithStack(ErrJTIKnown.WithHint("Claim \"jti\" from \"client_assertion\" MUST only be used once."))
+      }
+
+      // type conversion according to jwt.MapClaims.VerifyExpiresAt
+      var expiry int64
+      err = nil
+      switch exp := (*claims)["exp"].(type) {
+      case float64:
+          expiry = int64(exp)
+      case json.Number:
+          expiry, err = exp.Int64()
+      default:
+          err = ErrInvalidClient.WithHint("Unable to type assert the expiry time from claims.")
+      }
+
+      if err != nil {
+          return nil, errors.WithStack(err)
+      }
+      if err := f.Store.SetClientAssertionJWT(context.Background(), jti, time.Unix(expiry, 0)); err != nil {
+          return nil, err
+      }
+
+      if auds, ok := (*claims)["aud"].([]interface{}); !ok {
+          if !claims.VerifyAudience(f.TokenURL, true) {
+              return nil, errors.WithStack(ErrInvalidClient.WithHintf("Claim \"audience\" from \"client_assertion\" must match the authorization server's token endpoint \"%s\".", f.TokenURL))
+          }
+      }
+
+      client, err := f.Store.GetClient(ctx, clientID)
+      if err != nil {
+          return nil, errors.WithStack(ErrInvalidClient.WithDebug(err.Error()))
+      }
+      return client, nil
+  }
+  ```

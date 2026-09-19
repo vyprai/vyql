@@ -1,0 +1,7 @@
+test "rank33: Grafana Agent config marshal requires config exposure review"
+  expect VYQL-SEC-041
+  expect_review code.ConfigExposureReview
+  graph
+  ```
+  node op code.ConfigExposureReview
+  ```

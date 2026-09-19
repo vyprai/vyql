@@ -1,0 +1,41 @@
+module bindings.go.generated.m6de698c1;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/containernetworking/cni")
+  }
+  query pattern callExpr where callee.method == "NetworkPluginConfFromBytes"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/containernetworking/cni")
+  }
+  query pattern callExpr where callee.method == "NetworkConfFromBytes"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/containernetworking/cni")
+  }
+  query pattern callExpr where callee.method == "ConfFromBytes"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/containernetworking/cni")
+  }
+  query pattern callExpr where callee.method == "ConfListFromBytes"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/containernetworking/cni")
+  }
+  query pattern callExpr where callee.method == "validateConfig"
+  emit sink code.Deserialization at args[0]
+}

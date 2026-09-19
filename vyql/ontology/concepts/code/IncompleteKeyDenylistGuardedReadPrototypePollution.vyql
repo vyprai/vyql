@@ -1,0 +1,11 @@
+module code;
+
+concept IncompleteKeyDenylistGuardedReadPrototypePollution : issue {
+  cwe: [CWE_1321]
+  reviewAssumption: "a caller can supply an object whose keys include constructor, and the value the helper returns is recursed into or merged into rather than used as a leaf"
+  reviewCategory: prototype_pollution
+  reviewCondition: "a property-read helper that exists to make caller-supplied keys safe rejects only __proto__ and returns the raw subscript value for every other name, so constructor still hands the caller the object's constructor function and, through it, a live prototype to write into"
+  reviewConfidence: high
+  reviewEvidence: "guarded property read context {pattern} compares the key against __proto__ and returns object[key] for anything else, naming neither constructor nor prototype and applying no own-property check"
+  vulnerableTo: [injection.PrototypePollution]
+}

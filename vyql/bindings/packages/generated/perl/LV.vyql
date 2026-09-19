@@ -1,0 +1,9 @@
+module bindings.perl.generated.ma8ba91b3;
+
+binding codeEval0 {
+  requires {
+    dependency("LV")
+  }
+  query pattern callExpr where callee.method == "_set_implementation"
+  emit sink code.CodeEval at args[0]
+}

@@ -1,0 +1,117 @@
+# Rank 1541 / CVE-2022-0821 (OrchardCore/OrchardCore, CWE-862/CWE-200,
+# PR #11344 "Fix missing permission checks and encoding"): OrchardCore's
+# localization-set content picker served a search endpoint on the admin
+# surface that enumerated every content item in the queried sets and
+# serialized the listing straight back. The action is `SearchLocalizationSets`
+# in src/OrchardCore.Modules/OrchardCore.ContentFields/Controllers/
+# LocalizationSetContentPickerAdminController.cs: it pulls content items with
+# a YesSql session query -- `_session.Query<ContentItem, ContentItemIndex>()`
+# -- walks them in a foreach, materialises a view model per item, and returns
+# `new ObjectResult(results)`. Nothing in the action asks whether the calling
+# user may view each item; `[Admin]` only routes the request into the admin
+# surface, and an authenticated user without content permissions could list
+# entries they must not see.
+#
+# The fix is the per-item gate OrchardCore's own convention prescribes: the
+# controller takes IAuthorizationService and IHttpContextAccessor, and every
+# iteration runs `if (await _authorizationService.AuthorizeAsync(User,
+# CommonPermissions.ViewContent, contentItem))` before adding the item.
+#
+# Detection is the csharp binding
+# csContentItemListedToCallerWithoutAuthorization: a YesSql query whose
+# generic argument names ContentItem is the documented direct read of the
+# CMS's access-controlled resources, MVC's serialize-and-return vocabulary
+# (Json, ObjectResult, JsonResult) hands the listing to the caller, and the
+# negation collects the authorization-decision spellings generously
+# (authorize/permission/forbid calls and receivers, permission objects,
+# role tests). The ungated enumeration reports VYQL-AUTH-079 through
+# code.SensitiveOperation; the per-item-gated form does not. The action is
+# the unit, so the gate's per-item property is not itself checked -- a gate
+# consulted once for the whole listing suppresses too -- and a gate living
+# in a helper, middleware or an [Authorize] attribute leaves no token in
+# the action body and reports.
+
+test "rank1541: content items listed to the caller with no authorization decision"
+  lang csharp
+  file src/OrchardCore.Modules/OrchardCore.ContentFields/Controllers/LocalizationSetContentPickerAdminController.cs
+  expect VYQL-AUTH-079
+  expect_review code.SensitiveOperation
+  code
+  ```
+  using System.Collections.Generic;
+  using System.Threading.Tasks;
+  using Microsoft.AspNetCore.Mvc;
+
+  public class LocalizationSetContentPickerAdminController : Controller
+  {
+      private readonly ISession _session;
+      private readonly IContentManager _contentManager;
+
+      public async Task<IActionResult> SearchLocalizationSets(string part, string field, string query)
+      {
+          var contentItems = await _session.Query<ContentItem, ContentItemIndex>()
+              .Take(40).ListAsync();
+
+          var results = new List<VueMultiselectItemViewModel>();
+
+          foreach (var contentItem in contentItems)
+          {
+              results.Add(new VueMultiselectItemViewModel
+              {
+                  Id = contentItem.Key,
+                  DisplayText = contentItem.Value.ToString(),
+                  HasPublished = await _contentManager.HasPublishedVersionAsync(contentItem.Value)
+              });
+          }
+
+          return new ObjectResult(results);
+      }
+  }
+  ```
+
+test "rank1541: every enumerated item passes an authorization check before it is returned"
+  lang csharp
+  file src/OrchardCore.Modules/OrchardCore.ContentFields/Controllers/LocalizationSetContentPickerAdminController.cs
+  reject VYQL-AUTH-079
+  reject_review code.SensitiveOperation
+  code
+  ```
+  using System.Collections.Generic;
+  using System.Threading.Tasks;
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+
+  public class LocalizationSetContentPickerAdminController : Controller
+  {
+      private readonly ISession _session;
+      private readonly IContentManager _contentManager;
+      private readonly IAuthorizationService _authorizationService;
+      private readonly IHttpContextAccessor _httpContextAccessor;
+
+      public async Task<IActionResult> SearchLocalizationSets(string part, string field, string query)
+      {
+          var contentItems = await _session.Query<ContentItem, ContentItemIndex>()
+              .Take(40).ListAsync();
+
+          var results = new List<VueMultiselectItemViewModel>();
+
+          foreach (var contentItem in contentItems)
+          {
+              if (await _authorizationService.AuthorizeAsync(
+                  _httpContextAccessor.HttpContext.User,
+                  CommonPermissions.ViewContent,
+                  contentItem))
+              {
+                  results.Add(new VueMultiselectItemViewModel
+                  {
+                      Id = contentItem.Key,
+                      DisplayText = contentItem.Value.ToString(),
+                      HasPublished = await _contentManager.HasPublishedVersionAsync(contentItem.Value)
+                  });
+              }
+          }
+
+          return new ObjectResult(results);
+      }
+  }
+  ```

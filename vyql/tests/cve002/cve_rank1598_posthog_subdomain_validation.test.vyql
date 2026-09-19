@@ -1,0 +1,188 @@
+# PostHog's external data source creation passed the request's subdomain
+# into its credential validation and outbound URL construction without any
+# character check, so a crafted subdomain redirected the server's own
+# connections (host segment injection toward SSRF, CWE-20/CWE-918,
+# CVE-2024-9710; PR #25388). The Zendesk and Vitally branches of
+# ExternalDataSourceViewSet in posthog/warehouse/api/external_data_source.py
+# did `subdomain = request.data.get("subdomain", "")` and passed it straight
+# to validate_zendesk_credentials / validate_vitally_credentials, imported
+# from posthog/temporal/data_imports/pipelines/zendesk and .../vitally; each
+# helper interpolates the value into the host of its own request --
+# `requests.get(f"https://{subdomain}.zendesk.com/api/v2/tickets_count")`
+# and `requests.get(f"{get_base_url(region, subdomain)}resources/users")`.
+# The segment accepts slashes, dots and query characters, so a crafted
+# subdomain escaped the `.zendesk.com` suffix it was meant to name. The
+# fixing commit 3732c0fd9551ed29521b58611bf1e44d918c1032, "fix(data-warehouse):
+# Check source subdomains are correct (#25388)": both branches compile
+# `^[a-zA-Z-]+$` and reject with 400 before any validation or URL
+# construction.
+#
+# ## Re-measured at the current tip
+#
+# The source and the sink are both bound and the path crosses the import:
+# `vyql match` labels `request.data.get` as code.HttpInput in the view and
+# the `requests.get` argument as code.UrlFetch in both helpers, and
+# `vyql trace -brief` over a tree holding both files reports
+# external_data_source.py:763 ->[5 hops]-> zendesk/__init__.py:320 and
+# :773 ->[10 hops]-> vitally/__init__.py:355. Three `--cache off` runs per
+# revision (timeout 180, --max-ram 6GB) over posthog/warehouse plus
+# posthog/temporal/data_imports (82 Python files) report 38 findings, 7 of
+# them VYQL-RF-001, on every one of the six runs, with the Zendesk-subdomain
+# row present at both revisions -- :763 at the parent, :764 at the fix, same
+# sink. The whole posthog checkout aborts at the -max-ram 6GB ceiling
+# (5.7 GiB resident), so the pair above is the bounded tree that carries the
+# shape.
+#
+# The first pass recorded this as "no sink labels the helper's outbound
+# call, so no taint path forms". That was a misread zero, and not one that
+# later vocabulary closed: rerunning the same tree against the definitions
+# as they stood at the first pass (76e4a5789) reports the same seven
+# VYQL-RF-001 rows including :763 -> zendesk/__init__.py:320. The
+# `requests.get` -> code.UrlFetch binding (urlFetch336) predates that pass;
+# what the first pass scanned was the API file alone, where the helper is an
+# unresolved import and the sink sits in a module that was never in the
+# scan. Scanning the file, rather than the tree, cannot see the request.
+#
+# ## Why the miss holds
+#
+# Detection is live and the remediation is invisible: the character-class
+# gate does not reach the rule. VYQL-RF-001 suppresses only through
+# `unless path|endpoint coveredBy core.AllowlistValidation`, and the Python
+# emitters of that concept are name-keyed (`is_allowed_url`, `is_allowed_host`).
+# Crediting the gate itself was measured and is unsound. A binding emitting
+# core.AllowlistValidation at every `.match` / `re.match` call with endpoint
+# coverage, run over the Python checkouts under the corpus clones:
+#   authlib 63 -> 62 VYQL-RF-001 -- the cleared row is
+#   rfc7523/client.py:84 -> rfc7636/challenge.py:118, where
+#   `if not CODE_VERIFIER_PATTERN.match(verifier)` really is a character
+#   allowlist, so that one clearing is correct;
+#   vantage6 88 -> 86 -- the two cleared rows are
+#   algorithm-store/.../resource/algorithm.py:519 ->
+#   vantage6-common/.../docker/addons.py:425 and :435, where the `re.match`
+#   at :421 parses the `www-authenticate` header and
+#   `realm_match.group("realm")` at :426 *is* the fetched URL: the pattern is
+#   the extractor, not a guard, and it does not even dominate the :425 sink
+#   it clears. autogpt 122 -> 122 and lms 10 -> 10 move nothing.
+# That is the co-presence shape a guard keyed by "a regex happened in this
+# function" always has, and the narrow alternative -- crediting the
+# pattern-object spelling `subdomain_regex.match(x)` while declining the
+# documented equivalent `re.match(p, x)` -- is not answerable to the re
+# module's documentation, which describes both as matching at the beginning
+# of the string. The two spellings differ only in which one this fix used.
+# No token fact joins the gate to the value either: on the `.match` call node
+# no context field carries `compile`, so the compiled-pattern provenance of
+# the receiver is unavailable, and anchoring the check on the function
+# context node instead labels the function but suppresses nothing.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions reported.
+# The second test pins the gated form still reporting. When a control
+# concept can express a whole-string character allowlist on a value that is
+# about to name a host -- and be credited from the gate rather than from
+# co-presence with a sink -- it flips to reject.
+
+test "rank1598: the request subdomain reaches the helper's outbound url unvalidated"
+  lang python
+  file posthog/warehouse/api/external_data_source.py
+  code
+  ```
+  from rest_framework import status
+  from rest_framework.response import Response
+
+  from posthog.temporal.data_imports.pipelines.zendesk import validate_credentials as validate_zendesk_credentials
+
+
+  class ExternalDataSourceViewSet(viewsets.ModelViewSet):
+      def create(self, request):
+          source_type = request.data.get("source_type", None)
+
+          if source_type == ExternalDataSource.Type.ZENDESK:
+              subdomain = request.data.get("subdomain", "")
+              api_key = request.data.get("api_key", "")
+              email_address = request.data.get("email_address", "")
+
+              if not validate_zendesk_credentials(
+                  subdomain=subdomain, api_key=api_key, email_address=email_address
+              ):
+                  return Response(
+                      status=status.HTTP_400_BAD_REQUEST,
+                      data={"message": "Invalid credentials: Zendesk credentials are incorrect"},
+                  )
+
+          return Response(status=status.HTTP_201_CREATED)
+  ```
+  file posthog/temporal/data_imports/pipelines/zendesk/__init__.py
+  code
+  ```
+  import base64
+
+  import requests
+
+
+  def validate_credentials(subdomain: str, api_key: str, email_address: str) -> bool:
+      basic_token = base64.b64encode(f"{email_address}/token:{api_key}".encode("ascii")).decode("ascii")
+      res = requests.get(
+          f"https://{subdomain}.zendesk.com/api/v2/tickets/count",
+          headers={"Authorization": f"Basic {basic_token}"},
+      )
+
+      return res.status_code == 200
+  ```
+  expect VYQL-RF-001
+
+test "rank1598: the character-class gate on the subdomain still reports"
+  lang python
+  file posthog/warehouse/api/external_data_source.py
+  code
+  ```
+  import re
+
+  from rest_framework import status
+  from rest_framework.response import Response
+
+  from posthog.temporal.data_imports.pipelines.zendesk import validate_credentials as validate_zendesk_credentials
+
+
+  class ExternalDataSourceViewSet(viewsets.ModelViewSet):
+      def create(self, request):
+          source_type = request.data.get("source_type", None)
+
+          if source_type == ExternalDataSource.Type.ZENDESK:
+              subdomain = request.data.get("subdomain", "")
+              api_key = request.data.get("api_key", "")
+              email_address = request.data.get("email_address", "")
+
+              subdomain_regex = re.compile("^[a-zA-Z-]+$")
+              if not subdomain_regex.match(subdomain):
+                  return Response(
+                      status=status.HTTP_400_BAD_REQUEST,
+                      data={"message": "Invalid credentials: Zendesk subdomain is incorrect"},
+                  )
+
+              if not validate_zendesk_credentials(
+                  subdomain=subdomain, api_key=api_key, email_address=email_address
+              ):
+                  return Response(
+                      status=status.HTTP_400_BAD_REQUEST,
+                      data={"message": "Invalid credentials: Zendesk credentials are incorrect"},
+                  )
+
+          return Response(status=status.HTTP_201_CREATED)
+  ```
+  file posthog/temporal/data_imports/pipelines/zendesk/__init__.py
+  code
+  ```
+  import base64
+
+  import requests
+
+
+  def validate_credentials(subdomain: str, api_key: str, email_address: str) -> bool:
+      basic_token = base64.b64encode(f"{email_address}/token:{api_key}".encode("ascii")).decode("ascii")
+      res = requests.get(
+          f"https://{subdomain}.zendesk.com/api/v2/tickets/count",
+          headers={"Authorization": f"Basic {basic_token}"},
+      )
+
+      return res.status_code == 200
+  ```
+  expect VYQL-RF-001

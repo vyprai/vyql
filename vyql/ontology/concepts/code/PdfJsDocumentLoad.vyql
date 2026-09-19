@@ -1,0 +1,7 @@
+module code;
+
+concept PdfJsDocumentLoad : sink {
+  cwe: [CWE_79]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [injection.Xss]
+}

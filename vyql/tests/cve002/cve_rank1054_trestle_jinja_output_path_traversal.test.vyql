@@ -1,0 +1,84 @@
+# Rank 1054 / CVE-2026-45725: compliance-trestle's jinja author command writes
+# its rendered output to a path taken from the command line without constraining
+# it to the trestle workspace (CWE-73). JinjaCmd takes `-o/--output` and joins
+# it under the trestle root, and `../../../etc/passwd` escapes. The fixed
+# revision adds trestle/core/remote/security.py with PathSecurityValidator and
+# calls PathSecurityValidator.validate_local_path(output_file, trestle_root)
+# before the write, and again for the group directory.
+#
+# CAUGHT by VYQL-PATH-001. Three rows on the vulnerable revision, each source
+# code.StdinInput at jinja.py:114, the command-line argument, reaching
+# code.FilePathAccess at jinja.py:233, 235 and 295, which are the writes the
+# fixed revision guards. Both `unless` clauses are unsatisfied, path coveredBy
+# core.PathCanonicalization with no control anywhere on the flows, and endpoint
+# coveredBy core.PathAccessCheck with no guard on the sink.
+#
+# The row does not separate the revisions, and here that is a miss rather than
+# the tool being right. PathSecurityValidator.validate_local_path is the whole
+# defense and it is the project's own class, so nothing marks it as a path
+# control; the fixed revision reports the same 3 VYQL-PATH-001 rows. A control
+# that a project writes for itself is the normal case in application code, and
+# only a control the ontology already knows can suppress anything.
+#
+# Scanning the file gives 5 findings at each revision: 3 VYQL-PATH-001, plus one
+# VYQL-CFG-008 and one VYQL-INJ-009 that are unrelated to this CVE.
+#
+# Both directions here assert expect, deliberately. A third snippet
+# substituting os.path.basename, which is a known core.PathCanonicalization
+# control, still reports, so this flow has no demonstrated suppressing control
+# at all and the spec claims none.
+
+test "rank1054: the output path comes from the command line unconstrained"
+  lang python
+  file trestle/core/commands/author/jinja.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import argparse
+  import pathlib
+
+
+  class JinjaCmd:
+      def _init_arguments(self) -> None:
+          self.add_argument('-o', '--output', help='Name of the output file', required=True)
+
+      def _run(self, args: argparse.Namespace) -> int:
+          trestle_root = pathlib.Path(args.trestle_root)
+          output_file = trestle_root / args.output
+
+          template = self._load_template(args.input)
+          output = template.render()
+          output_file.open('w').write(output)
+
+          return 0
+  ```
+
+test "rank1054: the project's own validator does not suppress the row"
+  lang python
+  file trestle/core/commands/author/jinja.py
+  expect VYQL-PATH-001
+  code
+  ```
+  import argparse
+  import pathlib
+
+  from trestle.core.remote.security import PathSecurityValidator
+
+
+  class JinjaCmd:
+      def _init_arguments(self) -> None:
+          self.add_argument('-o', '--output', help='Name of the output file', required=True)
+
+      def _run(self, args: argparse.Namespace) -> int:
+          trestle_root = pathlib.Path(args.trestle_root)
+          output_file = trestle_root / args.output
+
+          # Validate output path to prevent path traversal
+          PathSecurityValidator.validate_local_path(output_file, trestle_root)
+
+          template = self._load_template(args.input)
+          output = template.render()
+          output_file.open('w').write(output)
+
+          return 0
+  ```

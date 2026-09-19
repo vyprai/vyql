@@ -1,0 +1,228 @@
+# Rank 1595 / CVE-2023-44270: PostCSS's tokenizer recognised every
+# line terminator except a bare carriage return in its bad-bracket
+# pattern, so input using \r line endings kept an unclosed bracket
+# token open across lines and confused every tool relying on
+# PostCSS's token positions (incorrect parsing enabling downstream
+# bypasses, CWE-74/CWE-144 family; the advisory names the security
+# tools that sanitize CSS through PostCSS). RE_BAD_BRACKET in
+# lib/tokenize.js read /.[\n"'(/\\]/ -- \n but not \r -- while the
+# sibling terminator classes RE_AT_END and RE_WORD_END enumerate the
+# full CSS whitespace set [\t\n\f\r ...] and the tokenizer's own
+# whitespace case treats CR as a line terminator. Pool commit
+# 58cc860b4c is the fix (COMMIT_OK -- "Fix carrier return
+# parsing"): the class gains \r, /.[\r\n"'(/\\]/, with parse tests
+# for \r-terminated input.
+#
+# ATTENTION, terminator-class completeness, held on recheck. The
+# parser exists and its terminator handling is mostly right -- one
+# character class omitted a terminator the same unit's own other
+# enumerations carry, the grammar-completeness family of ranks 1573
+# (single-quote encoding declarations), 1522, 1551 and 1564 -- and
+# the evidence is internal to the file, unlike 1573's external XML
+# grammar. Measured at the span tip on the real checkout (3 x
+# --cache off per revision, timeout 180, --max-ram 6GB): both
+# revisions report 14 findings, 7 at or above high, byte-identical
+# finding sets, and -flags only reports one prototype-pollution flag
+# in lib/parser.js at both revisions; vyql match on tokenize.js
+# labels only the exported tokenizer's input parameter
+# (code.ExternalEntryInput). No rule fires on the terminator class,
+# and none could: the shipped JavaScript rule family for a regex
+# that leaves line terminators unhandled is VYQL-INJ-056
+# (code.IncompleteCommandEscapeRegex), whose binding is scoped to
+# substitution escapers -- it requires a replace call with a
+# backreference replacement, and a detector class fed to .test() has
+# neither, which its own comment records as a deliberate exclusion
+# of lexer and tokenizer regexes. The property a rule would need is
+# per-literal -- "this character class enumerates a line terminator
+# set that omits a member the same unit's other enumerations carry"
+# -- and the binding vocabulary only offers substring tests over
+# compacted regex token text, measured in three forms on the real
+# pair: the module-wide negation the shipped binding uses is
+# suppressed at the vulnerable revision too (the sibling classes
+# mention \r, so "no regex mentions a terminator" is false); the
+# co-membership form (a class with \n and a regex with \r in one
+# module) fires at BOTH revisions because the fix only edits one of
+# the three classes; and the positional needle that does separate
+# the pair ([\n, the class opening with the line feed) encodes the
+# fix's own layout -- the equally correct [\n\r"'(/\\] spelling
+# still matches it -- and labels 23 further files across 10640
+# collateral JavaScript files, many of them on fully-correct
+# [\n\r\t] classes, 1 real in 24. No ENGINE-GAPS.md entry: the
+# missing piece is class-completeness vocabulary, not a localised
+# construct. No definition change shipped and no engine commit.
+# Spec cve_rank1595 records the \n-only bad-bracket class and the
+# \r-complete form modelled on the real file, both asserting reject
+# VYQL-INJ-056: when class-completeness vocabulary lands, the
+# incomplete class must flip to expect.
+
+test "rank1595: the bad bracket class omits the carriage return"
+  lang javascript
+  file lib/tokenize.js
+  reject VYQL-INJ-056
+  code
+  ```
+  'use strict'
+
+  const SINGLE_QUOTE = "'".charCodeAt(0)
+  const DOUBLE_QUOTE = '"'.charCodeAt(0)
+  const BACKSLASH = '\\'.charCodeAt(0)
+  const NEWLINE = '\n'.charCodeAt(0)
+  const SPACE = ' '.charCodeAt(0)
+  const FEED = '\f'.charCodeAt(0)
+  const TAB = '\t'.charCodeAt(0)
+  const CR = '\r'.charCodeAt(0)
+  const OPEN_PARENTHESES = '('.charCodeAt(0)
+
+  const RE_AT_END = /[\t\n\f\r "#'()/;[\\\]{}]/g
+  const RE_WORD_END = /[\t\n\f\r !"#'():;@[\\\]{}]|\/(?=\*)/g
+  const RE_BAD_BRACKET = /.[\n"'(/\\]/
+  const RE_HEX_ESCAPE = /[\da-f]/i
+
+  module.exports = function tokenizer(input, options = {}) {
+    let css = input.css.valueOf()
+    let ignore = options.ignoreErrors
+
+    let code, next, content
+    let length = css.length
+    let pos = 0
+    let buffer = []
+    let currentToken
+
+    function nextToken() {
+      if (pos >= length) return
+      code = css.charCodeAt(pos)
+
+      switch (code) {
+        case NEWLINE:
+        case SPACE:
+        case TAB:
+        case CR:
+        case FEED: {
+          next = pos
+          do {
+            next += 1
+            code = css.charCodeAt(next)
+          } while (
+            code === SPACE ||
+            code === NEWLINE ||
+            code === TAB ||
+            code === CR ||
+            code === FEED
+          )
+
+          currentToken = ['space', css.slice(pos, next)]
+          pos = next - 1
+          break
+        }
+
+        case OPEN_PARENTHESES: {
+          code = css.charCodeAt(pos + 1)
+          next = css.indexOf(')', pos + 1)
+          content = css.slice(pos, next + 1)
+
+          if (next === -1 || RE_BAD_BRACKET.test(content)) {
+            currentToken = ['(', '(', pos]
+          } else {
+            currentToken = ['brackets', content, pos, next]
+            pos = next
+          }
+          break
+        }
+
+        default:
+          pos++
+      }
+
+      pos++
+      return currentToken
+    }
+
+    return { nextToken, endOfFile: () => pos >= length }
+  }
+  ```
+
+test "rank1595: the fixed revision includes every line terminator"
+  lang javascript
+  file lib/tokenize.js
+  reject VYQL-INJ-056
+  code
+  ```
+  'use strict'
+
+  const SINGLE_QUOTE = "'".charCodeAt(0)
+  const DOUBLE_QUOTE = '"'.charCodeAt(0)
+  const BACKSLASH = '\\'.charCodeAt(0)
+  const NEWLINE = '\n'.charCodeAt(0)
+  const SPACE = ' '.charCodeAt(0)
+  const FEED = '\f'.charCodeAt(0)
+  const TAB = '\t'.charCodeAt(0)
+  const CR = '\r'.charCodeAt(0)
+  const OPEN_PARENTHESES = '('.charCodeAt(0)
+
+  const RE_AT_END = /[\t\n\f\r "#'()/;[\\\]{}]/g
+  const RE_WORD_END = /[\t\n\f\r !"#'():;@[\\\]{}]|\/(?=\*)/g
+  const RE_BAD_BRACKET = /.[\r\n"'(/\\]/
+  const RE_HEX_ESCAPE = /[\da-f]/i
+
+  module.exports = function tokenizer(input, options = {}) {
+    let css = input.css.valueOf()
+    let ignore = options.ignoreErrors
+
+    let code, next, content
+    let length = css.length
+    let pos = 0
+    let buffer = []
+    let currentToken
+
+    function nextToken() {
+      if (pos >= length) return
+      code = css.charCodeAt(pos)
+
+      switch (code) {
+        case NEWLINE:
+        case SPACE:
+        case TAB:
+        case CR:
+        case FEED: {
+          next = pos
+          do {
+            next += 1
+            code = css.charCodeAt(next)
+          } while (
+            code === SPACE ||
+            code === NEWLINE ||
+            code === TAB ||
+            code === CR ||
+            code === FEED
+          )
+
+          currentToken = ['space', css.slice(pos, next)]
+          pos = next - 1
+          break
+        }
+
+        case OPEN_PARENTHESES: {
+          code = css.charCodeAt(pos + 1)
+          next = css.indexOf(')', pos + 1)
+          content = css.slice(pos, next + 1)
+
+          if (next === -1 || RE_BAD_BRACKET.test(content)) {
+            currentToken = ['(', '(', pos]
+          } else {
+            currentToken = ['brackets', content, pos, next]
+            pos = next
+          }
+          break
+        }
+
+        default:
+          pos++
+      }
+
+      pos++
+      return currentToken
+    }
+
+    return { nextToken, endOfFile: () => pos >= length }
+  }
+  ```

@@ -1,0 +1,30 @@
+module bindings.java.netty_fast_thread_local_instance_field;
+
+// A netty FastThreadLocal does not hash: its constructor takes a global index
+// from InternalThreadLocalMap.nextVariableIndex(), a counter that only ever
+// increments, and every FastThreadLocalThread sizes its indexed-variables
+// array to the largest index any FastThreadLocal has claimed. The slot is held
+// for the life of the instance and is never returned, which the class's own
+// design states plainly -- enough claimed indices and nextVariableIndex itself
+// throws "too many thread-local indexed variables".
+//
+// That makes the number of FastThreadLocal constructions the resource, and a
+// field initializer is the spelling that multiplies it: `new FastThreadLocal<>()`
+// in a non-static field initializer runs once per construction of the enclosing
+// instance, so a class built per connection, per pool or per session converts
+// ordinary churn into growth of every event-loop thread's array, with no bound
+// on either axis. The static spelling claims one slot for the class however
+// often it is instantiated, which is why the same declaration with the static
+// modifier is the remediated form and reports nothing here.
+//
+// The instance_field_init token is the discriminator the modifiers alone never
+// provided: it is emitted for a field initializer that constructs the named
+// type and carries whether that construction is per class or per instance.
+// The residual is the constructor-assigned variant -- a FastThreadLocal-typed
+// instance field with no initializer, built in the constructor body, holds no
+// initializer for the walk to see and does not match.
+binding perInstanceFastThreadLocal {
+  query pattern presenceNode where node.scope == "class"
+    and node.context.instanceFieldInit in ["FastThreadLocal"]
+  emit issue code.UnboundedAllocationReview at node
+}

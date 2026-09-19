@@ -1,0 +1,49 @@
+module bindings.ruby.generated.maace8868;
+
+binding deserialization0 {
+  requires {
+    dependency("representable")
+  }
+  query pattern callExpr where callee.method == "from_xml"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("representable")
+  }
+  query pattern callExpr where callee.method == "parse_xml"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("representable")
+  }
+  query pattern callExpr where callee.method == "from_hash"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("representable")
+  }
+  query pattern callExpr where callee.method == "from_yaml"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("representable")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("representable")
+  }
+  query pattern callExpr where callee.method == "parse_pipeline"
+  emit sink code.Deserialization at args[0]
+}

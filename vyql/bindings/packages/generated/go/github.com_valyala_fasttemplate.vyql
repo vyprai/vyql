@@ -1,0 +1,57 @@
+module bindings.go.generated.m3466c608;
+
+binding templateRender0 {
+  requires {
+    dependency("github.com/valyala/fasttemplate")
+  }
+  query pattern callExpr where callee.method == "ExecuteFunc"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender1 {
+  requires {
+    dependency("github.com/valyala/fasttemplate")
+  }
+  query pattern callExpr where callee.method == "ExecuteFuncString"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender2 {
+  requires {
+    dependency("github.com/valyala/fasttemplate")
+  }
+  query pattern callExpr where callee.method == "ExecuteFuncStringWithErr"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender3 {
+  requires {
+    dependency("github.com/valyala/fasttemplate")
+  }
+  query pattern callExpr where callee.method == "Execute"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender4 {
+  requires {
+    dependency("github.com/valyala/fasttemplate")
+  }
+  query pattern callExpr where callee.method == "ExecuteStd"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender5 {
+  requires {
+    dependency("github.com/valyala/fasttemplate")
+  }
+  query pattern callExpr where callee.method == "ExecuteString"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding templateRender6 {
+  requires {
+    dependency("github.com/valyala/fasttemplate")
+  }
+  query pattern callExpr where callee.method == "ExecuteStringStd"
+  emit sink code.TemplateRender at args[0]
+}

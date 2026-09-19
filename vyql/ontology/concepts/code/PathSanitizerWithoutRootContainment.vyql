@@ -1,0 +1,11 @@
+module code;
+
+concept PathSanitizerWithoutRootContainment : issue {
+  cwe: [CWE_22, CWE_73]
+  reviewAssumption: "the paths reaching the sanitizer can carry traversal or absolute segments, which a separator or character rewrite leaves in place"
+  reviewCategory: path
+  reviewCondition: "a path-sanitizing helper rewrites its input and returns it with no containment check against a base directory in the same function"
+  reviewConfidence: high
+  reviewEvidence: "path sanitizer context {pattern} rewrites a caller path and hands it on with no startswith, relative_to, commonpath, realpath or basename reduction in scope"
+  vulnerableTo: [path.PathTraversal]
+}

@@ -1,0 +1,272 @@
+# osTicket's password-reset flow passed the raw reset-form username
+# straight into its ORM lookup arrays, so a crafted username injected
+# SQL through the query the ORM assembles for joined navigation keys
+# (SQL injection, CWE-89; reported by Bittylicious). The client entry
+# (pwreset.php) did `ClientAccount::lookupByUsername($_POST['userid'])`,
+# and UserAccount::lookupByUsername forwarded the value unguarded --
+# `if (strpos($username, '@') !== false) $user = static::lookup(
+# array('user__emails__address' => $username)); else $user =
+# static::lookup(array('username' => $username));` -- while the staff
+# entry (scp/pwreset.php) did `Staff::lookup($_POST['userid'])`, whose
+# branches forward `$var` uncast through `parent::lookup(array(...))`.
+# The ORM (VerySimpleModel::lookup in include/class.orm.php) turns the
+# criteria array into WHERE clauses and executes through db_query
+# (class.orm.php:3466), which the shipped `db_query` SqlExecution
+# binding already labels. The fix guards every lookup with Validator
+# predicates first (is_email, is_userid, is_username with the unicode
+# allowlist regex), casts staff_id (int) and username (string), and
+# pwreset.php rejects numeric usernames outright.
+#
+# ## Recheck measurements (3x --cache off, timeout 180, --max-ram 6GB)
+#
+# Full-tree scans of the vulnerable parent and the fix, three runs
+# each: 9160 findings per run at BOTH revisions, with byte-identical
+# by-rule sets on every paired run. Zero findings mention
+# lookupByUsername at either revision; no SqlExecution sink fires
+# anywhere in include/class.orm.php or include/mysqli.php; the only
+# findings touching a pwreset file are template XSS rows
+# (VYQL-INJ-004 on include/client/pwreset.login.php) present at both
+# revisions. The sources are labelled -- pwreset.php:18 and
+# scp/pwreset.php:42 read `$_POST['userid']` as code.HttpInput -- but
+# `vyql trace -from code.HttpInput -to code.SqlExecution` shows both
+# dead-ending before the ORM boundary: the pwreset.php source stops
+# with an empty frontier at the `ClientAccount::lookupByUsername`
+# call, and the scp/pwreset.php source enters Staff.lookup#param#$var
+# and escapes only through the `Validator::is_email` branch into the
+# mail stack, never through a `parent::lookup` branch. No rule names
+# the flow, so later-shipped vocabulary and overlooked detection both
+# fail as conversion paths.
+#
+# ## Why nothing ships
+#
+# The blocker is engine, and it is stacked two gaps deep:
+#
+# * Inherited static dispatch never routes. A PHP static call reaches
+#   the callee body only when the class named at the call site is the
+#   class that defines the method. Measured in three spellings on this
+#   tree: `ClientAccount::lookupByUsername(...)` (method on UserAccount,
+#   class.user.php) leaves the argument dead at the call; the
+#   `static::lookup(array(...))` calls at class.user.php:1345/1347 have
+#   edges only to the `$user` phi; the four `parent::lookup(...)`
+#   calls in Staff::lookup have edges only to their own arguments and
+#   the return. The only inbound edge to
+#   VerySimpleModel.lookup#param#$criteria in the whole graph is the
+#   parameter-entry pseudo-call. The minimal pair below isolates the
+#   construct: identical code, one spelling difference, 0 findings
+#   versus 1 VYQL-INJ-001 high.
+# * The ORM-internal hop is the field-store gap. With the dispatch
+#   spelling corrected in a repro, taint flows parameter -> array
+#   element -> VerySimpleModel.lookup#param#$criteria -> the fluent
+#   `static::objects()->filter($criteria)` chain -> QuerySet.filter's
+#   parameter -> the `$this->constraints = $criteria` write -- and the
+#   `$this->constraints` reads in the query builder have no inbound
+#   edge, the same cross-method field store already recorded for the
+#   config-object provenance family. Fixing dispatch alone therefore
+#   does not reach db_query.
+# * A binding cannot substitute. A SqlExecution sink on the ORM's own
+#   lookup names application-internal classes, not a documented
+#   library API, and no taint reaches a lookup-anchored sink today, so
+#   it would be inert here exactly as measured for the sibling
+#   config-object rank. The broad form -- `callee.method == "lookup"`
+#   -- labels 554 call sites in this checkout alone, essentially all
+#   benign primary-key fetches.
+#
+# Held as a double miss with the dispatch construct pinned by the
+# pair below. When inherited static dispatch routes, the
+# ClientAccount-spelled member must flip to expect; the real-code
+# blocks flip only after the field-store hop also lands.
+
+test "rank1545: the reset username reaches the ORM lookup raw"
+  lang php
+  file pwreset.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class VerySimpleModel {
+      static function lookup($criteria) {
+          return static::objects()->filter($criteria)->one();
+      }
+      static function objects() {
+          return new QuerySet(get_called_class());
+      }
+  }
+
+  class UserAccount extends VerySimpleModel {
+      static function lookupByUsername($username) {
+          if (strpos($username, '@') !== false)
+              $user = static::lookup(array('user__emails__address' => $username));
+          else
+              $user = static::lookup(array('username' => $username));
+          return $user;
+      }
+  }
+
+  class ClientAccount extends UserAccount {
+  }
+
+  if ($_POST) {
+      switch ($_POST['do']) {
+      case 'sendmail':
+          if (($acct = ClientAccount::lookupByUsername($_POST['userid']))) {
+              $inc = 'pwreset.sent.php';
+          }
+          break;
+      }
+  }
+  ```
+
+test "rank1545: the staff reset forwards the raw userid through parent lookup"
+  lang php
+  file scp/pwreset.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class VerySimpleModel {
+      static function lookup($criteria) {
+          return static::objects()->filter($criteria)->one();
+      }
+      static function objects() {
+          return new QuerySet(get_called_class());
+      }
+  }
+
+  class Staff extends VerySimpleModel {
+      static function lookup($var) {
+          if (is_array($var))
+              return parent::lookup($var);
+          elseif (is_numeric($var))
+              return parent::lookup(array('staff_id' => $var));
+          elseif (Validator::is_email($var))
+              return parent::lookup(array('email' => $var));
+          elseif (is_string($var))
+              return parent::lookup(array('username' => $var));
+          else
+              return null;
+      }
+  }
+
+  if ($_POST) {
+      switch ($_POST['do']) {
+      case 'sendmail':
+          if (($staff = Staff::lookup($_POST['userid']))) {
+              $msg = __('Registration email sent successfully.');
+          }
+          break;
+      }
+  }
+  ```
+
+test "rank1545: the fixed revision validates the userid before the lookup"
+  lang php
+  file pwreset.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Validator {
+      static function is_email($email, &$error='') {
+          return filter_var($email, FILTER_VALIDATE_EMAIL);
+      }
+
+      static function is_username($username, &$error='') {
+          if (strlen($username) < 2)
+              $error = __('Username must have at least two (2) characters');
+          elseif (is_numeric($username) || !preg_match('/^[\p{L}\d._-]+$/u', $username))
+              $error = __('Username contains invalid characters');
+          return $error == '';
+      }
+
+      static function is_userid($userid, &$error='') {
+          if (!self::is_username($userid) && !self::is_email($userid))
+              $error = __('Invalid User Id ');
+          return $error == '';
+      }
+  }
+
+  class VerySimpleModel {
+      static function lookup($criteria) {
+          return static::objects()->filter($criteria)->one();
+      }
+      static function objects() {
+          return new QuerySet(get_called_class());
+      }
+  }
+
+  class UserAccount extends VerySimpleModel {
+      static function lookupByUsername($username) {
+          if (Validator::is_email($username))
+              $user = static::lookup(array('user__emails__address' => $username));
+          elseif (Validator::is_userid($username))
+              $user = static::lookup(array('username' => $username));
+          return $user;
+      }
+  }
+
+  class ClientAccount extends UserAccount {
+  }
+
+  if ($_POST) {
+      switch ($_POST['do']) {
+      case 'sendmail':
+          $userid = (string) $_POST['userid'];
+          if (Validator::is_userid($userid)
+                  && ($acct = ClientAccount::lookupByUsername($userid))) {
+              $inc = 'pwreset.sent.php';
+          }
+          break;
+      }
+  }
+  ```
+
+test "rank1545: the inherited spelling of the same lookup is not traced"
+  lang php
+  file include/class.user.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  function db_query($sql, $logError=true) { return true; }
+
+  class UserAccount {
+      static function lookupByUsername($username) {
+          return db_query("SELECT * FROM user WHERE username = '" . $username . "'");
+      }
+  }
+
+  class ClientAccount extends UserAccount {
+  }
+
+  if (($acct = ClientAccount::lookupByUsername($_POST['userid']))) {
+      echo $acct;
+  }
+  ```
+
+test "rank1545: naming the defining class traces the identical flow"
+  lang php
+  file include/class.user.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  function db_query($sql, $logError=true) { return true; }
+
+  class UserAccount {
+      static function lookupByUsername($username) {
+          return db_query("SELECT * FROM user WHERE username = '" . $username . "'");
+      }
+  }
+
+  class ClientAccount extends UserAccount {
+  }
+
+  if (($acct = UserAccount::lookupByUsername($_POST['userid']))) {
+      echo $acct;
+  }
+  ```

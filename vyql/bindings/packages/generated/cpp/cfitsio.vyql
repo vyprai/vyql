@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m3c275d5a;
+
+binding deserialization0 {
+  requires {
+    dependency("cfitsio")
+  }
+  query pattern callExpr where callee.method == "fits_parser_yyparse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,223 @@
+# Rank 1942 / CVE-2026-35389: Bulwark Webmail verified S/MIME signatures
+# with pkijs's chain check switched off, so the CMS signature is only checked
+# against the certificate carried inside the signed message itself and any
+# self-signed certificate verified (improper certificate validation, CWE-295;
+# fixed in 1.4.11). The vulnerable call in lib/smime/smime-verify.ts:
+#   const verifyResult = await signedData.verify(
+#     { signer: 0, checkChain: false },   // v1: no trust-chain validation
+#     cryptoEngine,
+#   );
+# fed `signatureValid`, and the status banner rendered a green "signature
+# valid" shield for it. pkijs documents checkChain as defaulting to false and
+# shows the canonical verification call turning it on alongside a trustedCerts
+# anchor list (build/index.d.ts, SignedDataVerifyParams). Confirmed against the
+# version the project locks (pkijs 3.3.3): with checkChain false a self-signed
+# signer certificate verifies true; with checkChain true and no trustedCerts
+# the chain engine throws "No valid certificate paths found"; with
+# trustedCerts it returns true.
+#
+# The pool row named 7102add1943978aeb0b4df9a73d2d2bdf3ae1399 (self-signed
+# detection plus a warning banner), whose parent a3d8947 carries
+# checkChain: true -- the advisory's weakness is absent at 7102add1^, where
+# every signature reports invalid because the chain engine has no anchors at
+# all. The substantive fix is the sibling commit a3d894730ba04b1f3b6492446f401812e536f92a
+# ("reenabled S/MIME chain verify"), two minutes earlier in the same release;
+# 68214c3e91ed93ce0e332b612c1672677cfcf17e is the genuinely vulnerable parent.
+#
+# pkijs carried no binding, so the call lacks a label. The binding below
+# widens code.CertValidationDisabled to the pkijs spelling of the same
+# weakness class the rejectUnauthorized family covers -- a documented
+# verification toggle written in its disabled form -- so VYQL-CFG-004 reports
+# it. Measured on the real tree: 274 findings at 68214c3 before the binding,
+# 275 after, the added row being code.CertValidationDisabled @
+# lib/smime/smime-verify.ts:26 (the CVE's own function) -- 1/1/1 over three
+# --cache off runs; 274 at both a3d8947 and 7102add1, i.e. a clean 1 -> 0.
+# Reachable-set enumeration: `checkChain` occurs in exactly one JS/TS file
+# across all 142 rank clones (this one), and scans of three further large
+# JS/TS trees report no VYQL-CFG-004 rows. Fires under the generic, web,
+# frontend and api profiles.
+
+test "rank1942: a CMS signature verified with the chain check written false reports"
+  lang javascript
+  file smime-verify.js
+  expect VYQL-CFG-004
+  code
+  ```
+  export async function smimeVerify(cmsBytes, fromHeader) {
+    const signedData = extractSignedData(parseContentInfo(cmsBytes));
+    const signerCert = extractSignerCertificate(signedData);
+
+    let signatureValid = false;
+    let signatureError;
+
+    try {
+      const cryptoEngine = new pkijs.CryptoEngine({
+        crypto: crypto,
+        subtle: crypto.subtle,
+        name: 'webcrypto',
+      });
+
+      const verifyResult = await signedData.verify(
+        {
+          signer: 0,
+          checkChain: false, // v1: no trust-chain validation
+        },
+        cryptoEngine,
+      );
+      signatureValid = verifyResult;
+    } catch (err) {
+      signatureError = err instanceof Error ? err.message : 'Signature verification failed';
+    }
+
+    const certInfo = await extractCertificateInfo(signerCert);
+    const certExpired = new Date() > new Date(certInfo.notAfter);
+
+    return {
+      status: {
+        isSigned: true,
+        signatureValid: signatureValid && !certExpired,
+        signatureError,
+      },
+    };
+  }
+  ```
+
+test "rank1942: the fixed revision turns the documented chain check on"
+  lang javascript
+  file smime-verify.js
+  reject VYQL-CFG-004
+  code
+  ```
+  export async function smimeVerify(cmsBytes, fromHeader) {
+    const signedData = extractSignedData(parseContentInfo(cmsBytes));
+    const signerCert = extractSignerCertificate(signedData);
+
+    let signatureValid = false;
+    let signatureError;
+
+    try {
+      const cryptoEngine = new pkijs.CryptoEngine({
+        crypto: crypto,
+        subtle: crypto.subtle,
+        name: 'webcrypto',
+      });
+
+      const verifyResult = await signedData.verify(
+        {
+          signer: 0,
+          checkChain: true,
+        },
+        cryptoEngine,
+      );
+      signatureValid = verifyResult;
+    } catch (err) {
+      signatureError = err instanceof Error ? err.message : 'Signature verification failed';
+    }
+
+    const certInfo = await extractCertificateInfo(signerCert);
+    const certExpired = new Date() > new Date(certInfo.notAfter);
+
+    return {
+      status: {
+        isSigned: true,
+        signatureValid: signatureValid && !certExpired,
+        signatureError,
+      },
+    };
+  }
+  ```
+
+test "rank1942: minimal pair, chain check on with an anchor list -- no report"
+  lang javascript
+  file anchored.js
+  reject VYQL-CFG-004
+  code
+  ```
+  export async function smimeVerify(cmsBytes, anchors) {
+    const signedData = extractSignedData(parseContentInfo(cmsBytes));
+    const ok = await signedData.verify(
+      { signer: 0, checkChain: true, trustedCerts: anchors },
+      cryptoEngine,
+    );
+    return ok;
+  }
+  ```
+
+test "rank1942: the disabled toggle in a sibling function does not reach the verifier"
+  lang javascript
+  file sibling.js
+  reject VYQL-CFG-004
+  code
+  ```
+  export async function smimeVerify(cmsBytes) {
+    const signedData = extractSignedData(parseContentInfo(cmsBytes));
+    const ok = await signedData.verify(
+      { signer: 0, checkChain: true, trustedCerts: anchors },
+      cryptoEngine,
+    );
+    return ok;
+  }
+
+  function buildLegacyOptions() {
+    return { signer: 0, checkChain: false };
+  }
+  ```
+
+test "rank1942: the disabled toggle with no verification call in the body does not report"
+  lang javascript
+  file options.js
+  reject VYQL-CFG-004
+  code
+  ```
+  export function legacyVerifyOptions() {
+    return { signer: 0, checkChain: false };
+  }
+  ```
+
+test "rank1942: a comment naming the disabled spelling neither creates nor silences the flag"
+  lang javascript
+  file comments.js
+  expect VYQL-CFG-004
+  code
+  ```
+  export async function smimeVerify(cmsBytes) {
+    // the chain check read checkChain: true before the v1 rewrite, and the
+    // migration note still says do not restore checkChain: false blindly
+    const signedData = extractSignedData(parseContentInfo(cmsBytes));
+    const ok = await signedData.verify(
+      { signer: 0, checkChain: false },
+      cryptoEngine,
+    );
+    return ok;
+  }
+  ```
+
+test "rank1942: a comment naming the disabled spelling does not flag a verifying function"
+  lang javascript
+  file comments-fixed.js
+  reject VYQL-CFG-004
+  code
+  ```
+  export async function smimeVerify(cmsBytes) {
+    // do not set checkChain: false here; chain validation is required
+    const signedData = extractSignedData(parseContentInfo(cmsBytes));
+    const ok = await signedData.verify(
+      { signer: 0, checkChain: true, trustedCerts: anchors },
+      cryptoEngine,
+    );
+    return ok;
+  }
+  ```
+
+test "rank1942: the fixed revision's own variable names are not the anchor"
+  lang javascript
+  file renamed.js
+  expect VYQL-CFG-004
+  code
+  ```
+  async function checkMessage(raw) {
+    const blob = new pkijs.SignedData({ schema: read(raw).content });
+    const ok = await blob.verify({ signer: 0, checkChain: false }, engine);
+    return ok;
+  }
+  ```

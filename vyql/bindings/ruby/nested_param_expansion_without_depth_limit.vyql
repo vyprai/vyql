@@ -1,0 +1,56 @@
+module bindings.ruby.nested_param_expansion_without_depth_limit;
+
+// A nested-parameter decoder splits a query string into pairs,
+// percent-decodes each key, and then expands the bracket groups in the key
+// into nested containers: `a[b][c]=v` becomes {"a" => {"b" => {"c" => v}}}.
+// The bracket groups are caller-written, so one container is allocated per
+// group and the finished structure is walked one level at a time; with no
+// ceiling on how many groups a key may carry, the depth of the expansion is a
+// property of the request, and a key like a[b][c][d]... exhausts the stack or
+// the heap one level per pair. Rack's QueryParser sets this convention's
+// ceiling and names it in its public interface -- `param_depth_limit`, which
+// raises ParamsTooDeepError once nesting reaches it -- and faraday's
+// NestedParamsEncoder documents itself as the same convention ("this is not
+// compatible with Rack::Utils.parse_nested_query"), so the convention's two
+// implementations spell the control identically.
+//
+// The four positive conjuncts are the convention's own surface, co-occurring
+// in one module: an `unescape` call (percent-decoding a pair), an exact '&'
+// string literal (the pair separator the query string is split on), and a
+// `scan` whose pattern contains the bracket pair (the nesting delimiter),
+// which is how a decoder breaks `a[b][c]` into subkeys. Across every Ruby
+// file in the corpus clones (24659 files) that co-occurrence holds only in
+// faraday's own encoder; the next-nearest file, ruby/uri's rfc2396_parser,
+// carries the separator only inside comments, and comments produce no
+// literal token.
+//
+// The negation names the ceiling in the spellings the convention uses --
+// `param_depth_limit` first, then the generic depth/nesting/recursion ceiling
+// spellings -- and reads only the AST-derived `assign:` and `expr:` tokens. A
+// live ceiling is either configured (an assignment) or compared against (a
+// binary), and both survive comment stripping, while the module context also
+// carries the module's raw source text, which a `literal:` or whole-token
+// clause would let a comment silence. `dependency(...)` is deliberately
+// absent: Ruby projects declare dependencies in the Gemfile, which is not a
+// parsed manifest, so the gate would make the binding inert on every real
+// application; the parsing conjuncts carry the technology instead.
+//
+// Residuals: a decoder that slices the key instead of scanning it (rack's own
+// spelling of the expansion) keeps the weakness and is not reported, and an
+// accessor declared but never assigned or compared (`attr_accessor
+// :param_depth_limit` alone) does not silence, because symbols emit no
+// tokens -- a ceiling declared but never set is nil at run time and enforces
+// nothing. The module context is the file root, so one flag covers a file
+// however the decoder is nested.
+
+binding nestedParamExpansionWithoutDepthLimit {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "ruby"
+    and node.context.call in ["unescape"]
+    and node.context.call in ["scan"]
+    and containsAny(node.context.regex, ["\\[\\]"])
+    and node.context.literal in ["&"]
+    and not containsAny(node.context.assign, ["param_depth_limit", "depth_limit", "depthLimit", "max_depth", "maxDepth", "max_nesting", "maxNesting", "nesting_depth", "nestingDepth", "nesting_limit", "nestingLimit", "recursion_depth", "recursionDepth", "recursion_limit", "recursionLimit"])
+    and not containsAny(node.context.expr, ["param_depth_limit", "depth_limit", "depthLimit", "max_depth", "maxDepth", "max_nesting", "maxNesting", "nesting_depth", "nestingDepth", "nesting_limit", "nestingLimit", "recursion_depth", "recursionDepth", "recursion_limit", "recursionLimit"])
+  emit issue code.NestedParamExpansionWithoutDepthLimit at node
+}

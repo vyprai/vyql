@@ -1,0 +1,11 @@
+module code;
+
+concept DecodeOverwritesPresetId : issue {
+  cwe: [CWE_915]
+  reviewAssumption: "a request decode replaces any struct field the payload names"
+  reviewCategory: mass_assignment
+  reviewCondition: "an identifier field initialised from a trusted source is overwritten because the request body is decoded into the same struct in place"
+  reviewConfidence: medium
+  reviewEvidence: "decode {pattern} overwrites the preset identifier fields of the target struct"
+  vulnerableTo: [injection.MassAssignment]
+}

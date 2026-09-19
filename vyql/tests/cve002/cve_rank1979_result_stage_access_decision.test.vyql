@@ -1,0 +1,183 @@
+# Rank 1979 / CVE-2026-43937 (CWE-863): YAF.NET enforced every page-level
+# authorization -- login required, registered-users-only, admin-page access,
+# per-page view permissions -- from a class attribute on the ForumPage base:
+#
+#	[PageSecurityCheck]
+#	public abstract class ForumPage : PageModel, ...
+#
+# where PageSecurityCheckAttribute derives from ResultFilterAttribute and does
+# its work in OnResultExecutionAsync. A result filter runs only after the page
+# handler has executed, so the decision arrives too late to prevent
+# anything: every admin OnPost handler -- /Admin/RunSql above all, which binds
+# [BindProperty] Editor and hands it straight to IDbAccess.RunSql -> cmd
+# .CommandText -- performed its side effects before the access-denied result
+# is issued. The advisory calls it "Pre-Handler Authorization Bypass on Admin
+# Pages Enabling Blind SQL Execution via /Admin/RunSql"; fixed in 4.0.5.
+#
+# The fixed revision (27f7e67, "use IAsyncPageFilter instead of ResultFilterAttribute")
+# deletes the attribute and moves the identical checks into ForumPage's
+# OnPageHandlerExecutionAsync override, the page-filter hook that runs before
+# the handler and short-circuits with `context.Result = ...; return;`. The
+# checks themselves are byte-for-byte the same logic, so no taint path can
+# separate the revisions: the discriminator is which documented pipeline hook
+# carries the decision.
+#
+# `vyql match` at the parent labelled nothing on either file -- no source, no
+# sink, no flag on ForumPage.cs or PageSecurityCheckAttribute.cs, and the
+# RunSql page reported nothing either (a [BindProperty] without SupportsGet is
+# not labelled as input, and IDbAccess.RunSql -> CommandText has no C# sink).
+#
+# Detection keys on the framework hook names and the documented result-
+# replacement surface, never on the fixed revision's own vocabulary: the binding fires on
+# a function named OnResultExecutionAsync / OnResultExecuting / OnResultExecuted
+# -- the three documented result-stage filter hooks, which run after the
+# handler -- that assigns to the context's Result property, the documented way
+# a filter replaces the action result. Renaming any YAF-internal helper leaves
+# detection unchanged. The pre-handler hooks (OnPageHandlerExecutionAsync,
+# OnPageHandlerExecuting, OnAuthorization) are deliberately not in the list, so
+# the patched form and ModerateForumPage's own pre-handler moderator check --
+# which assigns context.Result = AccessDenied() the correct way -- do not fire.
+#
+# Measured on the real checkout (yafsrc/YAFNET.Core, three --cache off runs
+# each): VYQL-AUTH-168 0 -> 1 at the parent (PageSecurityCheckAttribute) and
+# 1 -> 0 across the fixed revisioned revision, the file being deleted; the fixed checks live in
+# OnPageHandlerExecutionAsync and are not matched. UserSuspendCheckAttribute,
+# an untouched sibling attribute in the same file family that redirects
+# suspended users from OnResultExecutionAsync, is reported on both revisions
+# -- correctly: the suspension decision still runs after the handler, the same
+# stage defect the fixed revision removes from PageSecurityCheck only.
+#
+# Reachable set across the ~175 clones (exhaustive grep, all ranks):
+# OnResultExecutionAsync / OnResultExecuting / OnResultExecuted appear in
+# exactly four files -- the two YAF attributes above and two copies of
+# Umbraco's PublishedRequestFilterAttribute, which only shapes cache headers
+# and status codes and never assigns Result, so it does not fire. CamelCase
+# OutputAttribute, YAF's own benign OnResultExecuting override (serializer
+# settings), does not fire either: the assignment conjunct is what separates a
+# decision from a response-shaping filter. OnActionExecuted /
+# OnPageHandlerExecuted are a different filter family left out of the hook
+# list on purpose; Umbraco alone carries nine of those.
+#
+# verify_current_expected: fixed
+
+test "rank1979: page security enforced from a result filter reports the decision as post-handler"
+  lang csharp
+  expect VYQL-AUTH-168
+  code
+  ```
+  using System.Threading.Tasks;
+  using Microsoft.AspNetCore.Mvc.Filters;
+
+  public class PageSecurityCheckAttribute : ResultFilterAttribute
+  {
+      public override Task OnResultExecutionAsync(ResultExecutingContext context, ResultExecutionDelegate next)
+      {
+          // check if login is required
+          if (BoardContext.Current.BoardSettings.RequireLogin && BoardContext.Current.IsGuest &&
+              BoardContext.Current.CurrentForumPage.IsProtected)
+          {
+              var result = this.Get<IPermissions>().HandleRequest(ViewPermissions.RegisteredUsers);
+              if (result != null)
+              {
+                  context.Result = result;
+              }
+          }
+
+          // Handle admin pages
+          if (BoardContext.Current.CurrentForumPage.IsAdminPage && !BoardContext.Current.IsAdmin)
+          {
+              context.Result = this.Get<ILinkBuilder>().AccessDenied();
+          }
+
+          return next.Invoke();
+      }
+  }
+  ```
+
+test "rank1979: the same checks moved into the pre-handler page-filter hook are not reported"
+  lang csharp
+  reject VYQL-AUTH-168
+  code
+  ```
+  using System.Threading.Tasks;
+  using Microsoft.AspNetCore.Mvc.RazorPages;
+
+  public abstract class ForumPage : PageModel
+  {
+      public async override Task OnPageHandlerExecutionAsync(
+          PageHandlerExecutingContext context,
+          PageHandlerExecutionDelegate next)
+      {
+          // check if login is required
+          if (BoardContext.Current.BoardSettings.RequireLogin && BoardContext.Current.IsGuest &&
+              BoardContext.Current.CurrentForumPage.IsProtected)
+          {
+              var result = this.Get<IPermissions>().HandleRequest(ViewPermissions.RegisteredUsers);
+              if (result != null)
+              {
+                  context.Result = result;
+                  return;
+              }
+          }
+
+          // Handle admin pages
+          if (BoardContext.Current.CurrentForumPage.IsAdminPage)
+          {
+              if (!BoardContext.Current.IsAdmin)
+              {
+                  context.Result = this.Get<ILinkBuilder>().AccessDenied();
+                  return;
+              }
+          }
+
+          await next.Invoke();
+      }
+  }
+  ```
+
+test "rank1979: a pre-handler access check assigning the denial result is not reported"
+  lang csharp
+  reject VYQL-AUTH-168
+  code
+  ```
+  using Microsoft.AspNetCore.Mvc.RazorPages;
+
+  public abstract class ModerateForumPage : ForumPage
+  {
+      public override void OnPageHandlerExecuting(PageHandlerExecutingContext context)
+      {
+          // Only moderators or admins are allowed here
+          if (!(this.PageBoardContext.IsModeratorInAnyForum || this.PageBoardContext.IsAdmin))
+          {
+              context.Result = this.Get<ILinkBuilder>().AccessDenied();
+          }
+      }
+  }
+  ```
+
+test "rank1979: a result filter that only shapes the response is not reported"
+  lang csharp
+  reject VYQL-AUTH-168
+  code
+  ```
+  using Microsoft.AspNetCore.Mvc.Filters;
+
+  public class CamelCaseOutputAttribute : ActionFilterAttribute
+  {
+      public override void OnResultExecuting(ResultExecutingContext context)
+      {
+          if (context.Result is ObjectResult objectResult)
+          {
+              var serializerSettings = new JsonSerializerSettings
+              {
+                  ContractResolver = new CamelCasePropertyNamesContractResolver()
+              };
+
+              objectResult.Formatters.Add(
+                  new NewtonsoftJsonOutputFormatter(serializerSettings, ArrayPool<char>.Shared, new MvcOptions(), null));
+          }
+
+          base.OnResultExecuting(context);
+      }
+  }
+  ```

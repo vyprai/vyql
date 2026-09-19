@@ -1,0 +1,36 @@
+module bindings.java.shellCommandAssemblyWithoutQuoting;
+
+// A command string handed to `bash -c` (or `sh -c`) is executed as shell
+// code, so every metacharacter in it is live: a value the code assembles
+// into that string has to be neutralised before it lands there, and the
+// POSIX way is to wrap it in single quotes. The wrapping shows up in the
+// source as a string literal whose entire content is one apostrophe --
+// `"'"` on one side of the assembly, or `.append("'")` closing a quoted
+// operand -- because a quote glued into a longer segment (`"' && "`)
+// quotes only that segment, not the value appended next to it. The builder
+// idiom that assembles such a command in Java is a StringBuilder or
+// StringBuffer `.append` chain, one append per command segment, and the
+// interpreter invocation shows up as the literal pair `bash`/`sh` and
+// `-c` in the command array handed to the executor. The review concept
+// code.CommandLineAssemblyReview (VYQL-INJ-053) carries the judgement;
+// this binding reads the shape on the function that builds and launches
+// the command, and all four facts are POSIX or JDK vocabulary.
+//
+// Residual, false-negative direction: assembly by plain concatenation
+// (`"id -gn " + v`) is not read, because the safe spelling of that form
+// delegates the quoting to a helper (`bashQuote(v)`), whose body sits
+// outside the launching function's context, so at function scope the
+// delegated safe form and the vulnerable form are the same three tokens.
+// Residual, false-positive direction: an append form whose quoting is
+// likewise delegated (`.append(bashQuote(v))`) still reports, for the same
+// reason. A lone apostrophe as a character literal (`'\''`) is a different
+// token and does not suppress.
+
+binding javaShellCommandAssemblyWithoutQuoting {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.literal in ["bash", "sh"]
+    and node.context.literal in ["-c"]
+    and node.context.call in ["append"]
+    and not (node.context.literal in ["'"])
+  emit issue code.CommandLineAssemblyReview at node
+}

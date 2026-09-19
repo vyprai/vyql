@@ -1,0 +1,209 @@
+# PRAGMA integrity_check verifies a NOT NULL column by emitting a column
+# read and then setting the TYPEOFARG hint on it (src/pragma.c, 2019-12-09):
+#
+#   sqlite3ExprCodeGetColumnOfTable(v, pTab, iDataCur, j, 3);
+#   sqlite3VdbeChangeP5(v, OPFLAG_TYPEOFARG);
+#   jmp2 = sqlite3VdbeAddOp1(v, OP_NotNull, 3);
+#
+# sqlite3VdbeChangeP5 writes into whatever opcode the VDBE emitted last, so
+# the hint is only well placed when the preceding call really did end on an
+# OP_Column. sqlite3ExprCodeGetColumnOfTable (src/expr.c) has five exits: a
+# bare OP_Column, OP_Rowid, OP_VColumn, OP_Column followed by
+# sqlite3ColumnDefault, and -- for a generated column -- a whole
+# sqlite3ExprCodeGeneratedColumn sub-program whose final instruction is
+# whatever the column's expression compiled to. For a generated column
+# defined AS (c0==0) that final instruction is a comparison opcode, and the
+# two bit domains collide: OPFLAG_TYPEOFARG is 0x80 (src/sqliteInt.h) and
+# so is SQLITE_NULLEQ, the P5 bit that OP_Eq and OP_Ne alone interpret
+# (src/vdbe.c, "which will only happen if the operator is OP_Eq or OP_Ne").
+# The hint therefore switched the generated column's comparison to
+# NULL-equality semantics and the NOT NULL verification mis-judged the
+# column, so integrity_check reported a violation for a row that satisfied
+# the constraint. The advisory's own weakness class is CWE-754; nothing in
+# the fix or its regression test (gencol1-12.10, which expects the pragma
+# to return `ok` normally) involves unbounded execution. The fixed revision
+# guards the write:
+#
+#   if( sqlite3VdbeGetOp(v,-1)->opcode==OP_Column ){
+#     sqlite3VdbeChangeP5(v, OPFLAG_TYPEOFARG);
+#   }
+#
+# ATTENTION, rechecked. Nothing is labelled on either revision. Re-measured
+# against the current knowledge base, three `--cache off` runs per side,
+# stable: the whole src/ tree is 8720 findings (4407 at or above high) at
+# the vulnerable parent and byte-identical counts at the fix, and in
+# src/pragma.c the findings view has nothing between :1545 and :1617, so
+# the defect at :1599 is unreported. The `-flags only` view was checked too
+# (197 review flags in pragma.c alone): the nearest are
+# code.IntegerSizeArithmetic on the `pTab->nNVCol-1` subtraction at :1589
+# and code.IndexAccess on `pTab->aCol[j]` at :1597 and :1602 -- generic
+# labels with no relation to the hint. `vyql match` over a repro of both
+# forms reports no source, no sink on either call and no control; only the
+# `pTab->aCol[j]` subscripts are labelled, identically in both revisions.
+#
+# A binding is the layer the diagnosis names (nothing labelled) and no
+# binding passes the genericity test. sqlite3VdbeChangeP5,
+# sqlite3VdbeGetOp and sqlite3ExprCodeGetColumnOfTable are private,
+# undocumented functions of SQLite's own code generator, so a binding
+# naming them detects this application rather than the weakness. The
+# discriminating fact is an interprocedural postcondition -- the emitter
+# call ended on the opcode the caller assumes, five cases in the callee --
+# and under the corrected mechanism it is a bit-domain collision between
+# two constants that happen to share the value 0x80, a table that lives in
+# src/vdbe.c and src/sqliteInt.h of this one project. No language-neutral
+# concept expresses either, and minting one for this shape is a concept
+# per case.
+#
+# The narrow shape cannot ship on precision either.
+# "Apply a flag to the last-emitted opcode with no opcode check" has a
+# reachable set of exactly three sites in src/, and two are correct code
+# the fixed revision deliberately leaves unguarded, because an explicit
+# sqlite3VdbeAddOp3(v, OP_Column, ...) immediately precedes them:
+# src/pragma.c:1590 and src/expr.c:2326 both keep the unguarded form in
+# the patched tree. The shape scores 3 at the vulnerable revision and 2 at
+# the patched one, with two permanent findings on correct code. The wider
+# class, "mutate the last-emitted opcode" (sqlite3VdbeChangeP1..P5 and
+# sqlite3VdbeJumpHere), is 202 sites in src/ alone, of which one is the
+# defect. Keying the negation on sqlite3VdbeGetOp is keying on the fixing
+# commit's own added call.
+#
+# No engine-gap entry: the C is plain sequential calls, `vyql match` and
+# `vyql resolve` both work here, and what is missing is a domain fact about
+# a private helper's postcondition, not a construct the engine mishandles.
+# All four tests assert reject, pinning the miss so the spec flips to
+# expect once emitter-postcondition vocabulary exists.
+
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1784: the typeofarg hint applies to whatever opcode is emitted last"
+  lang c
+  file src/pragma.c
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  code
+  ```
+  typedef struct Vdbe Vdbe;
+  typedef struct Table Table;
+  #define OPFLAG_TYPEOFARG 0x80    /* OP_Column only used for typeof() */
+  #define OP_NotNull 96
+  void sqlite3ExprCodeGetColumnOfTable(Vdbe*, Table*, int, int, int);
+  void sqlite3VdbeChangeP5(Vdbe*, unsigned char);
+  int sqlite3VdbeAddOp1(Vdbe*, int, int);
+
+  struct Column { int notNull; };
+  struct Table { struct Column *aCol; int nCol; int iPKey; };
+
+  /* Verify that all NOT NULL columns really are NOT NULL */
+  void verifyNotNull(Vdbe *v, Table *pTab, int iDataCur)
+  {
+    int j;
+    for(j=0; j<pTab->nCol; j++){
+      int jmp2;
+      if( j==pTab->iPKey ) continue;
+      if( pTab->aCol[j].notNull==0 ) continue;
+      sqlite3ExprCodeGetColumnOfTable(v, pTab, iDataCur, j, 3);
+      sqlite3VdbeChangeP5(v, OPFLAG_TYPEOFARG);
+      jmp2 = sqlite3VdbeAddOp1(v, OP_NotNull, 3);
+      (void)jmp2;
+    }
+  }
+  ```
+
+test "rank1784: the fixed revision checks that the emitter ended on an OP_Column"
+  lang c
+  file src/pragma.c
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  code
+  ```
+  typedef struct Vdbe Vdbe;
+  typedef struct Table Table;
+  #define OPFLAG_TYPEOFARG 0x80    /* OP_Column only used for typeof() */
+  #define OP_Column 93
+  #define OP_NotNull 96
+  void sqlite3ExprCodeGetColumnOfTable(Vdbe*, Table*, int, int, int);
+  void sqlite3VdbeChangeP5(Vdbe*, unsigned char);
+  int sqlite3VdbeAddOp1(Vdbe*, int, int);
+
+  typedef struct VdbeOp { int opcode; } VdbeOp;
+  VdbeOp *sqlite3VdbeGetOp(Vdbe*, int);
+
+  struct Column { int notNull; };
+  struct Table { struct Column *aCol; int nCol; int iPKey; };
+
+  void verifyNotNull(Vdbe *v, Table *pTab, int iDataCur)
+  {
+    int j;
+    for(j=0; j<pTab->nCol; j++){
+      int jmp2;
+      if( j==pTab->iPKey ) continue;
+      if( pTab->aCol[j].notNull==0 ) continue;
+      sqlite3ExprCodeGetColumnOfTable(v, pTab, iDataCur, j, 3);
+      if( sqlite3VdbeGetOp(v,-1)->opcode==OP_Column ){
+        sqlite3VdbeChangeP5(v, OPFLAG_TYPEOFARG);
+      }
+      jmp2 = sqlite3VdbeAddOp1(v, OP_NotNull, 3);
+      (void)jmp2;
+    }
+  }
+  ```
+
+test "rank1784: a hint that follows an explicit OP_Column needs no guard"
+  lang c
+  file src/pragma.c
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  code
+  ```
+  typedef struct Vdbe Vdbe;
+  typedef struct Table Table;
+  #define OPFLAG_TYPEOFARG 0x80    /* OP_Column only used for typeof() */
+  #define OP_Column 93
+  void sqlite3VdbeAddOp3(Vdbe*, int, int, int, int);
+  void sqlite3VdbeChangeP5(Vdbe*, unsigned char);
+
+  struct Table { int nNVCol; };
+
+  /* The form at src/pragma.c:1589 in the 2019-12-09 tree: the OP_Column is
+  ** emitted on the line above, so the hint cannot land anywhere else. The
+  ** fixed revision leaves this unguarded, so a shape that flags the
+  ** unguarded hint reports this correct code at both revisions. */
+  void sanityCheckOnRecordHeader(Vdbe *v, Table *pTab, int iDataCur)
+  {
+    sqlite3VdbeAddOp3(v, OP_Column, iDataCur, pTab->nNVCol-1, 3);
+    sqlite3VdbeChangeP5(v, OPFLAG_TYPEOFARG);
+  }
+  ```
+
+test "rank1784: the unguarded hint over a NULL-flag scan is also correct"
+  lang c
+  file src/expr.c
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  code
+  ```
+  typedef struct Vdbe Vdbe;
+  #define OPFLAG_TYPEOFARG 0x80    /* OP_Column only used for typeof() */
+  #define OP_Column 93
+  #define OP_Integer 1
+  #define OP_Rewind 86
+  int sqlite3VdbeAddOp1(Vdbe*, int, int);
+  int sqlite3VdbeAddOp2(Vdbe*, int, int, int);
+  int sqlite3VdbeAddOp3(Vdbe*, int, int, int, int);
+  void sqlite3VdbeChangeP5(Vdbe*, unsigned char);
+  void sqlite3VdbeJumpHere(Vdbe*, int);
+
+  /* sqlite3SetHasNullFlag, src/expr.c:2321 in the 2019-12-09 tree -- the
+  ** second site the fixed revision deliberately leaves unguarded: the
+  ** OP_Column it flags is emitted by the sqlite3VdbeAddOp3 call immediately
+  ** above, so the hint cannot land anywhere else. */
+  void sqlite3SetHasNullFlag(Vdbe *v, int iCur, int regHasNull)
+  {
+    int addr1;
+    sqlite3VdbeAddOp2(v, OP_Integer, 0, regHasNull);
+    addr1 = sqlite3VdbeAddOp1(v, OP_Rewind, iCur);
+    sqlite3VdbeAddOp3(v, OP_Column, iCur, 0, regHasNull);
+    sqlite3VdbeChangeP5(v, OPFLAG_TYPEOFARG);
+    sqlite3VdbeJumpHere(v, addr1);
+  }
+  ```

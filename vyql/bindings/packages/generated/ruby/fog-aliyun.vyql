@@ -1,0 +1,22 @@
+module bindings.ruby.generated.mc0f98a01;
+
+binding networkSend0 {
+  requires {
+    dependency("fog-aliyun")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding inputValidation1 {
+  requires {
+    dependency("fog-aliyun")
+  }
+  query pattern callExpr where callee.method == "escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

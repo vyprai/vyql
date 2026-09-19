@@ -1,0 +1,75 @@
+test "rank331: CasaOS user image path accepts traversal through loose prefix check"
+  lang go
+  expect VYQL-PATH-001
+  code
+  ```
+  package v1
+
+  import (
+      "net/http"
+      "os"
+      "strings"
+
+      "github.com/gin-gonic/gin"
+  )
+
+  var userDataPath = "/var/lib/casaos"
+
+  func GetUserImage(c *gin.Context) {
+      filePath := c.Query("path")
+      if len(filePath) == 0 {
+          c.JSON(http.StatusNotFound, nil)
+          return
+      }
+      if !strings.Contains(filePath, userDataPath) {
+          c.JSON(http.StatusNotFound, nil)
+          return
+      }
+      fileTmp, _ := os.Open(filePath)
+      defer fileTmp.Close()
+      c.File(filePath)
+  }
+  ```
+
+test "rank331: CasaOS user image path restricts avatar root with regex"
+  lang go
+  reject VYQL-PATH-001
+  code
+  ```
+  package v1
+
+  import (
+      "net/http"
+      "os"
+      "regexp"
+      "strings"
+
+      "github.com/gin-gonic/gin"
+  )
+
+  var userDataPath = "/var/lib/casaos"
+
+  func GetUserImage(c *gin.Context) {
+      filePath := c.Query("path")
+      if len(filePath) == 0 {
+          c.JSON(http.StatusNotFound, nil)
+          return
+      }
+      if !strings.Contains(filePath, userDataPath) {
+          c.JSON(http.StatusNotFound, nil)
+          return
+      }
+      matched, err := regexp.MatchString(`^/var/lib/casaos/\d`, filePath)
+      if err != nil {
+          c.JSON(http.StatusNotFound, nil)
+          return
+      }
+      if !matched {
+          c.JSON(http.StatusNotFound, nil)
+          return
+      }
+      fileTmp, _ := os.Open(filePath)
+      defer fileTmp.Close()
+      c.File(filePath)
+  }
+  ```

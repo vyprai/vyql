@@ -1,0 +1,48 @@
+test "rank883: Transform scan data reaches shell=True asnmap command string"
+  lang python
+  file to_asn.py
+  expect VYQL-INJ-119
+  expect VYQL-VAL-005
+  expect_review code.CommandStringWrapperExecution
+  code
+  ```
+  import subprocess
+  from typing import List
+  from flowsint_core.core.transform_base import Transform
+  from flowsint_types.organization import Organization
+
+
+  class OrgToAsnTransform(Transform):
+      InputType = List[Organization]
+
+      async def scan(self, data: InputType):
+          for org in data:
+              self.__get_asn_from_asnmap(org.name)
+
+      def __get_asn_from_asnmap(self, name: str):
+          command = f"echo {name} | asnmap -silent -json | jq -s"
+          return subprocess.run(command, shell=True, capture_output=True, text=True, timeout=60)
+  ```
+
+test "rank883: Transform scan data passed to tool API avoids shell command execution"
+  lang python
+  file to_asn.py
+  reject VYQL-INJ-119
+  reject VYQL-VAL-005
+  reject_review code.CommandStringWrapperExecution
+  code
+  ```
+  from typing import List
+  from flowsint_core.core.transform_base import Transform
+  from flowsint_types.organization import Organization
+  from tools.network.asnmap import AsnmapTool
+
+
+  class OrgToAsnTransform(Transform):
+      InputType = List[Organization]
+
+      async def scan(self, data: InputType):
+          asnmap = AsnmapTool()
+          for org in data:
+              asnmap.launch(org.name, type="org", api_key="secret")
+  ```

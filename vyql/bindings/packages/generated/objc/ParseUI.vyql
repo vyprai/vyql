@@ -1,0 +1,25 @@
+module bindings.objc.generated.m79099859;
+
+binding userControlledData0 {
+  requires {
+    dependency("ParseUI")
+  }
+  query pattern callExpr where callee.method == "signUpViewController:shouldBeginSignUp:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("ParseUI")
+  }
+  query pattern callExpr where callee.method == "signUpViewController:didSignUpUser:"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("ParseUI")
+  }
+  query pattern callExpr where callee.method == "logInViewController:didLogInUser:"
+  emit source core.UserControlledData at call.result
+}

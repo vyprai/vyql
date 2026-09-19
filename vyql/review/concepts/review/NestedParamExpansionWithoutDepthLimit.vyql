@@ -1,0 +1,7 @@
+module code;
+
+review code.NestedParamExpansionWithoutDepthLimit {
+  category: resource
+  kind: attention
+  text: "review nested-parameter decoding that expands bracket-delimited keys with no nesting-depth ceiling"
+}

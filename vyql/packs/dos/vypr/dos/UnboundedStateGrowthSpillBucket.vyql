@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule UnboundedStateGrowthSpillBucket {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_400, CWE_770]
+    id: "VYQL-DOS-048"
+    severity: medium
+  }
+  issue code.UnboundedStateGrowthReview as sink
+}

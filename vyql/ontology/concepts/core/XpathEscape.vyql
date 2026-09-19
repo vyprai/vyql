@@ -1,0 +1,8 @@
+module core;
+
+concept XpathEscape : check {
+  applies: path
+  covers: [path]
+  cwe: [CWE_643]
+  neutralizes: [injection.XpathInjection]
+}

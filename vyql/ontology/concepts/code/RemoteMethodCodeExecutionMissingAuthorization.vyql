@@ -1,0 +1,11 @@
+module code;
+
+concept RemoteMethodCodeExecutionMissingAuthorization : issue {
+  cwe: [CWE_862, CWE_269]
+  reviewAssumption: "the transport a remote method is registered on admits callers who hold no privilege beyond an account, so the method body is the only place the privilege can be enforced"
+  reviewCategory: access_control
+  reviewCondition: "a remotely invocable method executes dynamic code without an authorization check on the caller"
+  reviewConfidence: high
+  reviewEvidence: "remote method registration context {pattern} executes dynamic code and carries no authorization check"
+  vulnerableTo: [access_control.MissingAuthorization, access_control.PrivilegeEscalation]
+}

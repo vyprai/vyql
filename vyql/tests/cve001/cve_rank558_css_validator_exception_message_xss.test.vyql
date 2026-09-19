@@ -1,0 +1,62 @@
+test "rank558: css-validator raw exception message rendered through CssError"
+  lang java
+  expect VYQL-INJ-033
+  code
+  ```
+  import java.net.URL;
+  import org.w3c.css.css.CssFouffa;
+  import org.w3c.css.parser.CssError;
+  import org.w3c.css.parser.Errors;
+  import org.w3c.css.util.ApplContext;
+  import org.w3c.css.util.Messages;
+
+  class StyleSheetParser {
+    private CssFouffa cssFouffa;
+
+    void notifyErrors(Errors errors) {
+    }
+
+    public void parseURL(ApplContext ac, URL url) {
+      try {
+        cssFouffa = new CssFouffa(ac, url);
+        cssFouffa.parseStyle();
+      } catch (Exception e) {
+        Errors er = new Errors();
+        er.addError(new CssError(Messages.escapeString(url.toString()), -1, e));
+        notifyErrors(er);
+      }
+    }
+  }
+  ```
+
+test "rank558: css-validator escapes exception message before CssError"
+  lang java
+  reject VYQL-INJ-033
+  code
+  ```
+  import java.net.URL;
+  import org.w3c.css.css.CssFouffa;
+  import org.w3c.css.parser.CssError;
+  import org.w3c.css.parser.Errors;
+  import org.w3c.css.util.ApplContext;
+  import org.w3c.css.util.Messages;
+
+  class StyleSheetParser {
+    private CssFouffa cssFouffa;
+
+    void notifyErrors(Errors errors) {
+    }
+
+    public void parseURL(ApplContext ac, URL url) {
+      try {
+        cssFouffa = new CssFouffa(ac, url);
+        cssFouffa.parseStyle();
+      } catch (Exception e) {
+        Errors er = new Errors();
+        er.addError(new CssError(Messages.escapeString(url.toString()), -1,
+            new Exception(Messages.escapeString(e.getMessage()))));
+        notifyErrors(er);
+      }
+    }
+  }
+  ```

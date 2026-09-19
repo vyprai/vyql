@@ -1,0 +1,9 @@
+module bindings.python.generated.m091a68fd;
+
+binding deserialization0 {
+  requires {
+    dependency("parso")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

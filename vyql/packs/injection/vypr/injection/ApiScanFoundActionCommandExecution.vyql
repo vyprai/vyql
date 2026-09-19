@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ApiScanFoundActionCommandExecution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_78, CWE_15]
+    id: "VYQL-INJ-123"
+    severity: critical
+  }
+  issue code.ApiScanFoundActionCommandExecution as sink
+}

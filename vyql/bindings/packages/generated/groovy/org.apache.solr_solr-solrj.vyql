@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m2c08f198;
+
+binding deserialization0 {
+  requires {
+    dependency("org.apache.solr:solr-solrj")
+  }
+  query pattern callExpr where callee.method == "JSONParser"
+  emit sink code.Deserialization at args[0]
+}

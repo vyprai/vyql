@@ -1,0 +1,8 @@
+module code;
+
+review code.ChamiloUnsafeGuzzleUrlFetch {
+  category: request_forgery
+  expected: [core.AllowlistValidation]
+  kind: attention
+  text: "review Chamilo social URL previews for scheme, DNS, and private/reserved IP checks before Guzzle fetches"
+}

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m4bc92929;
+
+binding commandExecution0 {
+  requires {
+    dependency("appraisal")
+  }
+  query pattern callExpr where callee.method == "Appraisal::Command.initialize"
+  emit sink code.CommandExecution at args[0]
+}

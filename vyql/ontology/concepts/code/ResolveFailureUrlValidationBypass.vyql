@@ -1,0 +1,11 @@
+module code;
+
+concept ResolveFailureUrlValidationBypass : issue {
+  cwe: [CWE_918]
+  reviewAssumption: "the accepted URL reaches an outbound request whose client interprets host notations the resolver rejected -- hex, octal and short integer forms of internal addresses"
+  reviewCategory: request_forgery
+  reviewCondition: "URL host validation resolves the hostname, detects the resolver's documented failure return, and records it as a falsy sentinel assigned to a variable instead of rejecting the URL, so validation continues to acceptance"
+  reviewConfidence: high
+  reviewEvidence: "host validation context {pattern} resolves a hostname, assigns a literal false on the resolver's failure and continues toward returning the URL"
+  vulnerableTo: [request_forgery.Ssrf]
+}

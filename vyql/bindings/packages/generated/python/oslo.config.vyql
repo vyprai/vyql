@@ -1,0 +1,17 @@
+module bindings.python.generated.m545a70d1;
+
+binding cliArgument0 {
+  requires {
+    dependency("oslo.config")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}
+
+binding cliArgument1 {
+  requires {
+    dependency("oslo.config")
+  }
+  query pattern callExpr where callee.method == "parse_args"
+  emit source code.CliArgument at call.result
+}

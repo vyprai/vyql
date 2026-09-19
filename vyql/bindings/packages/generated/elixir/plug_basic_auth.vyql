@@ -1,0 +1,53 @@
+module bindings.elixir.generated.mbe60d0c5;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("plug_basic_auth")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("plug_basic_auth")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("plug_basic_auth")
+  }
+  query pattern callExpr where callee.method == "is_authorized"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("plug_basic_auth")
+  }
+  query pattern callExpr where callee.method == "get_credentials"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("plug_basic_auth")
+  }
+  query pattern callExpr where callee.method == "parse_auth"
+  emit source core.UserControlledData at call.result
+}

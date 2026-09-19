@@ -1,0 +1,11 @@
+module code;
+
+concept UnvalidatedLocaleFileInclude : issue {
+  cwe: [CWE_22, CWE_98]
+  reviewAssumption: "an application can pass user-controlled locale values into a path, as the Accept-Language header reaches request-derived locales"
+  reviewCategory: path
+  reviewCondition: "a locale's subtags are joined into a resource path before locale validation, so a subtag carrying '/' or '..' escapes the resource root"
+  reviewConfidence: medium
+  reviewEvidence: "locale resource context {pattern} builds a resource path from locale subtag getters with no subtag validation"
+  vulnerableTo: [path.FileInclusion, path.PathTraversal]
+}

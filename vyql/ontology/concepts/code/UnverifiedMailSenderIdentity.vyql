@@ -1,0 +1,11 @@
+module code;
+
+concept UnverifiedMailSenderIdentity : issue {
+  cwe: [CWE_290, CWE_287]
+  reviewAssumption: "anyone able to send mail to the polled mailbox controls every header of the message, including From"
+  reviewCategory: auth
+  reviewCondition: "an inbound mail handler takes the sender principal from the message's From header without requiring an SPF, DKIM or DMARC verdict for it"
+  reviewConfidence: medium
+  reviewEvidence: "inbound mail context {pattern} retrieves messages from a mailbox and reads the sender address out of the From header with no Authentication-Results verdict consulted"
+  vulnerableTo: [authentication.ImproperAuthentication, access_control.IncorrectAuthorization]
+}

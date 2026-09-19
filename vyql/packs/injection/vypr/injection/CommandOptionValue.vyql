@@ -1,0 +1,19 @@
+module vypr.injection;
+
+// A value the user controls reaching an argv element of a program that parses
+// its own arguments (CWE-88): the element is one command-line word, so a value
+// that begins with a dash is read as an option of the target program rather
+// than as the operand it was meant to be. This is the taint route over the
+// argument-injection sink; the presence route over the same concept is
+// VYQL-INJ-031. No control concept neutralizes
+// injection.ArgumentInjection, so the rule carries no coveredBy clause and the
+// end-of-options element is honoured where the sink is bound instead.
+rule CommandOptionValue {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_88]
+    id: "VYQL-INJ-280"
+    severity: high
+  }
+  taint core.UserControlledData -> code.CommandOptionInjectionSink
+}

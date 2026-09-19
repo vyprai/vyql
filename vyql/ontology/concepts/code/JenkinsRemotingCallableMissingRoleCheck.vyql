@@ -1,0 +1,11 @@
+module code;
+
+concept JenkinsRemotingCallableMissingRoleCheck : issue {
+  cwe: [CWE_862, CWE_269]
+  reviewAssumption: "an attacker able to reach the channel (through a controlled agent process) can have the callable's call() body run on the controller without its role being verified"
+  reviewCategory: auth
+  reviewCondition: "Jenkins remoting Callable implements checkRoles without verifying the caller's role instead of extending MasterToSlaveCallable"
+  reviewConfidence: high
+  reviewEvidence: "remoting callable context {pattern} declares checkRoles with no RoleChecker verification while using raw Callable instead of MasterToSlaveCallable"
+  vulnerableTo: [access_control.MissingAuthorization]
+}

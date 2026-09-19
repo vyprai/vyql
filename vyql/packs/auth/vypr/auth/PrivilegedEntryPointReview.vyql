@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule PrivilegedEntryPointReview {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_862]
+    id: "VYQL-AUTH-176"
+    severity: high
+  }
+  issue code.PrivilegedEntryPointReview as entry
+}

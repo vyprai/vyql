@@ -1,0 +1,44 @@
+# Rank 928 / CVE-2025-62703: Flask RPC helpers decoded request-controlled
+# RPC payloads with cloudpickle. A data-only codec such as JSON avoids the
+# unsafe deserialization sink, but the corpus patch is warning-only.
+
+test "rank928: Flask RPC request payload reaches cloudpickle"
+  lang python
+  file flask.py
+  expect VYQL-DESER-001
+  code
+  ```
+  import base64
+  import cloudpickle
+  from flask import request
+
+  class FlaskRPCServer:
+      def _invoke(self):
+          key = str(request.form.get("key"))
+          args, kwargs = _decode(str(request.form.get("value")))
+          return _encode(self.invoke(key, *args, **kwargs))
+
+  def _decode(data):
+      data = cloudpickle.loads(base64.b64decode(data.encode("ascii")))
+      return data["args"], data["kwargs"]
+  ```
+
+test "rank928: Flask RPC request payload uses JSON"
+  lang python
+  file flask.py
+  reject VYQL-DESER-001
+  code
+  ```
+  import json
+  from flask import request
+
+  class FlaskRPCServer:
+      def _invoke(self):
+          key = str(request.form.get("key"))
+          args, kwargs = _decode(str(request.form.get("value")))
+          return _encode(self.invoke(key, *args, **kwargs))
+
+  def _decode(data):
+      data = json.loads(data)
+      return data["args"], data["kwargs"]
+  ```

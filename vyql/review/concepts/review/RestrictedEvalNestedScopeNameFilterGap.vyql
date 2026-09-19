@@ -1,0 +1,7 @@
+module code;
+
+review code.RestrictedEvalNestedScopeNameFilterGap {
+  category: code_execution
+  kind: attention
+  text: "walk the compiled expression's nested code objects, or evaluate it structurally, instead of filtering names against the top-level code object alone"
+}

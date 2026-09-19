@@ -1,0 +1,162 @@
+# Rank 1544 / CVE-2025-70888: osslsigncode's verify_authenticode judged a
+# signer certificate against its chain, its revocation state and the
+# extendedKeyUsage extension, but never the keyUsage extension, so a
+# certificate whose key usage does not permit digital signatures passed
+# the tool's "Signature verification: ok" for Authenticode signatures the
+# platform must reject (improper certificate validation, CWE-295; issue
+# #475 / PR #477). The gate at osslsigncode.c read only
+# `if (!(X509_get_extended_key_usage(signer) & XKU_CODE_SIGN))` -- one of
+# the two RFC 5280 usage extensions -- while the sibling constraint from
+# section 4.2.1.3 went unchecked. Fix commit 6390ae2 ("Add keyUsage
+# digitalSignature validation for signer certificate", found from the
+# advisory's PR #477 reference; the pool row's d787541107 is a
+# test-certificate companion change) adds the sibling gate:
+# `if (!(X509_get_key_usage(signer) & X509v3_KU_DIGITAL_SIGNATURE))`.
+#
+# code.CertificatePurposeGateWithoutKeyUsage / VYQL-CRY-059 holds all
+# three directions. The OpenSSL man pages anchor it: X509_get_extension_flags(3)
+# documents that X509_get_extended_key_usage and X509_get_key_usage each
+# read exactly one of the two usage extensions (returning UINT32_MAX,
+# usage unrestricted, when theirs is absent), and X509_check_purpose(3)
+# documents that its checks "take into account the X.509 extensions
+# keyUsage, extendedKeyUsage, and basicConstraints". A purpose gate built
+# on the raw extended-key-usage accessor therefore consults one usage
+# extension and never the other; it is complete when the same function
+# reads the key usage flags or performs the combined purpose check. The
+# binding credits exactly those two, so the eku-only form below expects
+# the finding while the keyUsage-gated form and the purpose-check form
+# both reject it. The anchor is exact-token, so vendor-prefixed
+# implementation spellings (wolfSSL_X509_get_extended_key_usage) are not
+# drawn in.
+#
+# Residual, in the false-positive direction of a review advisory: a key
+# usage check in a helper the gate calls, or inside the chain verifier it
+# delegates to, does not clear -- the token routes that would credit it
+# are the callee's, not the gate's.
+#
+# Measured on the real revision pair (three --cache off runs each, timeout
+# 180, --max-ram 6GB): the tree reports 383 findings at 6390ae2^ and 382
+# at 6390ae2, deterministic across runs; the delta is VYQL-CRY-059 on
+# verify_authenticode itself, which the fix clears by reading
+# X509_get_key_usage in the same function. One permanent same-shape row
+# remains at both revisions on verify_timestamp (the timestamp-server EKU
+# gate, which relies on CMS_verify and reads neither the key usage flags
+# nor the purpose check in-function), and add_timestamp_builtin is
+# neutralised by its X509_check_purpose call. Collateral over the corpus
+# trees that read the accessor: OpenSSL's crypto/ocsp goes 46 -> 47 (the
+# delegated-responder EKU gate ocsp_check_delegated, the same shape),
+# crypto/x509 stays 538 (the accessor definitions call X509_check_purpose
+# for the caching side-effect), OpenSC's libopensc stays 3564 (reads both
+# accessors together), and wolfSSL's compat x509.c and its test stay put
+# (prefixed spelling; test reads both). The identifiers do not occur in
+# either benchmark corpus.
+
+test "rank1544: the signer gate consults one usage extension"
+  lang c
+  file osslsigncode.c
+  expect VYQL-CRY-059
+  expect_review code.CertificatePurposeGateWithoutKeyUsage
+  code
+  ```
+  #include <stdio.h>
+
+  #define XKU_CODE_SIGN 0x0001
+
+  typedef struct X509 X509;
+
+  uint32_t X509_get_extended_key_usage(const X509 *x);
+
+  static int verify_authenticode(X509 *signer)
+  {
+      int verok = 0;
+
+      /* check extended key usage flag XKU_CODE_SIGN */
+      if (!(X509_get_extended_key_usage(signer) & XKU_CODE_SIGN)) {
+          fprintf(stderr, "Unsupported Signer's certificate purpose XKU_CODE_SIGN\n");
+          goto out;
+      }
+
+      verok = 1; /* OK */
+  out:
+      return verok;
+  }
+  ```
+
+test "rank1544: the fixed revision also requires the signature bit"
+  lang c
+  file osslsigncode.c
+  reject VYQL-CRY-059
+  reject_review code.CertificatePurposeGateWithoutKeyUsage
+  code
+  ```
+  #include <stdio.h>
+
+  #define XKU_CODE_SIGN 0x0001
+  #define X509v3_KU_DIGITAL_SIGNATURE 0x0001
+
+  typedef struct X509 X509;
+
+  uint32_t X509_get_extended_key_usage(const X509 *x);
+  uint32_t X509_get_key_usage(const X509 *x);
+
+  static int verify_authenticode(X509 *signer)
+  {
+      int verok = 0;
+
+      /*
+       * Verify that:
+       * - extendedKeyUsage, if present, permits codeSigning (RFC 5280 section 4.2.1.12)
+       * - keyUsage, if present, permits digitalSignature (RFC 5280 section 4.2.1.3)
+       */
+      if (!(X509_get_extended_key_usage(signer) & XKU_CODE_SIGN)) {
+          fprintf(stderr, "Signer certificate rejected: extendedKeyUsage does not permit codeSigning\n");
+          goto out;
+      }
+      if (!(X509_get_key_usage(signer) & X509v3_KU_DIGITAL_SIGNATURE)) {
+          fprintf(stderr, "Signer certificate rejected: keyUsage does not permit digitalSignature\n");
+          goto out;
+      }
+
+      verok = 1; /* OK */
+  out:
+      return verok;
+  }
+  ```
+
+test "rank1544: the combined purpose check already covers both extensions"
+  lang c
+  file osslsigncode.c
+  reject VYQL-CRY-059
+  reject_review code.CertificatePurposeGateWithoutKeyUsage
+  code
+  ```
+  #include <stdio.h>
+
+  #define XKU_TIMESTAMP 0x0010
+  #define X509_PURPOSE_TIMESTAMP_SIGN 9
+
+  typedef struct X509 X509;
+
+  uint32_t X509_get_extended_key_usage(const X509 *x);
+  int X509_check_purpose(const X509 *x, int id, int ca);
+
+  static int add_timestamp_builtin(X509 *signer_cert)
+  {
+      int verok = 0;
+
+      /* check X509_PURPOSE_TIMESTAMP_SIGN certificate purpose */
+      if (X509_check_purpose(signer_cert, X509_PURPOSE_TIMESTAMP_SIGN, 0) != 1) {
+          fprintf(stderr, "Unsupported TSA signer's certificate purpose X509_PURPOSE_TIMESTAMP_SIGN\n");
+          goto out;
+      }
+      /* check extended key usage flag XKU_TIMESTAMP */
+      if (!(X509_get_extended_key_usage(signer_cert) & XKU_TIMESTAMP)) {
+          fprintf(stderr, "Unsupported Signer's certificate purpose XKU_TIMESTAMP\n");
+          goto out;
+      }
+
+      verok = 1; /* OK */
+  out:
+      return verok;
+  }
+  ```

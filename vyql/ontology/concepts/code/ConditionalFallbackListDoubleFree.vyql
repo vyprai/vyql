@@ -1,0 +1,11 @@
+module code;
+
+concept ConditionalFallbackListDoubleFree : issue {
+  cwe: [CWE_415, CWE_416]
+  reviewAssumption: "the list pointer remains in scope after the successful fallback path and the common cleanup frees it again"
+  reviewCategory: memory
+  reviewCondition: "a fallback branch frees a parsed list before a successful fallback open can continue to the shared list cleanup"
+  reviewConfidence: high
+  reviewEvidence: "conditional fallback ownership context {pattern} frees the parsed list before an open_port fallback and later reaches common list cleanup"
+  vulnerableTo: [memory.DoubleFree, memory.UseAfterFree]
+}

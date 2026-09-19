@@ -1,0 +1,54 @@
+# Rank 945 / CVE-2015-20110: JHipster compared authentication token signatures
+# with String.equals instead of a constant-time comparison.
+
+test "rank945: token signature compared with ordinary equals"
+  lang java
+  file TokenProvider.java
+  expect VYQL-CRY-006
+  expect_review code.SecretComparisonReview
+  code
+  ```
+  public class TokenProvider {
+      public boolean validateToken(String authToken, Object userDetails) {
+          String[] parts = authToken.split(":");
+          long expires = Long.parseLong(parts[1]);
+          String signature = parts[2];
+          String signatureToMatch = computeSignature(userDetails, expires);
+          return expires >= System.currentTimeMillis() && signature.equals(signatureToMatch);
+      }
+
+      private String computeSignature(Object userDetails, long expires) {
+          return "secret";
+      }
+  }
+  ```
+
+test "rank945: token signature uses constant-time comparison"
+  lang java
+  file TokenProvider.java
+  reject VYQL-CRY-006
+  reject_review code.SecretComparisonReview
+  code
+  ```
+  public class TokenProvider {
+      public boolean validateToken(String authToken, Object userDetails) {
+          String[] parts = authToken.split(":");
+          long expires = Long.parseLong(parts[1]);
+          String signature = parts[2];
+          String signatureToMatch = computeSignature(userDetails, expires);
+          return expires >= System.currentTimeMillis() && constantTimeEquals(signature, signatureToMatch);
+      }
+
+      private boolean constantTimeEquals(String a, String b) {
+          int equal = 0;
+          for (int i = 0; i < a.length(); i++) {
+              equal |= a.charAt(i) ^ b.charAt(i);
+          }
+          return equal == 0;
+      }
+
+      private String computeSignature(Object userDetails, long expires) {
+          return "secret";
+      }
+  }
+  ```

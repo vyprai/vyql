@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m8e721d02;
+
+binding htmlRender0 {
+  requires {
+    dependency("kaminari-actionview")
+  }
+  query pattern callExpr where callee.method == "render_partial"
+  emit sink code.HtmlRender at args[0]
+}

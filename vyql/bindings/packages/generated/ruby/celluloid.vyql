@@ -1,0 +1,17 @@
+module bindings.ruby.generated.mbe3c9b3d;
+
+binding userControlledData0 {
+  requires {
+    dependency("celluloid")
+  }
+  query pattern callExpr where callee.method == "async"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("celluloid")
+  }
+  query pattern callExpr where callee.method == "future"
+  emit source core.UserControlledData at call.result
+}

@@ -1,0 +1,194 @@
+# Rank 1597 / CVE-2023-31136: postgres-nio's connection state
+# machine transitioned into TLS negotiation while unread bytes
+# remained in the incoming buffer, so an attacker could send
+# plaintext ahead of the handshake and have it survive into the
+# encrypted channel's processing (plaintext injection through a
+# state transition that ignores buffered data,
+# CWE-345/CWE-311; GHSA-9cfh-vx93-84vv). sslSupportedReceived in
+# Sources/PostgresNIO/New/Connection State Machine/
+# ConnectionStateMachine.swift took no buffer state: it moved
+# .sslRequestSent to .sslNegotiated and returned
+# .establishSSLConnection with whatever bytes the channel had
+# already buffered. Pool commit 2df54bc946 is the real fix
+# (COMMIT_OK -- the GHSA merge, "Ensure empty incoming buffer
+# when TLS negotiation starts"): the method gains an
+# unprocessedBytes parameter and returns
+# closeConnectionAndCleanup(.receivedUnencryptedDataAfterSSLRequest)
+# when it is positive, with that failure added to the
+# unclean-shutdown handling set and the caller passing
+# self.decoder.unprocessedBytes.
+#
+# ATTENTION, transition-state validation, held on recheck. The
+# defect is a security transition that ignores leftover channel
+# state -- the protocol-state-confusion family the shipped
+# vocabulary names: code.ProtocolStateReview (VYQL-AUTH-082)
+# declares vulnerableTo [injection.ProtocolStateConfusion], and
+# its Rust member sshKexNewkeysWithoutSequenceReset is this exact
+# class (a plaintext-to-encrypted transition that ignores the
+# running counter), anchored on RFC 4253's own message names with
+# the counter the protocol requires every implementation to spell.
+# The family has members in Go, Java, JavaScript, Python, Rust,
+# C, C++ and Kotlin and none in Swift. Measured at the span tip on
+# the real checkout (3 x --cache off per revision, timeout 180,
+# --max-ram 6GB): both revisions report 119 findings -- 111
+# VYQL-DOS-040 assertion-review rows on fatalError and
+# preconditionFailure call sites (26 of them inside the state
+# machine file itself), 6 VYQL-SEC-002 hardcoded-secret rows in
+# CI workflows and test fixtures, 2 VYQL-CRY-001 weak-hash rows
+# on the SCRAM channel handler -- deterministic across runs, and
+# the two revisions' finding sets differ only by line shifts in
+# the state machine file (+3 lines from the inserted guard). No
+# rule fires on the transition, and none could today: the
+# discriminating vocabulary is postgres-nio's own spelling
+# (sslSupportedReceived, establishSSLConnection, unprocessedBytes),
+# which the genericity test rejects -- no library documentation
+# names those, and an independent implementation of the same
+# Postgres SSL upgrade spells the response differently (the
+# deprecated decoder in the same tree keys on
+# PostgresMessage.Identifier.sslSupported, the wire byte 0x53,
+# and its SSL setup has no establishSSL spelling at all). The
+# protocol-documented vocabulary cannot discriminate either,
+# measured: the file that actually adds the NIOSSL handler to the
+# pipeline (Sources/PostgresNIO/Connection/PostgresConnection.swift,
+# addHandler(sslHandler, position: .first) behind
+# configureSSLCallback) carries no unread-buffer identifier at
+# either revision (0 occurrences both -- the fix put the check two
+# files away, behind a stored closure), so a file-wide binding
+# anchored on documented TLS vocabulary fires identically before
+# and after the fix; the same anchor (a TLS handler add with no
+# readableBytes read anywhere in the file) matches 11 files across
+# swift-nio, swift-corelibs-foundation, swift-crypto, swift-asn1
+# and this vulnerable tree, of which 0 carry the control and 0
+# carry the defect -- every mid-stream and bootstrap TLS setup in
+# the ecosystem flags. The narrowest form that does discriminate
+# (files spelling sslSupported together with establishSSL: exactly
+# the two files the fix touched, 2 -> 0 on the buffer identifier)
+# keys on the incident's own spellings, so it detects this library
+# rather than the weakness. No ENGINE-GAPS.md entry: the missing
+# piece is protocol-state vocabulary for a mid-stream TLS upgrade,
+# not a localised construct -- Swift's one-context-node-per-file
+# frontend is a documented property the shipped Swift bindings
+# already record, and even per-function facts would not connect
+# the NIOSSL add to the check across the stored-closure boundary.
+# No definition change shipped and no engine commit. Spec
+# cve_rank1597 records the transition without the buffer check and
+# the checked form modelled on the real file, both asserting
+# reject VYQL-AUTH-082 (the 1st pass pinned VYQL-VAL-011, whose
+# device-status bypass vocabulary is the wrong family): when
+# protocol-state vocabulary lands for Swift, the unchecked form
+# must flip to expect.
+
+test "rank1597: the ssl transition ignores buffered bytes"
+  lang swift
+  file Sources/PostgresNIO/New/Connection State Machine/ConnectionStateMachine.swift
+  reject VYQL-AUTH-082
+  code
+  ```
+  struct ConnectionStateMachine {
+      private enum State {
+          case initialized
+          case sslRequestSent
+          case sslNegotiated
+          case sslHandlerAdded
+          case error
+          case closing
+          case closed
+      }
+
+      private var state: State
+
+      mutating func sslSupportedReceived() -> ConnectionAction {
+          switch self.state {
+          case .sslRequestSent:
+              self.state = .sslNegotiated
+              return .establishSSLConnection
+
+          case .initialized,
+               .sslNegotiated,
+               .sslHandlerAdded,
+               .error,
+               .closing,
+               .closed:
+              return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.sslSupported))
+          }
+      }
+
+      func shouldCloseConnection(reason error: PSQLError) -> Bool {
+          switch error.code.base {
+          case .sslUnsupported:
+              return true
+          case .failedToAddSSLHandler:
+              return true
+          case .queryCancelled:
+              return false
+          default:
+              return false
+          }
+      }
+  }
+
+  enum ConnectionAction {
+      case establishSSLConnection
+      case closeConnectionAndCleanup(PSQLError)
+      case fireChannelInactive
+  }
+  ```
+
+test "rank1597: the fixed revision requires an empty buffer at the transition"
+  lang swift
+  file Sources/PostgresNIO/New/Connection State Machine/ConnectionStateMachine.swift
+  reject VYQL-AUTH-082
+  code
+  ```
+  struct ConnectionStateMachine {
+      private enum State {
+          case initialized
+          case sslRequestSent
+          case sslNegotiated
+          case sslHandlerAdded
+          case error
+          case closing
+          case closed
+      }
+
+      private var state: State
+
+      mutating func sslSupportedReceived(unprocessedBytes: Int) -> ConnectionAction {
+          switch self.state {
+          case .sslRequestSent:
+              if unprocessedBytes > 0 {
+                  return self.closeConnectionAndCleanup(.receivedUnencryptedDataAfterSSLRequest)
+              }
+              self.state = .sslNegotiated
+              return .establishSSLConnection
+
+          case .initialized,
+               .sslNegotiated,
+               .sslHandlerAdded,
+               .error,
+               .closing,
+               .closed:
+              return self.closeConnectionAndCleanup(.unexpectedBackendMessage(.sslSupported))
+          }
+      }
+
+      func shouldCloseConnection(reason error: PSQLError) -> Bool {
+          switch error.code.base {
+          case .failedToAddSSLHandler,
+               .receivedUnencryptedDataAfterSSLRequest,
+               .sslUnsupported:
+              return true
+          case .queryCancelled:
+              return false
+          default:
+              return false
+          }
+      }
+  }
+
+  enum ConnectionAction {
+      case establishSSLConnection
+      case closeConnectionAndCleanup(PSQLError)
+      case fireChannelInactive
+  }
+  ```

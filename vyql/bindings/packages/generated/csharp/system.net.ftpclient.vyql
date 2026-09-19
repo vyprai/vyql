@@ -1,0 +1,93 @@
+module bindings.csharp.generated.md1519ec6;
+
+binding networkConnect0 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "Connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "BeginConnect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "EndConnect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding authenticationCheck3 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "Authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding networkData4 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "OpenRead"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData5 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "BeginOpenRead"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData6 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "EndOpenRead"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend7 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "OpenWrite"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "BeginOpenWrite"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "EndOpenWrite"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding weakHash10 {
+  requires {
+    dependency("system.net.ftpclient")
+  }
+  query pattern callExpr where callee.method == "GetMD5"
+  emit issue code.WeakHash at call
+}

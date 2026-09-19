@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule HighlightedSearchResultHtmlEscapeMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-144"
+    severity: high
+  }
+  issue code.HighlightedSearchResultHtmlEscapeMissing as sink
+}

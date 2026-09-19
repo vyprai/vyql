@@ -1,0 +1,141 @@
+# simple-slab through 0.3.2 (GHSA-438g-fx34-4h9m, CVE-2020-35892, CWE-125)
+# exposes its element storage through std::ops::Index and implements the
+# trait method with raw pointer arithmetic alone:
+#
+#     impl<T> Index<usize> for Slab<T> {
+#         type Output = T;
+#         fn index(&self, index: usize) -> &Self::Output {
+#             unsafe { &(*(self.mem.offset(index as isize))) }
+#         }
+#     }
+#
+# The Index contract is documented in the standard library: the indexing
+# operator panics when the index is out of bounds, and it is the
+# implementation's job to provide that check -- Vec and [T] compare against
+# their length before touching memory. Slab's impl computes the element
+# address straight from the index parameter and dereferences it, so every
+# slab[index] in safe caller code is an unchecked read at an arbitrary offset
+# from the heap allocation. The container carries the bound (self.len) and the
+# crate's own remove() compares against it, but index() compares against
+# nothing. 5e0524c1db836e2192e1cd818848d96937c0b587 adds the missing
+# relation before the unsafe block:
+#
+#     assert!(index < self.len, "Index out of bounds");
+#
+# The same commit also repairs remove()'s swap-with-last companion read at
+# self.len instead of self.len - 1, one element past the initialised region.
+# That half is a field-value-versus-offset correlation no token the Rust
+# frontend emits can state (remove()'s body carries a comparison, so
+# no body-text discriminator separates it either), and stays uncovered; the
+# advisory names index() and the out-of-bounds read, so this spec pins the
+# Index-impl half.
+#
+# What fires without this change: nothing on the defect. `scan --cache off` over
+# the vulnerable checkout reports ten findings -- four VYQL-CRY-003 on the
+# bench crates, six VYQL-MEM-006 NullableDeref on raw dereference
+# primitives, two of them in src/lib.rs at the deref inside index() (163) and
+# inside SlabIter::next (174). MEM-006 reviews null-ness, not bounds, and
+# fires identically on the patched revision (169/180 after the reformat):
+# the bounds assert is not a null exclusion, so nothing distinguishes the
+# revisions and nothing lands on the missing check.
+#
+# Vocabulary checked for reuse before minting. code.IndexAccess is the
+# taint-gated review of an attacker-controlled index reaching a subscript and
+# needs a source this library code does not have; code.FieldDerivedIndexAccess
+# is the engine-computed C/C++/Go shape of a *field-derived* index with no
+# dominating upper bound -- here the index is the method's own parameter and
+# the buffer is the field; code.PointerOffsetBoundsCheck is the parser shape
+# of a pointer advanced by an encoded length before the bounds comparison;
+# code.RawPointerFromTemporary is a dropped-temporary pointee. None covers
+# "the container's indexing entrypoint performs no bounds check at all", so
+# code.IndexOperatorWithoutBoundsCheck is minted for that class. It is bound
+# in Rust, where the trait's required method names -- index, index_mut --
+# identify the entrypoint from the standard library documentation alone.
+
+test "simple-slab: Index impl computes the element address from the index by pointer arithmetic with no comparison"
+  lang rust
+  file lib.rs
+  expect VYQL-MEM-066
+  expect_review code.IndexOperatorWithoutBoundsCheck
+  code
+  ```
+  use std::ops::Index;
+
+  pub struct Slab<T> {
+      len: usize,
+      mem: *mut T,
+  }
+
+  impl<T> Index<usize> for Slab<T> {
+      type Output = T;
+      fn index(&self, index: usize) -> &Self::Output {
+          unsafe { &(*(self.mem.offset(index as isize))) }
+      }
+  }
+  ```
+
+test "simple-slab: patched Index impl compares the index to the container length first"
+  lang rust
+  file lib.rs
+  reject VYQL-MEM-066
+  code
+  ```
+  use std::ops::Index;
+
+  pub struct Slab<T> {
+      len: usize,
+      mem: *mut T,
+  }
+
+  impl<T> Index<usize> for Slab<T> {
+      type Output = T;
+      fn index(&self, index: usize) -> &Self::Output {
+          assert!(index < self.len, "Index out of bounds");
+          unsafe { &(*(self.mem.offset(index as isize))) }
+      }
+  }
+  ```
+
+test "Index impl with the same check spelled as a guarding if"
+  lang rust
+  file lib.rs
+  reject VYQL-MEM-066
+  code
+  ```
+  use std::ops::Index;
+
+  pub struct Slab<T> {
+      len: usize,
+      mem: *mut T,
+  }
+
+  impl<T> Index<usize> for Slab<T> {
+      type Output = T;
+      fn index(&self, index: usize) -> &Self::Output {
+          if index >= self.len {
+              panic!("Index out of bounds");
+          }
+          unsafe { &(*(self.mem.offset(index as isize))) }
+      }
+  }
+  ```
+
+test "Index impl that delegates to a checked collection"
+  lang rust
+  file lib.rs
+  reject VYQL-MEM-066
+  code
+  ```
+  use std::ops::Index;
+
+  pub struct Wrapper<T> {
+      inner: Vec<T>,
+  }
+
+  impl<T> Index<usize> for Wrapper<T> {
+      type Output = T;
+      fn index(&self, index: usize) -> &Self::Output {
+          &self.inner[index]
+      }
+  }
+  ```

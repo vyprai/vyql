@@ -1,0 +1,74 @@
+# Rank 1109 / CVE-2026-50566: Fission's PodSpec-hardening validation covers
+# containers reachable through a PodSpec, but Environment also exposes
+# spec.runtime.container and spec.builder.container — bare Containers merged
+# into the pod without a PodSpec — so their SecurityContext is never inspected
+# at admission (CWE-250, CWE-269).
+#
+# ATTENTION: vocabulary gap. PrivilegedContainer binds literal privileged
+# flags in IaC, not "an admission walk covers one structurally parallel field
+# and a sibling path bypasses it."
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1109: PodSpec containers are checked, the standalone Container field is not"
+  lang go
+  file pkg/apis/core/v1/validation.go
+  reject VYQL-CFG-010
+  code
+  ```
+  package v1
+
+  func (e *Environment) Validate() error {
+      var errs error
+      errs = errors.Join(errs, ValidatePodSpecSafety("Environment.spec.runtime.podspec", e.Spec.Runtime.PodSpec))
+      errs = errors.Join(errs, ValidatePodSpecSafety("Environment.spec.builder.podspec", e.Spec.Builder.PodSpec))
+      return errs
+  }
+
+  func ValidatePodSpecSafety(fieldPath string, ps *apiv1.PodSpec) error {
+      var errs error
+      checkContainer := func(group string, c apiv1.Container) error {
+          sc := c.SecurityContext
+          if sc == nil {
+              return nil
+          }
+          if sc.Privileged != nil && *sc.Privileged {
+              return fmt.Errorf("%s.%s[%s].securityContext.privileged=true is not allowed", fieldPath, group, c.Name)
+          }
+          return nil
+      }
+      for _, c := range ps.Containers {
+          errs = errors.Join(errs, checkContainer("containers", c))
+      }
+      return errs
+  }
+  ```
+
+test "rank1109: the standalone Container field is validated directly"
+  lang go
+  file pkg/apis/core/v1/validation.go
+  reject VYQL-CFG-010
+  code
+  ```
+  package v1
+
+  func (e *Environment) Validate() error {
+      var errs error
+      errs = errors.Join(errs, ValidatePodSpecSafety("Environment.spec.runtime.podspec", e.Spec.Runtime.PodSpec))
+      errs = errors.Join(errs, ValidatePodSpecSafety("Environment.spec.builder.podspec", e.Spec.Builder.PodSpec))
+      errs = errors.Join(errs, ValidateContainerSafety("Environment.spec.runtime.container", e.Spec.Runtime.Container))
+      errs = errors.Join(errs, ValidateContainerSafety("Environment.spec.builder.container", e.Spec.Builder.Container))
+      return errs
+  }
+
+  func ValidateContainerSafety(fieldPath string, c *apiv1.Container) error {
+      if c == nil || c.SecurityContext == nil {
+          return nil
+      }
+      sc := c.SecurityContext
+      if sc.Privileged != nil && *sc.Privileged {
+          return fmt.Errorf("%s.securityContext.privileged=true is not allowed", fieldPath)
+      }
+      return nil
+  }
+  ```

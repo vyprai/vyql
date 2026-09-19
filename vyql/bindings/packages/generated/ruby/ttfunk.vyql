@@ -1,0 +1,9 @@
+module bindings.ruby.generated.md99973de;
+
+binding deserialization0 {
+  requires {
+    dependency("ttfunk")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.Deserialization at args[0]
+}

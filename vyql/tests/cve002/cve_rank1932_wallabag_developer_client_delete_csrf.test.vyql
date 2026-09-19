@@ -1,0 +1,182 @@
+# Rank 1932 / CVE-2023-4455: wallabag's developer API-client removal
+# action is a state-changing GET route with no CSRF token validation,
+# so a crafted page could make a logged-in user's browser delete one of
+# their API clients (cross-site request forgery, CWE-352; GHSA-gjvc-
+# 55fw-v6vq). deleteClientAction in src/Wallabag/ApiBundle/Controller/
+# DeveloperController.php:76 takes the route's {id} fragment converted to
+# a Client entity, checks ownership, then calls $entityManager->remove()
+# at :82 and ->flush() at :83 -- reading nothing from the request body
+# and validating no token. The fixing commit ffcc5c90 (a GHSA
+# private-fork merge, readable via `git diff 78b0b55 ffcc5c90`;
+# "Replace GET way to POST way to delete API client"): the route gains
+# methods={"POST"}, the action takes the Request, and
+# `if (!$this->isCsrfTokenValid('delete-client',
+# $request->request->get('token'))) { throw ... }` precedes the
+# ownership check; the twig template moves the link into a POST form
+# carrying the csrf_token.
+#
+# Rechecked, both revisions, three --cache off runs each over the real
+# checkout (timeout 180, --max-ram 6GB): byte-stable 78 findings on the
+# vulnerable parent 78b0b55 and 78 on ffcc5c90, 60 at or above high on
+# both, with an identical rule multiset (VYQL-PATH-001 seventeen,
+# VYQL-CRY-001 sixteen, VYQL-SEC-002 and VYQL-AUTH-002 eleven each,
+# VYQL-AUTH-079 eight, VYQL-RF-043 seven, VYQL-INJ-001 four, and one
+# each of VYQL-SCA-001, VYQL-INJ-007, VYQL-INJ-004, VYQL-CRY-003) and
+# no VYQL-RF-003 anywhere in the tree at either revision. The full
+# `-flags only` view adds 112 flags -- 87 auth code.ObjectLookupByUserInput,
+# 8 auth code.SensitiveOperation, 7 request code.StateChangingOp (all on
+# setValue/save calls in commands, fixtures and tests), 3 auth
+# core.AuthorizationCheck, 2 request core.CsrfProtection
+# (ConfigController.php:532 and :586), 2 resource code.ResourceReview, 2
+# resource core.ResourceRelease and 1 path core.PathAccessCheck -- none
+# of them in src/Wallabag/ApiBundle outside its tests. `vyql match` on
+# the vulnerable file labels two sources and nothing else:
+# `analysis.parameter.entry code.HttpInput` at :41 (createClientAction's
+# `Request $request`, bound by the typed-request-parameter binding) and
+# `$this.getParameter` at :104; sink: none; control: none. On the
+# patched file the same command additionally labels
+# `analysis.parameter.entry code.HttpInput` at :76 and
+# `$this.isCsrfTokenValid core.CsrfProtection` at :79, so the rule's
+# check half works on the remediated form.
+#
+# The parameter-entry class-token gap that the first pass recorded is
+# closed since then: phpParamEntries now emits class_name/class_base, and
+# a probe on `node.context.classBase in ["AbstractController"]` fires on
+# all seven parameter entries of this file. Closing it does not unblock
+# this rank, because the missing half is a source, not a scope.
+#
+# Measured, three probe shapes for that source, same bounds:
+# (a) Doctrine's remove/persist/flush as code.StateChangingOpSink alone:
+#     78 -> 98, twenty new VYQL-RF-003 rows, DeveloperController absent
+#     from every one of them -- pure collateral, no discrimination.
+# (b) that sink plus every AbstractController action parameter as
+#     core.UserControlledData: 78 -> 133, fifty-five new rows, the delete
+#     action among them twice, the other fifty-three spread over
+#     EntryController, ConfigController, TagController,
+#     SiteCredentialController and the repositories.
+# (c) that sink plus only the converter-shaped arguments (class-typed,
+#     excluding *Interface, *Repository, Request and the scalars):
+#     78 -> 129 at the parent and 128 at the fix, VYQL-RF-003 51 -> 37,
+#     and the delete action 2 -> 0 -- the fix's isCsrfTokenValid
+#     satisfies `unless endpoint coveredBy core.CsrfProtection`, so the
+#     pair discriminates. But 49 of the 51 rows at the parent are false
+#     positives: the form-guarded deletes (SiteCredentialController::
+#     deleteAction and ManageController::deleteAction, both behind
+#     $form->handleRequest() then $form->isSubmitted() &&
+#     $form->isValid(), which is Symfony's default-on form CSRF and is
+#     labelled by nothing) and the bearer-token JSON API actions
+#     (TagRestController, EntryRestController) whose only user input is
+#     the Authorization header.
+#
+# So the discriminator already exists and is the rule's own `unless`
+# clause; what has no expression is the source. Symfony's ParamConverter
+# materialises the {id} route placeholder as the `Client $client`
+# argument while autowiring materialises EntityManagerInterface and
+# TranslatorInterface in the same signature, and no fact in the graph
+# separates the two. The exclusion lists that get closest -- drop
+# *Interface, drop *Repository -- are naming conventions rather than
+# framework facts and still measure 49 false positives for 2 true rows
+# on this one repository. The other half of the fix is equally
+# unreachable: the PHP frontend extracts no docblock text, so the
+# `methods={"POST"}` the fix adds to the @Route annotation produces no
+# node and no token. The remaining gap is csrf-decision vocabulary, the
+# same family as ranks 1567, 1581, 1592, 1601, 1763 and 1786: an
+# action's request-resolved arguments and its non-simple-method reach
+# are both invisible. No engine change is implicated -- the class-token
+# facts the first pass asked for exist now and the taint engine carries
+# the path once a source is supplied.
+#
+# Both cases assert reject VYQL-RF-003: nothing fires today. When
+# csrf-decision vocabulary lands, the first case must flip to expect
+# while the patched case stays reject.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1932: the delete action removes the client with no token validation"
+  lang php
+  file src/Wallabag/ApiBundle/Controller/DeveloperController.php
+  reject VYQL-RF-003
+  code
+  ```
+  <?php
+
+  namespace Wallabag\ApiBundle\Controller;
+
+  use Doctrine\ORM\EntityManagerInterface;
+  use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+  use Symfony\Component\HttpFoundation\RedirectResponse;
+  use Symfony\Contracts\Translation\TranslatorInterface;
+  use Wallabag\ApiBundle\Entity\Client;
+
+  class DeveloperController extends AbstractController
+  {
+      /**
+       * @Route("/developer/client/delete/{id}", requirements={"id" = "\d+"}, name="developer_delete_client")
+       *
+       * @return RedirectResponse
+       */
+      public function deleteClientAction(Client $client, EntityManagerInterface $entityManager, TranslatorInterface $translator)
+      {
+          if (null === $this->getUser() || $client->getUser()->getId() !== $this->getUser()->getId()) {
+              throw $this->createAccessDeniedException('You can not access this client.');
+          }
+
+          $entityManager->remove($client);
+          $entityManager->flush();
+
+          $this->addFlash(
+              'notice',
+              $translator->trans('flashes.developer.notice.client_deleted', ['%name%' => $client->getName()])
+          );
+
+          return $this->redirect($this->generateUrl('developer'));
+      }
+  }
+  ```
+
+test "rank1932: the fixed revision validates the csrf token before removing"
+  lang php
+  file src/Wallabag/ApiBundle/Controller/DeveloperController.php
+  reject VYQL-RF-003
+  code
+  ```
+  <?php
+
+  namespace Wallabag\ApiBundle\Controller;
+
+  use Doctrine\ORM\EntityManagerInterface;
+  use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+  use Symfony\Component\HttpFoundation\RedirectResponse;
+  use Symfony\Component\HttpFoundation\Request;
+  use Symfony\Contracts\Translation\TranslatorInterface;
+  use Wallabag\ApiBundle\Entity\Client;
+
+  class DeveloperController extends AbstractController
+  {
+      /**
+       * @Route("/developer/client/delete/{id}", requirements={"id" = "\d+"}, name="developer_delete_client", methods={"POST"})
+       *
+       * @return RedirectResponse
+       */
+      public function deleteClientAction(Request $request, Client $client, EntityManagerInterface $entityManager, TranslatorInterface $translator)
+      {
+          if (!$this->isCsrfTokenValid('delete-client', $request->request->get('token'))) {
+              throw $this->createAccessDeniedException('Bad CSRF token.');
+          }
+
+          if (null === $this->getUser() || $client->getUser()->getId() !== $this->getUser()->getId()) {
+              throw $this->createAccessDeniedException('You can not access this client.');
+          }
+
+          $entityManager->remove($client);
+          $entityManager->flush();
+
+          $this->addFlash(
+              'notice',
+              $translator->trans('flashes.developer.notice.client_deleted', ['%name%' => $client->getName()])
+          );
+
+          return $this->redirect($this->generateUrl('developer'));
+      }
+  }
+  ```

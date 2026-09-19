@@ -1,0 +1,6 @@
+module access_control;
+
+threat BrokenAccess {
+  cwe: [CWE_284]
+  desc: "Improper access control"
+}

@@ -1,0 +1,6 @@
+module bindings.go.generated.mosqueryallowunsafe;
+
+binding osqueryAllowUnsafePlatformArgs345 {
+  query pattern presenceNode where node.analysis == "go.osquery_allow_unsafe_platform_args"
+  emit issue code.OsqueryAllowUnsafePlatformArgs at node
+}

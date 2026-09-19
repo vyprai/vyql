@@ -1,0 +1,8 @@
+module code;
+
+review code.MysqlConnectErrorUseAfterFree {
+  category: memory
+  expected: [core.ResourceRelease]
+  kind: target
+  text: "verify failed MySQL connection helpers do not release a handle before callers read mysql error state from that handle"
+}

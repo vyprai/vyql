@@ -1,0 +1,28 @@
+module bindings.rust.streaming_decompression_output_without_cap;
+
+// A streaming decompressor hands the peer control of the expansion ratio:
+// the transport bounds only the compressed bytes, while the decompressed
+// size is whatever the stream says. The push-style Rust APIs (flate2's
+// Decompress::decompress, miniz_oxide's inflate, the inflate crate's
+// InflateStream::update) fill a caller-supplied buffer and report
+// progress, so the caller owns a retry loop that grows that buffer until
+// the stream ends -- and a loop that grows without a ceiling turns a
+// few-kilobyte compressed packet into an unbounded allocation on
+// the receiving side. That is why the transports that carry compressed
+// packets cap the decompressed size themselves: OpenSSH rejects a
+// decompressed packet above its packet limit, and an SSH peer that
+// negotiates zlib compression is unauthenticated at the point the first
+// compressed packet can arrive.
+//
+// The growth calls are the Vec API the retry loop needs (resize, reserve,
+// extend, push, append, extend_from_slice); with_capacity is deliberately
+// absent because an initial allocation does not scale with the stream.
+// Any bound applied to the output pipeline in the same function
+// suppresses the finding -- min, clamp, take or truncate -- because the
+// finding is about the output being unbounded rather than about which
+// construct bounds it, the same policy the NTS cookie cap binding in this
+// directory states. All spellings are std or decompressor-API vocabulary.
+binding streamingDecompressionOutputWithoutCap {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.context.call, ["decompress", "inflate"]) and containsAny(node.context.call, ["resize", "reserve", "extend", "push", "append", "extend_from_slice"]) and not (containsAny(node.context.call, ["min", "clamp", "take", "truncate"]))
+  emit issue code.UnboundedResourceOperation at node
+}

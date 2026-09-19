@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule PrototypeKeyCachePoisoning {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_1321]
+    id: "VYQL-INJ-049"
+    severity: high
+  }
+  issue code.PrototypeKeyCachePoisoning as cache
+}

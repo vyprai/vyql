@@ -1,0 +1,9 @@
+module bindings.javascript.generated.mcb1f96d7;
+
+binding weakHash0 {
+  requires {
+    dependency("object-hash")
+  }
+  query pattern presenceNode where node.path ~= "object.hash.hash"
+  emit issue code.WeakHash at node
+}

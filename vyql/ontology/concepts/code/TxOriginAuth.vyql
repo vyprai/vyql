@@ -1,0 +1,6 @@
+module code;
+
+concept TxOriginAuth : issue {
+  cwe: [CWE_477]
+  vulnerableTo: [smartcontract.TxOriginAuth]
+}

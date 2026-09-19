@@ -1,0 +1,17 @@
+module bindings.python.generated.m6b456488;
+
+binding networkData0 {
+  requires {
+    dependency("h11")
+  }
+  query pattern callExpr where callee.method == "Connection.receive_data"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("h11")
+  }
+  query pattern callExpr where callee.method == "Connection.send"
+  emit sink code.NetworkSend at args[0]
+}

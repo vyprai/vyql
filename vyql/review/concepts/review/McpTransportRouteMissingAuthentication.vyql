@@ -1,0 +1,8 @@
+module code;
+
+review code.McpTransportRouteMissingAuthentication {
+  category: access_control
+  expected: [core.AuthenticationCheck]
+  kind: target
+  text: "verify every MCP transport path, the message endpoint as well as the event stream, is registered behind the same authentication middleware"
+}

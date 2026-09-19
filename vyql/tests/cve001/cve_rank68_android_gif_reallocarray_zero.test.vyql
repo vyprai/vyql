@@ -1,0 +1,12 @@
+# Rank 68 / CVE-2019-11932: android-gif-drawable passed a computed image size
+# into reallocarray without the zero-size lifetime guard added by the fix.
+
+test "rank68: computed image size reaches zero-size reallocarray sink"
+  expect VYQL-MEM-012
+  graph
+  ```
+  node size code.ComputedSizeValue
+  node sink code.ZeroSizeReallocationSink
+  edge FLOWS size -> sink
+  ```
+

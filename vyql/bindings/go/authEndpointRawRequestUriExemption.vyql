@@ -1,0 +1,39 @@
+module bindings.go.authEndpointRawRequestUriExemption;
+
+// net/http documents (*http.Request).RequestURI as "the unmodified request-target of
+// the Request-Line (RFC 7230, Section 3.1.1) as sent by the client to a server" and
+// says outright that "usually the URL field should be used instead". RFC 3986 puts
+// the query in the request-target, so a request-target is a path *plus* whatever the
+// client appended: `/v1.43/containers/create?x=/auth` and `/v1.43/auth` both end in
+// `/auth`, and `/login/../admin` both begins with `/login` and routes to `/admin`.
+// The documented way to get the path a server routes on is url.Parse (or
+// url.ParseRequestURI) and its URL.Path field.
+//
+// A decision that singles out an *authentication* endpoint is a security decision in
+// either direction: exempting it from a control (a login endpoint left out of a
+// session check, credentials kept out of a request forwarded to an authorizer) or
+// routing it into one. Deciding it by testing the raw request-target for a substring,
+// prefix or suffix hands that decision to the client, because any request-target can
+// be made to contain, begin with or end with the endpoint's spelling while routing
+// somewhere else entirely (CWE-187 partial string comparison, CWE-863).
+//
+// Three facts are that shape. A strings containment predicate whose literal argument
+// is one of the conventional authentication endpoint paths -- `/auth`, `/login`,
+// `/token`, `/oauth`, `/signin`, `/session`, `/authenticate`; the same kind of
+// predicate applied to a value named for the raw request target rather than for a
+// parsed path (`url`, `uri`, `requestURI`, and any `RequestURI` field or method, which
+// the engine matches segment-wise); and nothing in the same body deriving a path from
+// that target. That last one is the neutraliser and it is the documented form however
+// it is spelled: url.Parse or url.ParseRequestURI producing a URL, or a URL.Path read
+// the handler already has. A containment test against an already-parsed path is a
+// different and much weaker claim, so it is deliberately not this shape.
+//
+// The last clause is not about the match at all but about what consumes it: a
+// containment test whose result is handed to a test assertion decides nothing, and
+// `go doc testing` plus testify's and gotest.tools' assert/require are how Go spells
+// that. Without it the shape reports every test that asserts a redirect landed on
+// `/login`, which is what real code does with these paths in test files.
+binding goAuthEndpointRawRequestUriExemption {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and containsAny(node.context.callArg, ["strings.HasSuffix:/auth", "strings.HasPrefix:/auth", "strings.Contains:/auth", "strings.HasSuffix:/login", "strings.HasPrefix:/login", "strings.Contains:/login", "strings.HasSuffix:/token", "strings.HasPrefix:/token", "strings.Contains:/token", "strings.HasSuffix:/oauth", "strings.HasPrefix:/oauth", "strings.Contains:/oauth", "strings.HasSuffix:/signin", "strings.HasPrefix:/signin", "strings.Contains:/signin", "strings.HasSuffix:/session", "strings.HasPrefix:/session", "strings.Contains:/session", "strings.HasSuffix:/authenticate", "strings.HasPrefix:/authenticate", "strings.Contains:/authenticate"]) and containsAny(node.context.callArg, ["strings.HasSuffix:url", "strings.HasPrefix:url", "strings.Contains:url", "strings.HasSuffix:uri", "strings.HasPrefix:uri", "strings.Contains:uri", "strings.HasSuffix:requestURI", "strings.HasPrefix:requestURI", "strings.Contains:requestURI", "strings.HasSuffix:r.RequestURI", "strings.HasPrefix:r.RequestURI", "strings.Contains:r.RequestURI", "strings.HasSuffix:req.RequestURI", "strings.HasPrefix:req.RequestURI", "strings.Contains:req.RequestURI"]) and not containsAny(node.context.callPath, ["url.Parse", "url.ParseRequestURI"]) and not containsAny(node.context.selector, [".URL.Path", ".URL.RawPath", ".URL.EscapedPath"]) and not containsAny(node.context.callPath, ["assert.True", "assert.False", "assert.Equal", "assert.Assert", "require.True", "require.False", "require.Equal", "require.NoError"])
+  emit issue code.AuthEndpointRawRequestUriExemption at node
+}

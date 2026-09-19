@@ -1,0 +1,34 @@
+module bindings.php.key_material_file_permission;
+
+// Private-key files carry their secret only as file content, so the file
+// permission IS the access control: any co-user of the machine that can read
+// the key can impersonate the identity it certifies. PHP offers two documented
+// routes for landing key material in a file: the OpenSSL exports
+// (openssl_pkey_export_to_file writes a private key, openssl_pkcs12_export_to_file
+// writes a store that bundles the private key with its certificate) and the
+// framework keypair helpers whose names say what they do -- generateKey,
+// extractPublicKey -- called where a key-extension path (.key/.pem/.pfx/.p12)
+// has just been assigned. Both create the file with the process umask, which
+// on shared hosting is group/world readable. The documented hardening for
+// exactly this situation is a chmod to owner-only after generation; CWE-732
+// names the class.
+//
+// The key-extension assignment keeps the helper names honest: generateKey is
+// also the template-cache idiom (Twig's CacheInterface, HTMLPurifier's
+// DefinitionCache), where the generated key is a filename string and no key
+// material reaches a file, and those callers report nothing. Any chmod or
+// umask call in the body satisfies the negation.
+binding keyPairExportedToFileWithoutOwnerPermission8415 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php"
+    and containsAny(node.context.call, ["openssl_pkey_export_to_file", "openssl_pkcs12_export_to_file"])
+    and not containsAny(node.context.call, ["chmod", "umask"])
+  emit issue code.SecretFilePermissionReview at node
+}
+
+binding keyPairHelperNamingKeyFileWithoutOwnerPermission8416 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php"
+    and containsAny(node.context.call, ["generateKey", "extractPublicKey"])
+    and containsAny(node.context.assign, [".key", ".pem", ".pfx", ".p12"])
+    and not containsAny(node.context.call, ["chmod", "umask"])
+  emit issue code.SecretFilePermissionReview at node
+}

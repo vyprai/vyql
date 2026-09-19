@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule RewriteTargetFromUnrestrictedCapture {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_918, CWE_20]
+    id: "VYQL-RF-049"
+    severity: high
+  }
+  issue code.RewriteTargetFromUnrestrictedCapture as rewrite
+}

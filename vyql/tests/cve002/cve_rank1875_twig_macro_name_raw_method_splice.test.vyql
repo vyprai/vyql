@@ -1,0 +1,154 @@
+# Rank 1875 / CVE-2026-46633: Twig compiles templates to PHP, and a macro
+# reference expression stores the author-chosen macro name on the node —
+# `_self.('greet')` or `{% import %}` — where the name is whatever string the
+# template author wrote. `MacroReferenceExpression::compile()` then emits that
+# name straight into generated code at a method-call identifier position:
+#
+#   ->raw(\sprintf('->%s', $this->getAttribute('name')))
+#
+# so a template naming its macro reference `foo + 1; trigger_error("BAD") //`
+# splices raw PHP into the compiled template, which is executed when the
+# compiled file is included — a sandbox escape (CWE-94 into CWE-1336). The
+# caller is expected to validate the name; nothing in the unit did, and the
+# parser-side path (`DotExpressionParser` building `'macro_'` from a parsed
+# constant expression) reached the constructor unvalidated (fixed first at
+# 324fa60, the parent of the pool row's commit). The row's commit
+# ea3f7a284475 makes the class safe by construction: the constructor rejects
+# any name that is not a PHP identifier before it is ever stored.
+#
+# This is the same weakness class the Smarty compile-plugin binding
+# reports as VYQL-INJ-024 / code.IncompleteTemplateValidation: author-chosen
+# text spliced into generated PHP without an identifier check. The engine's
+# own safe emission route is `Compiler::repr()`, which quotes a value — the
+# vulnerable line sits directly beneath two `repr()` calls in the same chain.
+#
+# The third block pins the discrimination the binding must keep: the same
+# engine splices `->%s` formats from engine-internal values elsewhere
+# (BlockReferenceExpression splices a literal-validated local method name,
+# CallExpression a reflected PHP callable), and those must stay unreported —
+# a two-clause form (any `->%s` splice + any attribute read anywhere in the
+# unit) cross-satisfied from an unrelated error-message sprintf 255 lines
+# away in CallExpression and reported it.
+#
+# Union over three `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`
+# runs on the twig tree at the row's vulnerable parent: 191/191/191 findings
+# with the binding, 190/190 without; the added finding is
+# src/Node/Expression/MacroReferenceExpression.php every run, no other
+# finding moved. The fused shape's reachable set across the 70 clones under
+# /tmp/cve-work/rank*/ is exactly this one file; the broader
+# `sprintf('...->%s', ...)` neighbourhood is the three twig files, of which
+# the two engine-internal splicers do not match.
+
+test "rank1875: macro reference node splices the parsed name into a generated method call"
+  lang php
+  file MacroReferenceExpression.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace Twig\Node\Expression;
+
+  use Twig\Compiler;
+  use Twig\Node\Expression\Variable\TemplateVariable;
+
+  class MacroReferenceExpression extends AbstractExpression
+  {
+      public function __construct(TemplateVariable $template, string $name, AbstractExpression $arguments, int $lineno)
+      {
+          parent::__construct(['template' => $template, 'arguments' => $arguments], ['name' => $name], $lineno);
+      }
+
+      public function compile(Compiler $compiler): void
+      {
+          $compiler
+              ->subcompile($this->getNode('template'))
+              ->raw('->getTemplateForMacro(')
+              ->repr($this->getAttribute('name'))
+              ->raw(', $context, ')
+              ->repr($this->getTemplateLine())
+              ->raw(', $this->getSourceContext())')
+              ->raw(\sprintf('->%s', $this->getAttribute('name')))
+              ->raw('(...')
+              ->subcompile($this->getNode('arguments'))
+              ->raw(')')
+          ;
+      }
+  }
+  ```
+
+test "rank1875: macro reference constructor rejects a non-identifier name"
+  lang php
+  file MacroReferenceExpression.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace Twig\Node\Expression;
+
+  use Twig\Compiler;
+  use Twig\Node\Expression\Variable\TemplateVariable;
+
+  class MacroReferenceExpression extends AbstractExpression
+  {
+      public function __construct(TemplateVariable $template, string $name, AbstractExpression $arguments, int $lineno)
+      {
+          // The name is emitted as raw PHP in compile() via "->{$name}(...)",
+          // so it must be a valid PHP method identifier.
+          if (!preg_match('#^[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*$#D', $name)) {
+              throw new \LogicException(\sprintf('Macro name "%s" is not a valid PHP identifier.', $name));
+          }
+
+          parent::__construct(['template' => $template, 'arguments' => $arguments], ['name' => $name], $lineno);
+      }
+
+      public function compile(Compiler $compiler): void
+      {
+          $compiler
+              ->subcompile($this->getNode('template'))
+              ->raw('->getTemplateForMacro(')
+              ->repr($this->getAttribute('name'))
+              ->raw(', $context, ')
+              ->repr($this->getTemplateLine())
+              ->raw(', $this->getSourceContext())')
+              ->raw(\sprintf('->%s', $this->getAttribute('name')))
+              ->raw('(...')
+              ->subcompile($this->getNode('arguments'))
+              ->raw(')')
+          ;
+      }
+  }
+  ```
+
+test "rank1875: an engine-internal method name spliced from a local stays unreported"
+  lang php
+  file BlockReferenceExpression.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  namespace Twig\Node\Expression;
+
+  use Twig\Compiler;
+
+  class BlockReferenceExpression extends AbstractExpression
+  {
+      public function compile(Compiler $compiler): void
+      {
+          if ($this->getAttribute('renderer')) {
+              $this->compileTemplateCall($compiler, 'yieldBlock');
+          } else {
+              $this->compileTemplateCall($compiler, 'renderBlock');
+          }
+      }
+
+      private function compileTemplateCall(Compiler $compiler, string $method): Compiler
+      {
+          $compiler->raw(\sprintf('->unwrap()->%s', $method));
+
+          return $this;
+      }
+  }
+  ```

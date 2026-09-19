@@ -1,0 +1,146 @@
+# phpseclib's ASN.1 decoder accepted object identifiers up to 4096 bytes,
+# so a certificate carrying near-4KB OIDs drove outsized parsing work in
+# every chain-verification consumer (resource exhaustion through an
+# over-generous cap, CWE-400/CWE-770). _decodeOID in
+# phpseclib/File/ASN1.php measures the element with `$len =
+# strlen($content)`, rejects above 4096, then walks the bytes one at a
+# time accumulating each into a growing Math_BigInteger --
+# `$n = $n->bitwise_leftShift(7); $n = $n->bitwise_or(new
+# Math_BigInteger($temp & 0x7F))` -- so every admitted byte costs work
+# proportional to everything accumulated before it. The cap is what sets
+# the amplification ceiling. Fix d53d2021bc ("ASN1: reduce length of
+# supported OIDs from 4096 bytes to 128 bytes", citing OpenJDK's
+# ObjectIdentifier limit) changes only the constant: `if ($len > 128)`.
+#
+# ## Re-measured at the current tip
+#
+# Three `--cache off` runs per revision (timeout 180, --max-ram 6GB) over
+# the whole checkout: 108 findings at both revisions, identical across
+# all six runs. The only finding on ASN1.php is the same VYQL-RF-003 row
+# at :1147 on both sides (code.ExternalEntryInput from _encode_der's
+# $mapping into a code.HtmlRender sink), untouched by the fix. The
+# `-flags only` view reports 56 flags, none of them a DOS flag and the
+# only one on ASN1.php a neutralising core.PathAccessCheck at :1453, so
+# the zero is real and not a `-flags` replacement misread. `vyql match`
+# on a minimal reproduction of the function labels nothing at all: no
+# source, no sink, no control.
+#
+# ## Why no shipped rule reaches it
+#
+# No rule in the dos pack has a PHP feeder: every one of the 45 is bound
+# to another language's shape. VYQL-DOS-029, the parser-loop default this
+# family pins against, is fed only by bindings/c/mce54b166.vyql on the C
+# frontend fact `numeric_parser.missing_progress_check`, and
+# VYQL-DOS-050's `loop_restart_without_progress` is a JavaScript frontend
+# fact. Nothing minted since the first review names a cap magnitude.
+#
+# ## What a binding would have to key on
+#
+# A generic shape binding -- a strlen-measured cap, a per-byte `ord`
+# walk, an accumulating big-integer shift -- was probed as a throwaway
+# binding on both revisions: it labels the function on each side, so it
+# does not discriminate, and it reports nothing on two unrelated PHP
+# trees (67 and 574 files). The two revisions differ only in the literal
+# 4096 versus 128 and the same number inside a comment, so the only
+# formulation that separates them names that literal; the discriminating
+# probe does land exactly on ASN1.php:1274 at the parent, is silent at
+# the fix, and reports nothing on the two other trees, but the constant
+# is the entire diff -- a binding rejecting 4096 is the fixing commit's
+# own choice, not a property of the weakness, and the next variant with
+# an 8192-byte cap walks past it. The reference point is protocol
+# knowledge (OpenJDK's 128-byte ObjectIdentifier limit), which no
+# construct-level predicate carries. The nearest consumable concept,
+# code.NumericParserMissingProgressCheck, also describes the wrong
+# defect: this loop advances its cursor unconditionally every iteration
+# and terminates, where that rule is about a parse position that fails to
+# advance.
+#
+# Pin both revisions as a double miss. When vocabulary that can ask
+# whether a decoder's size cap is within the range its own format
+# documents lands, the first block must flip to expect.
+#
+# verify_current_expected: attention-vocabulary-gap, both revisions rejected.
+
+test "rank1572: the oid decoder caps at four kilobytes and accumulates big integers per byte"
+  lang php
+  file phpseclib/File/ASN1.php
+  reject VYQL-DOS-050
+  reject VYQL-DOS-029
+  code
+  ```
+  <?php
+
+  class File_ASN1
+  {
+      function _decodeOID($content)
+      {
+          $oid = array();
+          $pos = 0;
+          $len = strlen($content);
+          // see https://github.com/openjdk/jdk/blob/2deb318c9f047ec5a4b160d66a4b52f93688ec42/src/java.base/share/classes/sun/security/util/ObjectIdentifier.java#L55
+          if ($len > 4096) {
+              //user_error('Object Identifier size is limited to 4096 bytes');
+              return false;
+          }
+
+          if (ord($content[$len - 1]) & 0x80) {
+              return false;
+          }
+
+          $n = new Math_BigInteger();
+          while ($pos < $len) {
+              $temp = ord($content[$pos++]);
+              $n = $n->bitwise_leftShift(7);
+              $n = $n->bitwise_or(new Math_BigInteger($temp & 0x7F));
+              if (~$temp & 0x80) {
+                  $oid[] = $n;
+                  $n = new Math_BigInteger();
+              }
+          }
+
+          return implode('.', $oid);
+      }
+  }
+  ```
+
+test "rank1572: the fixed decoder caps at the jdk objectidentifier limit"
+  lang php
+  file phpseclib/File/ASN1.php
+  reject VYQL-DOS-050
+  reject VYQL-DOS-029
+  code
+  ```
+  <?php
+
+  class File_ASN1
+  {
+      function _decodeOID($content)
+      {
+          $oid = array();
+          $pos = 0;
+          $len = strlen($content);
+          // see https://github.com/openjdk/jdk/blob/2deb318c9f047ec5a4b160d66a4b52f93688ec42/src/java.base/share/classes/sun/security/util/ObjectIdentifier.java#L55
+          if ($len > 128) {
+              //user_error('Object Identifier size is limited to 128 bytes');
+              return false;
+          }
+
+          if (ord($content[$len - 1]) & 0x80) {
+              return false;
+          }
+
+          $n = new Math_BigInteger();
+          while ($pos < $len) {
+              $temp = ord($content[$pos++]);
+              $n = $n->bitwise_leftShift(7);
+              $n = $n->bitwise_or(new Math_BigInteger($temp & 0x7F));
+              if (~$temp & 0x80) {
+                  $oid[] = $n;
+                  $n = new Math_BigInteger();
+              }
+          }
+
+          return implode('.', $oid);
+      }
+  }
+  ```

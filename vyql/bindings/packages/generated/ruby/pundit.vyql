@@ -1,0 +1,61 @@
+module bindings.ruby.generated.m0455df5c;
+
+binding authorizationCheck0 {
+  requires {
+    dependency("pundit")
+  }
+  query pattern callExpr where callee.method == "authorize"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck1 {
+  requires {
+    dependency("pundit")
+  }
+  query pattern callExpr where callee.method == "policy_scope"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck2 {
+  requires {
+    dependency("pundit")
+  }
+  query pattern callExpr where callee.method == "policy_scope!"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck3 {
+  requires {
+    dependency("pundit")
+  }
+  query pattern callExpr where callee.method == "policy"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck4 {
+  requires {
+    dependency("pundit")
+  }
+  query pattern callExpr where callee.method == "policy!"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

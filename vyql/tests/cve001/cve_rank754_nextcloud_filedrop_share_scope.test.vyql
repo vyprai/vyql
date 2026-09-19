@@ -1,0 +1,79 @@
+# Rank 754 / CVE-2026-45159: Nextcloud end_to_end_encryption file-drop
+# metadata accepted a share token, returned the share owner, and then looked up
+# an arbitrary requested file id in the owner's root folder.
+
+test "rank754: Nextcloud filedrop metadata uses share owner without share containment"
+  lang php
+  file MetaDataController.php
+  expect VYQL-AUTH-050
+  expect_review code.NextcloudFileDropShareScopeBypass
+  code
+  ```
+  <?php
+  class MetaDataController {
+      #[PublicPage]
+      public function addMetadataFileDrop(int $id, string $filedrop, ?string $shareToken = null): DataResponse {
+          $ownerId = $this->getOwnerId($shareToken);
+          $userFolder = $this->rootFolder->getUserFolder($ownerId);
+          $nodes = $userFolder->getById($id);
+          if (!isset($nodes[0]) || !$nodes[0] instanceof Folder) {
+              throw new OCSForbiddenException('not allowed');
+          }
+          $lockToken = $this->lockManager->lockFile($id, 'filedrop-lock', 0, $ownerId, true);
+          $this->metaDataStorage->updateMetaDataIntoIntermediateFile($ownerId, $id, $filedrop, 'filedrop-lock');
+          return new DataResponse(['filedrop' => json_decode($filedrop, true)]);
+      }
+
+      private function getOwnerId(?string $shareToken = null): string {
+          if ($shareToken !== null) {
+              $share = $this->shareManager->getShareByToken($shareToken);
+              if (!($share->getPermissions() & \OCP\Constants::PERMISSION_CREATE)) {
+                  throw new OCSForbiddenException("Can't lock share without create permission");
+              }
+              return $share->getShareOwner();
+          }
+          return $this->userId;
+      }
+  }
+  ```
+
+test "rank754: Nextcloud filedrop metadata checks requested id is inside share"
+  lang php
+  file MetaDataController.php
+  reject VYQL-AUTH-050
+  reject_review code.NextcloudFileDropShareScopeBypass
+  code
+  ```
+  <?php
+  class MetaDataController {
+      #[PublicPage]
+      public function addMetadataFileDrop(int $id, string $filedrop, ?string $shareToken = null): DataResponse {
+          $ownerId = $shareToken
+              ? $this->getFileDropOwnerId($shareToken, $id)
+              : $this->userId;
+          $userFolder = $this->rootFolder->getUserFolder($ownerId);
+          $nodes = $userFolder->getById($id);
+          if (!isset($nodes[0]) || !$nodes[0] instanceof Folder) {
+              throw new OCSForbiddenException('not allowed');
+          }
+          $lockToken = $this->lockManager->lockFile($id, 'filedrop-lock', 0, $ownerId, true);
+          $this->metaDataStorage->updateMetaDataIntoIntermediateFile($ownerId, $id, $filedrop, 'filedrop-lock');
+          return new DataResponse(['filedrop' => json_decode($filedrop, true)]);
+      }
+
+      private function getFileDropOwnerId(string $shareToken, int $fileId): string {
+          $share = $this->shareManager->getShareByToken($shareToken);
+          if (!($share->getPermissions() & \OCP\Constants::PERMISSION_CREATE)) {
+              throw new OCSForbiddenException('not allowed');
+          }
+          $shareRoot = $share->getNode();
+          if (!$shareRoot instanceof Folder || !$shareRoot->isEncrypted()) {
+              throw new OCSForbiddenException('not allowed');
+          }
+          if ($shareRoot->getId() !== $fileId && $shareRoot->getFirstNodeById($fileId) === null) {
+              throw new OCSForbiddenException('not allowed');
+          }
+          return $share->getShareOwner();
+      }
+  }
+  ```

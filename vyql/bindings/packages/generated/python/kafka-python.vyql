@@ -1,0 +1,57 @@
+module bindings.python.generated.m38fd08c7;
+
+binding deserialization0 {
+  requires {
+    dependency("kafka-python")
+  }
+  query pattern callExpr where callee.method == "gzip_decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("kafka-python")
+  }
+  query pattern callExpr where callee.method == "snappy_decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("kafka-python")
+  }
+  query pattern callExpr where callee.method == "lz4f_decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("kafka-python")
+  }
+  query pattern callExpr where callee.method == "lz4_decode_old_kafka"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("kafka-python")
+  }
+  query pattern callExpr where callee.method == "zstd_decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkConnect5 {
+  requires {
+    dependency("kafka-python")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("kafka-python")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

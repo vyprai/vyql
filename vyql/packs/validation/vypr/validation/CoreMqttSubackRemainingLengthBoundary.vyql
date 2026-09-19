@@ -1,0 +1,10 @@
+module vypr.validation;
+
+rule CoreMqttSubackRemainingLengthBoundary {
+  meta {
+    cwe: [CWE_20]
+    id: "VYQL-VAL-020"
+    severity: medium
+  }
+  issue code.CoreMqttSubackRemainingLengthBoundary as parser
+}

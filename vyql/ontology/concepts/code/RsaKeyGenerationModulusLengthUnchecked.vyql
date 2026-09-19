@@ -1,0 +1,11 @@
+module code;
+
+concept RsaKeyGenerationModulusLengthUnchecked : issue {
+  cwe: [CWE_326, CWE_1240]
+  reviewAssumption: "callers treat the requested key size as the strength of the key they receive, so a modulus one or more bits shorter is used as if it were full length"
+  reviewCategory: crypto
+  reviewCondition: "RSA key generation multiplies two probable primes into a modulus and derives the private exponent and CRT parameters from it without comparing the modulus bit length to the requested key size, so the product of two primes whose bit lengths sum to the request can still be one bit short and is accepted"
+  reviewConfidence: high
+  reviewEvidence: "key generation context {pattern} calls a primality test and a modular inverse to build the private key, and never calls a bit-length accessor on the modulus"
+  vulnerableTo: [crypto.WeakCrypto]
+}

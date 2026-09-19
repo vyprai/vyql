@@ -1,0 +1,17 @@
+module bindings.ruby.generated.m6685b6c9;
+
+binding codeEval0 {
+  requires {
+    dependency("maruku")
+  }
+  query pattern callExpr where callee.method == "parse_doc"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("maruku")
+  }
+  query pattern callExpr where callee.method == "parse_email_headers"
+  emit sink code.Deserialization at args[0]
+}

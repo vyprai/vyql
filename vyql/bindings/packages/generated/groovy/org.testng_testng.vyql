@@ -1,0 +1,14 @@
+module bindings.groovy.generated.m71226c43;
+
+binding htmlEscape0 {
+  requires {
+    dependency("org.testng:testng")
+  }
+  query pattern callExpr where callee.method == "setEscapeHtml"
+  emit check core.HtmlEscape at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

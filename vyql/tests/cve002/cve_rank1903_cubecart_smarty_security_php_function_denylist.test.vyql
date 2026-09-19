@@ -1,0 +1,283 @@
+# CubeCart ships a custom Smarty security policy
+# (classes/cubecart_smarty_security.class.php) attached with
+# enableSecurity(new CubeCart_Smarty_Security($smarty)) in
+# controllers/controller.index.inc.php:50 and
+# controller.admin.pre_session.inc.php:42. The storefront and the admin
+# backend both compile stored markup as templates through
+# fetch('string:'.$content) -- document bodies (cubecart.class.php:192),
+# contact and category descriptions (:1664, catalogue.class.php:282),
+# product descriptions (catalogue.class.php:1261), the invoice editor
+# (admin/sources/documents.invoice.inc.php:40 renders
+# $GLOBALS['RAW']['POST']['content'] itself) -- so what a template may call
+# is decided entirely by that policy.
+#
+# Smarty's policy is an allow-list by construction: the documented
+# $php_functions / $php_modifiers properties are arrays of *trusted* names
+# and the base Smarty_Security::isTrustedPhpFunction trusts a name only
+# when the array is empty-unrestricted or lists it, triggering a compiler
+# error for everything else. CubeCart's subclass inverts the hook:
+# isTrustedPhpFunction / isTrustedPhpModifier throw only for names listed
+# in $dangerous_php and return true for every function nobody thought to
+# name, and the constructor's default plugin handler registers any callable
+# not on that same list as a modifier. Template markup reached error_log()
+# with message_type=3 (arbitrary file write, hence PHP execution) and
+# readgzfile() (file disclosure) through exactly that gap
+# (GHSA-wpjx-g695-qc5j).
+#
+# Fix 76d783c8 appends forty names to $dangerous_php and changes nothing
+# else: the class stays a denylist, so the revisions differ only in string
+# literals inside the array -- no rename-proof binding can discriminate
+# them, and keying on the added literals would be keying on the fixed revision's own
+# vocabulary. The denylist also stays incomplete at the fixed revision
+# (mb_send_mail, getimagesize, md5_file, imagecreatefrompng, finfo_file,
+# socket_create, ftp_connect, proc_nice, setlocale, hash_file and iconv
+# are all still callable, verified against the fixed revision), so the
+# weakness survives at the fixed revision the same way October CMS's Twig blocklist
+# survived each of its four append-only patches.
+#
+# So the shape reported here is the denylist policy itself, the same
+# incomplete template validation reported for a Twig sandbox
+# driven by blocked names (bindings/php/twig_sandbox_policy_method_blocklist.
+# vyql) and for a renderer with no sandbox at all: a Smarty_Security
+# subclass whose trust hook consults a list of *denied* function names
+# while never reading Smarty's own allow-list properties. The second case
+# pins that the patched revision still carries it.
+#
+# Measured with the binding present (three --cache off runs each, timeout
+# 180, --max-ram 6GB): the exhaustive reachable set of the binding's first
+# clause in this checkout is six files (the policy class, Smarty.class.php,
+# the vendored smarty_security.php, the template parser, and the two
+# controllers that attach the policy); scanning all six gives exactly one
+# VYQL-INJ-024 at classes/cubecart_smarty_security.class.php:1 on the
+# vulnerable parent (5 findings total against a 4-finding baseline without
+# the binding) and the same one finding at the fixed revision -- 1 -> 1 by design, a
+# true positive on both, identical fingerprint. Grep over the seven other
+# surviving PHP clones (twig, typo3, tickets, user_oidc, thrift, URI.js,
+# ux) finds no Smarty_Security mention at all, and an A/B scan of the
+# tickets tree is 6317 findings on both sides.
+#
+# verify_current_expected: fixed
+
+test "rank1903: Smarty security policy gates template PHP functions by a denylist of names"
+  lang php
+  file cubecart_smarty_security.class.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class CubeCart_Smarty_Security extends Smarty_Security
+  {
+      private $dangerous_php = array(
+          // Code execution
+          'exec', 'system', 'passthru', 'shell_exec', 'popen', 'proc_open',
+          'eval', 'assert', 'create_function', 'call_user_func',
+          'call_user_func_array', 'preg_replace_callback', 'usort', 'uasort',
+          // File system writes / destructive
+          'file_put_contents', 'fwrite', 'fputs', 'fopen', 'tmpfile',
+          'mkdir', 'rmdir', 'rename', 'unlink', 'copy', 'move_uploaded_file',
+          // File reads (templates should use Smarty includes, not raw reads)
+          'file_get_contents', 'file', 'readfile', 'fgets', 'fread',
+          'highlight_file', 'show_source', 'parse_ini_file',
+          // Network
+          'curl_init', 'curl_exec', 'fsockopen', 'pfsockopen',
+          'mail', 'header', 'setcookie',
+          // Info disclosure
+          'phpinfo', 'php_uname', 'getenv', 'putenv',
+          'get_defined_vars', 'get_defined_functions', 'get_defined_constants',
+      );
+
+      public $php_functions = array();
+
+      public $php_modifiers = array();
+
+      public $disabled_tags = array('math', 'eval', 'php', 'fetch');
+
+      public function __construct($smarty)
+      {
+          parent::__construct($smarty);
+          $dangerous = $this->dangerous_php;
+
+          // Fallback for any PHP function not in the pre-registered list.
+          $smarty->registerDefaultPluginHandler(function ($name, $type, $template, &$callback, &$script, &$cacheable) use ($dangerous) {
+              if ($type === Smarty::PLUGIN_MODIFIER && is_callable($name) && !in_array($name, $dangerous)) {
+                  $callback = $name;
+                  return true;
+              }
+              return false;
+          });
+      }
+
+      public function isTrustedPhpFunction($function_name, $compiler)
+      {
+          if (in_array($function_name, $this->dangerous_php)) {
+              $compiler->trigger_template_error("PHP function '{$function_name}' not allowed by security setting");
+              return false;
+          }
+          return true;
+      }
+
+      public function isTrustedPhpModifier($modifier_name, $compiler)
+      {
+          if (in_array($modifier_name, $this->dangerous_php)) {
+              $compiler->trigger_template_error("modifier '{$modifier_name}' not allowed by security setting");
+              return false;
+          }
+          return true;
+      }
+  }
+  ```
+
+test "rank1903: lengthening the denylist leaves it a denylist"
+  lang php
+  file cubecart_smarty_security.class.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class CubeCart_Smarty_Security extends Smarty_Security
+  {
+      private $dangerous_php = array(
+          'exec', 'system', 'passthru', 'shell_exec', 'popen', 'proc_open',
+          'eval', 'assert', 'create_function', 'call_user_func',
+          'forward_static_call', 'forward_static_call_array', 'iterator_apply',
+          'file_put_contents', 'fwrite', 'fopen', 'unlink', 'copy',
+          'error_log',
+          'fputcsv', 'gzwrite', 'gzputs', 'bzwrite',
+          'imagepng', 'imagejpeg', 'imagegif', 'imagewebp', 'imagebmp',
+          'file_get_contents', 'file', 'readfile', 'fgets', 'fread',
+          'readgzfile', 'gzfile', 'gzopen', 'gzread', 'gzgets',
+          'gzpassthru', 'gzdecode', 'gzinflate',
+          'bzopen', 'bzread', 'bzdecompress',
+          'fpassthru', 'readlink', 'linkinfo', 'realpath',
+          'glob', 'scandir', 'opendir', 'readdir', 'closedir',
+          'pathinfo', 'fileowner', 'filegroup', 'fileperms',
+          'simplexml_load_file', 'simplexml_import_dom',
+          'curl_init', 'curl_exec',
+          'gethostbyname', 'gethostbyaddr', 'gethostbynamel', 'gethostname',
+          'dns_get_record', 'dns_check_record', 'checkdnsrr', 'getmxrr',
+          'pclose', 'pcntl_fork', 'pcntl_signal', 'pcntl_wait',
+          'posix_kill', 'posix_setuid', 'posix_setgid', 'posix_setsid',
+          'phpinfo',
+      );
+
+      public $php_functions = array();
+
+      public $php_modifiers = array();
+
+      public function __construct($smarty)
+      {
+          parent::__construct($smarty);
+          $dangerous = $this->dangerous_php;
+          $smarty->registerDefaultPluginHandler(function ($name, $type, $template, &$callback, &$script, &$cacheable) use ($dangerous) {
+              if ($type === Smarty::PLUGIN_MODIFIER && is_callable($name) && !in_array($name, $dangerous)) {
+                  $callback = $name;
+                  return true;
+              }
+              return false;
+          });
+      }
+
+      public function isTrustedPhpFunction($function_name, $compiler)
+      {
+          if (in_array($function_name, $this->dangerous_php)) {
+              $compiler->trigger_template_error("PHP function '{$function_name}' not allowed by security setting");
+              return false;
+          }
+          return true;
+      }
+
+      public function isTrustedPhpModifier($modifier_name, $compiler)
+      {
+          if (in_array($modifier_name, $this->dangerous_php)) {
+              $compiler->trigger_template_error("modifier '{$modifier_name}' not allowed by security setting");
+              return false;
+          }
+          return true;
+      }
+  }
+  ```
+
+test "rank1903: Smarty's own policy trusts a function by allow-list membership"
+  lang php
+  file smarty_security.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class Smarty_Security
+  {
+      public $php_functions = array('isset', 'empty', 'count', 'sizeof', 'in_array', 'is_array', 'time');
+
+      public $php_modifiers = array('escape', 'count', 'sizeof', 'nl2br');
+
+      public function isTrustedPhpFunction($function_name, $compiler)
+      {
+          if (isset($this->php_functions)
+              && (empty($this->php_functions) || in_array($function_name, $this->php_functions))
+          ) {
+              return true;
+          }
+          $compiler->trigger_template_error("PHP function '{$function_name}' not allowed by security setting");
+          return false;
+      }
+
+      public function isTrustedPhpModifier($modifier_name, $compiler)
+      {
+          if (isset($this->php_modifiers)
+              && (empty($this->php_modifiers) || in_array($modifier_name, $this->php_modifiers))
+          ) {
+              return true;
+          }
+          $compiler->trigger_template_error("modifier '{$modifier_name}' not allowed by security setting");
+          return false;
+      }
+  }
+  ```
+
+test "rank1903: a subclass that only restricts directories and classes, not the trust hook"
+  lang php
+  file storefront_security.class.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class Storefront_Security extends Smarty_Security
+  {
+      public $static_classes = array('Catalogue');
+
+      public $streams = array('file');
+
+      public function __construct($smarty)
+      {
+          parent::__construct($smarty);
+          $this->secure_dir = array(CC_ROOT_DIR . '/js/', CC_ROOT_DIR . '/modules/');
+      }
+  }
+  ```
+
+test "rank1903: a subclass that overrides the hook with its own trusted list"
+  lang php
+  file catalogue_security.class.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php
+
+  class Catalogue_Security extends Smarty_Security
+  {
+      private $allowed_functions = array('isset', 'count', 'in_array', 'sprintf');
+
+      public function isTrustedPhpFunction($function_name, $compiler)
+      {
+          if (!in_array($function_name, $this->allowed_functions)) {
+              $compiler->trigger_template_error("PHP function '{$function_name}' not allowed by security setting");
+              return false;
+          }
+          return true;
+      }
+  }
+  ```

@@ -1,0 +1,55 @@
+# Rank 107 / CVE-2025-65105: LoadProfile wrote its AppArmor profile through
+# /proc/self/attr/exec opened with a plain os.OpenFile, so a hostile mount
+# or symlink over /proc could redirect the write. The fix opens a verified
+# procfs root and writes via OpenThreadSelf.
+
+test "rank107: apparmor profile write via plain procfs open"
+  lang go
+  expect VYQL-PATH-089
+  code
+  ```
+  package apparmor
+
+  import "os"
+
+  func LoadProfile(profile string) error {
+      f, err := os.OpenFile("/proc/self/attr/exec", os.O_WRONLY, 0)
+      if err != nil {
+          return err
+      }
+      defer f.Close()
+      if _, err := f.WriteString(profile); err != nil {
+          return err
+      }
+      return nil
+  }
+  ```
+
+test "rank107: apparmor profile write through verified procfs handle"
+  lang go
+  reject VYQL-PATH-089
+  code
+  ```
+  package apparmor
+
+  import (
+      "github.com/cyphar/filepath-securejoin/pathrs-lite/procfs"
+  )
+
+  func LoadProfile(profile string) error {
+      proc, err := procfs.OpenProcRoot()
+      if err != nil {
+          return err
+      }
+      defer proc.Close()
+      attrExec, closer, err := proc.OpenThreadSelf("attr/exec")
+      if err != nil {
+          return err
+      }
+      defer closer.Close()
+      if _, err := attrExec.WriteString(profile); err != nil {
+          return err
+      }
+      return nil
+  }
+  ```

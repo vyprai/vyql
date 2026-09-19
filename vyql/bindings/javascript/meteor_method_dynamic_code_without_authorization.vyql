@@ -1,0 +1,38 @@
+module bindings.javascript.meteor_method_dynamic_code_without_authorization;
+
+// Meteor documents `Meteor.methods(object)` as "defines functions that can
+// be invoked over the network by clients": every named property of the
+// object handed to it is a remote procedure a connected client can call by
+// name, and the body runs on the server with the server's own privileges.
+// The same documentation's security guidance puts the access decision in
+// the method body -- `this.userId` and a check that the caller may do the
+// thing -- because no other layer sits between the client and the code.
+//
+// A method body that executes dynamic code (`eval`, the `Function`
+// constructor, the `vm` module) is therefore the highest privilege a
+// client-invocable name can exercise, and the whole question is who is
+// allowed to reach it. An authentication check answers a different
+// question: it establishes that the caller holds *an* account, which is
+// the weaker of the two and the one every ordinary user passes. A module
+// that registers remote methods, executes dynamic code, and carries no
+// authorization vocabulary hands server-side code execution to every
+// account holder.
+//
+// The suppressing names are the ordinary spellings of "may this caller do
+// this": a role or permission query (`hasRole`, `checkPermission`,
+// `isPermitted`, `userIsInRole` -- alanning:roles' documented check), and
+// an admin gate (`requireAdmin`, `checkAdmin`, `isAdmin`). The list is
+// read as call paths and matched generously on purpose: for a negation,
+// matching too much costs recall rather than precision, and a module that
+// so much as names an authorization check is one whose gating has to be
+// read by a human rather than guessed at here.
+//
+// The scope is the module rather than the individual method, because a
+// method body's own context carries no fact about the `Meteor.methods`
+// call that publishes it -- only the enclosing module sees both the
+// registration and the code the registered body runs. That is the same
+// unit Express route mounting is read at.
+binding meteorMethodDynamicCodeWithoutAuthorization {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.callPath contains "Meteor.methods" and node.context.call in ["eval", "Function", "vm.runInNewContext", "vm.runInThisContext", "vm.runInContext", "vm.compileFunction", "vm2.run"] and not (containsAny(node.context.callPath, ["requireAdmin", "checkAdmin", "ensureAdmin", "assertAdmin", "isAdmin", "hasRole", "checkRole", "requireRole", "userIsInRole", "isPermitted", "hasPermission", "checkPermission", "requirePermission", "isAuthorized", "authorize"]))
+  emit issue code.RemoteMethodCodeExecutionMissingAuthorization at node
+}

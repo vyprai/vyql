@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule AmbiguousQueryParameterSeparator {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_444]
+    id: "VYQL-INJ-046"
+    severity: medium
+  }
+  issue code.AmbiguousQueryParameterSeparator as sink
+}

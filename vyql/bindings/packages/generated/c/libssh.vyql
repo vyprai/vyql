@@ -1,0 +1,13 @@
+module bindings.c.generated.mba25dfe2;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("libssh")
+  }
+  query pattern callExpr where callee.method == "ssh_userauth_agent_publickey"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

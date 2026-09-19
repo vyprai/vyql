@@ -1,0 +1,11 @@
+module vypr.numeric;
+
+rule SignedCharIndexReview {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_190, CWE_197, CWE_125]
+    id: "VYQL-NUM-018"
+    severity: medium
+  }
+  issue code.SignedCharIndexReview as index
+}

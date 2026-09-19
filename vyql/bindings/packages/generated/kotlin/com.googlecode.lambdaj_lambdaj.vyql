@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m77b91a27;
+
+binding expressionEval0 {
+  requires {
+    dependency("com.googlecode.lambdaj:lambdaj")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.ExpressionEval at args[0]
+}

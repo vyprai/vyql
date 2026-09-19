@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ResponseWriterScriptWindowIdXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-132"
+    severity: high
+  }
+  issue code.ResponseWriterScriptWindowIdXss as sink
+}

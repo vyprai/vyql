@@ -1,0 +1,8 @@
+module code;
+
+review code.UnverifiedMailSenderIdentity {
+  category: auth
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  kind: attention
+  text: "review inbound mail handlers for an SPF, DKIM or DMARC verdict before the From address is used as the sender's identity"
+}

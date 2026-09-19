@@ -1,0 +1,11 @@
+module code;
+
+concept PhpNegativeOffsetStringSearchWarningDisclosure : issue {
+  cwe: [CWE_200, CWE_209]
+  reviewAssumption: "short request parameter names can trigger PHP warning output that discloses path or diagnostic details"
+  reviewCategory: secret
+  reviewCondition: "PHP string search uses a negative offset on request-controlled keys before proving minimum length"
+  reviewConfidence: high
+  reviewEvidence: "PHP request-routing context {pattern} calls strrpos with a negative offset before a matching strlen lower-bound guard"
+  vulnerableTo: [secrets.SecretLeak]
+}

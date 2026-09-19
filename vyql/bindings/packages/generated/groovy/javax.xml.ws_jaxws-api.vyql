@@ -1,0 +1,25 @@
+module bindings.groovy.generated.md539988c;
+
+binding userControlledData0 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "LogicalMessage.getPayload"
+  emit source core.UserControlledData at call.result
+}
+
+binding deserialization1 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "LogicalMessage.setPayload"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("javax.xml.ws:jaxws-api")
+  }
+  query pattern callExpr where callee.method == "Provider.readEndpointReference"
+  emit sink code.Deserialization at args[0]
+}

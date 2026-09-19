@@ -1,0 +1,33 @@
+module bindings.cpp.generated.mecdc3ee1;
+
+binding filePathAccess0 {
+  requires {
+    dependency("boost-graph-parallel")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("boost-graph-parallel")
+  }
+  query pattern callExpr where callee.method == "out"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("boost-graph-parallel")
+  }
+  query pattern callExpr where callee.method == "serialize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("boost-graph-parallel")
+  }
+  query pattern callExpr where callee.method == "unsafe_serialize"
+  emit sink code.Deserialization at args[0]
+}

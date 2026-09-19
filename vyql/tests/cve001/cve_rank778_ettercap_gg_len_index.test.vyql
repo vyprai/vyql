@@ -1,0 +1,62 @@
+# Rank 778 / CVE-2026-9365: Ettercap's GG dissector used packet length
+# fields directly as strncpy sizes and terminator indexes into a fixed buffer.
+test "rank778: GG dissector indexes fixed buffer with packet length minus offset"
+  lang c
+  expect VYQL-MEM-010
+  code
+  ```
+  #include <string.h>
+
+  #define GG_MAX_LEN 70
+
+  struct gg_header {
+      unsigned int len;
+  };
+
+  struct gg_login {
+      char *description;
+  };
+
+  void dissect(struct gg_header *gg, struct gg_login *login) {
+      char tbuf2[GG_MAX_LEN + 1];
+
+      if ((int)gg->len - 22 < 0) {
+          return;
+      }
+
+      strncpy(tbuf2, login->description, (gg->len) - 22);
+      tbuf2[(gg->len) - 22] = '\0';
+  }
+  ```
+
+test "rank778: GG dissector clamps copy length before terminator index"
+  lang c
+  reject VYQL-MEM-010
+  code
+  ```
+  #include <string.h>
+
+  #define GG_MAX_LEN 70
+  #define MIN(a, b) ((a) < (b) ? (a) : (b))
+
+  struct gg_header {
+      unsigned int len;
+  };
+
+  struct gg_login {
+      char *description;
+  };
+
+  void dissect(struct gg_header *gg, struct gg_login *login) {
+      char tbuf2[GG_MAX_LEN + 1];
+      size_t offset = 22;
+
+      if (gg->len - offset < 0) {
+          return;
+      }
+
+      size_t copy_len = MIN(gg->len - offset, GG_MAX_LEN);
+      strncpy(tbuf2, login->description, copy_len);
+      tbuf2[copy_len] = '\0';
+  }
+  ```

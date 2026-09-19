@@ -1,0 +1,137 @@
+# An artifact renderer takes the markup a chat message carries and pushes it
+# into the preview frame by reaching for the frame's own `contentDocument` and
+# calling `write` on it. That runs the string through the frame's HTML parser,
+# and because the frame element carries no `sandbox` attribute the frame keeps
+# the embedder's origin: an `onerror` handler in the markup executes with
+# `window.parent` in reach. Two independent controls close it -- a `sandbox`
+# attribute on the frame, which withholds script execution whatever the markup
+# says, and a sanitizer over the string, which strips the active markup before
+# the parser sees it -- and the patched renderer applies both, dropping the
+# `contentDocument` write for a sanitized `srcDoc` on a sandboxed frame.
+#
+# Over 4388 TypeScript/JavaScript files of the unpatched application, this
+# reports one finding, VYQL-INJ-243 at the renderer above.
+
+test "rank1333: a preview frame's own document is written with unsanitized markup"
+  lang javascript
+  file src/features/Portal/Artifacts/Body/Renderer/HTML.tsx
+  expect VYQL-INJ-243
+  expect_review code.UnsanitizedFrameDocumentWrite
+  code
+  ```
+  import { memo, useEffect, useRef } from 'react';
+
+  interface HTMLRendererProps {
+    height?: string;
+    htmlContent: string;
+    width?: string;
+  }
+  const HTMLRenderer = memo<HTMLRendererProps>(({ htmlContent, width = '100%', height = '100%' }) => {
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+
+    useEffect(() => {
+      if (!iframeRef.current) return;
+
+      const doc = iframeRef.current.contentDocument;
+      if (!doc) return;
+
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+    }, [htmlContent]);
+
+    return <iframe ref={iframeRef} style={{ border: 'none', height, width }} title="html-renderer" />;
+  });
+
+  export default HTMLRenderer;
+  ```
+
+test "rank1333: a preview frame is sandboxed and its document set from sanitized markup"
+  lang javascript
+  file src/features/Portal/Artifacts/Body/Renderer/HTML.tsx
+  reject VYQL-INJ-243
+  reject_review code.UnsanitizedFrameDocumentWrite
+  code
+  ```
+  import { sanitizeHTMLContent } from '@lobechat/utils/client';
+  import { memo, useMemo } from 'react';
+
+  interface HTMLRendererProps {
+    height?: string;
+    htmlContent: string;
+    width?: string;
+  }
+  const HTMLRenderer = memo<HTMLRendererProps>(({ htmlContent, width = '100%', height = '100%' }) => {
+    const sanitizedContent = useMemo(() => sanitizeHTMLContent(htmlContent), [htmlContent]);
+
+    return (
+      <iframe
+        sandbox=""
+        srcDoc={sanitizedContent}
+        style={{ border: 'none', height, width }}
+        title="html-renderer"
+      />
+    );
+  });
+
+  export default HTMLRenderer;
+  ```
+
+test "rank1333: a preview frame's document is written with sanitized markup"
+  lang javascript
+  file src/features/Portal/Artifacts/Body/Renderer/HTML.tsx
+  reject VYQL-INJ-243
+  reject_review code.UnsanitizedFrameDocumentWrite
+  code
+  ```
+  import { sanitizeHTMLContent } from '@lobechat/utils/client';
+  import { memo, useEffect, useRef } from 'react';
+
+  const HTMLRenderer = memo(({ htmlContent }) => {
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+
+    useEffect(() => {
+      if (!iframeRef.current) return;
+
+      const doc = iframeRef.current.contentDocument;
+      if (!doc) return;
+
+      doc.open();
+      doc.write(sanitizeHTMLContent(htmlContent));
+      doc.close();
+    }, [htmlContent]);
+
+    return <iframe ref={iframeRef} title="html-renderer" />;
+  });
+
+  export default HTMLRenderer;
+  ```
+
+test "rank1333: a sandboxed preview frame's document is written with raw markup"
+  lang javascript
+  file src/features/Portal/Artifacts/Body/Renderer/HTML.tsx
+  reject VYQL-INJ-243
+  reject_review code.UnsanitizedFrameDocumentWrite
+  code
+  ```
+  import { memo, useEffect, useRef } from 'react';
+
+  const HTMLRenderer = memo(({ htmlContent }) => {
+    const iframeRef = useRef<HTMLIFrameElement>(null);
+
+    useEffect(() => {
+      if (!iframeRef.current) return;
+
+      const doc = iframeRef.current.contentDocument;
+      if (!doc) return;
+
+      doc.open();
+      doc.write(htmlContent);
+      doc.close();
+    }, [htmlContent]);
+
+    return <iframe ref={iframeRef} sandbox="" title="html-renderer" />;
+  });
+
+  export default HTMLRenderer;
+  ```

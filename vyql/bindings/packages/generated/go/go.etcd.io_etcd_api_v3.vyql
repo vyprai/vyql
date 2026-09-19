@@ -1,0 +1,117 @@
+module bindings.go.generated.m50dab3f4;
+
+binding storedDataRead0 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_KV_Range_0"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_KV_Put_0"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite2 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_KV_DeleteRange_0"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite3 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_KV_Txn_0"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite4 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_KV_Compact_0"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding authenticationCheck5 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_Auth_Authenticate_0"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding secretValue6 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_Auth_UserAdd_0"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue7 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_Auth_UserChangePassword_0"
+  emit source code.SecretValue at call.result
+}
+
+binding authorizationCheck8 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_Auth_UserGrantRole_0"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck9 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_Auth_UserRevokeRole_0"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck10 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_Auth_RoleGrantPermission_0"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authorizationCheck11 {
+  requires {
+    dependency("go.etcd.io/etcd/api/v3")
+  }
+  query pattern callExpr where callee.method == "request_Auth_RoleRevokePermission_0"
+  emit check core.AuthorizationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

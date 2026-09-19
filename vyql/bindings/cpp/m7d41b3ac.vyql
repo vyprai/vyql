@@ -1,0 +1,6 @@
+module bindings.cpp.generated.m7d41b3ac;
+
+binding externalUrlOpenWithoutSchemeAllowlist413 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "cpp" and node.context.callArgShape contains "QDesktopServices.openUrl:" and not (node.context.call in ["scheme", "isLocalFile", "toLocalFile", "startsWith", "isValid"]) and not (containsAny(node.context.callArgShape, ["QDesktopServices.openUrl:STR", "QDesktopServices.openUrl:QUrl(STR", "QDesktopServices.openUrl:QUrl(QLatin1String(STR", "QDesktopServices.openUrl:QUrl(QStringLiteral(STR", "QDesktopServices.openUrl:QUrl(tr(STR"]))
+  emit issue code.ExternalUrlOpenWithoutSchemeAllowlist at node
+}

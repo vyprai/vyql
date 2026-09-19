@@ -1,0 +1,6 @@
+module memory;
+
+threat DoubleFree {
+  cwe: [CWE_415]
+  desc: "Double free"
+}

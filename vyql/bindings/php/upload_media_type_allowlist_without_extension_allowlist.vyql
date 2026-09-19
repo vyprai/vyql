@@ -1,0 +1,14 @@
+module bindings.php.upload_media_type_allowlist_without_extension_allowlist;
+
+// A file-upload handler that admits the upload against a media-type allowlist and
+// then persists the extension the uploaded file itself carries. Media-type
+// allowlists are checked against sniffed content, while the stored extension comes
+// from the client-supplied source name, so an upload whose bytes sniff as an allowed
+// image is still stored -- and later served -- under whatever extension its name
+// carried. The negation is the extension allowlist the same handler would have to
+// pass to its validator; `assign:` is AST-derived, so a comment naming one does not
+// satisfy it.
+binding uploadMediaTypeAllowlistWithoutExtensionAllowlist {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.call == "validate" and node.context.call == "getExtension" and node.context.call == "setExtension" and containsAny(node.context.assign, ["media_types", "mediaTypes", "mime_types", "mimeTypes", "allowed_types", "allowedTypes"]) and not containsAny(node.context.assign, ["extension", "Extension"])
+  emit issue code.IncompleteFileExtensionValidation at node
+}

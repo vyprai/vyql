@@ -1,0 +1,65 @@
+module bindings.go.generated.mce4c1644;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/google/wire")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/google/wire")
+  }
+  query pattern callExpr where callee.method == "processFuncProvider"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/google/wire")
+  }
+  query pattern callExpr where callee.method == "processStructLiteralProvider"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/google/wire")
+  }
+  query pattern callExpr where callee.method == "processStructProvider"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/google/wire")
+  }
+  query pattern callExpr where callee.method == "processBind"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization5 {
+  requires {
+    dependency("github.com/google/wire")
+  }
+  query pattern callExpr where callee.method == "processValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization6 {
+  requires {
+    dependency("github.com/google/wire")
+  }
+  query pattern callExpr where callee.method == "processInterfaceValue"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization7 {
+  requires {
+    dependency("github.com/google/wire")
+  }
+  query pattern callExpr where callee.method == "processFieldsOf"
+  emit sink code.Deserialization at args[0]
+}

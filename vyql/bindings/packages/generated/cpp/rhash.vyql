@@ -1,0 +1,25 @@
+module bindings.cpp.generated.m64fe9f9b;
+
+binding weakHash0 {
+  requires {
+    dependency("rhash")
+  }
+  query pattern callExpr where callee.method == "rhash_init"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("rhash")
+  }
+  query pattern callExpr where callee.method == "rhash_init_multi"
+  emit issue code.WeakHash at call
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("rhash")
+  }
+  query pattern callExpr where callee.method == "rhash_file"
+  emit sink code.FilePathAccess at args[0]
+}

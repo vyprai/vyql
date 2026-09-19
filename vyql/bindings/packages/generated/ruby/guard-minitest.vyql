@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m20a31729;
+
+binding commandExecution0 {
+  requires {
+    dependency("guard-minitest")
+  }
+  query pattern callExpr where callee.method == "Runner.run"
+  emit sink code.CommandExecution at args[0]
+}

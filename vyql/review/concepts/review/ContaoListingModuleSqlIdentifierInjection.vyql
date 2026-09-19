@@ -1,0 +1,8 @@
+module code;
+
+review code.ContaoListingModuleSqlIdentifierInjection {
+  category: sql
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review Contao listing module search and sort query parameters for field allowlists before SQL construction"
+}

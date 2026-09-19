@@ -1,0 +1,76 @@
+# Rank 1113 / CVE-2019-10449: the Fortify on Demand Uploader Jenkins plugin
+# takes personalAccessToken as a plain String in @DataBoundConstructor, so
+# Jenkins persists it cleartext in job config.xml (CWE-312).
+#
+# FIXED. code.JenkinsPlaintextDataboundCredential covers the
+# @DataBoundConstructor + String (not Secret) shape; the binding keys on
+# paramName containing "accesstoken" alongside apilogin, apitoken and
+# repoPassword. Vulnerable snippet expects VYQL-SEC-015; fixed snippet
+# rejects it.
+#
+# verify_current_expected: current-behavior
+
+test "rank1113: the personal access token is databound as a plain String"
+  lang java
+  file src/main/java/org/jenkinsci/plugins/fodupload/StaticAssessmentBuildStep.java
+  expect_review code.JenkinsPlaintextDataboundCredential
+  code
+  ```
+  package org.jenkinsci.plugins.fodupload;
+
+  import org.kohsuke.stapler.DataBoundConstructor;
+
+  public class StaticAssessmentBuildStep {
+
+      private final SharedUploadBuildStep sharedBuildStep;
+
+      @DataBoundConstructor
+      public StaticAssessmentBuildStep(String bsiToken,
+                                       boolean overrideGlobalConfig,
+                                       String username,
+                                       String personalAccessToken,
+                                       String tenantId) {
+
+          sharedBuildStep = new SharedUploadBuildStep(bsiToken,
+                  overrideGlobalConfig,
+                  username,
+                  personalAccessToken,
+                  tenantId);
+      }
+  }
+  ```
+
+test "rank1113: the token is databound as a Secret and stored encrypted"
+  lang java
+  file src/main/java/org/jenkinsci/plugins/fodupload/StaticAssessmentBuildStep.java
+  reject_review code.JenkinsPlaintextDataboundCredential
+  code
+  ```
+  package org.jenkinsci.plugins.fodupload;
+
+  import hudson.util.Secret;
+  import org.kohsuke.stapler.DataBoundConstructor;
+
+  public class StaticAssessmentBuildStep {
+
+      private final SharedUploadBuildStep sharedBuildStep;
+
+      @DataBoundConstructor
+      public StaticAssessmentBuildStep(String bsiToken,
+                                       boolean overrideGlobalConfig,
+                                       String username,
+                                       Secret personalAccessToken,
+                                       String tenantId) {
+
+          sharedBuildStep = new SharedUploadBuildStep(bsiToken,
+                  overrideGlobalConfig,
+                  username,
+                  personalAccessToken.getEncryptedValue(),
+                  tenantId);
+      }
+
+      public Secret getPersonalAccessToken() {
+          return Secret.fromString(sharedBuildStep.getAuthModel().getPersonalAccessToken());
+      }
+  }
+  ```

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m6b429dde;
+
+binding deserialization0 {
+  requires {
+    dependency("mail")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

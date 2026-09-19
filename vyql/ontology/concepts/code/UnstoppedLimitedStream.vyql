@@ -1,0 +1,6 @@
+module code;
+
+concept UnstoppedLimitedStream : issue {
+  cwe: [CWE_400, CWE_772]
+  vulnerableTo: [dos.UncontrolledResourceConsumption]
+}

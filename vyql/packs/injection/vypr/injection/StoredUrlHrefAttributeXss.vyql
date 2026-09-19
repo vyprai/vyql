@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule StoredUrlHrefAttributeXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79, CWE_116, CWE_20]
+    id: "VYQL-INJ-195"
+    severity: high
+  }
+  issue code.StoredUrlHrefAttributeXss as sink
+}

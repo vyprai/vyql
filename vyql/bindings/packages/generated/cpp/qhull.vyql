@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m9352f769;
+
+binding userControlledData0 {
+  requires {
+    dependency("qhull")
+  }
+  query pattern callExpr where callee.method == "qh_rboxpoints"
+  emit source core.UserControlledData at call.result
+}

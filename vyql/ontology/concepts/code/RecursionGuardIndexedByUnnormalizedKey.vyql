@@ -1,0 +1,11 @@
+module code;
+
+concept RecursionGuardIndexedByUnnormalizedKey : issue {
+  cwe: [CWE_674, CWE_178]
+  reviewAssumption: "a caller can reach the handler with a key whose case differs from the normalized form the table is keyed by, for example an attribute name written as CHECKED instead of checked"
+  reviewCategory: resource
+  reviewCondition: "a handler stored in a lookup table breaks recursion by clearing its own table slot, but indexes the table with the raw key it received while the dispatch that reached it looked the handler up under the lowercased key, so the slot cleared is not the slot the next lookup reads"
+  reviewConfidence: high
+  reviewEvidence: "handler-table context {pattern} resolves the hook through a lowercased key and then saves and restores the table slot under the unnormalized parameter, with no lowercased local used as the index"
+  vulnerableTo: [dos.StackExhaustion]
+}

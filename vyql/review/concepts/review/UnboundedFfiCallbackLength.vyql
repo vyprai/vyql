@@ -1,0 +1,7 @@
+module code;
+
+review code.UnboundedFfiCallbackLength {
+  category: memory
+  kind: attention
+  text: "review whether the callback returning this length is bounded by contract; a user-supplied closure can return more than the buffer it was handed, and the foreign caller then reads past it -- bound the length against the buffer size before returning it"
+}

@@ -1,0 +1,44 @@
+module bindings.rust.parsed_entry_value_path_join;
+
+// A serialized document's entries carry names that the parser's own types
+// render as strings: the value field of a key/value entry -- protobuf's
+// StringStringEntryProto and every schema that models a record as a pair of
+// key and value fields -- read through as_str, the borrowed string form a
+// join consumes. When such a value names a file, the file is read or
+// written relative to a base directory the application chose while the
+// entry's author chose the rest of the path: an absolute value replaces the
+// base outright in Path::join, and a `..` component walks the join out of
+// the directory. A model file, a manifest, a package index -- the document
+// is untrusted input even though this process read the bytes itself,
+// because the document's author is not the operator.
+//
+// The shape is the join and the path's consumption in one function: a join
+// whose function context carries the string form of a parsed entry's value
+// field, plus a std path materialisation -- a fresh PathBuf or Path from a
+// base, a file open or create, a directory creation, a read, a copy, a
+// rename, a metadata call. The consumption clause is what separates a path
+// join from the iterator join that takes a separator string; the locator
+// clause is what separates a parsed entry value from a locally typed name.
+// The neutralising markers are std's own containment and traversal
+// vocabulary -- starts_with or strip_prefix against the base, a
+// components() walk, ParentDir or CurDir arms, canonicalize, is_absolute,
+// a named sanitizer, or a literal "." / ".." segment comparison -- so a
+// check written in place is honoured, whichever spelling it uses.
+//
+// This is the complement of remote_uri_mirror_path_join: that binding's
+// locator is a uri/url accessor and its materialisation is a create,
+// because a mirrored URI names a file being written; a parsed entry value
+// names a file being loaded, and the load is usually delegated to a
+// resolver or provider taking the path -- so any std path consumption
+// counts here, and requiring the read itself would miss the delegation.
+//
+// The to_string render spelling is deliberately not a locator: a Display
+// render is how a value is written into prose and templates, not how it is
+// joined. Residual, false-negative direction only: a containment check
+// established outside the joining function -- a checked wrapper that builds
+// the path in a helper -- is invisible to a function-scoped binding, the
+// standard delegation limit.
+binding parsedEntryValuePathJoin {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call == "join" and containsAny(node.context.selector, ["value.as_str"]) and containsAny(node.context.callPath, ["PathBuf.from", "Path.new", "File.open", "File.create", "fs.read", "fs.read_to_string", "fs.copy", "fs.write", "fs.create_dir", "create_dir_all", "fs.remove_file", "fs.rename", "fs.hard_link", "fs.symlink", "fs.metadata"]) and not (containsAny(node.context.call, ["starts_with", "strip_prefix", "components", "canonicalize", "is_absolute", "sanitize"])) and not (containsAny(node.context.callPath, ["ParentDir", "CurDir"])) and not (node.token contains "\"..\"") and not (node.token contains "\".\"")
+  emit issue code.RemoteListingDownloadPath at node
+}

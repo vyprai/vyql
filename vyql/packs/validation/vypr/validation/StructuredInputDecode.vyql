@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule StructuredInputDecode {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20]
+    id: "VYQL-VAL-038"
+    severity: medium
+  }
+  issue code.StructuredInputDecode as input
+}

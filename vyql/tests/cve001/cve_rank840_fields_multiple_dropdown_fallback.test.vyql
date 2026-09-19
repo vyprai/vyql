@@ -1,0 +1,104 @@
+test "rank840: PHP multiple dropdown update encodes scalar value without array fallback"
+  lang php
+  expect VYQL-VAL-010
+  expect_review code.MultipleDropdownScalarFallbackMissing
+  code
+  ```
+  <?php
+
+  class PluginFieldsContainer {
+     public function updateFieldsValues($data, $itemtype, $massiveaction = false) {
+        foreach ($multiple_fields_iterator as $field_data) {
+           $field_name = $field_data['name'];
+           if ($field_data['type'] === 'dropdown') {
+              $field_name = 'plugin_fields_' . $field_data['name'] . 'dropdowns_id';
+           }
+
+           if (array_key_exists($field_name, $data)) {
+              if (isset($data['multiple_dropdown_action']) && $data['multiple_dropdown_action'] === 'append' && $exist) {
+                 $existing_values = json_decode($obj->fields[$field_name] ?? '[]', true);
+                 $new_values = is_array($data[$field_name]) ? $data[$field_name] : [$data[$field_name]];
+                 $data[$field_name] = json_encode(array_values(array_unique(array_merge($existing_values, $new_values))));
+              } else {
+                 $data[$field_name] = json_encode($data[$field_name]);
+              }
+           }
+        }
+     }
+  }
+  ```
+
+test "rank840: PHP multiple dropdown update coerces scalar value to array"
+  lang php
+  reject VYQL-VAL-010
+  reject_review code.MultipleDropdownScalarFallbackMissing
+  code
+  ```
+  <?php
+
+  class PluginFieldsContainer {
+     public function updateFieldsValues($data, $itemtype, $massiveaction = false) {
+        foreach ($multiple_fields_iterator as $field_data) {
+           $field_name = $field_data['name'];
+           if ($field_data['type'] === 'dropdown') {
+              $field_name = 'plugin_fields_' . $field_data['name'] . 'dropdowns_id';
+           }
+
+           if (array_key_exists($field_name, $data)) {
+              if (isset($data['multiple_dropdown_action']) && $data['multiple_dropdown_action'] === 'append' && $exist) {
+                 $existing_values = json_decode($obj->fields[$field_name] ?? '[]', true);
+                 $new_values = is_array($data[$field_name]) ? $data[$field_name] : [$data[$field_name]];
+                 $data[$field_name] = json_encode(array_values(array_unique(array_merge($existing_values, $new_values))));
+              } else {
+                 $value = $data[$field_name];
+                 $value = is_array($value) ? $value : [];
+                 $data[$field_name] = json_encode($value);
+              }
+           }
+        }
+     }
+  }
+  ```
+
+test "rank840: PHP multiple dropdown default decodes without array fallback"
+  lang php
+  expect VYQL-VAL-010
+  expect_review code.MultipleDropdownScalarFallbackMissing
+  code
+  ```
+  <?php
+
+  class PluginFieldsField {
+     public static function prepareHtmlFields($fields) {
+        foreach ($fields as &$field) {
+           $value = $field['default_value'];
+           if ($field['multiple'] && !is_array($value)) {
+              $value = json_decode((string) $value);
+           }
+           $field['value'] = $value;
+        }
+     }
+  }
+  ```
+
+test "rank840: PHP multiple dropdown default decodes to array fallback"
+  lang php
+  reject VYQL-VAL-010
+  reject_review code.MultipleDropdownScalarFallbackMissing
+  code
+  ```
+  <?php
+
+  class PluginFieldsField {
+     public static function prepareHtmlFields($fields) {
+        foreach ($fields as &$field) {
+           $value = $field['default_value'];
+           if ($field['multiple'] && !is_array($value)) {
+              $decoded = json_decode((string) $value, true);
+              $value = is_array($decoded) ? $decoded : [];
+           }
+           $field['value'] = $value;
+        }
+     }
+  }
+  ```

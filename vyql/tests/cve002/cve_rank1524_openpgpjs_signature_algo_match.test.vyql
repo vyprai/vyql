@@ -1,0 +1,157 @@
+# Rank 1524 / CVE-2019-9153: OpenPGP.js verified signatures without
+# checking that the signature's public-key algorithm matches the verifying
+# key's, so a signature crafted under one algorithm could verify against a
+# key of another (improper signature verification, CWE-347; PR #816
+# "Security fixes"; the task list's commit? flag resolves to merge
+# b1b19946d8, which carries the change and the preferred_algo_mismatch
+# test).
+#
+# Signature.prototype.verify in src/packet/signature.js read the signature
+# packet's declared algorithm octet (`this.publicKeyAlgorithm`, translated
+# with `enums.write(enums.publicKey, ...)`), dispatched the MPI parsing on
+# it, and delegated to `crypto.signature.verify(publicKeyAlgorithm,
+# hashAlgorithm, mpi, key.params, toHash, hash)` — the primitive whose own
+# documentation says it "verifies the signature provided for data using
+# specified algorithms and public key parameters", taking the algorithm and
+# the key parameters as separate arguments. The verifying key declares its
+# own algorithm field beside those parameters, and nothing in the function
+# ever read it: the declared algorithm selected the maths, `key.params`
+# supplied the numbers, and no tie existed between the two.
+#
+# The fixing commit adds the gate before any hashing:
+# `if (publicKeyAlgorithm !== enums.write(enums.publicKey, key.algorithm))`
+# throws, so a `key.algorithm` read enters the same function and the
+# mismatch never reaches the primitive.
+#
+# code.SignatureKeyAlgorithmBindingMissing / VYQL-CRY-057 holds both
+# directions: the ungated form below expects the finding, and the
+# mismatch-gated form rejects it. The four VYQL-CRY-006 advisories the fix
+# revision adds on the new comparisons are constant-time-comparison
+# reviews and fire identically on the patched code, so they cannot
+# discriminate.
+
+test "rank1524: the verify path never reads the key's algorithm"
+  lang javascript
+  file src/packet/signature.js
+  expect VYQL-CRY-057
+  expect_review code.SignatureKeyAlgorithmBindingMissing
+  code
+  ```
+  import enums from '../enums.js';
+  import crypto from '../crypto';
+  import stream from 'web-stream-tools';
+  import type_mpi from '../type/mpi.js';
+
+  Signature.prototype.verify = async function (key, signatureType, data) {
+    const publicKeyAlgorithm = enums.write(enums.publicKey, this.publicKeyAlgorithm);
+    const hashAlgorithm = enums.write(enums.hash, this.hashAlgorithm);
+
+    let toHash;
+    let hash;
+    if (this.hashed) {
+      hash = this.hashed;
+    } else {
+      toHash = this.toHash(signatureType, data);
+      hash = await this.hash(signatureType, data, toHash);
+    }
+    hash = await stream.readToEnd(hash);
+
+    if (this.signedHashValue[0] !== hash[0] ||
+        this.signedHashValue[1] !== hash[1]) {
+      this.verified = false;
+    } else {
+      let mpicount = 0;
+      // Algorithm-Specific Fields for RSA signatures:
+      //      - multiprecision number (MPI) of RSA signature value m**d mod n.
+      if (publicKeyAlgorithm > 0 && publicKeyAlgorithm < 4) {
+        mpicount = 1;
+
+      //    Algorithm-Specific Fields for DSA, ECDSA, and EdDSA signatures:
+      //      - MPI of DSA value r.
+      //      - MPI of DSA value s.
+      } else if (publicKeyAlgorithm === enums.publicKey.dsa ||
+               publicKeyAlgorithm === enums.publicKey.ecdsa ||
+               publicKeyAlgorithm === enums.publicKey.eddsa) {
+        mpicount = 2;
+      }
+
+      // EdDSA signature parameters are encoded in little-endian format
+      // https://tools.ietf.org/html/rfc8032#section-5.1.2
+      const endian = publicKeyAlgorithm === enums.publicKey.eddsa ? 'le' : 'be';
+      const mpi = [];
+      let i = 0;
+      this.signature = await stream.readToEnd(this.signature);
+      for (let j = 0; j < mpicount; j++) {
+        mpi[j] = new type_mpi();
+        i += mpi[j].read(this.signature.subarray(i, this.signature.length), endian);
+      }
+
+      this.verified = await crypto.signature.verify(
+        publicKeyAlgorithm, hashAlgorithm, mpi, key.params,
+        toHash, hash
+      );
+    }
+    return this.verified;
+  };
+  ```
+
+test "rank1524: the fixed revision refuses algorithm mismatches"
+  lang javascript
+  file src/packet/signature.js
+  reject VYQL-CRY-057
+  reject_review code.SignatureKeyAlgorithmBindingMissing
+  code
+  ```
+  import enums from '../enums.js';
+  import crypto from '../crypto';
+  import stream from 'web-stream-tools';
+  import type_mpi from '../type/mpi.js';
+
+  Signature.prototype.verify = async function (key, signatureType, data) {
+    const publicKeyAlgorithm = enums.write(enums.publicKey, this.publicKeyAlgorithm);
+    const hashAlgorithm = enums.write(enums.hash, this.hashAlgorithm);
+
+    if (publicKeyAlgorithm !== enums.write(enums.publicKey, key.algorithm)) {
+      throw new Error('Public key algorithm used to sign signature does not match issuer key algorithm.');
+    }
+
+    let toHash;
+    let hash;
+    if (this.hashed) {
+      hash = this.hashed;
+    } else {
+      toHash = this.toHash(signatureType, data);
+      hash = await this.hash(signatureType, data, toHash);
+    }
+    hash = await stream.readToEnd(hash);
+
+    if (this.signedHashValue[0] !== hash[0] ||
+        this.signedHashValue[1] !== hash[1]) {
+      this.verified = false;
+    } else {
+      let mpicount = 0;
+      if (publicKeyAlgorithm > 0 && publicKeyAlgorithm < 4) {
+        mpicount = 1;
+      } else if (publicKeyAlgorithm === enums.publicKey.dsa ||
+               publicKeyAlgorithm === enums.publicKey.ecdsa ||
+               publicKeyAlgorithm === enums.publicKey.eddsa) {
+        mpicount = 2;
+      }
+
+      const endian = publicKeyAlgorithm === enums.publicKey.eddsa ? 'le' : 'be';
+      const mpi = [];
+      let i = 0;
+      this.signature = await stream.readToEnd(this.signature);
+      for (let j = 0; j < mpicount; j++) {
+        mpi[j] = new type_mpi();
+        i += mpi[j].read(this.signature.subarray(i, this.signature.length), endian);
+      }
+
+      this.verified = await crypto.signature.verify(
+        publicKeyAlgorithm, hashAlgorithm, mpi, key.params,
+        toHash, hash
+      );
+    }
+    return this.verified;
+  };
+  ```

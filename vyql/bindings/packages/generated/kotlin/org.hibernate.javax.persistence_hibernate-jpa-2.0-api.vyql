@@ -1,0 +1,46 @@
+module bindings.kotlin.generated.m44c3534f;
+
+binding sqlExecution0 {
+  requires {
+    dependency("org.hibernate.javax.persistence:hibernate-jpa-2.0-api")
+  }
+  query pattern callExpr where callee.method == "createQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.hibernate.javax.persistence:hibernate-jpa-2.0-api")
+  }
+  query pattern callExpr where callee.method == "createNamedQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.hibernate.javax.persistence:hibernate-jpa-2.0-api")
+  }
+  query pattern callExpr where callee.method == "createNativeQuery"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("org.hibernate.javax.persistence:hibernate-jpa-2.0-api")
+  }
+  query pattern callExpr where callee.method == "executeUpdate"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization4 {
+  requires {
+    dependency("org.hibernate.javax.persistence:hibernate-jpa-2.0-api")
+  }
+  query pattern callExpr where callee.method == "setParameter"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

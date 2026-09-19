@@ -1,0 +1,9 @@
+module bindings.objc.generated.ma5eab205;
+
+binding userControlledData0 {
+  requires {
+    dependency("EFQRCode")
+  }
+  query pattern callExpr where callee.method == "recognize"
+  emit source core.UserControlledData at call.result
+}

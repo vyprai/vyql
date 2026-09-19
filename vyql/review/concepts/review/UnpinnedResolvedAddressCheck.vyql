@@ -1,0 +1,8 @@
+module code;
+
+review code.UnpinnedResolvedAddressCheck {
+  category: request_forgery
+  expected: [core.AllowlistValidation]
+  kind: target
+  text: "review host address validation for a connection pinned to the address that was validated, rather than a hostname the transport resolves again"
+}

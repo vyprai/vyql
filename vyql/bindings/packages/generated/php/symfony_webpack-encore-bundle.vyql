@@ -1,0 +1,17 @@
+module bindings.php.generated.m7022c3f7;
+
+binding htmlRender0 {
+  requires {
+    dependency("symfony/webpack-encore-bundle")
+  }
+  query pattern callExpr where callee.method == "renderWebpackScriptTags"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("symfony/webpack-encore-bundle")
+  }
+  query pattern callExpr where callee.method == "renderWebpackLinkTags"
+  emit sink code.HtmlRender at args[0]
+}

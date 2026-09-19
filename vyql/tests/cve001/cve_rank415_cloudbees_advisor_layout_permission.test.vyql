@@ -1,0 +1,35 @@
+# Rank 415 / CVE-2020-2258: Health Advisor by CloudBees exposed its
+# administrative configuration page with a weaker Jelly layout permission.
+
+test "rank415: CloudBees Jenkins Advisor admin page uses weak layout permission"
+  lang config
+  file index.jelly
+  expect VYQL-AUTH-021
+  expect_review code.JenkinsAdvisorWeakLayoutPermission
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core" xmlns:l="/lib/layout">
+    <l:layout title="${it.actionTitleText}" norefresh="true" permission="${it.ADMINISTRATOR}">
+      <l:main-panel>
+        <f:form name="config" method="POST" action="configure"/>
+      </l:main-panel>
+    </l:layout>
+  </j:jelly>
+  ```
+
+test "rank415: CloudBees Jenkins Advisor admin page requires Overall Administer"
+  lang config
+  file index.jelly
+  reject VYQL-AUTH-021
+  code
+  ```
+  <?jelly escape-by-default='true'?>
+  <j:jelly xmlns:j="jelly:core" xmlns:l="/lib/layout">
+    <l:layout title="${it.actionTitleText}" norefresh="true" permission="${app.ADMINISTER}">
+      <l:main-panel>
+        <f:form name="config" method="POST" action="configure"/>
+      </l:main-panel>
+    </l:layout>
+  </j:jelly>
+  ```

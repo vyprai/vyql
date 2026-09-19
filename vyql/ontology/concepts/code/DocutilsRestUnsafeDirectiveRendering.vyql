@@ -1,0 +1,11 @@
+module code;
+
+concept DocutilsRestUnsafeDirectiveRendering : issue {
+  cwe: [CWE_79, CWE_22]
+  reviewAssumption: "attacker-controlled markup can include raw HTML or file-inclusion directives and the returned fragment is rendered as trusted HTML"
+  reviewCategory: xss
+  reviewCondition: "reStructuredText markup is rendered to HTML with docutils raw or file insertion directives still enabled"
+  reviewConfidence: high
+  reviewEvidence: "docutils render context {pattern} calls publish_parts(..., writer_name=\"html4css1\") without raw_enabled=False and file_insertion_enabled=False"
+  vulnerableTo: [injection.Xss, path.PathTraversal]
+}

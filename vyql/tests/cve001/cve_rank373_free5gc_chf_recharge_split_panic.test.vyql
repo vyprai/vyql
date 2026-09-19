@@ -1,0 +1,115 @@
+# Rank 373 / CVE-2026-32937: free5GC CHF split a route parameter and
+# indexed the rating-group field without validating the split result length,
+# making the recharge endpoint remotely panic-triggerable.
+
+test "rank373: free5GC CHF recharge split result is indexed without length check"
+  lang go
+  expect VYQL-DOS-015
+  expect_review code.Free5gcChfRechargeInfoSplitPanic
+  code
+  ```
+  package sbi
+
+  import (
+      "net/http"
+      "strconv"
+      "strings"
+
+      "github.com/gin-gonic/gin"
+  )
+
+  type Server struct{}
+  type Processor struct{}
+
+  func (s *Server) Processor() *Processor { return &Processor{} }
+  func (p *Processor) NotifyRecharge(ueId string, rg int32) {}
+
+  func (s *Server) RechargePut(c *gin.Context) {
+      rechargingInfo := c.Param("rechargingInfo")
+      ueIdRatingGroup := strings.Split(rechargingInfo, "_")
+      ueId := ueIdRatingGroup[0]
+      rgStr := ueIdRatingGroup[1]
+      rg, err := strconv.Atoi(rgStr)
+      if err != nil {
+          c.Status(http.StatusBadRequest)
+      }
+      s.Processor().NotifyRecharge(ueId, int32(rg))
+  }
+  ```
+
+test "rank373: free5GC CHF recharge split result with length check is clean"
+  lang go
+  reject VYQL-DOS-015
+  reject_review code.Free5gcChfRechargeInfoSplitPanic
+  code
+  ```
+  package sbi
+
+  import (
+      "net/http"
+      "strconv"
+      "strings"
+
+      "github.com/gin-gonic/gin"
+  )
+
+  type Server struct{}
+  type Processor struct{}
+
+  func (s *Server) Processor() *Processor { return &Processor{} }
+  func (p *Processor) NotifyRecharge(ueId string, rg int32) {}
+
+  func (s *Server) RechargePut(c *gin.Context) {
+      rechargingInfo := c.Param("rechargingInfo")
+      ueIdRatingGroup := strings.Split(rechargingInfo, "_")
+      if len(ueIdRatingGroup) < 2 {
+          c.JSON(http.StatusBadRequest, "invalid rechargingInfo")
+          return
+      }
+      ueId := ueIdRatingGroup[0]
+      rgStr := ueIdRatingGroup[1]
+      rg, err := strconv.Atoi(rgStr)
+      if err != nil {
+          c.JSON(http.StatusBadRequest, "invalid ratingGroup")
+          return
+      }
+      s.Processor().NotifyRecharge(ueId, int32(rg))
+  }
+  ```
+
+test "rank373: free5GC CHF recharge query parameter refactor is clean"
+  lang go
+  reject VYQL-DOS-015
+  reject_review code.Free5gcChfRechargeInfoSplitPanic
+  code
+  ```
+  package sbi
+
+  import (
+      "net/http"
+      "strconv"
+
+      "github.com/gin-gonic/gin"
+  )
+
+  type Server struct{}
+  type Processor struct{}
+
+  func (s *Server) Processor() *Processor { return &Processor{} }
+  func (p *Processor) NotifyRecharge(ueId string, rg int32) {}
+
+  func (s *Server) RechargePut(c *gin.Context) {
+      ueId := c.Param("ueId")
+      rgStr := c.Query("ratingGroup")
+      if rgStr == "" {
+          c.JSON(http.StatusBadRequest, "missing ratingGroup")
+          return
+      }
+      rg, err := strconv.Atoi(rgStr)
+      if err != nil {
+          c.JSON(http.StatusBadRequest, "invalid ratingGroup")
+          return
+      }
+      s.Processor().NotifyRecharge(ueId, int32(rg))
+  }
+  ```

@@ -1,0 +1,11 @@
+module code;
+
+concept UninitializedBufferExposure : issue {
+  cwe: [CWE_908]
+  reviewAssumption: "the callee can observe or depend on bytes before they are initialized"
+  reviewCategory: memory
+  reviewCondition: "a buffer with reserved capacity is exposed as initialized mutable storage"
+  reviewConfidence: medium
+  reviewEvidence: "uninitialized buffer lifecycle {pattern} is present"
+  vulnerableTo: [memory.UninitializedUse]
+}

@@ -1,0 +1,70 @@
+# Rank 976 / CVE-2025-26625: Git LFS checkout/pull wrote object
+# contents with os.Create, following terminal symlinks and clobbering hard links.
+
+test "rank976: Go checkout writer stats then creates path without exclusive clobber"
+  lang go
+  file lfs/gitfilter_smudge.go
+  expect VYQL-PATH-051
+  expect_review code.HardlinkedFileOverwriteWithoutClobber
+  code
+  ```
+  package lfs
+
+  import (
+    "os"
+    "path/filepath"
+  )
+
+  func SmudgeToFile(filename string) error {
+    if stat, _ := os.Stat(filename); stat != nil {
+      if stat.Mode()&0200 == 0 {
+        _ = os.Chmod(filename, stat.Mode()|0200)
+      }
+    }
+    abs, err := filepath.Abs(filename)
+    if err != nil {
+      return err
+    }
+    file, err := os.Create(abs)
+    if err != nil {
+      return err
+    }
+    defer file.Close()
+    return nil
+  }
+  ```
+
+test "rank976: Go checkout writer removes then exclusively creates replacement"
+  lang go
+  file lfs/gitfilter_smudge.go
+  reject VYQL-PATH-051
+  reject_review code.HardlinkedFileOverwriteWithoutClobber
+  code
+  ```
+  package lfs
+
+  import (
+    "os"
+    "path/filepath"
+  )
+
+  func SmudgeToFile(filename string) error {
+    var mode os.FileMode = 0666
+    if stat, _ := os.Lstat(filename); stat != nil && stat.Mode().IsRegular() {
+      mode = stat.Mode().Perm()
+    }
+    abs, err := filepath.Abs(filename)
+    if err != nil {
+      return err
+    }
+    if err := os.Remove(abs); err != nil && !os.IsNotExist(err) {
+      return err
+    }
+    file, err := os.OpenFile(abs, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+    if err != nil {
+      return err
+    }
+    defer file.Close()
+    return nil
+  }
+  ```

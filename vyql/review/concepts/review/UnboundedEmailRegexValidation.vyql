@@ -1,0 +1,8 @@
+module code;
+
+review code.UnboundedEmailRegexValidation {
+  category: resource
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review email validation regexes for maximum input length checks before matching attacker-controlled strings"
+}

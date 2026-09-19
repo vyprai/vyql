@@ -1,0 +1,39 @@
+module bindings.go.deserialization;
+
+// Go decodes into a caller-declared type: the payload cannot select the type, no
+// constructor or finaliser runs during decoding, and there is no gadget-chain
+// surface. Decoding through these calls neutralises deserialization abuse on the
+// path, so a flow that passes through one is covered.
+//
+// Exact path match, so this never covers encoding/gob. Gob does register types
+// and decode into interface values, which is the one Go decoder with a real
+// type-confusion story.
+binding jsonUnmarshalIsSafeDeserialization {
+  query pattern callExpr where callee.path == "json.Unmarshal"
+  emit check core.SafeDeserialization at args[0] {
+    covers path {
+      from: args[0]
+      to: call
+    }
+  }
+}
+
+binding jsonDecoderDecodeIsSafeDeserialization {
+  query pattern callExpr where callee.path == "json.NewDecoder.Decode"
+  emit check core.SafeDeserialization at args[0] {
+    covers path {
+      from: args[0]
+      to: call
+    }
+  }
+}
+
+binding yamlUnmarshalIsSafeDeserialization {
+  query pattern callExpr where callee.path == "yaml.Unmarshal"
+  emit check core.SafeDeserialization at args[0] {
+    covers path {
+      from: args[0]
+      to: call
+    }
+  }
+}

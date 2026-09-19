@@ -1,0 +1,9 @@
+module bindings.dart.generated.m71ad2569;
+
+binding filePathAccess0 {
+  requires {
+    dependency("rive")
+  }
+  query pattern callExpr where callee.method == "createState"
+  emit sink code.FilePathAccess at args[0]
+}

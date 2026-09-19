@@ -1,0 +1,34 @@
+module bindings.rust.unapproved_login_artifact_authentication;
+
+// A passwordless login artifact is created at the requester's initiative:
+// the requester names the account and holds the access code that identifies
+// the request, so the artifact's shared secret alone authenticates the
+// requester to the artifact, never the account holder to the server. The
+// account holder's recorded approval -- and the account the artifact
+// belongs to -- is what turns it into a credential, which is why the
+// approval endpoint writes approved and user_uuid and the login path must
+// read them.
+//
+// The AuthRequest model publishes every atom of the flow this recognises:
+// AuthRequest::find_by_uuid resolves the stored request from a
+// request-supplied identifier, check_access_code verifies the shared code,
+// and check_valid_password is the primary credential check the artifact
+// branch replaces. What is matched here is the login function -- the one
+// that carries the primary credential check -- resolving the artifact and
+// verifying its code while never reading the artifact's approval or owner
+// fields. The atoms are the model's own names, answerable to the flow's
+// documentation rather than to any one revision, and two non-login
+// consumers stay unreported: the polling endpoint that answers the
+// requesting device with the artifact's own state carries no primary
+// credential check, and the approval endpoint writes the state the login
+// must read.
+//
+// The judgement lives in the pack rule; this binding only recognises the
+// atoms. Every clause is an exact call token or a selector match over the
+// consuming function's own context, so prose in a comment satisfies neither
+// side and a sibling function's approval read does not clear the login.
+
+binding unapprovedLoginArtifactAuthentication {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["find_by_uuid"] and node.context.call in ["check_access_code"] and node.context.call in ["check_valid_password"] and not (containsAny(node.context.selector, ["approved", "user_uuid"]))
+  emit issue code.UnapprovedLoginArtifactAuthentication at node
+}

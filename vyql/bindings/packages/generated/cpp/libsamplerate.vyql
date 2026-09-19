@@ -1,0 +1,17 @@
+module bindings.cpp.generated.m06e2f9a0;
+
+binding userControlledData0 {
+  requires {
+    dependency("libsamplerate")
+  }
+  query pattern callExpr where callee.method == "src_process"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("libsamplerate")
+  }
+  query pattern callExpr where callee.method == "src_simple"
+  emit source core.UserControlledData at call.result
+}

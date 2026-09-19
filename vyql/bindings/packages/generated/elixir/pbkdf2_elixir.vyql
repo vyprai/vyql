@@ -1,0 +1,17 @@
+module bindings.elixir.generated.mbf3d8276;
+
+binding weakHash0 {
+  requires {
+    dependency("pbkdf2_elixir")
+  }
+  query pattern callExpr where callee.method == "Pbkdf2.hash_pwd_salt"
+  emit issue code.WeakHash at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("pbkdf2_elixir")
+  }
+  query pattern callExpr where callee.method == "Pbkdf2.verify_pass"
+  emit issue code.WeakHash at call
+}

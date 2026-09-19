@@ -1,0 +1,10 @@
+module bindings.javascript.generated.m0be89dd3;
+
+binding regexCompile0 {
+  requires {
+    dependency("regexpu-core")
+  }
+  query pattern callExpr where callee.method == "rewritePattern"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}

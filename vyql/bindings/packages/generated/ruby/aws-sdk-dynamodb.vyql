@@ -1,0 +1,441 @@
+module bindings.ruby.generated.m47da9b45;
+
+binding nosqlQuery0 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "batch_execute_statement"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery1 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "batch_get_item"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery2 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "batch_write_item"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery3 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "create_backup"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery4 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "create_global_table"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery5 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "create_table"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery6 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "delete_backup"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery7 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "delete_item"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery8 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "delete_resource_policy"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery9 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "delete_table"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery10 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_backup"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery11 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_continuous_backups"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery12 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_contributor_insights"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery13 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_endpoints"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery14 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_export"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery15 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_global_table"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery16 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_global_table_settings"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery17 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_import"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery18 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_kinesis_streaming_destination"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery19 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_limits"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery20 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_table"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery21 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_table_replica_auto_scaling"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery22 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "describe_time_to_live"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery23 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "disable_kinesis_streaming_destination"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery24 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "enable_kinesis_streaming_destination"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery25 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "execute_statement"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery26 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "execute_transaction"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery27 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "export_table_to_point_in_time"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery28 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "get_item"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery29 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "get_resource_policy"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery30 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "list_backups"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery31 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "list_contributor_insights"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery32 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "list_exports"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery33 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "list_global_tables"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery34 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "list_imports"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery35 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "list_tables"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery36 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "list_tags_of_resource"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery37 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "put_item"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery38 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "put_resource_policy"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery39 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery40 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "restore_table_from_backup"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery41 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "restore_table_to_point_in_time"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery42 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "scan"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery43 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "tag_resource"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery44 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "transact_get_items"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery45 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "transact_write_items"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery46 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "untag_resource"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery47 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "update_continuous_backups"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery48 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "update_contributor_insights"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery49 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "update_global_table"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery50 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "update_global_table_settings"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery51 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "update_item"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery52 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "update_table"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery53 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "update_table_replica_auto_scaling"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding nosqlQuery54 {
+  requires {
+    dependency("aws-sdk-dynamodb")
+  }
+  query pattern callExpr where callee.method == "update_time_to_live"
+  emit sink code.NosqlQuery at args[0]
+}

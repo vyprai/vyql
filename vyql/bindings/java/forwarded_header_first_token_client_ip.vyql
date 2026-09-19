@@ -1,0 +1,39 @@
+module bindings.java.forwarded_header_first_token_client_ip;
+
+// `X-Forwarded-For` is a list a proxy *appends* to: each hop adds the address
+// it received the request from, so the entries left of the one the nearest
+// trusted proxy wrote are whatever the client chose to send. RFC 7239 §7.1
+// and every reverse proxy's forwarding note say so, and the servlet-spec
+// counterpart of the same computation -- `HttpServletRequest.getRemoteAddr()`
+// -- is documented as the address the *container* observed on the connection.
+//
+// A method that reads a forwarding header (`X-Forwarded-For`, `X-Real-IP`,
+// `Client-IP` and their kin) and returns its *first* comma-separated entry
+// therefore hands back a client-chosen string where its callers expect the
+// peer's address. Feeding that to an IP allowlist, an ACL scheme or any
+// "is this host local" decision lets anyone set `X-Forwarded-For: 127.0.0.1`
+// and be treated as local. The two spellings of the leftmost read that
+// Java code actually uses are `String.split(",")[0]` (chained, or into a
+// local that is then indexed `[0]`) and `new StringTokenizer(v, ",")`
+// followed by a single `nextToken()`.
+//
+// The safe forms are excluded structurally, not by name. Walking the list
+// from the right -- the documented remedy, indexing the *last* split entry
+// or iterating a tokenizer to its end -- produces no `[0]` index token and
+// carries the iteration calls `hasMoreTokens`/`hasMoreElements`, which a
+// single-shot first-token read never makes. And a deployment that opts out
+// of header trust entirely reads a boolean system property through
+// `Boolean.getBoolean`, the JDK's documented boolean-system-property gate;
+// such a gated method returns the transport peer for the header path and is
+// not flagged. The header name is matched in either spelling a codebase
+// spells it -- an inline string literal or a named constant referenced at
+// the call -- because both leave the same text in the method.
+binding forwardedHeaderFirstTokenClientIpSplit {
+  query pattern presenceNode where node.scope == "function" and node.context.call in ["getHeader"] and containsAny(node.token, ["X-Forwarded-For", "x-forwarded-for", "X_FORWARDED_FOR", "XForwardedFor", "xForwardedFor", "FORWARDED_FOR", "forwarded_for", "X-Real-IP", "x-real-ip", "X_REAL_IP", "XRealIP", "xRealIp", "Client-IP", "client-ip", "True-Client-IP", "CF-Connecting-IP", "Fastly-Client-IP"]) and containsAny(node.context.call, ["split"]) and containsAny(node.context.index, ["[0]"]) and not (node.context.call contains "getBoolean")
+  emit issue code.ProxyClientIpSpoofingBypass at node
+}
+
+binding forwardedHeaderFirstTokenClientIpTokenizer {
+  query pattern presenceNode where node.scope == "function" and node.context.call in ["getHeader"] and containsAny(node.token, ["X-Forwarded-For", "x-forwarded-for", "X_FORWARDED_FOR", "XForwardedFor", "xForwardedFor", "FORWARDED_FOR", "forwarded_for", "X-Real-IP", "x-real-ip", "X_REAL_IP", "XRealIP", "xRealIp", "Client-IP", "client-ip", "True-Client-IP", "CF-Connecting-IP", "Fastly-Client-IP"]) and containsAny(node.context.callPath, ["StringTokenizer"]) and containsAny(node.context.call, ["nextToken"]) and not (containsAny(node.context.call, ["getBoolean", "hasMoreTokens", "hasMoreElements"]))
+  emit issue code.ProxyClientIpSpoofingBypass at node
+}

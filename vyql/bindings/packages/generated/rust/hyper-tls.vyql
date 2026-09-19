@@ -1,0 +1,9 @@
+module bindings.rust.generated.m96d022c4;
+
+binding networkConnect0 {
+  requires {
+    dependency("hyper-tls")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.NetworkConnectSink at args[0]
+}

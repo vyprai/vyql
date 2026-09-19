@@ -1,0 +1,37 @@
+module bindings.go.exiftoolLineProtocolTag;
+
+// go-exiftool drives the exiftool process with its `-stay_open True -@ -`
+// argument-file mode: `Exiftool.WriteMetadata` writes every queued argument
+// to the process stdin as its own line (`fmt.Fprintln(e.stdin, "-"+k+"="+v)`
+// in the library), and a `-execute` line ends the batch. The tag name given
+// to `FileMetadata.SetString`/`SetStrings`/`SetInt`/`SetFloat` therefore is
+// not a label attached to a value -- it becomes half of one argv line, so a
+// newline inside it ends the argument and whatever follows is read as an
+// argument of its own, an exiftool option such as `-if` with a Perl
+// expression (CWE-88). The same holds for the value half; the tag is bound
+// here because it is protocol syntax the way a channel name or an IMAP
+// attribute is, while the value is the document content the write exists to
+// carry.
+//
+// The tag is bound as a line-protocol command write, which reports when
+// untrusted data reaches the argument, and as a command-option review when a
+// function forwards into the setters with no character restriction in sight.
+// The review route is what reaches the shape as it is written in practice --
+// iterating a caller-supplied map and dispatching on the value's type inside
+// a type switch, whose arms the Go frontend does not lower at all -- so the
+// taint route stays dead on that spelling until the type-switch lowering gap
+// is closed. The restriction is recognised in whichever form the standard
+// library spells it: an anchored pattern (`MatchString`), a forbidden-set
+// test (`strings.Contains`, `strings.Index`), a strip (`strings.Replace`,
+// `strings.Map`, `strings.Trim`). Only the function the setters sit in is
+// searched, so a restriction applied by the caller leaves the flag standing.
+
+binding exiftoolTagKeyLineProtocolWrite {
+  query pattern callExpr where callee.method in ["SetString", "SetStrings", "SetInt", "SetFloat"] and callee.receiver.type == "exiftool.FileMetadata"
+  emit sink code.LineProtocolCommandWrite at args[0]
+}
+
+binding exiftoolTagKeyWithoutCharacterRestriction {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.call in ["SetString", "SetStrings", "SetInt", "SetFloat"] and node.context.callPath contains "WriteMetadata" and not containsAny(node.context.callPath, ["MatchString", "strings.Contains", "strings.Index", "strings.Replace", "strings.Map", "strings.Trim"])
+  emit issue code.CommandOptionInjection at node
+}

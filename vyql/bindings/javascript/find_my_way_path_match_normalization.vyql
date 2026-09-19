@@ -1,0 +1,65 @@
+module bindings.javascript.find_my_way_path_match_normalization;
+
+// find-my-way is the router Fastify dispatches with, and it does not match a
+// request path verbatim. Four documented options change the string it matches:
+// `ignoreDuplicateSlashes` collapses `//` runs, `ignoreTrailingSlash` drops a
+// final `/`, `caseSensitive: false` lower-cases the path, and
+// `useSemicolonDelimiter` cuts the path at the first `;`. Percent-decoding is
+// the last step, reached through `safeDecodeURI(url, useSemicolonDelimiter)`
+// exported from `find-my-way/lib/url-sanitizer` — the decoder alone, with the
+// delimiter decision passed in.
+//
+// Anything that decides for itself whether a request belongs to a registered
+// route has to reproduce that whole pipeline, because the router's answer is
+// what actually runs. Connect-style middleware engines do exactly this: they
+// compile each registered path to a regular expression and test the incoming
+// URL against it to decide whether the middleware runs or is skipped. An engine
+// that calls `safeDecodeURI` and stops has implemented only the last step, so it
+// disagrees with the router on every path the four options normalize —
+// `/a//b`, `/a/b/`, `/A/B` and `/a/b;x=1` are all dispatched to the handler
+// registered at `/a/b` while the middleware's regular expression declines them.
+//
+// The consequence is not a failed request. The middleware is silently skipped
+// and the handler runs unguarded, so an authentication, authorization, CSRF or
+// rate-limiting middleware registered for a route is bypassed by respelling the
+// path. No credential and no application bug are involved: the attacker is any
+// client that can reach the route.
+//
+// So the binding reads three facts out of the matching function and negates a
+// fourth:
+//
+//   * `call_path:safeDecodeURI` — the function canonicalizes with find-my-way's
+//     decoder, which is what marks it as reproducing the router's view of the
+//     path rather than parsing a URL for some other purpose;
+//   * `call:exec` or `call:test` — and tests the result against a regular
+//     expression, which is the dispatch decision;
+//   * a `req.url` / `req.originalUrl` selector — on the request's own path;
+//   * and no read of `ignoreDuplicateSlashes`, `ignoreTrailingSlash`,
+//     `caseSensitive` or `useSemicolonDelimiter`, the four options that decide
+//     what the router matched.
+//
+// The negation names the router's documented options, not any particular
+// remediation. Both routes out of the defect satisfy it: normalizing inline
+// before the decode leaves the option reads in the matching function, and
+// moving the whole canonicalization into a helper takes `safeDecodeURI` out of
+// it, so the positive conjunct no longer holds. Neither a helper's name nor the
+// property the configuration is read from is named here, because those differ
+// between the two engines that carry this shape.
+//
+// The option names are read from `selector:` tokens, which are member accesses
+// derived from the AST, so a comment naming an option cannot stand in for a
+// read of it.
+//
+// One cost, inherent to the way a JavaScript function context inherits the
+// tokens of the functions nested inside it: an engine whose matching closure
+// sits inside a factory function reports on each enclosing scope as well as on
+// the closure itself. The extra rows point at the same defect.
+binding fmwPathMatchNormalization {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and node.context.callPath == "safeDecodeURI"
+    and node.context.call in ["exec", "test"]
+    and containsAny(node.context.selector, ["req.originalUrl", "req.url", "request.originalUrl", "request.url"])
+    and not containsAny(node.context.selector, ["ignoreDuplicateSlashes", "ignoreTrailingSlash", "caseSensitive", "useSemicolonDelimiter"])
+  emit issue code.MiddlewarePathMatchNormalizationMismatch at node
+}

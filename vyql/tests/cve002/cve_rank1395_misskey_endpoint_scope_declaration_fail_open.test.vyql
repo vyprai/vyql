@@ -1,0 +1,311 @@
+# Rank 1395 / CVE-2023-52139 (GHSA-7pxq-6xx9-xpgm, CWE-285):
+# misskey-dev/misskey issues third-party applications OAuth-style access tokens
+# whose granted scopes are a list of permission strings (`read:account`,
+# `write:notes`, ...), and each API endpoint declares the one scope it requires in
+# its own descriptor as `meta.kind`. `ApiCallService.call` is the single place that
+# enforces the pairing, and it enforced it like this
+# (packages/backend/src/server/api/ApiCallService.ts:333 at c96bc36f^):
+#
+#   if (token && ep.meta.kind && !token.permission.some(p => p === ep.meta.kind)) {
+#     throw new ApiError({ code: 'PERMISSION_DENIED', ... });
+#   }
+#
+# The endpoint's own requirement declaration is a *conjunct of the guard that
+# enforces it*. An endpoint that declares no `kind` therefore skips scope
+# enforcement entirely, and the preceding guards in the same method only establish
+# that *a user* is authenticated (`requireCredential`) or holds a role
+# (`requireModerator` / `requireAdmin`) -- never that the application acting on
+# that user's behalf is granted anything. So any third-party app token, whatever
+# scopes the user actually approved, could call every privileged endpoint that
+# happened to omit `kind`: 70 of the 357 endpoint descriptors at c96bc36f^,
+# including `i/delete-account`, `i/update-email`, `i/revoke-token`,
+# `i/authorized-apps`, `i/move` and `i/import-following`. The weakness is not a
+# missing check. The check is present, correct, and conditioned on the presence of
+# the very policy field it consults -- an authorization decision that fails open
+# on an unset requirement.
+#
+# c96bc36f ("Merge pull request from GHSA-7pxq-6xx9-xpgm") closes it by denying
+# instead of skipping when the declaration is absent:
+#
+#   if (token && ((ep.meta.kind && !token.permission.some(p => p === ep.meta.kind))
+#     || (!ep.meta.kind && (ep.meta.requireCredential || ep.meta.requireModerator || ep.meta.requireAdmin)))) {
+#
+# and hardens three other surfaces of the same model: `IEndpointMeta` becomes a
+# discriminated union in which `requireCredential: true`, `requireModerator: true`
+# and `requireAdmin: true` each *imply* a `kind`, so the omission becomes a type
+# error; the admin scopes are split from two coarse values (`read:admin`,
+# `write:admin`) into 44 per-area ones; and the streaming endpoint, which had no
+# app-scope check at all, gains `if (app !== null && !app.permission.some(p => p
+# === 'read:account')) throw new AuthenticationError(...)`.
+#
+# The row is the GHSA merge commit, whose combined diff is readable, the
+# repository is correct, and the vulnerable guard is present verbatim at the
+# parent. No corpus correction; the recorded CWE-285 is right.
+#
+# What detects it now. The 1st pass held this rank on an engine gap: the JS
+# frontend recorded no relation between the sibling conjuncts of one `&&` chain,
+# so the guard's self-reference -- `ep.meta.kind` as both a bare conjunct and the
+# compared operand inside the negated membership test -- was inexpressible, and
+# every text-keyed candidate matched the patched file too, because the patched
+# condition still emits the vulnerable inner chain's own token verbatim. The
+# frontend now records that relation: `fail_open_policy_declaration_guard` holds
+# when one `&&` chain has a bare declared-field conjunct X and another conjunct
+# of the same chain is a negated membership call comparing against X, and no
+# operand of the same condition tests X's absence (`!X`, `X == null`,
+# `X === undefined`, `typeof X === 'undefined'`). The binding pairs the fact with the documented
+# permission-collection vocabulary (permission/permissions, scope/scopes, roles,
+# authorities, grants, privileges, claims, entitlements, capabilities,
+# accessRights) on the membership call itself, so it names neither misskey's
+# requirement field nor its collection field, and the fourth case below spells
+# the same weakness with neither of misskey's names.
+#
+# Measured on the motivating checkout, three `--cache off` runs per revision
+# under `--max-ram 6GB`: VYQL-AUTH-178 reports once at the parent, the
+# `ApiCallService.call` dispatcher itself, and zero times at the fix; 616
+# findings total at the parent against 615 at the fix, the difference being
+# exactly this report. A text-level sweep of the 209,314 JavaScript and
+# TypeScript files across the clone corpus finds the structural shape at 94
+# sites, of which one -- this guard -- carries a permission-collection receiver,
+# and scanned collateral trees that finish under the same bounds report none
+# (audiobookshelf, BookStack, vitest, brave-core, chatwoot, angular-cli, actual,
+# crater, dokan, orbit); mlflow, typo3, ChakraCore and espruino abort at the
+# 6GB ceiling, and genixcms, appsmith, autogpt and erxes pass the 180s timeout,
+# so those eight are unmeasured rather than zero.
+
+test "rank1395: an API dispatcher enforces an app token's scope only when the endpoint declares one, so a privileged endpoint that declares none skips the check"
+  lang javascript
+  file packages/backend/src/server/api/ApiCallService.ts
+  expect VYQL-AUTH-178
+  expect_review code.UndeclaredScopeSkipsEnforcement
+  code
+  ```
+  import type { IEndpoint } from './endpoints.js';
+
+  export class ApiCallService implements OnApplicationShutdown {
+    private async call(
+      ep: IEndpoint,
+      token: MiAccessToken | null,
+      user: MiLocalUser | null | undefined,
+      data: any,
+      file?: { name: string; path: string },
+    ) {
+      if (ep.meta.requireCredential && user == null) {
+        throw new ApiError({
+          message: 'Credential required.',
+          code: 'CREDENTIAL_REQUIRED',
+          kind: 'permission',
+          id: '1384574d-a912-4b81-8601-c7b1c4085df1',
+        });
+      }
+
+      if (token && ep.meta.secure) {
+        throw new ApiError({
+          message: 'The request requires an accessible credential.',
+          code: 'ACCESS_DENIED',
+          kind: 'permission',
+          id: '56f35758-7dd5-468b-8439-5d6fb8ec9b8e',
+        });
+      }
+
+      if (token && ep.meta.kind && !token.permission.some(p => p === ep.meta.kind)) {
+        throw new ApiError({
+          message: 'Your app does not have the necessary permissions to use this endpoint.',
+          code: 'PERMISSION_DENIED',
+          kind: 'permission',
+          id: '1370e5b7-d4eb-4566-bb1d-7748ee6a1838',
+        });
+      }
+
+      return await ep.exec(data, user, token, file, request.ip, request.headers);
+    }
+  }
+  ```
+
+test "rank1395: the same dispatcher denying an app token outright when a privileged endpoint declares no required scope"
+  lang javascript
+  file packages/backend/src/server/api/ApiCallService.ts
+  reject VYQL-AUTH-178
+  reject_review code.UndeclaredScopeSkipsEnforcement
+  code
+  ```
+  import type { IEndpoint } from './endpoints.js';
+
+  export class ApiCallService implements OnApplicationShutdown {
+    private async call(
+      ep: IEndpoint,
+      token: MiAccessToken | null,
+      user: MiLocalUser | null | undefined,
+      data: any,
+      file?: { name: string; path: string },
+    ) {
+      if (ep.meta.requireCredential && user == null) {
+        throw new ApiError({
+          message: 'Credential required.',
+          code: 'CREDENTIAL_REQUIRED',
+          kind: 'permission',
+          id: '1384574d-a912-4b81-8601-c7b1c4085df1',
+        });
+      }
+
+      if (token && ep.meta.secure) {
+        throw new ApiError({
+          message: 'The request requires an accessible credential.',
+          code: 'ACCESS_DENIED',
+          kind: 'permission',
+          id: '56f35758-7dd5-468b-8439-5d6fb8ec9b8e',
+        });
+      }
+
+      if (token && ((ep.meta.kind && !token.permission.some(p => p === ep.meta.kind))
+        || (!ep.meta.kind && (ep.meta.requireCredential || ep.meta.requireModerator || ep.meta.requireAdmin)))) {
+        throw new ApiError({
+          message: 'Your app does not have the necessary permissions to use this endpoint.',
+          code: 'PERMISSION_DENIED',
+          kind: 'permission',
+          id: '1370e5b7-d4eb-4566-bb1d-7748ee6a1838',
+        });
+      }
+
+      return await ep.exec(data, user, token, file, request.ip, request.headers);
+    }
+  }
+  ```
+
+test "rank1395: naming the undeclared case through a null comparison also denies"
+  lang javascript
+  file packages/backend/src/server/api/ApiCallService.ts
+  reject VYQL-AUTH-178
+  reject_review code.UndeclaredScopeSkipsEnforcement
+  code
+  ```
+  import type { IEndpoint } from './endpoints.js';
+
+  export class ApiCallService implements OnApplicationShutdown {
+    private async call(ep: IEndpoint, token: MiAccessToken | null, data: any) {
+      if (token && ((ep.meta.kind && !token.permission.some(p => p === ep.meta.kind))
+        || (ep.meta.kind == null && ep.meta.requireCredential))) {
+        throw new ApiError({
+          message: 'Your app does not have the necessary permissions to use this endpoint.',
+          code: 'PERMISSION_DENIED',
+          kind: 'permission',
+          id: '1370e5b7-d4eb-4566-bb1d-7748ee6a1838',
+        });
+      }
+
+      return await ep.exec(data, token);
+    }
+  }
+  ```
+
+test "rank1395: naming the undeclared case through the strict undefined comparison also denies"
+  lang javascript
+  file packages/backend/src/server/api/ApiCallService.ts
+  reject VYQL-AUTH-178
+  reject_review code.UndeclaredScopeSkipsEnforcement
+  code
+  ```
+  import type { IEndpoint } from './endpoints.js';
+
+  export class ApiCallService implements OnApplicationShutdown {
+    private async call(ep: IEndpoint, token: MiAccessToken | null, data: any) {
+      if (token && ((ep.meta.kind && !token.permission.some(p => p === ep.meta.kind))
+        || (ep.meta.kind === undefined && ep.meta.requireCredential))) {
+        throw new ApiError({
+          message: 'Your app does not have the necessary permissions to use this endpoint.',
+          code: 'PERMISSION_DENIED',
+          kind: 'permission',
+          id: '1370e5b7-d4eb-4566-bb1d-7748ee6a1838',
+        });
+      }
+
+      return await ep.exec(data, token);
+    }
+  }
+  ```
+
+test "rank1395: the same shape under other frameworks' names, with the requirement a route field and the grant a credentials scope list"
+  lang javascript
+  file packages/backend/src/router/dispatch.ts
+  expect VYQL-AUTH-178
+  expect_review code.UndeclaredScopeSkipsEnforcement
+  code
+  ```
+  export function requireRouteScope(route: Route, credentials: AccessToken | null) {
+    if (credentials && route.meta.scope && !credentials.scopes.includes(route.meta.scope)) {
+      throw new InsufficientScopeError(`token lacks ${route.meta.scope}`);
+    }
+
+    if (credentials && route.meta.audience && !credentials.claims.has(route.meta.audience)) {
+      throw new AudienceMismatchError(route.meta.audience);
+    }
+  }
+  ```
+
+test "rank1395: a membership test against a fixed literal requirement is an ordinary constant check"
+  lang javascript
+  file packages/backend/src/server/api/StreamingApiServerService.ts
+  reject VYQL-AUTH-178
+  reject_review code.UndeclaredScopeSkipsEnforcement
+  code
+  ```
+  export class StreamingApiServerService {
+    private attach(server: http.Server): void {
+      this.#wss = new WebSocket.Server({ noServer: true });
+
+      server.on('upgrade', async (request, socket, head) => {
+        const q = new URL(request.url!, `http://${request.headers.host}`).searchParams;
+        const token = q.get('i');
+
+        let user: MiLocalUser | null = null;
+        let app: MiAccessToken | null = null;
+
+        try {
+          [user, app] = await this.authenticateService.authenticate(token);
+
+          if (app !== null && !app.permission.some(p => p === 'read:account')) {
+            throw new AuthenticationError('Your app does not have necessary permissions to use websocket API.');
+          }
+        } catch (e) {
+          if (e instanceof AuthenticationError) {
+            socket.write([
+              'HTTP/1.1 401 Unauthorized',
+              'WWW-Authenticate: Bearer realm="Misskey", error="invalid_token"',
+            ].join('\r\n') + '\r\n\r\n');
+          } else {
+            socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+          }
+          socket.destroy();
+          return;
+        }
+
+        this.#wss.handleUpgrade(request, socket, head, (ws) => {
+          this.#wss.emit('connection', ws, request, { user, app });
+        });
+      });
+    }
+  }
+  ```
+
+test "rank1395: a guarded allowlist that is not a permission collection stays an input validation"
+  lang javascript
+  file packages/backend/src/server/api/UserService.ts
+  reject VYQL-AUTH-178
+  reject_review code.UndeclaredScopeSkipsEnforcement
+  code
+  ```
+  export class UserService {
+    public async update(updatePayload: { type?: string; permissions?: object }, user: { permissions: { librariesAccessible: string[] } }) {
+      if (updatePayload.permissions && typeof updatePayload.permissions !== 'object') {
+        throw new ValidationError('permissions must be an object');
+      }
+
+      if (updatePayload.type && !Database.userModel.accountTypes.includes(updatePayload.type)) {
+        throw new ValidationError('unknown account type');
+      }
+
+      if (user.permissions.librariesAccessible.join(',') !== '') {
+        this.logger.info('libraries accessible changed');
+      }
+    }
+  }
+  ```

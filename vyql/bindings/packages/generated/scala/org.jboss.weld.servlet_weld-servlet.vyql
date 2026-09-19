@@ -1,0 +1,17 @@
+module bindings.scala.generated.m11946b9b;
+
+binding codeEval0 {
+  requires {
+    dependency("org.jboss.weld.servlet:weld-servlet")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("org.jboss.weld.servlet:weld-servlet")
+  }
+  query pattern callExpr where callee.method == "define"
+  emit sink code.CodeEval at args[0]
+}

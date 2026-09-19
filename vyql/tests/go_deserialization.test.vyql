@@ -1,0 +1,62 @@
+# CWE-502 describes decoding that can instantiate attacker-chosen types or run
+# code while decoding: Java ObjectInputStream, Python pickle, PHP unserialize.
+#
+# Go decodes into a caller-declared type. The payload cannot select the type, no
+# constructor or finaliser runs during decoding, and there is no gadget chain, so
+# no input makes this CWE-502 whatever the bytes contain.
+
+test "go json.Unmarshal into a typed struct is not unsafe deserialization"
+  lang go
+  file handler.go
+  reject VYQL-DESER-001
+  code
+  ```
+  package main
+
+  import (
+      "encoding/json"
+      "net/http"
+  )
+
+  type payload struct {
+      Name string `json:"name"`
+  }
+
+  func handle(w http.ResponseWriter, r *http.Request) {
+      body := make([]byte, r.ContentLength)
+      _, _ = r.Body.Read(body)
+      var p payload
+      if err := json.Unmarshal(body, &p); err != nil {
+          http.Error(w, "bad", http.StatusBadRequest)
+          return
+      }
+      _ = p
+  }
+  ```
+
+test "go yaml.Unmarshal into a typed struct is not unsafe deserialization"
+  lang go
+  file config.go
+  reject VYQL-DESER-001
+  code
+  ```
+  package main
+
+  import (
+      "net/http"
+
+      "gopkg.in/yaml.v3"
+  )
+
+  type conf struct {
+      Mode string `yaml:"mode"`
+  }
+
+  func load(w http.ResponseWriter, r *http.Request) {
+      body := make([]byte, r.ContentLength)
+      _, _ = r.Body.Read(body)
+      var c conf
+      _ = yaml.Unmarshal(body, &c)
+      _ = c
+  }
+  ```

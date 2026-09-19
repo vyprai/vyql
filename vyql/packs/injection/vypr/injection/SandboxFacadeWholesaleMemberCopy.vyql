@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule SandboxFacadeWholesaleMemberCopy {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_913]
+    id: "VYQL-INJ-262"
+    severity: high
+  }
+  issue code.SandboxFacadeWholesaleMemberCopy as facade
+}

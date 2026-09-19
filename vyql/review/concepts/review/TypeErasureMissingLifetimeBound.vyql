@@ -1,0 +1,7 @@
+module code;
+
+review code.TypeErasureMissingLifetimeBound {
+  category: memory
+  kind: attention
+  text: "review whether this type-erasing pointer cast can outlive its pointee; bound the erased parameter by a lifetime in the signature"
+}

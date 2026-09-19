@@ -1,0 +1,47 @@
+module bindings.ruby.nokogiri_attribute_allowlist_without_value_rewrite;
+
+// An HTML sanitizer's element cleaner is, at its core, a pass over a parsed
+// node's attributes that keeps some and removes the rest. Nokogiri documents
+// exactly the calls such a pass needs: Node#attribute_nodes returns the
+// node's attribute objects, and Node#unlink (aliased #remove) detaches one
+// from the document -- for an attribute, deleting it. A pass whose own scope
+// enumerates attribute_nodes, removes with unlink/#remove, and reads a
+// #value is an attribute allowlist filter that keeps attributes on their
+// content, whatever the allowlist is keyed on.
+//
+// What that pass owes the values it keeps is the review question. Nokogiri
+// is built on libxml2, and libxml2 >= 2.9.2 deliberately leaves comment
+// sequences unescaped inside the attributes it serialises, to preserve
+// server-side includes; a kept href or src carrying `<!--" onmouseover=...-->`
+// therefore serialises with its double quote intact, re-opens the attribute,
+// and injects attributes the allowlist had just removed. A filter that
+// rewrites none of the values it keeps has left them exactly as the parser
+// produced them, and whether the serializer escapes them is a property of
+// the XML library underneath, not of this code. The pass that does take
+// responsibility spells it with Ruby's string-substitution primitives or
+// Nokogiri's documented writes: sanitize's remediation rewrites the
+// URL-bearing values it keeps through attr.value = attr.value.gsub(/[ "]/,
+// ...), and loofah's CVE-2018-8048 twin force_correct_attribute_escaping! is
+// the same rewrite beside an attr_node.value = attr_node.value.gsub(...) in
+// its own scrub -- both clear this binding.
+//
+// The anchor is the attribute_nodes enumeration call itself rather than a
+// function-scope presence node: Ruby's analysis.function.context statement
+// is emitted as a sibling of the method's FuncDef, so it carries no lexical
+// region and every scope filter over it degrades to file scope, which would
+// flag every method in a file that filters once. The call node carries the
+// method's region, which confines the scope-call conjuncts to the pass.
+//
+// Residual, both directions. A rewrite through a spelling outside the list
+// still flags: Nokogiri's own add_child_node_and_reparent_attrs re-adds each
+// removed attribute as node[attr_node.name] = attr_node.value, a write this
+// binding cannot credit, and is the one collateral finding per Nokogiri
+// tree. And a listed name called for an unrelated purpose silences the pass.
+binding nokogiriAttributeAllowlistWithoutValueRewrite {
+  query pattern presenceNode where node.kind == "call"
+    and node.method == "attribute_nodes"
+    and node.scopeCall.method in ["unlink", "remove"]
+    and node.scopeCall.method in ["value"]
+    and node.scopeCall.method not in ["gsub", "gsub!", "sub", "sub!", "tr", "tr!", "tr_s", "set_attribute", "escape", "escapeHTML", "url_encode", "encode_www_form_component"]
+  emit issue code.HtmlSanitizerLogicReview at node
+}

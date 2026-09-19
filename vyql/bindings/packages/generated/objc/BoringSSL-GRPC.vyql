@@ -1,0 +1,9 @@
+module bindings.objc.generated.m4164fa66;
+
+binding deserialization0 {
+  requires {
+    dependency("BoringSSL-GRPC")
+  }
+  query pattern callExpr where callee.method == "CRYPTO_atomic_load_u32"
+  emit sink code.Deserialization at args[0]
+}

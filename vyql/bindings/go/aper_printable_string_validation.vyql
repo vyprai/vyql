@@ -1,0 +1,23 @@
+module bindings.go.aper_printable_string_validation;
+
+// ASN.1 X.680 37.4 constrains PrintableString to a fixed alphabet: letters,
+// digits, space and ' ( ) + , - . / : = ? -- every other byte is a decoding
+// violation. A decoder that fills a reflect.String destination straight from
+// parseOctetString bytes performs no such validation: any byte sequence,
+// control characters included, becomes a Go string callers trust as
+// protocol-validated. The vulnerable decoder's own trace message names the
+// shortcut ("Decoding PrintableString using Octet String decoding method").
+//
+// The binding asks for the unvalidated shape: a function whose body decodes
+// via parseOctetString while filling a reflect String kind, with no
+// alphabet-checking call anywhere in the body. The fixed decoder routes
+// through a validating wrapper (parsePrintableString); any equivalent
+// validation loop satisfies the negation the same way.
+binding aperPrintableStringUnvalidated8413 {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go"
+    and node.context.call contains "parseOctetString"
+    and node.context.callPath contains "parseOctetString"
+    and containsAny(node.context.call, ["SetString", "SetBytes", "SetUint", "SetBool"])
+    and not containsAny(node.context.call, ["parsePrintableString", "validatePrintable", "isPrintable", "checkPrintable"])
+  emit issue code.StructuredInputDecode at node
+}

@@ -1,0 +1,17 @@
+module bindings.scala.generated.m5dbdfc12;
+
+binding networkSend0 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "executeAsync"
+  emit sink code.NetworkSend at args[0]
+}

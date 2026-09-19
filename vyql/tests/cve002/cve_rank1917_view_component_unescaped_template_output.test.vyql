@@ -1,0 +1,303 @@
+# ViewComponent's markup reaches the page through one class: Base, whose
+# render entry dispatches the compiled template and returns the result
+# (CWE-79). Component authors write the markup -- `call` methods and template
+# files that interpolate request data, which is the documented way to author a
+# component -- and Base decides whether that output is escaped on the way out.
+# Before the fix, render_in returned the concatenation raw:
+#
+#   lib/view_component/base.rb
+#     if render?
+#       render_template_for(@__vc_variant).to_s + output_postamble
+#     else
+#       ""
+#     end
+#
+# so a component whose template interpolated a request value had that value
+# inserted into the page unescaped. The fixing commit c43d8bafa7 (the 2.x
+# backport) routes both halves through a shared helper that returns the text
+# untouched when it is html_safe? and otherwise wraps it in html_escape:
+#
+#     def maybe_escape_html(text)
+#       return text if request && !request.format.html?
+#       return text if text.blank?
+#       if text.html_safe?
+#         text
+#       else
+#         yield
+#         html_escape(text)
+#       end
+#     end
+#
+# Detected at class scope by
+# vyql/bindings/ruby/component_base_template_render_without_escaping.vyql
+# emitting code.UnescapedHtmlPresenter (VYQL-INJ-122): a Ruby class derived
+# from ActionView::Base whose body dispatches render_template_for and carries
+# no html_escape / escape_html / escapeHTML call. The class is the finest scope
+# that holds both halves, because the escape ships as a helper on the same
+# class rather than a call inside the render entry -- the entry's own call set
+# cannot carry the discriminator, and the remediated base still dispatches the
+# template renderer from the entry directly with the escape two helpers away
+# (that shape is the fourth case below, and it rejects).
+#
+# Measured on the real checkout, three --cache off runs per revision (timeout
+# 180, --max-ram 6GB): the parent of c43d8bafa7 reports one
+# code.UnescapedHtmlPresenter flag at lib/view_component/base.rb:18 and one
+# VYQL-INJ-122 row, against none on the fixed revision and none on the current
+# default branch (whose base.rb calls render_template_for(...).to_s inside
+# render_in itself and escapes in a sibling helper); every other row and flag
+# is identical across all three trees apart from pure line shifts. Before the
+# binding, both revisions reported the same 17 findings and 11 flags with
+# nothing on the render pipeline -- the only HtmlRender sink is the unrelated
+# render delegation at base.rb:202/207, which the fix does not touch.
+#
+# Precision. `render_template_for` occurs in no other clone in the corpus, and
+# the only other `< ActionView::Base` subclass in any clone is a Redmine test
+# helper with no template dispatch, which scans clean (3101 flags, none of
+# them this concept). The escape conjunct is the vocabulary the Ruby
+# core.HtmlEscape bindings already treat as an HTML escape, so a class that
+# escapes through ERB::Util.html_escape, Rack::Utils.escape_html or
+# CGI.escapeHTML is suppressed the same way as one escaping through the bare
+# ActionView spelling.
+#
+# Residuals, all false-negative except the first: a class escaping only
+# through ERB::Util's `h` alias or a `sanitize` call stays reported (`h` is too
+# short a needle to key a negation on, and `sanitize` strips rather than
+# escapes, with a name that collides with unrelated methods); the conjunct
+# asks whether the class escapes anywhere rather than whether it escapes the
+# render pipeline, so an escape in an unrelated method of the same class also
+# suppresses; and the finding lands on the class declaration rather than the
+# render method, because the render entry is not distinguishable at class
+# scope. `html_safe` marks a string trusted without escaping it and is
+# deliberately absent from the conjunct -- the remediated base uses it for the
+# default postamble while the escape itself is html_escape, and a class that
+# only marked strings trusted would still deserve the review (fifth case).
+#
+# verify_current_expected: fixed, case 1 expects and cases 2-5 reject.
+
+test "rank1917: the component base returns template output and postamble unescaped"
+  lang ruby
+  file lib/view_component/base.rb
+  expect VYQL-INJ-122
+  expect_review code.UnescapedHtmlPresenter
+  code
+  ```
+  module ViewComponent
+    class Base < ActionView::Base
+      def render_in(view_context, &block)
+        @view_context = view_context
+
+        @lookup_context ||= view_context.lookup_context
+
+        # For template variants (+phone, +desktop, etc.)
+        @__vc_variant ||= @lookup_context.variants.first
+
+        @__vc_render_in_block = block
+
+        before_render
+
+        if render?
+          render_template_for(@__vc_variant).to_s + output_postamble
+        else
+          ""
+        end
+      end
+
+      # Optional content to be returned after the rendered template.
+      #
+      # @return [String]
+      def output_postamble
+        ""
+      end
+    end
+  end
+  ```
+
+test "rank1917: the render entry routes template output through an escape helper"
+  lang ruby
+  file lib/view_component/base.rb
+  reject VYQL-INJ-122
+  reject_review code.UnescapedHtmlPresenter
+  code
+  ```
+  module ViewComponent
+    class Base < ActionView::Base
+      def render_in(view_context, &block)
+        @view_context = view_context
+
+        @lookup_context ||= view_context.lookup_context
+
+        @__vc_variant ||= @lookup_context.variants.first
+
+        @__vc_render_in_block = block
+
+        before_render
+
+        if render?
+          # Avoid allocating new string when output_postamble is blank
+          if output_postamble.blank?
+            safe_render_template_for(@__vc_variant).to_s
+          else
+            safe_render_template_for(@__vc_variant).to_s + safe_output_postamble
+          end
+        else
+          ""
+        end
+      end
+
+      def maybe_escape_html(text)
+        return text if request && !request.format.html?
+        return text if text.blank?
+
+        if text.html_safe?
+          text
+        else
+          yield
+          html_escape(text)
+        end
+      end
+
+      def safe_render_template_for(variant)
+        if compiler.renders_template_for_variant?(variant)
+          render_template_for(variant)
+        else
+          maybe_escape_html(render_template_for(variant)) do
+            Kernel.warn("WARNING: The #{self.class} component rendered HTML-unsafe output. The output will be automatically escaped, but you may want to investigate.")
+          end
+        end
+      end
+
+      def safe_output_postamble
+        maybe_escape_html(output_postamble) do
+          Kernel.warn("WARNING: The #{self.class} component was provided an HTML-unsafe postamble. The postamble will be automatically escaped, but you may want to investigate.")
+        end
+      end
+
+      def output_postamble
+        @@default_output_postamble ||= "".html_safe
+      end
+    end
+  end
+  ```
+
+test "rank1917: escaping through the CGI spelling suppresses the same way"
+  lang ruby
+  file lib/view_component/base.rb
+  reject VYQL-INJ-122
+  reject_review code.UnescapedHtmlPresenter
+  code
+  ```
+  module ViewComponent
+    class Base < ActionView::Base
+      def render_in(view_context, &block)
+        @view_context = view_context
+
+        before_render
+
+        if render?
+          safe_render_template_for(@__vc_variant).to_s + safe_output_postamble
+        else
+          ""
+        end
+      end
+
+      def safe_render_template_for(variant)
+        CGI.escapeHTML(render_template_for(variant))
+      end
+
+      def safe_output_postamble
+        CGI.escapeHTML(output_postamble)
+      end
+    end
+  end
+  ```
+
+test "rank1917: the base that dispatches the template from the entry itself but escapes in a helper rejects"
+  lang ruby
+  file lib/view_component/base.rb
+  reject VYQL-INJ-122
+  reject_review code.UnescapedHtmlPresenter
+  code
+  ```
+  module ViewComponent
+    class Base < ActionView::Base
+      def render_in(view_context, &block)
+        @view_context = view_context
+
+        before_render
+
+        if render?
+          inner = nil
+          around_rendered = around_render do
+            inner = render_template_for(@__vc_requested_details).to_s
+          end
+
+          rendered = if around_rendered.equal?(inner)
+            around_rendered
+          else
+            __vc_safe_around_render_output(around_rendered)
+          end
+
+          if output_preamble.blank? && output_postamble.blank?
+            rendered
+          else
+            __vc_safe_output_preamble + rendered + __vc_safe_output_postamble
+          end
+        else
+          "".html_safe
+        end
+      end
+
+      def __vc_maybe_escape_html(text)
+        return text if request && !request.format.html?
+        return text if text.blank?
+
+        if text.html_safe?
+          text
+        else
+          yield
+          html_escape(text)
+        end
+      end
+
+      def __vc_safe_output_postamble
+        __vc_maybe_escape_html(output_postamble) do
+          Kernel.warn("WARNING: The #{self.class} component was provided an HTML-unsafe postamble.")
+        end
+      end
+
+      def __vc_safe_output_preamble
+        __vc_maybe_escape_html(output_preamble) do
+          Kernel.warn("WARNING: The #{self.class} component was provided an HTML-unsafe preamble.")
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1917: marking the postamble trusted does not escape the template output"
+  lang ruby
+  file lib/view_component/base.rb
+  expect VYQL-INJ-122
+  expect_review code.UnescapedHtmlPresenter
+  code
+  ```
+  module ViewComponent
+    class Base < ActionView::Base
+      def render_in(view_context, &block)
+        @view_context = view_context
+
+        before_render
+
+        if render?
+          render_template_for(@__vc_variant).to_s + output_postamble
+        else
+          ""
+        end
+      end
+
+      def output_postamble
+        @@default_output_postamble ||= "".html_safe
+      end
+    end
+  end
+  ```

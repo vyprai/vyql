@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule FrappeLinkExpansionMissingReadPermission {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862, CWE_863]
+    id: "VYQL-AUTH-065"
+    severity: high
+  }
+  issue code.FrappeLinkExpansionMissingReadPermission as expansion
+}

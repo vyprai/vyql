@@ -1,0 +1,294 @@
+# Rank 1047 / CVE-2026-27211: cloud-hypervisor protected sector 0 of a raw
+# disk image against guest writes, but only for the write request type
+# (CWE-73). check_request in virtio-devices/src/block.rs guarded one arm:
+#
+#   if request_type == RequestType::Out && disable_sector0_writes && request.sector == 0 {
+#       return Err(ExecuteError::ReadOnly);
+#   }
+#
+# The protection is configured in vmm/src/device_manager.rs: when the operator
+# does not pass image_type and the detected type is Raw, disable_sector0_writes
+# is set, because an untyped raw file may hold an image header the host itself
+# parses. Discard and WriteZeroes carry their own sector numbers inside the
+# request payload, read later in Request::execute_async in block/src/lib.rs,
+# and nothing checked those, so a guest could still punch a hole at sector 0
+# or write zeroes over it and rewrite the header that decides how the host
+# interprets the image. The fix (a63315df54, 2 files, 11 added lines) threads
+# disable_sector0_writes into execute_async and rejects discard_sector == 0
+# and wz_offset == 0 there.
+#
+# ATTENTION, analysis gap, rechecked. Three --cache off whole-tree runs per
+# revision (timeout 180, --max-ram 6GB; the tree completes, no ceiling abort)
+# report 468 unique rule-at-location findings at the vulnerable revision and
+# 468 at the fixed one, identical sets apart from the eleven-line shift the
+# fix itself adds (VYQL-DOS-040 moves 585->586 and 613->620, the VYQL-MEM-006
+# rows shift likewise). The only rules reaching either file are VYQL-DOS-040
+# on the two data_addr.checked_add(8).unwrap() calls and VYQL-MEM-006 on
+# unrelated dereferences; the tree histogram is VYQL-MEM-006 411,
+# VYQL-DOS-040 36, VYQL-RACE-003 6, VYQL-CRY-001 6, VYQL-MEM-009 2,
+# VYQL-DOS-042 2 and one each of VYQL-PATH-088, VYQL-MEM-063, VYQL-MEM-015,
+# VYQL-MEM-014, VYQL-CRY-003 -- no authorization rule fires anywhere, and
+# vyql match on virtio-devices/src/block.rs labels nothing at all inside
+# check_request.
+#
+# The AST-derived identifier route was probed rather than assumed. A presence
+# binding on containsAny(node.context.identifier, ["RequestType::Discard"])
+# labels four functions at both revisions, and adding a negation on
+# disable_sector0_writes drops exactly the fixed execute_async (4 -> 3): that
+# is measurable discrimination, and it is the fixing commit's own layout. An
+# equally correct fix that rejects discard and write zeroes in check_request,
+# where the Out guard already lives, leaves execute_async without the flag and
+# reads as vulnerable to this clause; and punch_hole/write_zeroes on their own
+# name ten further functions here (the AsyncIo implementations, qcow cluster
+# maintenance, the tests), so the call carries no discrimination either. The
+# flag names a project configuration policy, not anything a library document
+# states, so the binding fails the genericity test the same way POOL_OP_ at
+# rank 1039 and smallscep.UpdateReq at rank 1040 do.
+#
+# What is missing is the relation already recorded for that family: a guard
+# covers one branch of a request-type dispatch and not the siblings that reach
+# the same effect. Here the guard and the unguarded paths sit in different
+# functions in different crates (virtio-devices validates, block executes), so
+# no function-scoped or impl-scoped Rust route reaches both sides, and the
+# cross-procedural control view the family entry describes is what would be
+# needed. No branch is wrong when read alone.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1047: the sector zero guard covers the write type only"
+  lang rust
+  file virtio-devices/src/block.rs
+  reject VYQL-AUTH-001
+  code
+  ```
+  impl BlockEpollHandler {
+      fn check_request(
+          features: u64,
+          request: &Request,
+          disable_sector0_writes: bool,
+      ) -> result::Result<(), ExecuteError> {
+          let request_type = request.request_type;
+          if (has_feature(features, VIRTIO_BLK_F_RO.into()))
+              && !(request_type == RequestType::In
+                  || request_type == RequestType::GetDeviceId
+                  || request_type == RequestType::Flush)
+          {
+              // For virtio spec compliance: a device MUST NOT write any data
+              // when VIRTIO_BLK_F_RO is offered.
+              return Err(ExecuteError::ReadOnly);
+          }
+
+          if request_type == RequestType::Out && disable_sector0_writes && request.sector == 0 {
+              return Err(ExecuteError::ReadOnly);
+          }
+
+          Ok(())
+      }
+
+      fn process_queue_submit(&mut self) -> Result<()> {
+          while let Some(mut desc_chain) = self.queue.pop_descriptor_chain(self.mem.memory()) {
+              let mut request = Request::parse(&mut desc_chain, self.access_platform.as_deref())
+                  .map_err(Error::RequestParsing)?;
+
+              if let Err(e) =
+                  Self::check_request(self.acked_features, &request, self.disable_sector0_writes)
+              {
+                  warn!("Request check failed: {request:x?} {e:?}");
+                  desc_chain
+                      .memory()
+                      .write_obj(VIRTIO_BLK_S_IOERR, request.status_addr)
+                      .map_err(Error::RequestStatus)?;
+                  queue
+                      .add_used(desc_chain.memory(), desc_chain.head_index(), 0)
+                      .map_err(Error::RequestStatus)?;
+                  continue;
+              }
+
+              let result = request.execute_async(
+                  desc_chain.memory(),
+                  self.disk_nsectors.load(Ordering::SeqCst),
+                  self.disk_image.as_mut(),
+                  &self.serial,
+                  desc_chain.head_index() as u64,
+              );
+          }
+
+          Ok(())
+      }
+  }
+  ```
+
+test "rank1047: discard and write zeroes read their own sectors and check nothing"
+  lang rust
+  file block/src/lib.rs
+  reject VYQL-AUTH-001
+  code
+  ```
+  impl Request {
+      pub fn execute_async<B: Bitmap + 'static>(
+          &mut self,
+          mem: &vm_memory::GuestMemoryMmap<B>,
+          disk_nsectors: u64,
+          disk_image: &mut dyn AsyncIo,
+          serial: &[u8],
+          user_data: u64,
+      ) -> result::Result<ExecuteAsync, ExecuteError> {
+          match self.request_type {
+              RequestType::Discard => {
+                  let (data_addr, data_len) = if self.data_descriptors.len() == 1 {
+                      (self.data_descriptors[0].0, self.data_descriptors[0].1)
+                  } else {
+                      return Err(ExecuteError::BadRequest(Error::TooManyDescriptors));
+                  };
+
+                  if data_len < 16 {
+                      return Err(ExecuteError::BadRequest(Error::DescriptorLengthTooSmall));
+                  }
+
+                  let mut discard_sector = [0u8; 8];
+                  let mut discard_num_sectors = [0u8; 4];
+                  mem.read_slice(&mut discard_sector, data_addr)
+                      .map_err(ExecuteError::Read)?;
+                  mem.read_slice(&mut discard_num_sectors, data_addr.checked_add(8).unwrap())
+                      .map_err(ExecuteError::Read)?;
+
+                  let discard_sector = u64::from_le_bytes(discard_sector);
+                  let discard_num_sectors = u32::from_le_bytes(discard_num_sectors);
+
+                  let discard_offset = discard_sector * SECTOR_SIZE;
+                  let discard_length = (discard_num_sectors as u64) * SECTOR_SIZE;
+
+                  disk_image
+                      .punch_hole(discard_offset, discard_length, user_data)
+                      .map_err(ExecuteError::AsyncPunchHole)?;
+              }
+              RequestType::WriteZeroes => {
+                  let (data_addr, data_len) = if self.data_descriptors.len() == 1 {
+                      (self.data_descriptors[0].0, self.data_descriptors[0].1)
+                  } else {
+                      return Err(ExecuteError::BadRequest(Error::TooManyDescriptors));
+                  };
+
+                  if data_len < 16 {
+                      return Err(ExecuteError::BadRequest(Error::DescriptorLengthTooSmall));
+                  }
+
+                  let mut wz_sector = [0u8; 8];
+                  let mut wz_num_sectors = [0u8; 4];
+                  mem.read_slice(&mut wz_sector, data_addr)
+                      .map_err(ExecuteError::Read)?;
+                  mem.read_slice(&mut wz_num_sectors, data_addr.checked_add(8).unwrap())
+                      .map_err(ExecuteError::Read)?;
+
+                  let wz_sector = u64::from_le_bytes(wz_sector);
+                  let wz_num_sectors = u32::from_le_bytes(wz_num_sectors);
+
+                  let wz_offset = wz_sector * SECTOR_SIZE;
+                  let wz_length = (wz_num_sectors as u64) * SECTOR_SIZE;
+
+                  disk_image
+                      .write_zeroes(wz_offset, wz_length, user_data)
+                      .map_err(ExecuteError::AsyncWriteZeroes)?;
+              }
+              RequestType::Unsupported(t) => return Err(ExecuteError::Unsupported(t)),
+              _ => {}
+          }
+
+          Ok(ExecuteAsync::default())
+      }
+  }
+  ```
+
+test "rank1047: fix threads the flag in and rejects sector zero on the discard path"
+  lang rust
+  file block/src/lib.rs
+  reject VYQL-AUTH-001
+  code
+  ```
+  impl Request {
+      pub fn execute_async<B: Bitmap + 'static>(
+          &mut self,
+          mem: &vm_memory::GuestMemoryMmap<B>,
+          disk_nsectors: u64,
+          disk_image: &mut dyn AsyncIo,
+          serial: &[u8],
+          disable_sector0_writes: bool,
+          user_data: u64,
+      ) -> result::Result<ExecuteAsync, ExecuteError> {
+          match self.request_type {
+              RequestType::Discard => {
+                  let mut discard_sector = [0u8; 8];
+                  let mut discard_num_sectors = [0u8; 4];
+                  mem.read_slice(&mut discard_sector, data_addr)
+                      .map_err(ExecuteError::Read)?;
+                  mem.read_slice(&mut discard_num_sectors, data_addr.checked_add(8).unwrap())
+                      .map_err(ExecuteError::Read)?;
+
+                  let discard_sector = u64::from_le_bytes(discard_sector);
+
+                  if discard_sector == 0 && disable_sector0_writes {
+                      return Err(ExecuteError::BadRequest(Error::InvalidOffset));
+                  }
+
+                  let discard_num_sectors = u32::from_le_bytes(discard_num_sectors);
+
+                  let discard_offset = discard_sector * SECTOR_SIZE;
+                  let discard_length = (discard_num_sectors as u64) * SECTOR_SIZE;
+
+                  disk_image
+                      .punch_hole(discard_offset, discard_length, user_data)
+                      .map_err(ExecuteError::AsyncPunchHole)?;
+              }
+              _ => {}
+          }
+
+          Ok(ExecuteAsync::default())
+      }
+  }
+  ```
+
+test "rank1047: fix rejects a zero offset on the write zeroes path"
+  lang rust
+  file block/src/lib.rs
+  reject VYQL-AUTH-001
+  code
+  ```
+  impl Request {
+      pub fn execute_async<B: Bitmap + 'static>(
+          &mut self,
+          mem: &vm_memory::GuestMemoryMmap<B>,
+          disk_nsectors: u64,
+          disk_image: &mut dyn AsyncIo,
+          serial: &[u8],
+          disable_sector0_writes: bool,
+          user_data: u64,
+      ) -> result::Result<ExecuteAsync, ExecuteError> {
+          match self.request_type {
+              RequestType::WriteZeroes => {
+                  let mut wz_sector = [0u8; 8];
+                  let mut wz_num_sectors = [0u8; 4];
+                  mem.read_slice(&mut wz_sector, data_addr)
+                      .map_err(ExecuteError::Read)?;
+                  mem.read_slice(&mut wz_num_sectors, data_addr.checked_add(8).unwrap())
+                      .map_err(ExecuteError::Read)?;
+
+                  let wz_sector = u64::from_le_bytes(wz_sector);
+                  let wz_num_sectors = u32::from_le_bytes(wz_num_sectors);
+
+                  let wz_offset = wz_sector * SECTOR_SIZE;
+                  if wz_offset == 0 && disable_sector0_writes {
+                      return Err(ExecuteError::BadRequest(Error::InvalidOffset));
+                  }
+                  let wz_length = (wz_num_sectors as u64) * SECTOR_SIZE;
+
+                  disk_image
+                      .write_zeroes(wz_offset, wz_length, user_data)
+                      .map_err(ExecuteError::AsyncWriteZeroes)?;
+              }
+              _ => {}
+          }
+
+          Ok(ExecuteAsync::default())
+      }
+  }
+  ```

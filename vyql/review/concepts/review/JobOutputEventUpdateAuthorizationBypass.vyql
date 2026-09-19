@@ -1,0 +1,8 @@
+module code;
+
+review code.JobOutputEventUpdateAuthorizationBypass {
+  category: auth
+  expected: [core.AuthorizationCheck]
+  kind: target
+  text: "review child job output handlers for authorization or configuration gates before accepting event or schedule update fields"
+}

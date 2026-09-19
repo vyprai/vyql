@@ -1,0 +1,11 @@
+module code;
+
+concept UnboundAuthorizationTarget : issue {
+  cwe: [CWE_639, CWE_862, CWE_863]
+  reviewAssumption: "the protected target is private to a principal, account, or tenant"
+  reviewCategory: access_control
+  reviewCondition: "a request-selected protected target is used without a principal relation"
+  reviewConfidence: high
+  reviewEvidence: "authorization context {pattern} has a sensitive target operation but no owner or tenant binding"
+  vulnerableTo: [access_control.Idor, access_control.MissingAuthorization]
+}

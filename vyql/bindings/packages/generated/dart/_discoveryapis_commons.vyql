@@ -1,0 +1,14 @@
+module bindings.dart.generated.m0867d12e;
+
+binding inputValidation0 {
+  requires {
+    dependency("_discoveryapis_commons")
+  }
+  query pattern callExpr where callee.method == "escapeVariable"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

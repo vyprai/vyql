@@ -1,0 +1,59 @@
+test "rank662: Dojo i18n test page appends query string to innerHTML"
+  lang javascript
+  file unit.html
+  expect VYQL-INJ-004
+  code
+  ```
+  <html>
+    <body>
+      <p id="status">running</p>
+      <script type="text/javascript">
+        var hashInfo = location.search.substring(1),
+            options = hashInfo.split(","),
+            dojoLocation = options[3];
+
+        document.getElementById("status").innerHTML += hashInfo;
+
+        var node = document.createElement("script");
+        node.src = (/^http/.test(dojoLocation) ? dojoLocation : "../" + dojoLocation) + "/dojo.js";
+        document.getElementsByTagName("head")[0].appendChild(node);
+      </script>
+    </body>
+  </html>
+  ```
+
+test "rank662: commented Dojo test page does not expose executable script"
+  lang javascript
+  file unit.html
+  reject VYQL-INJ-004
+  code
+  ```
+  <!--<html>
+    <body>
+      <p id="status">running</p>
+      <script type="text/javascript">
+        var escapes = {
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          "\"": "&quot;",
+          "'": "&#039;"
+        };
+        function escape(unsafe) {
+          return unsafe.replace(/[&<>"']/g, function (match) {
+            return escapes[match];
+          });
+        }
+        var hashInfo = location.search.substring(1),
+            options = hashInfo.split(","),
+            dojoLocation = options[3];
+
+        document.getElementById("status").innerHTML += escape(hashInfo);
+
+        var node = document.createElement("script");
+        node.src = ((/^http/i).test(dojoLocation) ? "../dojo" : "../" + dojoLocation) + "/dojo.js";
+        document.getElementsByTagName("head")[0].appendChild(node);
+      </script>
+    </body>
+  </html>-->
+  ```

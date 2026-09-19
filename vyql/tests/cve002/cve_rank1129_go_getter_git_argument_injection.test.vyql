@@ -1,0 +1,149 @@
+# Rank 1129 / CVE-2024-3817: go-getter passed an attacker-controlled source
+# URL as a positional git argv entry with nothing marking where the options
+# end, so a URL beginning with a dash was read as a git option (CWE-88).
+# exec.Command runs no shell, so shell metacharacters are inert, but git
+# parses its own argv and takes any argument starting with - as an option
+# wherever it sits, so a source string like --upload-pack=touch${IFS}/tmp/pwned
+# in that slot runs a command on the machine doing the fetch. The consumer's
+# download call is correct code and the argv the library builds is invisible
+# from the consumer, so the report that belongs to this CVE is the dependency
+# finding: a pin below v1.7.4, the release the advisory names as first fixed.
+
+test "rank1129: a go-getter pin below the first fixed release is a dependency finding"
+  lang go
+  file downloader.go
+  code
+  ```
+  package terraform
+
+  import "github.com/hashicorp/go-getter"
+
+  type DefaultDownloader struct{}
+
+  func (d *DefaultDownloader) GetAny(dst, src string) error {
+      return getter.GetAny(dst, src)
+  }
+  ```
+  file main.go
+  code
+  ```
+  package terraform
+
+  func pullModule(pr PullRequest) error {
+      d := DefaultDownloader{}
+      return d.GetAny("/tmp/modules/"+pr.repo, pr.sourceURL)
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module github.com/runatlantis/atlantis
+
+  go 1.20
+
+  require github.com/hashicorp/go-getter v1.7.3
+  ```
+  expect VYQL-SCA-001
+  expect VYQL-SCA-002
+  expect_evidence VYQL-SCA-001 CVE-2024-3817
+
+test "rank1129: a go-getter pin at the first fixed release is clean"
+  lang go
+  file downloader.go
+  code
+  ```
+  package terraform
+
+  import "github.com/hashicorp/go-getter"
+
+  type DefaultDownloader struct{}
+
+  func (d *DefaultDownloader) GetAny(dst, src string) error {
+      return getter.GetAny(dst, src)
+  }
+  ```
+  file main.go
+  code
+  ```
+  package terraform
+
+  func pullModule(pr PullRequest) error {
+      d := DefaultDownloader{}
+      return d.GetAny("/tmp/modules/"+pr.repo, pr.sourceURL)
+  }
+  ```
+  file go.mod
+  code
+  ```
+  module github.com/runatlantis/atlantis
+
+  go 1.20
+
+  require github.com/hashicorp/go-getter v1.7.4
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SCA-002
+
+# The library's own argv assembly, both revisions, held here so a later reader
+# can see the patched form rather than inferring it from the advisory text.
+# No code-level rule reports either shape: the appended source URL is a
+# library parameter with no source inside go-getter, and an argv built by
+# append and handed to exec.Command without a -- terminator is the ordinary Go
+# subprocess idiom (63 of 74 collateral Go trees carry it), so a review flag on
+# that shape would not separate this fetch from a correct wrapper.
+
+test "rank1129: the library appends the source URL as a positional git argument"
+  lang go
+  file get_git.go
+  code
+  ```
+  package getter
+
+  import (
+      "context"
+      "net/url"
+      "os/exec"
+  )
+
+  func (g *GitGetter) clone(ctx context.Context, dst, sshKeyFile string, u *url.URL) (*exec.Cmd, error) {
+      args := []string{"clone"}
+      args = append(args, u.String(), dst)
+
+      cmd := exec.CommandContext(ctx, "git", args...)
+      return cmd, nil
+  }
+
+  func findRemoteDefaultBranch(ctx context.Context, u *url.URL) string {
+      cmd := exec.CommandContext(ctx, "git", "ls-remote", "--symref", u.String(), "HEAD")
+      return cmd.String()
+  }
+  ```
+  reject_review code.CommandLineAssemblyReview
+
+test "rank1129: an argument terminator marks the URL positional before it is used"
+  lang go
+  file get_git.go
+  code
+  ```
+  package getter
+
+  import (
+      "context"
+      "net/url"
+      "os/exec"
+  )
+
+  func (g *GitGetter) clone(ctx context.Context, dst, sshKeyFile string, u *url.URL) (*exec.Cmd, error) {
+      args := []string{"clone"}
+      args = append(args, "--", u.String(), dst)
+
+      cmd := exec.CommandContext(ctx, "git", args...)
+      return cmd, nil
+  }
+
+  func findRemoteDefaultBranch(ctx context.Context, u *url.URL) string {
+      cmd := exec.CommandContext(ctx, "git", "ls-remote", "--symref", "--", u.String(), "HEAD")
+      return cmd.String()
+  }
+  ```
+  reject_review code.CommandLineAssemblyReview

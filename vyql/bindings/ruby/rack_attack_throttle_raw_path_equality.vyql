@@ -1,0 +1,49 @@
+module bindings.ruby.rack_attack_throttle_raw_path_equality;
+
+// A rack-attack throttle counts requests whose block returns a non-nil key:
+//
+//   throttle('login/ip', limit: 5, period: 5.minutes) do |req|
+//     req.ip if req.path == '/auth/sign_in' && req.post?
+//   end
+//
+// Rails routes the same action under any format suffix (`/auth/sign_in.json`),
+// and Rack::Request#path returns the suffixed spelling, so a key predicate of
+// raw path equality never holds for the suffixed request, the block returns
+// nil, and the throttle counts nothing -- the brute-force limit that the
+// configuration declares is not the one that runs. The remediation compares a
+// derived accessor instead (any normalization of the path), and the two forms
+// separate structurally on the binary token: `req.path == x` emits a token
+// beginning `req.path==`, while every derived form (`req.path_without_extentions ==`,
+// `req.path.sub(...) ==`, `req.path.start_with?(...)`) emits one that does not,
+// because the character after the accessor name is not `=`. The startsWith
+// boundary is what makes that distinction -- a contains needle of `req.path`
+// matches both forms, and `call_arg_at` pairing does not exist in Ruby.
+//
+// The two conjuncts co-occur at module scope, so they combine by co-occurrence
+// in the initializer file: a file that throttles one endpoint and compares a
+// raw request path for equality anywhere else reports as well. Across every
+// Ruby file in the corpus clones (12007 files; a throttle call occurs in three
+// projects' rack-attack initializers, the other two keyed on
+// `start_with?`/`include?` predicates and correctly not reported), the
+// co-occurrence holds only in the initializer that motivated this binding.
+//
+// The block parameter is spelled `req` per the rack-attack documentation, and
+// the conjunct keys on that spelling: a project naming it `request`, or
+// writing the literal first (`'/auth/sign_in' == req.path`), keeps the
+// weakness and is not reported. Both are recall residuals, not exclusions. A
+// remediation that keeps the raw comparison and enumerates the suffixed
+// spellings (`req.path == '/auth/sign_in' || req.path == '/auth/sign_in.json'`)
+// also keeps the token and reports.
+//
+// `dependency("rack-attack")` is deliberately absent: Ruby projects declare
+// their dependencies in the Gemfile, which is not a parsed manifest, so the
+// gate would make this binding inert on every real Rails application. The
+// `throttle` conjunct carries the technology instead.
+
+binding throttleRawPathEquality {
+  query pattern presenceNode where node.scope == "module"
+    and node.context.language == "ruby"
+    and node.context.call in ["throttle"]
+    and node.context.expr startsWith "req.path=="
+  emit issue code.AuthAttemptLimitReview at node
+}

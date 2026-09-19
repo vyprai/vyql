@@ -1,0 +1,9 @@
+module bindings.dart.generated.mcb8ae269;
+
+binding userControlledData0 {
+  requires {
+    dependency("go_router")
+  }
+  query pattern callExpr where callee.method == "extractPathParams"
+  emit source core.UserControlledData at call.result
+}

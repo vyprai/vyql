@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule MissingOutParamStatusCheck {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_457, CWE_908]
+    id: "VYQL-MEM-075"
+    severity: medium
+  }
+  issue code.MissingOutParamStatusCheck as c
+}

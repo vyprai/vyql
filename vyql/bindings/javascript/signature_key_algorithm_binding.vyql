@@ -1,0 +1,32 @@
+module bindings.javascript.signature_key_algorithm_binding;
+
+// The low-level signature verifier in OpenPGP.js takes the public-key
+// algorithm and the key's parameters as separate arguments -- its own
+// documentation reads "Verifies the signature provided for data using
+// specified algorithms and public key parameters" -- so the primitive has no
+// way to notice that the algorithm it dispatches on and the parameters it
+// consumes belong to different algorithms. Binding them is the caller's
+// contract, and the packet layer is that caller: the signature packet's
+// public-key algorithm octet is attacker-chosen input read off the wire as
+// `publicKeyAlgorithm`, while the verifying key declares its own algorithm
+// field beside the algorithm-specific MPI parameters in `key.params`.
+//
+// A verifier that selects the primitive from the signature's declared
+// algorithm and feeds it the key's parameters, without ever reading the key's
+// `algorithm` field, lets a signature crafted under one algorithm verify
+// against a key of another: the declared algorithm picks the maths, the
+// parameters supply the numbers, and nothing ties the two together. The
+// hardened form compares the declared algorithm against the key's before any
+// verification and throws on mismatch, which introduces a `key.algorithm`
+// read into the same function, so the negation needs no special case.
+//
+// The clauses are each answerable to the library's documented surface rather
+// than to one incident: the delegated `crypto.signature.verify` call, the
+// signature packet's `publicKeyAlgorithm` octet, and the key's `params` and
+// `algorithm` fields. A caller that passes a literal algorithm with no
+// declared-algorithm read does not match, and neither does one that consults
+// the key's algorithm anywhere in the same function.
+binding signatureKeyAlgorithmBindingMissing {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and node.context.callPath contains "crypto.signature.verify" and node.context.selector contains "publicKeyAlgorithm" and node.context.selector contains "key.params" and not (node.context.selector contains "key.algorithm")
+  emit issue code.SignatureKeyAlgorithmBindingMissing at node
+}

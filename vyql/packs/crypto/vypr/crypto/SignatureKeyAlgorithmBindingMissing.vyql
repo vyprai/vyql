@@ -1,0 +1,11 @@
+module vypr.crypto;
+
+rule SignatureKeyAlgorithmBindingMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_347]
+    id: "VYQL-CRY-057"
+    severity: high
+  }
+  issue code.SignatureKeyAlgorithmBindingMissing as verifier
+}

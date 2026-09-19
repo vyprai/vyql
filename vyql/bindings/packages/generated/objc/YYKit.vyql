@@ -1,0 +1,9 @@
+module bindings.objc.generated.m0f66c3d0;
+
+binding deserialization0 {
+  requires {
+    dependency("YYKit")
+  }
+  query pattern callExpr where callee.method == "parseText:selectedRange:"
+  emit sink code.Deserialization at args[0]
+}

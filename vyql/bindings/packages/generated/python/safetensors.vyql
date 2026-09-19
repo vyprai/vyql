@@ -1,0 +1,33 @@
+module bindings.python.generated.m8159a835;
+
+binding deserialization0 {
+  requires {
+    dependency("safetensors")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("safetensors")
+  }
+  query pattern callExpr where callee.method == "load_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("safetensors")
+  }
+  query pattern callExpr where callee.method == "read_metadata"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("safetensors")
+  }
+  query pattern callExpr where callee.method == "deserialize"
+  emit sink code.Deserialization at args[0]
+}

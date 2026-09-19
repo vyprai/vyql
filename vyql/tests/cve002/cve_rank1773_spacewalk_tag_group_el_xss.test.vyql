@@ -1,0 +1,87 @@
+# Rank 1773 / CVE-2016-3079: Spacewalk rendered stored tag and
+# system-group names into markup through raw JSP EL, so a group or
+# snapshot tag whose name carried markup executed in an
+# administrator's browser (cross-site scripting, CWE-79; bugzilla
+# 1320452). Four sites: snapshot_tags.jsp and tags_delete.jsp render
+# ${current.name} as the body of a rollback link,
+# groups/delete.jsp passes ${systemgroup.name} as the arg0 of a
+# bean:message, and admin/assignedgroups.jsp renders the group name
+# through <c:out ... escapeXml="false"/>, which disables JSTL's
+# escaping. Fix b6491eba7f wraps every interpolation in <c:out> with
+# default escaping or fn:escapeXml() (and escapes the message
+# parameter Java-side in DeleteGroupAction.java). The fixed revision leaves the
+# ${param.sid} half of the rollback link's href raw, so that part of
+# the patched line still reports on the real file; the reject block
+# strips to the constructs the change changed.
+#
+# The raw-EL sites report under VYQL-INJ-004 through the jsp template
+# profile (source analysis.template.jsp.input -> sink
+# analysis.template.jsp.render). Two constructs are pinned here as
+# misses: a line carrying escapeXml="false" is credited as escaped
+# because the skip list matches any <c:out, and an EL wrapped in
+# fn:escapeXml() still renders raw because the profile has no escape
+# prefix for the jsp scope.
+
+test "rank1773: raw el renders the tag name into the rollback link"
+  lang config
+  file snapshot_tags.jsp
+  expect VYQL-INJ-004
+  code
+  ```
+  <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+  <rl:listset name="SnapshotSet">
+    <rl:column headerkey="system.history.snapshot.tagName">
+      <a href="/rhn/systems/details/history/snapshots/Rollback.do?sid=${param.sid}&ss_id=${current.ssId}">${current.name}</a>
+    </rl:column>
+  </rl:listset>
+  ```
+
+test "rank1773: raw el passes the group name to the message tag"
+  lang config
+  file delete.jsp
+  expect VYQL-INJ-004
+  code
+  ```
+  <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+  <div class="page-summary">
+    <p><bean:message key="systemgroup.delete.subtitle"
+                  arg0="${systemgroup.name}"
+                  arg1="<strong>"
+                  arg2="</strong>"/></p>
+  </div>
+  ```
+
+test "rank1773: c:out with escaping disabled renders the group name raw"
+  lang config
+  file assignedgroups.jsp
+  expect VYQL-INJ-004
+  code
+  ```
+  <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+  <rl:listset name="groupSet">
+    <rl:column sortable="true" headerkey="assignedgroups.jsp.group" sortattr="name">
+      <c:out value="<a href=\"/rhn/groups/GroupDetail.do?sgid=${current.id}\">${current.name}</a>" escapeXml="false" />
+    </rl:column>
+  </rl:listset>
+  ```
+
+test "rank1773: the fixed revision escapes every interpolation"
+  lang config
+  file assignedgroups_fixed.jsp
+  reject VYQL-INJ-004
+  code
+  ```
+  <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+  <%@ taglib uri="http://java.sun.com/jsp/jstl/functions" prefix="fn" %>
+  <rl:listset name="groupSet">
+    <rl:column sortable="true" headerkey="assignedgroups.jsp.group" sortattr="name">
+      <a href="/rhn/groups/GroupDetail.do?sgid=${current.id}">
+        <c:out value="${current.name}" />
+      </a>
+    </rl:column>
+  </rl:listset>
+  <p><bean:message key="systemgroup.delete.subtitle"
+                arg0="${fn:escapeXml(systemgroup.name)}"
+                arg1="<strong>"
+                arg2="</strong>"/></p>
+  ```

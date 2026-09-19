@@ -1,0 +1,9 @@
+module bindings.swift.generated.meba4fcb5;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/apple/swift-package-manager")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

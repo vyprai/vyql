@@ -1,0 +1,7 @@
+module code;
+
+review code.UnsafeYamlConstructor {
+  category: deserialization
+  kind: attention
+  text: "review SnakeYAML Constructor usage on untrusted YAML; prefer SafeConstructor"
+}

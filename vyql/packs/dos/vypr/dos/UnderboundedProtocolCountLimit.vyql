@@ -1,0 +1,11 @@
+module vypr.dos;
+
+rule UnderboundedProtocolCountLimit {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_20, CWE_400]
+    id: "VYQL-DOS-011"
+    severity: high
+  }
+  issue code.UnderboundedProtocolCountLimit as limit
+}

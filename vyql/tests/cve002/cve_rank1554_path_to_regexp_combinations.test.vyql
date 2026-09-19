@@ -1,0 +1,200 @@
+# Rank 1554 / CVE-2026-4926: path-to-regexp expanded every combination
+# of optional route groups before assembling its pattern, so a route with
+# many optional segments (`{/x}{/x}{/x}...`, ten suffices) drove exponential
+# work parsing one route string (resource exhaustion, CWE-400/CWE-1333
+# family; the nocommit flag reflects advisory-side absence, not a missing
+# commit). pathToRegexp in src/index.ts hands its parsed token tree to
+# flatten(data.tokens, 0, [], callback), whose group branch recurses twice
+# -- once over the group's own tokens with a copy of the accumulator
+# (`result.slice()`), once over the remaining tokens inside that branch's
+# callback -- so each optional group doubles the number of times the
+# outer callback runs, with no bound on how many combinations are
+# materialised before the regex is assembled. Pool commit 22a967901a is
+# the real fix (confirmed by diff, "Reject large optional route combinations
+# (#424)"): a combinations counter increments in the callback pathToRegexp
+# passes to flatten and throws PathError("Too many path combinations",
+# data.originalPath) once it passes 256, with a spec asserting that ten
+# `{/x}` segments throw. No pool correction.
+#
+# Held as a double miss after re-measuring against the current knowledge
+# base. Three `--cache off` runs per revision over src/ (timeout 180,
+# --max-ram 6GB) report exactly one finding at both revisions, with the
+# same fingerprint (fp=28619fcf5b38c1a4): VYQL-INJ-013, a prototype-
+# pollution heuristic over the library's options parameter at index.ts:456
+# -> :446, untouched by the fix. The flags view is empty at both revisions,
+# and a whole-tree scan reports the same single finding on each side --
+# so the zero is real, not a misread `-flags` replacement. The nearest
+# shipped vocabulary does not reach this shape: VYQL-DOS-047
+# (code.NestedExtglobExpansionWithoutDepthLimit, javascript) keys on the
+# documented extglob switch (`noext`/`noextglob`) that glob matchers expose
+# and path-to-regexp has no counterpart of, and VYQL-DOS-049
+# (code.NestedParamExpansionWithoutDepthLimit) has a Ruby binding only.
+#
+# The discriminating unit is the consumer, not the recursive helper --
+# measured, and this is what settles the rank. The fix does not touch
+# flatten's behaviour at all: its hunk inside flatten only replaces the
+# block-bodied callback with an arrow body and an `else` with a `continue`,
+# so the function is semantically identical at both revisions. Any binding
+# scoped to the recursive function therefore reports the same thing before
+# and after the fix. Two probes on the real file make both halves concrete:
+#
+# * A binding on the generic accumulation shape -- a function context that
+#   both copies an array and appends to one (`call:` `slice` and `push`) --
+#   labels exactly one function in the file, flatten, at index.ts:527 on
+#   the parent and index.ts:530 at the fix. Same function, same label, no
+#   discrimination; the shape also reaches 33 ordinary function contexts on
+#   angular-cli, 4 on brave-core and 2 on angular-expressions.
+# * A binding on the only token the two revisions do not share -- a
+#   function context carrying a `>=` comparison -- labels nothing on the
+#   parent and exactly two contexts at the fix, index.ts:456 (pathToRegexp)
+#   and index.ts:479 (the combination-consuming callback). That token is
+#   the counter the fixing commit introduced, so keying on it encodes the
+#   fix's own layout rather than the weakness.
+#
+# Naming flatten instead of the shape does not help either, and not only
+# because it is library vocabulary: the function it names is the one the
+# fix leaves unchanged. The remaining route -- ask "does the function that
+# consumes each combination bound the count" of pathToRegexp -- needs to
+# see that a call was seeded with an empty accumulator and handed a
+# callback, and the JavaScript frontend emits no call-argument tokens at
+# all (javascript.go's structured-context walk produces call_path:/call:
+# for a call_expression and nothing per argument), so the seed and the
+# callback are invisible next to each other. What is missing is the
+# expansion-budget fact already named by the ENGINE-GAPS entry "Self-
+# recursion depth: no fact for a function calling itself, or for a depth
+# cap" (blocking rank 1320), extended from the recursion's own depth to
+# the combination count observed by the callback that consumes it. That
+# is new vocabulary over a new relation, not a localised construct and not
+# a binding. No definition change ships.
+#
+# verify_current_expected: both forms reject -- nothing fires on either.
+# When an expansion/combination budget concept lands, the unbounded form
+# must flip to expect. The snippets carry one finding the real file does
+# not: VYQL-DOS-001 (ReDoS) fires on both forms because toRegExpSource is
+# not modelled, so the options-derived delimiter reaches new RegExp without
+# the per-segment escaping the real helper performs. It is an artefact of
+# stripping, it is identical on both sides, and it is not the weakness.
+
+test "rank1554: every combination of optional groups is materialised with no count bound"
+  lang javascript
+  file src/index.ts
+  reject VYQL-DOS-029
+  reject VYQL-DOS-047
+  code
+  ```
+  export function pathToRegexp(path, options) {
+    const { delimiter = "/", end = true, sensitive = false, trailing = true } = options;
+    const flags = sensitive ? "" : "i";
+    const keys = [];
+    const root = new SourceNode("^");
+    const paths = [path];
+
+    while (paths.length) {
+      const path = paths.shift()!;
+
+      if (Array.isArray(path)) {
+        paths.push(...path);
+        continue;
+      }
+
+      const data = typeof path === "object" ? path : parse(path, options);
+
+      flatten(data.tokens, 0, [], (tokens) => {
+        let node = root;
+
+        for (const part of toRegExpSource(tokens, delimiter, data.originalPath)) {
+          node = node.add(part.source, part.key);
+        }
+
+        node.add(""); // Mark the end of the source.
+      });
+    }
+
+    let pattern = toRegExp(root, keys);
+    if (trailing) pattern += "(?:" + escape(delimiter) + "$)?";
+    pattern += end ? "$" : "(?=" + escape(delimiter) + "|$)";
+
+    return { regexp: new RegExp(pattern, flags), keys };
+  }
+
+  function flatten(tokens, index, result, callback) {
+    while (index < tokens.length) {
+      const token = tokens[index++];
+
+      if (token.type === "group") {
+        flatten(token.tokens, 0, result.slice(), (seq) =>
+          flatten(tokens, index, seq, callback),
+        );
+        continue;
+      }
+
+      result.push(token);
+    }
+
+    callback(result);
+  }
+  ```
+
+test "rank1554: the fixed revision refuses combinations past a budget"
+  lang javascript
+  file src/index.ts
+  reject VYQL-DOS-029
+  reject VYQL-DOS-047
+  code
+  ```
+  export function pathToRegexp(path, options) {
+    const { delimiter = "/", end = true, sensitive = false, trailing = true } = options;
+    const root = new SourceNode("^");
+    const paths = [path];
+    let combinations = 0;
+
+    while (paths.length) {
+      const path = paths.shift()!;
+
+      if (Array.isArray(path)) {
+        paths.push(...path);
+        continue;
+      }
+
+      const data = typeof path === "object" ? path : parse(path, options);
+
+      flatten(data.tokens, 0, [], (tokens) => {
+        if (combinations++ >= 256) {
+          throw new PathError("Too many path combinations", data.originalPath);
+        }
+
+        let node = root;
+
+        for (const part of toRegExpSource(tokens, delimiter, data.originalPath)) {
+          node = node.add(part.source, part.key);
+        }
+
+        node.add(""); // Mark the end of the source.
+      });
+    }
+
+    const keys = [];
+    let pattern = toRegExp(root, keys);
+    if (trailing) pattern += "(?:" + escape(delimiter) + "$)?";
+    pattern += end ? "$" : "(?=" + escape(delimiter) + "|$)";
+
+    return { regexp: new RegExp(pattern, sensitive ? "" : "i"), keys };
+  }
+
+  function flatten(tokens, index, result, callback) {
+    while (index < tokens.length) {
+      const token = tokens[index++];
+
+      if (token.type === "group") {
+        flatten(token.tokens, 0, result.slice(), (seq) =>
+          flatten(tokens, index, seq, callback),
+        );
+        continue;
+      }
+
+      result.push(token);
+    }
+
+    callback(result);
+  }
+  ```

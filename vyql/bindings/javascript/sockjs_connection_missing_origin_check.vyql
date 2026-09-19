@@ -1,0 +1,24 @@
+module bindings.javascript.sockjsConnectionMissingOriginCheck;
+
+// A SockJS server is built the way the sockjs README spells it:
+// `sockjs.createServer()`, a `'connection'` listener on the resulting server,
+// and `installHandlers(httpServer, {prefix: ...})` to mount it. The browser
+// reaches the listener by opening that SockJS URL, and the library performs
+// no origin validation of its own — the listener is where same-origin policy
+// has to be enforced. A page on any other origin can open the socket and,
+// once open, drive everything the server does over it (CWE-352, CWE-346).
+//
+// `installHandlers` is SockJS's own method name, so the fingerprint does not
+// depend on the local alias the module happens to bind `require('sockjs')`
+// to. The Host-header read is what shows the module means to validate its
+// peer and simply never checks the Origin: the documented hardening is to
+// validate the request's Origin against trusted origins the same way, and
+// either spelling — a `headers.origin` member read or an `"origin"` header
+// name passed to the existing check — satisfies the negations. The scope is
+// the module because that is the unit a SockJS server is mounted in: the
+// createServer call, the connection listener and the header check sit in one
+// file or not at all.
+binding jsSockjsConnectionMissingOriginCheck {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.call contains "createServer" and node.context.call contains "installHandlers" and node.context.literal contains "connection" and node.context.selector contains "headers.host" and not (containsAny(node.context.selector, ["headers.origin", ".origin"])) and not (containsAny(node.context.literal, ["origin", "Origin"]))
+  emit issue code.WebSocketUpgradeMissingOriginCheck at node
+}

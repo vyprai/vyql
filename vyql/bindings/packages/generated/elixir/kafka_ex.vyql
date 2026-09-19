@@ -1,0 +1,29 @@
+module bindings.elixir.generated.m788dba71;
+
+binding networkSend0 {
+  requires {
+    dependency("kafka_ex")
+  }
+  query pattern callExpr where callee.method == "KafkaEx.Network.Socket.send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("kafka_ex")
+  }
+  query pattern callExpr where callee.method == "KafkaEx.Network.Socket.recv"
+  emit source code.NetworkData at call.result
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("kafka_ex")
+  }
+  query pattern callExpr where callee.method == "KafkaEx.Auth.Sasl.authenticate"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

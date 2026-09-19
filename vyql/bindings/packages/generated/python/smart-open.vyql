@@ -1,0 +1,33 @@
+module bindings.python.generated.mbf9b69ea;
+
+binding filePathAccess0 {
+  requires {
+    dependency("smart-open")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkData1 {
+  requires {
+    dependency("smart-open")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData2 {
+  requires {
+    dependency("smart-open")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData3 {
+  requires {
+    dependency("smart-open")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit source code.NetworkData at call.result
+}

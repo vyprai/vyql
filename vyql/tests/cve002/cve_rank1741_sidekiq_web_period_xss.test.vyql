@@ -1,0 +1,104 @@
+# Rank 1741 / CVE-2023-1892: Sidekiq's Web UI metrics pages assigned the raw
+# :period query parameter to a view variable and rendered it through the raw
+# ERB stack, where <%= %> does not escape. Both `get "/metrics"` and
+# `get "/metrics/:name"` in lib/sidekiq/web/application.rb read
+# `@period = params[:period]` and end in `erb(:metrics)` / `erb(:metrics_for_job)`;
+# the templates emit `metrics?period=<%= @period %>` into an href attribute.
+# Fix 458fdf74 escapes and trims at the assignment:
+# `@period = h((params[:period] || "")[0..1])` -- the templates are untouched,
+# so the discriminating signal is the controller: a request parameter landing
+# in a view variable with no escape call anywhere in the rendering file.
+# Detected by widening code.RequestViewVariableHtmlEscapeMissing (VYQL-INJ-162,
+# shipped for the PHP shape) to Ruby via the module context's assign
+# and call tokens: an `@view_var = params[...]` assignment, an `erb` render,
+# and no h / html_escape / escape_html / escapeHTML / sanitize call in the file.
+# Sinatra-style route blocks inline at module scope in the Ruby frontend, so
+# module scope is the finest context that sees the whole handler file.
+
+test "rank1741: sidekiq metrics period param reaches raw erb view variable"
+  lang ruby
+  file application.rb
+  expect VYQL-INJ-162
+  expect_review code.RequestViewVariableHtmlEscapeMissing
+  code
+  ```
+  module Sidekiq
+    class WebApplication
+      get "/metrics" do
+        q = Sidekiq::Metrics::Query.new
+        @period = params[:period]
+        @periods = METRICS_PERIODS
+        minutes = @periods.fetch(@period, @periods.values.first)
+        @query_result = q.top_jobs(minutes: minutes)
+        erb(:metrics)
+      end
+    end
+  end
+  ```
+
+test "rank1741: metrics period param escaped at the assignment"
+  lang ruby
+  file application.rb
+  reject VYQL-INJ-162
+  reject_review code.RequestViewVariableHtmlEscapeMissing
+  code
+  ```
+  module Sidekiq
+    class WebApplication
+      get "/metrics" do
+        q = Sidekiq::Metrics::Query.new
+        @period = h((params[:period] || "")[0..1])
+        @periods = METRICS_PERIODS
+        minutes = @periods.fetch(@period, @periods.values.first)
+        @query_result = q.top_jobs(minutes: minutes)
+        erb(:metrics)
+      end
+    end
+  end
+  ```
+
+test "rank1741: plugin-registered route assigns raw param to view variable"
+  lang ruby
+  file web.rb
+  expect VYQL-INJ-162
+  expect_review code.RequestViewVariableHtmlEscapeMissing
+  code
+  ```
+  module SidekiqUniqueJobs
+    module Web
+      def self.registered(app)
+        app.get "/locks" do
+          @filter = params[:filter] || "*"
+          @current_cursor = params[:cursor]
+          @total_size, @next_cursor, @locks = locks.page(
+            cursor: @current_cursor, pattern: @filter
+          )
+          erb(unique_template(:locks))
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1741: plugin-registered route escapes the param at the assignment"
+  lang ruby
+  file web.rb
+  reject VYQL-INJ-162
+  reject_review code.RequestViewVariableHtmlEscapeMissing
+  code
+  ```
+  module SidekiqUniqueJobs
+    module Web
+      def self.registered(app)
+        app.get "/locks" do
+          @filter = h(params[:filter] || "*")
+          @current_cursor = h(params[:cursor])
+          @total_size, @next_cursor, @locks = locks.page(
+            cursor: @current_cursor, pattern: @filter
+          )
+          erb(unique_template(:locks))
+        end
+      end
+    end
+  end
+  ```

@@ -1,0 +1,214 @@
+# Rank 1665 / CVE-2026-44429: the MCP registry accepted a publisher-
+# supplied websiteUrl that parses, is absolute and uses https, and
+# nothing more -- net/url.Parse accepts a literal double quote, single
+# quote, angle bracket and ASCII space, so a URL carrying `"` escaped
+# the href attribute of the catalogue UI's anchor template and
+# injected an event handler (stored cross-site scripting through an
+# under-validating URL check, CWE-79/CWE-116; GHSA-rqv2-m695-f8j4,
+# PR #1249, v1.7.7). validateWebsiteURL in internal/validators/
+# validators.go ran url.Parse, IsAbs and a Scheme != "https"
+# comparison on the field and returns. The fixed revision adds a
+# strings.IndexAny(websiteURL, "\"'<> \t\n\r") rejection after the
+# scheme check; the advisory names this commit.
+#
+# The render site the advisory describes is neutralised one
+# commit earlier -- PR #1248 (fbfd63c, the parent of the fixing commit)
+# introduced escapeAttr for the two href interpolations in
+# internal/api/handlers/v0/ui_index.html -- so the revision pair this
+# row names differs only in the Go validator, and only there.
+#
+# ATTENTION, precision cost on the one discriminating construct. The
+# Go side carries no label at all: vyql match on internal/validators
+# reports only code.RegexCompileSink on the package-level
+# regexp.MustCompile declarations (validators.go:23-51), nothing
+# inside validateWebsiteURL, and the publish handler's input.Body -- a
+# huma-bound struct field, not a request reader -- is not a source
+# either, so there is no taint shape. Re-measured on the real checkout,
+# 3 x --cache off --max-ram 6GB per revision: both revisions of the
+# pair report the same 25 findings and the same 117 review flags with
+# identical fingerprints, the full findings view and the -flags view
+# both hold nothing in validators.go, and the parent of PR #1248
+# (7a4216c), which still carries the unescaped href interpolation,
+# reports the same 25 findings and 117 flags too -- its only ui_index
+# rows are config-level code.ExternalLinkReferrerLeak on the static
+# document head. The under-validating URL-validator shape is the only
+# thing that separates the pair, and it is not a signal: across the 85
+# Go trees currently under /tmp/cve-work, 81 functions in 68 files call
+# url.Parse/url.ParseRequestURI and read .Scheme with no
+# strings.IndexAny/ContainsAny/ContainsRune/regexp scan, against 2 that
+# do (the same Prometheus test function in two tree copies); narrowing
+# it to validator-named or issue-emitting functions still leaves 29,
+# all ordinary service-discovery, backend-client and OIDC code. The
+# same file carries the counterexample the fix endorses: validateIcon
+# holds the identical parse + IsAbs + Scheme shape and was deliberately
+# left unchanged, so the shape flags code the fix considered correct.
+# The join to the render is what makes the validator a weakness and it
+# runs Go validator -> published JSON field -> attribute interpolation
+# in another file and another language, which no binding expresses; of
+# the CWE-79/116 landing spots, code.StoredUrlHrefAttributeXss
+# (VYQL-INJ-195) has a single PHP emitter (the GLPI fields/formatOutput
+# binding), VYQL-INJ-186 is Ruby-ERB-only and
+# code.JavaScriptTemplateHtmlEscapeMismatch is Java-only, so nothing
+# reaches a browser-side template. The pre-#1248 render form is pinned
+# below so href-attribute-escape vocabulary, when it lands, has a spec
+# to flip.
+#
+# verify_current_expected: attention-precision-cost, both revisions rejected.
+
+test "rank1665: the website url is checked for parse, absoluteness and scheme only"
+  lang go
+  file internal/validators/validators.go
+  reject VYQL-INJ-195
+  code
+  ```
+  package validators
+
+  import (
+      "fmt"
+      "net/url"
+  )
+
+  const SchemeHTTPS = "https"
+
+  // validateWebsiteURL accepts a publisher-supplied website URL.
+  func validateWebsiteURL(websiteURL string) []string {
+      var issues []string
+
+      if websiteURL == "" {
+          return issues
+      }
+
+      parsedURL, err := url.Parse(websiteURL)
+      if err != nil {
+          issues = append(issues, fmt.Sprintf("invalid websiteUrl: %v", err))
+          return issues
+      }
+
+      if !parsedURL.IsAbs() {
+          issues = append(issues, fmt.Sprintf("websiteUrl must be absolute (include scheme): %s", websiteURL))
+      }
+
+      if parsedURL.Scheme != SchemeHTTPS {
+          issues = append(issues, fmt.Sprintf("websiteUrl must use https scheme: %s", websiteURL))
+      }
+
+      return issues
+  }
+  ```
+
+test "rank1665: the fixed revision rejects characters invalid in a URI"
+  lang go
+  file internal/validators/validators.go
+  reject VYQL-INJ-195
+  code
+  ```
+  package validators
+
+  import (
+      "fmt"
+      "net/url"
+      "strings"
+  )
+
+  const SchemeHTTPS = "https"
+
+  // validateWebsiteURL accepts a publisher-supplied website URL.
+  func validateWebsiteURL(websiteURL string) []string {
+      var issues []string
+
+      if websiteURL == "" {
+          return issues
+      }
+
+      parsedURL, err := url.Parse(websiteURL)
+      if err != nil {
+          issues = append(issues, fmt.Sprintf("invalid websiteUrl: %v", err))
+          return issues
+      }
+
+      if !parsedURL.IsAbs() {
+          issues = append(issues, fmt.Sprintf("websiteUrl must be absolute (include scheme): %s", websiteURL))
+      }
+
+      if parsedURL.Scheme != SchemeHTTPS {
+          issues = append(issues, fmt.Sprintf("websiteUrl must use https scheme: %s", websiteURL))
+      }
+
+      if i := strings.IndexAny(websiteURL, "\"'<> \t\n\r"); i >= 0 {
+          issues = append(issues, fmt.Sprintf("websiteUrl contains an invalid character %q at position %d: %s", websiteURL[i], i, websiteURL))
+      }
+
+      return issues
+  }
+  ```
+
+test "rank1665: the icon validator holds the same url shape and stays unchanged"
+  lang go
+  file internal/validators/validators.go
+  reject VYQL-INJ-195
+  code
+  ```
+  package validators
+
+  import (
+      "fmt"
+      "net/url"
+  )
+
+  const SchemeHTTPS = "https"
+
+  // validateIcon accepts a publisher-supplied icon source URL and is
+  // not part of the metacharacter hardening.
+  func validateIcon(iconSrc string) []string {
+      var issues []string
+
+      parsedURL, err := url.Parse(iconSrc)
+      if err != nil {
+          issues = append(issues, fmt.Sprintf("invalid icon src URL: %v", err))
+          return issues
+      }
+
+      if !parsedURL.IsAbs() {
+          issues = append(issues, fmt.Sprintf("icon src must be an absolute URL: %s", iconSrc))
+      }
+
+      if parsedURL.Scheme != SchemeHTTPS {
+          issues = append(issues, fmt.Sprintf("icon src must use https scheme (no http or data URIs): %s", iconSrc))
+      }
+
+      return issues
+  }
+  ```
+
+test "rank1665: a stored url reaches an anchor attribute through a text escaper"
+  lang javascript
+  file ui_index_catalogue.js
+  reject VYQL-INJ-195
+  code
+  ```
+  function renderServerDetails(server) {
+      const detailsDiv = document.createElement('div');
+      detailsDiv.className = 'details-content';
+      detailsDiv.innerHTML = `
+          ${server.websiteUrl ? `
+              <div>
+                  <span class="font-medium">Website:</span>
+                  <a href="${escapeHtml(server.websiteUrl)}" target="_blank" class="text-blue-600 hover:underline" onclick="event.stopPropagation()">${escapeHtml(server.websiteUrl)}</a>
+              </div>
+          ` : ''}
+          <div>
+              <a href="${baseUrl}/v0.1/servers/${encodeURIComponent(server.name)}/versions/${encodeURIComponent(server.version)}" target="_blank" class="text-blue-600 hover:underline">View in API</a>
+          </div>
+      `;
+      return detailsDiv;
+  }
+
+  // Encodes what the HTML fragment serialisation algorithm encodes in a
+  // text node: &, < and >. It does not encode quotes, so a value holding
+  // one leaves the attribute it is interpolated into.
+  function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+  }
+  ```

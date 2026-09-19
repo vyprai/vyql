@@ -1,0 +1,73 @@
+test "rank697: file delete path joins request path under project root"
+  lang javascript
+  profile app
+  expect VYQL-PATH-001
+  code
+  ```
+  const express = require('express');
+  const fs = require('fs');
+  const path = require('path');
+
+  const app = express();
+
+  app.post('/api/delete-file', (req, res) => {
+    const { path: filePath } = req.body;
+    const absPath = path.join(__dirname, filePath.startsWith('/') ? filePath.substring(1) : filePath);
+    fs.unlink(absPath, () => res.json({ ok: true }));
+  });
+  ```
+
+test "rank697: path.resolve without containment and allowlist still reaches file delete"
+  lang javascript
+  profile app
+  expect VYQL-PATH-001
+  code
+  ```
+  const express = require('express');
+  const fs = require('fs');
+  const path = require('path');
+
+  const app = express();
+  const DATA_DIR = path.join(__dirname, 'data');
+
+  app.post('/api/delete-file', (req, res) => {
+    const { path: filePath } = req.body;
+    const absPath = path.resolve(DATA_DIR, filePath.replace(/^\/+/, ''));
+    fs.unlink(absPath, () => res.json({ ok: true }));
+  });
+  ```
+
+test "rank697: resolver rejects escaping and non-allowlisted data subdirs before delete"
+  lang javascript
+  profile app
+  reject VYQL-PATH-001
+  code
+  ```
+  const express = require('express');
+  const fs = require('fs');
+  const path = require('path');
+
+  const app = express();
+  const DATA_DIR = path.join(__dirname, 'data');
+  const ALLOWED_ASSET_FILE_SUBDIRS = ['Images', 'Receipts', 'Manuals'];
+
+  function resolveDataFilePath(filePath) {
+    if (typeof filePath !== 'string') return null;
+    const cleanPath = filePath.replace(/^\/+/, '');
+    if (!cleanPath) return null;
+    const resolved = path.resolve(DATA_DIR, cleanPath);
+    const dataDirPrefix = DATA_DIR + path.sep;
+    if (resolved !== DATA_DIR && !resolved.startsWith(dataDirPrefix)) return null;
+    const relative = path.relative(DATA_DIR, resolved);
+    const topDir = relative.split(path.sep)[0];
+    if (!ALLOWED_ASSET_FILE_SUBDIRS.includes(topDir)) return null;
+    return resolved;
+  }
+
+  app.post('/api/delete-file', (req, res) => {
+    const { path: filePath } = req.body;
+    const absPath = resolveDataFilePath(filePath);
+    if (!absPath) return res.status(400).json({ error: 'Invalid file path' });
+    fs.unlink(absPath, () => res.json({ ok: true }));
+  });
+  ```

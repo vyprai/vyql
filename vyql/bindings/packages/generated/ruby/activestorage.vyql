@@ -1,0 +1,41 @@
+module bindings.ruby.generated.m4fae70a9;
+
+binding fileUse0 {
+  requires {
+    dependency("activestorage")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("activestorage")
+  }
+  query pattern callExpr where callee.method == "download"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse2 {
+  requires {
+    dependency("activestorage")
+  }
+  query pattern callExpr where callee.method == "download_chunk"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse3 {
+  requires {
+    dependency("activestorage")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding fileUse4 {
+  requires {
+    dependency("activestorage")
+  }
+  query pattern callExpr where callee.method == "compose"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,126 @@
+# Rank 1915 / CVE-2024-1023: vert.x's CombinerExecutor held its task tail in a
+# per-instance netty FastThreadLocal (GHSA-5667-3wch-7q7w). A FastThreadLocal's
+# constructor takes a global index from InternalThreadLocalMap.nextVariableIndex(),
+# a counter that only increments, and every FastThreadLocalThread sizes its
+# indexed-variables array to the largest index claimed; the slot is held for the
+# life of the instance and never returned. A field initializer runs once per
+# construction of the enclosing instance, so `new FastThreadLocal<>()` in a
+# non-static field of a class instantiated per connection pool grows every
+# event-loop thread's array without bound. The fix (dd6f6430, cited directly by
+# the advisory; 665ceba3 is the identical change on the 4.4 branch) makes the
+# field static -- one slot for the class -- and threads the executor identity
+# through the stored value. The remediation is present at <fix> (line 46) and
+# absent at <fix>^ (line 36): the discriminating fact is one keyword, static.
+#
+# The corpus family hint (CWE-444 body framing) does not apply: this commit
+# fixes a resource leak, and the recorded CWE-119/CWE-200 does not match the
+# mechanism either -- the axis is unbounded per-instance allocation, judged by
+# code.UnboundedAllocationReview (VYQL-DOS-041, CWE-400/770), which is the
+# concept reused here rather than minted. ThreadLocalScopeOverwriteWithoutCleanup
+# is a lifecycle-overwrite race; the resource.ResourceLeak taint family needs a
+# release-ordering path, and none exists: no untrusted value flows, the
+# attacker's cost is the act of opening connections.
+#
+# The detection reads the instance_field_init token the Java walk now emits for
+# a field initializer that constructs the named type, per class or per instance:
+# perInstanceFastThreadLocal labels the class context of a class that
+# constructs a FastThreadLocal into an instance field, and VYQL-DOS-041 judges
+# it. Until that fact existed the declaration lowered to a bare assignment --
+# jvModifierTokens ran for classes and methods but never for fields, and the
+# class member walk skipped assignments -- so `vyql graph` was byte-identical
+# across the fix and a binding on the FastThreadLocal constructor labelled the
+# same single node at both revisions (1 -> 1). A text route was never a
+# substitute: the vulnerable file itself declares `protected static final
+# class InProgressTail`, so any "static appears near the field" heuristic
+# reads the vulnerable form as patched.
+#
+# Measured on the real checkout (--cache off, bounded, three runs per side):
+# the change-carrying pool subtree (14 files) reports 1 VYQL-DOS-041 high on
+# CombinerExecutor at <fix>^ and 0 at <fix>, identical every run; the wider
+# net subtree (76 files) is unchanged at 4 hardcoded-secret rows on both
+# revisions. The wider reachable set across the campaign's Java trees: quarkus
+# holds one more instance of the shape, agroal's QuarkusNettyConnectionCache
+# (`final FastThreadLocal<Acquirable> connectionCache = new
+# FastThreadLocal<>()`), whose own comments state the mechanism and that the
+# instance must not be created again -- reported there, 1 finding on the
+# 64-file agroal subtree where the shape is the only one. solr-core, tomcat
+# and protobuf mention FastThreadLocal nowhere and their finding counts are
+# identical before and after (1003, 2410, 7; three runs each). The residual
+# is the constructor-assigned variant: a FastThreadLocal-typed instance field
+# with no initializer, built in the constructor body, holds no initializer
+# for the walk to see and does not match.
+
+test "rank1915: the combiner executor holds its task tail in a per-instance FastThreadLocal"
+  lang java
+  file src/main/java/io/vertx/core/net/impl/pool/CombinerExecutor.java
+  expect VYQL-DOS-041
+  expect_review code.UnboundedAllocationReview
+  code
+  ```
+  package io.vertx.core.net.impl.pool;
+
+  import io.netty.util.concurrent.FastThreadLocal;
+  import java.util.concurrent.atomic.AtomicInteger;
+
+  public class CombinerExecutor<S> implements Executor<S> {
+
+    protected static final class InProgressTail {
+      Task task;
+    }
+
+    private final AtomicInteger s = new AtomicInteger();
+
+    private final FastThreadLocal<InProgressTail> current = new FastThreadLocal<>();
+
+    @Override
+    public void submit(Action<S> action) {
+      s.incrementAndGet();
+      InProgressTail inProgress = current.get();
+      if (inProgress == null) {
+        inProgress = new InProgressTail();
+        current.set(inProgress);
+        current.remove();
+      }
+    }
+  }
+  ```
+
+test "rank1915: the fixed revision makes the FastThreadLocal one per class"
+  lang java
+  file src/main/java/io/vertx/core/net/impl/pool/CombinerExecutor.java
+  reject VYQL-DOS-041
+  code
+  ```
+  package io.vertx.core.net.impl.pool;
+
+  import io.netty.util.concurrent.FastThreadLocal;
+  import java.util.concurrent.atomic.AtomicInteger;
+
+  public class CombinerExecutor<S> implements Executor<S> {
+
+    protected static final class InProgressTail<S> {
+      final CombinerExecutor<S> combiner;
+      Task task;
+
+      public InProgressTail(CombinerExecutor<S> combiner, Task task) {
+        this.combiner = combiner;
+        this.task = task;
+      }
+    }
+
+    private final AtomicInteger s = new AtomicInteger();
+
+    private static final FastThreadLocal<InProgressTail<?>> current = new FastThreadLocal<>();
+
+    @Override
+    public void submit(Action<S> action) {
+      s.incrementAndGet();
+      InProgressTail<S> inProgress = (InProgressTail<S>) current.get();
+      if (inProgress == null) {
+        inProgress = new InProgressTail<>(this, null);
+        current.set(inProgress);
+        current.remove();
+      }
+    }
+  }
+  ```

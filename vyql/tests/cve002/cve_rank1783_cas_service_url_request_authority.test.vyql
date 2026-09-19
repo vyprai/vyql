@@ -1,0 +1,370 @@
+# Rank 1783 / CVE-2014-3527 (SEC-2688, CWE-346 origin validation; the nearest
+# shipped concepts record CWE-20/918):
+# spring-projects/spring-security's CAS proxy-ticket authentication takes the
+# service URL -- the audience the CAS server matches a presented ticket
+# against -- from `ServiceAuthenticationDetails.getServiceUrl()`.
+# DefaultServiceAuthenticationDetails
+# (cas/src/main/java/org/springframework/security/cas/web/authentication/
+# DefaultServiceAuthenticationDetails.java:53 at the parent) assembles it as
+#
+#   this.serviceUrl = UrlUtils.buildFullRequestUrl(request.getScheme(),
+#           request.getServerName(), request.getServerPort(),
+#           request.getRequestURI(), query);
+#
+# with `query` the request's query string minus the artifact (ticket)
+# parameter. The servlet container resolves all three authority accessors from
+# the client's own Host header, so the client picks the audience a proxy ticket
+# is validated for: a ticket minted for a service the attacker controls
+# validates as genuine. The fixed revision's own regression test names the
+# property (`getServiceUrlDoesNotUseHostHeader`, `request.setServerName
+# ("evil.com")` must still yield `https://example.com/...`).
+#
+# 934937d9c1dc20c396b96c08310b72cfa627acbf fixes it by parsing the configured
+# service (`new URL(casService)`) and taking protocol, host and port from that
+# URL instead, while `request.getRequestURI()` and the cleaned query still come
+# from the request -- the path legitimately mirrors the request, the authority
+# must not. ServiceProperties.afterPropertiesSet() also drops the
+# `authenticateAllArtifacts` exemption so a configured `service` is mandatory,
+# and ServiceAuthenticationDetailsSource grows a ServiceProperties constructor
+# plus an ApplicationContextAware fallback. The remediation is present at the
+# commit and absent at its parent f50e058d0, so both halves of the 1390 check
+# hold and the pool row is correct in every field; no correction needed.
+#
+# What fires today, rechecked against the current knowledge base. `timeout 180
+# ./bin/vyql scan --cache off --max-ram 6GB` over spring-security/cas, three
+# runs per side, is byte-identical within each revision: 3 findings and 20
+# flags at the parent, 3 findings and 21 flags at the fixed revision -- all
+# three findings VYQL-INJ-009 log formatting in CasAuthenticationFilter, the
+# flags core.AuthenticationCheck, and the one flag delta a core.ResourceRelease
+# on `context.close` inside the fix's own new regression test. Nothing in
+# DefaultServiceAuthenticationDetails.java or
+# ServiceAuthenticationDetailsSource.java on either side, in the findings view
+# or the `-flags only` view. `vyql match` on the class labels
+# `request.getRequestURI()` and `request.getQueryString()` as code.HttpInput
+# and leaves getScheme/getServerName/getServerPort unlabelled;
+# UrlUtils.buildFullRequestUrl is unbound.
+#
+# The host-header vocabulary shipped since the first pin does not reach this
+# shape: UnvalidatedHostHeaderDispatch (VYQL-VAL-037) is a presence fact on a
+# server transport's dispatch method (getRequestHeaders + Headers.HOST +
+# Connectors.executeRootHandler -- Undertow's spelling, absent here), and
+# requestHostUrlValidationBypass66 requires the compare form (getServerName +
+# getHost + equals), which the assembly form spells neither half of.
+#
+# The discriminating taint route -- an authority-specific source on the three
+# accessors, a sink on the CAS validate audience argument -- was probed with
+# throwaway bindings for both ends over cas plus web (so UrlUtils resolves):
+# zero at CasAuthenticationProvider.java:140. The chain dead-ends at three
+# measured hops, each isolated below with shipped labels only (d)-(g):
+#   1. a `this.`-qualified Java field store never feeds the matching load --
+#      the same request read through a local reports VYQL-INJ-009, through a
+#      bare-identifier field pair (`saved = ...; f(saved)`) also reports, and
+#      through `this.saved = ...; f(this.saved)` is silent, in one method,
+#      same statements; the trace shows the source dead-ending with no
+#      outgoing node at all. The mixed spellings the real code uses --
+#      `this.serviceUrl = ...` in a constructor with a bare `return
+#      serviceUrl` getter -- are silent both same-method and across the
+#      constructor/getter boundary. The write branch
+#      (internal/extract/lowering/lowering.go:4821, `flow(args[0],
+#      elemNode(recvNode, attr.Attr))`) and the bare-read slot
+#      (`lowering.go:3668`, the class-member Name path) key different slots
+#      for the same field. The rank-1198 entry filed the cross-method form
+#      for PHP; in Java the this-qualified spelling fails intraprocedurally.
+#   2. the interface routing shipped for the rank-1339 gap
+#      (`resolveDerivedMethods`, internal/extract/lowering/lowering.go)
+#      carries arguments into implementor bodies but an implementor's return
+#      does not reach the caller's dispatch result -- `vyql trace` dead-ends
+#      at `analysis.function.return`.
+#   3. a cast-expression receiver (`((SavedSource) source).saved(request)`,
+#      the consumer's exact spelling at CasAuthenticationProvider.java:162)
+#      does not dispatch at all; the plain interface-typed variable is the
+#      form the 1339 routing fixed.
+# All three are new dataflow relations rather than mechanical corrections --
+# field store-to-load is solver-wide and precision-costly by the same reasoning
+# as 1198's entry -- so the rank is held.
+#
+# The presence route stays measured-unshippable, restated from the first pin
+# and unchanged: the three accessors are the servlet API's documented
+# request-mirroring idiom (~52 functions across 19 Java trees under
+# /tmp/cve-work/rank*/, every one a correct mirror; in spring-security itself
+# the vulnerable constructor plus UrlUtils.buildFullRequestUrl, DefaultSavedRequest
+# and LoginUrlAuthenticationEntryPoint); adding a URL-assembly call narrows to
+# 7 functions over 4 trees of which six are correct mirrors or origin checks
+# (CorsUtils.isCorsRequest, ShiroHttpServletResponse.doIsEncodeable); a
+# java.util.regex.Pattern-typed parameter is a rarity filter blind to the
+# idiomatic getRequestURL() spelling; class-scope excision co-membership fails
+# on openam's 2700-line SAML2Utils; ServiceAuthenticationDetails has exactly
+# one implementation in the ecosystem scanned. A plain code.HttpInput source
+# cannot discriminate either: the fixed revision still flows
+# request.getRequestURI() into the same assembly, so only an
+# authority-specific source separates the revisions, and that vocabulary's
+# only instance is this fix.
+#
+# The cases: (a) and (b) are the two real revisions and record the miss; (c)
+# is the request-mirror idiom the flaw half cannot be separated from, and must
+# stay a reject -- a rule that fired on it would flag correct code throughout
+# any servlet application; (d)-(h) isolate the consumer-side hops with the
+# shipped HttpInput source and LogOutput sink: (d) is the positive control
+# through a local and reports today, while (e) the this-qualified field
+# store-to-load, (f) the implementor return through an interface-typed
+# receiver, (g) the cast-receiver spelling of the same call and (h) the real
+# code's own constructor-write/getter-return spelling are silent. When those
+# hops carry, (e)-(h) flip to expect while (b) and (c) stay reject.
+#
+# verify_current_expected: attention-engine-gap, cases (a) and (e)-(h) rejected.
+
+test "rank1783: (a) the CAS service URL -- the audience a proxy ticket validates against -- is assembled from the request's own scheme, host and port"
+  lang java
+  file cas/src/main/java/org/springframework/security/cas/web/authentication/DefaultServiceAuthenticationDetails.java
+  reject VYQL-RF-010
+  reject VYQL-AUTH-003
+  reject VYQL-RF-045
+  code
+  ```
+  package org.springframework.security.cas.web.authentication;
+
+  import java.util.regex.Pattern;
+  import javax.servlet.http.HttpServletRequest;
+  import org.springframework.security.web.util.UrlUtils;
+
+  final class DefaultServiceAuthenticationDetails implements ServiceAuthenticationDetails {
+    private final String serviceUrl;
+
+    DefaultServiceAuthenticationDetails(HttpServletRequest request, Pattern artifactPattern) {
+      final String query = getQueryString(request, artifactPattern);
+      this.serviceUrl = UrlUtils.buildFullRequestUrl(request.getScheme(),
+              request.getServerName(), request.getServerPort(),
+              request.getRequestURI(), query);
+    }
+
+    public String getServiceUrl() {
+      return serviceUrl;
+    }
+
+    private String getQueryString(final HttpServletRequest request, final Pattern artifactPattern) {
+      final String query = request.getQueryString();
+      if (query == null) {
+        return null;
+      }
+      final String result = artifactPattern.matcher(query).replaceFirst("");
+      if (result.length() == 0) {
+        return null;
+      }
+      return result.startsWith("&") ? result.substring(1) : result;
+    }
+  }
+  ```
+
+test "rank1783: (b) the fixed revision takes protocol, host and port from the configured service URL, keeping only the request's path and cleaned query"
+  lang java
+  file cas/src/main/java/org/springframework/security/cas/web/authentication/DefaultServiceAuthenticationDetails.java
+  reject VYQL-RF-010
+  reject VYQL-AUTH-003
+  reject VYQL-RF-045
+  code
+  ```
+  package org.springframework.security.cas.web.authentication;
+
+  import java.net.MalformedURLException;
+  import java.net.URL;
+  import java.util.regex.Pattern;
+  import javax.servlet.http.HttpServletRequest;
+  import org.springframework.security.web.util.UrlUtils;
+
+  final class DefaultServiceAuthenticationDetails implements ServiceAuthenticationDetails {
+    private final String serviceUrl;
+
+    DefaultServiceAuthenticationDetails(String casService, HttpServletRequest request, Pattern artifactPattern)
+        throws MalformedURLException {
+      URL casServiceUrl = new URL(casService);
+      int port = getServicePort(casServiceUrl);
+      final String query = getQueryString(request, artifactPattern);
+      this.serviceUrl = UrlUtils.buildFullRequestUrl(casServiceUrl.getProtocol(),
+              casServiceUrl.getHost(), port,
+              request.getRequestURI(), query);
+    }
+
+    public String getServiceUrl() {
+      return serviceUrl;
+    }
+
+    private static int getServicePort(URL casServiceUrl) {
+      int port = casServiceUrl.getPort();
+      if (port == -1) {
+        port = casServiceUrl.getDefaultPort();
+      }
+      return port;
+    }
+
+    private String getQueryString(final HttpServletRequest request, final Pattern artifactPattern) {
+      final String query = request.getQueryString();
+      if (query == null) {
+        return null;
+      }
+      final String result = artifactPattern.matcher(query).replaceFirst("");
+      if (result.length() == 0) {
+        return null;
+      }
+      return result.startsWith("&") ? result.substring(1) : result;
+    }
+  }
+  ```
+
+test "rank1783: (c) the same three accessors in their documented role -- mirroring the request the client actually made -- which a rule on the accessors alone cannot be separated from"
+  lang java
+  file cas/src/main/java/org/springframework/security/cas/web/authentication/UrlUtils.java
+  reject VYQL-RF-010
+  reject VYQL-AUTH-003
+  reject VYQL-RF-045
+  code
+  ```
+  package org.springframework.security.cas.web.authentication;
+
+  import javax.servlet.http.HttpServletRequest;
+
+  public final class UrlUtils {
+    public static String buildFullRequestUrl(HttpServletRequest r) {
+      return buildFullRequestUrl(r.getScheme(), r.getServerName(), r.getServerPort(), r.getRequestURI(),
+              r.getQueryString());
+    }
+
+    public static String buildFullRequestUrl(String scheme, String serverName, int serverPort, String requestURI,
+            String queryString) {
+      scheme = scheme.toLowerCase();
+      boolean includePort = true;
+      if (serverPort == (scheme.equals("http") ? 80 : 443)) {
+        includePort = false;
+      }
+      return scheme + "://" + serverName + (includePort ? ":" + serverPort : "") + requestURI
+              + (queryString == null ? "" : "?" + queryString);
+    }
+  }
+  ```
+
+test "rank1783: (d) the same request read reaching the same sink through a local -- the positive control for the consumer-side hops, which reports today"
+  lang java
+  file cas/src/main/java/org/springframework/security/cas/web/authentication/ServiceUrlHops.java
+  expect VYQL-INJ-009
+  code
+  ```
+  package org.springframework.security.cas.web.authentication;
+
+  import javax.servlet.http.HttpServletRequest;
+
+  final class ServiceUrlHops {
+    private final Logger logger = LoggerFactory.getLogger(ServiceUrlHops.class);
+    private String saved;
+
+    void localForm(HttpServletRequest request) {
+      String v = request.getRequestURI();
+      logger.debug("saved: " + v);
+    }
+  }
+  ```
+
+test "rank1783: (e) the identical read through a this-qualified field store and load is silent -- the bare-identifier field pair reports, the this-qualified pair does not, in one method"
+  lang java
+  file cas/src/main/java/org/springframework/security/cas/web/authentication/ServiceUrlHops.java
+  reject VYQL-INJ-009
+  code
+  ```
+  package org.springframework.security.cas.web.authentication;
+
+  import javax.servlet.http.HttpServletRequest;
+
+  final class ServiceUrlHops {
+    private final Logger logger = LoggerFactory.getLogger(ServiceUrlHops.class);
+    private String saved;
+
+    void fieldForm(HttpServletRequest request) {
+      this.saved = request.getRequestURI();
+      logger.debug("saved: " + this.saved);
+    }
+  }
+  ```
+
+test "rank1783: (f) the implementor's return through an interface-typed receiver is silent -- the routing carries arguments into the body but not the return to the caller"
+  lang java
+  file cas/src/main/java/org/springframework/security/cas/web/authentication/ServiceUrlDispatch.java
+  reject VYQL-INJ-009
+  code
+  ```
+  package org.springframework.security.cas.web.authentication;
+
+  import javax.servlet.http.HttpServletRequest;
+
+  interface SavedSource {
+    String saved(HttpServletRequest request);
+  }
+
+  final class RequestSavedSource implements SavedSource {
+    public String saved(HttpServletRequest request) {
+      return "u:" + request.getRequestURI();
+    }
+  }
+
+  final class ServiceUrlDispatch {
+    private final Logger logger = LoggerFactory.getLogger(ServiceUrlDispatch.class);
+
+    void variableForm(SavedSource source, HttpServletRequest request) {
+      logger.debug("saved: " + source.saved(request));
+    }
+  }
+  ```
+
+test "rank1783: (g) the consumer's exact spelling -- the same dispatch on a cast-expression receiver -- is silent as well"
+  lang java
+  file cas/src/main/java/org/springframework/security/cas/web/authentication/ServiceUrlDispatch.java
+  reject VYQL-INJ-009
+  code
+  ```
+  package org.springframework.security.cas.web.authentication;
+
+  import javax.servlet.http.HttpServletRequest;
+
+  interface SavedSource {
+    String saved(HttpServletRequest request);
+  }
+
+  final class RequestSavedSource implements SavedSource {
+    public String saved(HttpServletRequest request) {
+      return "u:" + request.getRequestURI();
+    }
+  }
+
+  final class ServiceUrlDispatch {
+    private final Logger logger = LoggerFactory.getLogger(ServiceUrlDispatch.class);
+
+    void castForm(Object source, HttpServletRequest request) {
+      logger.debug("saved: " + ((SavedSource) source).saved(request));
+    }
+  }
+  ```
+
+test "rank1783: (h) the real code's own spelling -- a this-qualified constructor store with a bare getter return, consumed at the sink -- is silent"
+  lang java
+  file cas/src/main/java/org/springframework/security/cas/web/authentication/ServiceUrlCtor.java
+  reject VYQL-INJ-009
+  code
+  ```
+  package org.springframework.security.cas.web.authentication;
+
+  import javax.servlet.http.HttpServletRequest;
+
+  final class ServiceUrlCtor {
+    private final Logger logger = LoggerFactory.getLogger(ServiceUrlCtor.class);
+    private final String serviceUrl;
+
+    ServiceUrlCtor(HttpServletRequest request) {
+      this.serviceUrl = request.getRequestURI();
+    }
+
+    String getServiceUrl() {
+      return serviceUrl;
+    }
+
+    void consume(HttpServletRequest request) {
+      logger.debug("saved: " + new ServiceUrlCtor(request).getServiceUrl());
+    }
+  }
+  ```

@@ -1,0 +1,42 @@
+module bindings.python.http_message_body_framing_conflict;
+
+// RFC 7230 gives an HTTP/1 message exactly one body length, and says what to do
+// when the headers offer two: section 3.3.2 requires a recipient of duplicate
+// Content-Length values to reject the message or merge them into one field, and
+// section 3.3.3 says a message carrying both Transfer-Encoding and
+// Content-Length "might indicate an attempt to perform request smuggling ...
+// and ought to be handled as an error". A parser that stores whichever framing
+// header it sees and moves on is not wrong on its own bytes -- it is wrong
+// relative to the next implementation on the connection, which may take the
+// other reading, so one TCP stream becomes two different request sequences.
+//
+// The method this labels is the one where that obligation lands: the header
+// reader that both stores the parsed header lines and chooses the body framing
+// from them. It is identified by doing all three of those things in one
+// method -- it consults the header store (twisted documents getRawHeaders,
+// setRawHeaders, addRawHeader and getAllRawHeaders on Headers), it decides the
+// fixed-length framing by comparing a header name against content-length, and
+// it decides the chunked framing by comparing against chunked. A method that
+// does only one of them is not where the two readings meet: twisted's response
+// writer asks the store for content-length and emits a Transfer-Encoding chunked
+// header without ever comparing against the name, and the framing helper that
+// validates the values never touches the store, so neither is reported.
+//
+// The negation is the remedy RFC 7230 itself names -- refuse the message --
+// in the spellings a Python parser uses for it: constructing the error it
+// raises, or answering with the framework's error response (stdlib documents
+// send_error; write_error is the aiohttp/tornado spelling). It deliberately
+// does not look for a particular comparison: a parser that refuses the message
+// has discharged the obligation however it spells the test. The residual runs
+// the other way -- a header reader that raises for some unrelated malformed
+// input while still storing conflicting framings is not reported, which is the
+// same trade the Java form of this binding records.
+//
+// This is a property of the parser rather than of any value flowing through it
+// -- there is no untrusted argument to follow, because the attacker's input is
+// the header block the method is parsing -- so it is a presence fact on the
+// method context, not a taint sink.
+binding pythonHttpMessageBodyFramingConflict {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "python" and containsAny(node.context.callPath, ["getRawHeaders", "setRawHeaders", "addRawHeader", "getAllRawHeaders"]) and containsAny(node.context.expr, ["content-length"]) and containsAny(node.context.expr, ["chunked"]) and not (containsAny(node.context.call, ["ValueError", "TypeError", "Exception", "HTTPException", "send_error", "write_error"]))
+  emit issue code.AmbiguousMessageBodyFraming at node
+}

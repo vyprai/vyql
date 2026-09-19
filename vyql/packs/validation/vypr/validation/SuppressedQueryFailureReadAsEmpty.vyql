@@ -1,0 +1,10 @@
+module vypr.validation;
+
+rule SuppressedQueryFailureReadAsEmpty {
+  meta {
+    cwe: [CWE_754, CWE_20]
+    id: "VYQL-VAL-039"
+    severity: medium
+  }
+  issue code.SuppressedQueryFailureReadAsEmpty as guard
+}

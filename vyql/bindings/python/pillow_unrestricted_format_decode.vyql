@@ -1,0 +1,31 @@
+module bindings.python.pillow_unrestricted_format_decode;
+
+// Pillow documents Image.open's `formats` argument as "a list or tuple of
+// formats to attempt to load the file in. This can be used to restrict the set
+// of formats checked", and says that passing None -- the default, and what a
+// call with no `formats` keyword at all does -- tries all supported formats.
+// The plugin that runs is therefore selected by the file's own bytes rather
+// than by the caller, over the whole registered plugin set. One of those
+// plugins is EPS, whose reading Pillow documents as offloading to an external
+// Ghostscript process whenever Ghostscript is installed, so an upload that
+// sniffs as PostScript reaches a program that executes it. An extension
+// whitelist on the uploaded name decides nothing here: the decoder never
+// consults the name.
+//
+// The one restriction the caller can impose is the `formats` keyword, and it is
+// read per call site, so a restricted open and an unrestricted one in the same
+// function are told apart and a safe spelling in one method does not silence an
+// unsafe one elsewhere. Both `Image.open` and `PIL.Image.open` are matched
+// because both are Pillow's own documented import forms. The label is the
+// upload sink the unrestricted-upload rule already judges, so a decode of
+// genuinely local artifacts -- an asset bundled with the code, a file the same
+// process just wrote -- reports nothing: it is the taint requirement that
+// decides, not this binding. Residual, in the false-negative direction only: a
+// string literal argument of the same call containing the substring "formats"
+// satisfies the negation, and Pillow offers no spelling of the restriction
+// other than the keyword.
+binding pythonPillowOpenWithoutFormatRestriction {
+  query pattern callExpr where callee.path in ["Image.open", "PIL.Image.open"]
+    and not (args.any.literal contains "formats")
+  emit sink code.UnsafeUpload at args[0]
+}

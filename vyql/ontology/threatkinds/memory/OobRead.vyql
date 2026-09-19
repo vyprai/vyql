@@ -1,0 +1,6 @@
+module memory;
+
+threat OobRead {
+  cwe: [CWE_125]
+  desc: "Out-of-bounds read"
+}

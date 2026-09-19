@@ -1,0 +1,73 @@
+module bindings.ruby.generated.m8df885c9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("listen")
+  }
+  query pattern callExpr where callee.method == "add_dir"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("listen")
+  }
+  query pattern callExpr where callee.method == "update_file"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("listen")
+  }
+  query pattern callExpr where callee.method == "unset_path"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("listen")
+  }
+  query pattern callExpr where callee.method == "file_data"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("listen")
+  }
+  query pattern callExpr where callee.method == "dir_entries"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("listen")
+  }
+  query pattern callExpr where callee.method == "scan"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("listen")
+  }
+  query pattern callExpr where callee.method == "_async_changes"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("listen")
+  }
+  query pattern callExpr where callee.method == "_change"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("listen")
+  }
+  query pattern callExpr where callee.method == "_children"
+  emit sink code.FilePathAccess at args[0]
+}

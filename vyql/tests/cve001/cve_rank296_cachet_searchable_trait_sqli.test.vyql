@@ -1,0 +1,47 @@
+test "rank296: Cachet searchable scope passes unfiltered request keys to where"
+lang php
+expect VYQL-INJ-050
+expect_review code.UnfilteredSearchWhereColumns
+code
+```
+<?php
+trait SearchableTrait
+{
+    public function scopeSearch(Builder $query, array $search = [])
+    {
+        if (empty($search)) {
+            return $query;
+        }
+
+        if (!array_intersect(array_keys($search), $this->searchable)) {
+            return $query;
+        }
+
+        return $query->where($search);
+    }
+}
+```
+
+test "rank296: Cachet searchable scope filters to allowed search keys"
+lang php
+reject VYQL-INJ-050
+code
+```
+<?php
+trait SearchableTrait
+{
+    public function scopeSearch(Builder $query, array $search = [])
+    {
+        if (empty($search)) {
+            return $query;
+        }
+
+        $allowed_search = array_intersect_key($search, array_flip($this->searchable));
+        if (! $allowed_search) {
+            return $query;
+        }
+
+        return $query->where($allowed_search);
+    }
+}
+```

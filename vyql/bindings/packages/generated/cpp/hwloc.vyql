@@ -1,0 +1,17 @@
+module bindings.cpp.generated.mdff93ce6;
+
+binding xmlParse0 {
+  requires {
+    dependency("hwloc")
+  }
+  query pattern callExpr where callee.method == "hwloc_topology_set_xml"
+  emit sink code.XmlParse at args[0]
+}
+
+binding xmlParse1 {
+  requires {
+    dependency("hwloc")
+  }
+  query pattern callExpr where callee.method == "hwloc_topology_set_xmlbuffer"
+  emit sink code.XmlParse at args[0]
+}

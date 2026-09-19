@@ -1,0 +1,104 @@
+# Rank 1582 / CVE-2024-47830: Plane's web frontend whitelisted every
+# https host as a Next.js remote image source, so the server-side image
+# optimizer fetched attacker-chosen URLs -- including internal
+# addresses -- on behalf of any viewer (server-side request forgery
+# through a wildcard pattern, CWE-918; PR #5452). web/next.config.js
+# configured `images: { remotePatterns: [{ protocol: "https",
+# hostname: "**" }], unoptimized: true }` -- a bare `**` hostname
+# matches every host, so the allowlist excluded nothing. The fixing
+# commit b9f78ba42b ("chore: next image config updated") deletes the
+# remotePatterns block entirely.
+#
+# Detection is the allowlist entry itself: Next.js documents
+# remotePatterns as the list that allows images from specific external
+# paths and blocks all others, and documents that a `**` hostname
+# matches any number of subdomains -- so a bare `**` admits every host
+# while `**.example.com` names one site's subdomains. VYQL-RF-057
+# (code.PermissiveHostAllowlist) reports the module that ships the
+# bare-wildcard entry and stays quiet when the entry names a site or a
+# concrete host, and when the block is absent. `unoptimized` is not a
+# neutraliser: it sets the component default an image can override, and
+# the allowlist the deployment ships is still its fetch surface.
+
+test "rank1582: every https host is an allowed image source"
+  lang javascript
+  file web/next.config.js
+  expect VYQL-RF-057
+  reject VYQL-RF-001
+  code
+  ```
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    output: "standalone",
+    async headers() {
+      return [
+        {
+          source: "/(.*)?",
+          headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+        },
+      ];
+    },
+    images: {
+      remotePatterns: [
+        {
+          protocol: "https",
+          hostname: "**",
+        },
+      ],
+      unoptimized: true,
+    },
+  };
+
+  module.exports = nextConfig;
+  ```
+
+test "rank1582: the fixed revision ships no remote pattern"
+  lang javascript
+  file web/next.config.js
+  reject VYQL-RF-057
+  code
+  ```
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    output: "standalone",
+    async headers() {
+      return [
+        {
+          source: "/(.*)?",
+          headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }],
+        },
+      ];
+    },
+    images: {
+      unoptimized: true,
+    },
+  };
+
+  module.exports = nextConfig;
+  ```
+
+test "rank1582: patterns that name a site stay quiet"
+  lang javascript
+  file web/next.config.js
+  reject VYQL-RF-057
+  code
+  ```
+  /** @type {import('next').NextConfig} */
+  const nextConfig = {
+    images: {
+      remotePatterns: [
+        {
+          protocol: "https",
+          hostname: "**.plane.dev",
+        },
+        {
+          protocol: "https",
+          hostname: "cdn.plane.one",
+        },
+      ],
+      unoptimized: true,
+    },
+  };
+
+  module.exports = nextConfig;
+  ```

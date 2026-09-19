@@ -1,0 +1,9 @@
+module bindings.perl.generated.mfec3490a;
+
+binding deserialization0 {
+  requires {
+    dependency("CGI-XMLApplication")
+  }
+  query pattern callExpr where callee.method == "new"
+  emit sink code.Deserialization at args[0]
+}

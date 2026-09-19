@@ -1,0 +1,36 @@
+module bindings.php.resolveFailureUrlValidationBypass;
+
+// PHP documents gethostbyname() as returning "the IPv4 address of the
+// Internet host specified by hostname or a string containing the unmodified
+// hostname on failure". A URL validator that hands the host to the resolver
+// therefore learns two things from the call: the address, or -- by comparing
+// the answer with the input -- that the name did not resolve. The second
+// case is the one a fetch gate has to fail closed on: a host string the
+// resolver would not interpret is exactly the string an HTTP client may
+// still interpret on its own, and cURL's address parser accepts hex, octal
+// and short integer spellings of `127.0.0.1` that glibc's gethostbyname()
+// rejects outright. A validator that records the failure by assigning a bare
+// `false` back to the resolved variable and then continues -- so the range
+// test that follows is skipped by its own truthiness guard and the function
+// still reaches its accept return -- passes such hosts as safe, and the
+// request that follows connects to an internal address the validator never
+// saw (CWE-918).
+//
+// The discriminator has to correlate two assignments on the same variable:
+// the resolution (`$ip = gethostbyname($host)`) and the falsy sentinel
+// (`$ip = false`), with the documented failure comparison between them. A
+// presence clause cannot unify a variable across two tokens, and an
+// uncorrelated false literal in the same function -- a same-host flag, a
+// status default -- satisfies it just as well, on the patched revision too.
+// The PHP review extractor performs the correlation and emits
+// `resolve_failure_url_validation_bypass`; this binding only turns that fact
+// into the issue. A validator that rejects the failure with `die()`, `exit()`
+// or a `return` does not reset the resolved variable, and one that routes
+// the answer through filter_var() rejects the unmodified-hostname failure
+// return itself, so neither is matched. The residual is a function that
+// resets the resolved variable and rejects on it in a later branch; nothing
+// in the measured reachable set spells it that way.
+binding gethostbynameFailureSentinelNotRejected {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "php" and node.context.phpReview == "resolve_failure_url_validation_bypass"
+  emit issue code.ResolveFailureUrlValidationBypass at node
+}

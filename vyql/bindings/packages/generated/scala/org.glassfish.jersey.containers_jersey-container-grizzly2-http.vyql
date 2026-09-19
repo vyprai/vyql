@@ -1,0 +1,17 @@
+module bindings.scala.generated.mffceebc2;
+
+binding httpInput0 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-grizzly2-http")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit source code.HttpInput at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("org.glassfish.jersey.containers:jersey-container-grizzly2-http")
+  }
+  query pattern callExpr where callee.method == "service"
+  emit sink code.NetworkSend at args[0]
+}

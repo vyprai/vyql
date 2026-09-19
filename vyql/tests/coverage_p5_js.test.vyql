@@ -1,0 +1,33 @@
+# P5 framework depth (js): Prisma raw, Sequelize.literal, Next.js searchParams.
+
+test "js: Next.js searchParams -> Prisma $queryRawUnsafe is SQLi"
+  lang javascript
+  expect VYQL-INJ-001
+  code
+  ```
+  export async function GET(req) {
+    const q = req.nextUrl.searchParams.get("q");
+    return prisma.$queryRawUnsafe("SELECT * FROM users WHERE name = '" + q + "'");
+  }
+  ```
+
+test "js: a constant Prisma raw query is clean"
+  lang javascript
+  reject VYQL-INJ-001
+  code
+  ```
+  export async function GET(req) {
+    return prisma.$queryRawUnsafe("SELECT * FROM users");
+  }
+  ```
+
+test "js: Next.js searchParams -> Sequelize.literal is SQLi"
+  lang javascript
+  expect VYQL-INJ-001
+  code
+  ```
+  export async function GET(req) {
+    const order = req.nextUrl.searchParams.get("order");
+    return Model.findAll({ order: Sequelize.literal(order) });
+  }
+  ```

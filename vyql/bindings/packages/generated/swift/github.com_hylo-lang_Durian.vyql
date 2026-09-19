@@ -1,0 +1,9 @@
+module bindings.swift.generated.m17cf4e35;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/hylo-lang/Durian")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

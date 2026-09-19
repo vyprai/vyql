@@ -1,0 +1,9 @@
+module bindings.go.generated.ma28f9d53;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/xeipuuv/gojsonreference")
+  }
+  query pattern callExpr where callee.method == "NewJsonReference"
+  emit source core.UserControlledData at call.result
+}

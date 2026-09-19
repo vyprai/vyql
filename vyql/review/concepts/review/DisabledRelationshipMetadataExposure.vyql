@@ -1,0 +1,8 @@
+module code;
+
+review code.DisabledRelationshipMetadataExposure {
+  category: auth
+  expected: [core.AuthorizationCheck, core.InputValidation]
+  kind: target
+  text: "verify relationship/resource metadata helpers exclude disabled, inaccessible, or invisible fields before returning relatable targets"
+}

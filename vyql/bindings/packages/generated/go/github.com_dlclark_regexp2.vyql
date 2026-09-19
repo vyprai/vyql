@@ -1,0 +1,32 @@
+module bindings.go.generated.m77b40e56;
+
+binding regexCompile0 {
+  requires {
+    dependency("github.com/dlclark/regexp2")
+  }
+  query pattern callExpr where callee.method == "Compile"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding regexCompile1 {
+  requires {
+    dependency("github.com/dlclark/regexp2")
+  }
+  query pattern callExpr where callee.method == "MustCompile"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("github.com/dlclark/regexp2")
+  }
+  query pattern callExpr where callee.method == "Escape"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

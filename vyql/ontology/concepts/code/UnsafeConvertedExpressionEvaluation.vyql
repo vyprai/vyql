@@ -1,0 +1,11 @@
+module code;
+
+concept UnsafeConvertedExpressionEvaluation : issue {
+  cwe: [CWE_917, CWE_94]
+  reviewAssumption: "the caller supplies the filter or query terms whose identifiers and values the converter re-assembles into the evaluated string"
+  reviewCategory: code_execution
+  reviewCondition: "a filter or query expression is converted into an expression-language string and handed to an expression parser for evaluation instead of being evaluated structurally"
+  reviewConfidence: high
+  reviewEvidence: "expression string assembled by a filter/query converter {pattern} is parsed and evaluated by an expression engine; identifiers the converter does not escape keep their expression-language metacharacters"
+  vulnerableTo: [injection.ExpressionLanguageInjection, injection.CodeInjection]
+}

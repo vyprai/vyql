@@ -1,0 +1,259 @@
+# Node's `vm` module is documented as not being a security mechanism, so a probe
+# that runs an operator-authored synthetic-monitor script through
+# `vm.runInContext(script, sandbox, { timeout })` has exactly one control: what
+# the context object carries. oneuptime's `VMRunner.runCodeInNodeVM` puts a live
+# Playwright `Page` in there, wrapped in a `Proxy` whose `get` trap returns
+# `undefined` for the names in a module-level `BLOCKED_SANDBOX_PROPERTIES` set
+# and `Reflect.get(target, prop)` for everything else.
+#
+# That is a denylist over a live object graph, and Playwright documents how short
+# the graph is: `Page.context()` returns a `BrowserContext`, `.browser()` returns
+# a `Browser`, `Browser.browserType()` returns a `BrowserType`, and the
+# `BrowserType` reference lists five ways to get a browser process --
+# `launch()`, `launchServer()`, `launchPersistentContext()`, `connect()` and
+# `connectOverCDP()`. `launch({ executablePath })` runs an arbitrary binary. At
+# e8e4ee3ff074^ the set named `browserType`, `launch`, `launchPersistentContext`,
+# `connectOverCDP` and `newCDPSession`, so `page.context().browser()
+# .browserType().launchServer({ executablePath: "/bin/sh" })` walked straight
+# through it, as did `connect()` and the `_browserType` alias. Fix commit
+# e8e4ee3ff074 adds `_browserType`, `launchServer` and `connect` to the set; the
+# construct is present at the parent and the remediation at the fixed revision.
+#
+# Detection is a JavaScript module-scope binding,
+# `sandboxHostObjectMemberDenylistOmitsBrowserProcessEntryPoints`, emitting the
+# new `code.SandboxHostObjectMemberDenylistGap` (VYQL-INJ-271, CWE-749/CWE-184).
+# It reads four facts, all of them documented API: the module runs script through
+# `runInNewContext` / `runInThisContext` / `vm.runInContext`, it forwards reads of
+# a wrapped object with `Reflect.get`, and it denies the two names that identify
+# the Playwright traversal -- `browserType` and `launch` -- while naming neither
+# `launchServer` nor `connect`. Each name is matched in the quotes a list entry
+# carries, because a module-scope context carries the module's raw source and the
+# vulnerable file's own comment explains the
+# `browser.browserType().launch(...)` route in prose.
+#
+# Measured on `Common/Server` of both revisions, 817 TypeScript files,
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB`, three runs each:
+# 802 findings / 124 at or above high at e8e4ee3ff074^ and 801 / 123 at
+# e8e4ee3ff074, identical across all three runs on each side, the single delta
+# being VYQL-INJ-271 on `Common/Server/Utils/VM/VMRunner.ts`.
+#
+# Reachable set rather than a subtree sample for the collateral, because
+# oneuptime is a 288MB monorepo: exactly one file in the whole tree carries a
+# `node:vm` run call at all, and it is `VMRunner.ts`. Across the 210 other corpus
+# checkouts, 177 files carry a `node:vm` run call, 32 of those also call
+# `Reflect.get`, and none of the 32 carries a quoted `browserType` -- every one is
+# a vendored bundle (LimeSurvey webpack builds, yarn 4.0.2 releases) above the
+# scanner's per-file source cap, so the reachable set outside oneuptime is zero
+# either way.
+#
+# Concepts considered before minting: `code.SandboxFacadeWholesaleMemberCopy` is
+# the nearest neighbour, but its condition is a facade *populated by copying every
+# own property descriptor* of the host object, and nothing is copied here -- a
+# Proxy forwards reads and a name set refuses some, so its name and its evidence
+# text would misreport this module. `code.Vm2HostCallbackBridge` describes a
+# sandbox exposing host callbacks or globals while sandbox code runs, which is
+# equally true of both revisions and so is not the defect, and its wording is
+# written about vm2's `VM`/`sandbox` API.
+# `code.IncompleteKeyDenylistGuardedReadPrototypePollution` and
+# `code.SegmentedKeyDenylistBypassPrototypePollution` have the denylist shape but
+# are about `__proto__`/`constructor` on plain objects and are vulnerable to
+# prototype pollution, not code execution. `code.H2oJdbcDisallowedParameterDenylistGap`
+# and `code.PickleUnsafeImportBlocklistGap` are denylist-gap concepts whose
+# conditions name one product's parameter or import namespace rather than a
+# sandbox's host-object graph. `code.CodeEval` is labelled on
+# `vm.runInContext` at both revisions, so a sink label cannot separate them.
+
+test "rank1492: a node vm sandbox forwards a Playwright page behind a denylist that omits the browser-process entry points"
+  lang javascript
+  file Common/Server/Utils/VM/VMRunner.ts
+  expect VYQL-INJ-271
+  expect_review code.SandboxHostObjectMemberDenylistGap
+  code
+  ```
+  import vm, { Context } from "vm";
+
+  /*
+   * Block Playwright methods that can spawn processes or access internals.
+   * Prevents RCE via browser.browserType().launch({executablePath:"/bin/sh"})
+   * and traversal via page.context().browser().browserType().launch(...)
+   */
+  const BLOCKED_SANDBOX_PROPERTIES: ReadonlySet<string> = new Set([
+    "constructor",
+    "__proto__",
+    "prototype",
+    "browserType",
+    "launch",
+    "launchPersistentContext",
+    "connectOverCDP",
+    "newCDPSession",
+  ]);
+
+  function createSandboxProxy(value: unknown): unknown {
+    if (value === null || typeof value !== "object") {
+      return value;
+    }
+
+    return new Proxy(value as Record<string, unknown>, {
+      get(target: Record<string, unknown>, prop: string | symbol): unknown {
+        if (typeof prop === "string" && BLOCKED_SANDBOX_PROPERTIES.has(prop)) {
+          return undefined;
+        }
+        return createSandboxProxy(Reflect.get(target, prop, target));
+      },
+      getPrototypeOf(): null {
+        return null;
+      },
+    });
+  }
+
+  export default class VMRunner {
+    public static async runCodeInNodeVM(data: {
+      code: string;
+      options: { timeout?: number; context?: Record<string, unknown> };
+    }): Promise<unknown> {
+      const { code, options } = data;
+      const sandbox: Context = Object.create(null) as Context;
+
+      if (options.context) {
+        for (const key of Object.keys(options.context)) {
+          sandbox[key] = createSandboxProxy(options.context[key]);
+        }
+      }
+
+      vm.createContext(sandbox, {
+        codeGeneration: { strings: false, wasm: false },
+      });
+
+      return vm.runInContext(`(async()=>{ ${code} })()`, sandbox, {
+        timeout: options.timeout || 5000,
+      });
+    }
+  }
+  ```
+
+test "rank1492: the sandbox denylist names every documented browser-process entry point"
+  lang javascript
+  file Common/Server/Utils/VM/VMRunner.ts
+  reject VYQL-INJ-271
+  reject_review code.SandboxHostObjectMemberDenylistGap
+  code
+  ```
+  import vm, { Context } from "vm";
+
+  /*
+   * Block Playwright methods that can spawn processes or access internals.
+   * Prevents RCE via browser.browserType().launch({executablePath:"/bin/sh"})
+   * and traversal via page.context().browser().browserType().launch(...)
+   */
+  const BLOCKED_SANDBOX_PROPERTIES: ReadonlySet<string> = new Set([
+    "constructor",
+    "__proto__",
+    "prototype",
+    "browserType",
+    "_browserType",
+    "launch",
+    "launchServer",
+    "launchPersistentContext",
+    "connectOverCDP",
+    "connect",
+    "newCDPSession",
+  ]);
+
+  function createSandboxProxy(value: unknown): unknown {
+    if (value === null || typeof value !== "object") {
+      return value;
+    }
+
+    return new Proxy(value as Record<string, unknown>, {
+      get(target: Record<string, unknown>, prop: string | symbol): unknown {
+        if (typeof prop === "string" && BLOCKED_SANDBOX_PROPERTIES.has(prop)) {
+          return undefined;
+        }
+        return createSandboxProxy(Reflect.get(target, prop, target));
+      },
+      getPrototypeOf(): null {
+        return null;
+      },
+    });
+  }
+
+  export default class VMRunner {
+    public static async runCodeInNodeVM(data: {
+      code: string;
+      options: { timeout?: number; context?: Record<string, unknown> };
+    }): Promise<unknown> {
+      const { code, options } = data;
+      const sandbox: Context = Object.create(null) as Context;
+
+      if (options.context) {
+        for (const key of Object.keys(options.context)) {
+          sandbox[key] = createSandboxProxy(options.context[key]);
+        }
+      }
+
+      vm.createContext(sandbox, {
+        codeGeneration: { strings: false, wasm: false },
+      });
+
+      return vm.runInContext(`(async()=>{ ${code} })()`, sandbox, {
+        timeout: options.timeout || 5000,
+      });
+    }
+  }
+  ```
+
+test "rank1492: a compiled script run through runInNewContext carries the same incomplete denylist"
+  lang javascript
+  file src/worker/sandbox.js
+  expect VYQL-INJ-271
+  expect_review code.SandboxHostObjectMemberDenylistGap
+  code
+  ```
+  const { Script } = require('node:vm');
+
+  const denied = new Set(['browserType', 'launch', 'launchPersistentContext', 'newCDPSession']);
+
+  function guard(host) {
+    return new Proxy(host, {
+      get(target, prop) {
+        if (denied.has(prop)) {
+          return undefined;
+        }
+        return guard(Reflect.get(target, prop, target));
+      },
+    });
+  }
+
+  module.exports = function run(source, page, timeout) {
+    const script = new Script(source);
+    return script.runInNewContext({ page: guard(page) }, { timeout });
+  };
+  ```
+
+test "rank1492: a Playwright launcher that runs no sandboxed script is not a sandbox facade"
+  lang javascript
+  file src/browser/launcher.js
+  reject VYQL-INJ-271
+  reject_review code.SandboxHostObjectMemberDenylistGap
+  code
+  ```
+  // Ordinary browser-pool code. It names "browserType" and "launch" because that
+  // is the API it drives, and it reads properties reflectively off a config
+  // object, but nothing here runs author-supplied script against the result.
+  const { chromium } = require('playwright');
+
+  const SUPPORTED = new Set(['browserType', 'launch']);
+
+  function readOption(config, prop) {
+    if (!SUPPORTED.has(prop)) {
+      return undefined;
+    }
+    return Reflect.get(config, prop, config);
+  }
+
+  async function open(config) {
+    return chromium.launch({ headless: readOption(config, 'launch') !== false });
+  }
+
+  module.exports = { open, readOption };
+  ```

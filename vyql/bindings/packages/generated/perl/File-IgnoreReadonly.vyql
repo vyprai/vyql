@@ -1,0 +1,9 @@
+module bindings.perl.generated.mfaaf2f64;
+
+binding filePathAccess0 {
+  requires {
+    dependency("File-IgnoreReadonly")
+  }
+  query pattern callExpr where callee.method == "chmod"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,186 @@
+# Rank 1937 / CVE-2021-44079: the wazuh-slack active-response script read an
+# alert from stdin (the alert's fields, including the user agent, are
+# attacker-supplied log data), re-serialized it with cJSON and spliced the
+# result into a curl command line with snprintf, then handed the line to
+# system() (CWE-77). The fixed revision a121e732cd4885a9630b890c04e94c6ba4b75038 replaces
+# the assembled line with an argv array passed to wpopenv(), which launches
+# without a shell, and applies the same rewrite to the sibling scripts
+# firewalld-drop.c, netsh.c and route-null.c.
+#
+# Detection ships as a C presence binding widening the existing
+# code.CommandLineAssemblyReview concept (VYQL-INJ-053) to the plain libc
+# idiom: a function that appends values after a snprintf format string and
+# launches a variable command with system() or popen(). The glib route
+# (commandLineAssemblyReview22) covered one library's spelling of the
+# same class; this one answers to snprintf(3)'s own documentation rather than
+# to this incident. No taint path is needed, and none exists today: see the
+# last two tests.
+#
+# Measured. On the real src/active-response subtree the review fires 6 findings
+# at the vulnerable revision (the slack script, the three siblings this commit
+# fixed, one same-shape pf.c helper the commit did not touch, and one
+# restart-wazuh.c function where an error-log snprintf co-occurs with a
+# constant-command system) and 3 at the fixed revision; wazuh-slack.c itself
+# goes 1 -> 0. Across the rest of the wazuh tree's launch-carrying subtrees
+# (rootcheck, logcollector, os_maild, os_crypto, shared, syscheckd) it adds 12
+# more, all the assembled-command idiom, and drops one constant
+# popen("uname") that the variable-shaped launch clause excludes. Other C
+# trees: unbound 0, tigervnc 0, wavpack 0, vim 1 (its VMS mms front end, which
+# builds the mms command line from argv and runs system()). The full spec
+# suite passes.
+#
+# The final two tests pin the taint-route residual: the guard-shaped read
+# if (fgets(...) == NULL) never taints the buffer, because the cReaders
+# rewriting in exprStmt (c.go) fires only for statement-position calls, so
+# VYQL-INJ-002 reports the bare-statement spelling and not the guarded one.
+# That is the 1206 read-source family in a new syntactic position, with two
+# further blockers behind it (the unresolved cJSON_ParseWithOpts call and the
+# *message out-parameter), so the review binding above is what carries this
+# weakness today.
+
+test "rank1937: slack script splices re-serialized alert JSON into a curl command line"
+  lang c
+  file src/active-response/wazuh-slack.c
+  expect VYQL-INJ-053
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+
+  #define OS_MAXSTR 65536
+
+  static void *parse_input(const char *input);
+  static const void *get_alert_from_json(const void *input_json);
+  static char *get_extra_args_from_json(const void *input_json);
+  static void *format_output(const void *alert_json);
+  static char *print_unformatted(void *output_json);
+
+  int main(int argc, char **argv) {
+      (void)argc;
+      char input[OS_MAXSTR];
+      char system_command[OS_MAXSTR];
+      char *site_url;
+      char *output_str;
+      void *input_json = NULL;
+
+      if (fgets(input, OS_MAXSTR, stdin) == NULL) {
+          return 1;
+      }
+      input_json = parse_input(input);
+
+      const void *alert_json = get_alert_from_json(input_json);
+      site_url = get_extra_args_from_json(input_json);
+      output_str = print_unformatted(format_output(alert_json));
+
+      memset(system_command, '\0', OS_MAXSTR);
+      snprintf(system_command, OS_MAXSTR - 1,
+          "curl -H \"Accept: application/json\" -d '%s' %s", output_str, site_url);
+      if (system(system_command) != 0) {
+          return 1;
+      }
+      return 0;
+  }
+  ```
+
+test "rank1937: fix passes an argv array to wpopenv instead of a shell command line"
+  lang c
+  file src/active-response/wazuh-slack.c
+  reject VYQL-INJ-053
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+  #include <string.h>
+  #include <sys/wait.h>
+
+  #define OS_MAXSTR 65536
+
+  typedef struct wfd_t wfd_t;
+  #define W_BIND_STDOUT 2
+  #define W_BIND_STDERR 4
+
+  static void *parse_input(const char *input);
+  static char *get_extra_args_from_json(const void *input_json);
+  static void *format_output(const void *alert_json);
+  static char *print_unformatted(void *output_json);
+  static wfd_t *wpopenv(const char *command, char *const argv[], int flags);
+  static int wpclose(wfd_t *wfd);
+
+  int main(int argc, char **argv) {
+      (void)argc;
+      char input[OS_MAXSTR];
+      char *site_url;
+      char *output_str;
+      void *input_json = NULL;
+
+      if (fgets(input, OS_MAXSTR, stdin) == NULL) {
+          return 1;
+      }
+      input_json = parse_input(input);
+
+      site_url = get_extra_args_from_json(input_json);
+      output_str = print_unformatted(format_output(get_alert_from_json(input_json)));
+
+      bool success_command = false;
+      char *exec_cmd1[9] = { "curl", "-H", "Accept: application/json", "-H",
+          "Content-Type: application/json", "-d", output_str, site_url, NULL };
+
+      wfd_t *wfd = wpopenv("curl", exec_cmd1, W_BIND_STDOUT | W_BIND_STDERR);
+      if (wfd) {
+          char buffer[4096];
+          while (fgets(buffer, sizeof(buffer), wfd->file_out)) {
+          }
+          if (WIFEXITED(wpclose(wfd)) && WEXITSTATUS(wpclose(wfd)) == 0) {
+              success_command = true;
+          }
+      }
+      return success_command ? 0 : 1;
+  }
+  ```
+
+test "rank1937: the guard-shaped read keeps the taint rule off the assembled line"
+  lang c
+  file src/active-response/wazuh-slack.c
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  #define OS_MAXSTR 65536
+
+  int main(void) {
+      char input[OS_MAXSTR];
+      char system_command[OS_MAXSTR];
+
+      if (fgets(input, OS_MAXSTR, stdin) == NULL) {
+          return 1;
+      }
+      snprintf(system_command, OS_MAXSTR - 1,
+          "curl -H \"Accept: application/json\" -d '%s' http://hooks.invalid/x", input);
+      return system(system_command);
+  }
+  ```
+
+test "rank1937: the same read as a bare statement does reach the taint rule"
+  lang c
+  file src/active-response/wazuh-slack.c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <stdio.h>
+  #include <stdlib.h>
+
+  #define OS_MAXSTR 65536
+
+  int main(void) {
+      char input[OS_MAXSTR];
+      char system_command[OS_MAXSTR];
+
+      fgets(input, OS_MAXSTR, stdin);
+      snprintf(system_command, OS_MAXSTR - 1,
+          "curl -H \"Accept: application/json\" -d '%s' http://hooks.invalid/x", input);
+      return system(system_command);
+  }
+  ```

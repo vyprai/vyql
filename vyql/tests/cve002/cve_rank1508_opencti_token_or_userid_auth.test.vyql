@@ -1,0 +1,158 @@
+# OpenCTI authenticated a request by treating one credential field as either
+# an API token or a user identifier (CWE-287).
+# `authenticateUserByTokenOrUserId` in
+# `opencti-platform/opencti-graphql/src/domain/user.js` did
+#   if (platformUsers.has(tokenOrId)) { let authenticatedUser =
+# platformUsers.get(tokenOrId); ... }
+# -- a map lookup with no secret comparison, so knowledge of a user's id alone
+# authenticated as that user, and the `opencti-applicant-id` header could then
+# impersonate further via `isBypassUser`.
+#
+# Fix `519631866736d413873045f2c8f0c1c4e0df867a`
+# ("[backend] User authentication refactoring (#14267)", a single-parent
+# squash merge whose diff reads normally once the leading
+# `opencti-platform/` segment is kept) splits the conflation into
+# `authenticateUserByToken`, which looks the user up by token and then requires
+# `crypto.timingSafeEqual(Buffer.from(user.api_token), Buffer.from(token))`,
+# and `authenticateUserByUserId`, used only where the id comes from an
+# already-identified context.
+#
+# Held miss. The weakness is an authentication decision on an identifier
+# instead of a secret -- a map-membership check standing in for credential
+# verification, with no dataflow to a sink. The corpus vocabulary reaches one
+# edge of the fix: `VYQL-CRY-006` treats `timingSafeEqual` as the safe
+# comparison form for secrets, which is exactly what the fixed revision
+# adopts. The other edge is still missing: nothing states "this lookup
+# authenticates" or "this value is a credential" for application-owned
+# authentication code, so no rule can require the comparison. The third block
+# below is the reason no function-scope shape can be written instead: it is
+# the fix's own `authenticateUserByUserId`, byte-for-byte the same body as the
+# vulnerable function -- cache fetch, `Map.has(param)`, `Map.get(param)`,
+# return the resolved object, no secret comparison -- and it is correct,
+# because what differs is which credential the caller spends, not anything in
+# the function.
+
+test "rank1508: the credential field is used as token or user id"
+  lang javascript
+  file opencti-platform/opencti-graphql/src/domain/user.js
+  reject VYQL-CRY-006
+  code
+  ```
+  export const authenticateUserByTokenOrUserId = async (context, req, tokenOrId) => {
+    const platformUsers = await getEntitiesMapFromCache(context, SYSTEM_USER, ENTITY_TYPE_USER);
+    if (platformUsers.has(tokenOrId)) {
+      let authenticatedUser = platformUsers.get(tokenOrId);
+      const settings = await getEntityFromCache(context, SYSTEM_USER, ENTITY_TYPE_SETTINGS);
+      const applicantId = req.headers['opencti-applicant-id'];
+      if (applicantId && isBypassUser(authenticatedUser)) {
+        authenticatedUser = platformUsers.get(applicantId) || INTERNAL_USERS[applicantId];
+        if (!authenticatedUser) {
+          throw FunctionalError(`Cant impersonate applicant ${applicantId}`);
+        }
+      }
+      validateUser(authenticatedUser, settings);
+      return userWithOrigin(req, authenticatedUser);
+    }
+    throw new Error(`Cant identify with ${tokenOrId}`);
+  };
+  ```
+
+test "rank1508: the fixed revision compares the token in constant time"
+  lang javascript
+  file opencti-platform/opencti-graphql/src/domain/user.js
+  reject VYQL-CRY-006
+  code
+  ```
+  import crypto from 'crypto';
+
+  export const authenticateUserByToken = async (context, req, token) => {
+    const platformUsers = await getEntitiesMapFromCache(context, SYSTEM_USER, ENTITY_TYPE_USER);
+    if (platformUsers.has(token)) {
+      const user = platformUsers.get(token);
+      if (crypto.timingSafeEqual(Buffer.from(user.api_token), Buffer.from(token))) {
+        return internalAuthenticateUser(context, req, user);
+      }
+    }
+    throw new Error('Cannot identify user with token');
+  };
+  ```
+
+test "rank1508: the fix's own id path has the same body and no comparison"
+  lang javascript
+  file opencti-platform/opencti-graphql/src/domain/user.js
+  reject VYQL-CRY-006
+  code
+  ```
+  export const authenticateUserByUserId = async (context, req, userId) => {
+    const platformUsers = await getEntitiesMapFromCache(context, SYSTEM_USER, ENTITY_TYPE_USER);
+    if (platformUsers.has(userId)) {
+      const user = platformUsers.get(userId);
+      return internalAuthenticateUser(context, req, user);
+    }
+    throw new Error('Cannot identify user with id');
+  };
+
+  const internalAuthenticateUser = async (context, req, user) => {
+    let authenticatedUser = user;
+    const settings = await getEntityFromCache(context, SYSTEM_USER, ENTITY_TYPE_SETTINGS);
+    const applicantId = req.headers['opencti-applicant-id'];
+    if (applicantId && isBypassUser(authenticatedUser)) {
+      const platformUsers = await getEntitiesMapFromCache(context, SYSTEM_USER, ENTITY_TYPE_USER);
+      authenticatedUser = platformUsers.get(applicantId) || INTERNAL_USERS[applicantId];
+      if (!authenticatedUser) {
+        throw new Error(`Cant impersonate applicant ${applicantId}`);
+      }
+    }
+    validateUser(authenticatedUser, settings);
+    return userWithOrigin(req, authenticatedUser);
+  };
+  ```
+
+# ## Recheck measurements
+#
+# Re-measured against the knowledge base as it stands, at the span tip.
+# Three `--cache off` runs on `opencti-platform/opencti-graphql/src/domain` at
+# `5196318667^` and at `5196318667`, `timeout 180` and `--max-ram 6GB`:
+# **17 findings / 3 at or above high at both revisions, all six runs**, and the
+# rule+file+line multisets are byte-identical once the fix's own line shift is
+# normalised away (md5 `41e066644d3cee50dc178fb1a03c61de` over all six). The
+# wider `opencti-graphql/src` tree gives **271 findings at or above high at
+# both revisions** with the same `user.js` rows. Nothing discriminates.
+#
+# The full findings view and the `-flags only` view were both read: 17 findings
+# plus 12 flags at each revision, and the only `user.js` flags are five
+# `code.SecretComparisonReview` at 246/491/625/967/1069 (247/492/626/968/1070
+# after the fix) on `__binop.===` comparisons elsewhere in the file -- none on
+# the authentication decision. `vyql match` shows the only labels near the
+# authentication path are `code.HttpInput` on the `req.headers` reads and a
+# `code.SqlExecution` that `javascript.sinks@syntactic` puts on
+# `getEntitiesMapFromCache` (a cache fetch, not a query); the resulting
+# `VYQL-INJ-001` row is present at both revisions and its taint path runs
+# through `authenticateUserByTokenOrUserId#param#tokenOrId` before the fix and
+# through `authenticateUserByToken#param#token` after it, so it does not
+# separate them either.
+#
+# Half of the recorded vocabulary gap has since been filled:
+# `code.UnverifiedCredential` now exists as a source concept for "credential
+# material a peer handed over that has not been verified", with
+# `VYQL-AUTH-152` consuming it against `code.ConnectionStateWrite`. The other
+# half is still absent -- `SessionIdSink` (CWE-384) is the only
+# authentication-flavoured sink concept, `core.AuthenticationCheck` is an
+# endpoint-level missing-authentication control rather than a marker for "this
+# function is the authentication decision", and `core/` has no
+# constant-time-comparison control at all, so a taint rule could not hang an
+# `unless` on the fix's own `crypto.timingSafeEqual`; those names survive only
+# as inlined negations in three `mfb63017a.vyql` bindings.
+#
+# The best generic function-scope shape was probed and measured rather than
+# asserted: a function containing a `get`/`has` call with no constant-time
+# comparison in scope labels **35 of the 103 functions in `user.js` at both
+# revisions** -- at 1639 before the fix and at 1651 (`authenticateUserByUserId`)
+# and 1660 (`internalAuthenticateUser`) after it, the two correct functions the
+# fix itself introduces. Corpus collateral: **1606** labels on audiobookshelf,
+# **670** on arcane, **41** on angular-expressions. Requiring the comparison
+# instead would fire on every `sessions.get(token)`-shaped validator, whose map
+# key already is the secret.
+#
+# No definition is touched, so the OWASP Java and Python numbers are unaffected
+# by this rank.

@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mddc6cf00;
+
+binding deserialization0 {
+  requires {
+    dependency("webmock")
+  }
+  query pattern callExpr where callee.method == "WebMock::Util::Parsers::XML.parse"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.perl.generated.m50c9a827;
+
+binding secretValue0 {
+  requires {
+    dependency("PlugAuth")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit source code.SecretValue at call.result
+}

@@ -1,0 +1,9 @@
+module bindings.elixir.generated.m06fb4c38;
+
+binding userControlledData0 {
+  requires {
+    dependency("scrivener_html")
+  }
+  query pattern callExpr where callee.method == "pagination_links"
+  emit source core.UserControlledData at call.result
+}

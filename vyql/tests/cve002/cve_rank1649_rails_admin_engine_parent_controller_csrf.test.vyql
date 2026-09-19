@@ -1,0 +1,244 @@
+# Rank 1649 / CVE-2016-10522: rails_admin's engine controllers inherited
+# a runtime-configured parent controller whose default, since 53eef4fe
+# ("Change parent controller to ActionController::Base for out-of-box
+# support of Rails 5 API mode"), is '::ActionController::Base' -- a base
+# that carries no forgery protection of its own -- so every
+# state-changing admin endpoint (create, edit, delete, bulk destroy)
+# accepted cross-site requests with no CSRF token (CWE-352; reported by
+# SourceClear). The engine controller in app/controllers/rails_admin/
+# application_controller.rb declares `class ApplicationController <
+# Config.parent_controller.constantize` with before_action
+# authentication and authorization filters and no protect_from_forgery
+# of its own; the default that actually decides the protection,
+# `@parent_controller = '::ActionController::Base'`, sits in
+# lib/rails_admin/config.rb:290. The fixing commit b13e879eb9
+# ("[Security] Fixes CSRF vulnerability, introduced by
+# 53eef4fe2ec0953381f4e3197c885adc0423dd49", +2 lines of code): the
+# engine's ApplicationController now declares
+# `protect_from_forgery with: :exception` itself, so protection no
+# longer depends on the configured parent.
+#
+# ATTENTION, class-level guard attribution, held on recheck. Re-measured
+# at the span tip (3 x --cache off per revision, timeout 180, --max-ram
+# 6GB): the tree reports 50 findings at the fix parent and 50 at the
+# fix, identical sets by fingerprint diff (0 added, 0 removed, all three
+# runs each side), all unrelated (INJ-004 on the asset javascript,
+# RF-002 redirects, AUTH-002); the full findings view plus -flags with
+# gives 117 review flags at the parent and 119 at the fix, the delta
+# being exactly the fix's own core.CsrfProtection label on
+# application_controller.rb:14 and an ObjectLookupByUserInput on the
+# integration spec the fix commit adds. No rule shipped since the first
+# pass fires on the vulnerable revision.
+#
+# The first pass's diagnosis is half corrected by the re-measurement:
+# the taint route is not blocked. VYQL-INJ-012 already reports the
+# mass-assignment path lib/rails_admin/config/actions/edit.rb:27 ->
+# lib/rails_admin/adapters/active_record/abstract_object.rb:19, so
+# `@object.set_attributes(params[@abstract_model.param_key])` resolves
+# through the wrapper into `object.assign_attributes(attributes)` and
+# the params reach the write. What is missing is narrower: a
+# code.StateChangingOpSink binding for the documented Rails
+# mass-assignment API, and a guard relation that can see the class-level
+# forgery declaration. Measured with a throwaway binding emitting
+# code.StateChangingOpSink at args[0] of assign_attributes/
+# update_attributes/set_attributes: VYQL-RF-003 fires four times at the
+# parent AND four times, same fingerprints, at the fix (new.rb:23->25,
+# new.rb:38, and edit.rb:27 twice, once via abstract_object.rb:19) --
+# zero discrimination, and four findings sitting on the remediated
+# revision. The suppression clause is why: `unless endpoint coveredBy
+# core.CsrfProtection` only connects a guard in the same function
+# (sameFunctionContextGuarded, internal/engine/engine.go:1216, requires
+# an identical functionScopeKey, and a class-body macro carries no fn
+# key at all) or one that dominates the sink in one function's CFG. A
+# class-body protect_from_forgery never covers a method body, and the
+# real shape is one step wider still -- the declaration sits in the
+# engine's ApplicationController while the write runs in an action proc
+# registered from lib/rails_admin/config/actions/edit.rb.
+#
+# The minimal pair at the bottom isolates exactly that construct: the
+# same guarded controller with the write in a method reports VYQL-RF-003
+# under the probe while moving the guard call into the method suppresses
+# it, one line apart. Adding the relation is not a localised correction
+# -- it is a new coverage route (a control emitted at class scope
+# covers the class's methods and subclasses), shared by every language
+# that emits a class-level control with `covers endpoint` (dart, python,
+# go, scala, groovy, elixir, lua, csharp, php, ruby), and it needs
+# argument awareness to stay sound: Rails' `only:`/`except:`/`with:`
+# options and `skip_before_action :verify_authenticity_token` opt-outs
+# are the distinction the shipped RailsBasicAuthWeakCsrfStrategy binding
+# already keys on, and the parent here is resolved at runtime
+# (`Config.parent_controller.constantize`), which no frontend resolves.
+#
+# The presence route stays unshippable for the same reason as the first
+# pass found: a class-scope binding on the dynamic-superclass idiom
+# (`classBase contains "constantize"` with no protect_from_forgery in
+# the class body) does fire 1 -> 0 on this repository, but it keys on
+# the idiom rather than the weakness -- the documented safe
+# configuration (`config.parent_controller = '::ApplicationController'`)
+# and Devise's identical `parent_controller.constantize` idiom leave the
+# controller file textually identical while inheriting protection from
+# the host application's ApplicationController, because the deciding
+# value lives in another file (lib/rails_admin/config.rb:290 against the
+# application's initializer). Across the pool clones only this
+# repository carries the idiom at all, so the false-positive rate of the
+# idiom binding cannot even be measured on the corpus. No pool
+# correction: b13e879eb9 is the real fix.
+#
+# The spec pins five forms, all rejecting VYQL-RF-003 today: the engine
+# controller as shipped and as fixed, the edit action's write proc, and
+# the guarded and unguarded canonical controller. When the
+# state-changing sink vocabulary and the class-level guard relation land
+# together, the unguarded canonical form and the two real-code forms
+# must flip to expect while the guarded form and the fixed engine
+# controller must stay rejected.
+
+test "rank1649: the engine controller inherits the configured parent with no forgery declaration of its own"
+  lang ruby
+  file app/controllers/rails_admin/application_controller.rb
+  reject VYQL-RF-003
+  code
+  ```
+  require 'rails_admin/abstract_model'
+
+  module RailsAdmin
+    class ApplicationController < Config.parent_controller.constantize
+      before_action :_authenticate!
+      before_action :_authorize!
+      before_action :_audit!
+
+      helper_method :_current_user, :_get_plugin_name
+
+      attr_reader :object, :model_config, :abstract_model, :authorization_adapter
+
+      def get_model
+        @model_name = to_model_name(params[:model_name])
+        raise(RailsAdmin::ModelNotFound) unless (@abstract_model = RailsAdmin::AbstractModel.new(@model_name))
+        raise(RailsAdmin::ModelNotFound) if (@model_config = @abstract_model.config).excluded?
+        @properties = @abstract_model.properties
+      end
+
+      def get_object
+        raise(RailsAdmin::ObjectNotFound) unless (@object = @abstract_model.get(params[:id]))
+      end
+
+      def to_model_name(param)
+        param.split('~').collect(&:camelize).join('::')
+      end
+    end
+  end
+  ```
+
+test "rank1649: the fixed revision declares forgery protection in the engine controller itself"
+  lang ruby
+  file app/controllers/rails_admin/application_controller.rb
+  reject VYQL-RF-003
+  code
+  ```
+  require 'rails_admin/abstract_model'
+
+  module RailsAdmin
+    class ApplicationController < Config.parent_controller.constantize
+      protect_from_forgery with: :exception
+
+      before_action :_authenticate!
+      before_action :_authorize!
+      before_action :_audit!
+
+      helper_method :_current_user, :_get_plugin_name
+
+      attr_reader :object, :model_config, :abstract_model, :authorization_adapter
+
+      def get_model
+        @model_name = to_model_name(params[:model_name])
+        raise(RailsAdmin::ModelNotFound) unless (@abstract_model = RailsAdmin::AbstractModel.new(@model_name))
+        raise(RailsAdmin::ModelNotFound) if (@model_config = @abstract_model.config).excluded?
+        @properties = @abstract_model.properties
+      end
+
+      def get_object
+        raise(RailsAdmin::ObjectNotFound) unless (@object = @abstract_model.get(params[:id]))
+      end
+
+      def to_model_name(param)
+        param.split('~').collect(&:camelize).join('::')
+      end
+    end
+  end
+  ```
+
+test "rank1649: the edit action applies request parameters to the object"
+  lang ruby
+  file lib/rails_admin/config/actions/edit.rb
+  reject VYQL-RF-003
+  code
+  ```
+  module RailsAdmin
+    module Config
+      module Actions
+        class Edit < RailsAdmin::Config::Actions::Base
+          register_instance_option :http_methods do
+            [:get, :put]
+          end
+
+          register_instance_option :controller do
+            proc do
+              if request.get?
+                respond_to do |format|
+                  format.html { render @action.template_name }
+                end
+              elsif request.put?
+                sanitize_params_for!(request.xhr? ? :modal : :update)
+
+                @object.set_attributes(params[@abstract_model.param_key])
+                @authorization_adapter && @authorization_adapter.attributes_for(:update, @abstract_model).each do |name, value|
+                  @object.send("#{name}=", value)
+                end
+                changes = @object.changes
+                if @object.save
+                  @auditing_adapter && @auditing_adapter.update_object(@object, @abstract_model, _current_user, changes)
+                  respond_to do |format|
+                    format.html { redirect_to_on_success }
+                  end
+                else
+                  handle_save_error :edit
+                end
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1649: a class-body forgery declaration must cover the action that writes"
+  lang ruby
+  file app/controllers/posts_controller.rb
+  reject VYQL-RF-003
+  code
+  ```
+  class PostsController < ApplicationController
+    protect_from_forgery with: :exception
+
+    def create
+      @post = Post.new
+      @post.assign_attributes(params[:post])
+      @post.save
+    end
+  end
+  ```
+
+test "rank1649: an action that mass-assigns request parameters with no forgery declaration"
+  lang ruby
+  file app/controllers/posts_controller.rb
+  reject VYQL-RF-003
+  code
+  ```
+  class PostsController < ApplicationController
+    def create
+      @post = Post.new
+      @post.assign_attributes(params[:post])
+      @post.save
+    end
+  end
+  ```

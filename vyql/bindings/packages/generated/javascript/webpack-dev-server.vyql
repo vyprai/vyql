@@ -1,0 +1,86 @@
+module bindings.javascript.generated.m27cf45a6;
+
+binding networkSend0 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "sanitize"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding networkConnect3 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "proxyUpgrade"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkBind4 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "createWebSocketServer"
+  emit sink code.NetworkBind at args[0]
+}
+
+binding urlFetch5 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "openBrowser"
+  emit sink code.UrlFetch at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "readFile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "setupWatchStaticFiles"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "setupWatchFiles"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding commandExecution9 {
+  requires {
+    dependency("webpack-dev-server")
+  }
+  query pattern callExpr where callee.method == "launchEditor"
+  emit sink code.CommandExecution at args[0]
+}

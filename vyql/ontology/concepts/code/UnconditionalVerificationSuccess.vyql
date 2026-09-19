@@ -1,0 +1,11 @@
+module code;
+
+concept UnconditionalVerificationSuccess : issue {
+  cwe: [CWE_347, CWE_494]
+  reviewAssumption: "the routine is the only verification step between obtaining an artifact and trusting or executing it"
+  reviewCategory: crypto
+  reviewCondition: "a signature, checksum or integrity verification routine reports success without performing any check"
+  reviewConfidence: high
+  reviewEvidence: "verification routine context {pattern} returns only the success value and its body performs no call, comparison or assignment"
+  vulnerableTo: [crypto.ImproperSignatureCheck, supply_chain.MaliciousCode]
+}

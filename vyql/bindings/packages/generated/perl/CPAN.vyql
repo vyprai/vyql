@@ -1,0 +1,17 @@
+module bindings.perl.generated.mca17f939;
+
+binding deserialization0 {
+  requires {
+    dependency("CPAN")
+  }
+  query pattern callExpr where callee.method == "_yaml_loadfile"
+  emit sink code.Deserialization at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("CPAN")
+  }
+  query pattern callExpr where callee.method == "system"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,20 @@
+module profiles;
+
+// Server-side Swift: a package built on a server framework. The Apple-app and
+// server ecosystems share the Package.swift artifact, and the app profile wins
+// every Swift tree on it, so a server package reads as a mobile app and its
+// inbound wire carries no trust boundary at all. This profile carries the HTTP
+// request sources the app profile omits, beside the app sources: a server
+// package linked into an application still exposes both surfaces.
+//
+// Detection requires both the manifest declaring a server framework and the
+// manifest itself at the project root, so an application project whose only
+// server declaration sits in a nested module keeps the app threat model — its
+// score on the app fingerprints (an Xcode project, an Info.plist) outranks this
+// profile's tie anyway.
+profile server_swift {
+  detect: [project.has("swift:server"), file("Package.swift")]
+  entrypoints: [code.HttpInput, code.HttpHeader, code.PasteboardInput, code.URLSchemeInput, code.ExternalApiResponse, code.DatabaseRead, code.StoredDataRead, code.SecretValue, code.ComputedSizeValue, code.ArchiveEntryName]
+  priority: 95
+  title: "Server-side Swift service"
+}

@@ -1,0 +1,49 @@
+module bindings.cpp.generated.m7b583f38;
+
+binding filePathAccess0 {
+  requires {
+    dependency("lmdb")
+  }
+  query pattern callExpr where callee.method == "mdb_env_open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding nosqlQuery1 {
+  requires {
+    dependency("lmdb")
+  }
+  query pattern callExpr where callee.method == "mdb_dbi_open"
+  emit sink code.NosqlQuery at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("lmdb")
+  }
+  query pattern callExpr where callee.method == "mdb_env_copy"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("lmdb")
+  }
+  query pattern callExpr where callee.method == "mdb_env_copy2"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("lmdb")
+  }
+  query pattern callExpr where callee.method == "mdb_env_copyfd"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("lmdb")
+  }
+  query pattern callExpr where callee.method == "mdb_env_copyfd2"
+  emit sink code.FilePathAccess at args[0]
+}

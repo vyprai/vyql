@@ -1,0 +1,149 @@
+# Rank 1605 / CVE-2016-7063: Pritunl's macOS client built privileged
+# paths from the server-supplied profile id without filtering, so a
+# crafted id carrying traversal segments escaped its directory and
+# overwrote privileged files (path traversal to privilege escalation,
+# CWE-22/CWE-78; reported by Anthony Weems of Praetorian; fixed in
+# release 1.0.1116.6). The pool row is already corrected in place: it
+# held 0e5559c2ba (the "Set version" release commit); the real fix is
+# 2c4c6bf6c3, "Filter profile id to prevent path traversal leading to
+# privilege escalation on macOS": a new FilterStr in service/profile/
+# utils.go strips every non-alphanumeric character
+# (regexp.MustCompile("[^a-zA-Z0-9]+")) and Profile.Init applies it --
+# p.Id = FilterStr(p.Id) -- before any use.
+#
+# The flow crosses three hops: the gin handler binds the request body
+# into profileData (service/handlers/profile.go), the id rides a field
+# of the Profile struct, and the privileged write happens inside the
+# write/Start methods on that struct (service/profile/profile.go,
+# filepath.Join(rootDir, p.Id) into ioutil.WriteFile). Both snippets
+# below assert reject because two source-side pieces and one engine
+# relation are missing today:
+#
+# 1. gin's plain Context.Bind is the one member of the binding family
+#    (ShouldBind, ShouldBindJSON, BindJSON, BindQuery, ... in
+#    bindings/go/m48a985c1.vyql) that is not labelled, and that family
+#    emits code.HttpInput at call.result -- the error value -- so even
+#    the bound members never taint the filled struct. Emitting at
+#    args[0] instead reaches data.Id and, on an intraprocedural chain,
+#    reports VYQL-PATH-001 (measured with a throwaway probe binding).
+# 2. Taint riding a field of an object never crosses a Go method call:
+#    prfl.Start() dead-ends ("callee not traced"), while the identical
+#    chain with the tainted value as an explicit argument resolves and
+#    reaches the sink, and a plain function taking the same pointer
+#    also resolves. The Go frontend drops the method receiver -- funcDef
+#    (golang.go) receives only fn.Type, whose Params exclude fn.Recv --
+#    so the callee has no receiver parameter to bind the caller's
+#    object to. Same absence the cross-method field gap records for PHP
+#    and TypeScript, on an explicit receiver.
+# 3. The fix's neutraliser already exists: ReplaceAll with a global
+#    filter emits threat.CharFilter covering path (go/go/342.vyql).
+#
+# When 1 and 2 land, the first snippet must flip to expect
+# VYQL-PATH-001 and the second must stay silent: Init's FilterStr runs
+# before the write, and CharFilter covers the traversal. The real tree
+# is the judge: service/handlers/profile.go plus service/profile/
+# profile.go report zero findings at both revisions today.
+
+test "rank1605: the bound profile id reaches the privileged write through the profile methods"
+  lang go
+  file service/handlers/profile.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package handlers
+
+  import (
+      "github.com/gin-gonic/gin"
+      "io/ioutil"
+      "os"
+      "path/filepath"
+  )
+
+  type profileData struct {
+      Id string `json:"id"`
+  }
+
+  type Profile struct {
+      waiters []chan bool
+      Id      string
+  }
+
+  func (p *Profile) Init() {
+      p.waiters = []chan bool{}
+  }
+
+  func (p *Profile) write() (pth string) {
+      rootDir := os.TempDir()
+      pth = filepath.Join(rootDir, p.Id)
+      ioutil.WriteFile(pth, []byte("conf"), os.FileMode(0600))
+      return
+  }
+
+  func (p *Profile) Start() {
+      p.write()
+  }
+
+  func profilePost(c *gin.Context) {
+      data := &profileData{}
+      c.Bind(data)
+      prfl := &Profile{Id: data.Id}
+      prfl.Init()
+      prfl.Start()
+  }
+  ```
+
+test "rank1605: Init strips the id to its alphanumeric alphabet before the write"
+  lang go
+  file service/handlers/profile.go
+  reject VYQL-PATH-001
+  code
+  ```
+  package handlers
+
+  import (
+      "github.com/gin-gonic/gin"
+      "io/ioutil"
+      "os"
+      "path/filepath"
+      "regexp"
+  )
+
+  type profileData struct {
+      Id string `json:"id"`
+  }
+
+  type Profile struct {
+      waiters []chan bool
+      Id      string
+  }
+
+  var alphaNumRe = regexp.MustCompile("[^a-zA-Z0-9]+")
+
+  func FilterStr(input string) string {
+      return string(alphaNumRe.ReplaceAll([]byte(input), []byte("")))
+  }
+
+  func (p *Profile) Init() {
+      p.Id = FilterStr(p.Id)
+      p.waiters = []chan bool{}
+  }
+
+  func (p *Profile) write() (pth string) {
+      rootDir := os.TempDir()
+      pth = filepath.Join(rootDir, p.Id)
+      ioutil.WriteFile(pth, []byte("conf"), os.FileMode(0600))
+      return
+  }
+
+  func (p *Profile) Start() {
+      p.write()
+  }
+
+  func profilePost(c *gin.Context) {
+      data := &profileData{}
+      c.Bind(data)
+      prfl := &Profile{Id: data.Id}
+      prfl.Init()
+      prfl.Start()
+  }
+  ```

@@ -1,0 +1,134 @@
+# Hadoop's FileUtil.unTarUsingTar builds a shell command by appending
+# segments to a StringBuffer and hands the result to `bash -c`, so every
+# shell metacharacter in the assembled string is live. The non-gzipped
+# branch appends FileUtil.makeSecureShellPath(inFile) straight into the
+# command with no surrounding quotes; the gzipped branch and the `cd`
+# segment both wrap the same helper's result in a literal `'...'` pair.
+# makeSecureShellPath only escapes embedded single quotes
+# (`replace("'", "'\\''")`), and that escaping holds only when the caller
+# also wraps the result in single quotes -- exactly what the unquoted
+# branch skips, so an archive path containing metacharacters reaches the
+# shell (CWE-78, CWE-88). The fix (cae749b0, HADOOP-18136) hoists
+# `final String source = "'" + FileUtil.makeSecureShellPath(inFile) +
+# "'";` and appends `source` in both branches, so the previously-unquoted
+# operand gets the same wrapping.
+#
+# Vocabulary. bindings.java.shellCommandAssemblyWithoutQuoting reads four
+# function-scope facts, each POSIX or JDK vocabulary: a `bash`/`sh` string
+# literal and a `-c` string literal (the interpreter-invocation array
+# handed to the executor), an `append` call (the StringBuilder/StringBuffer
+# assembly idiom), and the absence of a string literal whose entire content
+# is one apostrophe -- the POSIX single-quote wrapping, which appears in the
+# fixed revision as the `"'"` operands of the hoisted assignment and in
+# `.append("'")` spellings generally, while a quote glued into a longer
+# segment literal (`"' && "`) is not that literal and does not suppress,
+# correctly, because it quotes its own segment rather than the operand
+# appended next to it. The judgement is code.CommandLineAssemblyReview
+# (VYQL-INJ-053), whose review condition is this shape verbatim; no engine
+# change. Assembly by plain concatenation is a documented false-negative
+# residual: its safe spelling delegates the quoting to a helper
+# (bashQuote), whose body is outside the launching function's context.
+#
+# Discrimination, --cache off scans of the org.apache.hadoop.fs subtree
+# (296 files) at each revision, identical across repeated runs: 40 findings
+# with exactly 1 VYQL-INJ-053 on cae749b0^ (FileUtil.java:888,
+# unTarUsingTar), 39 findings and 0 VYQL-INJ-053 on cae749b0 -- the
+# baseline rulesets differ by nothing else. On the wider hadoop-common
+# main tree (1113 files): 514 with exactly the one VYQL-INJ-053 at
+# cae749b0^ against 513 and none at cae749b0, stable over three baseline
+# runs. Exhaustive grep puts both a `bash`/`sh` literal and a `-c` literal
+# in exactly five files of that tree; the four besides FileUtil stay
+# unreported for reasons the enumeration confirms: DF quotes its operand
+# in-command (`... + dirPath + "'"`), Shell assembles by concatenation with
+# bashQuote-delegated quoting, ShellCommandFencer's command arrives from a
+# helper with no in-function assembly, and ShellBasedIdMapping's constant
+# echo commands have no dynamic operand.
+#
+# verify_current_expected: fixed
+
+test "rank1157: the escaped path is appended into the bash command with no surrounding quotes"
+  lang java
+  file FileUtil.java
+  expect VYQL-INJ-053
+  expect_review code.CommandLineAssemblyReview
+  code
+  ```
+  package org.apache.hadoop.fs;
+
+  public class FileUtil {
+    private static void unTarUsingTar(File inFile, File untarDir, boolean gzipped) throws IOException {
+      StringBuffer untarCommand = new StringBuffer();
+      if (gzipped) {
+        untarCommand.append(" gzip -dc '")
+            .append(FileUtil.makeSecureShellPath(inFile))
+            .append("' | (");
+      }
+      untarCommand.append("cd '")
+          .append(FileUtil.makeSecureShellPath(untarDir))
+          .append("' && ")
+          .append("tar -xf ");
+
+      if (gzipped) {
+        untarCommand.append(" -)");
+      } else {
+        untarCommand.append(FileUtil.makeSecureShellPath(inFile));
+      }
+      String[] shellCmd = { "bash", "-c", untarCommand.toString() };
+      ShellCommandExecutor shexec = new ShellCommandExecutor(shellCmd);
+      shexec.execute();
+      int exitcode = shexec.getExitCode();
+      if (exitcode != 0) {
+        throw new IOException("Error untarring file " + inFile +
+                    ". Tar process exited with exit code " + exitcode);
+      }
+    }
+
+    public static String makeSecureShellPath(File file) throws IOException {
+      return makeShellPath(file, false).replace("'", "'\\''");
+    }
+  }
+  ```
+
+test "rank1157: both branches append a source wrapped in single quotes"
+  lang java
+  file FileUtil.java
+  reject VYQL-INJ-053
+  reject_review code.CommandLineAssemblyReview
+  code
+  ```
+  package org.apache.hadoop.fs;
+
+  public class FileUtil {
+    private static void unTarUsingTar(File inFile, File untarDir, boolean gzipped) throws IOException {
+      StringBuffer untarCommand = new StringBuffer();
+      final String source = "'" + FileUtil.makeSecureShellPath(inFile) + "'";
+      if (gzipped) {
+        untarCommand.append(" gzip -dc ")
+            .append(source)
+            .append(" | (");
+      }
+      untarCommand.append("cd '")
+          .append(FileUtil.makeSecureShellPath(untarDir))
+          .append("' && ")
+          .append("tar -xf ");
+
+      if (gzipped) {
+        untarCommand.append(" -)");
+      } else {
+        untarCommand.append(source);
+      }
+      String[] shellCmd = { "bash", "-c", untarCommand.toString() };
+      ShellCommandExecutor shexec = new ShellCommandExecutor(shellCmd);
+      shexec.execute();
+      int exitcode = shexec.getExitCode();
+      if (exitcode != 0) {
+        throw new IOException("Error untarring file " + inFile +
+            ". Tar process exited with exit code " + exitcode);
+      }
+    }
+
+    public static String makeSecureShellPath(File file) throws IOException {
+      return makeShellPath(file, false).replace("'", "'\\''");
+    }
+  }
+  ```

@@ -1,0 +1,11 @@
+module code;
+
+concept MissingFormatTruncationCheck : issue {
+  cwe: [CWE_252, CWE_125, CWE_787]
+  reviewAssumption: "the formatted output can need more space than the destination holds"
+  reviewCategory: memory
+  reviewCondition: "a formatted-output length is reused as a write length or destination-pointer offset without a truncation check"
+  reviewConfidence: medium
+  reviewEvidence: "format-length context {pattern} reuses the captured formatted-output return value while no comparison consults the bound the call received"
+  vulnerableTo: [memory.OobWrite]
+}

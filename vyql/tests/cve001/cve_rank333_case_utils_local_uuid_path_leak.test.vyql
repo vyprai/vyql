@@ -1,0 +1,82 @@
+test "rank333: CASE local UUID deterministic base leaks resolved command path"
+  lang python
+  expect VYQL-SEC-004
+  expect_review code.AbsolutePathDisclosure
+  code
+  ```
+  import os
+  import pathlib
+  import sys
+
+  DEMO_UUID_BASE = None
+
+  def configure() -> None:
+      global DEMO_UUID_BASE
+      env_base_dir_name = os.getenv("CASE_DEMO_NONRANDOM_UUID_BASE")
+      if env_base_dir_name is None:
+          return
+
+      demo_uuid_base_parts = ["example.org"]
+      env_venv_name = os.getenv("VIRTUAL_ENV")
+      if env_venv_name is None:
+          demo_uuid_base_parts.append(sys.argv[0])
+      else:
+          command_original_path = pathlib.Path(sys.argv[0])
+          command_resolved_path = command_original_path.resolve()
+          venv_original_path = pathlib.Path(env_venv_name)
+          venv_resolved_path = venv_original_path.resolve()
+          try:
+              command_relative_path = command_resolved_path.relative_to(
+                  venv_resolved_path
+              )
+              demo_uuid_base_parts.append(str(command_relative_path))
+          except ValueError:
+              demo_uuid_base_parts.append(str(command_resolved_path))
+
+      DEMO_UUID_BASE = "/".join(demo_uuid_base_parts)
+  ```
+
+test "rank333: CASE local UUID deterministic base keeps external command path unresolved"
+  lang python
+  reject VYQL-SEC-004
+  reject_review code.AbsolutePathDisclosure
+  code
+  ```
+  import os
+  import pathlib
+  import sys
+
+  DEMO_UUID_BASE = None
+
+  def _is_relative_to(p1: pathlib.Path, p2: pathlib.Path) -> bool:
+      try:
+          _ = p1.relative_to(p2)
+          return True
+      except ValueError:
+          return False
+
+  def configure() -> None:
+      global DEMO_UUID_BASE
+      env_base_dir_name = os.getenv("CASE_DEMO_NONRANDOM_UUID_BASE")
+      if env_base_dir_name is None:
+          return
+
+      demo_uuid_base_parts = ["example.org"]
+      env_venv_name = os.getenv("VIRTUAL_ENV")
+      if env_venv_name is None:
+          demo_uuid_base_parts.append(sys.argv[0])
+      else:
+          command_original_path = pathlib.Path(sys.argv[0])
+          command_resolved_path = command_original_path.resolve()
+          venv_original_path = pathlib.Path(env_venv_name)
+          venv_resolved_path = venv_original_path.resolve()
+          if _is_relative_to(command_resolved_path, venv_resolved_path):
+              command_relative_path = command_resolved_path.relative_to(
+                  venv_resolved_path
+              )
+              demo_uuid_base_parts.append(str(command_relative_path))
+          else:
+              demo_uuid_base_parts.append(str(command_original_path))
+
+      DEMO_UUID_BASE = "/".join(demo_uuid_base_parts)
+  ```

@@ -1,0 +1,15 @@
+module bindings.php.twig_sandbox_policy_method_blocklist;
+
+// Twig's sandbox is an allow-list by construction: `Twig\Sandbox\SecurityPolicy`
+// is built from the tags, filters, methods, properties and functions a template
+// may use, and each `check*` hook throws for anything not on those lists. An
+// application that supplies its own `Twig\Sandbox\SecurityPolicyInterface` and
+// decides `checkMethodAllowed` from a list of *blocked* method names inverts
+// that contract: every method nobody thought to name stays callable from
+// template markup, so the policy has to be extended again for each new escape
+// that is found. That is the same incomplete template validation already
+// reported when a renderer runs untrusted templates with no sandbox at all.
+binding twigSandboxPolicyMethodBlocklist {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and node.token contains "SecurityPolicyInterface" and node.token contains "checkMethodAllowed" and containsAny(node.token, ["blockedMethods", "blacklistedMethods", "blacklistMethods", "forbiddenMethods", "deniedMethods", "disallowedMethods", "methodBlacklist", "methodBlocklist", "methodDenylist"]) and not containsAny(node.token, ["allowedMethods", "allowedTags", "allowedFilters", "allowedFunctions", "allowedProperties", "whitelistedMethods", "methodWhitelist", "methodAllowlist"])
+  emit issue code.IncompleteTemplateValidation at node
+}

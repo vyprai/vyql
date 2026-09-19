@@ -1,0 +1,6 @@
+module code;
+
+concept AuthAttemptLimitReview : issue {
+  cwe: [CWE_307]
+  vulnerableTo: [authentication.ImproperAuthentication]
+}

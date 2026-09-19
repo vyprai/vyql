@@ -1,0 +1,38 @@
+# verify_current_expected: skip-fresh-target
+# The rank 23 corpus patch is only a 3.3.5 -> 3.3.6 version bump; the advisory
+# endpoint is the Admidio roles_function.php permission update without CSRF.
+
+test "rank23: Admidio role permissions update from POST requires CSRF protection"
+  lang php
+  file adm_program/modules/roles/roles_function.php
+  expect VYQL-RF-003
+  code
+  ```
+  <?php
+  function save_role_permissions() {
+      if (isset($_POST['role_id'])) {
+          $roleId = $_POST['role_id'];
+          $sql = "UPDATE adm_roles SET rol_assign_roles = '$_POST[assign_roles]' WHERE rol_id = $roleId";
+          queryDB($sql);
+      }
+  }
+  ?>
+  ```
+
+test "rank23: Admidio role permissions update with CSRF token is clean"
+  lang php
+  file adm_program/modules/roles/roles_function.php
+  reject VYQL-RF-003
+  code
+  ```
+  <?php
+  function save_role_permissions() {
+      if (isset($_POST['role_id'])) {
+          csrf_token();
+          $roleId = $_POST['role_id'];
+          $sql = "UPDATE adm_roles SET rol_assign_roles = '$_POST[assign_roles]' WHERE rol_id = $roleId";
+          queryDB($sql);
+      }
+  }
+  ?>
+  ```

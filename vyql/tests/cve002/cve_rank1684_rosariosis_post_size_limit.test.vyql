@@ -1,0 +1,167 @@
+# Rank 1684 / CVE-2022-2714: RosarioSIS accepts an unbounded $_POST body.
+# PHP caps the raw request at post_max_size, but that budget is shared with
+# $_FILES and must be greater than upload_max_filesize, so an installation
+# that allows large uploads also allows a 100MB textarea body: the whole
+# $_POST array is walked by array_rwalk in Warehouse.php (escaped for the
+# database and stripped of tags) and the values are later stored, past
+# MySQL's 16MB max_allowed_packet default (CWE-130 recorded by the reporter,
+# CWE-400/CWE-770 in substance). The fixing commit 4022954c3f is the SHA the
+# advisory references: it defines ROSARIO_POST_MAX_SIZE_LIMIT (16MB,
+# overridable in config.inc.php) and gates the sanitize walk on
+# strlen(serialize($_POST)) > ROSARIO_POST_MAX_SIZE_LIMIT, resetting any
+# value over limit/4 before the HackingLog mail could echo it back. The
+# unbounded walk is present at the parent and the gate is not; the gate is
+# present at the fixed revision.
+#
+# ATTENTION, request-size-budget vocabulary, rechecked. The request
+# superglobals are labelled (vyql match on the vulnerable Warehouse.php
+# reports $_REQUEST as code.HttpInput via php.input, six reads plus four
+# subscript reads), and taint flows from the walk line to sinks across the
+# tree; what no rule can ask is "does the handler cap the request body at
+# N bytes". Re-measured on the real checkout over four complete
+# --cache off/--max-ram 6GB runs of the parent and three of the fix
+# (timeout 180): 1550 findings each run, 13939 output lines each, the
+# per-run rule histograms identical (INJ-004 1298, CFG-014 74, PATH-001 41,
+# PATH-002 27, CRY-001/CRY-003/INJ-010 13 each, INJ-001 15, and 21 more
+# rules), and after normalising line numbers, finding fingerprints and node
+# ids the only differing lines are the "nearest on a sibling path" control
+# listings (2774 lines, all of that form -- Warehouse.php's own lines shift
+# by the 44 lines the fix inserts). The knowledge base grew since the first
+# review (1495 -> 1550 findings on this tree) and now sources findings at
+# the walk line itself: code.HttpInput @ Warehouse.php:294
+# (array_rwalk($_REQUEST, 'DBEscapeString')) feeds VYQL-DESER-001 on the
+# unserialize(Config(...)) calls at :400/:415, VYQL-PATH-002 on require_once
+# at :461, and VYQL-RF-001/INJ rows -- every one identical at both
+# revisions and about other weaknesses; findings in the file are not
+# coverage of the size defect. The -flags only view carries 25 flags on
+# this tree (ResourceRelease on fclose, UnescapedLocalFileContentHtmlRender,
+# PrototypePollutionGuard expects) and none on Warehouse.php.
+#
+# No later-shipped vocabulary claims the shape: the one CWE-400 concept
+# whose reviewCondition carries it almost word for word,
+# code.ConduitHyperUnboundedBodyToBytes ("HTTP request bodies are fully
+# collected ... before a request-size limit is enforced"), is still named
+# and bound for one Rust framework (vyql/bindings/rust/mdc4f74cd.vyql), the
+# only Unbounded-named concept with a PHP emitter is
+# code.UnboundedReportPeriod (unrelated), and no PHP binding emits
+# code.UnboundedAllocationReview, so VYQL-DOS-041 -- the rule the Go
+# smtpd rank reused where the library documents a MaxSize field -- has no
+# PHP foothold. The precision denominator still settles the direct route:
+# 242 PHP files (5798 reads) touch $_POST/$_REQUEST in this one tree and
+# exactly four carry any size-cap vocabulary, none of them a request-body
+# cap, so a binding emitting on "request input read with no size cap" fires
+# on 242 files for one true positive, the request-body byte-cap shape
+# measured unshippable in Go (1 -> 124 findings on one tree). No positive
+# PHP API fact distinguishes the file either: the superglobals carry no
+# documented size field, array_rwalk and DBEscapeString are the
+# application's own helpers, and the strlen(serialize($_POST)) gate is the
+# fixing commit's own spelling, so keying on either detects this
+# application, not the weakness. The same vocabulary gap is recorded at
+# rank 1135 for Go (json.NewDecoder(r.Body) with no MaxBytesReader wrap)
+# and at rank 1559 as a wire budget threaded through recursion.
+#
+# No ENGINE-GAPS.md entry: taint and the source label are intact, the
+# missing piece is a bound fact on request-input size, which is vocabulary
+# design rather than a localized construct the engine mishandles. Spec
+# records the unbounded walk and the capped form, both asserting
+# reject_review code.ConduitHyperUnboundedBodyToBytes and reject
+# VYQL-DOS-041: when generic request-size-budget vocabulary lands for PHP,
+# the unbounded walk must flip to expect.
+
+test "rank1684: the whole request body is walked and stored with no size cap"
+  lang php
+  file Warehouse.php
+  reject_review code.ConduitHyperUnboundedBodyToBytes
+  reject VYQL-DOS-041
+  code
+  ```
+  <?php
+  /**
+   * Array recursive walk (values AND keys!)
+   */
+  function array_rwalk( &$array, $function )
+  {
+  	$key = array_keys( $array );
+
+  	$size = count( $key );
+
+  	for ( $i = 0; $i < $size; $i++ )
+  	{
+  		if ( is_array( $array[$key[$i]] ) )
+  		{
+  			array_rwalk( $array[$key[$i]], $function );
+  		}
+  		else
+  		{
+  			$array[$key[$i]] = $function( $array[$key[$i]] );
+  		}
+  	}
+  }
+
+  /**
+   * Sanitize $_REQUEST array ($_POST + $_GET)
+   */
+  // Escape strings for DB queries.
+  array_rwalk( $_REQUEST, 'DBEscapeString' );
+
+  // Remove HTML tags.
+  array_rwalk( $_REQUEST, 'strip_tags' );
+  ```
+
+test "rank1684: the request body is capped before the walk"
+  lang php
+  file Warehouse.php
+  reject_review code.ConduitHyperUnboundedBodyToBytes
+  reject VYQL-DOS-041
+  code
+  ```
+  <?php
+  function array_rwalk( &$array, $function )
+  {
+  	$key = array_keys( $array );
+
+  	$size = count( $key );
+
+  	for ( $i = 0; $i < $size; $i++ )
+  	{
+  		if ( is_array( $array[$key[$i]] ) )
+  		{
+  			array_rwalk( $array[$key[$i]], $function );
+  		}
+  		else
+  		{
+  			$array[$key[$i]] = $function( $array[$key[$i]] );
+  		}
+  	}
+  }
+
+  if ( ! defined( 'ROSARIO_POST_MAX_SIZE_LIMIT' ) )
+  {
+  	define( 'ROSARIO_POST_MAX_SIZE_LIMIT', 16 * 1024 * 1024 );
+  }
+
+  if ( $_POST
+  	&& strlen( serialize( $_POST ) ) > ROSARIO_POST_MAX_SIZE_LIMIT )
+  {
+  	$post_max_size_limit = function( $value ) {
+  		if ( strlen( $value ) > ( ROSARIO_POST_MAX_SIZE_LIMIT / 4 ) )
+  		{
+  			return 'ROSARIO_POST_MAX_SIZE_LIMIT / 4 reached.';
+  		}
+
+  		return $value;
+  	};
+
+  	array_rwalk( $_POST, $post_max_size_limit );
+
+  	array_rwalk( $_REQUEST, $post_max_size_limit );
+
+  	$error[] = 'You are submitting too much data';
+  }
+
+  // Escape strings for DB queries.
+  array_rwalk( $_REQUEST, 'DBEscapeString' );
+
+  // Remove HTML tags.
+  array_rwalk( $_REQUEST, 'strip_tags' );
+  ```

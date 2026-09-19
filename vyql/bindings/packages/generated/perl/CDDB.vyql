@@ -1,0 +1,57 @@
+module bindings.perl.generated.mc51f2d06;
+
+binding networkConnect0 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "command"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData2 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "getline"
+  emit source code.NetworkData at call.result
+}
+
+binding deserialization3 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "parse_cdinfo"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "parse_xmcd_file"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "get_discs_by_query"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("CDDB")
+  }
+  query pattern callExpr where callee.method == "submit_disc"
+  emit sink code.NetworkSend at args[0]
+}

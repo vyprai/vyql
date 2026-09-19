@@ -1,0 +1,14 @@
+module bindings.python.generated.mf6ed667b;
+
+binding inputValidation0 {
+  requires {
+    dependency("validators")
+  }
+  query pattern callExpr where callee.method == "url"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

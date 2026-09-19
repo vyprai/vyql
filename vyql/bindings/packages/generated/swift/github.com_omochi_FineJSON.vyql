@@ -1,0 +1,9 @@
+module bindings.swift.generated.mcde47758;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/omochi/FineJSON")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept SandboxHostObjectMemberDenylistGap : issue {
+  cwe: [CWE_749, CWE_184]
+  reviewAssumption: "the wrapped host object is reachable from script the sandbox runs on behalf of an untrusted author"
+  reviewCategory: code_execution
+  reviewCondition: "a live host object is forwarded into a sandbox behind a property-name denylist that omits documented members of the same API which return or spawn a more privileged object"
+  reviewConfidence: medium
+  reviewEvidence: "sandbox module {pattern} forwards every read of the wrapped host object except a fixed list of property names, and that list names only part of the API's documented escape surface"
+  vulnerableTo: [injection.CodeInjection]
+}

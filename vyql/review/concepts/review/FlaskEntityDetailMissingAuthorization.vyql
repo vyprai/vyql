@@ -1,0 +1,8 @@
+module code;
+
+review code.FlaskEntityDetailMissingAuthorization {
+  category: access_control
+  expected: [core.AuthenticationCheck, core.AuthorizationCheck]
+  kind: target
+  text: "verify Flask entity-detail JSON routes require authentication and an authorization check before returning user or group metadata"
+}

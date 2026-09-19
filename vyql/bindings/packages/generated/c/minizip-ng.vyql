@@ -1,0 +1,51 @@
+module bindings.c.generated.m22971185;
+
+binding pathCanonicalization0 {
+  requires {
+    dependency("minizip-ng")
+  }
+  query pattern callExpr where callee.method == "mz_path_combine"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathCanonicalization1 {
+  requires {
+    dependency("minizip-ng")
+  }
+  query pattern callExpr where callee.method == "mz_path_resolve"
+  emit check core.PathCanonicalization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding pathAccessCheck2 {
+  requires {
+    dependency("minizip-ng")
+  }
+  query pattern callExpr where callee.method == "mz_dir_has_unsafe_symlink"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding pathAccessCheck3 {
+  requires {
+    dependency("minizip-ng")
+  }
+  query pattern callExpr where callee.method == "mz_path_compare_wc"
+  emit check core.PathAccessCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

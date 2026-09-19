@@ -1,0 +1,9 @@
+module vypr.identity;
+
+rule AnonymousToAdmin {
+  meta {
+    id: "VYQL-IDN-002"
+    severity: critical
+  }
+  grant identity.Anonymous -> identity.AdminPrivilege
+}

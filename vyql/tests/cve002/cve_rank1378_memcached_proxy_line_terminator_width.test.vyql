@@ -1,0 +1,167 @@
+# The memcached proxy request parser bounded its command-line scan at
+# `cmdlen - 2`, taking the two-byte CRLF trailer for granted. A bare-LF command
+# line is one byte shorter, so every offset derived from that bound is off by
+# one: the parsed cursor lands past the last consumed byte and the multiget key
+# walker's `reqlen - parsed - 2` goes negative, which `while (remain)` treats as
+# true and `memchr(cur, ' ', remain)` widens into an out-of-bounds read.
+# The fixed revision measures the trailer by inspecting the byte at `cmdlen - 2` instead.
+
+test "rank1378: proxy command scan bounded by an assumed two-byte line terminator"
+  lang c
+  file proxy_request.c
+  expect VYQL-MEM-055
+  expect_review code.AssumedLineTerminatorWidthScan
+  code
+  ```
+  int process_request(mcp_parser_t *pr, const char *command, size_t cmdlen) {
+      // we want to "parse in place" as much as possible, which allows us to
+      // forward an unmodified request without having to rebuild it.
+
+      const char *cm = command;
+      size_t cl = 0;
+      // min command length is 2, plus the "\r\n"
+      if (cmdlen < 4) {
+          return -1;
+      }
+
+      const char *s = memchr(command, ' ', cmdlen-2);
+      if (s != NULL) {
+          cl = s - command;
+      } else {
+          cl = cmdlen - 2;
+      }
+      pr->keytoken = 0;
+      pr->has_space = false;
+      pr->parsed = cl + 1;
+      pr->request = command;
+      pr->reqlen = cmdlen;
+      int token_max = PARSER_MAX_TOKENS;
+
+      int cmd = -1;
+      int type = CMD_TYPE_GENERIC;
+      int ret = 0;
+
+      switch (cl) {
+          case 2:
+              if (cm[0] == 'm') {
+                  type = CMD_TYPE_META;
+                  switch (cm[1]) {
+                      case 'g':
+                          cmd = CMD_MG;
+                          ret = _process_request_meta(pr);
+                          break;
+                      case 's':
+                          cmd = CMD_MS;
+                          ret = _process_request_mset(pr);
+                          break;
+                  }
+              }
+              break;
+          case 3:
+              if (cm[0] == 'g' && cm[1] == 'e' && cm[2] == 't') {
+                  cmd = CMD_GET;
+                  ret = _process_request_simple(pr, 2, token_max);
+              }
+              break;
+          case 7:
+              if (strncmp(cm, "version", 7) == 0) {
+                  cmd = CMD_VERSION;
+                  _process_tokenize(pr, token_max);
+              }
+              break;
+      }
+
+      if (cmd == -1 || ret != 0) {
+          return -1;
+      }
+
+      pr->command = cmd;
+      pr->cmd_type = type;
+
+      return 0;
+  }
+  ```
+
+test "rank1378: proxy command scan measures the line terminator before bounding"
+  lang c
+  file proxy_request.c
+  reject VYQL-MEM-055
+  reject_review code.AssumedLineTerminatorWidthScan
+  code
+  ```
+  int process_request(mcp_parser_t *pr, const char *command, size_t cmdlen) {
+      // we want to "parse in place" as much as possible, which allows us to
+      // forward an unmodified request without having to rebuild it.
+
+      const char *cm = command;
+      size_t cl = 0;
+      // min command length is 2, plus the "\r\n"
+      if (cmdlen < 4) {
+          return -1;
+      }
+
+      // Commands can end with bare '\n's. In this case we _know_ \n is at
+      // cmdlen because we can't enter this function otherwise.
+      if (cm[cmdlen-2] == '\r') {
+          pr->endlen = cmdlen - 2;
+      } else {
+          pr->endlen = cmdlen - 1;
+      }
+
+      const char *s = memchr(command, ' ', pr->endlen);
+      if (s != NULL) {
+          cl = s - command;
+      } else {
+          cl = pr->endlen;
+      }
+      pr->keytoken = 0;
+      pr->has_space = false;
+      pr->parsed = cl;
+      pr->request = command;
+      pr->reqlen = cmdlen;
+      int token_max = PARSER_MAX_TOKENS;
+
+      int cmd = -1;
+      int type = CMD_TYPE_GENERIC;
+      int ret = 0;
+
+      switch (cl) {
+          case 2:
+              if (cm[0] == 'm') {
+                  type = CMD_TYPE_META;
+                  switch (cm[1]) {
+                      case 'g':
+                          cmd = CMD_MG;
+                          ret = _process_request_meta(pr);
+                          break;
+                      case 's':
+                          cmd = CMD_MS;
+                          ret = _process_request_mset(pr);
+                          break;
+                  }
+              }
+              break;
+          case 3:
+              if (cm[0] == 'g' && cm[1] == 'e' && cm[2] == 't') {
+                  cmd = CMD_GET;
+                  ret = _process_request_simple(pr, 2, token_max);
+              }
+              break;
+          case 7:
+              if (strncmp(cm, "version", 7) == 0) {
+                  cmd = CMD_VERSION;
+                  _process_tokenize(pr, token_max);
+              }
+              break;
+      }
+
+      if (cmd == -1 || ret != 0) {
+          return -1;
+      }
+
+      pr->command = cmd;
+      pr->cmd_type = type;
+
+      return 0;
+  }
+  ```

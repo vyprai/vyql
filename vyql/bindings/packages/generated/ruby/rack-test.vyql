@@ -1,0 +1,65 @@
+module bindings.ruby.generated.mc0281a92;
+
+binding userControlledData0 {
+  requires {
+    dependency("rack-test")
+  }
+  query pattern callExpr where callee.method == "request"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("rack-test")
+  }
+  query pattern callExpr where callee.method == "custom_request"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("rack-test")
+  }
+  query pattern callExpr where callee.method == "set_cookie"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("rack-test")
+  }
+  query pattern callExpr where callee.method == "header"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("rack-test")
+  }
+  query pattern callExpr where callee.method == "env"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("rack-test")
+  }
+  query pattern callExpr where callee.method == "basic_authorize"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData6 {
+  requires {
+    dependency("rack-test")
+  }
+  query pattern callExpr where callee.method == "parse_uri"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData7 {
+  requires {
+    dependency("rack-test")
+  }
+  query pattern callExpr where callee.method == "append_query_params"
+  emit source core.UserControlledData at call.result
+}

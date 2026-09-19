@@ -1,0 +1,7 @@
+module code;
+
+concept StateChangingOp : issue {
+  cwe: [CWE_352]
+  enabledBy: [taint.UntrustedData]
+  vulnerableTo: [request_forgery.Csrf]
+}

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule SchemaCodegenValidationBypass {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_1321, CWE_915]
+    id: "VYQL-INJ-029"
+    severity: medium
+  }
+  issue code.SchemaCodegenValidationBypass as sink
+}

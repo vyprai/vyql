@@ -1,0 +1,9 @@
+module bindings.csharp.generated.mef71f0a7;
+
+binding htmlRender0 {
+  requires {
+    dependency("microsoft.toolkit.ui.xamlhost")
+  }
+  query pattern callExpr where callee.method == "CreateXamlContentByType"
+  emit sink code.HtmlRender at args[0]
+}

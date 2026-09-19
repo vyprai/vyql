@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule Vm2HostCallbackBridge {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_94]
+    id: "VYQL-INJ-035"
+    severity: critical
+  }
+  issue code.Vm2HostCallbackBridge as bridge
+}

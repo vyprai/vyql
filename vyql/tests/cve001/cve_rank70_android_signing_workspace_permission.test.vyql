@@ -1,0 +1,56 @@
+# Rank 70 / CVE-2022-36915: Jenkins Android Signing descriptor read workspace
+# data through the @AncestorInPath project before any permission check.
+
+test "rank70: Android signing descriptor exposes sensitive operation"
+  lang java
+  expect VYQL-AUTH-172
+  code
+  ```
+  import hudson.model.AbstractProject;
+  import hudson.FilePath;
+  import hudson.util.FormValidation;
+  import org.kohsuke.stapler.AncestorInPath;
+  import org.kohsuke.stapler.QueryParameter;
+
+  public class SignApksBuilder {
+      public FormValidation doCheckApksToSign(@AncestorInPath AbstractProject project,
+              @QueryParameter String value) {
+          if (project == null) {
+              return FormValidation.warning("no project");
+          }
+          FilePath someWorkspace = project.getSomeWorkspace();
+          if (someWorkspace == null) {
+              return FormValidation.warning("no workspace");
+          }
+          return FormValidation.ok();
+      }
+  }
+  ```
+
+test "rank70: descriptor checks the ancestor permission before the workspace read"
+  lang java
+  reject VYQL-AUTH-172
+  code
+  ```
+  import hudson.model.AbstractProject;
+  import hudson.FilePath;
+  import hudson.util.FormValidation;
+  import hudson.model.Item;
+  import org.kohsuke.stapler.AncestorInPath;
+  import org.kohsuke.stapler.QueryParameter;
+
+  public class SignApksBuilder {
+      public FormValidation doCheckApksToSign(@AncestorInPath AbstractProject project,
+              @QueryParameter String value) {
+          if (project == null) {
+              return FormValidation.warning("no project");
+          }
+          project.checkPermission(Item.WORKSPACE);
+          FilePath someWorkspace = project.getSomeWorkspace();
+          if (someWorkspace == null) {
+              return FormValidation.warning("no workspace");
+          }
+          return FormValidation.ok();
+      }
+  }
+  ```

@@ -1,0 +1,33 @@
+module bindings.java.generated.md40ee1af;
+
+binding networkConnect0 {
+  requires {
+    dependency("io.netty:netty")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkBind1 {
+  requires {
+    dependency("io.netty:netty")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit sink code.NetworkBind at args[0]
+}
+
+binding networkSend2 {
+  requires {
+    dependency("io.netty:netty")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkData3 {
+  requires {
+    dependency("io.netty:netty")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source code.NetworkData at call.result
+}

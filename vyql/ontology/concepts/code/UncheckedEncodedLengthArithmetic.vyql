@@ -1,0 +1,11 @@
+module code;
+
+concept UncheckedEncodedLengthArithmetic : issue {
+  cwe: [CWE_190, CWE_835]
+  reviewAssumption: "a malformed serialized payload can supply oversized container or string lengths"
+  reviewCategory: numeric
+  reviewCondition: "serialized protocol length arithmetic lacks checked overflow handling"
+  reviewConfidence: medium
+  reviewEvidence: "protocol length context {pattern} narrows or scales serialized lengths without checked arithmetic"
+  vulnerableTo: [memory.IntegerOverflow, dos.UncontrolledResourceConsumption]
+}

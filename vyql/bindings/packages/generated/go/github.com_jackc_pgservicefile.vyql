@@ -1,0 +1,17 @@
+module bindings.go.generated.m2f3d7944;
+
+binding filePathAccess0 {
+  requires {
+    dependency("github.com/jackc/pgservicefile")
+  }
+  query pattern callExpr where callee.method == "ReadServicefile"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/jackc/pgservicefile")
+  }
+  query pattern callExpr where callee.method == "ParseServicefile"
+  emit sink code.Deserialization at args[0]
+}

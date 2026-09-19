@@ -1,0 +1,6 @@
+module crypto;
+
+threat WeakCrypto {
+  cwe: [CWE_327]
+  desc: "Use of a broken/risky cryptographic algorithm"
+}

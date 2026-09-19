@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m56051908;
+
+binding deserialization0 {
+  requires {
+    dependency("com.fasterxml.jackson.jaxrs:jackson-jaxrs-base")
+  }
+  query pattern callExpr where callee.method == "readFrom"
+  emit sink code.Deserialization at args[0]
+}

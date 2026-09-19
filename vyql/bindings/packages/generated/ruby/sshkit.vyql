@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m1fdf76ae;
+
+binding commandExecution0 {
+  requires {
+    dependency("sshkit")
+  }
+  query pattern callExpr where callee.method == "execute_command"
+  emit sink code.CommandExecution at args[0]
+}

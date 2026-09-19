@@ -1,0 +1,9 @@
+module bindings.php.generated.m0f7dfbd3;
+
+binding logOutput0 {
+  requires {
+    dependency("monolog/monolog")
+  }
+  query pattern callExpr where callee.method == "addRecord"
+  emit sink code.LogOutput at args[0]
+}

@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule LogoutWithoutSessionInvalidation {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_613]
+    id: "VYQL-AUTH-177"
+    severity: medium
+  }
+  issue code.LogoutWithoutSessionInvalidation as session
+}

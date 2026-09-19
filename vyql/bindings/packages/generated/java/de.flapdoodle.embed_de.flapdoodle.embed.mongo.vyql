@@ -1,0 +1,49 @@
+module bindings.java.generated.m1f95a22f;
+
+binding networkConnect0 {
+  requires {
+    dependency("de.flapdoodle.embed:de.flapdoodle.embed.mongo")
+  }
+  query pattern callExpr where callee.method == "sendShutdown"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("de.flapdoodle.embed:de.flapdoodle.embed.mongo")
+  }
+  query pattern callExpr where callee.method == "sendShutdown"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("de.flapdoodle.embed:de.flapdoodle.embed.mongo")
+  }
+  query pattern callExpr where callee.method == "sendShutdownLegacy"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend3 {
+  requires {
+    dependency("de.flapdoodle.embed:de.flapdoodle.embed.mongo")
+  }
+  query pattern callExpr where callee.method == "sendShutdownLegacy"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding secretValue4 {
+  requires {
+    dependency("de.flapdoodle.embed:de.flapdoodle.embed.mongo")
+  }
+  query pattern callExpr where callee.method == "password"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue5 {
+  requires {
+    dependency("de.flapdoodle.embed:de.flapdoodle.embed.mongo")
+  }
+  query pattern callExpr where callee.method == "passwordAsString"
+  emit source code.SecretValue at call.result
+}

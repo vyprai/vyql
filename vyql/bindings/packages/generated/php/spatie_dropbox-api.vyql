@@ -1,0 +1,121 @@
+module bindings.php.generated.mc0603966;
+
+binding filePathAccess0 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "copy"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "createFolder"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "createSharedLinkWithSettings"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "download"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "downloadZip"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess6 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "getMetadata"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess7 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "getTemporaryLink"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess8 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "getThumbnail"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess9 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "listFolder"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess10 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "move"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding storedDataRead11 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit source code.StoredDataRead at call.result
+}
+
+binding filePathAccess12 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding networkData13 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "upload"
+  emit source code.NetworkData at call.result
+}
+
+binding secretValue14 {
+  requires {
+    dependency("spatie/dropbox-api")
+  }
+  query pattern callExpr where callee.method == "revokeToken"
+  emit source code.SecretValue at call.result
+}

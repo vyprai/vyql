@@ -1,0 +1,9 @@
+module bindings.dart.generated.m30b7c76d;
+
+binding filePathAccess0 {
+  requires {
+    dependency("archive")
+  }
+  query pattern callExpr where callee.method == "open"
+  emit sink code.FilePathAccess at args[0]
+}

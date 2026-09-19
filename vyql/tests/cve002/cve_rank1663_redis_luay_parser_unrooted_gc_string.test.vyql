@@ -1,0 +1,238 @@
+# CVE-2025-49844: Redis's vendored Lua parser (deps/lua/src/lparser.c) passed
+# the source name straight into the lexer setup without rooting it on the VM
+# stack:
+#
+#   Proto *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff, const char *name) {
+#     ...
+#     luaX_setinput(L, &lexstate, z, luaS_new(L, name));
+#     open_func(&lexstate, &funcstate);
+#     ...
+#     chunk(&lexstate);
+#     check(&lexstate, TK_EOS);
+#     close_func(&lexstate);
+#
+# luaS_new returns a TString, an object the Lua collector is free to reclaim.
+# luaX_setinput stores the pointer into lexstate.source, and LexState is a
+# plain C struct the collector cannot see, so from the collector's point of
+# view the string is garbage from the moment luaY_parser loses it. The parse
+# itself (chunk) allocates constantly, every allocation can step the
+# collector, and a crafted EVAL script drives enough allocation for the
+# string to be reclaimed and its storage reused while the lexer still holds
+# the pointer — a use-after-free the attacker fills (CWE-416, remote code
+# execution). Fix d5728cb5795c966c5b5b1e0f0ac576a7e69af539 roots the string
+# on the VM stack for the duration of the parse and pops it after:
+#
+#   TString *tname = luaS_new(L, name);
+#   setsvalue2s(L, L->top, tname);
+#   incr_top(L);
+#   luaX_setinput(L, &lexstate, z, tname);
+#   ...
+#   close_func(&lexstate);
+#   --L->top;
+#
+# ATTENTION, engine gap. What makes the vulnerable line wrong is that the
+# reference's only holder (lexstate.source, a C-stack struct field) is
+# invisible to the collector across a window in which callees allocate.
+# Neither half of that is expressible today: the engine has no callee-effect
+# provenance (which calls may allocate or step the collector) and no
+# classification of a reference's holder as collector-visible (VM stack slot,
+# GC-managed object field) or not (C local, C struct field). This is the
+# same family as the recorded "pointer held across a call the callee may
+# invalidate" gap — there the callee replaces the buffer, here the collector
+# reclaims the object — with the added twist that the invalidating event is
+# not a call at all, so no node ever exists where a free could be labelled.
+# VYQL-MEM-007 (PointerFree reaches PointerUse) therefore cannot fire in
+# principle on this shape: there is no PointerFree to reach from, and the
+# eventual rule needs the rooting/liveness relations above, not a new label
+# on a call.
+#
+# Detecting the shape alone is not worth its precision cost, and this
+# codebase measures that directly. luaS_new* has 23 call sites in
+# deps/lua/src; 22 of them anchor the result before any allocation can
+# intervene, each through a different idiom: a VM-stack push
+# (setsvalue2s(L, L->top, ...) at lapi.c:448/1005, lobject.c:105/117,
+# ldo.c:54/58/411, lvm.c:54/311), a pin (luaS_fix at lstate.c:79,
+# llex.c:67, ltm.c:40), a keyed store whose callee anchors (setsvalue(L,
+# &key, ...) at lapi.c:550/664), a userdata slot (setuvalue at lapi.c:1035),
+# table insertion (luaH_setstr at llex.c:119, ldo.c:225), a store into a
+# GC-managed Proto field (f->source = luaS_newliteral(...) at luac.c:128),
+# and returning the string for the caller to anchor (lundump.c:86). A
+# negation keyed on that vocabulary is a curated enumeration of this tree's
+# idioms, and it still leaves lundump.c:208 — LoadFunction(&S,
+# luaS_newliteral(L, "=?")), byte-identical in shape to the vulnerable
+# line and safe only because the callee chain anchors the string — plus the
+# interprocedural return at lundump.c:86 and the field store at luac.c:128
+# reporting: 4 structural false positives for 1 true positive on the very
+# tree that contains the vulnerability. The discriminator is GC visibility
+# of the holder, not the presence of any named call.
+#
+# vyql match on the vulnerable function labels nothing (luaS_new and
+# luaX_setinput have no binding, and no concept means "collector-managed
+# allocation" or "collector-visible root"); a bounded scan of the vulnerable
+# lparser.c reports 6 FieldDerivedIndexAccess findings, all in other
+# functions, and the fixed revision reports the same 6 — no rule separates
+# the two sides. The minimal pair below isolates what is missing: with an
+# explicit free() between allocation and use the release is at least a
+# labelled node (code.PointerFree), while the collector form has no node
+# where any relation could attach.
+#
+# verify_current_expected: attention-engine-gap
+
+test "rank1663: luaY_parser passes an unrooted collectable string into the lexer and parses with it"
+  lang c
+  file lparser.c
+  reject VYQL-MEM-007
+  code
+  ```
+  #include <stddef.h>
+
+  typedef struct lua_State lua_State;
+  typedef struct ZIO ZIO;
+  typedef struct Mbuffer Mbuffer;
+  typedef struct TString TString;
+  typedef struct Proto Proto;
+  struct LexState;
+  struct FuncState;
+
+  TString *luaS_new (lua_State *L, const char *str);
+  void luaX_setinput (lua_State *L, struct LexState *ls, ZIO *z, TString *source);
+  void open_func (struct LexState *ls, struct FuncState *fs);
+  void luaX_next (struct LexState *ls);
+  void chunk (struct LexState *ls);
+  void check (struct LexState *ls, int c);
+  void close_func (struct LexState *ls);
+
+  #define TK_EOS 41
+  #define VARARG_ISVARARG 2
+
+  Proto *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff, const char *name) {
+    struct LexState lexstate;
+    struct FuncState funcstate;
+    lexstate.buff = buff;
+    luaX_setinput(L, &lexstate, z, luaS_new(L, name));
+    open_func(&lexstate, &funcstate);
+    funcstate.f->is_vararg = VARARG_ISVARARG;  /* main func. is always vararg */
+    luaX_next(&lexstate);  /* read first token */
+    chunk(&lexstate);
+    check(&lexstate, TK_EOS);
+    close_func(&lexstate);
+    return funcstate.f;
+  }
+  ```
+
+test "rank1663: fix roots the string on the VM stack for the duration of the parse"
+  lang c
+  file lparser.c
+  reject VYQL-MEM-007
+  code
+  ```
+  #include <stddef.h>
+
+  typedef struct lua_State lua_State;
+  typedef struct ZIO ZIO;
+  typedef struct Mbuffer Mbuffer;
+  typedef struct TString TString;
+  typedef struct Proto Proto;
+  struct LexState;
+  struct FuncState;
+
+  TString *luaS_new (lua_State *L, const char *str);
+  void setsvalue2s (lua_State *L, void *o, TString *x);
+  void incr_top (lua_State *L);
+  void luaX_setinput (lua_State *L, struct LexState *ls, ZIO *z, TString *source);
+  void open_func (struct LexState *ls, struct FuncState *fs);
+  void luaX_next (struct LexState *ls);
+  void chunk (struct LexState *ls);
+  void check (struct LexState *ls, int c);
+  void close_func (struct LexState *ls);
+
+  #define TK_EOS 41
+  #define VARARG_ISVARARG 2
+
+  Proto *luaY_parser (lua_State *L, ZIO *z, Mbuffer *buff, const char *name) {
+    struct LexState lexstate;
+    struct FuncState funcstate;
+    lexstate.buff = buff;
+    TString *tname = luaS_new(L, name);
+    setsvalue2s(L, L->top, tname);
+    incr_top(L);
+    luaX_setinput(L, &lexstate, z, tname);
+    open_func(&lexstate, &funcstate);
+    funcstate.f->is_vararg = VARARG_ISVARARG;  /* main func. is always vararg */
+    luaX_next(&lexstate);  /* read first token */
+    chunk(&lexstate);
+    check(&lexstate, TK_EOS);
+    close_func(&lexstate);
+    --L->top;
+    return funcstate.f;
+  }
+  ```
+
+test "rank1663: the shape-identical undump and luac sites are safe through holder visibility, not a named call"
+  lang c
+  file luac.c
+  reject VYQL-MEM-007
+  code
+  ```
+  #include <stddef.h>
+
+  typedef struct lua_State lua_State;
+  typedef struct ZIO ZIO;
+  typedef struct Mbuffer Mbuffer;
+  typedef struct TString TString;
+  typedef struct Proto Proto;
+  typedef struct LoadState LoadState;
+
+  TString *luaS_newliteral (lua_State *L, const char *s);
+  Proto *LoadFunction (LoadState *S, TString *p);
+  void LoadHeader (LoadState *S);
+
+  /* lundump.c:208 — a collectable string passed inline into a call that
+     stores it into fields of a Proto the collector traverses. Shape-identical
+     to the vulnerable luaX_setinput line; safe only because the callee chain
+     anchors the reference, which no node-level fact can see. */
+  Proto *luaU_undump (lua_State *L, ZIO *Z, Mbuffer *b, const char *name) {
+    LoadState S;
+    if (name == NULL) name = "=?";
+    S.name = name;
+    S.L = L;
+    S.Z = Z;
+    S.b = b;
+    LoadHeader(&S);
+    return LoadFunction(&S, luaS_newliteral(L, "=?"));
+  }
+
+  /* luac.c:128 — the string is stored into f->source, a field of a
+     GC-managed Proto, so the store itself is the anchor. */
+  static void set_script_name (lua_State *L, Proto *f) {
+    f->source = luaS_newliteral(L, "=(" "luac" ")");
+  }
+  ```
+
+test "rank1663: minimal pair -- an explicit free between allocation and use is a labelled release node"
+  lang c
+  file lparser.c
+  reject VYQL-MEM-007
+  code
+  ```
+  #include <stdlib.h>
+
+  typedef struct lua_State lua_State;
+  typedef struct TString TString;
+  typedef struct Proto Proto;
+  struct LexState;
+
+  TString *luaS_new (lua_State *L, const char *str);
+  void luaX_setinput (lua_State *L, struct LexState *ls, TString *source);
+  void chunk (struct LexState *ls);
+  void close_func (struct LexState *ls);
+
+  Proto *parse_then_collect (lua_State *L, struct LexState *ls, const char *name) {
+    TString *tname = luaS_new(L, name);
+    luaX_setinput(L, ls, tname);
+    chunk(ls);           /* allocation steps the collector */
+    free(tname);         /* the release is at least a call: code.PointerFree */
+    close_func(&ls);
+    return NULL;
+  }
+  ```

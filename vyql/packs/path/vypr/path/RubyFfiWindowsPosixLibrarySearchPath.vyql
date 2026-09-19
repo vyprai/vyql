@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule RubyFfiWindowsPosixLibrarySearchPath {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_427]
+    id: "VYQL-PATH-044"
+    severity: high
+  }
+  issue code.RubyFfiWindowsPosixLibrarySearchPath as sink
+}

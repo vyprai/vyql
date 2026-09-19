@@ -1,0 +1,49 @@
+module bindings.rust.container_capability_set_administrative_grant;
+
+// A container runtime hands its processes a Linux capability set, and every
+// runtime's documentation draws the same line through that set: the container
+// default -- Docker's fourteen, runc's default set -- is a working set for
+// ordinary workloads, and the capabilities outside it administer the host or
+// bypass its mandatory controls. SYS_ADMIN mounts and remounts filesystems and
+// builds namespaces, NET_ADMIN reconfigures networking, SYS_MODULE loads kernel
+// code, SYS_RAWIO and SYSPTRACE reach past the container's own boundaries, BPF
+// and PERFMON load observability programs into the kernel, the MAC pair
+// overrides mandatory access control, and the rest administer audit, the
+// clock, the tty layer, suspend and immutable flags. A sandbox that grants
+// from that second group has not sandboxed: whatever runs inside can act on
+// the host through it.
+//
+// The oci_spec::runtime::Capability enumeration is the vocabulary a Rust
+// runtime grants from, and the grant is written as a function that materialises
+// it -- an iterator of enum values collected into the set the spec builder
+// takes. What this binding recognises is that function: a host-administrative
+// variant named as a value in the function's own body, together with the
+// collection being built there. Both clauses read the AST-derived tokens of the
+// function context, so prose in a comment satisfies neither -- the frontend
+// records an enum path only where the parse has one, and a call only where a
+// call is.
+//
+// The collect clause is what separates a grant from the two shapes that name
+// the same variants innocently. A conversion table -- the match that maps every
+// spec capability onto the syscall layer's constant -- names all of them and is
+// a runtime's legitimate plumbing; it builds no collection, and a match arm is
+// not a collection element. A regression test asserting the dangerous variants
+// are absent lists them and iterates to assert; it too builds no collection.
+// The grant is the one that collects.
+//
+// The syscall layer's own CAP_ constants are not recognised: that spelling is
+// shared by the conversion plumbing and by host reporting, which names a
+// capability to say whether the host has it.
+//
+// Residual, stated rather than hidden. False-negative direction: a set built
+// with the vec! macro emits no call atom for the construction, so a grant
+// written that way is not recognised, and a grant spelled in the CAP_ string
+// form for a syscall-layer API is outside this binding for the reason above.
+// False-positive direction: a function that collects a set of administrative
+// capabilities in order to deny them carries the same two atoms as one that
+// collects them to grant -- the polarity lives in the consumer, and these atoms
+// do not see it.
+binding containerCapabilitySetAdministrativeGrant {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.context.identifier, ["Capability::SysAdmin", "Capability::NetAdmin", "Capability::SysModule", "Capability::SysRawio", "Capability::SysPtrace", "Capability::SysPacct", "Capability::SysBoot", "Capability::SysTime", "Capability::SysTtyConfig", "Capability::LinuxImmutable", "Capability::MacOverride", "Capability::MacAdmin", "Capability::AuditControl", "Capability::Syslog", "Capability::WakeAlarm", "Capability::BlockSuspend", "Capability::Perfmon", "Capability::Bpf", "Capability::CheckpointRestore"]) and node.context.call in ["collect"]
+  emit issue code.PrivilegedContainer at node
+}

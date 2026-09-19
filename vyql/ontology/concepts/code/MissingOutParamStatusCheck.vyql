@@ -1,0 +1,11 @@
+module code;
+
+concept MissingOutParamStatusCheck : issue {
+  cwe: [CWE_457, CWE_908]
+  reviewAssumption: "the callee can fail and leave the output it hands back half-built"
+  reviewCategory: memory
+  reviewCondition: "a call's output, handed back through a pointer the caller owns, is read through a member access while the status the call returned is never consulted"
+  reviewConfidence: medium
+  reviewEvidence: "out-parameter context {pattern} reads the call's output inside a branch that tests only the pointers' non-nullness"
+  vulnerableTo: [memory.UninitializedUse]
+}

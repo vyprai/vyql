@@ -1,0 +1,17 @@
+module bindings.go.generated.mcd5dd770;
+
+binding networkConnect0 {
+  requires {
+    dependency("sigs.k8s.io/apiserver-network-proxy/konnectivity-client")
+  }
+  query pattern callExpr where callee.method == "CreateSingleUseGrpcTunnel"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect1 {
+  requires {
+    dependency("sigs.k8s.io/apiserver-network-proxy/konnectivity-client")
+  }
+  query pattern callExpr where callee.method == "CreateSingleUseGrpcTunnelWithContext"
+  emit sink code.NetworkConnectSink at args[0]
+}

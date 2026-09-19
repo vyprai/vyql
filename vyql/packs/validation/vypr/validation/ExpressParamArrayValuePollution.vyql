@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule ExpressParamArrayValuePollution {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20, CWE_235]
+    id: "VYQL-VAL-008"
+    severity: medium
+  }
+  issue code.ExpressParamArrayValuePollution as param
+}

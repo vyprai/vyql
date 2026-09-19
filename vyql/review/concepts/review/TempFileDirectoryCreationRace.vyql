@@ -1,0 +1,8 @@
+module code;
+
+review code.TempFileDirectoryCreationRace {
+  category: path
+  expected: [core.PathAccessCheck]
+  kind: target
+  text: "create temporary directories atomically instead of deleting a temporary file and recreating the same path as a directory"
+}

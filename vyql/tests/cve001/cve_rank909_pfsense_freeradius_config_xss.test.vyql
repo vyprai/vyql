@@ -1,0 +1,51 @@
+# Rank 909 / CVE-2019-18667: pfSense FreeRADIUS rendered configuration file
+# contents in an HTML page before escaping the file body with htmlspecialchars.
+
+test "rank909: local config file contents printed into HTML without escaping"
+  lang php
+  file freeradius_view_config.php
+  expect VYQL-INJ-180
+  expect_review code.UnescapedLocalFileContentHtmlRender
+  code
+  ```
+  <?php
+  function get_file($file) {
+      $files['radiusd'] = FREERADIUS_RADDB . "/radiusd.conf";
+      $files['eap'] = FREERADIUS_MODSENABLED . "/eap";
+
+      if ($files[$file] != "" && file_exists($files[$file])) {
+          print '<pre>';
+          print $files[$file] . "\n" . file_get_contents($files[$file]);
+          print '</pre>';
+      }
+  }
+
+  if ($_REQUEST['file'] != "") {
+      get_file($_REQUEST['file']);
+  }
+  ```
+
+test "rank909: config file contents escaped before HTML rendering"
+  lang php
+  file freeradius_view_config.php
+  reject VYQL-INJ-180
+  reject VYQL-INJ-004
+  reject_review code.UnescapedLocalFileContentHtmlRender
+  code
+  ```
+  <?php
+  function get_file($file) {
+      $files['radiusd'] = FREERADIUS_RADDB . "/radiusd.conf";
+      $files['eap'] = FREERADIUS_MODSENABLED . "/eap";
+
+      if ($files[$file] != "" && file_exists($files[$file])) {
+          print '<pre>';
+          print $files[$file] . "\n" . htmlspecialchars(file_get_contents($files[$file]));
+          print '</pre>';
+      }
+  }
+
+  if ($_REQUEST['file'] != "") {
+      get_file($_REQUEST['file']);
+  }
+  ```

@@ -1,0 +1,156 @@
+# CVE-2016-2785: the puppet master's REST layer authorized one spelling of a
+# request key and then looked up another (CWE-436, CWE-863).
+# Puppet::Network::HTTP::API::IndirectedRoutes#uri2indirection split the
+# request path, handed the raw indirection key to the auth.conf ACL check,
+# and only then percent-decoded it:
+#
+#   check_authorization(method, "#{url_prefix}/#{indirection_name}/#{key}", params)
+#   ...
+#   key = URI.unescape(key)
+#   [indirection, method, key, params]
+#
+# The returned key drives indirection.find, so the resource actually served is
+# named by the decoded string while the ACL matched the encoded one. A client
+# that can reach the route names a resource as /node/foo%2520bar -- the ACL
+# rule sees the %2520 spelling, the lookup sees "foo bar" -- and any auth.conf
+# path rule written against the decoded spelling never runs. With WEBrick the
+# HTTP layer decodes the path once, so uri2indirection's unescape
+# is a second decode of the same value. Fix 6592a816 removes the unescape
+# from uri2indirection and performs the single decode at the edge instead
+# (Puppet::Network::HTTP::RackREST#path returns URI.unescape(request.path)),
+# so the string the ACL matches is the string the indirection looks up.
+#
+# Same weakness class as the JavaScript decodeURIComponent findings for
+# VYQL-AUTH-127: a component derives a path from the request after the access
+# decision is taken on a different decoding of it. No new rule, concept or
+# CWE -- the Ruby binding requestKeyPercentDecodeAfterAuthorization reuses the
+# concept and widens its guidance text from router/middleware to name the
+# authorization-check role. Measured on the real checkout: the vulnerable
+# revision reports VYQL-AUTH-127 exactly once, on uri2indirection
+# (indirected_routes.rb:56), stable over three --cache off runs, and the fixed
+# revision reports none, same three runs. Across every non-test Ruby file in
+# the corpus clones (~12k files) a percent-decode assignment and an
+# authorization hook co-occur in one file only here.
+#
+# verify_current_expected: fixed, 1 -> 0.
+
+test "rank1620: the indirection key is decoded after the ACL matched the encoded spelling"
+  lang ruby
+  file lib/puppet/network/http/api/indirected_routes.rb
+  expect VYQL-AUTH-127
+  expect_review code.MiddlewarePathMatchNormalizationMismatch
+  code
+  ```
+  require 'uri'
+
+  class Puppet::Network::HTTP::API::IndirectedRoutes
+    def uri2indirection(http_method, uri, params)
+      indirection_type, version, indirection_name, key = uri.split("/", 5)[1..-1]
+      url_prefix = "/#{indirection_type}/#{version}"
+      environment = params.delete(:environment)
+
+      method = indirection_method(http_method, indirection_name)
+      indirection = Puppet::Indirector::Indirection.instance(indirection_name.to_sym)
+
+      configured_environment = Puppet.lookup(:environments).get(environment)
+      unless configured_environment.nil?
+        params[:environment] = configured_environment
+      end
+
+      check_authorization(method, "#{url_prefix}/#{indirection_name}/#{key}", params)
+
+      params.delete(:bucket_path)
+
+      if key == "" or key.nil?
+        raise ArgumentError, "No request key specified in #{uri}"
+      end
+
+      key = URI.unescape(key)
+
+      [indirection, method, key, params]
+    end
+  end
+  ```
+
+test "rank1620: the patched routes leave the key in the spelling the ACL matched"
+  lang ruby
+  file lib/puppet/network/http/api/indirected_routes.rb
+  reject VYQL-AUTH-127
+  code
+  ```
+  class Puppet::Network::HTTP::API::IndirectedRoutes
+    def uri2indirection(http_method, uri, params)
+      indirection_type, version, indirection_name, key = uri.split("/", 5)[1..-1]
+      url_prefix = "/#{indirection_type}/#{version}"
+      environment = params.delete(:environment)
+
+      method = indirection_method(http_method, indirection_name)
+      indirection = Puppet::Indirector::Indirection.instance(indirection_name.to_sym)
+
+      configured_environment = Puppet.lookup(:environments).get(environment)
+      unless configured_environment.nil?
+        params[:environment] = configured_environment
+      end
+
+      check_authorization(method, "#{url_prefix}/#{indirection_name}/#{key}", params)
+
+      params.delete(:bucket_path)
+
+      if key == "" or key.nil?
+        raise ArgumentError, "No request key specified in #{uri}"
+      end
+
+      [indirection, method, key, params]
+    end
+  end
+  ```
+
+test "rank1620: the decode alone at the edge is not the mismatch"
+  lang ruby
+  file lib/puppet/network/http/rack/rest.rb
+  reject VYQL-AUTH-127
+  code
+  ```
+  require 'uri'
+
+  class Puppet::Network::HTTP::RackREST
+    def path(request)
+      if request.path
+        URI.unescape(request.path)
+      end
+    end
+  end
+  ```
+
+test "rank1620: the same shape in another stack's vocabulary"
+  lang ruby
+  file app/controllers/documents_controller.rb
+  expect VYQL-AUTH-127
+  code
+  ```
+  require 'cgi'
+
+  class DocumentsController < ApplicationController
+    def show
+      document_key = request.path.split("/", 5)[4]
+      authorize(document_key, :show?)
+      document_key = CGI.unescape(document_key)
+      @document = Document.find(document_key)
+    end
+  end
+  ```
+
+test "rank1620: an authorization over a value the function never decodes"
+  lang ruby
+  file app/controllers/documents_controller.rb
+  reject VYQL-AUTH-127
+  code
+  ```
+  class DocumentsController < ApplicationController
+    def show
+      document_key = request.path.split("/", 5)[4]
+      authorize(document_key, :show?)
+      @document = Document.find(document_key)
+    end
+  end
+  ```

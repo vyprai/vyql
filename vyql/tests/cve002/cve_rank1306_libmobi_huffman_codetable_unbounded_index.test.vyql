@@ -1,0 +1,361 @@
+# Rank 1306 / CVE-2021-3881: libmobi's Huffman decompressor
+# (mobi_decompress_huffman_internal, src/compression.c) reads a code length
+# out of a fixed 256-entry lookup (`code_length = t1 & 0x1f`, where `t1 =
+# huffcdic->table1[code >> 24]`, itself populated verbatim from the HUFF
+# record's file data) and then, when the termination bit is clear, walks it
+# forward with no cap at all:
+#
+#   while (code < huffcdic->mincode_table[code_length]) {
+#       code_length++;
+#   }
+#   maxcode = huffcdic->maxcode_table[code_length];
+#
+# `mincode_table`/`maxcode_table` are fixed 33-entry arrays
+# (`MOBIHuffCdic`, compression.h). Because `code` and the table's own
+# contents both come from the same crafted file, an attacker can arrange for
+# the loop condition to keep holding past index 32, walking `code_length`
+# arbitrarily far and reading out of bounds both inside the loop's own
+# comparison (`mincode_table[code_length]`) and in the following statement
+# (`maxcode_table[code_length]`) -- CWE-125, closes bfabiszewski/libmobi#35
+# and #36. The fixed revision adds
+# `HUFF_CODETABLE_SIZE` (33) and caps the increment:
+# `if (++code_length >= HUFF_CODETABLE_SIZE) { ...; return MOBI_DATA_CORRUPT; }`.
+#
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` against the real
+# checkout at the vulnerable revision reports nothing for
+# mobi_decompress_huffman_internal: no VYQL-MEM-005 (TaintedIndexAccess), no
+# VYQL-MEM-010 (FieldDerivedIndexAccess), no VYQL-MEM-017
+# (CountDerivedElementAccess). `vyql match` on an isolated repro of the same
+# shape shows why: `huffcdic->mincode_table[code_length]` (inside the
+# `while` condition) carries no concept at all, not even the generic
+# code.IndexAccess presence label that an identical subscript gets in
+# statement position -- the subscript nested inside a loop's own condition
+# is invisible to the extractor. `code_length` also never satisfies
+# FieldDerivedIndexAccess's own gate on either side, since that analysis
+# requires the *index* text itself to be struct/field-derived
+# (`ccStructuredIndex`, e.g. `arr[s->count]`); here the index is a bare
+# scalar local that a loop increments without any upper bound, not a field
+# access.
+#
+# ATTENTION, engine gap, rechecked. Nothing fires at either revision: three
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` runs per revision
+# over the real checkouts report 885 findings / 181 at or above high on every
+# run, identically on both sides. compression.c contributes five rows on both
+# sides and all five are code.NullableDeref in the `mobi_decompress_huffman`
+# wrapper (39/78/98/207/214), not the walk. The one index row anywhere near the
+# parser is VYQL-MEM-010 on `huffcdic->symbol_offsets[huffcdic->index_read++]`
+# in mobi_parse_cdic (read.c:686), a field-derived index that the fix does not
+# touch and that fires identically on both trees.
+#
+# The gap is narrower than "the index side cannot express it". The
+# statement-position subscript `maxcode = huffcdic->maxcode_table[code_length]`
+# (compression.c:146) is lowered and carries both code.IndexAccess and
+# code.IndexAccessSink, and substituting a recognised read for the accessor
+# that fills `buffer` makes VYQL-MEM-005 report that exact node through
+# `code >> 24` -> table1 -> `t1 & 0x1f` -> `code_length`. So the index route is
+# live end to end and the rank is blocked one step earlier: nothing labels
+# libmobi's buffer reads (`mobi_buffer_fill64`, `mobi_buffer_get32`) as a
+# source, so no taint ever reaches `huffcdic`'s tables -- the read-accessor
+# half of the C out-parameter/return-value source gap. The loop-condition
+# subscript `mincode_table[code_length]` (compression.c:143) is separately
+# invisible: a `while_statement` lowers to `nir.Loop{Body: ...}` with the
+# condition dropped, so no `__subscript` node exists for it at all.
+#
+# A wider index gate is measured out, on two widths. "A field-derived array
+# subscripted by a bare local that some loop in the same body increments, with
+# no relational comparison of that local anywhere in the body" occurs at 1142
+# sites across 223 files in 28 real C and C++ trees, out of 120 scanned;
+# sampled hits are all safe -- a sentinel walk `for (i = 0; e->cmda[i]; i++)`,
+# an equality bound `if (++low == size) break;`, and a bound spelled one past
+# the index `while (i+1 < sizeof(header.name) && header.name.c[i+1]) i++;`,
+# the last two of which the existing `ccHasUpperBoundGuard` text test also
+# fails to credit. It also scores identically on both revisions of the same
+# project (198 rows in gpac and 160 in asterisk, vulnerable and fixed alike).
+# Narrowing to the correlated form the gap first described -- a loop whose own
+# condition subscripts some array by the incremented local -- still leaves 342
+# sites across 135 files in 27 trees, and inside libmobi itself it flags four
+# ordinary sentinel-terminated table walks beside the target
+# (mobi_get_filemeta_by_type, mobi_is_guide_type, mobi_set_pdbname,
+# mobi_get_exthtagmeta_by_tag). Those walks and the vulnerable one are
+# structurally identical at the text level; what separates them is whether the
+# table is guaranteed to carry its terminator, which is data, not code. The
+# fifth through eighth snippets pin those four walks so a future gate has to
+# clear them.
+#
+# verify_current_expected: attention-engine-gap, rechecked; the vulnerable and
+#   fixed revisions both report 885 findings over the real checkout and the
+#   index route fires as soon as a labelled source reaches the index
+
+test "rank1306: code_length walks mincode_table/maxcode_table with no upper cap"
+  lang c
+  file compression.c
+  reject VYQL-MEM-005
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  typedef struct {
+      uint32_t table1[256];
+      uint32_t mincode_table[33];
+      uint32_t maxcode_table[33];
+  } MOBIHuffCdic;
+
+  typedef struct {
+      unsigned char *data;
+      size_t offset;
+      size_t maxlen;
+      int error;
+  } MOBIBuffer;
+
+  uint64_t mobi_buffer_fill64(MOBIBuffer *buf_in);
+
+  int mobi_decompress_huffman_internal(MOBIBuffer *buf_out, MOBIBuffer *buf_in, const MOBIHuffCdic *huffcdic, size_t depth) {
+      int ret = 0;
+      int8_t bitcount = 32;
+      uint8_t code_length = 0;
+      uint64_t buffer = mobi_buffer_fill64(buf_in);
+      while (ret == 0) {
+          if (bitcount <= 0) {
+              bitcount += 32;
+              buffer = mobi_buffer_fill64(buf_in);
+          }
+          uint32_t code = (buffer >> bitcount) & 0xffffffffU;
+          uint32_t t1 = huffcdic->table1[code >> 24];
+          code_length = t1 & 0x1f;
+          uint32_t maxcode = (((t1 >> 8) + 1) << (32 - code_length)) - 1;
+          if (!(t1 & 0x80)) {
+              while (code < huffcdic->mincode_table[code_length]) {
+                  code_length++;
+              }
+              maxcode = huffcdic->maxcode_table[code_length];
+          }
+          bitcount -= code_length;
+          if (maxcode == 0) {
+              break;
+          }
+      }
+      return ret;
+  }
+  ```
+
+test "rank1306: fix caps code_length against HUFF_CODETABLE_SIZE before it indexes either table"
+  lang c
+  file compression.c
+  reject VYQL-MEM-005
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <stdint.h>
+  #include <stddef.h>
+
+  #define HUFF_CODETABLE_SIZE 33
+
+  typedef struct {
+      uint32_t table1[256];
+      uint32_t mincode_table[HUFF_CODETABLE_SIZE];
+      uint32_t maxcode_table[HUFF_CODETABLE_SIZE];
+  } MOBIHuffCdic;
+
+  typedef struct {
+      unsigned char *data;
+      size_t offset;
+      size_t maxlen;
+      int error;
+  } MOBIBuffer;
+
+  uint64_t mobi_buffer_fill64(MOBIBuffer *buf_in);
+
+  int mobi_decompress_huffman_internal(MOBIBuffer *buf_out, MOBIBuffer *buf_in, const MOBIHuffCdic *huffcdic, size_t depth) {
+      int ret = 0;
+      int8_t bitcount = 32;
+      uint8_t code_length = 0;
+      uint64_t buffer = mobi_buffer_fill64(buf_in);
+      while (ret == 0) {
+          if (bitcount <= 0) {
+              bitcount += 32;
+              buffer = mobi_buffer_fill64(buf_in);
+          }
+          uint32_t code = (buffer >> bitcount) & 0xffffffffU;
+          uint32_t t1 = huffcdic->table1[code >> 24];
+          code_length = t1 & 0x1f;
+          uint32_t maxcode = (((t1 >> 8) + 1) << (32 - code_length)) - 1;
+          if (!(t1 & 0x80)) {
+              while (code < huffcdic->mincode_table[code_length]) {
+                  if (++code_length >= HUFF_CODETABLE_SIZE) {
+                      return -1;
+                  }
+              }
+              maxcode = huffcdic->maxcode_table[code_length];
+          }
+          bitcount -= code_length;
+          if (maxcode == 0) {
+              break;
+          }
+      }
+      return ret;
+  }
+  ```
+
+test "rank1306: minimal pair -- a struct-field count used directly as an index is caught"
+  lang c
+  file huffcdic.c
+  expect VYQL-MEM-010
+  expect_review code.FieldDerivedIndexAccess
+  code
+  ```
+  struct hrd_state { unsigned cpb_cnt; int rate[32]; };
+
+  void direct_index(struct hrd_state *s) {
+      s->rate[s->cpb_cnt] = 1;
+  }
+  ```
+
+test "rank1306: minimal pair -- a local scalar a loop increments without bound, tested only against the array it indexes, is not"
+  lang c
+  file huffcdic.c
+  reject VYQL-MEM-005
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  struct hrd_state { int mincode[33]; int maxcode[33]; };
+
+  void unbounded_table_walk(struct hrd_state *s, int code) {
+      unsigned char idx = 0;
+      while (code < s->mincode[idx]) {
+          idx++;
+      }
+      int v = s->maxcode[idx];
+  }
+  ```
+
+# The four walks below are copied from libmobi's own src/util.c and src/opf.c,
+# each a sentinel-terminated table walk that any gate widened to catch the
+# huffman walk would also hit: the same bare local, incremented in a loop, with
+# no relational comparison of that local anywhere in the body. Each is safe
+# because its table is defined, in the same translation unit, to end in a
+# terminator entry -- a fact about the data that no code-level extractor can
+# read. A future gate must still report none of them.
+
+test "rank1306: pin -- a walk to an explicit terminator field is not the huffman walk"
+  lang c
+  file util.c
+  reject VYQL-MEM-005
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  typedef struct { int type; const char *name; } FileMeta;
+
+  const FileMeta file_meta[] = {
+      { 1, "book" },
+      { 2, "news" },
+      { 0, NULL },
+  };
+
+  FileMeta get_filemeta_by_type(int type) {
+      size_t i = 0;
+      while (file_meta[i].type != 0) {
+          if (file_meta[i].type == type) {
+              return file_meta[i];
+          }
+          i++;
+      }
+      return file_meta[i];
+  }
+  ```
+
+test "rank1306: pin -- a walk to a NULL pointer entry is not the huffman walk"
+  lang c
+  file opf.c
+  reject VYQL-MEM-005
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <string.h>
+
+  const char *guide_types[] = { "cover", "toc", "index", NULL };
+
+  int is_guide_type(const char *type) {
+      size_t i = 0;
+      size_t type_length = strlen(type);
+      while (guide_types[i]) {
+          if (strncmp(guide_types[i++], type, type_length) == 0) {
+              return 1;
+          }
+      }
+      return 0;
+  }
+  ```
+
+test "rank1306: pin -- a walk copying up to a NUL into a fixed field is not the huffman walk"
+  lang c
+  file util.c
+  reject VYQL-MEM-005
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  #include <ctype.h>
+  #include <string.h>
+
+  #define NAME_SIZE_MAX 32
+
+  typedef struct { char name[NAME_SIZE_MAX + 1]; } PalmHeader;
+
+  void set_dbname(PalmHeader *ph, const char *name) {
+      char dbname[NAME_SIZE_MAX + 1];
+      memcpy(dbname, name, NAME_SIZE_MAX);
+      dbname[NAME_SIZE_MAX] = '\0';
+      char c;
+      int i = 0;
+      while ((c = dbname[i])) {
+          if (!isalnum(c)) {
+              c = '_';
+          }
+          ph->name[i++] = c;
+      }
+      ph->name[i] = '\0';
+  }
+  ```
+
+test "rank1306: pin -- a walk gated on a positive tag field is not the huffman walk"
+  lang c
+  file util.c
+  reject VYQL-MEM-005
+  reject VYQL-MEM-010
+  reject VYQL-MEM-017
+  reject_review code.FieldDerivedIndexAccess
+  code
+  ```
+  typedef struct { int tag; int len; const char *name; } ExthMeta;
+
+  const ExthMeta exth_tags[] = {
+      { 100, 4, "author" },
+      { 101, 4, "publisher" },
+      { 0, 0, NULL },
+  };
+
+  ExthMeta get_exthtagmeta_by_tag(int tag) {
+      size_t i = 0;
+      while (exth_tags[i].tag > 0) {
+          if (exth_tags[i].tag == tag) {
+              return exth_tags[i];
+          }
+          i++;
+      }
+      return (ExthMeta) {0, 0, NULL};
+  }
+  ```
+

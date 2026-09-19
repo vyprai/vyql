@@ -1,0 +1,59 @@
+# Rank 879 / CVE-2020-36321: Vaadin Flow decoded request paths before
+# parent-directory validation, but malformed percent escapes could abort the
+# check before the traversal regex ran.
+
+test "rank879: URL decode exception bypasses parent directory path check"
+  lang java
+  file HandlerHelper.java
+  expect VYQL-PATH-048
+  expect_review code.UrlDecodedTraversalCheckExceptionBypass
+  code
+  ```
+  import java.io.UnsupportedEncodingException;
+  import java.net.URLDecoder;
+  import java.nio.charset.StandardCharsets;
+  import java.util.regex.Pattern;
+
+  class HandlerHelper {
+      private static final Pattern PARENT_DIRECTORY_REGEX = Pattern
+              .compile("(/|\\\\)\\.\\.(/|\\\\)?", Pattern.CASE_INSENSITIVE);
+
+      static boolean isPathUnsafe(String path) {
+          try {
+              path = URLDecoder.decode(path, StandardCharsets.UTF_8.name());
+          } catch (UnsupportedEncodingException e) {
+              throw new RuntimeException("An error occurred during decoding URL.", e);
+          }
+          return PARENT_DIRECTORY_REGEX.matcher(path).find();
+      }
+  }
+  ```
+
+test "rank879: malformed URL decode still falls through to path check"
+  lang java
+  file HandlerHelper.java
+  reject VYQL-PATH-048
+  reject_review code.UrlDecodedTraversalCheckExceptionBypass
+  code
+  ```
+  import java.io.UnsupportedEncodingException;
+  import java.net.URLDecoder;
+  import java.nio.charset.StandardCharsets;
+  import java.util.regex.Pattern;
+
+  class HandlerHelper {
+      private static final Pattern PARENT_DIRECTORY_REGEX = Pattern
+              .compile("(/|\\\\)\\.\\.(/|\\\\)?", Pattern.CASE_INSENSITIVE);
+
+      static boolean isPathUnsafe(String path) {
+          try {
+              path = URLDecoder.decode(path, StandardCharsets.UTF_8.name());
+          } catch (UnsupportedEncodingException e) {
+              throw new RuntimeException("An error occurred during decoding URL.", e);
+          } catch (IllegalArgumentException ex) {
+              // Ignore: the path is not URL encoded, check it as is.
+          }
+          return PARENT_DIRECTORY_REGEX.matcher(path).find();
+      }
+  }
+  ```

@@ -1,0 +1,9 @@
+module bindings.kotlin.generated.m44c20d39;
+
+binding expressionEval0 {
+  requires {
+    dependency("javax.el:javax.el-api")
+  }
+  query pattern callExpr where callee.method == "eval"
+  emit sink code.ExpressionEval at args[0]
+}

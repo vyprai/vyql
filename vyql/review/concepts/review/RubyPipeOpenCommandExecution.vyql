@@ -1,0 +1,7 @@
+module code;
+
+review code.RubyPipeOpenCommandExecution {
+  category: command
+  kind: attention
+  text: "review Ruby Kernel.open callers for pipe-prefixed path command execution"
+}

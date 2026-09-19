@@ -1,0 +1,56 @@
+test "rank167: AVideo Encoder ffmpeg thumbnail URL lacks private-address SSRF guard"
+  lang php
+  expect VYQL-RF-004
+  expect_review code.IncompleteIpDenylist
+  code
+  ```
+  <?php
+  require_once dirname(__FILE__) . '/../videos/configuration.php';
+  header('Access-Control-Allow-Origin: *');
+  $url = base64_decode($_GET['base64Url']);
+
+  if (!filter_var($url, FILTER_VALIDATE_URL) || !preg_match('/^https?:\/\//i', $url)) {
+      error_log("Invalid URL rejected: {$url}");
+      die();
+  }
+
+  $urlEscaped = escapeshellarg($url);
+  if ($_GET['format'] === 'jpg') {
+      $exec = get_ffmpeg() . " -i {$urlEscaped} -f image2 -vframes 1 -y {$destination}";
+  }
+  execAsync($exec);
+  ```
+
+test "rank167: AVideo Encoder ffmpeg thumbnail URL blocks private and local hosts"
+  lang php
+  reject VYQL-RF-004
+  reject_review code.IncompleteIpDenylist
+  code
+  ```
+  <?php
+  require_once dirname(__FILE__) . '/../videos/configuration.php';
+  header('Access-Control-Allow-Origin: *');
+  $url = base64_decode($_GET['base64Url']);
+
+  if (!filter_var($url, FILTER_VALIDATE_URL) || !preg_match('/^https?:\/\//i', $url)) {
+      error_log("Invalid URL rejected: {$url}");
+      die();
+  }
+  $_ssrfParsed = parse_url($url);
+  $_ssrfHost = isset($_ssrfParsed['host']) ? $_ssrfParsed['host'] : '';
+  if (empty($_ssrfHost) || preg_match('/^(localhost|.*\.local)$/i', $_ssrfHost)) {
+      error_log("SSRF attempt blocked for host: {$_ssrfHost}");
+      die();
+  }
+  $_ssrfIP = filter_var($_ssrfHost, FILTER_VALIDATE_IP) ? $_ssrfHost : gethostbyname($_ssrfHost);
+  if (ip_is_private($_ssrfIP)) {
+      error_log("SSRF attempt blocked - host '{$_ssrfHost}' resolves to private IP '{$_ssrfIP}'");
+      die();
+  }
+
+  $urlEscaped = escapeshellarg($url);
+  if ($_GET['format'] === 'jpg') {
+      $exec = get_ffmpeg() . " -i {$urlEscaped} -f image2 -vframes 1 -y {$destination}";
+  }
+  execAsync($exec);
+  ```

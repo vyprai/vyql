@@ -1,0 +1,457 @@
+# Rank 1412 / CVE-2026-5079 (GHSA-72gw-mp4g-v24j, CWE-400/CWE-770):
+# expressjs/multer is Express's multipart/form-data middleware. It hands the
+# request stream to busboy and, for every non-file part, receives busboy's
+# documented `field` event: the client's raw field *name*, the value, and an
+# info object. `lib/make-middleware.js` then expands that name into `req.body`
+# through the `append-field` package, whose documented job is to interpret
+# HTML's nested-name convention -- `a[b][c]` -- and create one container per
+# bracket group:
+#
+#   busboy.on('field', function (fieldname, value, { nameTruncated, valueTruncated }) {
+#     if (fieldname == null) return abortWithCode('MISSING_FIELD_NAME')
+#     if (nameTruncated) return abortWithCode('LIMIT_FIELD_KEY')
+#     if (valueTruncated) return abortWithCode('LIMIT_FIELD_VALUE', fieldname)
+#
+#     if (limits && Object.prototype.hasOwnProperty.call(limits, 'fieldNameSize')) {
+#       if (fieldname.length > limits.fieldNameSize) return abortWithCode('LIMIT_FIELD_KEY')
+#     }
+#
+#     appendField(req.body, fieldname, value)      // <-- no ceiling on bracket depth
+#   })
+#
+# Nothing in the vulnerable revision bounds how many bracket groups the name may
+# contain. The number of objects allocated and the number of walk steps taken
+# are both the number of groups the client typed, and a group costs three
+# characters (`[0]`), so a field name of a few kilobytes buys a nesting chain
+# thousands of levels deep -- once per part, for as many parts as the `parts`
+# limit allows, and the documented default for every count limit in multer is
+# Infinity. The advisory's own regression test builds the attack as
+# `'a' + '[0]'.repeat(11)`, which is the same shape at toy scale.
+#
+# The three limits that existed do not bound it. `fieldNameSize` caps
+# the name's *length*: because a group is three characters, any name-size limit
+# generous enough to be usable still admits hundreds of levels, and busboy's own
+# default is 100 bytes -- 33 levels through a nul-cost path. `fields` and `parts`
+# cap how many times the expansion runs, not how deep each run goes. So the
+# weakness is not a missing size check and not a missing count check; it is a
+# cost that scales with a *depth* number embedded in attacker text, with no
+# quantity anywhere in the program that the depth is compared against.
+#
+# a192b5278f240967f5eb13dd1e9a413b4e1b6533 ("feat: add fieldNestingDepth limit
+# option") adds exactly that quantity, alongside the existing name-size check
+# and before the expansion:
+#
+#   if (limits && Object.prototype.hasOwnProperty.call(limits, 'fieldNestingDepth')) {
+#     if (fieldname.split('[').length - 1 > limits.fieldNestingDepth) return abortWithCode('LIMIT_FIELD_NESTING', fieldname)
+#   }
+#
+# plus the `LIMIT_FIELD_NESTING` message in lib/multer-error.js, the option's row
+# in README.md's limits table, and test/nesting-depth.js. The default stays
+# Infinity, so the remediation is opt-in -- which is why the detectable state is
+# "a multipart field handler that expands the name and has no depth quantity at
+# all", not "a handler that mis-compares one".
+#
+# The pool row is marked `nocommit` and the flag is wrong for the sixth time
+# this campaign, by a route none of the five earlier ones took: nothing is odd
+# about the row at all. `a192b5278f240967f5eb13dd1e9a413b4e1b6533` is a plain
+# single-parent commit on `main`, tagged v2.2.0, and `git show` prints its
+# four-file diff in full -- no empty combined diff, no merge preview, no
+# release-prep misdirection, no reconstruction needed. Repository, CVE and
+# commit all resolve, the parent 9c801c7 has the unguarded `appendField` call at
+# make-middleware.js:156, and the remediation is present at the fixed revisionit as
+# checked (rank 1390's rule). The recorded CWE-400/770 axis is right. No corpus
+# correction beyond dropping the `nocommit` flag.
+#
+# What fires without this. `timeout 180 ./bin/vyql scan --cache off --max-ram
+# 6GB` over each whole checkout reported the **same 6 findings and 0 flags** on
+# both revisions, byte-identical fingerprints: three VYQL-PATH-001 on the disk
+# storage's `path.join(destination, filename)`, a VYQL-INJ-015, a VYQL-INJ-013
+# and a VYQL-CFG-014. None of them is about the field name, and none moves
+# across the revisions, so there is nothing to reuse and nothing to suppress.
+# `vyql match` on lib/ labels 45 nodes and not one of them is the expansion:
+# `req.body` at make-middleware.js:156 carries `code.HttpInput`, the `require`
+# calls carry `code.DynamicCodeLoad` (the known regex/require over-label), and
+# `appendField` itself is unlabelled. Findings in the file are not coverage.
+#
+# code.UnboundedAllocationReview is reused rather than minted, and this is the
+# concept's own language: "review allocation sizes derived from parsed counts",
+# where the parsed count is the bracket-group count read out of the field name
+# and the allocation is the nesting chain built from it. Rank 1381 established
+# it as the home for "parsed, then executed with no cost bound" via
+# jsGraphqlDocumentExecutedWithoutCostBound, which is the same judgement one
+# layer up (a client picks the nesting depth of a GraphQL selection set; here a
+# client picks the nesting depth of a form field name). Considered and rejected:
+# code.NestedExtglobExpansionWithoutDepthLimit (VYQL-DOS-047, rank 1391) is the
+# nearest sibling and is about a *glob pattern's* extglob groups compiling to
+# nested regex quantifiers -- CWE-1333 backtracking, not allocation, and its
+# review text names extglob recursion specifically;
+# code.UnboundedDelimiterSplitCount is about a helper that materialises all
+# split parts before comparing against a count limit, and the vulnerable
+# revision does no split at all (the fixed revision introduces one);
+# code.UnboundedResourceOperation reads "long-lived resource operation ...
+# timeouts, message limits, cancellation", which a per-part synchronous
+# expansion is not; code.NestedPathInheritedPropertyPrototypePollution is the
+# right shape but the wrong weakness -- it judges the *implementation* of a path
+# setter for an own-property guard (CWE-1321), and append-field has one.
+# No new concept and no new rule ID.
+#
+# The binding is module-scope, which is where the vocabulary is. The expansion
+# happens inside the anonymous `field` callback -- JavaScript does give a
+# function expression its own analysis.function.context, unlike Go's FuncLit
+# (1334), so a function-scope route exists -- but a JavaScript function context
+# inherits its nested functions' tokens, so `node.context.call in
+# ["appendField"]` at function scope reports **3** nodes for one site
+# (make-middleware.js:16 `makeMiddleware`, :17 `multerMiddleware`, :146 the
+# callback) and the callback's own context cannot see the `.on('field', ...)`
+# registration or the `is(req, ['multipart'])` test that make the name
+# untrusted, because both sit in the enclosing function. Module scope reports
+# one node and has the whole documented signature.
+#
+# Module scope brings §4's comment trap, and it is real here, which changed the
+# binding. Measured on this file: `containsAny(node.context.literal, ["nesting"])`
+# on a JavaScript **module**-scope presence node is satisfied by a token that
+# occurs only inside a `//` comment -- prepending `// NOTE: the field name
+# nesting depth is bounded by the reverse proxy` to the vulnerable module took
+# the flag from 1 to 0, so a first draft that negated on `literal` could have
+# been silenced by prose claiming a fix. Three routes are measured
+# comment-proof on the same file, with a nonsense token planted in a comment
+# only: the exact form `node.context.literal in [...]`, `node.context.selector`
+# and `node.context.identifier` (and `node.context.callPath`). The same
+# `containsAny(node.context.literal, ...)` at **function** scope is also
+# comment-proof, so this is specific to the module context, whose raw source is
+# carried as searchable `code.Const` arguments -- it is a narrower statement
+# than §4's, and it does not contradict rank 1398's finding that AST-derived
+# `assign:`/`call_path:` clauses cannot be silenced. The shipped binding
+# therefore uses exact `in [...]` for its two literal clauses and puts both
+# negations on `selector` and `identifier`.
+#
+# Measured, `--cache off`, `--max-ram 6GB`, union over three runs. Whole-tree
+# A/B on the two checkouts: **1 flag on the vulnerable revision
+# (lib/make-middleware.js:1) and 0 on the patched**, VYQL-DOS-041 HIGH, with the
+# other six findings unchanged in both directions. Dropping both negations gives
+# 1/1, so the discrimination is entirely in the ceiling clause and not in the
+# gate. Each remaining clause is the sole discriminator for at least one case
+# below, tested by dropping it: the selector list alone rejects the real fix and
+# the second case (`limits.fieldNestingDepth`, a member read); the identifier
+# list alone rejects the third case (a ceiling in a local, which is the only
+# route left once the option is a property_identifier -- JavaScript emits no
+# `identifier:` token for a property name, so the selector list cannot see it);
+# the path-setter list alone rejects the fourth case; and the two literal
+# clauses alone reject the fifth.
+#
+# A second measurement worth recording, because it is the reason the fourth and
+# fifth cases exist: JavaScript emits no `identifier:` token for a property name.
+# `limits.fieldNestingDepth` produces `selector:limits.fieldNestingDepth` and the
+# string in the `hasOwnProperty` test produces `literal:fieldNestingDepth`, but
+# nothing produces `identifier:fieldNestingDepth`, so a ceiling that is only ever
+# an option key is invisible to an identifier clause and a ceiling that is only
+# ever a local is invisible to a selector clause. Both are needed, and neither
+# subsumes the other.
+#
+# The fixed revision's own vocabulary is not the discriminator, tested by renaming rather
+# than argued: rewriting the patched revision with `fieldNestingDepth` renamed
+# to `maxDepth` still gives 0 flags, so the negation is keyed on the quantity
+# and not on multer's identifier. The honest limit in the other direction is
+# that a ceiling named without the words depth, nesting, level, segment or
+# bracket is missed -- renaming the option to `fieldBracketCap` and the error to
+# `LIMIT_FIELD_LEVELS` brings the flag back to 1. The same trade silences the
+# flag on a vulnerable module that mentions any of those words for an unrelated
+# reason (`util.inspect(x, { depth: 2 })` would do it); that direction costs
+# recall, which is the safe one.
+#
+# Collateral is enumerated rather than sampled, because a five-file library
+# gives a vacuous zero. Across every JavaScript/TypeScript file in the ~120
+# repositories cloned for this campaign, `appendField`/`append-field` appears in
+# **zero** files outside multer, and a `require`/import of busboy or a
+# `.on('field'` registration in **zero** files, so the append-field clause on
+# its own has an empty reachable set in the corpus and proves nothing. The
+# clause set's real reachable set is enumerated instead: 316 JavaScript and
+# TypeScript files mention `multipart`, 15 of those also contain a bare
+# `'field'` string literal, and 13 of those 15 also contain one of the
+# path-setter substrings the binding lists -- 6 distinct contents, the rest
+# being the same bundle copied into other ranks' fixture trees. Every one of the
+# 15 is scanned and the binding reports **0** on all of them: the three
+# LimeSurvey `uploadquestion` builds and the Nest and MeterSphere files (0 in
+# one scan of 5 files), and the three large bundles scanned one at a time --
+# lollms' and lollms-webui's Vite output and MISP's redoc.standalone.js, 3MB,
+# 2.7MB and 1.2MB. So the gate is not satisfied by mere co-membership in a
+# bundle, which is what the two literal clauses are for. The path-setter clause
+# is not load-bearing for multer's own A/B (dropping it still gives 1/0), but it
+# is what keeps the binding off a module that merely serves uploads, which is
+# why the fourth case below pins a flat-write multipart handler as a reject and
+# the fifth pins a path setter with no multipart parsing at all.
+
+test "rank1412: a multipart field handler expands the client's field name into nested containers with no depth ceiling"
+  lang javascript
+  file lib/make-middleware.js
+  expect VYQL-DOS-041
+  expect_review code.UnboundedAllocationReview
+  code
+  ```
+  var is = require('type-is')
+  var Busboy = require('busboy')
+  var appendField = require('append-field')
+
+  var MulterError = require('./multer-error')
+
+  function makeMiddleware (setup) {
+    return function multipartMiddleware (req, res, next) {
+      if (!is(req, ['multipart'])) return next()
+
+      var options = setup()
+      var limits = options.limits
+      var isDone = false
+
+      req.body = Object.create(null)
+
+      function abortWithCode (code, optionalField) {
+        if (isDone) return
+        isDone = true
+        next(new MulterError(code, optionalField))
+      }
+
+      var busboy = Busboy({
+        headers: req.headers,
+        limits: limits,
+        preservePath: options.preservePath
+      })
+
+      busboy.on('field', function (fieldname, value, info) {
+        if (fieldname == null) return abortWithCode('MISSING_FIELD_NAME')
+        if (info.nameTruncated) return abortWithCode('LIMIT_FIELD_KEY')
+        if (info.valueTruncated) return abortWithCode('LIMIT_FIELD_VALUE', fieldname)
+
+        if (limits && Object.prototype.hasOwnProperty.call(limits, 'fieldNameSize')) {
+          if (fieldname.length > limits.fieldNameSize) return abortWithCode('LIMIT_FIELD_KEY')
+        }
+
+        appendField(req.body, fieldname, value)
+      })
+
+      busboy.on('finish', function () {
+        next()
+      })
+
+      req.pipe(busboy)
+    }
+  }
+
+  module.exports = makeMiddleware
+  ```
+
+test "rank1412: the same handler comparing the field name's bracket count against a configured nesting ceiling"
+  lang javascript
+  file lib/make-middleware.js
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  var is = require('type-is')
+  var Busboy = require('busboy')
+  var appendField = require('append-field')
+
+  var MulterError = require('./multer-error')
+
+  function makeMiddleware (setup) {
+    return function multipartMiddleware (req, res, next) {
+      if (!is(req, ['multipart'])) return next()
+
+      var options = setup()
+      var limits = options.limits
+      var isDone = false
+
+      req.body = Object.create(null)
+
+      function abortWithCode (code, optionalField) {
+        if (isDone) return
+        isDone = true
+        next(new MulterError(code, optionalField))
+      }
+
+      var busboy = Busboy({
+        headers: req.headers,
+        limits: limits,
+        preservePath: options.preservePath
+      })
+
+      busboy.on('field', function (fieldname, value, info) {
+        if (fieldname == null) return abortWithCode('MISSING_FIELD_NAME')
+        if (info.nameTruncated) return abortWithCode('LIMIT_FIELD_KEY')
+        if (info.valueTruncated) return abortWithCode('LIMIT_FIELD_VALUE', fieldname)
+
+        if (limits && Object.prototype.hasOwnProperty.call(limits, 'fieldNameSize')) {
+          if (fieldname.length > limits.fieldNameSize) return abortWithCode('LIMIT_FIELD_KEY')
+        }
+
+        if (limits && Object.prototype.hasOwnProperty.call(limits, 'fieldNestingDepth')) {
+          if (fieldname.split('[').length - 1 > limits.fieldNestingDepth) {
+            return abortWithCode('LIMIT_FIELD_NESTING', fieldname)
+          }
+        }
+
+        appendField(req.body, fieldname, value)
+      })
+
+      busboy.on('finish', function () {
+        next()
+      })
+
+      req.pipe(busboy)
+    }
+  }
+
+  module.exports = makeMiddleware
+  ```
+
+test "rank1412: the same handler bounding the expansion through a differently named local ceiling"
+  lang javascript
+  file lib/make-middleware.js
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  var is = require('type-is')
+  var Busboy = require('busboy')
+  var appendField = require('append-field')
+
+  var MulterError = require('./multer-error')
+
+  function countLevels (name) {
+    var levels = 0
+    for (var i = 0; i < name.length; i++) {
+      if (name.charAt(i) === '[') levels++
+    }
+    return levels
+  }
+
+  function makeMiddleware (setup) {
+    return function multipartMiddleware (req, res, next) {
+      if (!is(req, ['multipart'])) return next()
+
+      var options = setup()
+      var limits = options.limits
+      var nestingLimit = (options.limits && options.limits.keyLevels) || 8
+      var isDone = false
+
+      req.body = Object.create(null)
+
+      function abortWithCode (code, optionalField) {
+        if (isDone) return
+        isDone = true
+        next(new MulterError(code, optionalField))
+      }
+
+      var busboy = Busboy({
+        headers: req.headers,
+        limits: limits,
+        preservePath: options.preservePath
+      })
+
+      busboy.on('field', function (fieldname, value, info) {
+        if (fieldname == null) return abortWithCode('MISSING_FIELD_NAME')
+        if (info.nameTruncated) return abortWithCode('LIMIT_FIELD_KEY')
+
+        if (countLevels(fieldname) > nestingLimit) {
+          return abortWithCode('LIMIT_FIELD_KEY', fieldname)
+        }
+
+        appendField(req.body, fieldname, value)
+      })
+
+      busboy.on('finish', function () {
+        next()
+      })
+
+      req.pipe(busboy)
+    }
+  }
+
+  module.exports = makeMiddleware
+  ```
+
+test "rank1412: a multipart field handler that stores each name flat, so no nesting is expanded"
+  lang javascript
+  file lib/flat-middleware.js
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  var is = require('type-is')
+  var Busboy = require('busboy')
+
+  var MulterError = require('./multer-error')
+
+  function makeMiddleware (setup) {
+    return function multipartMiddleware (req, res, next) {
+      if (!is(req, ['multipart'])) return next()
+
+      var options = setup()
+      var limits = options.limits
+      var isDone = false
+
+      req.body = Object.create(null)
+
+      function abortWithCode (code, optionalField) {
+        if (isDone) return
+        isDone = true
+        next(new MulterError(code, optionalField))
+      }
+
+      var busboy = Busboy({
+        headers: req.headers,
+        limits: limits,
+        preservePath: options.preservePath
+      })
+
+      busboy.on('field', function (fieldname, value, info) {
+        if (fieldname == null) return abortWithCode('MISSING_FIELD_NAME')
+        if (info.nameTruncated) return abortWithCode('LIMIT_FIELD_KEY')
+
+        Object.defineProperty(req.body, fieldname, {
+          value: value,
+          enumerable: true,
+          configurable: true,
+          writable: true
+        })
+      })
+
+      busboy.on('finish', function () {
+        next()
+      })
+
+      req.pipe(busboy)
+    }
+  }
+
+  module.exports = makeMiddleware
+  ```
+
+test "rank1412: a configuration loader expanding a caller-supplied dotted path, which is not a multipart field name"
+  lang javascript
+  file lib/config-override.js
+  reject_review code.UnboundedAllocationReview
+  code
+  ```
+  var _ = require('lodash')
+
+  function parseOverrides (argv) {
+    var overrides = []
+
+    argv.forEach(function (arg) {
+      if (arg.indexOf('--set=') !== 0) return
+      var body = arg.slice('--set='.length)
+      var eq = body.indexOf('=')
+      if (eq < 0) return
+      overrides.push({ path: body.slice(0, eq), value: body.slice(eq + 1) })
+    })
+
+    return overrides
+  }
+
+  function applyOverrides (config, argv) {
+    parseOverrides(argv).forEach(function (override) {
+      _.set(config, override.path, override.value)
+    })
+
+    return config
+  }
+
+  module.exports = applyOverrides
+  ```

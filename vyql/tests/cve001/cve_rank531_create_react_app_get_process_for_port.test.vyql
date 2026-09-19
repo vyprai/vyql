@@ -1,0 +1,29 @@
+# Rank 531 / CVE-2021-24033: create-react-app getProcessForPort command execution.
+# Ledger verification: VYQL-INJ-002 catches child_process command execution.
+
+test "rank531: create-react-app interpolates port into shell command"
+  lang javascript
+  expect VYQL-INJ-002
+  code
+  ```
+  const child_process = require("child_process");
+
+  function getProcessForPort(req) {
+    const port = req.query.port;
+    return child_process.exec("lsof -i:" + port);
+  }
+  ```
+
+test "rank531: create-react-app shell-quotes port command"
+  lang javascript
+  reject VYQL-INJ-002
+  code
+  ```
+  const child_process = require("child_process");
+  const shellQuote = require("shell-quote");
+
+  function getProcessForPort(req) {
+    const port = req.query.port;
+    return child_process.exec(shellQuote.quote(["lsof", "-i:" + port]));
+  }
+  ```

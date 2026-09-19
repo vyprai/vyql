@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m7baed960;
+
+binding commandExecution0 {
+  requires {
+    dependency("tap-windows6")
+  }
+  query pattern callExpr where callee.method == "MsiProcess"
+  emit sink code.CommandExecution at args[0]
+}

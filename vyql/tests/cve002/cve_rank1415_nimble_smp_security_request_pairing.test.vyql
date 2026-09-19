@@ -1,0 +1,301 @@
+# Rank 1415 / CVE-2025-62235 (GHSA-8mfp-xmv3-hv35): apache/mynewt-nimble's SMP
+# Security Request handler, ble_sm_sec_req_rx (nimble/host/src/ble_sm.c), decides
+# what to do about a peer-sent BLE_SM_OP_SEC_REQ PDU using only two things: the
+# authreq bitfield taken straight off the air, and whether the bond store holds a
+# key for the peer's identity address. It never consults the security state of the
+# link it is running on. So a peer that clears BLE_SM_PAIR_AUTHREQ_BOND, or sets
+# BLE_SM_PAIR_AUTHREQ_MITM while the stored key is unauthenticated, drives the
+# central straight into ble_sm_pair_initiate() on a link that is still plaintext,
+# and the existing bond is renegotiated at the request of a device that has never
+# proved it holds the LTK. An attacker spoofing a bonded peripheral's address
+# therefore overwrites or downgrades the bonding material without authenticating
+# (CWE-290).
+#
+# The fixed revision 41f67e391e reads conn->bhc_sec_state while the connection list is
+# locked and requires bhc_sec_state.encrypted before it will start a new pairing
+# for security-level elevation; when keys exist and the link is not yet encrypted
+# it always calls ble_sm_enc_initiate() first, so the peer must authenticate with
+# the existing LTK before anything can be renegotiated.
+#
+# The weakness class is a received-PDU handler that starts a credential-
+# establishing procedure without reading the link's current security state, so
+# detection keys on ble_hs_mbuf_pullup_base (this function parses a peer PDU) plus
+# ble_sm_pair_initiate (it starts pairing) with no read of a ble_gap_sec_state
+# encrypted/authenticated field anywhere in the same function. ble_gap.c's
+# ble_gap_security_initiate() makes the same pair-or-encrypt choice but is called
+# by the local application rather than by a received PDU, and is not flagged.
+
+test "rank1415: an SMP Security Request handler starts pairing without reading the link security state"
+  lang c
+  file ble_sm.c
+  expect VYQL-AUTH-082
+  expect_review code.ProtocolStateReview
+  code
+  ```
+  #include "ble_hs_priv.h"
+
+  static void
+  ble_sm_update_sec_state(uint16_t conn_handle, int encrypted, int authenticated)
+  {
+      struct ble_hs_conn *conn;
+
+      conn = ble_hs_conn_find(conn_handle);
+      if (conn != NULL) {
+          conn->bhc_sec_state.encrypted = encrypted;
+          conn->bhc_sec_state.authenticated = authenticated;
+      }
+  }
+
+  static void
+  ble_sm_sec_req_rx(uint16_t conn_handle, struct os_mbuf **om,
+                    struct ble_sm_result *res)
+  {
+      struct ble_store_value_sec value_sec;
+      struct ble_store_key_sec key_sec;
+      struct ble_hs_conn_addrs addrs;
+      struct ble_sm_sec_req *cmd;
+      struct ble_hs_conn *conn;
+      int authreq_mitm;
+
+      res->app_status = ble_hs_mbuf_pullup_base(om, sizeof(*cmd));
+      if (res->app_status != 0) {
+          return;
+      }
+
+      cmd = (struct ble_sm_sec_req *)(*om)->om_data;
+
+      ble_hs_lock();
+
+      conn = ble_hs_conn_find_assert(conn_handle);
+
+      if (ble_sm_proc_find(conn_handle, BLE_SM_PROC_STATE_PAIR, 1, NULL)) {
+          ble_hs_unlock();
+          res->app_status = 0;
+          return;
+      }
+
+      if (!(conn->bhc_flags & BLE_HS_CONN_F_MASTER)) {
+          res->app_status = BLE_HS_SM_US_ERR(BLE_SM_ERR_CMD_NOT_SUPP);
+          res->sm_err = BLE_SM_ERR_CMD_NOT_SUPP;
+      } else {
+          ble_hs_conn_addrs(conn, &addrs);
+          memset(&key_sec, 0, sizeof key_sec);
+          key_sec.peer_addr = addrs.peer_id_addr;
+      }
+
+      ble_hs_unlock();
+
+      if (res->app_status == 0) {
+          if (cmd->authreq & BLE_SM_PAIR_AUTHREQ_BOND) {
+              res->app_status = ble_store_read_peer_sec(&key_sec, &value_sec);
+          } else {
+              res->app_status = BLE_HS_ENOENT;
+          }
+          if (res->app_status == 0) {
+              authreq_mitm = cmd->authreq & BLE_SM_PAIR_AUTHREQ_MITM;
+              if (authreq_mitm && !value_sec.authenticated) {
+                  res->app_status = BLE_HS_EREJECT;
+              }
+          }
+
+          if (res->app_status == 0) {
+              res->app_status = ble_sm_enc_initiate(conn_handle,
+                                                    value_sec.key_size,
+                                                    value_sec.ltk,
+                                                    value_sec.ediv,
+                                                    value_sec.rand_num,
+                                                    value_sec.authenticated);
+          } else {
+              res->app_status = ble_sm_pair_initiate(conn_handle);
+          }
+      }
+  }
+  ```
+
+test "rank1415: the handler requires an encrypted link before starting pairing"
+  lang c
+  file ble_sm.c
+  reject VYQL-AUTH-082
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  #include "ble_hs_priv.h"
+
+  static void
+  ble_sm_sec_req_rx(uint16_t conn_handle, struct os_mbuf **om,
+                    struct ble_sm_result *res)
+  {
+      struct ble_gap_sec_state bhc_sec_state;
+      struct ble_store_value_sec value_sec;
+      struct ble_store_key_sec key_sec;
+      struct ble_hs_conn_addrs addrs;
+      struct ble_sm_sec_req *cmd;
+      struct ble_hs_conn *conn;
+      bool start_pairing = false;
+      bool authreq_mitm;
+      bool authreq_lesc;
+
+      res->app_status = ble_hs_mbuf_pullup_base(om, sizeof(*cmd));
+      if (res->app_status != 0) {
+          return;
+      }
+
+      cmd = (struct ble_sm_sec_req *)(*om)->om_data;
+
+      ble_hs_lock();
+
+      conn = ble_hs_conn_find_assert(conn_handle);
+
+      if (ble_sm_proc_find(conn_handle, BLE_SM_PROC_STATE_PAIR, 1, NULL)) {
+          ble_hs_unlock();
+          res->app_status = 0;
+          return;
+      }
+
+      if (!(conn->bhc_flags & BLE_HS_CONN_F_MASTER)) {
+          ble_hs_unlock();
+          res->app_status = BLE_HS_SM_US_ERR(BLE_SM_ERR_CMD_NOT_SUPP);
+          res->sm_err = BLE_SM_ERR_CMD_NOT_SUPP;
+          return;
+      }
+
+      ble_hs_conn_addrs(conn, &addrs);
+      memset(&key_sec, 0, sizeof key_sec);
+      key_sec.peer_addr = addrs.peer_id_addr;
+
+      bhc_sec_state = conn->bhc_sec_state;
+
+      ble_hs_unlock();
+
+      res->app_status = ble_store_read_peer_sec(&key_sec, &value_sec);
+      if (res->app_status == 0) {
+          if (bhc_sec_state.encrypted) {
+              authreq_mitm = !!(cmd->authreq & BLE_SM_PAIR_AUTHREQ_MITM);
+              authreq_lesc = !!(cmd->authreq & BLE_SM_PAIR_AUTHREQ_SC);
+
+              if (authreq_mitm && !value_sec.authenticated) {
+                  start_pairing = true;
+              } else if (authreq_lesc && !value_sec.sc) {
+                  start_pairing = true;
+              }
+          }
+      } else {
+          start_pairing = true;
+      }
+
+      if (start_pairing) {
+          res->app_status = ble_sm_pair_initiate(conn_handle);
+      } else {
+          res->app_status = ble_sm_enc_initiate(conn_handle,
+                                                value_sec.key_size,
+                                                value_sec.ltk,
+                                                value_sec.ediv,
+                                                value_sec.rand_num,
+                                                value_sec.authenticated);
+      }
+  }
+  ```
+
+test "rank1415: the link security state read through the public connection descriptor also clears it"
+  lang c
+  file ble_sm.c
+  reject VYQL-AUTH-082
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  #include "ble_hs_priv.h"
+
+  static void
+  ble_sm_sec_req_rx(uint16_t conn_handle, struct os_mbuf **om,
+                    struct ble_sm_result *res)
+  {
+      struct ble_store_value_sec value_sec;
+      struct ble_store_key_sec key_sec;
+      struct ble_gap_conn_desc desc;
+      struct ble_sm_sec_req *cmd;
+
+      res->app_status = ble_hs_mbuf_pullup_base(om, sizeof(*cmd));
+      if (res->app_status != 0) {
+          return;
+      }
+
+      cmd = (struct ble_sm_sec_req *)(*om)->om_data;
+
+      res->app_status = ble_gap_conn_find(conn_handle, &desc);
+      if (res->app_status != 0) {
+          return;
+      }
+
+      memset(&key_sec, 0, sizeof key_sec);
+      key_sec.peer_addr = desc.peer_id_addr;
+
+      if (ble_store_read_peer_sec(&key_sec, &value_sec) != 0) {
+          res->app_status = ble_sm_pair_initiate(conn_handle);
+          return;
+      }
+
+      if (desc.sec_state.encrypted &&
+          (cmd->authreq & BLE_SM_PAIR_AUTHREQ_MITM) &&
+          !value_sec.authenticated) {
+          res->app_status = ble_sm_pair_initiate(conn_handle);
+          return;
+      }
+
+      res->app_status = ble_sm_enc_initiate(conn_handle, value_sec.key_size,
+                                            value_sec.ltk, value_sec.ediv,
+                                            value_sec.rand_num,
+                                            value_sec.authenticated);
+  }
+  ```
+
+test "rank1415: a locally initiated security procedure is not a received-PDU handler"
+  lang c
+  file ble_gap.c
+  reject VYQL-AUTH-082
+  reject_review code.ProtocolStateReview
+  code
+  ```
+  #include "ble_hs_priv.h"
+
+  int
+  ble_gap_security_initiate(uint16_t conn_handle)
+  {
+      struct ble_store_value_sec value_sec;
+      struct ble_store_key_sec key_sec;
+      struct ble_hs_conn_addrs addrs;
+      ble_hs_conn_flags_t conn_flags;
+      struct ble_hs_conn *conn;
+      int rc;
+
+      ble_hs_lock();
+      conn = ble_hs_conn_find(conn_handle);
+      if (conn != NULL) {
+          conn_flags = conn->bhc_flags;
+          ble_hs_conn_addrs(conn, &addrs);
+
+          memset(&key_sec, 0, sizeof key_sec);
+          key_sec.peer_addr = addrs.peer_id_addr;
+      }
+      ble_hs_unlock();
+
+      if (conn == NULL) {
+          return BLE_HS_ENOTCONN;
+      }
+
+      if (conn_flags & BLE_HS_CONN_F_MASTER) {
+          rc = ble_store_read_peer_sec(&key_sec, &value_sec);
+          if (rc == 0 && value_sec.ltk_present) {
+              rc = ble_sm_enc_initiate(conn_handle, value_sec.key_size,
+                                       value_sec.ltk, value_sec.ediv,
+                                       value_sec.rand_num,
+                                       value_sec.authenticated);
+          } else {
+              rc = ble_sm_pair_initiate(conn_handle);
+          }
+      } else {
+          rc = ble_sm_slave_initiate(conn_handle);
+      }
+
+      return rc;
+  }
+  ```

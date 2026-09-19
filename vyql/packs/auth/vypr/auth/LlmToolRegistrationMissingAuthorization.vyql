@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule LlmToolRegistrationMissingAuthorization {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862]
+    id: "VYQL-AUTH-112"
+    severity: high
+  }
+  issue code.LlmToolRegistrationMissingAuthorization as action
+}

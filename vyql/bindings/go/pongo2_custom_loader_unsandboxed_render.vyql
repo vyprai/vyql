@@ -1,0 +1,51 @@
+module bindings.go.pongo2_custom_loader_unsandboxed_render;
+
+// pongo2's TemplateLoader interface is the set's injection point for file
+// access, and the engine's own doc comments state plainly that the loaders
+// it ships claim no confinement: DefaultLoader is "the default un-sandboxed
+// access to the local file system" and LocalFilesystemLoader's "access to
+// the local filesystem is unrestricted". An application that hands NewSet a
+// loader of its own is therefore declaring a confinement the engine does
+// not deliver. pongo2 resolves the file-reaching tags' paths itself, and
+// for a template parsed from a string the resolver returns the tag's path
+// unchanged -- the loader's Abs is never consulted -- so {% ssi %}'s plain
+// text mode reads that path with ioutil.ReadFile directly, outside the
+// loader entirely, and {% include %}, {% extends %} and {% import %} name
+// their targets without the loader's path rewriting. Whatever a custom
+// loader's Get checks, the tags' file access on a string-sourced template
+// is not mediated by it. The documented way to take the file tags off a set
+// is BanTag, which the engine enforces at parse time.
+//
+// The shape: a function that builds a set on a loader the application
+// defined -- any NewSet whose body names none of the engine's loaders --
+// and parses a template on it from a string or bytes, with no BanTag in
+// the same body. That is the same incomplete template validation already
+// reported for a Twig environment on a custom loader with no sandbox, a
+// Jinja2 compile of a source it was handed, and a Smarty policy that
+// inverts its allow-list.
+//
+// Read at function scope because Go gives each function -- hoisted
+// closures included -- its own token set, and the set is built and the
+// template parsed in one body; a factory building the set in a sibling
+// function is not covered. A set that only renders templates it loaded
+// through FromFile or FromCache is not this shape either: those calls go
+// through the loader's Abs and Get, which is the mediation the string path
+// skips. Clauses are token-level over AST-derived facts, so a commented-out
+// BanTag does not clear the flag -- false-negative direction only -- and a
+// module aliasing the pongo2 import keeps every clause working, because
+// the match is on bare method names and loader identifiers, not the
+// package prefix. The dependency requirement names the engine the shape is
+// written from; the conjunction of a NewSet with a string parse and no
+// restriction call in one body is what keeps it narrow.
+binding pongo2CustomLoaderUnsandboxedRender {
+  requires {
+    dependency("github.com/flosch/pongo2/v6")
+  }
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "go"
+    and node.context.call in ["NewSet"]
+    and containsAny(node.context.call, ["FromString", "FromBytes", "RenderTemplateString", "RenderTemplateBytes"])
+    and not containsAny(node.context.identifier, ["DefaultLoader", "FSLoader", "FilesystemLoader", "FileSystemLoader"])
+    and not containsAny(node.context.call, ["BanTag"])
+  emit issue code.IncompleteTemplateValidation at node
+}

@@ -1,0 +1,58 @@
+module bindings.java.generated.mdc69555d;
+
+binding regexCompile0 {
+  requires {
+    dependency("oro:oro")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit issue code.RegexCompile at call
+  emit sink code.RegexCompileSink at call
+}
+
+binding expressionEval1 {
+  requires {
+    dependency("oro:oro")
+  }
+  query pattern callExpr where callee.method == "split"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval2 {
+  requires {
+    dependency("oro:oro")
+  }
+  query pattern callExpr where callee.method == "substitute"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval3 {
+  requires {
+    dependency("oro:oro")
+  }
+  query pattern callExpr where callee.method == "match"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval4 {
+  requires {
+    dependency("oro:oro")
+  }
+  query pattern callExpr where callee.method == "matches"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval5 {
+  requires {
+    dependency("oro:oro")
+  }
+  query pattern callExpr where callee.method == "matchesPrefix"
+  emit sink code.ExpressionEval at args[0]
+}
+
+binding expressionEval6 {
+  requires {
+    dependency("oro:oro")
+  }
+  query pattern callExpr where callee.method == "contains"
+  emit sink code.ExpressionEval at args[0]
+}

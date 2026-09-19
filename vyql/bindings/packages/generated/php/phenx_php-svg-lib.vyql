@@ -1,0 +1,9 @@
+module bindings.php.generated.m5f3838eb;
+
+binding deserialization0 {
+  requires {
+    dependency("phenx/php-svg-lib")
+  }
+  query pattern callExpr where callee.method == "loadFile"
+  emit sink code.Deserialization at args[0]
+}

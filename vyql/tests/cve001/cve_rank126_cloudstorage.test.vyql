@@ -1,0 +1,54 @@
+# Rank 126 / CVE-2024-50353: CreateSASUrl(container, objectName, tokenDuration)
+# takes the token duration in minutes but hardcodes the SAS expiry at one hour,
+# so every caller gets an hour-long token no matter what bound it asked for (the
+# two-argument overloads forward the configured DefaultSASTokenDurationMinutes,
+# which is ignored too). The fix passes the parameter through:
+# ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(tokenDuration).
+
+test "rank126: csharp SAS URL expiry with fixed duration is review-visible"
+  lang csharp
+  expect VYQL-AUTH-086
+  expect_review code.TimeBoundAccessTokenReview
+  code
+  ```
+  class AzureCloudStorageProvider {
+      public string CreateSASUrl(string container, string objectName, int tokenDuration) {
+          var blobClient = new BlobClient(_storageOptions.Value.StorageConnectionString, container, objectName);
+          if (blobClient.CanGenerateSasUri) {
+              var tokenBuilder = new BlobSasBuilder {
+                  BlobContainerName = container,
+                  BlobName = objectName,
+                  Resource = "b",
+                  ExpiresOn = DateTimeOffset.UtcNow.AddHours(1)
+              };
+              tokenBuilder.SetPermissions(BlobSasPermissions.Read);
+              return blobClient.GenerateSasUri(tokenBuilder).ToString();
+          }
+          throw new InvalidOperationException();
+      }
+  }
+  ```
+
+test "rank126: csharp SAS URL expiry using requested duration is clean"
+  lang csharp
+  reject VYQL-AUTH-086
+  reject_review code.TimeBoundAccessTokenReview
+  code
+  ```
+  class AzureCloudStorageProvider {
+      public string CreateSASUrl(string container, string objectName, int tokenDuration) {
+          var blobClient = new BlobClient(_storageOptions.Value.StorageConnectionString, container, objectName);
+          if (blobClient.CanGenerateSasUri) {
+              var tokenBuilder = new BlobSasBuilder {
+                  BlobContainerName = container,
+                  BlobName = objectName,
+                  Resource = "b",
+                  ExpiresOn = DateTimeOffset.UtcNow.AddMinutes(tokenDuration)
+              };
+              tokenBuilder.SetPermissions(BlobSasPermissions.Read);
+              return blobClient.GenerateSasUri(tokenBuilder).ToString();
+          }
+          throw new InvalidOperationException();
+      }
+  }
+  ```

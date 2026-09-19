@@ -1,0 +1,10 @@
+module vypr.auth;
+
+rule InsecureHeaderConfig {
+  meta {
+    cwe: [CWE_942, CWE_1021, CWE_693]
+    id: "VYQL-AUTH-106"
+    severity: medium
+  }
+  issue code.InsecureHeaderConfig as c
+}

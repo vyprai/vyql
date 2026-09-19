@@ -1,0 +1,144 @@
+# Rank 1586 / CVE-2022-31018: Play Framework's JSON form binding walked
+# a request body's nested objects and arrays with no depth limit, so a
+# deeply nested JSON body exhausted the stack and took the request
+# thread down (denial of service through unbounded recursion,
+# CWE-1327/CWE-400; PR #11301, backported to 2.8.16). doFromJson in
+# core/play/src/main/scala/play/api/data/Form.scala flattened a JsValue
+# into the form's key-value map by re-entering itself at every
+# JsObject/JsArray node, bounded only by the maxChars budget of the
+# produced map -- nesting depth itself was unbounded. The fixing commit
+# f6722f1e57 (the merge "[2.8.x] add depth limit for JSON form
+# binding") adds Form.FromJsonMaxDepth = 64, a depth member on every
+# FromJsonContext node, and a guard throwing FormJsonExpansionTooDeep
+# once a context's depth passes the bound.
+#
+# ATTENTION, depth budgets on a structure walk, held on recheck. The
+# depth-ceiling vocabulary family has landed since the first pass --
+# NestedParamExpansionWithoutDepthLimit (ruby), NestedExtglobExpansion
+# WithoutDepthLimit (javascript), and a php sibling -- and its generic
+# ceiling spellings do discriminate here: measured with function-scope
+# probes, the fixed doFromJson carries expr:context.depth>maxDepth and
+# the case classes carry assign:depth=parent.depth+1, while the
+# vulnerable revision carries neither. What has not landed is a
+# positive surface for the walk itself: the Scala frontend emits no
+# token for a type test (case obj: JsObject and its siblings produce
+# nothing), so the walk's structure is visible only through Play's own
+# identifiers -- the doFromJson self-call, the FromJsonObject and
+# FromJsonArray constructors, the FormJsonExpansionTooLarge throw --
+# and those appear in no other repository in the corpus clones; the
+# best public-API shape (the .fields.nonEmpty and .values.nonEmpty
+# selectors with a Map.updated accumulation) matches exactly one
+# function in 2676 corpus scala files, Play's own, so a binding on it
+# covers one framework's one function and the next Scala JSON walker
+# walks past it. The generic alternative, self-recursion with no depth
+# ceiling, is unshippable as a rule: across the corpus clones 9455
+# self-recursive defs in 1462 files carry no depth spelling, for one
+# true positive here, and self-recursion is not expressible as a
+# binding predicate anyway (the recorded engine gap first measured on
+# C and JS). Minting a third per-shape sibling concept beside the two
+# existing depth-limit concepts is the ontology-rot move the campaign
+# rejects. Measured on the real code at the span tip (3 x --cache off
+# per revision, timeout 180, --max-ram 6GB): Form.scala and the whole
+# play/api/data package report zero findings at both revisions in the
+# findings view. No ENGINE-GAPS.md entry: the missing piece is the
+# walk's positive surface, not a localised construct. No definition
+# change shipped. Spec cve_rank1586 records the unbounded walk and the
+# depth-capped form off the real code, both asserting reject
+# VYQL-DOS-029: when a walk-with-depth-budget rule lands, the
+# unbounded form must flip to expect.
+
+test "rank1586: the json form walk re-enters itself with no depth budget"
+  lang scala
+  file core/play/src/main/scala/play/api/data/Form.scala
+  reject VYQL-DOS-029
+  code
+  ```
+  import play.api.libs.json._
+
+  private[data] object FormUtils {
+    def fromJson(js: JsValue, maxChars: Long): Map[String, String] =
+      doFromJson(FromJsonRoot(js), Map.empty, 0, maxChars)
+
+    @annotation.tailrec
+    private def doFromJson(
+        context: FromJsonContext,
+        form: Map[String, String],
+        cumulativeChars: Int,
+        maxChars: Long
+    ): Map[String, String] = context match {
+      case FromJsonTerm              => form
+      case ctx: FromJsonContextValue =>
+        // Ensure this contexts next is initialised, this prevents unbounded recursion.
+        ctx.next
+        ctx.value match {
+          case obj: JsObject if obj.fields.nonEmpty =>
+            doFromJson(FromJsonObject(ctx, obj.fields.toIndexedSeq, 0), form, cumulativeChars, maxChars)
+          case JsArray(values) if values.nonEmpty =>
+            doFromJson(FromJsonArray(ctx, values, 0), form, cumulativeChars, maxChars)
+          case JsNull | JsArray(_) | JsObject(_) =>
+            doFromJson(ctx.next, form, cumulativeChars, maxChars)
+          case simple =>
+            val value = simple match {
+              case JsString(v) => v
+              case JsNumber(v) => v.toString
+            }
+            val prefix             = ctx.prefix
+            val newCumulativeChars = cumulativeChars + prefix.length + value.length
+            if (newCumulativeChars > maxChars) {
+              throw FormJsonExpansionTooLarge(maxChars)
+            }
+            doFromJson(ctx.next, form.updated(prefix, value), newCumulativeChars, maxChars)
+        }
+    }
+  }
+  ```
+
+test "rank1586: the fixed revision caps the walk's depth"
+  lang scala
+  file core/play/src/main/scala/play/api/data/Form.scala
+  reject VYQL-DOS-029
+  code
+  ```
+  import play.api.libs.json._
+
+  private[data] object FormUtils {
+    @annotation.tailrec
+    private def doFromJson(
+        context: FromJsonContext,
+        form: Map[String, String],
+        cumulativeChars: Int,
+        maxChars: Long,
+        maxDepth: Int
+    ): Map[String, String] = {
+      if (context.depth > maxDepth)
+        throw FormJsonExpansionTooDeep(maxDepth)
+      context match {
+        case FromJsonTerm              => form
+        case ctx: FromJsonContextValue =>
+          // Ensure this contexts next is initialised, this prevents unbounded recursion.
+          ctx.next
+          ctx.value match {
+            case obj: JsObject if obj.fields.nonEmpty =>
+              doFromJson(FromJsonObject(ctx, obj.fields.toIndexedSeq, 0), form, cumulativeChars, maxChars, maxDepth)
+            case JsArray(values) if values.nonEmpty =>
+              doFromJson(FromJsonArray(ctx, values, 0), form, cumulativeChars, maxChars, maxDepth)
+            case JsNull | JsArray(_) | JsObject(_) =>
+              doFromJson(ctx.next, form, cumulativeChars, maxChars, maxDepth)
+            case simple =>
+              val value = simple match {
+                case JsString(v) => v
+                case JsNumber(v) => v.toString
+              }
+              val prefix             = ctx.prefix
+              val newCumulativeChars = cumulativeChars + prefix.length + value.length
+              doFromJson(ctx.next, form.updated(prefix, value), newCumulativeChars, maxChars, maxDepth)
+          }
+      }
+    }
+
+    private case class FromJsonArray(parent: FromJsonContextValue, values: scala.collection.IndexedSeq[JsValue], idx: Int)
+        extends FromJsonContextValue {
+      override val depth: Int = parent.depth + 1
+    }
+  }
+  ```

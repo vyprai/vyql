@@ -1,0 +1,11 @@
+module code;
+
+concept WerkzeugDebugConsoleExposure : issue {
+  cwe: [CWE_94, CWE_77]
+  reviewAssumption: "the development server can be reached by an unauthenticated network client"
+  reviewCategory: code_execution
+  reviewCondition: "Flask/Werkzeug debug mode is bound to an externally reachable interface with the eval console enabled"
+  reviewConfidence: high
+  reviewEvidence: "application run context {pattern} enables debug=True on 0.0.0.0 without disabling evalex"
+  vulnerableTo: [injection.CodeInjection, injection.CommandInjection]
+}

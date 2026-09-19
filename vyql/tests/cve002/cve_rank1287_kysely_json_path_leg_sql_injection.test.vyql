@@ -1,0 +1,265 @@
+# Rank 1287 / CVE-2026-32763: kysely's MySQL JSON path literal for
+# eb.ref(col, '->$').key(key) is built by DefaultQueryCompiler
+# (src/query-compiler/default-query-compiler.ts). visitJSONPathLeg opens a
+# fragment with `this.append("'$")`, then splices the leg's value straight
+# into the SQL text with `this.append(String(node.value))`, and closes with
+# `this.append("'")` -- a raw string coercion sitting unescaped between two
+# single quotes, so a key containing `'` closes the literal early and the
+# rest of the key parses as SQL (CWE-89). Fix 0a602bff2f routes the string
+# case through the compiler's own sanitizeStringLiteral (doubles embedded
+# `'`), leaving the non-string branch as String(node.value) since array
+# indexes and 'last'/'#-N' never carry a quote. The project's own
+# regression test injects `first' as X from Y; drop table person -- `
+# through exactly this call (GHSA-wmrf-hv6w-mr66: >= 0.26.0, <= 0.28.11,
+# patched 0.28.12).
+#
+# The vulnerable splice is present at 0.26.0 (default-query-compiler.ts:1361
+# at that tag), 0.27.0, 0.27.6, 0.28.5 and 0.28.11, and the compiler has no
+# JSON path handling at all at 0.25.0 or 0.25.5 -- the advisory's lower
+# bound is the construct's first release. `git tag --contains 0a602bff2f`
+# names v0.28.12 first, matching the advisory's patched version.
+#
+# The weakness is inside the library's compiler, and the caller's
+# eb.ref(col, '->$').key(key) is correct code on both sides of the fix, so
+# the report that belongs to this CVE is the dependency finding: an npm pin
+# of kysely below 0.28.12, the first release carrying the sanitized leg.
+# The feed holds one threshold per artifact, so pins below the advisory's
+# 0.26.0 lower bound report too; those releases do not contain the
+# construct (verified at 0.25.5) and that over-match is this row's stated
+# residual. Non-registry specifiers share it: `file:`/`link:`/`workspace:`
+# pins carry no comparable version and read as below the floor, which is
+# how the library's own tree (test/bun's link:kysely,
+# test/outdated-ts's file:../../) reports while its example app's 0.23.3
+# pin and test/composite-ts's ^0.28.9 pin report as genuine below-floor
+# versions.
+#
+# The code-level shape stays unreachable and the ENGINE-GAPS "1287" entry
+# stays open: `append` mutates the private field `#sql`, set inside
+# `append` (called from `visitJSONPathLeg`) and read back inside
+# `compileQuery`/`getSql()` -- several methods on one receiver joined only
+# by `this`, no argument or return value carrying the leg's value across
+# the last hop. `vyql trace` still dead-ends identically on both revisions
+# at the `this.#sql += str` statement (`call=this.#sql`, no outgoing flow,
+# callee not traced), the TypeScript private-field instance of the
+# aliasReceiverSelf field-crossing family recorded for 1198 (PHP) and 1740
+# (Ruby). The four code-form tests below hold that gap open on both sides
+# of the fix. A trap while isolating it: lowering.go's mutatorMethods
+# treats a fixed name vocabulary (append, write, add, push, set, ...) as
+# taint-transferring by call-site method name alone, so the isolating pair
+# avoids every name on that list on the write side (addPart, build);
+# `append` stays in the primary repro because that is kysely's actual
+# method name, and it is the innermost hop either way.
+
+test "rank1287: a kysely pin below the first sanitized JSON-path release is a dependency finding"
+  lang javascript
+  file src/handler.ts
+  code
+  ```
+  import { Kysely, sql } from 'kysely'
+
+  interface Database {
+    people: { data: string }
+  }
+
+  export async function firstNames(
+    db: Kysely<Database>,
+    req: { query: { key: string } },
+  ) {
+    const key = req.query.key
+    return db
+      .with('people', (eb) =>
+        eb
+          .selectFrom('person')
+          .select(sql<{ data: string }>`json_object('first', first_name)`.as('data')),
+      )
+      .selectFrom('people')
+      .select((eb) => eb.ref('data', '->$').key(key).as('first'))
+      .execute()
+  }
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "app",
+    "dependencies": {
+      "kysely": "0.28.11"
+    }
+  }
+  ```
+  expect VYQL-SCA-001
+  expect_evidence VYQL-SCA-001 CVE-2026-32763
+  expect VYQL-SCA-002
+
+test "rank1287: a kysely pin at the first sanitized JSON-path release is clean"
+  lang javascript
+  file src/handler.ts
+  code
+  ```
+  import { Kysely, sql } from 'kysely'
+
+  interface Database {
+    people: { data: string }
+  }
+
+  export async function firstNames(
+    db: Kysely<Database>,
+    req: { query: { key: string } },
+  ) {
+    const key = req.query.key
+    return db
+      .with('people', (eb) =>
+        eb
+          .selectFrom('person')
+          .select(sql<{ data: string }>`json_object('first', first_name)`.as('data')),
+      )
+      .selectFrom('people')
+      .select((eb) => eb.ref('data', '->$').key(key).as('first'))
+      .execute()
+  }
+  ```
+  file package.json
+  code
+  ```
+  {
+    "name": "app",
+    "dependencies": {
+      "kysely": "0.28.12"
+    }
+  }
+  ```
+  reject VYQL-SCA-001
+  reject VYQL-SCA-002
+
+test "rank1287: the JSON path leg value is coerced straight into the SQL literal"
+  lang javascript
+  file src/query-compiler/default-query-compiler.ts
+  reject VYQL-INJ-001
+  code
+  ```
+  class DefaultQueryCompiler {
+    #sql = ''
+
+    protected append(str: string): void {
+      this.#sql += str
+    }
+
+    protected visitJSONPathLeg(node: { type: string; value: string | number }): void {
+      const isArrayLocation = node.type === 'ArrayLocation'
+      this.append(isArrayLocation ? '[' : '.')
+      this.append(String(node.value))
+      if (isArrayLocation) {
+        this.append(']')
+      }
+    }
+
+    compileQuery(pathLegs: { type: string; value: string | number }[]): string {
+      this.append("'$")
+      for (const leg of pathLegs) {
+        this.visitJSONPathLeg(leg)
+      }
+      this.append("'")
+      return this.#sql
+    }
+  }
+
+  async function handler(db, req) {
+    const key = req.query.key
+    const sql = new DefaultQueryCompiler().compileQuery([{ type: 'Member', value: key }])
+    await db.query(sql)
+  }
+  ```
+
+test "rank1287: the fixed revision routes the string leg through sanitizeStringLiteral"
+  lang javascript
+  file src/query-compiler/default-query-compiler.ts
+  reject VYQL-INJ-001
+  code
+  ```
+  const LIT_WRAP_REGEX = /'/g
+
+  class DefaultQueryCompiler {
+    #sql = ''
+
+    protected append(str: string): void {
+      this.#sql += str
+    }
+
+    protected sanitizeStringLiteral(value: string): string {
+      return value.replace(LIT_WRAP_REGEX, "''")
+    }
+
+    protected visitJSONPathLeg(node: { type: string; value: string | number }): void {
+      const isArrayLocation = node.type === 'ArrayLocation'
+      this.append(isArrayLocation ? '[' : '.')
+      this.append(
+        typeof node.value === 'string'
+          ? this.sanitizeStringLiteral(node.value)
+          : String(node.value),
+      )
+      if (isArrayLocation) {
+        this.append(']')
+      }
+    }
+
+    compileQuery(pathLegs: { type: string; value: string | number }[]): string {
+      this.append("'$")
+      for (const leg of pathLegs) {
+        this.visitJSONPathLeg(leg)
+      }
+      this.append("'")
+      return this.#sql
+    }
+  }
+
+  async function handler(db, req) {
+    const key = req.query.key
+    const sql = new DefaultQueryCompiler().compileQuery([{ type: 'Member', value: key }])
+    await db.query(sql)
+  }
+  ```
+
+# The isolating pair for the field-crossing gap. Same source, same
+# db.query() sink, same concatenated fragment; only whether it crosses a
+# private field between two methods on one receiver differs.
+
+test "rank1287: the fragment reaches db.query() inline, in one function"
+  lang javascript
+  file inline.ts
+  expect VYQL-INJ-001
+  code
+  ```
+  async function handler(db, req) {
+    const key = req.query.key
+    let sql = "'$"
+    sql += String(key)
+    sql += "'"
+    await db.query(sql)
+  }
+  ```
+
+test "rank1287: the same fragment, written to a private field in one method and read in another"
+  lang javascript
+  file field_crossing.ts
+  reject VYQL-INJ-001
+  code
+  ```
+  class Frag {
+    #sql = ''
+
+    addPart(value: string | number): void {
+      this.#sql += String(value)
+    }
+
+    build(value: string | number): string {
+      this.addPart(value)
+      return this.#sql
+    }
+  }
+
+  async function handler(db, req) {
+    const key = req.query.key
+    const frag = new Frag()
+    await db.query(frag.build(key))
+  }
+  ```

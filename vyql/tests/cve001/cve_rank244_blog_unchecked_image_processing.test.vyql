@@ -1,0 +1,41 @@
+test "rank244: PHP uploaded image processor ignores decode and write failures"
+  lang php
+  expect VYQL-INJ-043
+  code
+  ```
+  <?php
+  class Image
+  {
+      private static function thumb($source_path, $thumb_path) {
+          $imgt = "imagepng";
+          $imgcreatefrom = "imagecreatefrompng";
+          $old_image = $imgcreatefrom($source_path);
+          $new_image = imagecreatetruecolor(100, 100);
+          imagecopyresampled($new_image, $old_image, 0, 0, 0, 0, 100, 100, 100, 100);
+          $imgt($new_image, $thumb_path);
+          $imgt($old_image, $source_path);
+          return true;
+      }
+  }
+  ```
+
+test "rank244: PHP uploaded image processor returns failure on decode or write failure"
+  lang php
+  reject VYQL-INJ-043
+  code
+  ```
+  <?php
+  class Image
+  {
+      private static function thumb($source_path, $thumb_path) {
+          $imgt = "imagepng";
+          $imgcreatefrom = "imagecreatefrompng";
+          $old_image = $imgcreatefrom($source_path);
+          if ($old_image === false) return false;
+          $new_image = imagecreatetruecolor(100, 100);
+          imagecopyresampled($new_image, $old_image, 0, 0, 0, 0, 100, 100, 100, 100);
+          return $imgt($new_image, $thumb_path)
+              && $imgt($old_image, $source_path);
+      }
+  }
+  ```

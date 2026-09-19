@@ -1,0 +1,36 @@
+module bindings.javascript.graphqlDocumentExecutedWithoutCostBound;
+
+// graphql-js splits running an operation into three documented steps: `parse`
+// turns the client's operation string into a document, `validate(schema,
+// document, rules)` checks it, and `execute`/`subscribe` runs it. `execute` and
+// `subscribe` document that the document must already have been validated --
+// they perform no validation of their own -- and the validation rule list is
+// where the ecosystem's cost controls plug in (graphql-depth-limit's
+// `depthLimit`, graphql-query-complexity's `createComplexityRule`,
+// graphql-cost-analysis's `costAnalysis`) or where a server calls its own depth
+// or complexity helper. A module that parses a client-supplied operation and
+// hands the document straight to `execute`/`subscribe` therefore runs it with no
+// bound at all: the client picks the nesting depth, and on a schema with
+// recursive types the resolver work grows with it (CWE-400/CWE-770).
+//
+// The module is recognised by graphql-js's own vocabulary: an import or require
+// of "graphql", a bare `parse` call, one of the four entry points that skip
+// validation, and at least one ExecutionArgs field name (`variableValues`,
+// `contextValue`, `rootValue`) in the argument object, which pins the call to
+// graphql-js rather than an unrelated `subscribe`/`execute` method.
+//
+// Three things mean a bound exists, so none of them reports: a `validate` call
+// (the documented rule-driven route, including the named validators the cost
+// packages export), any identifier naming a depth or complexity budget (which is
+// how a server that computes the bound itself reads, whatever the helper is
+// called), and a module that builds the schema it executes against --
+// `buildSchema`, `new GraphQLSchema`, `makeExecutableSchema` -- because a module
+// holding both the schema and the operation is a harness or benchmark, not a
+// request path, and its operation is a literal rather than client input. The
+// scope is the module: in this idiom the executing method reads the schema off a
+// server object and the bound is read from the same module's configuration, so
+// the module is the unit that either carries a bound or does not.
+binding jsGraphqlDocumentExecutedWithoutCostBound {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and node.context.literal contains "graphql" and node.context.call in ["parse"] and node.context.call in ["subscribe", "execute", "executeSync", "createSourceEventStream"] and containsAny(node.context.prop, ["variableValues=", "contextValue=", "rootValue="]) and not (node.context.call in ["validate", "validateSchema", "validateDocument", "depthLimit", "createComplexityRule", "createComplexityLimitRule", "getComplexity", "costAnalysis", "queryComplexity"]) and not (containsAny(node.context.identifier, ["depth", "Depth", "complexity", "Complexity"])) and not (node.context.call in ["buildSchema", "buildASTSchema", "buildClientSchema", "makeExecutableSchema", "GraphQLSchema", "GraphQLObjectType"])
+  emit issue code.UnboundedAllocationReview at node
+}

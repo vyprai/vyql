@@ -1,0 +1,17 @@
+module bindings.swift.generated.m6a06e6f4;
+
+binding weakRandomValue0 {
+  requires {
+    dependency("github.com/objecthub/swift-numberkit")
+  }
+  query pattern callExpr where callee.method == "random"
+  emit issue code.WeakRandomValue at call
+}
+
+binding weakHash1 {
+  requires {
+    dependency("github.com/objecthub/swift-numberkit")
+  }
+  query pattern callExpr where callee.method == "hash"
+  emit issue code.WeakHash at call
+}

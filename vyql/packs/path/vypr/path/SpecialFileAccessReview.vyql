@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule SpecialFileAccessReview {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_61, CWE_706]
+    id: "VYQL-PATH-089"
+    severity: medium
+  }
+  issue code.SpecialFileAccessReview as path
+}

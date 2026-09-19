@@ -1,0 +1,156 @@
+# Rank 1593 / CVE-2023-33189: Pomerium's authorize service selected
+# the policy to evaluate from client-controllable request
+# attributes, so a crafted Host header or URL made a request
+# evaluate against a different route's weaker policy (authorization
+# bypass through request-attribute provenance, CWE-346/CWE-863;
+# GHSA-pvrc-wvj2-f59p). getCheckRequestURL builds the URL from the
+# Envoy CheckRequest's http attributes (h.GetHost, h.GetPath) and
+# getMatchingPolicy walks the configured policies returning the
+# first whose Policy.Matches accepts that URL, so the client's own
+# Host and Path decide which policy judges the request. The fix
+# (d315e68, the GHSA merge: "authorize: use route id from envoy
+# for policy evaluation" + "authorize: normalize URL query params"
+# + "config: enable envoy normalize_path option") deletes the
+# pomerium_routes OPA criterion and keys getMatchingPolicy on
+# envoyconfig.ExtAuthzContextExtensionsRouteID(in...GetContextExtensions())
+# -- the route id Envoy's own match set, not a client attribute --
+# compared against each policy's p.RouteID().
+#
+# ATTENTION, policy-key provenance, held on recheck. The
+# authorization engine exists and its policies evaluate; the defect
+# is which input selects the policy. Re-measured at the span tip
+# (3 x --cache off per revision, timeout 180, --max-ram 6GB): the
+# full findings view reports 254 findings per run at both
+# revisions over an identical set (union of 146 source/sink lines
+# each, zero difference once the fix's three-line shift in
+# authorize/grpc.go is normalized), and -flags only is likewise
+# identical (447 flag lines per union). The only labels in
+# authorize/grpc.go are the CheckRequest header chain
+# (code.HttpInput on GetHeaders, :144 vulnerable / :147 fixed) and
+# the header write it reaches (code.TrustBoundary /
+# code.ResponseHeaderWrite on Header.Set, :137 / :140) -- the
+# VYQL-INJ-010 and VYQL-CFG-014 rows fire unchanged at both
+# revisions and say nothing about the policy match. `vyql match`
+# labels nothing on getCheckRequestURL's host/path reads, on
+# getMatchingPolicy or on Policy.Matches; `vyql resolve` resolves
+# a.getMatchingPolicy and p.Matches, so no engine construct is
+# mishandled and no ENGINE-GAPS.md entry is due. The rule family
+# that must fire is VYQL-AUTH-173 (code.RequestScopePolicyReview,
+# "the request may be authorized or dispatched under the wrong
+# resource scope"): its Go bindings are keyed to other projects'
+# identifiers (ServeHTTP + RequestInfoFrom + serveResource; Fetch +
+# SubstituteAllInType), and a Pomerium-keyed binding names this
+# proxy rather than the weakness. The source-side Envoy getter
+# labels (GetHeaders only) live in the engine's native go.input
+# table, and extending them fires nothing while no sink concept
+# consumes an authorization policy keyed on a client-derived URL.
+# No definition change shipped. Spec cve_rank1593 records the
+# URL-keyed policy lookup and the route-id-keyed form on the real
+# file shape, both asserting reject VYQL-AUTH-173: when
+# policy-provenance vocabulary lands, the URL-keyed form must flip
+# to expect.
+
+test "rank1593: the authorize policy is selected by the request URL"
+  lang go
+  file authorize/grpc.go
+  reject VYQL-AUTH-173
+  code
+  ```
+  package authorize
+
+  import (
+  	"net/url"
+  	"strings"
+
+  	"github.com/pomerium/pomerium/authorize/evaluator"
+  	"github.com/pomerium/pomerium/config"
+  )
+
+  func (a *Authorize) getEvaluatorRequestFromCheckRequest(
+  	in *envoy_service_auth_v3.CheckRequest,
+  ) (*evaluator.Request, error) {
+  	requestURL := getCheckRequestURL(in)
+  	req := &evaluator.Request{
+  		HTTP: evaluator.NewRequestHTTP(
+  			in.GetAttributes().GetRequest().GetHttp().GetMethod(),
+  			requestURL,
+  			getCheckRequestHeaders(in),
+  		),
+  	}
+  	req.Policy = a.getMatchingPolicy(requestURL)
+  	return req, nil
+  }
+
+  func (a *Authorize) getMatchingPolicy(requestURL url.URL) *config.Policy {
+  	options := a.currentOptions.Load()
+
+  	for _, p := range options.GetAllPolicies() {
+  		if p.Matches(requestURL) {
+  			return &p
+  		}
+  	}
+
+  	return nil
+  }
+
+  func getCheckRequestURL(req *envoy_service_auth_v3.CheckRequest) url.URL {
+  	h := req.GetAttributes().GetRequest().GetHttp()
+  	u := url.URL{
+  		Scheme: h.GetScheme(),
+  		Host:   h.GetHost(),
+  	}
+  	// envoy sends the query string as part of the path
+  	path := h.GetPath()
+  	if idx := strings.Index(path, "?"); idx != -1 {
+  		u.RawPath, u.RawQuery = path[:idx], path[idx+1:]
+  	} else {
+  		u.RawPath = path
+  	}
+  	u.Path, _ = url.PathUnescape(u.RawPath)
+  	return u
+  }
+  ```
+
+test "rank1593: the fixed revision keys the policy on the envoy route id"
+  lang go
+  file authorize/grpc.go
+  reject VYQL-AUTH-173
+  code
+  ```
+  package authorize
+
+  import (
+  	"github.com/pomerium/pomerium/authorize/evaluator"
+  	"github.com/pomerium/pomerium/config"
+  	"github.com/pomerium/pomerium/config/envoyconfig"
+  )
+
+  func (a *Authorize) getEvaluatorRequestFromCheckRequest(
+  	in *envoy_service_auth_v3.CheckRequest,
+  ) (*evaluator.Request, error) {
+  	requestURL := getCheckRequestURL(in)
+  	req := &evaluator.Request{
+  		IsInternal: envoyconfig.ExtAuthzContextExtensionsIsInternal(in.GetAttributes().GetContextExtensions()),
+  		HTTP: evaluator.NewRequestHTTP(
+  			in.GetAttributes().GetRequest().GetHttp().GetMethod(),
+  			requestURL,
+  			getCheckRequestHeaders(in),
+  		),
+  	}
+  	req.Policy = a.getMatchingPolicy(envoyconfig.ExtAuthzContextExtensionsRouteID(in.Attributes.GetContextExtensions()))
+  	return req, nil
+  }
+
+  func (a *Authorize) getMatchingPolicy(routeID uint64) *config.Policy {
+  	options := a.currentOptions.Load()
+
+  	for _, p := range options.GetAllPolicies() {
+  		id, _ := p.RouteID()
+  		if id == routeID {
+  			return &p
+  		}
+  	}
+
+  	return nil
+  }
+  ```

@@ -1,0 +1,8 @@
+module code;
+
+review code.TemplatePathComponentTraversal {
+  category: path
+  expected: [core.PathCanonicalization]
+  kind: attention
+  text: "review template or resource path builders for basename canonicalization of interpolated path components before returning template paths"
+}

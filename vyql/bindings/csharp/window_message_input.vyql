@@ -1,0 +1,30 @@
+module bindings.csharp.windowMessageInput;
+
+// A WinForms window receives messages in Control.WndProc(ref Message m), and
+// the Win32 delivery model behind it lets any process on the same desktop
+// hand a window a message: PostMessage/SendMessage address any HWND, and
+// WM_COPYDATA is the documented mechanism for one process to hand another a
+// payload (the receiver marshals Message.LParam to a COPYDATASTRUCT and
+// copies its buffer). The message's WParam and LParam fields carry values
+// the sender chose, so data read out of them is external input to the
+// application, exactly like an intent on Android or a datagram on a socket.
+//
+// The keys are the two documented payload fields of
+// System.Windows.Forms.Message, matched as final segments so a chained read
+// such as m.LParam.ToInt64() is labelled at its own node. presenceNode with
+// node.kind "any" ranges over the Attr nodes a plain property read lowers
+// to, so the label follows the value wherever the read happens -- inside the
+// WndProc override itself or in a helper it hands the message to. A project
+// naming an unrelated member LParam/WParam is out of reach of the token
+// route; both spellings come from the Win32 LPARAM/WPARAM convention, so in
+// practice only message payloads read that way.
+
+binding windowMessageLParam {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "LParam"
+  emit source code.MessageInput at node
+}
+
+binding windowMessageWParam {
+  query pattern presenceNode where node.kind == "any" and node.path ~= "WParam"
+  emit source code.MessageInput at node
+}

@@ -1,0 +1,9 @@
+module bindings.javascript.generated.md2153757;
+
+binding deserialization0 {
+  requires {
+    dependency("qs")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

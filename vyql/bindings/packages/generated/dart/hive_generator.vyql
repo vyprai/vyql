@@ -1,0 +1,25 @@
+module bindings.dart.generated.m545a0d91;
+
+binding deserialization0 {
+  requires {
+    dependency("hive_generator")
+  }
+  query pattern callExpr where callee.method == "buildRead"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("hive_generator")
+  }
+  query pattern callExpr where callee.method == "buildWrite"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("hive_generator")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.Deserialization at args[0]
+}

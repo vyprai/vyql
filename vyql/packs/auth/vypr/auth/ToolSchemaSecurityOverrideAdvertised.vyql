@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule ToolSchemaSecurityOverrideAdvertised {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_862, CWE_306]
+    id: "VYQL-AUTH-179"
+    severity: high
+  }
+  issue code.ToolSchemaSecurityOverrideAdvertised as auth
+}

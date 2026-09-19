@@ -1,0 +1,310 @@
+# Rank 1841 / CVE-2023-25668: the QuantizeAndDequantizeV2/V3/V4/V4Grad
+# shape functions in tensorflow/core/ops/array_ops.cc read the op-graph
+# attribute "axis" into a plain int through the out-parameter of
+# InferenceContext::GetAttr, validate it only against the lower bound
+# (`if (axis < -1) return errors::InvalidArgument(...)`), then use it in
+# signed arithmetic -- `c->WithRankAtLeast(c->input(0), axis + 1, &input)`
+# and `c->Dim(input, axis)`. A graph carrying axis == kint32max makes
+# axis + 1 overflow int, the wrapped negative rank defeats the
+# WithRankAtLeast check, and Dim reads past the shape's dimension vector
+# (heap out-of-bounds read in shape inference; CWE-190 feeding CWE-125).
+# Fix commit 7b174a0f2e adds `if (axis >= kint32max) return
+# errors::InvalidArgument("Axis cannot be >= kint32max value, got ",
+# axis)` ahead of the arithmetic in all four lambdas. Verified present at
+# the parent and remediated at the fixed revision. The parent already
+# carries the identical guard in Dequantize's lambda (3 `kint32max`
+# occurrences at the parent, 11 at the fix, all inside file-scope
+# lambdas), so a negation keyed at file scope on that spelling suppresses
+# the vulnerable revision as well.
+#
+# Recheck measurements (isolated two-file trees holding only the two
+# files the ledger names, array_ops.cc and common_shape_fns.cc, at the
+# fix parent and the fix; 3 `--cache off` runs each, timeout 180,
+# --max-ram 6GB): 35 findings at the vulnerable revision and the same 35
+# at the fixed one, location sets identical -- all VYQL-MEM-006
+# NullableDeref, 10 in array_ops.cc (lines 46/50/360/1126/1777/1788/
+# 2291/2312/2346/2387) and none in the 2860-3020 range where the four
+# shape functions live, and none of common_shape_fns.cc's 25 findings at
+# 2632-2660 where the named-function sibling sits. The `-flags only`
+# view holds 286 flags at both revisions with identical kinds and counts
+# (111 IntegerSizeArithmetic, 105 IndexAccess, 35 NullableDeref, 35
+# PointerUse), differing only by the fix's 16-line shift; the four
+# `axis + 1` adds carry the syntactic `code.IntegerSizeArithmetic`
+# review flag at both revisions, which discriminates nothing.
+# `vyql match` confirms the adds are labelled
+# code.IntegerSizeArithmeticSink while the source section is empty --
+# nothing labels GetAttr -- and `vyql trace -from core.UserControlledData
+# -to code.IntegerSizeArithmeticSink` reports 0 sources, 0 reaching.
+#
+# The width-limit overflow-guard control shipped since the first pass
+# (integerOverflowGuard163, the *_MAX / numeric_limits family) is live in
+# this base and labels 0 nodes in the fixed tree, on two independent
+# grounds: `kint32max` matches none of its spellings (neither file
+# contains any INT_MAX-family or numeric_limits spelling at all), and the
+# guard comparisons sit inside the file-scope lambdas where no
+# analysis.function.context node exists to anchor the function-scoped
+# binding -- the graph holds 14 context nodes in array_ops.cc, all on
+# named functions (GetAxisForPackAndUnpack :42, AsInt64 :55,
+# ScatterNdTensorShape :3132 and the rest), none in the lambdas' range.
+# A throwaway GetAttr binding emitting code.HttpInput at call.result and
+# one emitting it at args[1] each leave the count at 35 findings with 0
+# VYQL-NUM-003: the filled local stays untainted either way.
+#
+# ATTENTION holds, engine gap, three independent blockers, each
+# re-verified.
+# 1. Out-parameter reads (the 1206/1407 family): InferenceContext::GetAttr
+#    fills `axis` through &axis; out-param taint is the hardcoded
+#    cReaders/cPropagators tables in internal/extract/frontend/treesitter/c.go
+#    (shared by ExtractCPP), `propagate ... to args[N].pointee` panics every
+#    scan, and CallEffectsFor has zero callers, so no binding can deliver
+#    taint to the filled local (re-measured: both source routes above
+#    dead-end).
+# 2. A lambda passed as an argument at file scope (the REGISTER_OP(...)
+#    .SetShapeFn([](InferenceContext* c) {...}) chains these four shape
+#    functions live in) produces no analysis.function.context node at all
+#    in the C/C++ frontend -- see the ENGINE-GAPS.md entry; without it even
+#    presence-shaped bindings cannot see the shape function as a unit
+#    (re-measured: 0 context nodes in the lambdas' range, 14 on the file's
+#    named functions). The named-function sibling QuantizeV2Shape in
+#    tensorflow/core/framework/common_shape_fns.cc:2632 carries the same
+#    unguarded idiom, has its context node, and is equally undetected --
+#    the blocker is the missing source, not the placement.
+# 3. Guard vocabulary: the fixed revision's `axis >= kint32max` would have to
+#    be recognised as core.IntegerOverflowGuard for a taint route to
+#    discriminate, and keying the project-private spelling of INT32_MAX is
+#    the fixing commit's own vocabulary; the shipped width-limit control
+#    deliberately covers the documented <limits.h>/<stdint.h> spellings
+#    only, and neither target file contains one.
+# Exhaustive enumeration of the idiom tree-wide (grep over every .cc/.h):
+# 11 `WithRankAtLeast(..., X + 1, ...)` sites; of the attr-derived ones,
+# the four fixed here, QuantizeV2Shape (common_shape_fns.cc:2648) and
+# GatherV2's batch_dims (array_ops.cc:1252) remain unguarded at the fixed
+# revision, while Dequantize (array_ops.cc:3052 at the parent) carried the
+# kint32max guard ahead of the vulnerable call. No definition change
+# ships; all blocks pin the miss as reject.
+#
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1841: attr-derived axis overflows in the rank arithmetic"
+  lang cpp
+  file tensorflow/core/ops/array_ops.cc
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <string>
+
+  typedef int Status;
+  #define TF_RETURN_IF_ERROR(expr) \
+    do {                           \
+      Status _s = (expr);          \
+      if (_s != 0) return _s;     \
+    } while (0)
+
+  class ShapeHandle;
+  class DimensionHandle;
+
+  class InferenceContext {
+   public:
+    Status GetAttr(const std::string& attr_name, int* value);
+    ShapeHandle* input(int idx);
+    Status WithRank(ShapeHandle* shape, int rank, ShapeHandle* out);
+    Status WithRankAtLeast(ShapeHandle* shape, int rank, ShapeHandle* out);
+    Status Merge(DimensionHandle* a, DimensionHandle* b, DimensionHandle* out);
+    DimensionHandle* Dim(ShapeHandle* shape, int idx);
+  };
+
+  Status InvalidArgument(const std::string& msg);
+  Status OkStatus();
+
+  Status QuantizeAndDequantizeV2Shape(InferenceContext* c) {
+    int axis;
+    TF_RETURN_IF_ERROR(c->GetAttr("axis", &axis));
+    const int minmax_rank = (axis == -1) ? 0 : 1;
+    ShapeHandle* minmax = nullptr;
+    TF_RETURN_IF_ERROR(c->WithRank(c->input(1), minmax_rank, &minmax));
+    TF_RETURN_IF_ERROR(c->Merge(c->Dim(c->input(2), 0), c->Dim(minmax, 0), nullptr));
+    if (axis < -1) {
+      return InvalidArgument("axis should be at least -1, got ");
+    } else if (axis != -1) {
+      ShapeHandle* input = nullptr;
+      TF_RETURN_IF_ERROR(c->WithRankAtLeast(c->input(0), axis + 1, input));
+      DimensionHandle* depth = nullptr;
+      TF_RETURN_IF_ERROR(
+          c->Merge(c->Dim(minmax, 0), c->Dim(input, axis), depth));
+    }
+    return OkStatus();
+  }
+  ```
+
+test "rank1841: the upper-bound guard precedes the rank arithmetic"
+  lang cpp
+  file tensorflow/core/ops/array_ops.cc
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <string>
+
+  typedef int Status;
+  #define TF_RETURN_IF_ERROR(expr) \
+    do {                           \
+      Status _s = (expr);          \
+      if (_s != 0) return _s;     \
+    } while (0)
+
+  class ShapeHandle;
+  class DimensionHandle;
+
+  class InferenceContext {
+   public:
+    Status GetAttr(const std::string& attr_name, int* value);
+    ShapeHandle* input(int idx);
+    Status WithRank(ShapeHandle* shape, int rank, ShapeHandle* out);
+    Status WithRankAtLeast(ShapeHandle* shape, int rank, ShapeHandle* out);
+    Status Merge(DimensionHandle* a, DimensionHandle* b, DimensionHandle* out);
+    DimensionHandle* Dim(ShapeHandle* shape, int idx);
+  };
+
+  Status InvalidArgument(const std::string& msg);
+  Status OkStatus();
+
+  static const int kint32max = 2147483647;
+
+  Status QuantizeAndDequantizeV2Shape(InferenceContext* c) {
+    int axis;
+    TF_RETURN_IF_ERROR(c->GetAttr("axis", &axis));
+    const int minmax_rank = (axis == -1) ? 0 : 1;
+    ShapeHandle* minmax = nullptr;
+    TF_RETURN_IF_ERROR(c->WithRank(c->input(1), minmax_rank, &minmax));
+    TF_RETURN_IF_ERROR(c->Merge(c->Dim(c->input(2), 0), c->Dim(minmax, 0), nullptr));
+    if (axis < -1) {
+      return InvalidArgument("axis should be at least -1, got ");
+    } else if (axis != -1) {
+      if (axis >= kint32max) {
+        return InvalidArgument("Axis cannot be >= kint32max value, got ");
+      }
+      ShapeHandle* input = nullptr;
+      TF_RETURN_IF_ERROR(c->WithRankAtLeast(c->input(0), axis + 1, input));
+      DimensionHandle* depth = nullptr;
+      TF_RETURN_IF_ERROR(
+          c->Merge(c->Dim(minmax, 0), c->Dim(input, axis), depth));
+    }
+    return OkStatus();
+  }
+  ```
+
+test "rank1841: engine gap isolated -- the same shape fn registered as a file-scope chained lambda"
+  lang cpp
+  file tensorflow/core/ops/array_ops.cc
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <string>
+
+  typedef int Status;
+  #define TF_RETURN_IF_ERROR(expr) \
+    do {                           \
+      Status _s = (expr);          \
+      if (_s != 0) return _s;     \
+    } while (0)
+
+  class ShapeHandle;
+  class DimensionHandle;
+
+  class InferenceContext {
+   public:
+    Status GetAttr(const std::string& attr_name, int* value);
+    ShapeHandle* input(int idx);
+    Status WithRankAtLeast(ShapeHandle* shape, int rank, ShapeHandle* out);
+    Status Merge(DimensionHandle* a, DimensionHandle* b, DimensionHandle* out);
+    DimensionHandle* Dim(ShapeHandle* shape, int idx);
+  };
+
+  typedef void (*ShapeFn)(InferenceContext*);
+
+  struct OpDef {
+    OpDef& Attr(const char* def);
+    OpDef& SetShapeFn(ShapeFn fn);
+  };
+
+  OpDef& REGISTER_OP(const char* name);
+
+  Status InvalidArgument(const std::string& msg);
+  Status OkStatus();
+
+  REGISTER_OP("QuantizeAndDequantizeV2")
+      .Attr("axis: int = -1")
+      .SetShapeFn([](InferenceContext* c) {
+        int axis;
+        TF_RETURN_IF_ERROR(c->GetAttr("axis", &axis));
+        const int minmax_rank = (axis == -1) ? 0 : 1;
+        ShapeHandle* minmax = nullptr;
+        TF_RETURN_IF_ERROR(
+            c->Merge(c->Dim(c->input(2), 0), c->Dim(minmax, 0), nullptr));
+        if (axis < -1) {
+          return InvalidArgument("axis should be at least -1, got ");
+        } else if (axis != -1) {
+          ShapeHandle* input = nullptr;
+          TF_RETURN_IF_ERROR(c->WithRankAtLeast(c->input(0), axis + 1, input));
+          DimensionHandle* depth = nullptr;
+          TF_RETURN_IF_ERROR(
+              c->Merge(c->Dim(minmax, 0), c->Dim(input, axis), depth));
+        }
+        return OkStatus();
+      });
+  ```
+
+test "rank1841: engine gap isolated -- the identical lambda inside a named function does get a function context"
+  lang cpp
+  file tensorflow/core/ops/array_ops.cc
+  reject VYQL-NUM-003
+  code
+  ```
+  #include <string>
+
+  typedef int Status;
+  #define TF_RETURN_IF_ERROR(expr) \
+    do {                           \
+      Status _s = (expr);          \
+      if (_s != 0) return _s;     \
+    } while (0)
+
+  class ShapeHandle;
+  class DimensionHandle;
+
+  class InferenceContext {
+   public:
+    Status GetAttr(const std::string& attr_name, int* value);
+    ShapeHandle* input(int idx);
+    Status WithRankAtLeast(ShapeHandle* shape, int rank, ShapeHandle* out);
+    Status Merge(DimensionHandle* a, DimensionHandle* b, DimensionHandle* out);
+    DimensionHandle* Dim(ShapeHandle* shape, int idx);
+  };
+
+  typedef void (*ShapeFn)(InferenceContext*);
+
+  void SetShapeFn(ShapeFn fn);
+
+  Status InvalidArgument(const std::string& msg);
+  Status OkStatus();
+
+  void RegisterQuantizeAndDequantizeV2() {
+    SetShapeFn([](InferenceContext* c) {
+      int axis;
+      TF_RETURN_IF_ERROR(c->GetAttr("axis", &axis));
+      const int minmax_rank = (axis == -1) ? 0 : 1;
+      ShapeHandle* minmax = nullptr;
+      TF_RETURN_IF_ERROR(
+          c->Merge(c->Dim(c->input(2), 0), c->Dim(minmax, 0), nullptr));
+      if (axis < -1) {
+        return InvalidArgument("axis should be at least -1, got ");
+      } else if (axis != -1) {
+        ShapeHandle* input = nullptr;
+        TF_RETURN_IF_ERROR(c->WithRankAtLeast(c->input(0), axis + 1, input));
+        DimensionHandle* depth = nullptr;
+        TF_RETURN_IF_ERROR(
+            c->Merge(c->Dim(minmax, 0), c->Dim(input, axis), depth));
+      }
+      return OkStatus();
+    });
+  }
+  ```

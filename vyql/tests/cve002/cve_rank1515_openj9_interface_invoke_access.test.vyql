@@ -1,0 +1,179 @@
+# Rank 1515 / CVE-2021-41035: Eclipse OpenJ9 resolved an interface
+# method through a method handle without checking the resolved method's
+# access flags, so a Java application could invoke a non-public interface
+# method and bypass Java access control (execution with unnecessary
+# privileges, CWE-250). The dispatch path is three-headed:
+# VM_MHInterpreter::dispatchLoop in runtime/vm/MHInterpreter.inc runs
+# `method = convertITableIndexToVirtualMethod(receiverClazz,
+# interfaceClazz, getVMSlot(methodHandle)); if (NULL != method) { goto
+# runMethod; }` with no look at the resolved J9Method's modifiers; the JIT
+# counterpart Java_java_lang_invoke_InterfaceHandle_
+# convertITableIndexToVTableIndex in runtime/compiler/env/VMJ9.cpp:9496
+# returned the itable offset directly; and the JCL wrapper
+# InterfaceHandle.java:80 returned `convertITableIndexToVTableIndex(...)
+# << VTABLE_ENTRY_SHIFT` unchecked. The fixing merge 9f0b7b785a ("Throw
+# IllegalAccessError (IAE): Lookup.findVirtual") carries the three fix
+# commits -- VMJ9.cpp now reads the resolved J9Method's modifiers and
+# returns -1 when J9AccPublic is absent, MHInterpreter.inc calls
+# setIllegalAccessErrorNonPublicInvokeInterface before runMethod, and
+# InterfaceHandle.java throws IllegalAccessError on the negative sentinel.
+#
+# ATTENTION, access-modifier verification vocabulary. The weakness is a
+# missing authorization decision on a resolved callee -- no input flows,
+# no tainted value reaches a sink, and the two revisions differ only in
+# whether the runtime consults the callee's access flags before
+# dispatch. Nothing in the corpus can express "this invocation must
+# verify the resolved member's accessibility": it is the same
+# missing-concept family as ranks 1513/1514 (authorization decisions
+# with no dataflow), one step lower in the runtime -- the corpus would
+# need a concept for the resolved-method descriptor and a rule judging
+# dispatch without an accessibility check. A binding on OpenJ9's own
+# convertITableIndexToVirtualMethod or J9AccPublic macros would detect
+# this JVM rather than the weakness.
+#
+# ## Recheck measurements
+#
+# Re-probed at the recheck span tip, which carries every engine change
+# shipped since the first pass. Path 1 does not convert: the auth pack
+# still tops out at VYQL-AUTH-178, no concept in the ontology names a
+# resolved member's accessibility (the only "visibility"/"non-public"
+# hits are content-exposure concepts), and no C++ binding emits
+# code.SensitiveOperation, so no later-shipped rule reaches the dispatch.
+# Measured 3x --cache off / timeout 180 / --max-ram 6GB per revision on
+# the real checkout, vulnerable parent 506de89332 against fix 9f0b7b785a:
+#
+#   runtime/compiler/env/VMJ9.cpp -- 87/87/87 findings at the parent,
+#     88/88/88 at the fix, deterministic; the rule set is identical on
+#     both sides (65 VYQL-MEM-006, 13 MEM-002, 5 MEM-016, 4 MEM-004),
+#     all memory-family noise, and the +1 is the fix's own added lines
+#     shifting an alloca smell. Nothing on the dispatch path.
+#   jcl/.../invoke/InterfaceHandle.java -- 0/0/0 at both revisions, and
+#     the whole java.lang.invoke package (scanned java:94) reports 0
+#     findings at the parent; vyql match on the wrapper labels nothing
+#     at all: no source, no sink, no control. The Java half is a hard
+#     zero, not a misread one.
+#   runtime/vm/MHInterpreter.inc -- "scanned php:1", 0/0/0 at both
+#     revisions: .inc routes to the PHP frontend
+#     (internal/extract/frontend/registry.go:49), so the interpreter is
+#     never parsed as C++. The same bytes under a .cpp name give
+#     137/137/137 at both revisions (115 MEM-006 + 22 MEM-016),
+#     identical rule sets, so the routing gap is not what blocks the
+#     finding: even parsed as C++ nothing discriminates. Re-keying .inc
+#     away from PHP would reclassify every .inc in every scan and break
+#     the PHP projects that use it for includes, so it is a design call
+#     rather than a localized correction, and it would not change this
+#     rank's outcome.
+#
+# The genericity test fails for every binding this fix invites:
+# convertITableIndexToVirtualMethod, convertITableIndexToVTableIndex and
+# J9AccPublic are OpenJ9-internal names answerable to no library
+# documentation, and a generic "native result used without a negative
+# sentinel check" rule fires on ordinary JNI wrappers everywhere. No
+# definition change shipped. Spec cve_rank1515 records the label-free
+# dispatch in both languages and the modifier-checked forms, all
+# asserting reject VYQL-AUTH-079: when resolved-member accessibility
+# lands as vocabulary, the unchecked dispatches must flip to expect.
+
+test "rank1515: the interpreter dispatches a resolved interface method without checking its access flags"
+  lang cpp
+  file runtime/vm/MHInterpreter_dispatch.cpp
+  reject VYQL-AUTH-079
+  code
+  ```
+  static J9Method *dispatchInterfaceMethod(J9VMThread *_currentThread, j9object_t methodHandle, j9object_t receiver) {
+      J9Method *method = NULL;
+      J9Class *receiverClazz = J9VM_J9CLASS_FROM_HEAPCLASS(_currentThread, receiver);
+      J9Class *interfaceClazz = J9VM_J9CLASS_FROM_HEAPCLASS(
+          _currentThread, J9VMJAVALANGINVOKEPRIMITIVEHANDLE_REFERENCECLASS(_currentThread, methodHandle));
+      method = convertITableIndexToVirtualMethod(receiverClazz, interfaceClazz, getVMSlot(methodHandle));
+      if (NULL != method) {
+          goto runMethod;
+      }
+      prepareForExceptionThrow(_currentThread);
+      goto throwCurrentException;
+
+  runMethod:
+      return method;
+  throwCurrentException:
+      return NULL;
+  }
+  ```
+
+test "rank1515: the fixed revision refuses non-public interface methods"
+  lang cpp
+  file runtime/vm/MHInterpreter_dispatch.cpp
+  reject VYQL-AUTH-079
+  code
+  ```
+  static J9Method *dispatchInterfaceMethod(J9VMThread *_currentThread, j9object_t methodHandle, j9object_t receiver) {
+      J9Method *method = NULL;
+      J9Class *receiverClazz = J9VM_J9CLASS_FROM_HEAPCLASS(_currentThread, receiver);
+      J9Class *interfaceClazz = J9VM_J9CLASS_FROM_HEAPCLASS(
+          _currentThread, J9VMJAVALANGINVOKEPRIMITIVEHANDLE_REFERENCECLASS(_currentThread, methodHandle));
+      method = convertITableIndexToVirtualMethod(receiverClazz, interfaceClazz, getVMSlot(methodHandle));
+      if (NULL != method) {
+          J9ROMMethod *romMethod = J9_ROM_METHOD_FROM_RAM_METHOD(method);
+          if (J9_ARE_NO_BITS_SET(romMethod->modifiers, J9AccPublic)) {
+              prepareForExceptionThrow(_currentThread);
+              setIllegalAccessErrorNonPublicInvokeInterface(_currentThread, method);
+              goto throwCurrentException;
+          }
+          goto runMethod;
+      }
+      prepareForExceptionThrow(_currentThread);
+      goto throwCurrentException;
+
+  runMethod:
+      return method;
+  throwCurrentException:
+      return NULL;
+  }
+  ```
+
+test "rank1515: the JCL wrapper returns the itable offset without checking the resolved method"
+  lang java
+  file jcl/src/java.base/share/classes/java/lang/invoke/InterfaceHandle.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  final class InterfaceHandle extends IndirectHandle {
+      protected final long vtableOffset(Object receiver) {
+          Class<?> interfaceClass = referenceClass;
+          if (interfaceClass.isInstance(receiver)) {
+              long interfaceJ9Class = getJ9ClassFromClass(interfaceClass);
+              long receiverJ9Class = getJ9ClassFromClass(receiver.getClass());
+              return convertITableIndexToVTableIndex(interfaceJ9Class, (int)vmSlot, receiverJ9Class) << VTABLE_ENTRY_SHIFT;
+          } else {
+              throw new IncompatibleClassChangeError();
+          }
+      }
+
+      protected static native int convertITableIndexToVTableIndex(long interfaceClass, int itableIndex, long receiverClass);
+  }
+  ```
+
+test "rank1515: the fixed wrapper throws on the negative sentinel"
+  lang java
+  file jcl/src/java.base/share/classes/java/lang/invoke/InterfaceHandle.java
+  reject VYQL-AUTH-079
+  code
+  ```
+  final class InterfaceHandle extends IndirectHandle {
+      protected final long vtableOffset(Object receiver) {
+          Class<?> interfaceClass = referenceClass;
+          if (interfaceClass.isInstance(receiver)) {
+              long interfaceJ9Class = getJ9ClassFromClass(interfaceClass);
+              long receiverJ9Class = getJ9ClassFromClass(receiver.getClass());
+              int result = convertITableIndexToVTableIndex(interfaceJ9Class, (int)vmSlot, receiverJ9Class) << VTABLE_ENTRY_SHIFT;
+              if (result < 0) {
+                  throw new IllegalAccessError();
+              }
+              return result;
+          } else {
+              throw new IncompatibleClassChangeError();
+          }
+      }
+
+      protected static native int convertITableIndexToVTableIndex(long interfaceClass, int itableIndex, long receiverClass);
+  }
+  ```

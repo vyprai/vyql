@@ -1,0 +1,17 @@
+module bindings.ruby.generated.mb43fd36b;
+
+binding userControlledData0 {
+  requires {
+    dependency("rack-pjax")
+  }
+  query pattern callExpr where callee.method == "container_selector"
+  emit source core.UserControlledData at call.result
+}
+
+binding deserialization1 {
+  requires {
+    dependency("rack-pjax")
+  }
+  query pattern callExpr where callee.method == "call"
+  emit sink code.Deserialization at args[0]
+}

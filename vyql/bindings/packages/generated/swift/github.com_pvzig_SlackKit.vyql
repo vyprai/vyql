@@ -1,0 +1,105 @@
+module bindings.swift.generated.m3180263b;
+
+binding secretValue0 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "oauthAccess"
+  emit source code.SecretValue at call.result
+}
+
+binding authenticationCheck1 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "oauthAccess"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding authenticationCheck2 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "oauthRevoke"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}
+
+binding networkSend3 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "sendMessage"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend4 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "sendThreadedMessage"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend5 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "sendEphemeral"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "sendMeMessage"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding fileUse7 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "uploadFile"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "uploadFile"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect9 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "search"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect10 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "searchFiles"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkConnect11 {
+  requires {
+    dependency("github.com/pvzig/SlackKit")
+  }
+  query pattern callExpr where callee.method == "searchMessages"
+  emit sink code.NetworkConnectSink at args[0]
+}

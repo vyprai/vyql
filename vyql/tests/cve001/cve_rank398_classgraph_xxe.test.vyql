@@ -1,0 +1,66 @@
+test "rank398: ClassGraph parses pom.xml with raw DocumentBuilderFactory"
+  lang java
+  expect VYQL-DESER-004
+  expect_review code.XmlParserCreate
+  code
+  ```
+  import java.io.InputStream;
+  import java.nio.file.Files;
+  import java.nio.file.Path;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import javax.xml.xpath.XPathConstants;
+  import javax.xml.xpath.XPathFactory;
+  import org.w3c.dom.Document;
+
+  class VersionFinder {
+    static String getVersion(Path path) throws Exception {
+      final Path pom = path.resolve("pom.xml");
+      try (InputStream is = Files.newInputStream(pom)) {
+        final Document doc = DocumentBuilderFactory.newInstance().newDocumentBuilder().parse(is);
+        doc.getDocumentElement().normalize();
+        return (String) XPathFactory.newInstance().newXPath().compile("/project/version")
+            .evaluate(doc, XPathConstants.STRING);
+      }
+    }
+  }
+  ```
+
+test "rank398: ClassGraph uses secure DocumentBuilderFactory helper"
+  lang java
+  reject VYQL-DESER-004
+  code
+  ```
+  import java.io.InputStream;
+  import java.nio.file.Files;
+  import java.nio.file.Path;
+  import javax.xml.XMLConstants;
+  import javax.xml.parsers.DocumentBuilderFactory;
+  import javax.xml.xpath.XPathConstants;
+  import javax.xml.xpath.XPathFactory;
+  import org.w3c.dom.Document;
+
+  class VersionFinder {
+    static String getVersion(Path path) throws Exception {
+      final Path pom = path.resolve("pom.xml");
+      try (InputStream is = Files.newInputStream(pom)) {
+        final Document doc = getSecureDocumentBuilderFactory().newDocumentBuilder().parse(is);
+        doc.getDocumentElement().normalize();
+        return (String) XPathFactory.newInstance().newXPath().compile("/project/version")
+            .evaluate(doc, XPathConstants.STRING);
+      }
+    }
+
+    private static DocumentBuilderFactory getSecureDocumentBuilderFactory() throws Exception {
+      DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+      dbf.setXIncludeAware(false);
+      dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      dbf.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
+      dbf.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
+      dbf.setExpandEntityReferences(false);
+      dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+      dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+      dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+      return dbf;
+    }
+  }
+  ```

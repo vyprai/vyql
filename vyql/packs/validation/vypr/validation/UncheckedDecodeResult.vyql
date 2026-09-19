@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule UncheckedDecodeResult {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_20]
+    id: "VYQL-VAL-001"
+    severity: medium
+  }
+  issue code.UncheckedDecodeResult as decode
+}

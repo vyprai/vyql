@@ -1,0 +1,111 @@
+# Rank 1581 / CVE-2023-5898: PKP's reviewer action forms accepted
+# submissions without a CSRF token check, so a page crafted elsewhere
+# could make an editor's browser unassign, cancel or reinstate reviews
+# (cross-site request forgery, CWE-352; pkp/pkp-lib#9410). The
+# constructor of ReviewerNotifyActionForm in controllers/grid/users/
+# reviewer/form/ReviewerNotifyActionForm.inc.php -- the base of the
+# unassign and reinstate forms -- sets its assignment, round and
+# submission and never registers FormValidatorCSRF, while sibling pkp
+# forms add the check. Pool commit 01feef7a93 is the real fix
+# (COMMIT_OK -- "pkp/pkp-lib#9410 Add missing CSRF checks to
+# unassign/cancel and reinstate forms", +3 lines):
+# `$this->addCheck(new FormValidatorCSRF($this));` joins the
+# constructor.
+#
+# ATTENTION, constructor-registered csrf coverage, held on recheck.
+# The registration and the operations it guards sit in different
+# scopes: the check joins the base-class constructor while the writes
+# it authorises -- updateObject, deleteById, the notification mail --
+# live in execute() methods of the same and other classes, and the
+# submitted values (personalMessage, reviewerId) reach only the mail,
+# never the assignment writes, which the request's occurrence alone
+# drives. No binding scope contains both the check and a sink, and a
+# check anchored anywhere in a class cannot cover a method's sink:
+# endpoint coverage is same-function-scope or intraprocedural
+# dominance. Measured on the real code (3 x --cache off per revision,
+# timeout 180, --max-ram 6GB): the base form file reports zero
+# findings at both revisions; UnassignReviewerForm.inc.php:60
+# ($reviewAssignmentDao->deleteById(...)) reports VYQL-AUTH-079 at
+# both revisions through the auditreview deleteById mark -- reported,
+# not discriminating, since the rule carries no suppression clause
+# and the fix adds no token anywhere near the sink. With best-case
+# pkp bindings (request accessors as HttpInput, DAO writes and the
+# mail send as StateChangingOpSink, FormValidatorCSRF as
+# core.CsrfProtection) the two revisions of the form directory stay
+# identical at 5 findings (diff: 0 added, 0 removed), and the two new
+# VYQL-RF-003 rows land on the compliant sibling ReviewerForm, whose
+# own FormValidatorCSRF registration, labelled core.CsrfProtection,
+# leaves its execute() sinks reported ("no guard on sink"); repo-wide
+# the same bindings add 214 VYQL-RF-003 findings (278 -> 492) with
+# the fixed tree identical. The discriminator is an inheritance-aware
+# coverage relation -- a check registered in a base-class constructor
+# covering the subclass lifecycle methods -- the
+# class-declaration-to-endpoint family recorded against rank 160; not
+# a mechanical engine fix. Spec cve_rank1581 keeps the bare
+# constructor and the CSRF-checked form, both asserting reject
+# VYQL-AUTH-079: when constructor-registration coverage lands, the
+# unchecked form must flip to expect.
+
+test "rank1581: the reviewer forms build without a csrf check"
+  lang php
+  file controllers/grid/users/reviewer/form/ReviewerNotifyActionForm.inc.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  abstract class ReviewerNotifyActionForm extends Form
+  {
+      public $reviewAssignment;
+      public $reviewRound;
+      public $submission;
+
+      public function __construct($reviewAssignment, $reviewRound, $submission, $template)
+      {
+          $this->setReviewAssignment($reviewAssignment);
+          $this->setReviewRound($reviewRound);
+          $this->setSubmission($submission);
+
+          parent::__construct($template);
+      }
+
+      public function execute(...$args)
+      {
+          $this->reviewAssignment->setCancelled(true);
+          $this->reviewAssignmentDao->updateObject($this->reviewAssignment);
+      }
+  }
+  ```
+
+test "rank1581: the fixed revision registers the csrf validator"
+  lang php
+  file controllers/grid/users/reviewer/form/ReviewerNotifyActionForm.inc.php
+  reject VYQL-AUTH-079
+  code
+  ```
+  <?php
+
+  abstract class ReviewerNotifyActionForm extends Form
+  {
+      public $reviewAssignment;
+      public $reviewRound;
+      public $submission;
+
+      public function __construct($reviewAssignment, $reviewRound, $submission, $template)
+      {
+          $this->setReviewAssignment($reviewAssignment);
+          $this->setReviewRound($reviewRound);
+          $this->setSubmission($submission);
+
+          $this->addCheck(new FormValidatorCSRF($this));
+
+          parent::__construct($template);
+      }
+
+      public function execute(...$args)
+      {
+          $this->reviewAssignment->setCancelled(true);
+          $this->reviewAssignmentDao->updateObject($this->reviewAssignment);
+      }
+  }
+  ```

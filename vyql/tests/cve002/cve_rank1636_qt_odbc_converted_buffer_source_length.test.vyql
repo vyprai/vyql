@@ -1,0 +1,218 @@
+# Qt's ODBC driver plugin converts QStrings into the driver's SQLTCHAR
+# encoding with toSQLTCHAR() and hands the converted buffer to the ODBC
+# C API beside a length taken from the *source* string. SQLTCHAR is 16-bit
+# on some platforms but 8- or 32-bit on others, and a UTF-8 or UTF-32
+# encoding of the same string holds a different number of elements than
+# the QString's UTF-16 length, so with sizeof(SQLTCHAR) == 4 a crafted
+# string with astral characters makes the length argument overstate the
+# buffer and the driver reads past it. The fixing commit
+# aaf1381eab6292aa0444a5eadcc24165b6e1c02d reworks the call sites across
+# qsql_odbc.cpp to name the conversion's result first and pass *its*
+# size: `const auto encoded = toSQLTCHAR(s); ... encoded.data(),
+# encoded.size()` replaces `toSQLTCHAR(s).data(), s.length()`.
+#
+# The discriminator is that an unnamed conversion temporary cannot be
+# measured: code passing the temporary's accessor inline has no way to
+# pass that buffer's size, so whatever length lands beside it describes
+# the source string. The named form takes the accessor on a variable
+# instead, which is what the binding reads -- the call_path token of an
+# accessor on an inline conversion result spells the conversion's own
+# name (`toSQLTCHAR.data`, `toSQLTCHAR.constData`) while the named form
+# spells the variable -- confined to the ODBC calls that take (buffer,
+# length) pairs, with the byte-count copy constructor the converted
+# buffer is stashed through, and cleared where the length argument is the
+# interface's SQL_NTS sentinel or a second conversion measuring the
+# converted form (vyql/bindings/cpp/converted_buffer_source_length.vyql,
+# VYQL-MEM-078).
+#
+# Measured on the real checkout of src/plugins/sqldrivers/odbc, 3 x
+# --cache off runs per revision (timeout 180, --max-ram 6GB): the
+# vulnerable revision reports 8 VYQL-MEM-078 rows -- one per function
+# carrying the shape (setConnectionOptions, reset, prepare, exec, open,
+# tables, primaryIndex, record; qsql_odbc.cpp:749, 960, 1315, 1370,
+# 1937, 2351, 2424, 2528) -- and the fixed revision reports none, with
+# the rest of both trees' findings identical (31 VYQL-MEM-006 + 1
+# VYQL-MEM-016). The self-terminating spelling the fix left alone
+# (checkUnicode's SQLExecDirect with SQL_NTS) stays silent through the
+# sentinel exclusion, and toSQLTCHAR appears in no other tree in the
+# corpus clones, so no collateral finding exists to measure.
+#
+# Residuals, all false-negative and stated in the binding: the
+# correlation is function-scoped, so a sentinel-spelled call vouches for
+# a mismatched one in the same function; the context token list is
+# capped, so a sentinel token pushed past the cap leaves the exclusion
+# vacuous; the compacted argument text keeps comments, so a
+# commented-out sentinel still clears; and a conversion helper renamed
+# away from toSQLTCHAR needs the callee list edited, which is where the
+# library's spelling lives.
+
+test "rank1636: the converted buffer is passed with the source string's length"
+  lang cpp
+  file qsql_odbc.cpp
+  expect VYQL-MEM-078
+  code
+  ```
+  typedef short SQLTCHAR;
+  typedef int SQLINTEGER;
+  typedef void *SQLHSTMT;
+
+  struct VarLengthArray {
+      const SQLTCHAR *data() const { return buf; }
+      int size() const { return n; }
+      SQLTCHAR buf[64];
+      int n;
+  };
+  struct QString {
+      int length() const { return len; }
+      int len;
+  };
+  VarLengthArray toSQLTCHAR(const QString &s);
+
+  int SQLExecDirect(SQLHSTMT h, const SQLTCHAR *sql, SQLINTEGER len);
+
+  // QODBCResult::reset, qsql_odbc.cpp:1006 at the fix's parent: the buffer
+  // is the converted string, the length is the source string's.
+  int exec_direct(SQLHSTMT h, const QString &query) {
+      int r = SQLExecDirect(h,
+                            toSQLTCHAR(query).data(),
+                            (SQLINTEGER) query.length());
+      return r;
+  }
+  ```
+
+test "rank1636: the fixed revision names the conversion's result and passes its size"
+  lang cpp
+  file qsql_odbc.cpp
+  reject VYQL-MEM-078
+  code
+  ```
+  typedef short SQLTCHAR;
+  typedef int SQLINTEGER;
+  typedef void *SQLHSTMT;
+
+  struct VarLengthArray {
+      const SQLTCHAR *data() const { return buf; }
+      int size() const { return n; }
+      SQLTCHAR buf[64];
+      int n;
+  };
+  struct QString {
+      int length() const { return len; }
+      int len;
+  };
+  VarLengthArray toSQLTCHAR(const QString &s);
+
+  int SQLExecDirect(SQLHSTMT h, const SQLTCHAR *sql, SQLINTEGER len);
+
+  // Patched form: the conversion's result reaches both the buffer argument
+  // and the size argument of the same call.
+  int exec_direct(SQLHSTMT h, const QString &query) {
+      auto encoded = toSQLTCHAR(query);
+      int r = SQLExecDirect(h,
+                            encoded.data(),
+                            SQLINTEGER(encoded.size()));
+      return r;
+  }
+  ```
+
+test "rank1636: the shape survives renaming the source and moving to another consumer"
+  lang cpp
+  file qsql_odbc.cpp
+  expect VYQL-MEM-078
+  code
+  ```
+  typedef short SQLTCHAR;
+  typedef short SQLSMALLINT;
+  typedef void *SQLHSTMT;
+
+  struct VarLengthArray {
+      const SQLTCHAR *constData() const { return buf; }
+      SQLTCHAR buf[64];
+      int n;
+  };
+  struct QString {
+      int length() const { return len; }
+      int len;
+  };
+  VarLengthArray toSQLTCHAR(const QString &s);
+
+  int SQLColumns(SQLHSTMT h, const SQLTCHAR *catalog, SQLSMALLINT l1,
+                 const SQLTCHAR *schema, SQLSMALLINT l2,
+                 const SQLTCHAR *table, SQLSMALLINT l3,
+                 const SQLTCHAR *column, SQLSMALLINT l4);
+
+  // QODBCDriver::record's shape with every name but the conversion's own
+  // spelled differently: the buffer is still an unnamed conversion
+  // temporary, the lengths still come from the source strings.
+  int list_columns(SQLHSTMT h, const QString &cat, const QString &tab) {
+      return SQLColumns(h,
+                        toSQLTCHAR(cat).constData(), (SQLSMALLINT) cat.length(),
+                        NULL, 0,
+                        toSQLTCHAR(tab).constData(), (SQLSMALLINT) tab.length(),
+                        NULL, 0);
+  }
+  ```
+
+test "rank1636: the self-terminating sentinel length does not describe the buffer"
+  lang cpp
+  file qsql_odbc.cpp
+  reject VYQL-MEM-078
+  code
+  ```
+  typedef short SQLTCHAR;
+  typedef int SQLINTEGER;
+  typedef void *SQLHSTMT;
+
+  struct VarLengthArray {
+      const SQLTCHAR *data() const { return buf; }
+      int size() const { return n; }
+      SQLTCHAR buf[64];
+      int n;
+  };
+  struct QString { int len; };
+  VarLengthArray toSQLTCHAR(const QString &s);
+
+  #define SQL_NTS (-3)
+  int SQLExecDirect(SQLHSTMT h, const SQLTCHAR *sql, SQLINTEGER len);
+
+  // QODBCDriverPrivate::checkUnicode, unchanged by the fix: SQL_NTS is the
+  // ODBC interface's NUL-terminated sentinel, and the conversion appends
+  // the NUL, so the driver stops inside the buffer it was handed.
+  int probe_server(SQLHSTMT h, const QString &query) {
+      return SQLExecDirect(h, toSQLTCHAR(query).data(), SQL_NTS);
+  }
+  ```
+
+test "rank1636: a length that is a second conversion measures the converted form"
+  lang cpp
+  file qsql_odbc.cpp
+  reject VYQL-MEM-078
+  code
+  ```
+  typedef short SQLTCHAR;
+  typedef int SQLINTEGER;
+  typedef void *SQLHSTMT;
+
+  struct VarLengthArray {
+      const SQLTCHAR *data() const { return buf; }
+      int size() const { return n; }
+      SQLTCHAR buf[64];
+      int n;
+  };
+  struct QString {
+      int length() const { return len; }
+      int len;
+  };
+  VarLengthArray toSQLTCHAR(const QString &s);
+
+  int SQLExecDirect(SQLHSTMT h, const SQLTCHAR *sql, SQLINTEGER len);
+
+  // Wasteful but correct: the length argument is itself a conversion of
+  // the same string, so it counts the converted elements the driver will
+  // read.
+  int exec_direct(SQLHSTMT h, const QString &query) {
+      return SQLExecDirect(h,
+                           toSQLTCHAR(query).data(),
+                           (SQLINTEGER) toSQLTCHAR(query).size());
+  }
+  ```

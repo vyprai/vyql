@@ -1,0 +1,101 @@
+test "rank171: Aurora PostgreSQL dialect resolves catalog routines through the active search path"
+  lang go
+  expect VYQL-PATH-057
+  expect_review code.UnqualifiedDatabaseRoutineReview
+  code
+  ```
+  package dialects
+
+  func (g *GlobalAuroraPgDatabaseDialect) IsDialect(conn driver.Conn) bool {
+    if !g.PgDatabaseDialect.IsDialect(conn) {
+      return false
+    }
+    hasExtensions := utils.GetFirstRowFromQuery(
+      conn,
+      "SELECT (setting LIKE '%aurora_stat_utils%') AS aurora_stat_utils FROM pg_catalog.pg_settings WHERE name OPERATOR(pg_catalog.=) 'rds.extensions'")
+    if hasExtensions == nil || hasExtensions[0] != true {
+      return false
+    }
+
+    if !utils.CheckExistenceQueries(conn,
+      "SELECT 'aurora_global_db_status'::regproc",
+      "SELECT 'aurora_global_db_instance_status'::regproc") {
+      return false
+    }
+
+    regionCount := utils.GetFirstRowFromQuery(conn, "SELECT count(1) FROM aurora_global_db_status()")
+    if regionCount == nil {
+      return false
+    }
+    count, ok := regionCount[0].(int64)
+    if !ok {
+      return false
+    }
+    return count > 1
+  }
+
+  func (g *GlobalAuroraPgDatabaseDialect) GetDialectUpdateCandidates() []string {
+    return []string{}
+  }
+
+  func (g *GlobalAuroraPgDatabaseDialect) GetTopologyQuery() string {
+    return "SELECT SERVER_ID, CASE WHEN SESSION_ID OPERATOR(pg_catalog.=) 'MASTER_SESSION_ID' THEN TRUE ELSE FALSE END, " +
+      "VISIBILITY_LAG_IN_MSEC, AWS_REGION " +
+      "FROM aurora_global_db_instance_status()"
+  }
+
+  func (g *GlobalAuroraPgDatabaseDialect) GetRegionByInstanceIdQuery() string {
+    return "SELECT AWS_REGION FROM aurora_global_db_instance_status() WHERE SERVER_ID = $1"
+  }
+  ```
+
+test "rank171: Aurora PostgreSQL dialect qualifies every catalog routine with pg_catalog"
+  lang go
+  reject VYQL-PATH-057
+  reject_review code.UnqualifiedDatabaseRoutineReview
+  code
+  ```
+  package dialects
+
+  func (g *GlobalAuroraPgDatabaseDialect) IsDialect(conn driver.Conn) bool {
+    if !g.PgDatabaseDialect.IsDialect(conn) {
+      return false
+    }
+    hasExtensions := utils.GetFirstRowFromQuery(
+      conn,
+      "SELECT (setting LIKE '%aurora_stat_utils%') AS aurora_stat_utils FROM pg_catalog.pg_settings WHERE name OPERATOR(pg_catalog.=) 'rds.extensions'")
+    if hasExtensions == nil || hasExtensions[0] != true {
+      return false
+    }
+
+    if !utils.CheckExistenceQueries(conn,
+      "SELECT 'pg_catalog.aurora_global_db_status'::regproc",
+      "SELECT 'pg_catalog.aurora_global_db_instance_status'::regproc") {
+      return false
+    }
+
+    regionCount := utils.GetFirstRowFromQuery(conn, "SELECT count(1) FROM pg_catalog.aurora_global_db_status()")
+    if regionCount == nil {
+      return false
+    }
+    count, ok := regionCount[0].(int64)
+    if !ok {
+      return false
+    }
+    return count > 1
+  }
+
+  func (g *GlobalAuroraPgDatabaseDialect) GetDialectUpdateCandidates() []string {
+    return []string{}
+  }
+
+  func (g *GlobalAuroraPgDatabaseDialect) GetTopologyQuery() string {
+    return "SELECT SERVER_ID, CASE WHEN SESSION_ID OPERATOR(pg_catalog.=) 'MASTER_SESSION_ID' THEN TRUE ELSE FALSE END, " +
+      "VISIBILITY_LAG_IN_MSEC, AWS_REGION " +
+      "FROM pg_catalog.aurora_global_db_instance_status()"
+  }
+
+  func (g *GlobalAuroraPgDatabaseDialect) GetRegionByInstanceIdQuery() string {
+    return "SELECT AWS_REGION FROM pg_catalog.aurora_global_db_instance_status() WHERE SERVER_ID = $1"
+  }
+  ```

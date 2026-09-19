@@ -1,0 +1,49 @@
+module bindings.java.xwiki_macro_content_parse;
+
+// XWiki's rendering engine documents MacroContentParser.parse as "Parses
+// content of a macro field (parameter, macro content) in a given syntax",
+// taking "the executing Macro context (from which to get the current syntax,
+// etc)" and, for its transform argument, executing transformations -- so the
+// call is the engine's wiki-markup render-and-execute entry point, the same
+// role a template engine's process call plays, and it is labelled with the
+// existing template-render sink rather than a new one.
+//
+// MacroMarkerBlock is the wrapper the engine leaves around every macro that
+// has already been executed elsewhere in the document, and getContent()
+// returns that macro's raw wiki text. Wiki markup carries executable macros
+// ({{velocity}}, {{groovy}}) whose rights are checked against the author of
+// the context that evaluates them, so content read off a marker block is
+// markup authored outside the current context and is labelled as
+// user-controlled data: whoever wrote the foreign macro, not whoever runs
+// this parser, chose the text. Whether a caller is entitled to evaluate
+// another macro's content under its own context is the rule's question; the
+// bindings only state the API's documented contract.
+//
+// The sink is reached through the injected field's dotted path rather than a
+// receiver type: the engine keeps a type-constrained sink at syntactic
+// fidelity whenever the receiver type is unresolved, and MacroContentParser
+// is a library interface that does not resolve in consuming trees, so a type
+// predicate labels every `.parse(` whose receiver comes from a jar -- 37
+// unrelated template-render rows on one Tomcat tree, measured. The field is
+// injected under the API's own name (or macroContentParser, its ContentMacro
+// spelling), the dotted path forms only from that receiver expression, and
+// the label comes out type-verified. A consumer naming its injected field
+// something else is the residual. getContent is declared on
+// AbstractMacroBlock, and the type predicate matches only receivers declared
+// MacroMarkerBlock: code that reads macro content through a MacroBlock or
+// Block receiver is the engine's own dispatch path and is not labelled.
+
+binding wikiMacroContentParse9310 {
+  query pattern callExpr where callee.path ~= "contentParser.parse"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding wikiMacroContentParseAlias9312 {
+  query pattern callExpr where callee.path ~= "macroContentParser.parse"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding wikiForeignMacroContent9311 {
+  query pattern callExpr where callee.method == "getContent" and callee.receiver.type == "MacroMarkerBlock"
+  emit source core.UserControlledData at call.result
+}

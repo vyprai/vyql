@@ -1,0 +1,29 @@
+module bindings.javascript.template_engine_registry_prototype_lookup;
+
+// JavaScript template engines expose a name-keyed registry: liquidjs documents
+// `registerFilter(name, impl)` and `registerTag(name, impl)`, nunjucks
+// `addFilter`/`addExtension`, handlebars `registerHelper`/`registerPartial`.
+// The template text names the entry to run, so the lookup key is whatever the
+// template says, and the value the lookup returns is invoked as the handler.
+//
+// When the registry itself is a plain object, that lookup also resolves
+// `Object.prototype` members: `valueOf`, `toString`, `constructor`,
+// `hasOwnProperty`, `__defineGetter__`. Each is a callable the engine will
+// happily treat as a registered handler, and `valueOf` in particular returns
+// its own receiver, handing the template the engine internals bound as `this`.
+// The engines' own "unknown filter"/"tag not found" assertion cannot see this,
+// because the lookup did return something. Null-prototype storage
+// (`Object.create(null)`) is what makes the registry hold only what was
+// registered, and is the documented way to key a container by
+// externally-supplied names. A `Map` needs no clause of its own: it is written
+// through `set`, so it never produces the subscript write this keys on.
+//
+// The registry storage and its guard are module facts, not method facts: a
+// class field's initializer is outside every method body, so the shape is only
+// visible at module scope. `Object.create` anywhere in the module clears it,
+// which is deliberate — a module that null-prototypes one container has made
+// the choice, and the residual risk is not worth re-reporting per field.
+binding templateEngineRegistryPrototypeLookup {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and containsAny(node.context.identifier, ["registerFilter", "registerTag", "registerHelper", "registerPartial", "addFilter", "addTag", "addExtension"]) and node.context.dynamicPropertyWrite == "true" and node.context.indexBase startsWith "this." and not (node.context.callPath contains "Object.create") and not (node.context.ownPropertyKeyGuard == "true") and not (node.context.prototypeKeyGuard == "true")
+  emit issue code.ExpressionEvaluatorPrototypeNameAccess at node
+}

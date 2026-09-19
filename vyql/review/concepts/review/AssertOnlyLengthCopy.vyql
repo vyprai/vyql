@@ -1,0 +1,7 @@
+module code;
+
+review code.AssertOnlyLengthCopy {
+  category: memory
+  kind: attention
+  text: "review whether a caller can pass more than the asserted amount; move the bound into a runtime check or bound the copy by the destination"
+}

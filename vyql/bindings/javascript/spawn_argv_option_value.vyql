@@ -1,0 +1,56 @@
+module bindings.javascript.spawn_argv_option_value;
+
+// node:child_process documents spawn, spawnSync, execFile and execFileSync as
+// handing each element of the args array to the new process as one argv entry,
+// with no shell in between, so the target program parses the element itself: a
+// value that begins with a dash is read as an option of that program rather
+// than as the file name, host or URL it was meant to be. That is argument
+// injection, not command injection, so a shell target is not this sink -- the
+// command-execution bindings label those argv vectors, and an element that is
+// `-c` marks the element after it as a shell command string, the same thing.
+// An argv element that is `--` ends option parsing for everything after it, so
+// a vector carrying one hands the target no option and is not labelled either.
+
+binding spawnArgvOptionValue {
+  query pattern callExpr where callee.path ~= "spawn"
+    and not (args.any.literal contains "cmd.exe")
+    and not (args.any.literal contains "powershell")
+    and not (args.any.literal contains "/bin/sh")
+    and not (args.any.literal contains "/bin/bash")
+    and not containsAny(args.any.literal, ["-c"])
+    and not (args.any.literal contains "--")
+  emit sink code.CommandOptionInjectionSink at args[1].collection
+}
+
+binding spawnSyncArgvOptionValue {
+  query pattern callExpr where callee.path ~= "spawnSync"
+    and not (args.any.literal contains "cmd.exe")
+    and not (args.any.literal contains "powershell")
+    and not (args.any.literal contains "/bin/sh")
+    and not (args.any.literal contains "/bin/bash")
+    and not containsAny(args.any.literal, ["-c"])
+    and not (args.any.literal contains "--")
+  emit sink code.CommandOptionInjectionSink at args[1].collection
+}
+
+binding execFileArgvOptionValue {
+  query pattern callExpr where callee.path ~= "execFile"
+    and not (args.any.literal contains "cmd.exe")
+    and not (args.any.literal contains "powershell")
+    and not (args.any.literal contains "/bin/sh")
+    and not (args.any.literal contains "/bin/bash")
+    and not containsAny(args.any.literal, ["-c"])
+    and not (args.any.literal contains "--")
+  emit sink code.CommandOptionInjectionSink at args[1].collection
+}
+
+binding execFileSyncArgvOptionValue {
+  query pattern callExpr where callee.path ~= "execFileSync"
+    and not (args.any.literal contains "cmd.exe")
+    and not (args.any.literal contains "powershell")
+    and not (args.any.literal contains "/bin/sh")
+    and not (args.any.literal contains "/bin/bash")
+    and not containsAny(args.any.literal, ["-c"])
+    and not (args.any.literal contains "--")
+  emit sink code.CommandOptionInjectionSink at args[1].collection
+}

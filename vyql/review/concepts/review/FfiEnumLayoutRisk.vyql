@@ -1,0 +1,7 @@
+module code;
+
+review code.FfiEnumLayoutRisk {
+  category: memory
+  kind: attention
+  text: "review FFI enum representation and whether the foreign ABI expects a fixed integer width"
+}

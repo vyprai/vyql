@@ -1,0 +1,9 @@
+module bindings.groovy.generated.m0331aa9d;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.microsoft.sqlserver:mssql-jdbc")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit sink code.SqlExecution at args[0]
+}

@@ -1,0 +1,8 @@
+module code;
+
+review code.GraphCypherChainMissingQueryValidation {
+  category: sql
+  expected: [core.AllowlistValidation]
+  kind: attention
+  text: "review Cypher/graph QA chains for LLM-generated statements executed with no validation or read-only restriction before they run"
+}

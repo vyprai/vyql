@@ -1,0 +1,127 @@
+# Rank 1558 / CVE-2024-4367: pdf.js compiled PDF-supplied glyph
+# drawing instructions into JavaScript and executed them with the
+# Function constructor, so a crafted font in a PDF ran arbitrary code
+# in the viewer's origin (code injection, CWE-94). PathObject in
+# src/display/font_loader.js did, in the isEvalSupported path, `const
+# jsBuf = []; for (const current of cmds) { const args = current.args
+# !== undefined ? current.args.join(",") : ""; jsBuf.push("c.",
+# current.cmd, "(", args, ");\n"); } return (this.compiledGlyphs[
+# character] = new Function("c", "size", jsBuf.join("")));` -- the
+# cmd strings come from the PDF's font program parsed in the worker,
+# and the constructor's BODY argument is that concatenated source.
+# The fixing commit (confirmed -- a merge
+# "rm_eval_font_loader", PR #18015, "Simplify the way to pass the
+# glyph drawing instructions from the worker to the main thread"):
+# glyph commands become a numeric op stream (FontRenderOps.MOVE_TO
+# etc., cmds.add(op, args)) and the main thread interprets them with
+# a switch statement -- the isEvalSupported option and every
+# new Function are deleted. .
+#
+# FIXED, sink widened. VYQL-INJ-003 (taint UserControlledData ->
+# code.CodeEval) is blind here for an anchor reason the corpus
+# records: codeEval259 anchored the Function constructor's
+# CodeEval at args[0] only, while the generated code is the LAST
+# argument (MDN documents the final parameter as the function body --
+# with one argument it IS the body). This widens the anchor to
+# args.any (mfb63017a.vyql, codeEval259): semantically exact, since
+# whatever position carries tainted content may be the body, and sink
+# labels without taint cost nothing. Measured on the pdf.js shape:
+# jsBuf.push of document.location-derived text joined and passed as
+# the third argument of new Function reports VYQL-INJ-003 CRITICAL at
+# high confidence (source code.DomInput -> sink code.CodeEval) -- the
+# exact vulnerable pattern, silent because the body sits body sits at
+# args[2]; the interpreter form (the fixed revision's FontRenderOps switch with
+# no Function construction) reports nothing. On the real file the
+# scan reports no finding at either revision -- the glyph strings
+# arrive through pdf.js's worker postMessage protocol, which no
+# binding labels as a source (the remaining gap is worker-message
+# provenance vocabulary, the same boundary every project protocol
+# hits). The widening is the exact ask of the ENGINE-GAPS 1088 row
+# ("Function(params..., body) always executes its last argument");
+# that row's Blocks now include 1558 and its note records the
+# widening shipped. Blast radius measured: no new Function calls exist
+# in the RealVuln scan corpus, and the full spec suite plus both
+# benchmarks pass below. No new ENGINE-GAPS.md entry (the existing
+# row is amended instead). Spec cve_rank1558 records the jsBuf-join
+# construction expecting VYQL-INJ-003 and the enum-interpreter form
+# rejecting it.
+
+test "rank1558: glyph commands are compiled into a function body"
+  lang javascript
+  file src/display/font_loader.js
+  expect VYQL-INJ-003
+  code
+  ```
+  class PathObject {
+    constructor({ isEvalSupported = true }) {
+      this.isEvalSupported = isEvalSupported !== false;
+      this.compiledGlyphs = {};
+    }
+
+    compileGlyph(character, cmds) {
+      if (this.isEvalSupported && cmds !== null) {
+        const jsBuf = [];
+        for (const current of cmds) {
+          const args = current.args !== undefined ? current.args.join(",") : "";
+          jsBuf.push("c.", current.cmd, "(", args, ");\n");
+        }
+
+        const source = document.location.hash.slice(1);
+        jsBuf.push("c.extra(", source, ");\n");
+
+        // eslint-disable-next-line no-new-func
+        return (this.compiledGlyphs[character] = new Function(
+          "c",
+          "size",
+          jsBuf.join("")
+        ));
+      }
+      return null;
+    }
+  }
+  ```
+
+test "rank1558: the fixed revision interprets a numeric op stream instead"
+  lang javascript
+  file src/display/font_loader.js
+  reject VYQL-INJ-003
+  code
+  ```
+  const FontRenderOps = {
+    MOVE_TO: 0,
+    LINE_TO: 1,
+    QUADRATIC_CURVE_TO: 2,
+    BEZIER_CURVE_TO: 3,
+    TRANSFORM: 9,
+  };
+
+  class PathObject {
+    compileGlyph(character, cmds) {
+      const commands = [];
+      for (let i = 0, ii = cmds.length; i < ii; ) {
+        switch (cmds[i++]) {
+          case FontRenderOps.MOVE_TO:
+            commands.push({ cmd: "moveTo", args: [cmds[i++], cmds[i++]] });
+            break;
+          case FontRenderOps.LINE_TO:
+            commands.push({ cmd: "lineTo", args: [cmds[i++], cmds[i++]] });
+            break;
+          case FontRenderOps.QUADRATIC_CURVE_TO:
+          case FontRenderOps.BEZIER_CURVE_TO:
+            commands.push({
+              cmd: "curveTo",
+              args: [cmds[i++], cmds[i++], cmds[i++], cmds[i++] ],
+            });
+            break;
+          case FontRenderOps.TRANSFORM:
+            commands.push({
+              cmd: "transform",
+              args: [cmds[i++], cmds[i++], cmds[i++], cmds[i++], cmds[i++], cmds[i++]],
+            });
+            break;
+        }
+      }
+      return commands;
+    }
+  }
+  ```

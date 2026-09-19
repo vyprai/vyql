@@ -1,0 +1,168 @@
+# Rank 1666 / CVE-2019-12041 (markdown-it prior art):
+# a markdown parser's HTML-tag recognizer is assembled at module scope out of
+# per-construct regex literals, and two of those literals carry an alternation
+# of overlapping prefixes under a star: the HTML comment body
+# `([^-]+|[-][^-]+)*` and the CDATA body
+# `([^\]]+|\][^\]]|\]\][^>])*`. Each branch can end a run at the same character
+# the next iteration can begin it, so a body that never reaches the closing
+# delimiter is re-split at every boundary and the match cost grows without
+# bound in the length of the input (CWE-1333 inefficient regular expression
+# complexity, CWE-400). The composed recognizer is applied to the document text
+# at every inline position, so a crafted comment or CDATA section hangs the
+# parse. The rewrite removes the ambiguity rather than capping the input: the
+# comment body becomes `<!---->|<!--(?:-?[^>-])(?:-?[^-])*-->`, where every
+# iteration must consume a non-dash and the closing delimiter is unreachable
+# from inside the loop, and the CDATA body becomes the lazy `[\s\S]*?`, which
+# cannot split a run at all.
+#
+# The module composes the literals through a local `replace` helper that folds
+# each fragment's `.source` into a master pattern and compiles it once with
+# `new RegExp`, so the literal and the untrusted operand never meet in one
+# expression: the recognizer is exported and applied in a different file
+# (`state.src.slice(pos).match(HTML_TAG_RE)` at lib/rules_inline/htmltag.js:37),
+# where the pattern arrives as a variable and no regex literal exists.
+#
+# The pool row carries no flag and reads correctly: 287dfbf2 is the targeted
+# two-pattern change inherited from markdown-it, the vulnerable literals are
+# present at its parent, and the remediation is present at the commit itself.
+# No pool correction is needed.
+#
+# Recheck measurements (3 x `--cache off --max-ram 6GB` per revision): both
+# revisions report the same 33 findings and the same 5 review flags at the same
+# locations, and neither `lib/common/html_re.js` nor `lib/rules_inline/
+# htmltag.js` carries a finding on either side. The engine's shared classifier
+# still discriminates the pair exactly -- the vulnerable revision lowers the
+# two literals to synthesised `__regex.match` call nodes at html_re.js:44 and
+# :47, the fixed revision synthesises none -- and still no JavaScript binding
+# consumes them (Ruby turns the same node into `code.RegexMatch` and
+# `code.CatastrophicRegex` through `regexMatch205` and `catastrophicRegex1701/
+# 1703` in vyql/bindings/ruby/m5a48bf47.vyql; the JavaScript bindings carry
+# only per-CVE literal fragments).
+#
+# Three throwaway probes (removed, not shipped) re-measure the presence route:
+#
+# 1. The ungated verdict -- `node.path ~= "__regex.match"` emitting
+#    `code.CatastrophicRegex` -- discriminates the real trees 2 -> 0 and is
+#    unshippable, as first measured across ~250 trees: moment +6, URI.js +4,
+#    prompts.chat +3, qwik +1 over seven collateral trees with the probe
+#    subtracted (mathjs and tinymce +0).
+#
+# 2. The shipped Ruby gate ported -- verdict plus a same-scope match-family
+#    application (`node.context.callPath contains "__regex.match"` and
+#    `containsAny(node.context.callPath, [".match"])`, the shape of
+#    `catastrophicRegex1701/1703`) -- reports 0 on both revisions. The
+#    declaring module never applies the pattern: the `.match` lives in another
+#    file where no literal exists, so the gate that makes the Ruby form
+#    shippable cannot see this code at all.
+#
+# 3. The one gate that does reach the pair -- verdict plus a same-scope
+#    `RegExp` construction -- reports 1 -> 0 on the real trees and is still
+#    unshippable, for two measured reasons. On a bundled file a module-scope
+#    gate is whole-file co-membership: five of moment's six rows sit on the
+#    shipped copies of one source file (moment.js, meteor/moment.js,
+#    min/moment.min.js, min/moment-with-locales*.js) where an ambiguous literal
+#    and a `new RegExp` thousands of lines apart satisfy it, and URI.js's other
+#    three rows sit on vendored bundles (jquery-1.7.2.min.js, prettify.js,
+#    src/URI.min.js). And the sixth moment row is src/lib/parse/regex.js --
+#    the bounded `{0,256}`/`{1,256}` branches moment shipped as its own ReDoS
+#    remediation -- because `jsRegexQuantifier` maps every `{...}` body except
+#    `1` and `0,1` to `*`, so an explicitly bounded repeat classifies exactly
+#    like an unbounded one. Minimal triple isolating that defect: the bounded
+#    form `/[0-9]{0,256}['a-z...]{1,256}|[...]{1,256}(\s*?[...]{1,256}){1,2}/`
+#    synthesises a `__regex.match` node, the identical `*`-spelled form
+#    synthesises one, and the bound-free form synthesises none. Across eight
+#    trees the gate adds 15 rows, of which two are defensible -- this pair's
+#    own, and URI.js:231, `find_uri_expression`, a genuinely catastrophic URL
+#    regex -- one real in seven, the ratio the ungated criterion already
+#    measured, now at the gated level too.
+#
+# What would make this catchable is a taint gate, and only one endpoint of it
+# exists: at the application file the exported rule's `state` parameter is
+# labelled `code.ExternalEntryInput` by `library.param-source`
+# (htmltag.js:16), so the untrusted half -- `state.src.slice(pos).match(...)` --
+# is covered, but no sink exists for a match-family call whose pattern arrives
+# as a variable: every shipped match-family sink keys on an argument literal
+# (`catastrophicRegex543/546/548/549`, `regexMatch540`), and the ambiguity
+# verdict lives at the literal in the other file. At the literal's file the
+# pattern is a module-scope constant no untrusted value reaches, so a sink on
+# the synthesised node can never receive taint there either. Linking the two
+# needs the engine to propagate a composed regex constant's ambiguity across a
+# module boundary into the call that applies it -- a dataflow relation that
+# does not exist -- plus a boundedness-aware quantifier model so remediated
+# `{n,m}` forms stop classifying. Both are engine work, not bindings; the
+# narrower fragment form that would catch this one library names this fix's own
+# pattern text and is the repro shape the genericity test excludes.
+#
+# verify_current_expected: attention-precision-cost, both revisions rejected.
+
+test "remarkable: html recognizer folds ambiguous comment and cdata bodies into the tag matcher"
+  lang javascript
+  file lib/common/html_re.js
+  profile library
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  function replace(regex, options) {
+    regex = regex.source;
+    options = options || '';
+
+    return function self(name, val) {
+      if (!name) {
+        return new RegExp(regex, options);
+      }
+      val = val.source || val;
+      regex = regex.replace(name, val);
+      return self;
+    };
+  }
+
+  var close_tag = /<\/[A-Za-z][A-Za-z0-9]*\s*>/;
+  var comment   = /<!--([^-]+|[-][^-]+)*-->/;
+  var cdata     = /<!\[CDATA\[([^\]]+|\][^\]]|\]\][^>])*\]\]>/;
+
+  var HTML_TAG_RE = replace(/^(?:close_tag|comment|cdata)/)
+                      ('close_tag', close_tag)
+                      ('comment', comment)
+                      ('cdata', cdata)
+                      ();
+
+  module.exports.HTML_TAG_RE = HTML_TAG_RE;
+  ```
+
+test "remarkable: html recognizer with iteration-forced comment and lazy cdata bodies is clean"
+  lang javascript
+  file lib/common/html_re.js
+  profile library
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  function replace(regex, options) {
+    regex = regex.source;
+    options = options || '';
+
+    return function self(name, val) {
+      if (!name) {
+        return new RegExp(regex, options);
+      }
+      val = val.source || val;
+      regex = regex.replace(name, val);
+      return self;
+    };
+  }
+
+  var close_tag = /<\/[A-Za-z][A-Za-z0-9]*\s*>/;
+  var comment   = /<!---->|<!--(?:-?[^>-])(?:-?[^-])*-->/;
+  var cdata     = /<!\[CDATA\[[\s\S]*?\]\]>/;
+
+  var HTML_TAG_RE = replace(/^(?:close_tag|comment|cdata)/)
+                      ('close_tag', close_tag)
+                      ('comment', comment)
+                      ('cdata', cdata)
+                      ();
+
+  module.exports.HTML_TAG_RE = HTML_TAG_RE;
+  ```

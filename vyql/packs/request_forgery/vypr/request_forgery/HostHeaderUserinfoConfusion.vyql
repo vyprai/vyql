@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule HostHeaderUserinfoConfusion {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_444, CWE_20]
+    id: "VYQL-RF-045"
+    severity: medium
+  }
+  issue code.HostHeaderUserinfoConfusion as sink
+}

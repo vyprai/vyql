@@ -1,0 +1,60 @@
+module bindings.ruby.smtp_envelope_address;
+
+// Net::SMTP's address arguments are written verbatim into SMTP command lines.
+//
+// `sendmail(msgstr, from_addr, to_addrs)` and `send_message(msgstr, from_addr,
+// *to_addrs)` issue `MAIL FROM:<from_addr>` and one `RCPT TO:<to_addr>` per
+// recipient; `mailfrom`, `rcptto` and `rcptto_list` issue those same commands
+// directly. SMTP is line-oriented, so CR or LF inside an address terminates the
+// command and whatever follows is read by the server as the next command
+// (CWE-93). net/smtp documents these parameters as addresses, not as a place to
+// put arbitrary text, and only Ruby 2.4 and later reject embedded newlines
+// themselves -- so the address positions are CRLF sinks.
+//
+// The message argument is deliberately not bound here: it is the DATA payload,
+// which is dot-stuffed and terminated by a lone ".", and net-smtp already binds
+// it as code.NetworkSend.
+
+binding smtpSendmailFromAddress {
+  query pattern callExpr where callee.method == "sendmail"
+  emit sink code.MailHeaderWrite at args[1]
+}
+
+binding smtpSendmailToAddress {
+  query pattern callExpr where callee.method == "sendmail"
+  emit sink code.MailHeaderWrite at args[2]
+}
+
+binding smtpMailFromAddress {
+  query pattern callExpr where callee.method == "mailfrom"
+  emit sink code.MailHeaderWrite at args[0]
+}
+
+binding smtpRcptToAddress {
+  query pattern callExpr where callee.method == "rcptto"
+  emit sink code.MailHeaderWrite at args[0]
+}
+
+binding smtpRcptToListAddresses {
+  query pattern callExpr where callee.method == "rcptto_list"
+  emit sink code.MailHeaderWrite at args[0]
+}
+
+// `send_message` is a name shared with SQS, DNS and chat clients, so the
+// envelope positions are only bound where net-smtp is actually a dependency.
+
+binding smtpSendMessageFromAddress {
+  requires {
+    dependency("net-smtp")
+  }
+  query pattern callExpr where callee.method == "send_message"
+  emit sink code.MailHeaderWrite at args[1]
+}
+
+binding smtpSendMessageToAddress {
+  requires {
+    dependency("net-smtp")
+  }
+  query pattern callExpr where callee.method == "send_message"
+  emit sink code.MailHeaderWrite at args[2]
+}

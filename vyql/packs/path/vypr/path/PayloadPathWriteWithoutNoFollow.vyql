@@ -1,0 +1,11 @@
+module vypr.path;
+
+rule PayloadPathWriteWithoutNoFollow {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_22, CWE_59, CWE_367]
+    id: "VYQL-PATH-088"
+    severity: high
+  }
+  issue code.PayloadPathWriteWithoutNoFollow as sink
+}

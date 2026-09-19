@@ -1,0 +1,197 @@
+# Rank 1658 / CVE-2025-55182: the Flight reply deserializer resolved a
+# client-supplied "$id:seg:seg" outline reference by walking the
+# deserialized objects one segment at a time with a plain subscript, so a
+# reference such as $3:constructor:constructor reached through the
+# prototype chain to the Function constructor, and a crafted Promise-like
+# .then resolves via the chunk wake path -- unauthenticated remote code
+# execution on any Server Function endpoint (CVSS 10.0; the React blog
+# post and Dynatrace's analysis name the missing attribute check). The
+# walk in getOutlinedModel (packages/react-server/src/ReactFlightReplyServer.js)
+# ran `value = value[path[i]]` with no own-property check, where path is
+# reference.split(':') and reference is a slice of the reply model string;
+# loadServerReference then handed metaData.id to resolveServerReference /
+# requireModule with no typeof check. The fixing commit 7dc903cd29
+# ("Patch FlightReplyServer with fixes from ReactFlightClient (#35277)",
+# 822 lines in this file) gates both walk sites on
+# `typeof value === 'object' && hasOwnProperty.call(value, name)`, makes
+# loadServerReference reject a non-string id, and lets getChunk and
+# resolveStream take only string FormData entries. Remediation verified
+# present at the fixed revision. No pool correction.
+#
+# ATTENTION, two stacked gaps, rechecked and both re-measured.
+#
+# 1. Engine, frontend: a function whose signature carries Flow-only
+# type syntax has no function context, and on this file the loss runs
+# to the end of it. Isolated, the Flow-signature block below still
+# yields six call nodes at module scope but zero
+# analysis.function.context nodes, where the identical body behind a
+# plain signature yields one -- no function-scoped binding can reach
+# the walk at all. On the real parent revision it is worse: the
+# 1180-line file yields 42 Call nodes and 13 Func nodes, every one at
+# or before line 162 -- nothing after line 186 extracts, including the
+# functions that carry no generic parameter (bindArgs at :337, getChunk
+# at :518, createMap at :640, parseModelString at :916). `vyql query
+# -call` reports 0 nodes for getOutlinedModel and for every `split`
+# call, and `vyql match` on the file reports no source, no sink and no
+# control. Three --cache off scans of packages/react-server (75
+# javascript files) report 0 findings at the parent and 0 at the fix,
+# and the same under the api, generic and library profiles (the library
+# profile's 36 rows all sit in ReactFizzClassComponent.js); no rule can
+# see this file. The loss is per-function in isolation -- a plain
+# sibling after one generic declaration extracts -- but the real file's
+# run of consecutive generic declarations takes the parser's recovery
+# with it, so the practical loss is file-wide. Routing Flow-annotated
+# .js through the TypeScript grammar (the extension switch already sends
+# .ts there with the same walker) is the correction, and it stays a
+# design call, not a mechanical one: pragma detection versus error
+# retry, grammar choice, and a scan-wide change in extraction volume on
+# every Flow-typed library. ENGINE-GAPS.md entry unchanged.
+#
+# 2. Vocabulary, provenance: the segments come from
+# reference.split(':') where reference is a slice of the reply model
+# string, and nothing labels the delimiter-separated names of a wire
+# format as untrusted -- the family ranks 1518, 1584 and 1613 share, and
+# rank 1725 measures the read arm of it again (code.ReflectionInvoke
+# has a Java emitter only). Flattening the signature to plain
+# javascript isolates this half from the first: the unguarded walk then
+# has its function context, `reference.split` and `value[path[i]]` both
+# extracted, and still reports nothing, so no source or sink exists for
+# it. A guard-free presence binding over split+subscript walks is
+# unshippable on the measured reachable set -- 15 of 168 split-carrying
+# files on next.js, 38 of 266 on lime-survey, 35 of 181 on microweber,
+# all vendored browser libraries reading trusted config paths.
+#
+# The control half is the one piece that works, and only through the
+# frontend fact. On the flattened pair the own-property check makes
+# `own_property_key_guard=true` fire 0 -> 1 (measured with a probe
+# binding emitting core.PrototypePollutionGuard from that fact), which
+# is what a future source/sink pair needs for its `unless`. The shipped
+# ownPropertyCheckGuard binding does not reach this spelling: it
+# matches Object.prototype.hasOwnProperty.call, `.hasOwnProperty(key)`
+# and Object.hasOwn, and the fix's receiverless
+# `hasOwnProperty.call(value, name)` -- hasOwnProperty imported from
+# 'shared/hasOwnProperty', the form MDN recommends for null-prototype
+# receivers -- matches none of the three. Widening a control binding is
+# a suppression change with no finding here to measure it against, so
+# nothing is shipped.
+#
+# The first and third blocks carry the signature the real file has and
+# pin the extraction gap (zero function contexts against one for the
+# flattened twin); the second and fourth flatten it and pin the
+# vocabulary gap (one function context, the split and the subscript
+# both extracted, and still nothing fires). All four reject
+# VYQL-INJ-013. When Flow-annotated .js extracts and untrusted-name
+# provenance lands, the unguarded walk must flip to expect.
+# verify_current_expected: attention-engine-gap, both revisions rejected.
+
+test "rank1658: the outline walk follows the prototype chain"
+  lang javascript
+  file packages/react-server/src/ReactFlightReplyServer.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function getOutlinedModel<T>(
+    response: Response,
+    reference: string,
+    map: (response: Response, model: any) => T,
+  ): T {
+    const path = reference.split(':');
+    const id = parseInt(path[0], 16);
+    const chunk = getChunk(response, id);
+    switch (chunk.status) {
+      case INITIALIZED:
+        let value = chunk.value;
+        for (let i = 1; i < path.length; i++) {
+          value = value[path[i]];
+        }
+        return map(response, value);
+      default:
+        throw chunk.reason;
+    }
+  }
+  ```
+
+test "rank1658: the same walk behind a plain signature"
+  lang javascript
+  file packages/react-server/src/ReactFlightReplyServer.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function getOutlinedModel(response, reference, map) {
+    const path = reference.split(':');
+    const id = parseInt(path[0], 16);
+    const chunk = getChunk(response, id);
+    switch (chunk.status) {
+      case INITIALIZED:
+        let value = chunk.value;
+        for (let i = 1; i < path.length; i++) {
+          value = value[path[i]];
+        }
+        return map(response, value);
+      default:
+        throw chunk.reason;
+    }
+  }
+  ```
+
+test "rank1658: the fixed revision reads only own properties on the walk"
+  lang javascript
+  file packages/react-server/src/ReactFlightReplyServer.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function getOutlinedModel<T>(
+    response: Response,
+    reference: string,
+    map: (response: Response, model: any) => T,
+  ): T {
+    const path = reference.split(':');
+    const id = parseInt(path[0], 16);
+    const chunk = getChunk(response, id);
+    switch (chunk.status) {
+      case INITIALIZED:
+        let value = chunk.value;
+        for (let i = 1; i < path.length; i++) {
+          const name = path[i];
+          if (
+            typeof value === 'object' &&
+            hasOwnProperty.call(value, name)
+          ) {
+            value = value[name];
+          }
+        }
+        return map(response, value);
+      default:
+        throw chunk.reason;
+    }
+  }
+  ```
+
+test "rank1658: the fixed walk behind a plain signature"
+  lang javascript
+  file packages/react-server/src/ReactFlightReplyServer.js
+  reject VYQL-INJ-013
+  code
+  ```
+  function getOutlinedModel(response, reference, map) {
+    const path = reference.split(':');
+    const id = parseInt(path[0], 16);
+    const chunk = getChunk(response, id);
+    switch (chunk.status) {
+      case INITIALIZED:
+        let value = chunk.value;
+        for (let i = 1; i < path.length; i++) {
+          const name = path[i];
+          if (
+            typeof value === 'object' &&
+            hasOwnProperty.call(value, name)
+          ) {
+            value = value[name];
+          }
+        }
+        return map(response, value);
+      default:
+        throw chunk.reason;
+    }
+  }
+  ```

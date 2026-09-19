@@ -1,0 +1,33 @@
+module bindings.kotlin.generated.mc12e92cb;
+
+binding networkSend0 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-remote-driver")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-remote-driver")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.CodeEval at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-remote-driver")
+  }
+  query pattern callExpr where callee.method == "fromJson"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkData3 {
+  requires {
+    dependency("org.seleniumhq.selenium:selenium-remote-driver")
+  }
+  query pattern callExpr where callee.method == "addRequestHandler"
+  emit source code.NetworkData at call.result
+}

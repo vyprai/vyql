@@ -1,0 +1,9 @@
+module bindings.go.generated.m05641ddc;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/googleapis/gax-go/v2")
+  }
+  query pattern callExpr where callee.method == "NewProtoJSONStreamReader"
+  emit sink code.Deserialization at args[0]
+}

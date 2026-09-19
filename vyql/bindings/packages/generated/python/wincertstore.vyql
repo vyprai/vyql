@@ -1,0 +1,49 @@
+module bindings.python.generated.m07a705d1;
+
+binding secretValue0 {
+  requires {
+    dependency("wincertstore")
+  }
+  query pattern callExpr where callee.method == "itercerts"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("wincertstore")
+  }
+  query pattern callExpr where callee.method == "itercrls"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("wincertstore")
+  }
+  query pattern callExpr where callee.method == "get_encoded"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue3 {
+  requires {
+    dependency("wincertstore")
+  }
+  query pattern callExpr where callee.method == "get_pem"
+  emit source code.SecretValue at call.result
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("wincertstore")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding secretValue5 {
+  requires {
+    dependency("wincertstore")
+  }
+  query pattern callExpr where callee.method == "addcerts"
+  emit source code.SecretValue at call.result
+}

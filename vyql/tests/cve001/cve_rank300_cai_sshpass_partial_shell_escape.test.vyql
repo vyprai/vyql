@@ -1,0 +1,50 @@
+test "rank300: CAI SSH tool leaves username host and port unescaped"
+lang python
+expect VYQL-INJ-052
+expect_review code.PartiallyEscapedSshCommand
+code
+```
+from cai.sdk.agents import function_tool
+
+@function_tool
+def run_ssh_command_with_credentials(host: str, username: str, password: str, command: str, port: int = 22) -> str:
+    escaped_password = password.replace("'", "'\\''")
+    escaped_command = command.replace("'", "'\\''")
+
+    ssh_command = (
+        f"sshpass -p '{escaped_password}' "
+        f"ssh -o StrictHostKeyChecking=no "
+        f"{username}@{host} -p {port} "
+        f"'{escaped_command}'"
+    )
+    return run_command(ssh_command)
+```
+
+test "rank300: CAI SSH tool quotes all shell-controlled fields"
+lang python
+reject VYQL-INJ-052
+code
+```
+import shlex
+from cai.sdk.agents import function_tool
+
+@function_tool
+def run_ssh_command_with_credentials(host: str, username: str, password: str, command: str, port: int = 22) -> str:
+    port = int(port)
+    if port <= 0 or port > 65535:
+        return "port is not a valid integer"
+
+    quoted_password = shlex.quote(password)
+    quoted_username = shlex.quote(username)
+    quoted_host = shlex.quote(host)
+    quoted_command = shlex.quote(command)
+    port = str(port)
+
+    ssh_command = (
+        f"sshpass -p {quoted_password} "
+        f"ssh -o StrictHostKeyChecking=no "
+        f"{quoted_username}@{quoted_host} -p {port} "
+        f"{quoted_command}"
+    )
+    return run_command(ssh_command)
+```

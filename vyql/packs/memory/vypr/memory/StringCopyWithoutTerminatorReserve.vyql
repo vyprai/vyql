@@ -1,0 +1,11 @@
+module vypr.memory;
+
+rule StringCopyWithoutTerminatorReserve {
+  meta {
+    confidenceFloor: medium
+    cwe: [CWE_170, CWE_120]
+    id: "VYQL-MEM-068"
+    severity: medium
+  }
+  issue code.StringCopyWithoutTerminatorReserve as c
+}

@@ -1,0 +1,27 @@
+module bindings.rust.opcua_decoding_limits_disabled;
+
+// OPC UA binary transport (Part 6, sections 7.1.2 and 7.1.3) bounds a
+// connection from both ends with MaxMessageSize and MaxChunkCount, negotiated
+// in the Hello/Acknowledge handshake. Both fields carry an explicit "0 means
+// no limit" sentinel, and the specification's own guidance is that a server
+// must not accept the unlimited form: a peer that never sends the Final chunk
+// can otherwise hold an arbitrary number of arbitrarily large chunks in the
+// receiver's pending-chunk buffer, and every sanity check the decoder performs
+// against the limit is dead code while the limit reads zero.
+//
+// This labels the construction of a decoding-options value that sets the chunk
+// count or the total message size to that sentinel while giving the per-value
+// limits (string, byte string and array lengths) real ceilings -- that is, a
+// configuration that bounds what a single decoded value may cost but leaves
+// the transport framing itself unbounded.
+//
+// The `..Default::default()` exclusion is Rust's struct update syntax and not
+// an incidental spelling: a literal that falls back to the type's defaults for
+// the fields it does not name still receives whatever ceiling the crate's
+// default supplies, so only a literal enumerating the limits itself can be
+// read as deliberately disabling one. The limit names are the wire protocol's,
+// so the same shape is recognisable in any implementation of it.
+binding opcuaDecodingLimitsDisabled {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and containsAny(node.token, ["max_chunk_count:0,", "max_message_size:0,"]) and containsAny(node.token, ["max_string_length:", "max_byte_string_length:", "max_array_length:"]) and not (node.token contains "..Default::default()")
+  emit issue code.UnboundedResourceOperation at node
+}

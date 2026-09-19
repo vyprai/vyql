@@ -1,0 +1,46 @@
+test "rank347: Cecil dynamic 404 page reflects request URI path"
+  lang php
+  expect VYQL-INJ-004
+  code
+  ```
+  <?php
+  $path = urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH));
+  if (!file_exists($_SERVER['DOCUMENT_ROOT'] . '/404.html')) {
+      echo <<<END
+      <!doctype html>
+      <html>
+        <head><meta http-equiv="refresh" content="2;URL=$path"></head>
+        <body><p>The requested resource <code>$path</code> was not found.</p></body>
+      </html>
+      END;
+  }
+  ```
+
+test "rank347: Cecil escapes dynamic 404 request URI path"
+  lang php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  $path = htmlspecialchars(urldecode(parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH)));
+  if (!file_exists($_SERVER['DOCUMENT_ROOT'] . '/404.html')) {
+      echo <<<END
+      <!doctype html>
+      <html>
+        <head><meta http-equiv="refresh" content="2;URL=$path"></head>
+        <body><p>The requested resource <code>$path</code> was not found.</p></body>
+      </html>
+      END;
+  }
+  ```
+
+test "rank347: document root file content is not request-controlled HTML"
+  lang php
+  reject VYQL-INJ-004
+  code
+  ```
+  <?php
+  $filename = $_SERVER['DOCUMENT_ROOT'] . '/index.html';
+  $content = file_get_contents($filename);
+  echo $content;
+  ```

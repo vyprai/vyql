@@ -1,0 +1,189 @@
+# protobuf's Python JSON parser expanded nested google.protobuf.Any
+# messages through a reflective method dispatch that skipped the
+# recursion-depth accounting, so deeply nested Any input bypassed
+# max_recursion_depth and overflowed the stack (denial of service
+# through a budget-bypassing branch, CWE-400/CWE-1327; #25239, fixed
+# with #25587). _Parser.ConvertMessage in
+# python/google/protobuf/json_format.py is the budget-checked entry:
+# recursion_depth += 1, the max_recursion_depth comparison, and the
+# decrement on exit. Its well-known-type branch dispatches through
+# methodcaller(_WKTJSONMETHODS[full_name][1], ...)(self) -- accounted
+# for, because the increment already ran. _ConvertAnyMessage, reached
+# through that same table for google.protobuf.Any, had a second
+# methodcaller branch of its own that re-entered the parser without
+# passing ConvertMessage, so nested Any never paid the increment.
+# Pool commit 5ebddcb1bc is the real fix ("Fix Any recursion depth
+# bypass in Python json_format.ParseDict"): the _ConvertAnyMessage
+# branch calls self.ConvertMessage(value['value'], sub_message,
+# '{0}.value'.format(path)) so every nested message -- Any included --
+# is counted, with a regression test nesting five Anys under
+# max_recursion_depth=5. The budget-covered methodcaller branch in
+# ConvertMessage stays as it was. No pool correction.
+#
+# Held ATTENTION, budget-bypassing dispatch, rechecked at the span tip.
+# Fresh 3 x --cache off scans of the real checkout: json_format.py
+# alone reports 0 findings at both revisions (6 core.PathAccessCheck
+# flags on `in` operators and a core.SafeDeserialization control, the
+# only labels in either view), and the whole python/google/protobuf
+# tree reports 98 findings at both revisions with none on
+# json_format.py, so the 1st-pass zero is genuine in the full findings
+# view, not a -flags misread. Nothing in the recursion family fires:
+# VYQL-DOS-029's concept has a C binding only, VYQL-DOS-016 is the
+# bespoke Gson classifier, VYQL-DOS-035/045 have no Python emitters,
+# and VYQL-DOS-042's Python emitters key on asyncio task registries
+# and streaming decompressors. The label surface exists -- vyql graph
+# emits code.Call path=operator.methodcaller at the bypassing site --
+# but no verdict is reachable from it: the dispatch target is
+# _WKTJSONMETHODS[full_name][1], a dict lookup keyed by a runtime
+# descriptor string, with no resolvable edge into any _Convert*
+# method, and re-entry unification is a recorded engine limit
+# (1320/1391/1697). The discriminating fact is measured to be the
+# method, not the construct: the identical reflective dispatch appears
+# at two sites in the budget-bearing class -- ConvertMessage's
+# budget-covered branch and _ConvertAnyMessage's bypassing branch --
+# and the fix removes only the second while the first survives, so a
+# class-scope "budget-bearing class using reflective dispatch" binding
+# fires at both revisions and a method-scope binding flags the safe
+# site at both; the only clean 1 -> 0 discriminator is keying on the
+# method that must route through ConvertMessage, the fixing commit's
+# own layout. A binding on _WKTJSONMETHODS or _ConvertAnyMessage
+# detects this library rather than the weakness: the table and the
+# method names are undocumented internals. methodcaller is absent from
+# the Python benchmark corpus, so a bare reflective-dispatch label
+# would be benchmark-neutral and verdict-free -- the missing thing is
+# the dispatch-path completeness question, not the label. Second
+# vehicle of the 1262 counter-bypass family (reflective dispatch
+# instead of a fresh instance); no standalone ENGINE-GAPS.md entry,
+# restated there instead. No definition change shipped. This spec pins
+# both revisions on the real class shape -- both methodcaller sites
+# present in the vulnerable form, the fix swapping only
+# _ConvertAnyMessage's branch to ConvertMessage -- rejecting
+# VYQL-DOS-029 and VYQL-DOS-042: when depth-budget vocabulary lands,
+# the bypassing form must flip to expect on whichever fires.
+
+test "rank1612: the well-known branch bypasses the depth budget"
+  lang python
+  file python/google/protobuf/json_format.py
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  code
+  ```
+  from operator import methodcaller
+
+
+  _WKTJSONMETHODS = {
+      'google.protobuf.Any': ('', '_ConvertAnyMessage'),
+      'google.protobuf.Duration': ('', '_ConvertDurationMessage'),
+  }
+
+
+  class _Parser(object):
+
+    def __init__(self, ignore_unknown_fields, descriptor_pool,
+                 max_recursion_depth):
+      self.ignore_unknown_fields = ignore_unknown_fields
+      self.descriptor_pool = descriptor_pool
+      self.max_recursion_depth = max_recursion_depth
+      self.recursion_depth = 0
+
+    def ConvertMessage(self, value, message, path):
+      self.recursion_depth += 1
+      if self.recursion_depth > self.max_recursion_depth:
+        raise ParseError('Message too deep.')
+      message_descriptor = message.DESCRIPTOR
+      full_name = message_descriptor.full_name
+      if _IsWrapperMessage(message_descriptor):
+        self._ConvertWrapperMessage(value, message, path)
+      elif full_name in _WKTJSONMETHODS:
+        methodcaller(
+            _WKTJSONMETHODS[full_name][1], value, message, path
+        )(self)
+      else:
+        self._ConvertFieldValuePair(value, message, path)
+      self.recursion_depth -= 1
+
+    def _ConvertAnyMessage(self, value, message, path):
+      type_url = value['@type']
+      sub_message = _CreateMessageFromTypeUrl(
+          type_url, self.descriptor_pool
+      )
+      full_name = sub_message.DESCRIPTOR.full_name
+      if _IsWrapperMessage(sub_message.DESCRIPTOR):
+        self._ConvertWrapperMessage(
+            value['value'], sub_message, '{0}.value'.format(path)
+        )
+      elif full_name in _WKTJSONMETHODS:
+        methodcaller(
+            _WKTJSONMETHODS[full_name][1],
+            value['value'],
+            sub_message,
+            '{0}.value'.format(path),
+        )(self)
+      else:
+        self._ConvertFieldValuePair(value, sub_message, path)
+      message.value = sub_message.SerializeToString()
+      message.type_url = type_url
+  ```
+
+test "rank1612: the fixed revision routes the branch through the budget"
+  lang python
+  file python/google/protobuf/json_format.py
+  reject VYQL-DOS-029
+  reject VYQL-DOS-042
+  code
+  ```
+  from operator import methodcaller
+
+
+  _WKTJSONMETHODS = {
+      'google.protobuf.Any': ('', '_ConvertAnyMessage'),
+      'google.protobuf.Duration': ('', '_ConvertDurationMessage'),
+  }
+
+
+  class _Parser(object):
+
+    def __init__(self, ignore_unknown_fields, descriptor_pool,
+                 max_recursion_depth):
+      self.ignore_unknown_fields = ignore_unknown_fields
+      self.descriptor_pool = descriptor_pool
+      self.max_recursion_depth = max_recursion_depth
+      self.recursion_depth = 0
+
+    def ConvertMessage(self, value, message, path):
+      self.recursion_depth += 1
+      if self.recursion_depth > self.max_recursion_depth:
+        raise ParseError('Message too deep.')
+      message_descriptor = message.DESCRIPTOR
+      full_name = message_descriptor.full_name
+      if _IsWrapperMessage(message_descriptor):
+        self._ConvertWrapperMessage(value, message, path)
+      elif full_name in _WKTJSONMETHODS:
+        methodcaller(
+            _WKTJSONMETHODS[full_name][1], value, message, path
+        )(self)
+      else:
+        self._ConvertFieldValuePair(value, message, path)
+      self.recursion_depth -= 1
+
+    def _ConvertAnyMessage(self, value, message, path):
+      type_url = value['@type']
+      sub_message = _CreateMessageFromTypeUrl(
+          type_url, self.descriptor_pool
+      )
+      full_name = sub_message.DESCRIPTOR.full_name
+      if _IsWrapperMessage(sub_message.DESCRIPTOR):
+        self._ConvertWrapperMessage(
+            value['value'], sub_message, '{0}.value'.format(path)
+        )
+      elif full_name in _WKTJSONMETHODS:
+        # For well-known types (including nested Any), use ConvertMessage
+        # to ensure recursion depth is properly tracked
+        self.ConvertMessage(
+            value['value'], sub_message, '{0}.value'.format(path)
+        )
+      else:
+        self._ConvertFieldValuePair(value, sub_message, path)
+      message.value = sub_message.SerializeToString()
+      message.type_url = type_url
+  ```

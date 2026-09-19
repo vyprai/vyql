@@ -1,0 +1,8 @@
+module code;
+
+review code.PhpZvalArrayMergeMissingDestTypeCheck {
+  category: memory
+  expected: [core.InputValidation]
+  kind: attention
+  text: "review PHP C API zval merge loops for destination zval array-type checks before Z_ARRVAL_PP(ptr)"
+}

@@ -1,0 +1,25 @@
+module bindings.perl.generated.md0ee70ef;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Plugins")
+  }
+  query pattern callExpr where callee.method == "readconfig"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("Plugins")
+  }
+  query pattern callExpr where callee.method == "file_plugin"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("Plugins")
+  }
+  query pattern callExpr where callee.method == "parseconfig"
+  emit sink code.Deserialization at args[0]
+}

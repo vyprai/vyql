@@ -1,0 +1,22 @@
+module bindings.go.generated.mb7d23d90;
+
+binding sqlExecution0 {
+  requires {
+    dependency("github.com/go-sql-driver/mysql")
+  }
+  query pattern callExpr where callee.method == "TestDSNServerPubKeyQueryEscape"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization1 {
+  requires {
+    dependency("github.com/go-sql-driver/mysql")
+  }
+  query pattern callExpr where callee.method == "TestPreparedManyCols"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

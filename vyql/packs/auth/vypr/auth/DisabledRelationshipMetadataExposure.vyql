@@ -1,0 +1,11 @@
+module vypr.auth;
+
+rule DisabledRelationshipMetadataExposure {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_284, CWE_863]
+    id: "VYQL-AUTH-027"
+    severity: medium
+  }
+  issue code.DisabledRelationshipMetadataExposure as metadata
+}

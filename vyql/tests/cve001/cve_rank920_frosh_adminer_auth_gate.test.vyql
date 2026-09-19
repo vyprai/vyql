@@ -1,0 +1,50 @@
+# Rank 920 / CVE-2026-25878: Frosh Adminer exposed the Adminer UI route with
+# route authentication disabled and no session-authenticated gate.
+
+test "rank920: Adminer include route lacks authenticated session gate"
+  lang php
+  file AdminerController.php
+  expect VYQL-AUTH-067
+  expect_review code.UnauthenticatedAdminerIncludeRoute
+  code
+  ```
+  <?php
+  class AdminerController extends AbstractController {
+      #[Route(path: '/adminer', name: 'administration.frosh_adminer', defaults: ['auth_required' => false], methods: ['GET', 'POST'])]
+      public function index(): Response
+      {
+          chdir(__DIR__ . '/../Adminer');
+          unset($_POST['auth']);
+          require __DIR__ . '/../Adminer/Adminer.php';
+          return new Response('');
+      }
+  }
+  ```
+
+test "rank920: Adminer include route requires authenticated session gate"
+  lang php
+  file AdminerController.php
+  reject VYQL-AUTH-067
+  reject_review code.UnauthenticatedAdminerIncludeRoute
+  code
+  ```
+  <?php
+  class AdminerController extends AbstractController {
+      #[Route(path: '/adminer', name: 'administration.frosh_adminer', defaults: ['auth_required' => false], methods: ['GET', 'POST'])]
+      public function index(): Response
+      {
+          session_cache_limiter('');
+          session_name('adminer_sid');
+          session_start();
+
+          if (empty($_SESSION['frosh_adminer_authenticated'])) {
+              return new Response('Forbidden', Response::HTTP_FORBIDDEN);
+          }
+
+          chdir(__DIR__ . '/../Adminer');
+          unset($_POST['auth']);
+          require __DIR__ . '/../Adminer/Adminer.php';
+          return new Response('');
+      }
+  }
+  ```

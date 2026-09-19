@@ -1,0 +1,9 @@
+module bindings.cpp.generated.mae193afb;
+
+binding deserialization0 {
+  requires {
+    dependency("boost-property-map")
+  }
+  query pattern callExpr where callee.method == "read_value"
+  emit sink code.Deserialization at args[0]
+}

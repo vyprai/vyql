@@ -1,0 +1,43 @@
+module bindings.javascript.birpc_cdp_proxy_without_permission_gate;
+
+// birpc documents `createBirpc(functions, options)` as the half of a
+// bidirectional RPC where every property of `functions` becomes a method the
+// other side of the transport can call by name. When the transport is the
+// WebSocket a dev server or test runner exposes, the peer is whatever page or
+// client connected, so each registered handler is a network-reachable entry
+// point that runs with the server's own privileges.
+//
+// A raw Chrome DevTools Protocol session is the highest privilege such a peer
+// can be handed. The session-acquisition calls are documented library APIs --
+// Playwright's `context.newCDPSession(page)` / `browser.newBrowserCDPSession()`,
+// Puppeteer's `page.createCDPSession()`, and test-runner wrappers that name the
+// thing they return (`ensureCDPHandler`) -- and a `send` on one of them takes a
+// client-chosen method name (`Runtime.evaluate`, `Page.navigate`) that executes
+// and writes with the browser's authority. A handler surface that both
+// registers birpc functions and reaches one of these sessions is therefore a
+// client-driven proxy over the whole debugging protocol, and the only thing
+// that makes it safe is a permission gate the handler checks before proxying.
+//
+// The suppressing spellings are the ordinary readings of "is this caller
+// allowed": a permission query (`checkPermission`, `isPermitted`,
+// `hasPermission`), an explicit allow assertion (`assertCdpAllowed`,
+// `isAllowed`), a config flag the surface honours (`allowWrite`, `allowExec`),
+// an authorization or privilege query, and a role or admin gate. The list is
+// matched generously on purpose: for a negation, matching too much costs
+// recall rather than precision, and a registration that so much as names a
+// permission gate is one whose gating has to be read by a human rather than
+// guessed at here.
+//
+// The scope is the registering function rather than the individual handler,
+// because a handler body's own context carries no fact about the `createBirpc`
+// call that publishes it -- only the enclosing function sees both the
+// registration and the privileged calls the registered bodies make. That is
+// the same unit the Meteor and Express registrations are read at. Sibling
+// handlers' own gates (`canWrite(project)` in the snapshot handlers) do not
+// suppress: they answer whether *that* handler may write, not whether the CDP
+// proxy is permitted, and reading them here would credit a gate the vulnerable
+// handler never runs.
+binding jsBirpcPrivilegedProtocolProxyWithoutPermissionGate {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "javascript" and containsAny(node.context.callPath, ["createBirpc"]) and containsAny(node.context.callPath, ["ensureCDPHandler", "newCDPSession", "createCDPSession", "newBrowserCDPSession"]) and not (containsAny(node.context.callPath, ["Allowed", "allowed", "Permission", "permission", "Permitted", "permitted", "Authorize", "authorize", "Authorized", "authorized", "Privilege", "privilege", "allowWrite", "allowExec", "AllowWrite", "AllowExec", "Role", "role", "Admin", "admin"]))
+  emit issue code.SensitiveOperation at node
+}

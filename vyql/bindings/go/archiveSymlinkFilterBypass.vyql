@@ -1,0 +1,21 @@
+module bindings.go.archiveSymlinkFilterBypass;
+
+// github.com/mholt/archiver's Unarchiver.Unarchive (and the package-level
+// Unarchive helper) writes every entry an archive declares, including symlink
+// and hard-link entries, whose targets it reproduces verbatim -- the documented
+// behaviour is "extract the archive", not "confine the archive to the
+// destination". A later entry named through such a link therefore lands wherever
+// the link points, so a function that hands an archive to Unarchive without
+// first establishing that no entry is a link is an extraction that cannot keep
+// its own destination root (CWE-22/CWE-59).
+//
+// The library's read-only entry iterator, archiver.Walk, is how a caller
+// inspects entries before extracting them; an inline link-type test
+// (os.ModeSymlink / fs.ModeSymlink on the entry mode, tar.TypeSymlink or
+// tar.TypeLink on a header, a Linkname or Lstat inspection) is the other way.
+// Either one means the entry types are being looked at, so neither form
+// reports.
+binding goArchiveUnarchiveWithoutEntryLinkCheck {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.call contains "Unarchive" and not (node.context.callPath contains "archiver.Walk") and not (containsAny(node.context.selector, ["os.ModeSymlink", "fs.ModeSymlink", "tar.TypeSymlink", "tar.TypeLink"])) and not (containsAny(node.context.call, ["Lstat", "Readlink"])) and not (node.context.identifier contains "Linkname")
+  emit issue code.ArchiveSymlinkFilterBypass at node
+}

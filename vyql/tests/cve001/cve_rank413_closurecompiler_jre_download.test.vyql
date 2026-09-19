@@ -1,0 +1,59 @@
+# Rank 413 / CVE-2016-10582: ClosureCompiler.js downloaded its bundled
+# OpenJDK JRE archive over HTTP, allowing a network attacker to replace the
+# runtime archive before local unpack/use.
+
+test "rank413: ClosureCompiler downloads bundled OpenJDK JRE over HTTP"
+  lang javascript
+  file configure.js
+  expect VYQL-CFG-016
+  expect_review code.InsecureExecutableDownload
+  code
+  ```
+  var path = require("path");
+
+  function platformPostfix() {
+    return "linux64";
+  }
+
+  var jrePrefix = "http://bundled-openjdk-jre.googlecode.com/files/OpenJDK-JRE-7u6_24-";
+  var jrePostfix = ".tar.gz";
+  var jreUrl = jrePrefix + platformPostfix() + jrePostfix;
+  var jreTempFile = path.normalize(path.join(__dirname, "..", "jre", "jre.tar.gz"));
+
+  function configure_jre() {
+    download(jreUrl, jreTempFile, function(error, bytes) {});
+  }
+
+  function download(downloadUrl, filename, callback) {
+    var req = require(path.join(__dirname, "..", "lib", "follow-redirects.js")).http.request({}, function(res) {});
+    req.end();
+  }
+  ```
+
+test "rank413: ClosureCompiler downloads bundled OpenJDK JRE over HTTPS"
+  lang javascript
+  file configure.js
+  reject VYQL-CFG-016
+  reject_review code.InsecureExecutableDownload
+  code
+  ```
+  var path = require("path");
+
+  function platformPostfix() {
+    return "linux64";
+  }
+
+  var jrePrefix = "https://storage.googleapis.com/google-code-archive-downloads/v2/code.google.com/bundled-openjdk-jre/OpenJDK-JRE-7u6_24-";
+  var jrePostfix = ".tar.gz";
+  var jreUrl = jrePrefix + platformPostfix() + jrePostfix;
+  var jreTempFile = path.normalize(path.join(__dirname, "..", "jre", "jre.tar.gz"));
+
+  function configure_jre() {
+    download(jreUrl, jreTempFile, function(error, bytes) {});
+  }
+
+  function download(downloadUrl, filename, callback) {
+    var req = require(path.join(__dirname, "..", "lib", "follow-redirects.js")).http.request({}, function(res) {});
+    req.end();
+  }
+  ```

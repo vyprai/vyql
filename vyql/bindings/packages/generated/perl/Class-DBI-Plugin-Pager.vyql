@@ -1,0 +1,17 @@
+module bindings.perl.generated.m9502193b;
+
+binding sqlExecution0 {
+  requires {
+    dependency("Class-DBI-Plugin-Pager")
+  }
+  query pattern callExpr where callee.method == "pager"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("Class-DBI-Plugin-Pager")
+  }
+  query pattern callExpr where callee.method == "search_where"
+  emit sink code.SqlExecution at args[0]
+}

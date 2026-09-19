@@ -1,0 +1,168 @@
+# Rank 1683 / CVE-2025-65946: Roo-Code's terminal auto-approval screener
+# `containsDangerousSubstitution` (webview-ui/src/utils/command-validation.ts)
+# tests a shell command string for substitution forms that execute code, and
+# every form it recognises routes the command to `ask_user` instead of
+# `auto_approve`. At the vulnerable revision (966ed76c) it recognises `${var@P}`-style
+# prompt expansion, parameter assignments carrying octal/hex/unicode escapes,
+# `${!var}`, `<<<$(...)` here-strings and zsh `=(...)` process substitution --
+# and nothing else. A command like `ls *(e:whoami:)` therefore parses as the
+# allowlisted `ls`, passes the screener, and executes `whoami` during zsh glob
+# expansion when the auto-approved command reaches the terminal (CWE-77,
+# CWE-20). The fixed revision, b50104cc, adds one more recognised form:
+# `/[*?+@!]\(e:[^:]+:\)/`, the documented zsh eval glob qualifier family
+# `*(e:cmd:)` / `?(e:cmd:)` / `+(e:cmd:)` / `@(e:cmd:)` / `!(e:cmd:)`, and
+# wires it into the same disjunction. The parent commit of the fixing change is itself
+# the previous sibling fix in this family ("Handle zsh process substitution
+# correctly"), so the screener is maintained form by form and the recurring
+# weakness is that the recognised set is incomplete.
+#
+# The detection is a review flag on the screening function itself: a function
+# that `.test()`s its input against regexes for command substitution `$(...)`
+# and zsh process substitution `=(...)` -- the escaped spellings `$\(` and
+# `=\(` that only occur in regex text, never in template literals, measured --
+# while carrying no pattern for the eval glob qualifier `(e:...)`. Both
+# substitution forms are required together: `$\(` on its own also appears in
+# expression-template detectors, and on n8n a first revision carrying only the
+# any-of form flagged `containsExpression` (ai-workflow-builder
+# src/validation/utils/expressions.ts) and `isTransformingData` (editor-ui
+# src/app/utils/telemetryUtils.ts), which recognise n8n's own `{{ $(node) }}`
+# syntax and screen no shell. Requiring `=\(` -- a form only a shell-literate
+# screener checks -- removes both, and collapses the corpus-wide file-level
+# candidate set (every `$\(` or `=\(` under the scan corpus without `(e:`)
+# from 230 files to 21, of which 19 are minified vendor bundles; scans of the
+# bundle-bearing trees and of mantisbt report zero. The discrimination is
+# carried by the regex text in the function's own function-confined
+# `literal:` context tokens (JS `literal:` is function-confined at
+# `node.scope == "function"`), so the sibling-function case below pins that
+# confinement. Requiring the `.test` call keeps the flag off tokenizers that
+# merely rewrite `$\(` into placeholders, which the same real file does in
+# `parseCommandLine` -- the real tree reports exactly one finding, on the
+# screener, and zero once the qualifier regex is present.
+#
+# FIXED. The binding is `incompleteShellSubstitutionDenylist2213` in
+# vyql/bindings/javascript/mfb63017a.vyql, the concept
+# code.IncompleteShellSubstitutionDenylist, and the rule VYQL-INJ-272. Measured
+# on the real checkout at the vulnerable revision: 1 finding
+# (src/utils/command-validation.ts:79); at the fixed revision: 0.
+
+test "rank1683: the auto-approval screener tests substitution forms but no zsh eval glob qualifier"
+  lang javascript
+  file command-validation.ts
+  expect VYQL-INJ-272
+  expect_review code.IncompleteShellSubstitutionDenylist
+  code
+  ```
+  export function containsDangerousSubstitution(source: string): boolean {
+    const dangerousParameterExpansion = /\$\{[^}]*@[PQEAa][^}]*\}/.test(source)
+    const parameterAssignmentWithEscapes =
+      /\$\{[^}]*[=+\-?][^}]*\\[0-7]{3}[^}]*\}/.test(source) || // octal escapes
+      /\$\{[^}]*[=+\-?][^}]*\\x[0-9a-fA-F]{2}[^}]*\}/.test(source) || // hex escapes
+      /\$\{[^}]*[=+\-?][^}]*\\u[0-9a-fA-F]{4}[^}]*\}/.test(source) // unicode escapes
+    const indirectExpansion = /\$\{![^}]+\}/.test(source)
+    const hereStringWithSubstitution = /<<<\s*(\$\(|`)/.test(source)
+    const zshProcessSubstitution = /=\([^)]+\)/.test(source)
+    return (
+      dangerousParameterExpansion ||
+      parameterAssignmentWithEscapes ||
+      indirectExpansion ||
+      hereStringWithSubstitution ||
+      zshProcessSubstitution
+    )
+  }
+  ```
+
+test "rank1683: the screener recognising the eval glob qualifier is complete"
+  lang javascript
+  file command-validation.ts
+  reject VYQL-INJ-272
+  reject_review code.IncompleteShellSubstitutionDenylist
+  code
+  ```
+  export function containsDangerousSubstitution(source: string): boolean {
+    const dangerousParameterExpansion = /\$\{[^}]*@[PQEAa][^}]*\}/.test(source)
+    const parameterAssignmentWithEscapes =
+      /\$\{[^}]*[=+\-?][^}]*\\[0-7]{3}[^}]*\}/.test(source) || // octal escapes
+      /\$\{[^}]*[=+\-?][^}]*\\x[0-9a-fA-F]{2}[^}]*\}/.test(source) || // hex escapes
+      /\$\{[^}]*[=+\-?][^}]*\\u[0-9a-fA-F]{4}[^}]*\}/.test(source) // unicode escapes
+    const indirectExpansion = /\$\{![^}]+\}/.test(source)
+    const hereStringWithSubstitution = /<<<\s*(\$\(|`)/.test(source)
+    const zshProcessSubstitution = /=\([^)]+\)/.test(source)
+    const zshGlobQualifier = /[*?+@!]\(e:[^:]+:\)/.test(source)
+    return (
+      dangerousParameterExpansion ||
+      parameterAssignmentWithEscapes ||
+      indirectExpansion ||
+      hereStringWithSubstitution ||
+      zshProcessSubstitution ||
+      zshGlobQualifier
+    )
+  }
+  ```
+
+test "rank1683: a sibling function carrying the qualifier regex does not complete the screener"
+  lang javascript
+  file command-validation.ts
+  expect VYQL-INJ-272
+  code
+  ```
+  export function containsDangerousSubstitution(source: string): boolean {
+    const hereStringWithSubstitution = /<<<\s*(\$\(|`)/.test(source)
+    const zshProcessSubstitution = /=\([^)]+\)/.test(source)
+    return hereStringWithSubstitution || zshProcessSubstitution
+  }
+
+  export function expandGlob(word: string): string[] {
+    const isEvalQualifier = /[*?+@!]\(e:[^:]+:\)/.test(word)
+    if (isEvalQualifier) throw new Error("eval glob qualifier is not supported")
+    return word.split(" ")
+  }
+  ```
+
+test "rank1683: a substitution tokenizer that never screens is not flagged"
+  lang javascript
+  file command-validation.ts
+  reject VYQL-INJ-272
+  reject_review code.IncompleteShellSubstitutionDenylist
+  code
+  ```
+  export function parseCommandLine(command: string): string[] {
+    const subshells: string[] = []
+    const processedCommand = command
+      .replace(/\$\((.*?)\)/g, (_, inner) => {
+        subshells.push(inner.trim())
+        return `__SUBSH_${subshells.length - 1}__`
+      })
+      .replace(/`(.*?)`/g, (_, inner) => {
+        subshells.push(inner.trim())
+        return `__SUBSH_${subshells.length - 1}__`
+      })
+    return processedCommand.split(/\s+/).filter((cmd) => cmd.length > 0)
+  }
+  ```
+
+test "rank1683: screening plain glob characters without an execution form is not flagged"
+  lang javascript
+  file command-validation.ts
+  reject VYQL-INJ-272
+  reject_review code.IncompleteShellSubstitutionDenylist
+  code
+  ```
+  export function isSafeGlob(word: string): boolean {
+    return !/[*?]/.test(word) || !/\{[^}]*\}/.test(word)
+  }
+  ```
+
+test "rank1683: an independent screener spelling the substitution forms differently is flagged"
+  lang javascript
+  file screen.ts
+  expect VYQL-INJ-272
+  expect_review code.IncompleteShellSubstitutionDenylist
+  code
+  ```
+  export function isSafeToRun(cmd: string): boolean {
+    const commandSubstitution = /\$\(/.test(cmd)
+    const processSubstitution = /<\(|>\(|=\(/.test(cmd)
+    const backtickSubstitution = new RegExp("`").test(cmd)
+    return !commandSubstitution && !processSubstitution && !backtickSubstitution
+  }
+  ```

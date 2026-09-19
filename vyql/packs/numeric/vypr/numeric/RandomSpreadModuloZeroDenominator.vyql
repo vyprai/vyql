@@ -1,0 +1,11 @@
+module vypr.numeric;
+
+rule RandomSpreadModuloZeroDenominator {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_369]
+    id: "VYQL-NUM-015"
+    severity: medium
+  }
+  issue code.RandomSpreadModuloZeroDenominator as denominator
+}

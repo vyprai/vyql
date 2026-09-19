@@ -1,0 +1,30 @@
+module bindings.scala.generated.m658a6b13;
+
+binding sqlExecution0 {
+  requires {
+    dependency("com.microsoft.sqlserver:mssql-jdbc")
+  }
+  query pattern callExpr where callee.method == "SocketFinder"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlParameterization1 {
+  requires {
+    dependency("com.microsoft.sqlserver:mssql-jdbc")
+  }
+  query pattern callExpr where callee.method == "bind"
+  emit check core.SqlParameterization at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding deserialization2 {
+  requires {
+    dependency("com.microsoft.sqlserver:mssql-jdbc")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

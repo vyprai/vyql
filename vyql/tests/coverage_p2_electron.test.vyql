@@ -1,0 +1,31 @@
+# P2 entry-point seeding: Electron ipcMain handler payload.
+
+test "js: Electron ipcMain.on payload -> child_process.exec is command injection"
+  lang javascript
+  expect VYQL-INJ-002
+  code
+  ```
+  ipcMain.on('run', (event, cmd) => {
+    cp.exec(cmd);
+  });
+  ```
+
+test "js: Electron ipcMain.handle payload -> raw SQL is injection"
+  lang javascript
+  expect VYQL-INJ-001
+  code
+  ```
+  ipcMain.handle('query', async (event, id) => {
+    return db.query("SELECT * FROM users WHERE id = " + id);
+  });
+  ```
+
+test "js: Electron ipcMain constant command is clean"
+  lang javascript
+  reject VYQL-INJ-002
+  code
+  ```
+  ipcMain.on('run', (event, cmd) => {
+    cp.exec("ls -la");
+  });
+  ```

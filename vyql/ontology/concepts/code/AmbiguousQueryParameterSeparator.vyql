@@ -1,0 +1,11 @@
+module code;
+
+concept AmbiguousQueryParameterSeparator : issue {
+  cwe: [CWE_444]
+  reviewAssumption: "upstream components, caches, or security filters use ampersand-only query delimiter semantics"
+  reviewCategory: request
+  reviewCondition: "query parser accepts semicolon as an alternate parameter separator"
+  reviewConfidence: medium
+  reviewEvidence: "query parsing context {pattern} rewrites semicolons into ampersands before splitting parameters"
+  vulnerableTo: [injection.ProtocolStateConfusion]
+}

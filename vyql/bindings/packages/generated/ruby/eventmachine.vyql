@@ -1,0 +1,25 @@
+module bindings.ruby.generated.mdb4485cf;
+
+binding networkData0 {
+  requires {
+    dependency("eventmachine")
+  }
+  query pattern callExpr where callee.method == "Read"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("eventmachine")
+  }
+  query pattern callExpr where callee.method == "close"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("eventmachine")
+  }
+  query pattern callExpr where callee.method == "connect"
+  emit sink code.NetworkConnectSink at args[0]
+}

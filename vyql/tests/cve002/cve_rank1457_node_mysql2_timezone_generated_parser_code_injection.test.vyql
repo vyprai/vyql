@@ -1,0 +1,133 @@
+# Rank 1457 / CVE-2024-21511: node-mysql2 built its row-parser source as a
+# string and interpolated the caller-supplied `timezone` option straight into
+# a single-quoted literal inside that source, then compiled the result with
+# generate-function's `toFunction()`. A timezone value carrying a quote closes
+# the literal and the rest of it is compiled and executed as part of the
+# parser (CWE-94).
+#
+# `readCodeFor` in lib/parsers/text_parser.js and lib/parsers/binary_parser.js
+# read `options.timezone || config.timezone` and returned
+# `packet.parseDate('${timezone}')`; `compile` appended that string to the
+# generate-function builder and called `parserFn.toFunction()`. Fix
+# 7d4b098c7e29 replaces the hand-written quoting with
+# `helpers.srcEscape(timezone)`, a JSON.stringify-based escaper the same files
+# used for field and table names.
+#
+# CAUGHT by VYQL-INJ-003. On lib/ at the vulnerable revision the scan reports
+# four P2 CRITICAL rows, source core.UserControlledData at the `options.timezone
+# || config.timezone` read (binary_parser.js:21, text_parser.js:21) reaching
+# code.CodeEval at the four generated-source appends that carry the parse
+# expression; at the fixed revision all four are gone, because taint dies inside
+# srcEscape. Counts over three --cache off runs are stable: 42 findings and 4
+# P2 rows vulnerable, 42 findings and 0 P2 rows patched.
+#
+# The reject case defines srcEscape in the same file rather than importing it,
+# because a spec snippet is one file and an unresolved escaper would clear the
+# taint for the wrong reason.
+#
+# Recorded limit, not a regression introduced here: the sink label comes from
+# `codeEval276` in vyql/bindings/javascript/mfb63017a.vyql, which is
+# `callee.path ~= "parserFn"` — the local variable name node-mysql2 happens to
+# use for the builder. Renaming that variable across lib/parsers takes
+# VYQL-INJ-003 from 8 rows to 0, so the coverage is name-shaped rather than
+# API-shaped. Making it API-shaped needs the builder's provenance from the
+# generate-function factory call, which the JavaScript frontend does not carry:
+# `vyql resolve` reports every builder call unresolved, `emit sink at
+# callee.receiver` on `toFunction` labels nothing, and there is no predicate
+# tying a local to the call that produced it. The third test pins that miss.
+#
+# verify_current_expected: caught-vyql-inj-003, plus one pinned miss.
+
+test "rank1457: the timezone option is interpolated into generated parser source"
+  lang javascript
+  file text_parser.js
+  expect VYQL-INJ-003
+  code
+  ```
+  'use strict';
+  const genFunc = require('generate-function');
+
+  function readCodeFor(type, config, options) {
+    const timezone = options.timezone || config.timezone;
+    return `packet.parseDateTime('${timezone}')`;
+  }
+
+  function compile(fields, options, config) {
+    const parserFn = genFunc();
+    parserFn('return class TextRow {');
+    parserFn('next(packet, fields, options) {');
+    parserFn('const result = {};');
+    const readCode = readCodeFor(fields[0].columnType, config, options);
+    parserFn(`result.value = ${readCode};`);
+    parserFn('return result;');
+    parserFn('}');
+    parserFn('};');
+    return parserFn.toFunction();
+  }
+
+  module.exports = compile;
+  ```
+
+test "rank1457: the escaped timezone value does not reach the generated source"
+  lang javascript
+  file text_parser_fixed.js
+  reject VYQL-INJ-003
+  code
+  ```
+  'use strict';
+  const genFunc = require('generate-function');
+
+  function srcEscape(str) {
+    return JSON.stringify({ [str]: 1 }).slice(1, -3);
+  }
+
+  function readCodeFor(type, config, options) {
+    const timezone = options.timezone || config.timezone;
+    return `packet.parseDateTime(${srcEscape(timezone)})`;
+  }
+
+  function compile(fields, options, config) {
+    const parserFn = genFunc();
+    parserFn('return class TextRow {');
+    parserFn('next(packet, fields, options) {');
+    parserFn('const result = {};');
+    const readCode = readCodeFor(fields[0].columnType, config, options);
+    parserFn(`result.value = ${readCode};`);
+    parserFn('return result;');
+    parserFn('}');
+    parserFn('};');
+    return parserFn.toFunction();
+  }
+
+  module.exports = compile;
+  ```
+
+test "rank1457: the same injection under a differently named builder is a pinned miss"
+  lang javascript
+  file text_parser_renamed.js
+  reject VYQL-INJ-003
+  code
+  ```
+  'use strict';
+  const genFunc = require('generate-function');
+
+  function readCodeFor(type, config, options) {
+    const timezone = options.timezone || config.timezone;
+    return `packet.parseDateTime('${timezone}')`;
+  }
+
+  function compile(fields, options, config) {
+    const srcBuilder = genFunc();
+    srcBuilder('return class TextRow {');
+    srcBuilder('next(packet, fields, options) {');
+    srcBuilder('const result = {};');
+    const readCode = readCodeFor(fields[0].columnType, config, options);
+    srcBuilder(`result.value = ${readCode};`);
+    srcBuilder('return result;');
+    srcBuilder('}');
+    srcBuilder('};');
+    return srcBuilder.toFunction();
+  }
+
+  module.exports = compile;
+  ```

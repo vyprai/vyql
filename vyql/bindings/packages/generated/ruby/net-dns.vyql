@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mc714d3df;
+
+binding networkSend0 {
+  requires {
+    dependency("net-dns")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.NetworkSend at args[0]
+}

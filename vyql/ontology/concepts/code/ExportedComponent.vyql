@@ -1,0 +1,6 @@
+module code;
+
+concept ExportedComponent : issue {
+  cwe: [CWE_926]
+  vulnerableTo: [mobile.ExportedComponent]
+}

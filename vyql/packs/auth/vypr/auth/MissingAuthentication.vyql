@@ -1,0 +1,12 @@
+module vypr.auth;
+
+rule MissingAuthentication {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_306]
+    id: "VYQL-AUTH-001"
+    severity: high
+  }
+  issue code.AuthenticationRequiredOp as op
+  unless op.endpoint coveredBy core.AuthenticationCheck
+}

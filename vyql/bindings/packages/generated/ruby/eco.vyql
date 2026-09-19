@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m70c2ab7f;
+
+binding codeEval0 {
+  requires {
+    dependency("eco")
+  }
+  query pattern callExpr where callee.method == "compile"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("eco")
+  }
+  query pattern callExpr where callee.method == "context_for"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("eco")
+  }
+  query pattern callExpr where callee.method == "render"
+  emit sink code.CodeEval at args[0]
+}

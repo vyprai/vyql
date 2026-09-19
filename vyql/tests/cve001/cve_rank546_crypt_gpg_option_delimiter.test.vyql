@@ -1,0 +1,126 @@
+# Rank 546 / CVE-2022-24953: Crypt_GPG escaped GnuPG key arguments but
+# omitted the "--" end-of-options delimiter, allowing option injection.
+
+test "rank546: escaped GnuPG key id without end-of-options delimiter"
+  lang php
+  file Crypt/GPGAbstract.php
+  expect VYQL-VAL-004
+  expect VYQL-INJ-031
+  expect_review code.CommandOptionInjection
+  code
+  ```
+  <?php
+  abstract class Crypt_GPGAbstract
+  {
+      protected function _getKeys($keyId = '')
+      {
+          if ($keyId == '') {
+              $operation = '--list-secret-keys';
+          } else {
+              $operation = '--utf8-strings --list-secret-keys ' . escapeshellarg($keyId);
+          }
+
+          if ($keyId == '') {
+              $operation = '--list-public-keys';
+          } else {
+              $operation = '--utf8-strings --list-public-keys ' . escapeshellarg($keyId);
+          }
+      }
+  }
+  ```
+
+test "rank546: GnuPG key id protected by end-of-options delimiter"
+  lang php
+  file Crypt/GPGAbstract.php
+  reject VYQL-VAL-004
+  reject VYQL-INJ-031
+  reject_review code.CommandOptionInjection
+  code
+  ```
+  <?php
+  abstract class Crypt_GPGAbstract
+  {
+      protected function _getKeys($keyId = '')
+      {
+          if ($keyId == '') {
+              $operation = '--list-secret-keys';
+          } else {
+              $operation = '--utf8-strings --list-secret-keys -- ' . escapeshellarg($keyId);
+          }
+
+          if ($keyId == '') {
+              $operation = '--list-public-keys';
+          } else {
+              $operation = '--utf8-strings --list-public-keys -- ' . escapeshellarg($keyId);
+          }
+      }
+  }
+  ```
+
+test "rank546: escaped GnuPG fingerprint without end-of-options delimiter"
+  lang php
+  file Crypt/GPG.php
+  expect VYQL-VAL-004
+  expect VYQL-INJ-031
+  expect_review code.CommandOptionInjection
+  code
+  ```
+  <?php
+  class Crypt_GPG
+  {
+      public function deletePublicKey($fingerprint)
+      {
+          $operation = '--delete-key ' . escapeshellarg($fingerprint);
+      }
+
+      public function deletePrivateKey($fingerprint)
+      {
+          $operation = '--delete-secret-key ' . escapeshellarg($fingerprint);
+      }
+
+      public function getFingerprint($keyId)
+      {
+          $operation = '--list-keys ' . escapeshellarg($keyId);
+      }
+
+      protected function _exportKey($fingerprint, $private)
+      {
+          $operation = $private ? '--export-secret-keys' : '--export';
+          $operation .= ' ' . escapeshellarg($fingerprint);
+      }
+  }
+  ```
+
+test "rank546: GnuPG fingerprint protected by end-of-options delimiter"
+  lang php
+  file Crypt/GPG.php
+  reject VYQL-VAL-004
+  reject VYQL-INJ-031
+  reject_review code.CommandOptionInjection
+  code
+  ```
+  <?php
+  class Crypt_GPG
+  {
+      public function deletePublicKey($fingerprint)
+      {
+          $operation = '--delete-key -- ' . escapeshellarg($fingerprint);
+      }
+
+      public function deletePrivateKey($fingerprint)
+      {
+          $operation = '--delete-secret-key -- ' . escapeshellarg($fingerprint);
+      }
+
+      public function getFingerprint($keyId)
+      {
+          $operation = '--list-keys -- ' . escapeshellarg($keyId);
+      }
+
+      protected function _exportKey($fingerprint, $private)
+      {
+          $operation = $private ? '--export-secret-keys' : '--export';
+          $operation .= ' -- ' . escapeshellarg($fingerprint);
+      }
+  }
+  ```

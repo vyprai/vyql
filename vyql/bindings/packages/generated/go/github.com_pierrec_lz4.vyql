@@ -1,0 +1,41 @@
+module bindings.go.generated.me292c376;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/pierrec/lz4")
+  }
+  query pattern callExpr where callee.method == "UncompressBlock"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/pierrec/lz4")
+  }
+  query pattern callExpr where callee.method == "CompressBlock"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/pierrec/lz4")
+  }
+  query pattern callExpr where callee.method == "CompressBlockHC"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("github.com/pierrec/lz4")
+  }
+  query pattern callExpr where callee.method == "NewReader"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("github.com/pierrec/lz4")
+  }
+  query pattern callExpr where callee.method == "NewWriter"
+  emit sink code.Deserialization at args[0]
+}

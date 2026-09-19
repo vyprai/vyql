@@ -1,0 +1,9 @@
+module bindings.perl.generated.m778485a9;
+
+binding filePathAccess0 {
+  requires {
+    dependency("Convert-BinHex")
+  }
+  query pattern callExpr where callee.method == "debinhex"
+  emit sink code.FilePathAccess at args[0]
+}

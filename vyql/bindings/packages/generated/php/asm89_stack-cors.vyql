@@ -1,0 +1,38 @@
+module bindings.php.generated.m1fcb5247;
+
+binding httpInput0 {
+  requires {
+    dependency("asm89/stack-cors")
+  }
+  query pattern callExpr where callee.method == "handle"
+  emit source code.HttpInput at call.result
+}
+
+binding responseHeaderWrite1 {
+  requires {
+    dependency("asm89/stack-cors")
+  }
+  query pattern callExpr where callee.method == "addPreflightRequestHeaders"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding responseHeaderWrite2 {
+  requires {
+    dependency("asm89/stack-cors")
+  }
+  query pattern callExpr where callee.method == "addActualRequestHeaders"
+  emit sink code.ResponseHeaderWrite at args[0]
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("asm89/stack-cors")
+  }
+  query pattern callExpr where callee.method == "isOriginAllowed"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

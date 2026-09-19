@@ -1,0 +1,124 @@
+# Rank 1734 / CVE-2022-31180: shescape's argument escapers neutralized the
+# shell separator metacharacters ($, ;, &, | for Bash/Dash/Zsh, & and | for
+# CMD, , ; & | for PowerShell) but carried no pattern for a line feed or
+# carriage return, while those same shells read a line terminator as command
+# separation. With interpolation enabled, anything after a line feed inside
+# one "escaped" argument ran as a new command. The fixed revision adds
+# .replace(/\n/g, " ") (and \n|\r for CMD and PowerShell) to each chain.
+
+test "rank1734: bash escaper escapes separators but not the line feed"
+  lang javascript
+  expect VYQL-INJ-056
+  expect_review code.IncompleteCommandEscapeRegex
+  code
+  ```
+  function escapeArg(arg, interpolation) {
+    let result = arg.replace(/\u0000/g, "");
+
+    if (interpolation) {
+      result = result
+        .replace(/\\/g, "\\\\")
+        .replace(/(\*|\?)/g, "\\$1")
+        .replace(/(\$|\;|\&|\|)/g, "\\$1")
+        .replace(/(\(|\)|\<|\>)/g, "\\$1")
+        .replace(/("|'|`)/g, "\\$1");
+    }
+
+    return result;
+  }
+
+  export function escape(arg, options) {
+    return escapeArg(String(arg), options.interpolation);
+  }
+  ```
+
+test "rank1734: replacing the line feed with a space completes the chain"
+  lang javascript
+  reject VYQL-INJ-056
+  reject_review code.IncompleteCommandEscapeRegex
+  code
+  ```
+  function escapeArg(arg, interpolation) {
+    let result = arg.replace(/\u0000/g, "");
+
+    if (interpolation) {
+      result = result
+        .replace(/\\/g, "\\\\")
+        .replace(/\n/g, " ")
+        .replace(/(\*|\?)/g, "\\$1")
+        .replace(/(\$|\;|\&|\|)/g, "\\$1")
+        .replace(/(\(|\)|\<|\>)/g, "\\$1")
+        .replace(/("|'|`)/g, "\\$1");
+    }
+
+    return result;
+  }
+
+  export function escape(arg, options) {
+    return escapeArg(String(arg), options.interpolation);
+  }
+  ```
+
+test "rank1734: cmd escaper escapes separators but not the terminators"
+  lang javascript
+  expect VYQL-INJ-056
+  expect_review code.IncompleteCommandEscapeRegex
+  code
+  ```
+  function escapeArgCmd(arg, interpolation) {
+    let result = arg.replace(/\u0000/g, "");
+
+    if (interpolation) {
+      result = result
+        .replace(/\^/g, "^^")
+        .replace(/(<|>)/g, "^$1")
+        .replace(/(")/g, "^$1")
+        .replace(/(\&|\|)/g, "^$1");
+    }
+
+    return result;
+  }
+
+  export function escape(arg, options) {
+    return escapeArgCmd(String(arg), options.interpolation);
+  }
+  ```
+
+test "rank1734: replacing both terminators completes the cmd chain"
+  lang javascript
+  reject VYQL-INJ-056
+  reject_review code.IncompleteCommandEscapeRegex
+  code
+  ```
+  function escapeArgCmd(arg, interpolation) {
+    let result = arg.replace(/\u0000/g, "").replace(/\n|\r/g, " ");
+
+    if (interpolation) {
+      result = result
+        .replace(/\^/g, "^^")
+        .replace(/(<|>)/g, "^$1")
+        .replace(/(")/g, "^$1")
+        .replace(/(\&|\|)/g, "^$1");
+    }
+
+    return result;
+  }
+
+  export function escape(arg, options) {
+    return escapeArgCmd(String(arg), options.interpolation);
+  }
+  ```
+
+test "rank1734: a lexer regex with escaped separators is not an escaper"
+  lang javascript
+  reject VYQL-INJ-056
+  reject_review code.IncompleteCommandEscapeRegex
+  code
+  ```
+  function firstWord(stream) {
+    const firstWordMatch = stream.string.match(
+      /(^[\w-]+\s*=\s*$)|(^\s*[\w-]+\s*=\s*[\w-])|(^\s*(\.|#|@|\$|\&|\[|\d|\+|::?|\{|\>|~|\/)?\s*[\w-]*)/
+    );
+    return firstWordMatch ? firstWordMatch[0].replace(/^\s*/, "") : "";
+  }
+  ```

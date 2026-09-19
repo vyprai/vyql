@@ -1,0 +1,7 @@
+module code;
+
+review code.LoopRestartWithoutProgressCheck {
+  category: resource
+  kind: attention
+  text: "review while, do-while and update-less for loops for a restart that bypasses every advance of the exit's variables"
+}

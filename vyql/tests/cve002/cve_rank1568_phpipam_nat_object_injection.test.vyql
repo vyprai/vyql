@@ -1,0 +1,263 @@
+# phpIPAM's NAT item-add form passed a raw POST value into its
+# database helper as the object type, which becomes the SQL table
+# name, so a crafted object_type injected SQL (SQL injection,
+# CWE-89; issue #2344). app/admin/nat/item-add-submit.php did
+# `$obj_type = $_POST['object_type']; $obj_id = $_POST['object_id'];
+# ... $item = $Tools->fetch_object($obj_type, "id", $obj_id);` --
+# Common_functions::fetch_object (functions/classes/
+# class.Common.php:204) interpolates its first argument straight
+# into the query text: `SELECT * from `$table` where `$method` = ?
+# limit 1;`, handing it to Database_PDO::getObjectQuery
+# (functions/classes/class.PDO.php:686), whose `$this->pdo->
+# prepare($query)` the shipped `prepare` SqlExecution binding
+# labels (class.PDO.php:689 among its sink rows). The fix allowlists
+# the type (in_array over subnets/ipaddresses) and numerics the id
+# before the fetch.
+#
+# The miss is not missing sink vocabulary and not the ORM lookup
+# call itself: `vyql trace` shows the source at item-add-submit.php:89
+# resolving into Common_functions.fetch_object#param#$table and
+# through the SELECT interpolation to the call node
+# `$this->Database->getObjectQuery(...)` at class.Common.php:224 --
+# then dead. The blocker is the field-access receiver: the callee's
+# receiver is `$this->Database`, a protected field with no type
+# declaration (PHP-5 style, assigned in each subclass constructor
+# from an untyped parameter), and lowering resolves a member call
+# only when the receiver base is a bare local name or a constructor
+# call, so every `$this->field->method()` call stops at the call
+# node. Copying the field to a local first (`$db = $this->Database;
+# $db->getObjectQuery(...)`) resolves and reports -- the pair below
+# pins that asymmetry. This is the PHP instance of the cross-language
+# field/attribute-chain receiver family (Go struct field, Python and
+# TypeScript chained attribute), whose rows record the fix as typed
+# field extraction feeding the classFields walk, not the unique-name
+# fallback: routing every field-receiver call through unique-named
+# bodies was measured here and flips four pinned minimal pairs,
+# deletes a pinned true positive and adds false positives elsewhere
+# in the suite, confirming the scan-wide, bidirectional verdict
+# already on record. When the typed-field route lands, the first two
+# blocks must flip to expect: the raw form's source reaches the
+# prepare sink in six hops on a repro receiver. The allowlist gate is
+# no modelled control -- in_array and is_numeric clear no taint, so
+# the patched revision reports identically (2341-vs-2341 whole-tree
+# counts hold only while the path stays dead; with the hop resolved
+# both revisions connect). The literal-table spelling the same file
+# uses elsewhere keeps the identifier out of the query text and is
+# the discrimination target.
+
+test "rank1568: the nat form passes the raw post object type as the table"
+  lang php
+  file app/admin/nat/item-add-submit.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Database_PDO {
+      public $pdo;
+      public function getObjectQuery($query = null, $values = array(), $class = 'stdClass') {
+          if (!$this->isConnected()) $this->connect();
+          $statement = $this->pdo->prepare($query);
+          $this->log_query ($statement, $values);
+          $statement->execute((array)$values);
+          $resultObj = $statement->fetchObject($class);
+          if ($resultObj === false) { return null; } else { return $resultObj; }
+      }
+  }
+
+  class Common_functions {
+      protected $Database;
+      public function fetch_object ($table=null, $method=null, $value) {
+          if(is_null($table)||strlen($table)==0) return false;
+          $cached_item = $this->cache_check($table, $value);
+          if($cached_item!==false) {
+              return $cached_item;
+          }
+          else {
+              $method = is_null($method) ? "id" : $this->Database->escape($method);
+              try { $res = $this->Database->getObjectQuery("SELECT * from `$table` where `$method` = ? limit 1;", array($value)); }
+              catch (Exception $e) {
+                  return false;
+              }
+              return $res;
+          }
+      }
+  }
+
+  class Tools extends Common_functions {
+      public function __construct($Database) { $this->Database = $Database; }
+  }
+
+  $Database = new Database_PDO;
+  $Tools = new Tools ($Database);
+
+  if (isset($_POST['object_type']) && isset($_POST['object_id'])) {
+      $obj_type = $_POST['object_type'];
+      $obj_id   = $_POST['object_id'];
+
+      $item = $Tools->fetch_object ($obj_type, "id", $obj_id);
+  }
+  ```
+
+test "rank1568: the same chain through a local copy of the field reports"
+  lang php
+  file app/admin/nat/item-add-submit.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Database_PDO {
+      public $pdo;
+      public function getObjectQuery($query = null, $values = array(), $class = 'stdClass') {
+          if (!$this->isConnected()) $this->connect();
+          $statement = $this->pdo->prepare($query);
+          $this->log_query ($statement, $values);
+          $statement->execute((array)$values);
+          $resultObj = $statement->fetchObject($class);
+          if ($resultObj === false) { return null; } else { return $resultObj; }
+      }
+  }
+
+  class Common_functions {
+      protected $Database;
+      public function fetch_object ($table=null, $method=null, $value) {
+          if(is_null($table)||strlen($table)==0) return false;
+          $method = is_null($method) ? "id" : $this->Database->escape($method);
+          $db = $this->Database;
+          try { $res = $db->getObjectQuery("SELECT * from `$table` where `$method` = ? limit 1;", array($value)); }
+          catch (Exception $e) {
+              return false;
+          }
+          return $res;
+      }
+  }
+
+  class Tools extends Common_functions {
+      public function __construct($Database) { $this->Database = $Database; }
+  }
+
+  $Database = new Database_PDO;
+  $Tools = new Tools ($Database);
+
+  if (isset($_POST['object_type']) && isset($_POST['object_id'])) {
+      $obj_type = $_POST['object_type'];
+      $obj_id   = $_POST['object_id'];
+
+      $item = $Tools->fetch_object ($obj_type, "id", $obj_id);
+  }
+  ```
+
+test "rank1568: the fixed revision gates the type and id before the fetch"
+  lang php
+  file app/admin/nat/item-add-submit.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Database_PDO {
+      public $pdo;
+      public function getObjectQuery($query = null, $values = array(), $class = 'stdClass') {
+          if (!$this->isConnected()) $this->connect();
+          $statement = $this->pdo->prepare($query);
+          $this->log_query ($statement, $values);
+          $statement->execute((array)$values);
+          $resultObj = $statement->fetchObject($class);
+          if ($resultObj === false) { return null; } else { return $resultObj; }
+      }
+  }
+
+  class Common_functions {
+      protected $Database;
+      public function fetch_object ($table=null, $method=null, $value) {
+          if(is_null($table)||strlen($table)==0) return false;
+          $cached_item = $this->cache_check($table, $value);
+          if($cached_item!==false) {
+              return $cached_item;
+          }
+          else {
+              $method = is_null($method) ? "id" : $this->Database->escape($method);
+              try { $res = $this->Database->getObjectQuery("SELECT * from `$table` where `$method` = ? limit 1;", array($value)); }
+              catch (Exception $e) {
+                  return false;
+              }
+              return $res;
+          }
+      }
+  }
+
+  class Tools extends Common_functions {
+      public function __construct($Database) { $this->Database = $Database; }
+  }
+
+  $Database = new Database_PDO;
+  $Tools = new Tools ($Database);
+
+  if (isset($_POST['object_type']) && isset($_POST['object_id'])) {
+      $obj_type = $_POST['object_type'];
+      $obj_id   = $_POST['object_id'];
+
+      // validate object type
+      if (!in_array($obj_type, ['subnets', 'ipaddresses'])) { return; }
+
+      // validate object id
+      if (!is_numeric($obj_id)) { return; }
+
+      $item = $Tools->fetch_object ($obj_type, "id", $obj_id);
+  }
+  ```
+
+test "rank1568: a literal table keeps the identifier out of the query text"
+  lang php
+  file app/admin/nat/item-add-submit.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  class Database_PDO {
+      public $pdo;
+      public function getObjectQuery($query = null, $values = array(), $class = 'stdClass') {
+          if (!$this->isConnected()) $this->connect();
+          $statement = $this->pdo->prepare($query);
+          $this->log_query ($statement, $values);
+          $statement->execute((array)$values);
+          $resultObj = $statement->fetchObject($class);
+          if ($resultObj === false) { return null; } else { return $resultObj; }
+      }
+  }
+
+  class Common_functions {
+      protected $Database;
+      public function fetch_object ($table=null, $method=null, $value) {
+          if(is_null($table)||strlen($table)==0) return false;
+          $cached_item = $this->cache_check($table, $value);
+          if($cached_item!==false) {
+              return $cached_item;
+          }
+          else {
+              $method = is_null($method) ? "id" : $this->Database->escape($method);
+              try { $res = $this->Database->getObjectQuery("SELECT * from `$table` where `$method` = ? limit 1;", array($value)); }
+              catch (Exception $e) {
+                  return false;
+              }
+              return $res;
+          }
+      }
+  }
+
+  class Tools extends Common_functions {
+      public function __construct($Database) { $this->Database = $Database; }
+  }
+
+  $Database = new Database_PDO;
+  $Tools = new Tools ($Database);
+
+  if (isset($_POST['object_type']) && isset($_POST['object_id'])) {
+      $obj_type = $_POST['object_type'];
+      $obj_id   = $_POST['object_id'];
+
+      $item = $Tools->fetch_object ("ipaddresses", "id", $obj_id);
+  }
+  ```

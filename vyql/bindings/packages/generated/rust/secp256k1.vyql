@@ -1,0 +1,25 @@
+module bindings.rust.generated.m88940a4e;
+
+binding secretValue0 {
+  requires {
+    dependency("secp256k1")
+  }
+  query pattern callExpr where callee.method == "SecretKey::new"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("secp256k1")
+  }
+  query pattern callExpr where callee.method == "SecretKey::to_secret_bytes"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("secp256k1")
+  }
+  query pattern callExpr where callee.method == "SecretKey::as_secret_bytes"
+  emit source code.SecretValue at call.result
+}

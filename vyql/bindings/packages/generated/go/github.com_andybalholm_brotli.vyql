@@ -1,0 +1,9 @@
+module bindings.go.generated.m9f9469db;
+
+binding httpInput0 {
+  requires {
+    dependency("github.com/andybalholm/brotli")
+  }
+  query pattern callExpr where callee.method == "parseAccept"
+  emit source code.HttpInput at call.result
+}

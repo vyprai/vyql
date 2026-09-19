@@ -1,0 +1,37 @@
+test "velocity xml: request-controlled conversion without CSRF is exposed"
+  lang config
+  expect VYQL-RF-003
+  file HTMLConverter.xml
+  code
+  ```
+  <xwikidoc>
+    <content><![CDATA[
+  #set ($toHTML = $request.toHTML == 'true')
+#set ($fromHTML = $request.fromHTML == 'true')
+#if ($toHTML || $fromHTML)
+  #set ($text = "$!request.text")
+  #set ($output = "#ckeditor_convert($text $toHTML $fromHTML)")
+  $response.writer.print($output)
+#end
+    ]]></content>
+  </xwikidoc>
+  ```
+
+test "velocity xml: request-controlled conversion with CSRF is clean"
+  lang config
+  reject VYQL-RF-003
+  file HTMLConverter.xml
+  code
+  ```
+  <xwikidoc>
+    <content><![CDATA[
+  #set ($toHTML = $request.toHTML == 'true')
+#set ($fromHTML = $request.fromHTML == 'true')
+#if (($toHTML || $fromHTML) && $services.csrf.isTokenValid($request.formToken))
+  #set ($text = "$!request.text")
+  #set ($output = "#ckeditor_convert($text $toHTML $fromHTML)")
+  $response.writer.print($output)
+#end
+    ]]></content>
+  </xwikidoc>
+  ```

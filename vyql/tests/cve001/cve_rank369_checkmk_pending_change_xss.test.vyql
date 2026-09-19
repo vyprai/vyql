@@ -1,0 +1,54 @@
+# Rank 369 / CVE-2026-20915: Checkmk pending changes popout unescaped
+# permissively-escaped change text before sending it to frontend HTML rendering.
+
+test "rank369: pending change text is unescaped before popout HTML rendering"
+  lang python
+  expect VYQL-INJ-063
+  expect_review code.CheckmkPendingChangeTextUnescapeXss
+  code
+  ```
+  from html import unescape
+
+  class PendingChangeSummary:
+      def __init__(self, **kwargs):
+          self.kwargs = kwargs
+
+  class ActivateChanges:
+      def get_all_data_required_for_activation_popout(self, sites):
+          pending_changes = []
+          for _changeid, change in self._all_changes:
+              pending_changes.append(
+                  PendingChangeSummary(
+                      changeId=change["id"],
+                      changeText=unescape(change["text"]),
+                      user=change["user_id"],
+                  )
+              )
+          return pending_changes
+  ```
+
+test "rank369: pending change text remains entity-escaped for popout HTML rendering"
+  lang python
+  reject VYQL-INJ-063
+  reject_review code.CheckmkPendingChangeTextUnescapeXss
+  code
+  ```
+  from html import unescape
+
+  class PendingChangeSummary:
+      def __init__(self, **kwargs):
+          self.kwargs = kwargs
+
+  class ActivateChanges:
+      def get_all_data_required_for_activation_popout(self, sites):
+          pending_changes = []
+          for _changeid, change in self._all_changes:
+              pending_changes.append(
+                  PendingChangeSummary(
+                      changeId=change["id"],
+                      changeText=change["text"],
+                      user=change["user_id"],
+                  )
+              )
+          return pending_changes
+  ```

@@ -1,0 +1,133 @@
+# TeamPass assembles its administrator log listings and its
+# favourite-toggle lookup from POST values without any escaping: the
+# ORDER BY column and direction are concatenated straight into the
+# statement handed to MeekroDB's DB::query(), and the quick-icon action
+# concatenates the POST id into DB::queryfirstrow(). Both are SQL
+# injection in the hands of any authenticated user -- the order and
+# direction parameters of the connections_logs, errors_logs and
+# access_logs actions in sources/views.queries.php, and the id
+# parameter of the action_on_quick_icon action in sources/
+# items.queries.php.
+#
+# The fixed revision parameterises the ORDER BY clause (ORDER BY %s %s, with the
+# two POST values moved into the query's argument list) and wraps the
+# favourite id in mysql_real_escape_string().
+#
+# Detection: VYQL-INJ-001 covers the DB::query() form -- the
+# generic `query` method binding labels its first argument as a
+# SqlExecution sink, and the POST subscript reaches it through the
+# concatenation. Two labels are missing. MeekroDB's queryFirstRow /
+# queryFirstOne / queryFirstList / queryOneCol / queryFullLists /
+# queryFirstObject helpers all take the statement as their first
+# argument exactly like DB::query() and lack labels; PHP method
+# lookup is case-insensitive, so the lowercase spellings this codebase
+# uses are listed beside the documented camelCase ones. And
+# mysql_real_escape_string -- the deprecated mysql extension's escaper,
+# without the i -- carried no SqlParameterization check, so even the
+# escaped form could not be recognised as remediated; only the mysqli
+# form and the bare escape_string methods carry labels.
+
+test "rank1839: ORDER BY column and direction concatenated into the log query"
+  lang php
+  file sources/views.queries.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+  switch ($_POST['type']) {
+      case "connections_logs":
+          //launch query
+          $rows = DB::query(
+              "SELECT l.date as date, l.label as label, l.qui as who, u.login as login
+              FROM ".prefix_table("log_system")." as l
+              INNER JOIN ".prefix_table("users")." as u ON (l.qui=u.id)
+              WHERE l.type = %s
+              ORDER BY ".$_POST['order']." ".$_POST['direction']."
+              LIMIT $start, $nbElements",
+              "user_connection"
+          );
+          break;
+  }
+  ```
+
+test "rank1839: the favourite id concatenated into queryfirstrow"
+  lang php
+  file sources/items.queries.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+  switch ($_POST['type']) {
+      case "action_on_quick_icon":
+          if ($_POST['action'] == 1) {
+              // Add new favourite
+              array_push($_SESSION['favourites'], $_POST['id']);
+              // Update SESSION with this new favourite
+              $data = DB::queryfirstrow("SELECT label,id_tree FROM ".prefix_table("items")." WHERE id = ".$_POST['id']);
+              $_SESSION['favourites_tab'][$_POST['id']] = array(
+                  'label' => $data['label'],
+                  'url' => 'index.php?page=items&amp;group='.$data['id_tree'].'&amp;id='.$_POST['id']
+                 );
+          }
+          break;
+  }
+  ```
+
+test "rank1839: the documented camelCase spelling of the same helper"
+  lang php
+  file lib/Database.php
+  expect VYQL-INJ-001
+  code
+  ```
+  <?php
+
+  function findItem($id) {
+      return DB::queryFirstRow("SELECT label FROM ".prefix_table("items")." WHERE id = ".$_POST['id']);
+  }
+  ```
+
+test "rank1839: the fixed revision binds the ORDER BY clause as query parameters"
+  lang php
+  file sources/views.queries.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  switch ($_POST['type']) {
+      case "connections_logs":
+          //launch query
+          $rows = DB::query(
+              "SELECT l.date as date, l.label as label, l.qui as who, u.login as login
+              FROM ".prefix_table("log_system")." as l
+              INNER JOIN ".prefix_table("users")." as u ON (l.qui=u.id)
+              WHERE l.type = %s
+              ORDER BY %s %s
+              LIMIT $start, $nbElements",
+              "user_connection",$_POST['order'],$_POST['direction']
+          );
+          break;
+  }
+  ```
+
+test "rank1839: the fixed revision escapes the favourite id with the mysql extension escaper"
+  lang php
+  file sources/items.queries.php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  switch ($_POST['type']) {
+      case "action_on_quick_icon":
+          if ($_POST['action'] == 1) {
+              // Add new favourite
+              array_push($_SESSION['favourites'], $_POST['id']);
+              // Update SESSION with this new favourite
+              $data = DB::queryfirstrow("SELECT label,id_tree FROM ".prefix_table("items")." WHERE id = ".mysql_real_escape_string($_POST['id']));
+              $_SESSION['favourites_tab'][$_POST['id']] = array(
+                  'label' => $data['label'],
+                  'url' => 'index.php?page=items&amp;group='.$data['id_tree'].'&amp;id='.$_POST['id']
+                 );
+          }
+          break;
+  }
+  ```

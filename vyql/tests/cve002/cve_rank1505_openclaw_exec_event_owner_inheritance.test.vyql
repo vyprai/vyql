@@ -1,0 +1,181 @@
+# Rank 1505 / CVE-2026-41329: an OpenClaw heartbeat that carries node exec
+# output authorises owner-only commands from the delivery target's routing
+# fields (CWE-863). `resolveCommandAuthorization` in
+# src/auto-reply/command-auth.ts derives sender trust from the message
+# context -- `Boolean(matchedSender)` over the sender candidates resolved from
+# `ctx.From`, and `isInternalMessageChannel(ctx.Provider) &&
+# ctx.GatewayClientScopes.includes("operator.admin")` -- and folds them into
+#
+#   const senderIsOwner = senderIsOwnerByIdentity || senderIsOwnerByScope || ownerAllowAll;
+#
+# The heartbeat runner builds that context for an exec completion with
+# `Provider: "exec-event"` but the delivery target's `From`/`To`, so output an
+# untrusted process produced is authorised for owner-only commands. The fixing
+# commit a30214a62 ("fix(heartbeat): block owner-only auth inheritance for exec
+# events (#57652)") adds a `ForceSenderIsOwnerFalse?: boolean` field to
+# `MsgContext`, sets it from `hasExecCompletion` at the construction site, and
+# forces `senderIsOwner` false when it is present.
+#
+# ## What fires, both revisions
+#
+# Three --cache off runs per revision over `src/auto-reply` plus `src/infra`
+# (370 and 366 analysed files) report **595 findings each, deterministically**,
+# with an identical per-rule split on every run: 173 VYQL-PATH-001, 113
+# VYQL-INJ-001, 76 VYQL-INJ-013, 37 VYQL-INJ-134, 34 VYQL-SEC-001, 32
+# VYQL-CRY-006, 31 VYQL-INJ-009, 19 VYQL-INJ-015, 14 VYQL-INJ-002, 13
+# VYQL-RES-001, 12 VYQL-RF-001, 10 VYQL-INJ-004, 8 VYQL-INJ-011, 4 VYQL-VAL-005,
+# 4 VYQL-INJ-119, 2 each of VYQL-SEC-002, VYQL-INJ-280, VYQL-DOS-002,
+# VYQL-DOS-001, VYQL-CFG-014, VYQL-CFG-006 and 1 each of VYQL-MEM-006,
+# VYQL-DESER-001, VYQL-CRY-003. **Zero VYQL-AUTH findings on either revision**;
+# the only per-line diff between the two finding sets is the fingerprint hash.
+# The `-flags only` view is identical too. `vyql match` on command-auth.ts
+# labels only Log-family sinks at lines 177 and 190 plus
+# `vyql.internal.NeutralizerAssumption` on `.includes` calls -- nothing at or
+# near the `senderIsOwner` computation.
+#
+# ## Why nothing ships
+#
+# The defect is an identity-trust inference with no dataflow: routing fields a
+# delivery surface controls are read as the sender's authority. Two shipped
+# mechanisms come near and neither reaches it.
+#
+# `code.TrustBoundary` (VYQL-CFG-014, `taint core.UserControlledData ->
+# code.TrustBoundary`) is the shipped vocabulary for untrusted data entering a
+# trusted surface, and it is bound in JavaScript -- but only as a *sink* on
+# `session`/`securityContext`/`authContext`/`Object.assign` calls. Cases three
+# and four below are the measured pair: the same labelled `code.HttpInput`
+# source crossing into a security-context call fires, and the same source read
+# into a boolean owner decision does not, because the decision shape has no
+# sink at all. Any binding that gave it one would have to name the decision's
+# own field names.
+#
+# The review concepts in this family key on a documented verification surface
+# or on another codebase's literals: `code.UnverifiedMailSenderIdentity`
+# requires SPF/DKIM/DMARC verdicts over `imaplib`/`poplib` (Python, protocol
+# documented); `code.JobOutputEventUpdateAuthorizationBypass` is bound to the
+# literals "Got job update from child", `update_event` and
+# `job[]=data[key]`; `code.UserIdentityMappingReview` judges external-identity
+# to local UID/GID collision resistance. None states that a delivery surface
+# inherits the recipient's authority, and the knowledge that would separate
+# vulnerable from fixed here -- which `MsgContext` fields an exec event may
+# carry -- is OpenClaw's internal design, not library documentation, so a
+# binding on it fails the genericity test. The fix's own marker
+# (`ForceSenderIsOwnerFalse`) is the discriminator this loop refuses to key on.
+# The generic fallback, "an authorisation decision with no credential read in
+# its body", is the shape already measured unshippable at 1331 and 1417.
+#
+# Third of a family with the callback-confirmation shape and the
+# schema-override shape; all three need a review vocabulary for
+# delivery-context identity inheritance, which is design work rather than a
+# binding. Recorded as a vocabulary gap; no ENGINE-GAPS.md entry, no definition
+# change.
+#
+# ## Recheck measurements (knowledge base tip 160eab081)
+#
+# Narrow spec 2/2 passing; the three-run A/B above; the trust-boundary pair in
+# cases three and four verified by scan on an isolated tree. Rank stays
+# ATTENTION.
+
+test "rank1505: the owner decision folds delivery routing fields into sender trust"
+  lang javascript
+  file src/auto-reply/command-auth.ts
+  reject VYQL-CFG-014
+  code
+  ```
+  type MsgContext = {
+    Provider: string;
+    From: string;
+    To: string;
+    SenderId?: string;
+    GatewayClientScopes?: string[];
+  };
+
+  export function resolveCommandAuthorization(
+    ctx: MsgContext,
+    senderCandidates: string[],
+    ownerList: string[],
+    ownerAllowAll: boolean,
+  ) {
+    const matchedSender = ownerList.length
+      ? senderCandidates.find((candidate) => ownerList.includes(candidate))
+      : undefined;
+    const senderIsOwnerByIdentity = Boolean(matchedSender);
+    const senderIsOwnerByScope =
+      isInternalMessageChannel(ctx.Provider) &&
+      Array.isArray(ctx.GatewayClientScopes) &&
+      ctx.GatewayClientScopes.includes("operator.admin");
+    const senderIsOwner = senderIsOwnerByIdentity || senderIsOwnerByScope || ownerAllowAll;
+    return { senderIsOwner };
+  }
+
+  function isInternalMessageChannel(provider: string) {
+    return provider === "internal";
+  }
+  ```
+
+test "rank1505: the fixed revision forces the sender non-owner for exec events"
+  lang javascript
+  file src/auto-reply/command-auth.ts
+  reject VYQL-CFG-014
+  code
+  ```
+  type MsgContext = {
+    Provider: string;
+    From: string;
+    To: string;
+    SenderId?: string;
+    GatewayClientScopes?: string[];
+    /** Trusted system override for contexts that must never inherit owner semantics. */
+    ForceSenderIsOwnerFalse?: boolean;
+  };
+
+  export function resolveCommandAuthorization(
+    ctx: MsgContext,
+    senderCandidates: string[],
+    ownerList: string[],
+    ownerAllowAll: boolean,
+  ) {
+    const matchedSender = ownerList.length
+      ? senderCandidates.find((candidate) => ownerList.includes(candidate))
+      : undefined;
+    const senderIsOwnerByIdentity = Boolean(matchedSender);
+    const senderIsOwnerByScope =
+      isInternalMessageChannel(ctx.Provider) &&
+      Array.isArray(ctx.GatewayClientScopes) &&
+      ctx.GatewayClientScopes.includes("operator.admin");
+    const senderIsOwner = ctx.ForceSenderIsOwnerFalse
+      ? false
+      : senderIsOwnerByIdentity || senderIsOwnerByScope || ownerAllowAll;
+    return { senderIsOwner };
+  }
+
+  function isInternalMessageChannel(provider: string) {
+    return provider === "internal";
+  }
+  ```
+
+test "rank1505: trust-boundary control -- untrusted input crossing into a security context fires"
+  lang javascript
+  file src/gateway/handler.ts
+  expect VYQL-CFG-014
+  code
+  ```
+  export function handleRequest(req: any, securityContext: (v: string) => void) {
+    const token = req.query.token;
+    securityContext(token);
+  }
+  ```
+
+test "rank1505: trust-boundary pair -- the same source read into an owner decision has no sink"
+  lang javascript
+  file src/gateway/handler.ts
+  reject VYQL-CFG-014
+  code
+  ```
+  export function resolveOwnerFromRequest(req: any) {
+    const ctx = { From: req.query.from, To: req.query.to, Provider: "exec-event" };
+    const senderIsOwnerByIdentity = Boolean(ctx.From === ctx.To);
+    const senderIsOwner = senderIsOwnerByIdentity;
+    return { senderIsOwner };
+  }
+  ```

@@ -1,0 +1,25 @@
+module bindings.javascript.nextImageRemotePatternsWildcard;
+
+// Next.js documents `images.remotePatterns` as the list that allows images
+// from specific external paths and blocks all others: the image
+// optimization API fetches a remote `src` server-side, and an entry admits
+// only what its `hostname`, `pathname`, `port` and `search` patterns match.
+// A wildcard hostname is legitimate when it names a site -- `**.example.com`
+// matches that site's subdomains -- but a bare `**` hostname matches every
+// host, so the allowlist admits all of them and any viewer can have the
+// server fetch a URL of their choosing, internal addresses included. The
+// documentation's own warning about under-specified entries ("it may allow
+// malicious actors to optimize urls you did not intend") is about exactly
+// this shape.
+//
+// The pair is read as exact `prop:` tokens at module scope, which is where
+// a next.config.js declares itself: `hostname=**` only, so a restricted
+// wildcard (`**.example.com`) and a concrete host are not reported, and the
+// `remotePatterns=` key in the same module confines the hostname pair to
+// this config. `unoptimized` is deliberately not read as a neutraliser: it
+// sets the component default that an image can override, and the allowlist
+// the deployment ships is still its fetch surface.
+binding jsNextImageWildcardRemotePattern {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "javascript" and containsAny(node.context.prop, ["remotePatterns="]) and node.context.prop in ["hostname=**"]
+  emit issue code.PermissiveHostAllowlist at node
+}

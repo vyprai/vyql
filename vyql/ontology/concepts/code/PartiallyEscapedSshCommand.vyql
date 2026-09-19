@@ -1,0 +1,11 @@
+module code;
+
+concept PartiallyEscapedSshCommand : issue {
+  cwe: [CWE_77]
+  reviewAssumption: "an agent, upstream target, or caller can influence SSH connection fields"
+  reviewCategory: command
+  reviewCondition: "an SSH command string escapes only some attacker-controlled fields before shell execution"
+  reviewConfidence: medium
+  reviewEvidence: "SSH command assembly context {pattern} quotes password/remote command but interpolates username, host, or port directly"
+  vulnerableTo: [injection.CommandInjection]
+}

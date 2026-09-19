@@ -1,0 +1,96 @@
+# Rank 1006 / CVE-2026-9298: omec-project/amf NGAP crash on malformed input.
+# The advisory (VulDB GHSA-h3w8-h79v-64cv, CWE-119, PathSwitchRequest
+# handler) describes remotely
+# triggerable memory corruption; in Go this is a panic (nil-pointer dereference
+# or index out of range) that crashes the AMF. Fix 34bc6724ac (PR #666) is a
+# broad hardening pass: it adds nil-checks on decoded NGAP information elements
+# across many handlers (RANUENGAPID / AMFUENGAPID in the PathSwitchRequest path,
+# nil PDU / connection / RAN guards in ngap/dispatcher.go) plus length and digit
+# validation in util.PlmnIdStringToModels, which sliced plmnId[:3] and
+# plmnId[3:] with no length check and panics on a short string. The string
+# reaches the slicer from a NAS-decoded mobile identity, so a taint route would
+# also need a source on the third-party decode (nasConvert.SuciToString in
+# github.com/omec-project/nas), which is outside this tree.
+#
+# ATTENTION, no precise generic detection; the precision cost is measured, not
+# argued.
+#
+#  - Both fix axes leave the vulnerable construct in place on the fixed
+#    revision: the slicer still runs plmnId[:3] and plmnId[3:] after validating
+#    the length, and the handlers still read the decoded information element's
+#    Value, now behind guarded helpers. Only a binding that also models the
+#    added guard can separate the revisions.
+#  - The guard is not expressible generically. A presence binding cannot match
+#    "a numeric slice offset" (the regex matcher is rejected in presence
+#    predicates, internal/bindings/compile_presence.go:268), so only enumerated
+#    offset literals remain, which is the repro itself.
+#  - The negated shape "fixed-offset slice with no len() in the function"
+#    separates this pair 1 -> 0 and is unshippable: by textual count the
+#    non-test Go standard library alone carries 1568 functions with a
+#    fixed-offset slice expression, 605 of them with no len() call, and on this
+#    tree the shape flags 9 functions on the vulnerable revision and 8 on the
+#    fixed one. The collateral includes a slice of a fixed-size array parameter
+#    (StmsiToGuti(buf [7]byte) in nas/nas_security/security.go), which cannot
+#    go out of range at all.
+#  - The nil-check axis is per-library and does not track the fix: 31 functions
+#    in this tree read a decoded *NGAPID .Value, and the "unguarded in this
+#    function" variant of that shape flags 3 functions on the vulnerable
+#    revision and 2 on the fixed one, because the fix moves the reads into
+#    guarded helpers while the flagged sites hold their guards elsewhere.
+#  - Measured on the real checkout, 3 x --cache off per revision, --max-ram
+#    6GB: both revisions report the same four rows with identical fingerprints
+#    (VYQL-CFG-003 once, VYQL-VAL-036 three times, all on the OAM HTTP
+#    handlers); the ngap/ + util/ + gmm/ subtree reports zero findings in the
+#    full findings view; the review-flag view (120 flags) holds nothing on
+#    ngap/handler.go, ngap/dispatcher.go or util/convert.go; and vyql match on
+#    those files and on minimal repros of both axes reports no source, no sink
+#    and no control label. No Go binding labels a decoded protocol field as a
+#    source or a slice as a sink today.
+#
+# verify_current_expected: attention-precision-cost
+
+test "rank1006: PlmnId string sliced at fixed offsets with no length check panics"
+  lang go
+  file util/convert.go
+  reject VYQL-MEM-006
+  code
+  ```
+  package util
+
+  import "github.com/omec-project/openapi/models"
+
+  func PlmnIdStringToModels(plmnId string) (plmnID models.PlmnId) {
+      plmnID.Mcc = plmnId[:3]
+      plmnID.Mnc = plmnId[3:]
+      return
+  }
+  ```
+
+test "rank1006: fix validates the PlmnId length and digits before slicing"
+  lang go
+  file util/convert.go
+  reject VYQL-MEM-006
+  code
+  ```
+  package util
+
+  import (
+      "fmt"
+
+      "github.com/omec-project/openapi/models"
+  )
+
+  func PlmnIdStringToModels(plmnId string) (plmnID models.PlmnId, err error) {
+      if len(plmnId) < 5 || len(plmnId) > 6 {
+          return models.PlmnId{}, fmt.Errorf("invalid PLMN ID length %d", len(plmnId))
+      }
+      for _, digit := range plmnId {
+          if digit < '0' || digit > '9' {
+              return models.PlmnId{}, fmt.Errorf("invalid PLMN ID %q", plmnId)
+          }
+      }
+      plmnID.Mcc = plmnId[:3]
+      plmnID.Mnc = plmnId[3:]
+      return plmnID, nil
+  }
+  ```

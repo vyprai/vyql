@@ -1,0 +1,262 @@
+# Rank 1827 / CVE-2018-21029: systemd-resolved's GnuTLS DNS-over-TLS backend
+# asked GnuTLS to verify the server certificate but never told it which server
+# it talks to. dnstls_stream_connect_tls() in
+# src/resolve/resolved-dnstls-gnutls.c set up a client session and, in strict
+# mode (DNS_OVER_TLS_YES), called
+# gnutls_session_set_verify_cert(gs, NULL, 0). A DNS server is configured by
+# address, not by name, so there is no hostname to hand over -- and GnuTLS's
+# manual is explicit about what that costs: "if no hostname is provided, no
+# hostname verification will be performed". The chain is still checked
+# against the trusted CAs, so any certificate any CA issues for any name is
+# accepted for any resolver, which is a machine-in-the-middle on the
+# resolver's own upstream link. The adjacent OpenSSL backend bound the
+# identity with X509_VERIFY_PARAM_set1_ip(); only the GnuTLS one did not.
+# CWE-295. Fix b7a4129ca946ed49e161a03283faf5bbab96d110 replaces the call with
+# gnutls_session_set_verify_cert2(gs, &stream->dnstls_data.validation, 1, 0),
+# where the gnutls_typed_vdata_st carries the server's address as
+# GNUTLS_DT_IP_ADDRESS.
+#
+# Pool row verified in both directions: the NULL-hostname call is present at
+# the parent (resolved-dnstls-gnutls.c:63) and the typed-datum call is present
+# at the fixed revision. The row names a merge whose combined diff is empty; the change
+# reads in full as `git diff 8fc59b6ef b7a4129ca`, and the readable sibling is
+# 7f2f4face. .
+#
+# What fires without this change: nothing, on either revision -- the file
+# reports zero findings at the parent, and no binding anywhere covers a
+# gnutls symbol. code.CertValidationDisabled and VYQL-CFG-004 carry
+# CWE-295, but every C-side binding for the concept keyed on an explicit
+# opt-out (SSL_VERIFY_NONE, CURLOPT_SSL_VERIFYPEER 0, VerifyNone), and this
+# weakness has no opt-out call at all -- verification is switched on and then
+# starved of the identity it is meant to check.
+#
+# The binding states the GnuTLS client contract from the manual: a
+# gnutls_session_set_verify_cert() whose hostname argument is NULL skips
+# hostname verification, so that call is the disable. Nothing from the fixing
+# commit is named -- the callee, the argument position and the NULL atom are
+# all the API's own documentation, and the two forms that do bind an identity
+# (a hostname argument, or a gnutls_typed_vdata_st handed to
+# gnutls_session_set_verify_cert2) are different atoms and a different callee,
+# so they do not match. The C++ spelling is bound alongside the C one, since
+# the same header is usable from both.
+#
+# The route is the structured context walk rather than a callExpr value
+# predicate, and that is a property of the frontend, not a choice: the C
+# frontend lowers a NULL literal to a valueless constant, so
+# args.any.literal never sees it -- measured, an identifier argument
+# ("hostname", "ABCD") does reach args.any.literal and NULL does not, on the
+# same call shape. call_arg_at: reads the argument atom off the syntax tree
+# instead, and is function-confined and comment-proof.
+#
+# Measured bounded (timeout 180, --max-ram 6GB, --cache off, union over three
+# runs each): systemd/src/resolve at the parent goes from 520 findings with
+# none in resolved-dnstls-gnutls.c to 521, the extra one being VYQL-CFG-004
+# on resolved-dnstls-gnutls.c; at the fixed revision the subtree reports 520 with none
+# there. Across every other clone under /tmp/cve-work/rank*/ (448 trees) an
+# exhaustive grep finds no further gnutls_session_set_verify_cert call site,
+# so the reachable set is the one systemd file and the collateral is zero by
+# enumeration rather than by sampling.
+#
+# The cases: (a) is dnstls_stream_connect_tls() as the parent had it; (b) is
+# the same function at both revisions, the minimal pair; (c) and (d) are the
+# two correct spellings of a hostname argument, a variable and a string
+# literal; (e) proves the token is positional -- NULL elsewhere in the same
+# call and in sibling calls must not fire; (f) and (g) pin the C++ spelling
+# against the same two forms.
+
+test "rank1827: a GnuTLS client session verifies the certificate with no hostname to check it against"
+  lang c
+  file src/resolve/resolved-dnstls-gnutls.c
+  expect VYQL-CFG-004
+  code
+  ```
+  #include <gnutls/socket.h>
+
+  #include "resolved-dns-stream.h"
+  #include "resolved-dnstls.h"
+
+  #define PRIORTY_STRING "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2"
+  DEFINE_TRIVIAL_CLEANUP_FUNC(gnutls_session_t, gnutls_deinit);
+
+  int dnstls_stream_connect_tls(DnsStream *stream, DnsServer *server) {
+          _cleanup_(gnutls_deinitp) gnutls_session_t gs;
+          int r;
+
+          assert(stream);
+          assert(server);
+
+          r = gnutls_init(&gs, GNUTLS_CLIENT | GNUTLS_ENABLE_FALSE_START | GNUTLS_NONBLOCK);
+          if (r < 0)
+                  return r;
+
+          r = gnutls_priority_set_direct(gs, PRIORTY_STRING, NULL);
+          if (r < 0)
+                  return r;
+
+          r = gnutls_credentials_set(gs, GNUTLS_CRD_CERTIFICATE, stream->manager->dnstls_data.cert_cred);
+          if (r < 0)
+                  return r;
+
+          if (server->manager->dns_over_tls_mode == DNS_OVER_TLS_YES)
+                  gnutls_session_set_verify_cert(gs, NULL, 0);
+
+          gnutls_handshake_set_timeout(gs, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
+          gnutls_transport_set_ptr2(gs, (gnutls_transport_ptr_t) (long) stream->fd, stream);
+
+          stream->encrypted = true;
+          stream->dnstls_data.handshake = gnutls_handshake(gs);
+
+          stream->dnstls_data.session = TAKE_PTR(gs);
+
+          return 0;
+  }
+  ```
+
+test "rank1827: the fixed revision hands the expected identity to the certificate check"
+  lang c
+  file src/resolve/resolved-dnstls-gnutls.c
+  reject VYQL-CFG-004
+  code
+  ```
+  #include <gnutls/socket.h>
+
+  #include "resolved-dns-stream.h"
+  #include "resolved-dnstls.h"
+
+  #define PRIORTY_STRING "NORMAL:-VERS-ALL:+VERS-TLS1.3:+VERS-TLS1.2"
+  DEFINE_TRIVIAL_CLEANUP_FUNC(gnutls_session_t, gnutls_deinit);
+
+  int dnstls_stream_connect_tls(DnsStream *stream, DnsServer *server) {
+          _cleanup_(gnutls_deinitp) gnutls_session_t gs;
+          int r;
+
+          assert(stream);
+          assert(server);
+
+          r = gnutls_init(&gs, GNUTLS_CLIENT | GNUTLS_ENABLE_FALSE_START | GNUTLS_NONBLOCK);
+          if (r < 0)
+                  return r;
+
+          r = gnutls_priority_set_direct(gs, PRIORTY_STRING, NULL);
+          if (r < 0)
+                  return r;
+
+          r = gnutls_credentials_set(gs, GNUTLS_CRD_CERTIFICATE, stream->manager->dnstls_data.cert_cred);
+          if (r < 0)
+                  return r;
+
+          if (server->manager->dns_over_tls_mode == DNS_OVER_TLS_YES) {
+                  stream->dnstls_data.validation.type = GNUTLS_DT_IP_ADDRESS;
+                  if (server->family == AF_INET) {
+                          stream->dnstls_data.validation.data = (unsigned char*) &server->address.in.s_addr;
+                          stream->dnstls_data.validation.size = 4;
+                  } else {
+                          stream->dnstls_data.validation.data = server->address.in6.s6_addr;
+                          stream->dnstls_data.validation.size = 16;
+                  }
+                  gnutls_session_set_verify_cert2(gs, &stream->dnstls_data.validation, 1, 0);
+          }
+
+          gnutls_handshake_set_timeout(gs, GNUTLS_DEFAULT_HANDSHAKE_TIMEOUT);
+          gnutls_transport_set_ptr2(gs, (gnutls_transport_ptr_t) (long) stream->fd, stream);
+
+          stream->encrypted = true;
+          stream->dnstls_data.handshake = gnutls_handshake(gs);
+
+          stream->dnstls_data.session = TAKE_PTR(gs);
+
+          return 0;
+  }
+  ```
+
+test "rank1827: a hostname variable is the identity the check needs"
+  lang c
+  file src/tls/connect_by_name.c
+  reject VYQL-CFG-004
+  code
+  ```
+  #include <gnutls/socket.h>
+
+  int connect_by_name(const char *hostname) {
+          gnutls_session_t gs;
+
+          gnutls_init(&gs, GNUTLS_CLIENT);
+          gnutls_session_set_verify_cert(gs, hostname, 0);
+          return gnutls_handshake(gs);
+  }
+  ```
+
+test "rank1827: a hostname literal is the identity the check needs"
+  lang c
+  file src/tls/connect_by_literal.c
+  reject VYQL-CFG-004
+  code
+  ```
+  #include <gnutls/socket.h>
+
+  int connect_by_literal(void) {
+          gnutls_session_t gs;
+
+          gnutls_init(&gs, GNUTLS_CLIENT);
+          gnutls_session_set_verify_cert(gs, "dns.example.com", 0);
+          return gnutls_handshake(gs);
+  }
+  ```
+
+test "rank1827: a NULL in another argument or another call is not a skipped identity check"
+  lang c
+  file src/tls/null_elsewhere.c
+  reject VYQL-CFG-004
+  code
+  ```
+  #include <gnutls/socket.h>
+
+  int connect_checked(const char *nm) {
+          gnutls_session_t gs;
+          const char *err_pos = NULL;
+
+          gnutls_init(&gs, GNUTLS_CLIENT);
+
+          /* NULL in the first and third argument of sibling calls */
+          gnutls_priority_set_direct(gs, NULL, &err_pos);
+          gnutls_session_set_data(gs, NULL, 0);
+
+          gnutls_session_set_verify_cert(gs, nm, 0);
+          return gnutls_handshake(gs);
+  }
+  ```
+
+test "rank1827: the C++ spelling of a GnuTLS client with no hostname to check against"
+  lang cpp
+  file src/tls/gnutls_client.cpp
+  expect VYQL-CFG-004
+  code
+  ```
+  #include <gnutls/socket.h>
+
+  int connect_upstream(gnutls_session_t gs) {
+          gnutls_init(&gs, GNUTLS_CLIENT);
+          gnutls_session_set_verify_cert(gs, NULL, 0);
+          return gnutls_handshake(gs);
+  }
+  ```
+
+test "rank1827: the C++ spelling of the identity-bearing fix"
+  lang cpp
+  file src/tls/gnutls_client.cpp
+  reject VYQL-CFG-004
+  code
+  ```
+  #include <gnutls/socket.h>
+
+  int connect_upstream(gnutls_session_t gs, unsigned char *ip, unsigned ip_len) {
+          gnutls_typed_vdata_st vdata[1];
+
+          gnutls_init(&gs, GNUTLS_CLIENT);
+          vdata[0].type = GNUTLS_DT_IP_ADDRESS;
+          vdata[0].data = ip;
+          vdata[0].size = ip_len;
+          gnutls_session_set_verify_cert2(gs, vdata, 1, 0);
+          return gnutls_handshake(gs);
+  }
+  ```

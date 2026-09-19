@@ -1,0 +1,28 @@
+# Rank 199 / CVE-2026-49136: banana-slides /files image-reference path traversal.
+# Ledger verification: VYQL-PATH-001 catches request-controlled file references.
+
+test "rank199: banana-slides opens request-selected file reference"
+  lang python
+  expect VYQL-PATH-001
+  code
+  ```
+  import os
+
+  def generate_image(request):
+      rel = request.args["file"]
+      local_path = os.path.abspath(os.path.join("/srv/uploads", rel))
+      return open(local_path, "rb")
+  ```
+
+test "rank199: banana-slides normalizes file reference basename"
+  lang python
+  reject VYQL-PATH-001
+  code
+  ```
+  import os
+
+  def generate_image(request):
+      rel = os.path.basename(request.args["file"])
+      local_path = os.path.abspath(os.path.join("/srv/uploads", rel))
+      return open(local_path, "rb")
+  ```

@@ -1,0 +1,110 @@
+# Publify's core models declared string attributes whose length only
+# MySQL's implicit 255-character column limit bounded -- on PostgreSQL
+# and other databases the values persisted unbounded, so any form that
+# mass-assigns a string column could store an arbitrarily large value
+# the application later pays to load and render (improper input
+# validation, CWE-20; the release sweep bounded every string attribute
+# at once). The vulnerable models under app/models/ name their string
+# attributes only in presence and uniqueness validations. Commit
+# 34f6e9c98e ("Validate lengths of string attributes", released in
+# 9.2.10) adds the concern app/models/concerns/string_length_limit.rb
+# and applies it across the models:
+#
+#   STRING_LIMIT = 255
+#   validates_default_string_length :email, :text_filter_name
+#
+# with a different explicit bound where a column has one. The pool row
+# already names this repository -- the advisory names publify/publify,
+# which vendors publify_core as a directory, and the row points at the
+# repository holding the fixing commit.
+#
+# Held: cross-database attribute budgets. No binding labels a Rails
+# `validates` declaration in either direction, and none can: the Ruby
+# frontend emits no call-argument tokens, and every symbol argument
+# (`:email`, `:login`) lowers to an anonymous const with no path, so
+# which attribute a validation bounds is unanswerable from the graph.
+# The one in-file route -- a model class whose file carries no length
+# atom -- is file-wide rather than class-confined in Ruby and does not
+# discriminate: on the fixing revision it still reports Article, Page
+# and Comment, whose bound arrives through the StringLengthLimit
+# concern inherited from Content and Feedback, and across ordinary
+# Rails code it reports 35 of 72 validating classes in one application
+# and 2 of 2 in another that carry no such weakness. Unbounded text is
+# also the correct declaration for genuinely long fields. Both blocks
+# assert reject VYQL-DOS-029: when attribute-budget vocabulary lands,
+# the unvalidated form must flip to expect.
+
+test "rank1616: string attributes carry no length validation"
+  lang ruby
+  file publify_core/app/models/user.rb
+  reject VYQL-DOS-029
+  code
+  ```
+  class User < ApplicationRecord
+    devise :database_authenticatable, :registerable,
+           :recoverable, :rememberable, :trackable, :validatable
+    include ConfigManager
+
+    before_validation :set_default_profile
+
+    validates :login, uniqueness: true
+    validates :email, :login, presence: true
+    validates :login, length: { in: 3..40 }
+
+    belongs_to :resource, optional: true
+    has_many :notifications, foreign_key: "notify_user_id"
+
+    serialize :settings, Hash
+
+    def permalink_url(anchor)
+      "#{blog.base_url}authors/#{login}##{anchor}"
+    end
+  end
+  ```
+
+test "rank1616: the fixed revision bounds the string attributes"
+  lang ruby
+  file publify_core/app/models/user.rb
+  reject VYQL-DOS-029
+  code
+  ```
+  class User < ApplicationRecord
+    devise :database_authenticatable, :registerable,
+           :recoverable, :rememberable, :trackable, :validatable
+    include ConfigManager
+    include StringLengthLimit
+
+    before_validation :set_default_profile
+
+    validates :login, uniqueness: true
+    validates :email, :login, presence: true
+    validates :login, length: { in: 3..40 }
+    validates_default_string_length :email, :text_filter_name
+
+    belongs_to :resource, optional: true
+    has_many :notifications, foreign_key: "notify_user_id"
+
+    serialize :settings, Hash
+
+    def permalink_url(anchor)
+      "#{blog.base_url}authors/#{login}##{anchor}"
+    end
+  end
+
+  module StringLengthLimit
+    # Default string length limit for model attributes. When running
+    # on MySQL, this is equal to the default string length in the
+    # database as set by Rails.
+    STRING_LIMIT = 255
+
+    extend ActiveSupport::Concern
+
+    class_methods do
+      def validates_default_string_length(*names)
+        names.each do |name|
+          validates name, length: { maximum: STRING_LIMIT }
+        end
+      end
+    end
+  end
+  ```

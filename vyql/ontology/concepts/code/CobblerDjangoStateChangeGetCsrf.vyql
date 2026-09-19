@@ -1,0 +1,11 @@
+module code;
+
+concept CobblerDjangoStateChangeGetCsrf : issue {
+  cwe: [CWE_352]
+  reviewAssumption: "the Django view is reachable through the browser-backed Cobbler web interface"
+  reviewCategory: csrf
+  reviewCondition: "Cobbler Django web actions can be triggered by GET without the require_POST CSRF hardening"
+  reviewConfidence: high
+  reviewEvidence: "Cobbler web view context {pattern} starts a background or destructive action without @require_POST"
+  vulnerableTo: [request_forgery.Csrf]
+}

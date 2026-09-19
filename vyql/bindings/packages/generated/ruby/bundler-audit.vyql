@@ -1,0 +1,9 @@
+module bindings.ruby.generated.mb08165c4;
+
+binding deserialization0 {
+  requires {
+    dependency("bundler-audit")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.Deserialization at args[0]
+}

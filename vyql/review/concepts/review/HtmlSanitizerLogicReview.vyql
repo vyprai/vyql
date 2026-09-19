@@ -1,0 +1,7 @@
+module code;
+
+review code.HtmlSanitizerLogicReview {
+  category: xss
+  kind: attention
+  text: "review HTML sanitizer/parser raw-text, comment-preservation, and serialization behavior for sanitizer-bypass or mutation-XSS cases"
+}

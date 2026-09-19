@@ -1,0 +1,12 @@
+# Rank 116 / CVE-2022-25856: Argo Events GitArtifactReader let artifact path
+# input reach local file reads.
+
+test "rank116: Git artifact path reaches file path access"
+  expect VYQL-PATH-001
+  graph
+  ```
+  node src core.UserControlledData
+  node sink code.FilePathAccess
+  edge FLOWS src -> sink
+  ```
+

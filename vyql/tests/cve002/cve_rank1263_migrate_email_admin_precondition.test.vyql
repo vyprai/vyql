@@ -1,0 +1,78 @@
+test "rank1263: migrate-email lets a caller with valid credentials confirm a new email even with an admin account present"
+  lang csharp
+  file API/Controllers/AccountController.cs
+  expect VYQL-AUTH-079
+  code
+  ```
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+
+  public class AccountController : BaseApiController
+  {
+      [AllowAnonymous]
+      [HttpPost("migrate-email")]
+      public async Task<ActionResult<string>> MigrateEmail(MigrateUserEmailDto dto)
+      {
+          var emailValidationErrors = await _accountService.ValidateEmail(dto.Email);
+          if (emailValidationErrors.Any())
+          {
+              return BadRequest("User is already invited under this email and has yet to accepted invite.");
+          }
+
+          var user = await _userManager.Users
+              .SingleOrDefaultAsync(x => x.NormalizedUserName == dto.Username.ToUpper());
+          if (user == null) return BadRequest("Invalid username");
+
+          var validPassword = await _signInManager.UserManager.CheckPasswordAsync(user, dto.Password);
+          if (!validPassword) return BadRequest("Your credentials are not correct");
+
+          var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+          user.Email = dto.Email;
+          if (!await ConfirmEmailToken(token, user)) return BadRequest("There was a critical error during migration");
+          _unitOfWork.UserRepository.Update(user);
+          await _unitOfWork.CommitAsync();
+          return Ok();
+      }
+  }
+  ```
+
+test "rank1263: migrate-email refuses to run once an admin account is present"
+  lang csharp
+  file API/Controllers/AccountController.cs
+  reject VYQL-AUTH-079
+  code
+  ```
+  using Microsoft.AspNetCore.Authorization;
+  using Microsoft.AspNetCore.Mvc;
+
+  public class AccountController : BaseApiController
+  {
+      [AllowAnonymous]
+      [HttpPost("migrate-email")]
+      public async Task<ActionResult<string>> MigrateEmail(MigrateUserEmailDto dto)
+      {
+          var users = await _unitOfWork.UserRepository.GetAdminUsersAsync();
+          if (users.Any()) return BadRequest("Admin already exists");
+
+          var emailValidationErrors = await _accountService.ValidateEmail(dto.Email);
+          if (emailValidationErrors.Any())
+          {
+              return BadRequest("User is already invited under this email and has yet to accepted invite.");
+          }
+
+          var user = await _userManager.Users
+              .SingleOrDefaultAsync(x => x.NormalizedUserName == dto.Username.ToUpper());
+          if (user == null) return BadRequest("Invalid username");
+
+          var validPassword = await _signInManager.UserManager.CheckPasswordAsync(user, dto.Password);
+          if (!validPassword) return BadRequest("Your credentials are not correct");
+
+          var token = await _userManager.GenerateEmailConfirmationTokenAsync(user);
+          user.Email = dto.Email;
+          if (!await ConfirmEmailToken(token, user)) return BadRequest("There was a critical error during migration");
+          _unitOfWork.UserRepository.Update(user);
+          await _unitOfWork.CommitAsync();
+          return Ok();
+      }
+  }
+  ```

@@ -1,0 +1,17 @@
+module bindings.ruby.generated.m0a8c6833;
+
+binding codeEval0 {
+  requires {
+    dependency("pry-rescue")
+  }
+  query pattern callExpr where callee.method == "load"
+  emit sink code.CodeEval at args[0]
+}
+
+binding codeEval1 {
+  requires {
+    dependency("pry-rescue")
+  }
+  query pattern callExpr where callee.method == "load_rake"
+  emit sink code.CodeEval at args[0]
+}

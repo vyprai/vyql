@@ -1,0 +1,9 @@
+module bindings.dart.generated.mde767698;
+
+binding deserialization0 {
+  requires {
+    dependency("in_app_purchase_storekit")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}

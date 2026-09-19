@@ -1,0 +1,208 @@
+# Rank 1481 / CVE-2021-32649: October CMS renders CMS pages, layouts and
+# partials -- markup a backend user with the "create, modify and delete
+# website pages" permission authors -- through a Twig environment wrapped in
+# `new SandboxExtension(new System\Twig\SecurityPolicy, true)`. That policy is
+# a `Twig\Sandbox\SecurityPolicyInterface` implementation whose
+# `checkSecurity` and `checkPropertyAllowed` bodies are empty and whose
+# `checkMethodAllowed` throws only when the called method's lowercased name
+# appears in a `$blockedMethods` array. Everything the array does not name
+# stays callable from template markup, so `{{ ... }}` reached the controller's
+# `getTwig()` accessor and a Halcyon `write()`, which is arbitrary file write
+# and therefore PHP execution.
+#
+# Fix commit 167b592e appends `'getTwig'` and `'write'` to that same array.
+# The class stays a blocklist, so the two revisions differ only in the two
+# string literals the fixed revision adds -- there is no structural difference for a
+# binding to key on, and keying on the added literals would be keying on the
+# fix's own vocabulary. October's own history bears the consequence out: the
+# same file is escaped again by CVE-2020-15247, CVE-2020-26231 and, two
+# years after this patch, CVE-2023-44382, each time patched by appending more
+# names.
+#
+# So the shape reported here is the blocklist policy itself, which is the
+# weakness that survives every one of those patches. Twig's sandbox is an
+# allow-list by construction -- `Twig\Sandbox\SecurityPolicy` is built from
+# the tags, filters, methods, properties and functions a template may use and
+# each hook throws for anything not on those lists -- and an implementation
+# that inverts the contract into a list of blocked names is the same
+# incomplete template validation reports for a renderer with no
+# sandbox at all (rank 1271, code.IncompleteTemplateValidation /
+# VYQL-INJ-024). The second case pins that the patched revision still carries
+# it, so no later change turns this into a match on `getTwig`.
+
+test "rank1481: Twig sandbox policy gates methods by a blocklist of names"
+  lang php
+  file SecurityPolicy.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php namespace System\Twig;
+
+  use Twig\Markup;
+  use Twig\Template;
+  use Twig\Sandbox\SecurityPolicyInterface;
+  use Twig\Sandbox\SecurityNotAllowedMethodError;
+  use Twig\Sandbox\SecurityNotAllowedPropertyError;
+
+  final class SecurityPolicy implements SecurityPolicyInterface
+  {
+      /**
+       * @var array List of forbidden methods.
+       */
+      protected $blockedMethods = [
+          // \October\Rain\Extension\ExtendableTrait
+          'addDynamicMethod',
+          'addDynamicProperty',
+
+          // \October\Rain\Support\Traits\Emitter
+          'bindEvent',
+          'bindEventOnce',
+
+          // Eloquent & Halcyon data modification
+          'insert',
+          'update',
+          'delete',
+      ];
+
+      public function __construct()
+      {
+          foreach ($this->blockedMethods as $i => $m) {
+              $this->blockedMethods[$i] = strtolower($m);
+          }
+      }
+
+      public function checkSecurity($tags, $filters, $functions)
+      {
+      }
+
+      public function checkPropertyAllowed($obj, $property)
+      {
+      }
+
+      public function checkMethodAllowed($obj, $method)
+      {
+          // No need to check Twig internal objects
+          if ($obj instanceof Template || $obj instanceof Markup) {
+              return;
+          }
+
+          $blockedMethod = strtolower($method);
+          if (in_array($blockedMethod, $this->blockedMethods)) {
+              $class = get_class($obj);
+              throw new SecurityNotAllowedMethodError(sprintf('Calling "%s" method on a "%s" object is blocked.', $method, $class), $class, $method);
+          }
+      }
+  }
+  ```
+
+test "rank1481: lengthening the blocklist leaves it a blocklist"
+  lang php
+  file SecurityPolicy.php
+  expect VYQL-INJ-024
+  code
+  ```
+  <?php namespace System\Twig;
+
+  use Twig\Markup;
+  use Twig\Template;
+  use Twig\Sandbox\SecurityPolicyInterface;
+  use Twig\Sandbox\SecurityNotAllowedMethodError;
+  use Twig\Sandbox\SecurityNotAllowedPropertyError;
+
+  final class SecurityPolicy implements SecurityPolicyInterface
+  {
+      /**
+       * @var array List of forbidden methods.
+       */
+      protected $blockedMethods = [
+          // Prevent manipulating Twig itself
+          'getTwig',
+
+          // Prevent dynamic methods and props
+          'addDynamicMethod',
+          'addDynamicProperty',
+
+          // Prevent binding event logic
+          'bindEvent',
+          'bindEventOnce',
+
+          // Eloquent & Halcyon data modification
+          'insert',
+          'update',
+          'delete',
+          'write',
+      ];
+
+      public function __construct()
+      {
+          foreach ($this->blockedMethods as $i => $m) {
+              $this->blockedMethods[$i] = strtolower($m);
+          }
+      }
+
+      public function checkSecurity($tags, $filters, $functions)
+      {
+      }
+
+      public function checkPropertyAllowed($obj, $property)
+      {
+      }
+
+      public function checkMethodAllowed($obj, $method)
+      {
+          // No need to check Twig internal objects
+          if ($obj instanceof Template || $obj instanceof Markup) {
+              return;
+          }
+
+          $blockedMethod = strtolower($method);
+          if (in_array($blockedMethod, $this->blockedMethods)) {
+              $class = get_class($obj);
+              throw new SecurityNotAllowedMethodError(sprintf('Calling "%s" method on a "%s" object is blocked.', $method, $class), $class, $method);
+          }
+      }
+  }
+  ```
+
+test "rank1481: Twig sandbox policy gates methods by an allow-list"
+  lang php
+  file TemplatePolicy.php
+  reject VYQL-INJ-024
+  code
+  ```
+  <?php namespace App\Twig;
+
+  use Twig\Markup;
+  use Twig\Template;
+  use Twig\Sandbox\SecurityPolicyInterface;
+  use Twig\Sandbox\SecurityNotAllowedMethodError;
+
+  final class TemplatePolicy implements SecurityPolicyInterface
+  {
+      protected $allowedMethods = [
+          'getname',
+          'gettitle',
+          'geturl',
+      ];
+
+      public function checkSecurity($tags, $filters, $functions)
+      {
+      }
+
+      public function checkPropertyAllowed($obj, $property)
+      {
+      }
+
+      public function checkMethodAllowed($obj, $method)
+      {
+          if ($obj instanceof Template || $obj instanceof Markup) {
+              return;
+          }
+
+          if (!in_array(strtolower($method), $this->allowedMethods)) {
+              $class = get_class($obj);
+              throw new SecurityNotAllowedMethodError(sprintf('Calling "%s" method on a "%s" object is blocked.', $method, $class), $class, $method);
+          }
+      }
+  }
+  ```

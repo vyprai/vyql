@@ -1,0 +1,9 @@
+module bindings.swift.generated.mdb6307d8;
+
+binding networkData0 {
+  requires {
+    dependency("github.com/ProxymanApp/atlantis")
+  }
+  query pattern callExpr where callee.method == "add"
+  emit source code.NetworkData at call.result
+}

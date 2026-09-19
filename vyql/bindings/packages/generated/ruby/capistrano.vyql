@@ -1,0 +1,25 @@
+module bindings.ruby.generated.mbbb9062e;
+
+binding commandExecution0 {
+  requires {
+    dependency("capistrano")
+  }
+  query pattern callExpr where callee.method == "run_locally"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution1 {
+  requires {
+    dependency("capistrano")
+  }
+  query pattern callExpr where callee.method == "run_shell_command"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding commandExecution2 {
+  requires {
+    dependency("capistrano")
+  }
+  query pattern callExpr where callee.method == "run_remote_ssh_command"
+  emit sink code.CommandExecution at args[0]
+}

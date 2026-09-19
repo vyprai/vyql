@@ -1,0 +1,9 @@
+module bindings.groovy.generated.me871342f;
+
+binding fileUse0 {
+  requires {
+    dependency("org.springframework.integration:spring-integration-file")
+  }
+  query pattern callExpr where callee.method == "FileWritingMessageHandler.handleRequestMessage"
+  emit sink code.FileUseSink at args[0]
+}

@@ -1,0 +1,31 @@
+module bindings.php.twig_string_template_unsandboxed_render;
+
+// Twig's documented boundary for a template whose source the program did
+// not write is the sandbox: the security chapter of Twig's own
+// documentation requires the sandbox extension whenever template authors
+// are untrusted. `Environment::createTemplate($source)` compiles markup
+// handed to it at runtime -- the string form of `load()`, with no loader
+// and no path involved -- so rendering a template built that way executes
+// whatever the string contains, and only the environment's policy bounds
+// what it can reach. Compiling a string and rendering it with no sandbox
+// vocabulary anywhere in the file is the same incomplete template
+// validation already reported for an environment on a loader of the
+// application's own, a sandbox policy driven by blocked names, and a
+// Smarty policy that inverts its allow-list.
+//
+// The shape is read at module scope because the sandbox is a property of
+// the environment, and the common layout configures the environment where
+// it is built -- a factory, a container getter, an init method -- rather
+// than at the render site, so requiring the policy in the rendering
+// function alone would report a renderer whose environment is in fact
+// sandboxed. `createTemplate` is also Smarty's name for loading a
+// template by resource name, which compiles nothing the caller handed it,
+// so the clauses are confined to files that name Twig. Any spelling of
+// the sandbox clears the issue (`Twig\Sandbox`, `SandboxExtension`, the
+// enable/disable helpers on it); every clause is text-level over the
+// module context, so a comment naming the sandbox clears too:
+// false-negative direction only.
+binding twigStringTemplateUnsandboxedRender {
+  query pattern presenceNode where node.scope == "module" and node.context.language == "php" and containsAny(node.token, ["->createTemplate("]) and containsAny(node.token, ["->render("]) and containsAny(node.token, ["Twig", "twig"]) and not containsAny(node.token, ["Sandbox"])
+  emit issue code.IncompleteTemplateValidation at node
+}

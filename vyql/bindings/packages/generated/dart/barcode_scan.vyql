@@ -1,0 +1,9 @@
+module bindings.dart.generated.m1732f9f9;
+
+binding userControlledData0 {
+  requires {
+    dependency("barcode_scan")
+  }
+  query pattern callExpr where callee.method == "BarcodeScanner.scan"
+  emit source core.UserControlledData at call.result
+}

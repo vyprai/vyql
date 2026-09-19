@@ -1,0 +1,55 @@
+module bindings.java.spring_response_body_render;
+
+// Spring's `@ResponseBody` is the documented switch for "the return value is
+// the response body": no view resolution, the value the method returns is what
+// the client receives. `@RestController` is the composed form -- "a convenience
+// annotation that is itself annotated with @Controller and @ResponseBody" --
+// so it carries the same meaning for every handler in the class. A handler
+// that answers with a `@RequestParam` it never escaped is therefore handing
+// the request string to whatever renders the response, which is the reflected
+// half of an XSS.
+//
+// Two facts decide the label and both come from the framework's own
+// documentation rather than from any one incident:
+//
+//   - the body annotation: `@ResponseBody` on the method, or `@RestController`
+//     on its class. Both are read as annotation tokens, the method's own for
+//     the first, the class's for the second -- which is why there are two
+//     bindings rather than one, since a call-argument context takes one value
+//     per clause and no disjunction.
+//   - the declared return type. A bare `String` return is written verbatim by
+//     `StringHttpMessageConverter`, so the body is the string; a
+//     `ReadableOrder` return is serialized by Jackson to JSON, which is not a
+//     render. Without this gate the label lands on every REST handler in an
+//     application: on the tree this was measured against, the ungated form
+//     added 90 findings of which 84 sat on object-returning JSON endpoints.
+//     The handler-visibility clause is the same kind of framework fact --
+//     Spring dispatches only public handler methods -- and it keeps the
+//     composed annotation from reaching private helpers in the same class.
+//
+// The sink lands on the return argument itself, so the existing
+// `core.HtmlEscape` controls (`escapeHtml4`, `escapeHtml`, `htmlEscape`, ...)
+// neutralise the path they actually cover and only that path: a handler that
+// escapes one return and leaves another raw reports the raw one, which is the
+// correct answer about that handler.
+//
+// `callee.method` is not the route here because there is no call to name --
+// the value is returned, not passed. `callee.analysis ~= "function.return"`
+// addresses the return pseudo-call, which is the same route the Flask handler
+// bindings use for the identical question in Python.
+//
+// Note on the matching semantics measured here: on a call-argument context,
+// `contains` compares the whole token value, so `contains "ResponseBody"`
+// matches `annotation:ResponseBody` and nothing else, while `containsAny`
+// matches nothing at all. Spelling the value in full is what makes the clause
+// behave as read.
+
+binding springResponseBodyStringRender {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.annotation contains "ResponseBody" and args.any.context.functionModifier contains "public" and args.any.context.returnType contains "String"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding springRestControllerStringRender {
+  query pattern callExpr where callee.analysis ~= "function.return" and args.any.context.classAnnotation contains "RestController" and args.any.context.functionModifier contains "public" and args.any.context.returnType contains "String"
+  emit sink code.HtmlRender at args[0]
+}

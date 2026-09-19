@@ -1,0 +1,25 @@
+module bindings.go.generated.med2d97cf;
+
+binding networkSend0 {
+  requires {
+    dependency("gopkg.in/inconshreveable/log15.v2")
+  }
+  query pattern callExpr where callee.method == "NetHandler"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding fileUse1 {
+  requires {
+    dependency("gopkg.in/inconshreveable/log15.v2")
+  }
+  query pattern callExpr where callee.method == "FileHandler"
+  emit sink code.FileUseSink at args[0]
+}
+
+binding codeEval2 {
+  requires {
+    dependency("gopkg.in/inconshreveable/log15.v2")
+  }
+  query pattern callExpr where callee.method == "StreamHandler"
+  emit sink code.CodeEval at args[0]
+}

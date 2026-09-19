@@ -1,0 +1,11 @@
+module vypr.request_forgery;
+
+rule CodeDxJenkinsRemoteValidationMissingPostPermission {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_352, CWE_862, CWE_918]
+    id: "VYQL-RF-018"
+    severity: medium
+  }
+  issue code.CodeDxJenkinsRemoteValidationMissingPostPermission as endpoint
+}

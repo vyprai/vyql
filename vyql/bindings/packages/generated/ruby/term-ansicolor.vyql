@@ -1,0 +1,201 @@
+module bindings.ruby.generated.mde62ae8b;
+
+binding logOutput0 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "apply_code"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput1 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "apply_attribute"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput2 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "color"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput3 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "on_color"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput4 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_to"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput5 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_to_column"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput6 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_to_line"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput7 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_up"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput8 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_down"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput9 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_forward"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput10 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_backward"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput11 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_to_next_line"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput12 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_to_previous_line"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput13 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_home"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput14 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "clear_screen"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput15 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "erase_in_display"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput16 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "erase_in_line"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput17 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "scroll_up"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput18 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "scroll_down"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput19 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "save_position"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput20 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "restore_position"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput21 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "return_to_position"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput22 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "show_cursor"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput23 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "hide_cursor"
+  emit sink code.LogOutput at args[0]
+}
+
+binding logOutput24 {
+  requires {
+    dependency("term-ansicolor")
+  }
+  query pattern callExpr where callee.method == "move_command"
+  emit sink code.LogOutput at args[0]
+}

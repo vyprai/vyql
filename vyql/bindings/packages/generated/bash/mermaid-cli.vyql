@@ -1,0 +1,9 @@
+module bindings.bash.generated.m5d8042ba;
+
+binding cliArgument0 {
+  requires {
+    dependency("mermaid-cli")
+  }
+  query pattern callExpr where callee.path ~= "mermaid-cli.argv"
+  emit source code.CliArgument at call.result
+}

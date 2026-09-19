@@ -1,0 +1,30 @@
+module bindings.objc.generated.m98a69847;
+
+binding deserialization0 {
+  requires {
+    dependency("CMDQueryStringSerialization")
+  }
+  query pattern callExpr where callee.method == "dictionaryWithQueryString"
+  emit sink code.Deserialization at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("CMDQueryStringSerialization")
+  }
+  query pattern callExpr where callee.method == "cmd_queryDictionary"
+  emit source core.UserControlledData at call.result
+}
+
+binding inputValidation2 {
+  requires {
+    dependency("CMDQueryStringSerialization")
+  }
+  query pattern callExpr where callee.method == "CMDQueryStringSerialization_stringByAddingEscapes"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

@@ -1,0 +1,11 @@
+module code;
+
+concept UrlAuthoritySplitWithoutBackslashNormalization : issue {
+  cwe: [CWE_20, CWE_918]
+  reviewAssumption: "the parsed hostname feeds a host comparison or allowlist decision while browsers resolve the same URL under WHATWG semantics, where a backslash is a path separator"
+  reviewCategory: request_forgery
+  reviewCondition: "a hand-rolled URL parser splits authority components (userinfo, host, port) from the raw URL string with no backslash-to-slash normalization, so a backslash-delimited URL parses to a different host than a browser resolves"
+  reviewConfidence: medium
+  reviewEvidence: "URL authority parsing context {pattern} derives hostname and userinfo components from raw-string delimiters while the module performs no backslash-to-slash replacement"
+  vulnerableTo: [request_forgery.Ssrf, request_forgery.OpenRedirect]
+}

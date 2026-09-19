@@ -1,0 +1,9 @@
+module bindings.elixir.generated.madfe6120;
+
+binding commandExecution0 {
+  requires {
+    dependency("exirc")
+  }
+  query pattern callExpr where callee.method == "ExIRC.Client.cmd"
+  emit sink code.CommandExecution at args[0]
+}

@@ -1,0 +1,24 @@
+module bindings.java.generated.m420f6b67;
+
+// javax.naming.Context (and its InitialContext/InitialDirContext/InitialLdapContext
+// implementations) documents lookup(String name) as resolving name against the
+// naming/directory service the context is bound to. When that service is remote
+// (LDAP, RMI, DNS-based JNDI providers), an untrusted name lets the client connect
+// to and instantiate whatever a naming/directory server not under the caller's
+// control describes -- the same class of remote-object-instantiation risk
+// code.Deserialization already models for readObject/Yaml.load/XMLDecoder, so
+// lookup joins that sink family rather than minting a JNDI-specific concept.
+binding jndiLookup457 {
+  query pattern callExpr where callee.method == "lookup" and callee.receiver.type in [Context, InitialContext, InitialDirContext, InitialLdapContext, DirContext]
+  emit sink code.Deserialization at args[0]
+}
+
+binding jndiLookup458 {
+  query pattern callExpr where callee.path ~= "InitialContext.lookup"
+  emit sink code.Deserialization at args[0]
+}
+
+binding jndiLookup459 {
+  query pattern callExpr where callee.path ~= "InitialDirContext.lookup"
+  emit sink code.Deserialization at args[0]
+}

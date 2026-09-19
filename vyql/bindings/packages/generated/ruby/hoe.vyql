@@ -1,0 +1,9 @@
+module bindings.ruby.generated.m87a00b10;
+
+binding filePathAccess0 {
+  requires {
+    dependency("hoe")
+  }
+  query pattern callExpr where callee.method == "read_utf"
+  emit sink code.FilePathAccess at args[0]
+}

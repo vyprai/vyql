@@ -1,0 +1,9 @@
+module bindings.dart.generated.maa245c74;
+
+binding sqlExecution0 {
+  requires {
+    dependency("sqlite3")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.SqlExecution at args[0]
+}

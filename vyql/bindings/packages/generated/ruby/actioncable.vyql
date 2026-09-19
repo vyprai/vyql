@@ -1,0 +1,41 @@
+module bindings.ruby.generated.m765c6045;
+
+binding networkData0 {
+  requires {
+    dependency("actioncable")
+  }
+  query pattern callExpr where callee.method == "receive"
+  emit source code.NetworkData at call.result
+}
+
+binding networkData1 {
+  requires {
+    dependency("actioncable")
+  }
+  query pattern callExpr where callee.method == "dispatch_websocket_message"
+  emit source code.NetworkData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("actioncable")
+  }
+  query pattern callExpr where callee.method == "handle_channel_command"
+  emit source core.UserControlledData at call.result
+}
+
+binding networkSend3 {
+  requires {
+    dependency("actioncable")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("actioncable")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}

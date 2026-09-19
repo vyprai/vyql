@@ -1,0 +1,113 @@
+module bindings.java.generated.mb2560d14;
+
+binding userControlledData0 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.query"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.header"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.headers"
+  emit source core.UserControlledData at call.result
+}
+
+binding cookie3 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.cookie"
+  emit source code.Cookie at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.getResponse"
+  emit source code.HttpInput at call.result
+}
+
+binding networkSend5 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.invoke"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend6 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.post"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend7 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.put"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend8 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.get"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend9 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.head"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend10 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.options"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend11 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.delete"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend12 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.form"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect13 {
+  requires {
+    dependency("org.apache.cxf:cxf-rt-rs-client")
+  }
+  query pattern callExpr where callee.method == "WebClient.create"
+  emit sink code.NetworkConnectSink at args[0]
+}

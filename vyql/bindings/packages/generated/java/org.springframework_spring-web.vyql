@@ -1,0 +1,33 @@
+module bindings.java.generated.m7fdb02a2;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework:spring-web")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("org.springframework:spring-web")
+  }
+  query pattern callExpr where callee.method == "tokenize"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("org.springframework:spring-web")
+  }
+  query pattern callExpr where callee.method == "parseMediaType"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization3 {
+  requires {
+    dependency("org.springframework:spring-web")
+  }
+  query pattern callExpr where callee.method == "parseRanges"
+  emit sink code.Deserialization at args[0]
+}

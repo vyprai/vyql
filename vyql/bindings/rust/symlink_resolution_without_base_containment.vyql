@@ -1,0 +1,31 @@
+module bindings.rust.symlink_resolution_without_base_containment;
+
+// The standard library documents the two halves of safe symlink handling
+// separately. Path::is_symlink reports that a path points at a link;
+// Path::canonicalize resolves the link and returns the target as an absolute
+// path; fs::symlink_metadata reads a path's own metadata without following
+// it. None of those three says anything about where the target lands: a link
+// planted inside a tree that is served, listed or walked resolves to wherever
+// it points, and every reader that goes through it -- the metadata call, the
+// file open, the entry's listing row -- reads outside the tree.
+//
+// The documented way to allow links while keeping a tree rooted is the
+// component-wise comparison family on Path: starts_with and strip_prefix
+// compare whole path components against a base, and components and ancestors
+// walk them. Refusing links outright needs no resolution at all, which is why
+// the binding requires the resolution half: code that only tests is_symlink
+// and stops -- the detector that reports a link for its caller to refuse, the
+// filter that skips link entries -- never reaches for the target and is not
+// this shape. What is reported is the function that has already decided a
+// path may be a link, resolves or inspects the target anyway, and carries no
+// component-wise containment against a base directory.
+//
+// The judgement lives in the pack rule; this binding only recognises the
+// atoms. Every clause is an exact-token match over the resolving function's
+// own context tokens, so prose in a comment satisfies neither side and a
+// sibling function's containment comparison cannot clear the resolution.
+
+binding symlinkResolutionWithoutBaseContainment {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "rust" and node.context.call in ["is_symlink"] and node.context.call in ["canonicalize", "symlink_metadata"] and not (node.context.call in ["starts_with", "strip_prefix", "components", "ancestors"])
+  emit issue code.SymlinkFollowedWithoutBaseContainment at node
+}

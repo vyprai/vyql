@@ -1,0 +1,11 @@
+module code;
+
+concept PresenceDerivedEmailVerification : issue {
+  cwe: [CWE_287, CWE_290]
+  reviewAssumption: "the email address on a federated identity profile is chosen by whoever controls the upstream account, and a verified flag on it decides whether the address may be matched against an existing local account"
+  reviewCategory: auth
+  reviewCondition: "an email-verification status is set from the address being non-empty rather than from an attestation the identity provider supplied"
+  reviewConfidence: high
+  reviewEvidence: "identity profile context {pattern} sets an email-verified field while the only email predicate in scope is a non-empty test of the address, with no provider verification claim read"
+  vulnerableTo: [authentication.ImproperAuthentication, authentication.AuthenticationBypass]
+}

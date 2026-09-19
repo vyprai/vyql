@@ -1,0 +1,49 @@
+module bindings.go.generated.m7c85617b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("rsc.io/pdf")
+  }
+  query pattern callExpr where callee.method == "Open"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("rsc.io/pdf")
+  }
+  query pattern callExpr where callee.method == "NewReader"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("rsc.io/pdf")
+  }
+  query pattern callExpr where callee.method == "NewReaderEncrypted"
+  emit source core.UserControlledData at call.result
+}
+
+binding deserialization3 {
+  requires {
+    dependency("rsc.io/pdf")
+  }
+  query pattern callExpr where callee.method == "readCmap"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization4 {
+  requires {
+    dependency("rsc.io/pdf")
+  }
+  query pattern callExpr where callee.method == "applyFilter"
+  emit sink code.Deserialization at args[0]
+}
+
+binding codeEval5 {
+  requires {
+    dependency("rsc.io/pdf")
+  }
+  query pattern callExpr where callee.method == "Interpret"
+  emit sink code.CodeEval at args[0]
+}

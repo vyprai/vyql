@@ -1,0 +1,13 @@
+module bindings.python.generated.m76c56ef7;
+
+binding authenticationCheck0 {
+  requires {
+    dependency("flask-login")
+  }
+  query pattern callExpr where callee.method == "login_user"
+  emit check core.AuthenticationCheck at call {
+    covers endpoint {
+      anchor: call
+    }
+  }
+}

@@ -1,0 +1,17 @@
+module bindings.ruby.generated.mc1109f40;
+
+binding userControlledData0 {
+  requires {
+    dependency("cucumber-core")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("cucumber-core")
+  }
+  query pattern callExpr where callee.method == "process"
+  emit source core.UserControlledData at call.result
+}

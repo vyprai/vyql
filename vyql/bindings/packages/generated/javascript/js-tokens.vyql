@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m8aca8b41;
+
+binding deserialization0 {
+  requires {
+    dependency("js-tokens")
+  }
+  query pattern callExpr where callee.method == "jsTokens"
+  emit sink code.Deserialization at args[0]
+}

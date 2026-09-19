@@ -1,0 +1,17 @@
+module bindings.scala.generated.m79bae58a;
+
+binding networkConnect0 {
+  requires {
+    dependency("com.qiniu:qiniu-java-sdk")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkConnectSink at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("com.qiniu:qiniu-java-sdk")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}

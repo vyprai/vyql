@@ -1,0 +1,89 @@
+module bindings.cpp.generated.m2bcacd66;
+
+binding secretValue0 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "auth"
+  emit source code.SecretValue at call.result
+}
+
+binding storedDataWrite1 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "del"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite2 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "del_range"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite3 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "flushall"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataWrite4 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "flushdb"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataRead5 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "dump"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead6 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "info"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataRead7 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "lastsave"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataWrite8 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "save"
+  emit sink code.StoredDataWrite at args[0]
+}
+
+binding storedDataRead9 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "select"
+  emit source code.StoredDataRead at call.result
+}
+
+binding storedDataWrite10 {
+  requires {
+    dependency("redis-plus-plus")
+  }
+  query pattern callExpr where callee.method == "swapdb"
+  emit sink code.StoredDataWrite at args[0]
+}

@@ -1,0 +1,9 @@
+module bindings.rust.generated.m624a8fbe;
+
+binding secretValue0 {
+  requires {
+    dependency("pear")
+  }
+  query pattern callExpr where callee.method == "Token"
+  emit source code.SecretValue at call.result
+}

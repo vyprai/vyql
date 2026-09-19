@@ -1,0 +1,25 @@
+module bindings.ruby.generated.m7bd69ab9;
+
+binding deserialization0 {
+  requires {
+    dependency("webrobots")
+  }
+  query pattern callExpr where callee.method == "parse!"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("webrobots")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding htmlRender2 {
+  requires {
+    dependency("webrobots")
+  }
+  query pattern callExpr where callee.method == "parse_meta_robots"
+  emit sink code.HtmlRender at args[0]
+}

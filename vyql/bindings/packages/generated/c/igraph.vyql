@@ -1,0 +1,25 @@
+module bindings.c.generated.m07707a64;
+
+binding networkData0 {
+  requires {
+    dependency("igraph")
+  }
+  query pattern callExpr where callee.method == "igraph_fatal_handler_t"
+  emit source code.NetworkData at call.result
+}
+
+binding networkSend1 {
+  requires {
+    dependency("igraph")
+  }
+  query pattern callExpr where callee.method == "igraph_sparsemat_add"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkConnect2 {
+  requires {
+    dependency("igraph")
+  }
+  query pattern callExpr where callee.method == "igraph_st_vertex_connectivity"
+  emit sink code.NetworkConnectSink at args[0]
+}

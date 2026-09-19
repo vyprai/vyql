@@ -1,0 +1,25 @@
+module bindings.java.generated.mf438f5b2;
+
+binding networkSend0 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "execute"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "executeAsync"
+  emit sink code.NetworkSend at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("io.searchbox:jest")
+  }
+  query pattern callExpr where callee.method == "deserializeResponse"
+  emit sink code.Deserialization at args[0]
+}

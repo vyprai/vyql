@@ -1,0 +1,34 @@
+module bindings.python.generated.m11fd24d1;
+
+binding htmlRender0 {
+  requires {
+    dependency("django-bootstrap3")
+  }
+  query pattern callExpr where callee.method == "render_script_tag"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding htmlRender1 {
+  requires {
+    dependency("django-bootstrap3")
+  }
+  query pattern callExpr where callee.method == "render_link_tag"
+  emit sink code.HtmlRender at args[0]
+}
+
+binding templateRender2 {
+  requires {
+    dependency("django-bootstrap3")
+  }
+  query pattern callExpr where callee.method == "render_template_file"
+  emit sink code.TemplateRender at args[0]
+}
+
+binding redirectTarget3 {
+  requires {
+    dependency("django-bootstrap3")
+  }
+  query pattern callExpr where callee.method == "url_replace_param"
+  emit issue code.RedirectTarget at call
+  emit sink code.RedirectTargetSink at call
+}

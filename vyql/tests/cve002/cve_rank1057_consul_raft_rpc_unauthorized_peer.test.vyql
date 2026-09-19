@@ -1,0 +1,175 @@
+# Rank 1057 / CVE-2021-37219: Consul hands a TLS connection to the Raft
+# consensus transport without checking that the peer is a server, so any client
+# holding a certificate the agent CA signs can join the consensus layer
+# (CWE-295).
+# Server.handleConn dispatches on the connection's first byte and the Raft arm
+# goes straight through:
+#
+#   case pool.RPCRaft:
+#     metrics.IncrCounter([]string{"rpc", "raft_handoff"}, 1)
+#     s.raftLayer.Handoff(conn)
+#
+# with the same two lines repeated in handleNativeTLS for the ALPN path. A
+# valid client-agent certificate is enough to reach it, and the Raft layer
+# trusts whatever it is handed. The fixed revision routes both arms through a
+# new handleRaftRPC that calls tlsConfigurator.AuthorizeServerConn, which
+# verifies the peer certificate chains to the agent CA and carries a DNSName
+# matching the local ServerSNI, and closes the connection otherwise.
+#
+# ATTENTION, vocabulary gap. Nothing reports agent/consul/rpc.go at either
+# revision: the whole checkout scans to 625 findings before the fix and 631
+# after, sharing 623 fingerprints, and none of them is on this file. The labels
+# the file does get are transport furniture -- code.NetworkData on tls.Server,
+# two code.ResourceReview rows on Accept, one code.NetworkSend, and
+# core.ResourceRelease on every conn.Close.
+#
+# code.PrivilegedEntryPointReview is the right vocabulary and Go can emit it: a
+# presenceNode binding keyed on the function produces the attention flag with
+# expects: core.AuthorizationCheck. Two things keep that binding unshippable,
+# and both are vocabulary rather than engine work.
+#
+#  - The only anchor that identifies the privileged dispatch is
+#    s.raftLayer.Handoff, Consul's own RaftLayer method; hashicorp/raft's
+#    documented StreamLayer interface offers Accept, Dial and Close and no
+#    handoff, so a binding on that name detects this project and not the
+#    weakness. The protocol discriminators pool.RPCRaft and ALPN_RPCRaft are
+#    Consul's own constants.
+#  - A review flag is emitted for every node carrying the concept, and the
+#    expected-control list is advisory text for the reviewer, so the control
+#    cannot withdraw it; the emitter has to carry the negation itself. The only
+#    spelling of that negation is AuthorizeServerConn, also Consul's own
+#    method, and core.AuthorizationCheck has no binding under
+#    vyql/bindings/go at all.
+#
+# A throwaway binding carrying both project names measures 2 flags on the
+# vulnerable revision (handleConn, handleNativeTLS) and 0 on the fixed one, so
+# the discrimination exists and is entirely project-shaped. The last two
+# snippets are that pair.
+#
+# verify_current_expected: attention-vocabulary-gap
+
+test "rank1057: the raft arm hands the connection off with no peer check"
+  lang go
+  file agent/consul/rpc.go
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  package consul
+
+  import (
+      "net"
+
+      "github.com/armon/go-metrics"
+      "github.com/hashicorp/consul/agent/pool"
+  )
+
+  func (s *Server) handleConn(conn net.Conn, isTLS bool) {
+      buf := make([]byte, 1)
+      if _, err := conn.Read(buf); err != nil {
+          conn.Close()
+          return
+      }
+
+      switch pool.RPCType(buf[0]) {
+      case pool.RPCConsul:
+          s.handleConsulConn(conn)
+
+      case pool.RPCRaft:
+          metrics.IncrCounter([]string{"rpc", "raft_handoff"}, 1)
+          s.raftLayer.Handoff(conn)
+
+      case pool.RPCMultiplexV2:
+          s.handleMultiplexV2(conn)
+
+      default:
+          conn.Close()
+      }
+  }
+  ```
+
+test "rank1057: the ALPN arm repeats it"
+  lang go
+  file agent/consul/rpc.go
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  package consul
+
+  import (
+      "crypto/tls"
+
+      "github.com/armon/go-metrics"
+      "github.com/hashicorp/consul/agent/pool"
+  )
+
+  func (s *Server) handleNativeTLS(conn net.Conn) {
+      tlsConn := tls.Server(conn, s.tlsConfigurator.IncomingALPNRPCConfig(nil))
+      if err := tlsConn.Handshake(); err != nil {
+          conn.Close()
+          return
+      }
+
+      switch tlsConn.ConnectionState().NegotiatedProtocol {
+      case pool.ALPN_RPCConsul:
+          s.handleConsulConn(tlsConn)
+
+      case pool.ALPN_RPCRaft:
+          metrics.IncrCounter([]string{"rpc", "raft_handoff"}, 1)
+          s.raftLayer.Handoff(tlsConn)
+
+      default:
+          tlsConn.Close()
+      }
+  }
+  ```
+
+test "rank1057: the pair only project vocabulary separates, unauthorized handoff"
+  lang go
+  file agent/consul/rpc.go
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  package consul
+
+  import (
+      "crypto/tls"
+      "net"
+
+      "github.com/armon/go-metrics"
+  )
+
+  func (s *Server) handleRaftRPC(conn net.Conn) {
+      metrics.IncrCounter([]string{"rpc", "raft_handoff"}, 1)
+      s.raftLayer.Handoff(conn)
+  }
+  ```
+
+test "rank1057: the pair only project vocabulary separates, authorized handoff"
+  lang go
+  file agent/consul/rpc.go
+  reject_review code.PrivilegedEntryPointReview
+  code
+  ```
+  package consul
+
+  import (
+      "crypto/tls"
+      "net"
+
+      "github.com/armon/go-metrics"
+  )
+
+  func (s *Server) handleRaftRPC(conn net.Conn) {
+      if tlsConn, ok := conn.(*tls.Conn); ok {
+          err := s.tlsConfigurator.AuthorizeServerConn(s.config.Datacenter, tlsConn)
+          if err != nil {
+              s.rpcLogger().Warn(err.Error(), "from", conn.RemoteAddr(), "operation", "raft RPC")
+              conn.Close()
+              return
+          }
+      }
+
+      metrics.IncrCounter([]string{"rpc", "raft_handoff"}, 1)
+      s.raftLayer.Handoff(conn)
+  }
+  ```

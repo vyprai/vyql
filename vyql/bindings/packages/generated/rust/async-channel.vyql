@@ -1,0 +1,49 @@
+module bindings.rust.generated.mf35ca464;
+
+binding userControlledData0 {
+  requires {
+    dependency("async-channel")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("async-channel")
+  }
+  query pattern callExpr where callee.method == "try_send"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData2 {
+  requires {
+    dependency("async-channel")
+  }
+  query pattern callExpr where callee.method == "send_blocking"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData3 {
+  requires {
+    dependency("async-channel")
+  }
+  query pattern callExpr where callee.method == "recv"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData4 {
+  requires {
+    dependency("async-channel")
+  }
+  query pattern callExpr where callee.method == "try_recv"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData5 {
+  requires {
+    dependency("async-channel")
+  }
+  query pattern callExpr where callee.method == "recv_blocking"
+  emit source core.UserControlledData at call.result
+}

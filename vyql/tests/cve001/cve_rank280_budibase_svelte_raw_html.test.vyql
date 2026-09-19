@@ -1,0 +1,48 @@
+# Rank 280 / CVE-2026-35218: Budibase's command palette rendered stored entity
+# names through Svelte {@html}, allowing Builder-role stored XSS.
+
+test "rank280: budibase command palette renders command name as raw Svelte html"
+  lang config
+  file CommandPalette.svelte
+  expect VYQL-INJ-028
+  code
+  ```
+  <script lang="ts">
+    const commands = tables.map(table => ({
+      type: "Table",
+      name: table.name,
+      icon: "table",
+    }))
+  </script>
+
+  {#each commands as command}
+    <div class="name">
+      {@html command.name}
+    </div>
+  {/each}
+  ```
+
+test "rank280: budibase command palette renders command name as escaped text"
+  lang config
+  file CommandPalette.svelte
+  reject VYQL-INJ-028
+  code
+  ```
+  <script lang="ts">
+    const commands = tables.map(table => ({
+      type: "Table",
+      name: table.name,
+      codeName: table._id,
+      icon: "table",
+    }))
+  </script>
+
+  {#each commands as command}
+    <div class="name">
+      {command.name}
+      {#if command.codeName}
+        <code>{command.codeName}</code>
+      {/if}
+    </div>
+  {/each}
+  ```

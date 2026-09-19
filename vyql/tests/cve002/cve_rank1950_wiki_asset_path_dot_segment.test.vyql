@@ -1,0 +1,128 @@
+# A wiki that stores pages and assets under a content root resolves the
+# request path through a cleaner before it ever reaches storage. The real
+# cleaner decoded the raw path with querystring.unescape, split it on '/',
+# dropped the empty segments and re-joined the rest — a screen, in that it
+# exists to remove what should not reach storage — but no dot-segment form
+# is rejected anywhere, so `..` segments survived into the re-joined path.
+# The storage side of the flow composes that path onto the configured root
+# (`path.join(this.config.path, asset.path)` in each local storage module)
+# and serves the result (`res.sendFile`), which resolves outside the root
+# when the segments climb (CWE-22):
+#
+#   server/controllers/common.js          parsePath(req.path) -> assets.getAsset(pageArgs.path, res)
+#   server/models/assets.js               getAssetFromStorage -> getLocalLocations -> getAssetFromCache -> sendFile
+#   server/modules/storage/disk/storage.js getLocalLocation: path.join(this.config.path, asset.path)
+#
+# The fixed revision rejects the dot segments inside the screen itself — the segment
+# filter drops `..` and `.` and each segment is trimmed first, plus a
+# character screen for control and reserved filesystem characters — so the
+# traversal segments die where the empty ones did.
+#
+# Detected by widening the existing request-path-screen family to JavaScript:
+# `code.IncompleteDotSegmentRequestScreen` and its rule VYQL-PATH-041
+# covered the servlet deny-list shape (class screening percent-encoded
+# control sequences) and the leading-`/.` route filter shape. This shape is
+# the segment screen: decode, split, filter, re-join, and no dot-segment
+# rejection. The fixed revision's own filter adds the `'..'` literal the negation reads,
+# so the patched cleaner is not reported while the vulnerable one is — 1 at
+# the defect, server/helpers/page.js, and 0 at the fixed revision commit on the same
+# tree. The decode anchor stays on the documented unescape spelling:
+# widening it to decodeURIComponent is measured at two false positives on
+# minified client bundles and no additional true positive.
+
+test "rank1950: path cleaner screens empty segments but no dot segments"
+  lang javascript
+  file server/helpers/page.js
+  expect VYQL-PATH-041
+  expect_review code.IncompleteDotSegmentRequestScreen
+  code
+  ```
+  const qs = require('querystring')
+  const _ = require('lodash')
+  const path = require('path')
+
+  module.exports = {
+    parsePath (rawPath, opts = {}) {
+      let pathObj = {
+        locale: 'en',
+        path: 'home',
+        explicitLocale: false
+      }
+
+      // Clean Path
+      rawPath = _.trim(qs.unescape(rawPath))
+      if (_.startsWith(rawPath, '/')) { rawPath = rawPath.substring(1) }
+      if (rawPath === '') { rawPath = 'home' }
+
+      // Extract Info
+      let pathParts = _.filter(_.split(rawPath, '/'), p => !_.isEmpty(p))
+      if (pathParts[0].length === 1) {
+        pathParts.shift()
+      }
+
+      // Strip extension
+      if (opts.stripExt && pathParts.length > 0) {
+        const lastPart = _.last(pathParts)
+        if (lastPart.indexOf('.') > 0) {
+          pathParts.pop()
+          const lastPartMeta = path.parse(lastPart)
+          pathParts.push(lastPartMeta.name)
+        }
+      }
+
+      pathObj.path = _.join(pathParts, '/')
+      return pathObj
+    }
+  }
+  ```
+
+test "rank1950: the fixed revision rejects dot segments inside the screen"
+  lang javascript
+  file server/helpers/page.js
+  reject VYQL-PATH-041
+  code
+  ```
+  const qs = require('querystring')
+  const _ = require('lodash')
+  const path = require('path')
+
+  const unsafeCharsRegex = /[\\x00-\\x1f\\x80-\\x9f\\\\\"|<>:*?]/
+
+  module.exports = {
+    parsePath (rawPath, opts = {}) {
+      let pathObj = {
+        locale: 'en',
+        path: 'home',
+        explicitLocale: false
+      }
+
+      // Clean Path
+      rawPath = _.trim(qs.unescape(rawPath))
+      if (_.startsWith(rawPath, '/')) { rawPath = rawPath.substring(1) }
+      rawPath = rawPath.replace(unsafeCharsRegex, '')
+      if (rawPath === '') { rawPath = 'home' }
+
+      // Extract Info
+      let pathParts = _.filter(_.split(rawPath, '/'), p => {
+        p = _.trim(p)
+        return !_.isEmpty(p) && p !== '..' && p !== '.'
+      })
+      if (pathParts[0].length === 1) {
+        pathParts.shift()
+      }
+
+      // Strip extension
+      if (opts.stripExt && pathParts.length > 0) {
+        const lastPart = _.last(pathParts)
+        if (lastPart.indexOf('.') > 0) {
+          pathParts.pop()
+          const lastPartMeta = path.parse(lastPart)
+          pathParts.push(lastPartMeta.name)
+        }
+      }
+
+      pathObj.path = _.join(pathParts, '/')
+      return pathObj
+    }
+  }
+  ```

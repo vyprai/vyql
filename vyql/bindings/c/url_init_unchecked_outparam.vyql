@@ -1,0 +1,35 @@
+module bindings.c.url_init_unchecked_outparam;
+
+// h2o_url_init's own header contract: "@return 0 if successful", and the
+// inline definition keeps it -- the failure return happens before any field
+// of the output h2o_url_t is written, so an authority the host/port parser
+// cannot fully consume leaves the caller's struct exactly as it was found.
+// A stack h2o_url_t handed to the call as its first argument is therefore
+// only initialised when the caller consults the return, and the two idioms
+// that consult it are a comparison (`if (h2o_url_init(...) != 0)`) and a
+// capture into a named variable (`int ret = h2o_url_init(...)`). A call
+// whose result reaches neither leaves the output struct unwritten for the
+// rest of the function, and the reverse proxy passes it straight to the
+// outgoing connection target (CWE-908's CWE-824 child: an invalid read of
+// an uninitialised stack value a single malformed request triggers).
+//
+// The consumption test is over the two AST-derived tokens a comparison and
+// a capture each lower to -- binary: carries the whole comparison text,
+// assign: the whole right-hand side -- so the fix's own spelling
+// (`target == &target_buf && h2o_url_init(...) != 0`) clears the finding by
+// the call's appearance inside a binary expression, and the crash-guard
+// spelling in the sibling call site clears the same way. The h2o_url_init
+// anchor is exact-token, so h2o_url_init_with_hostport and
+// h2o_url_init_with_sun_path -- which write their fields unconditionally
+// and only fail at an sprintf that cannot -- are not drawn in.
+//
+// Residuals, all false-negative: a return consumed by a form that lowers to
+// neither token -- a bare `return h2o_url_init(...)` wrapper, an explicit
+// `(void)` discard -- still reports, and a capture that is never read still
+// clears. A `!h2o_url_init(...)` condition also reports, which is the right
+// way round: the function returns 0 on success, so negating it inverts the
+// check.
+binding urlInitUncheckedOutparam {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "c" and node.context.call in ["h2o_url_init"] and not (node.context.binary contains "h2o_url_init") and not (node.context.assign contains "h2o_url_init")
+  emit issue code.UninitializedBufferExposure at node
+}

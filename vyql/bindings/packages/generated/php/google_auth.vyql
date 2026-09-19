@@ -1,0 +1,17 @@
+module bindings.php.generated.m3a3bc648;
+
+binding commandExecution0 {
+  requires {
+    dependency("google/auth")
+  }
+  query pattern callExpr where callee.method == "exec"
+  emit sink code.CommandExecution at args[0]
+}
+
+binding secretValue1 {
+  requires {
+    dependency("google/auth")
+  }
+  query pattern callExpr where callee.method == "setRefreshToken"
+  emit source code.SecretValue at call.result
+}

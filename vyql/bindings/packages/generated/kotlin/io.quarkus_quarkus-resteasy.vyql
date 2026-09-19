@@ -1,0 +1,49 @@
+module bindings.kotlin.generated.me22d1877;
+
+binding httpInput0 {
+  requires {
+    dependency("io.quarkus:quarkus-resteasy")
+  }
+  query pattern callExpr where callee.method == "extractUriInfo"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput1 {
+  requires {
+    dependency("io.quarkus:quarkus-resteasy")
+  }
+  query pattern callExpr where callee.method == "extractHttpHeaders"
+  emit source code.HttpInput at call.result
+}
+
+binding cookie2 {
+  requires {
+    dependency("io.quarkus:quarkus-resteasy")
+  }
+  query pattern callExpr where callee.method == "extractCookies"
+  emit source code.Cookie at call.result
+}
+
+binding httpInput3 {
+  requires {
+    dependency("io.quarkus:quarkus-resteasy")
+  }
+  query pattern callExpr where callee.method == "extractAccepts"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput4 {
+  requires {
+    dependency("io.quarkus:quarkus-resteasy")
+  }
+  query pattern callExpr where callee.method == "extractLanguages"
+  emit source code.HttpInput at call.result
+}
+
+binding httpInput5 {
+  requires {
+    dependency("io.quarkus:quarkus-resteasy")
+  }
+  query pattern callExpr where callee.method == "extractRequestHeaders"
+  emit source code.HttpInput at call.result
+}

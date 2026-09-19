@@ -1,0 +1,73 @@
+# Rank 1940 / CVE-2023-45158: web2py shipped a logging handler that rendered
+# each log record to a string and passed it to a shell. NotifySendHandler.emit
+# in gluon/messageboxhandler.py held
+#
+#   def emit(self, record):
+#       if tkinter:
+#           msg = self.format(record)
+#           os.system("notify-send '%s'" % msg)
+#
+# so any message the application logs -- web2py logs request-derived errors
+# and tracebacks -- is spliced inside single quotes into a command string and
+# handed to /bin/sh; a record containing `' ; payload #` runs the payload
+# (CWE-78). The fixing commit 936e2260b0c3 (message
+# "fixed vulnerability JVN#80476432", the JVN id the advisory cites); it
+# replaces the shell call with an argv list,
+#
+#   subprocess.run(["notify-send", msg], check=False, timeout=2)
+#
+# so the formatted record is passed as one argument and never reaches a shell.
+
+#
+# CAUGHT. Scanning the file at the fixed revision's parent reports two critical rows:
+# VYQL-INJ-002 with the full taint path -- source code.ExternalEntryInput by
+# library.param-source on the emit entrypoint's parameter, sink
+# code.CommandExecution by python.sinks on os.system's argument, no shell
+# escape or argument validation on the path -- and VYQL-INJ-202 on the same
+# line for the command string being assembled by %-interpolation before
+# execution. Scanning the fixed revision reports 0 findings, so both rules
+# separate the revisions. Stable at 2 findings over three --cache off runs.
+#
+# The snippets keep the handler subclass and the self.format(record) hop,
+# which is what makes the record reachable as input, and drop only the
+# tkinter import dance that gates the branch.
+#
+# verify_current_expected: caught
+
+test "rank1940: a formatted log record is spliced into an os.system command"
+  lang python
+  file messageboxhandler.py
+  expect VYQL-INJ-202
+  code
+  ```
+  import logging
+  import os
+
+
+  class NotifySendHandler(logging.Handler):
+      def __init__(self):
+          logging.Handler.__init__(self)
+
+      def emit(self, record):
+          msg = self.format(record)
+          os.system("notify-send '%s'" % msg)
+  ```
+
+test "rank1940: the fixed revision passes the record as one argv element, not through a shell"
+  lang python
+  file messageboxhandler.py
+  reject VYQL-INJ-202
+  code
+  ```
+  import logging
+  import subprocess
+
+
+  class NotifySendHandler(logging.Handler):
+      def __init__(self):
+          logging.Handler.__init__(self)
+
+      def emit(self, record):
+          msg = self.format(record)
+          subprocess.run(["notify-send", msg], check=False, timeout=2)
+  ```

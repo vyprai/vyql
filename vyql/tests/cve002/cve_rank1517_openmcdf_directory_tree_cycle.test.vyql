@@ -1,0 +1,350 @@
+# Rank 1517 / CVE-2026-45785: OpenMcdf descended a compound-file directory
+# tree using only per-hop ordering checks, so a crafted sibling cycle hung
+# the process (loop with unreachable exit, CWE-835). The directory entry
+# tree in a CFB is a red-black-ish binary search tree stored on disk:
+# TryGetDirectoryEntry in OpenMcdf/DirectoryTree.cs walked
+# `while (child is not null) { compare = Compare(nameSpan, child.NameCharSpan);
+# ... child = directories.TryGetSibling(child, siblingType, validateColor); }`
+# where the old TryGetSibling in OpenMcdf/DirectoryEntries.cs validated only
+# the immediate name order (Left must compare < 0, Right > 0) and optionally
+# the red-black colour rule -- and every caller passed validateColor=false.
+# TryGetParent and the insert walk were worse: they descended through raw
+# TryGetDictionaryEntry(child.LeftSiblingId, out child) with no check at all.
+# A mixed-direction cycle satisfies per-hop ordering (A right B, B left C,
+# C right A with names consistent at each hop), so the loop never exits;
+# only the enumerator had Brent's cycle detection, the search paths had
+# none. The fixing commit c6f82db72 ("Enforce binary search tree
+# validation", citing GHSA-5qwm-7pvp-w988, resolving the nocommit flag --
+# the advisory names no commit but the commit message names the advisory):
+# sibling access now goes through an IDirectoryTreeValidator; the new
+# DirectoryTreeSearchOrderValidator carries a [min,max] name window down
+# the descent so any cycle must cross a bound and throw, the new
+# DirectoryTreeTraversalOrderValidator does the per-hop checks for
+# enumeration, and the enumerator's own Brent check is removed as
+# redundant.
+#
+# ATTENTION, structural-loop termination vocabulary. The weakness is a
+# loop whose exit depends on a structural invariant of attacker-supplied
+# data that the code never establishes -- no tainted value reaches a
+# sink, and the fix adds an invariant check rather than a bound. The
+# corpus's CWE-835 family reaches one edge of the fix -- VYQL-DOS-029
+# (code.NumericParserMissingProgressCheck) and VYQL-DOS-028
+# (code.BufReadDiscardLoopWithoutEofGuard) judge missing-progress loops,
+# exactly this judgement for parsers and buffered reads -- but the other
+# edge is missing: no concept names a descent over a linked structure,
+# so no rule can ask whether it carries a cycle guard, and a binding on
+# OpenMcdf's own TryGetSibling would detect this library rather than the
+# weakness.
+#
+# ## Recheck measurements
+#
+# Re-probed at the recheck span tip, which carries every definition and
+# engine change shipped since the first pass. Path 1 does not convert:
+# the ontology still has no concept for a descent over a linked structure
+# (the nearest, RecursiveObjectParentResolveWithoutCycleGuard, is a
+# CWE-674 recursion concept fed by one PHP binding about dictionary
+# Parent resolution, not an iterative sibling walk), VYQL-DOS-028/029
+# are fed only by the rust and c bindings for buffered reads and numeric
+# parsers, and the C# frontend's analysis observations cover JWT and CAS
+# flags only (csSecurityObservations, csharp.go) -- nothing observes a
+# loop. Measured 3x --cache off / timeout 180 / --max-ram 6GB per
+# revision on the real checkout, vulnerable parent c6f82db72^ against
+# fix c6f82db72:
+#
+#   OpenMcdf/DirectoryTree.cs, DirectoryEntries.cs,
+#   DirectoryTreeEnumerator.cs -- 0/0/0 findings each at the vulnerable
+#   revision, full findings view, deterministic; vyql match on
+#   DirectoryTree.cs labels nothing at all: no source, no sink, no
+#   control. A hard zero, not a misread one.
+#   whole repository -- 30/30/30 findings at both revisions (csharp:133
+#   at the parent, 136 at the fix): 18 vs 19 VYQL-NUM-005
+#   UncheckedEncodedLengthArithmetic, 9 VYQL-RES-001 ResourceLeak, one
+#   VYQL-MOB-006, one VYQL-CFG-014. The +1 NUM-005 is the fix's own
+#   added validator files, nothing on any descent. The flags view on
+#   OpenMcdf/ reports the same 15 findings plus 36 flags, all
+#   core.ResourceRelease controls.
+#
+# Path 3 is not shippable today, measured on this very tree: the
+# descent shape occurs twice in OpenMcdf/ (the search walk at
+# DirectoryTree.cs:35 and PushLeft at DirectoryTreeEnumerator.cs:89),
+# and PushLeft's own class carries Brent's cycle detection at the
+# vulnerable revision -- a guard one method away that a function-scoped
+# rule cannot see. Worse, the fix DELETES Brent's check as redundant and
+# replaces it with a stack-top order invariant, so the obvious rule shape
+# "descent without a visited-set or two-pointer guard" flags the
+# remediation and clears the bug. What the rule needs is loop-carried
+# guard reasoning (visited-set, depth bound, or order-window tracking),
+# which no frontend's per-statement guard families provide; the entry
+# filed at the first pass stands. No definition change shipped. Spec
+# cve_rank1517 records all four descents and their guarded forms, all
+# asserting reject VYQL-DOS-029: when structural-descent vocabulary
+# lands, the unguarded walks must flip to expect.
+
+test "rank1517: the directory search descends sibling links with per-hop checks only"
+  lang csharp
+  file OpenMcdf/DirectoryTree.cs
+  reject VYQL-DOS-029
+  code
+  ```
+  internal sealed class DirectoryTree
+  {
+      private readonly DirectoryEntries directories;
+      private readonly DirectoryEntry root;
+
+      public bool TryGetDirectoryEntry(string name, out DirectoryEntry entry)
+      {
+          if (!directories.TryGetDictionaryEntry(root.ChildId, out DirectoryEntry child))
+          {
+              entry = null;
+              return false;
+          }
+
+          while (child is not null)
+          {
+              int compare = DirectoryEntryComparer.Compare(name, child.Name);
+              if (compare == 0)
+              {
+                  entry = child;
+                  return true;
+              }
+
+              SiblingType siblingType = compare < 0 ? SiblingType.Left : SiblingType.Right;
+              child = directories.TryGetSibling(child, siblingType, false);
+          }
+
+          entry = null;
+          return false;
+      }
+  }
+  ```
+
+test "rank1517: the fixed revision carries a search-order validator down the descent"
+  lang csharp
+  file OpenMcdf/DirectoryTree.cs
+  reject VYQL-DOS-029
+  code
+  ```
+  internal sealed class DirectoryTree
+  {
+      private readonly DirectoryEntries directories;
+      private readonly DirectoryEntry root;
+
+      public bool TryGetDirectoryEntry(string name, out DirectoryEntry entry)
+      {
+          if (!directories.TryGetDictionaryEntry(root.ChildId, out DirectoryEntry child))
+          {
+              entry = null;
+              return false;
+          }
+
+          DirectoryTreeSearchOrderValidator validator = new DirectoryTreeSearchOrderValidator();
+          while (child is not null)
+          {
+              int compare = DirectoryEntryComparer.Compare(name, child.Name);
+              if (compare == 0)
+              {
+                  entry = child;
+                  return true;
+              }
+
+              SiblingType siblingType = compare < 0 ? SiblingType.Left : SiblingType.Right;
+              child = directories.TryGetSibling(child, siblingType, validator);
+          }
+
+          entry = null;
+          return false;
+      }
+  }
+  ```
+
+test "rank1517: the parent walk descends raw sibling ids with no check at all"
+  lang csharp
+  file OpenMcdf/DirectoryTree.cs
+  reject VYQL-DOS-029
+  code
+  ```
+  internal sealed class DirectoryTree
+  {
+      private readonly DirectoryEntries directories;
+      private readonly DirectoryEntry root;
+
+      public bool TryGetParent(DirectoryEntry entry, out DirectoryEntry parent, out RelationType relation)
+      {
+          if (!directories.TryGetDictionaryEntry(root.ChildId, out DirectoryEntry child))
+          {
+              parent = null;
+              relation = RelationType.Root;
+              return false;
+          }
+
+          parent = root;
+          relation = RelationType.Root;
+          while (child is not null)
+          {
+              int compare = DirectoryEntryComparer.Compare(entry.Name, child.Name);
+              if (compare < 0)
+              {
+                  parent = child;
+                  relation = RelationType.LeftSibling;
+                  directories.TryGetDictionaryEntry(child.LeftSiblingId, out child);
+              }
+              else if (compare > 0)
+              {
+                  parent = child;
+                  relation = RelationType.RightSibling;
+                  directories.TryGetDictionaryEntry(child.RightSiblingId, out child);
+              }
+              else
+              {
+                  return true;
+              }
+          }
+
+          return false;
+      }
+  }
+  ```
+
+test "rank1517: the fixed parent walk routes the descent through the validator"
+  lang csharp
+  file OpenMcdf/DirectoryTree.cs
+  reject VYQL-DOS-029
+  code
+  ```
+  internal sealed class DirectoryTree
+  {
+      private readonly DirectoryEntries directories;
+      private readonly DirectoryEntry root;
+
+      public bool TryGetParent(DirectoryEntry entry, out DirectoryEntry parent, out RelationType relation)
+      {
+          if (!directories.TryGetDictionaryEntry(root.ChildId, out DirectoryEntry child))
+          {
+              parent = null;
+              relation = RelationType.Root;
+              return false;
+          }
+
+          parent = root;
+          relation = RelationType.Root;
+          DirectoryTreeSearchOrderValidator validator = new DirectoryTreeSearchOrderValidator();
+          while (child is not null)
+          {
+              int compare = DirectoryEntryComparer.Compare(entry.Name, child.Name);
+              if (compare < 0)
+              {
+                  parent = child;
+                  relation = RelationType.LeftSibling;
+                  child = directories.TryGetSibling(child, SiblingType.Left, validator);
+              }
+              else if (compare > 0)
+              {
+                  parent = child;
+                  relation = RelationType.RightSibling;
+                  child = directories.TryGetSibling(child, SiblingType.Right, validator);
+              }
+              else
+              {
+                  return true;
+              }
+          }
+
+          return false;
+      }
+  }
+  ```
+
+test "rank1517: the enumerator's left-spine walk runs beside a cycle guard it cannot use"
+  lang csharp
+  file OpenMcdf/DirectoryTreeEnumerator.cs
+  reject VYQL-DOS-029
+  code
+  ```
+  internal sealed class DirectoryTreeEnumerator : IEnumerator<DirectoryEntry>
+  {
+      private readonly DirectoryEntries directories;
+      private readonly Stack<DirectoryEntry> stack = new();
+
+      // Brent's cycle detection algorithm
+      uint cycleLength = 1;
+      uint power = 1;
+      uint slowId = StreamId.NoStream;
+
+      public bool MoveNext()
+      {
+          if (stack.Count == 0)
+              return false;
+
+          DirectoryEntry current = stack.Pop();
+          if (current.Id == slowId && slowId != StreamId.NoStream)
+              throw new FileFormatException("Directory tree contains a loop.");
+
+          if (cycleLength == power)
+          {
+              cycleLength = 0;
+              power *= 2;
+              slowId = current.Id;
+          }
+          cycleLength++;
+
+          DirectoryEntry rightSibling = directories.TryGetSibling(current, SiblingType.Right, false);
+          if (rightSibling is not null)
+              PushLeft(rightSibling);
+
+          return true;
+      }
+
+      private void PushLeft(DirectoryEntry node)
+      {
+          while (node is not null)
+          {
+              stack.Push(node);
+              node = directories.TryGetSibling(node, SiblingType.Left, false);
+          }
+      }
+  }
+  ```
+
+test "rank1517: the fixed left-spine walk enforces the stack-top order invariant"
+  lang csharp
+  file OpenMcdf/DirectoryTreeEnumerator.cs
+  reject VYQL-DOS-029
+  code
+  ```
+  internal sealed class DirectoryTreeEnumerator : IEnumerator<DirectoryEntry>
+  {
+      private readonly DirectoryEntries directories;
+      private readonly DirectoryTreeTraversalOrderValidator validator = new();
+      private readonly Stack<DirectoryEntry> stack = new();
+
+      public bool MoveNext()
+      {
+          if (stack.Count == 0)
+              return false;
+
+          DirectoryEntry current = stack.Pop();
+
+          DirectoryEntry rightSibling = directories.TryGetSibling(current, SiblingType.Right, validator);
+          if (rightSibling is not null)
+              PushLeft(rightSibling);
+
+          return true;
+      }
+
+      private void PushLeft(DirectoryEntry node)
+      {
+          while (node is not null)
+          {
+              // Entries pushed onto the stack must always be less than the previous entry
+              if (stack.Count > 0 && stack.Peek() is { } peek)
+              {
+                  int compare = DirectoryEntryComparer.Compare(node.Name, peek.Name);
+                  ThrowHelper.ThrowIfInvalidBinarySearchTree(compare >= 0);
+              }
+
+              stack.Push(node);
+              node = directories.TryGetSibling(node, SiblingType.Left, validator);
+          }
+      }
+  }
+  ```

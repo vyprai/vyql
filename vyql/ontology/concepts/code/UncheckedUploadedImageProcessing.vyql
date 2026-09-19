@@ -1,0 +1,6 @@
+module code;
+
+concept UncheckedUploadedImageProcessing : issue {
+  cwe: [CWE_434]
+  vulnerableTo: [injection.UnrestrictedUpload]
+}

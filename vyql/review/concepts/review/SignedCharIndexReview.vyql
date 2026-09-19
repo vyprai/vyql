@@ -1,0 +1,7 @@
+module code;
+
+review code.SignedCharIndexReview {
+  category: numeric
+  kind: attention
+  text: "review table indexes cast to unsigned char before subscripting"
+}

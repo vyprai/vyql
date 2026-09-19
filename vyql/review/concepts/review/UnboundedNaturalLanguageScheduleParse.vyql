@@ -1,0 +1,8 @@
+module code;
+
+review code.UnboundedNaturalLanguageScheduleParse {
+  category: resource
+  expected: [core.InputValidation]
+  kind: target
+  text: "review natural-language schedule parsers for an input-length guard before grammar parsing"
+}

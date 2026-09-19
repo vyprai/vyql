@@ -1,0 +1,134 @@
+# Rank 1077 / CVE-2026-34976: Dgraph's admin GraphQL server registered
+# restoreTenant as a mutation resolver but left it out of the mutation
+# middleware table, so the operation ran with no IP allow-listing, no
+# GuardianOfTheGalaxy authorization and no audit logging (CWE-862).
+#
+# ATTENTION: analysis gap. The resolver table and the middleware table are two
+# collection literals in one file, and what separates the revisions is set
+# inclusion between them -- every key of the resolver table appears in the
+# middleware table, the property the fix's own test asserts. A binding reads
+# presence context as flat text, so it can ask whether a string occurs near a
+# node but not whether one literal's key set covers another's; spelling it with
+# the strings available names this project's operation instead of the shape, and
+# the next table with a missing key walks past it. The middleware table also
+# carries keys the resolver table does not, so equality is the wrong relation.
+# Both snippets reject VYQL-AUTH-081.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1077: a mutation is registered with no middleware table entry"
+  lang go
+  file graphql/admin/admin.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package admin
+
+  import (
+  	"github.com/dgraph-io/dgraph/v25/graphql/resolve"
+  	"github.com/dgraph-io/dgraph/v25/graphql/schema"
+  )
+
+  var (
+  	gogMutMWs = resolve.MutationMiddlewares{
+  		resolve.IpWhitelistingMW4Mutation,
+  		resolve.GuardianOfTheGalaxyAuthMW4Mutation,
+  		resolve.LoggingMWMutation,
+  	}
+  	minimalAdminMutMWs = resolve.MutationMiddlewares{
+  		resolve.IpWhitelistingMW4Mutation,
+  		resolve.LoggingMWMutation,
+  	}
+
+  	adminMutationMWConfig = map[string]resolve.MutationMiddlewares{
+  		"backup":     gogMutMWs,
+  		"login":      minimalAdminMutMWs,
+  		"restore":    gogMutMWs,
+  		"shutdown":   gogMutMWs,
+  		"addUser":    minimalAdminMutMWs,
+  		"deleteUser": minimalAdminMutMWs,
+  	}
+  )
+
+  func newAdminResolverFactory() resolve.ResolverFactory {
+  	adminMutationResolvers := map[string]resolve.MutationResolverFunc{
+  		"backup":        resolveBackup,
+  		"login":         resolveLogin,
+  		"restore":       resolveRestore,
+  		"restoreTenant": resolveTenantRestore,
+  		"shutdown":      resolveShutdown,
+  	}
+
+  	rf := resolverFactoryWithErrorMsg(errResolverNotFound).
+  		WithMutationMiddlewareConfig(adminMutationMWConfig)
+
+  	for gqlMut, resolver := range adminMutationResolvers {
+  		func(f resolve.MutationResolver) {
+  			rf.WithMutationResolver(gqlMut, func(m schema.Mutation) resolve.MutationResolver {
+  				return f
+  			})
+  		}(resolver)
+  	}
+
+  	return rf.WithSchemaIntrospection()
+  }
+  ```
+
+test "rank1077: the middleware table carries the registered mutation"
+  lang go
+  file graphql/admin/admin.go
+  reject VYQL-AUTH-081
+  code
+  ```
+  package admin
+
+  import (
+  	"github.com/dgraph-io/dgraph/v25/graphql/resolve"
+  	"github.com/dgraph-io/dgraph/v25/graphql/schema"
+  )
+
+  var (
+  	gogMutMWs = resolve.MutationMiddlewares{
+  		resolve.IpWhitelistingMW4Mutation,
+  		resolve.GuardianOfTheGalaxyAuthMW4Mutation,
+  		resolve.LoggingMWMutation,
+  	}
+  	minimalAdminMutMWs = resolve.MutationMiddlewares{
+  		resolve.IpWhitelistingMW4Mutation,
+  		resolve.LoggingMWMutation,
+  	}
+
+  	adminMutationMWConfig = map[string]resolve.MutationMiddlewares{
+  		"backup":        gogMutMWs,
+  		"login":         minimalAdminMutMWs,
+  		"restore":       gogMutMWs,
+  		"restoreTenant": gogMutMWs,
+  		"shutdown":      gogMutMWs,
+  		"addUser":       minimalAdminMutMWs,
+  		"deleteUser":    minimalAdminMutMWs,
+  	}
+  )
+
+  func newAdminResolverFactory() resolve.ResolverFactory {
+  	adminMutationResolvers := map[string]resolve.MutationResolverFunc{
+  		"backup":        resolveBackup,
+  		"login":         resolveLogin,
+  		"restore":       resolveRestore,
+  		"restoreTenant": resolveTenantRestore,
+  		"shutdown":      resolveShutdown,
+  	}
+
+  	rf := resolverFactoryWithErrorMsg(errResolverNotFound).
+  		WithMutationMiddlewareConfig(adminMutationMWConfig)
+
+  	for gqlMut, resolver := range adminMutationResolvers {
+  		func(f resolve.MutationResolver) {
+  			rf.WithMutationResolver(gqlMut, func(m schema.Mutation) resolve.MutationResolver {
+  				return f
+  			})
+  		}(resolver)
+  	}
+
+  	return rf.WithSchemaIntrospection()
+  }
+  ```

@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule ConcreteCmsIncompleteUploadExtensionBlacklist {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_434]
+    id: "VYQL-INJ-099"
+    severity: critical
+  }
+  issue code.ConcreteCmsIncompleteUploadExtensionBlacklist as config
+}

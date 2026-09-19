@@ -1,0 +1,8 @@
+module code;
+
+review code.ProxyRedirectCertVerificationBypass {
+  category: crypto
+  expected: [core.InputValidation]
+  kind: target
+  text: "verify proxied HTTPS redirect clients preserve certificate and hostname verification settings before following redirects"
+}

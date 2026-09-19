@@ -1,0 +1,35 @@
+test "rank224: Kernel.open on caller path can execute pipe commands"
+  lang ruby
+  profile library
+  expect VYQL-INJ-042
+  expect_review code.RubyPipeOpenCommandExecution
+  file lib/bibtex/bibliography.rb
+  code
+  ```
+  class Bibliography
+    class << self
+      def open(options = {})
+        path = params[:path]
+        parse(Kernel.open(path, 'r:UTF-8').read, options)
+      end
+    end
+  end
+  ```
+
+test "rank224: File.read treats caller path as file read, not command execution"
+  lang ruby
+  profile library
+  reject VYQL-INJ-042
+  reject_review code.RubyPipeOpenCommandExecution
+  file lib/bibtex/bibliography.rb
+  code
+  ```
+  class Bibliography
+    class << self
+      def open(options = {})
+        path = params[:path]
+        parse(File.read(path), options)
+      end
+    end
+  end
+  ```

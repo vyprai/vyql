@@ -1,0 +1,65 @@
+module bindings.groovy.generated.m60088840;
+
+binding cliArgument0 {
+  requires {
+    dependency("org.apache.ibatis:ibatis-sqlmap")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit source code.CliArgument at call.result
+}
+
+binding sqlExecution1 {
+  requires {
+    dependency("org.apache.ibatis:ibatis-sqlmap")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution2 {
+  requires {
+    dependency("org.apache.ibatis:ibatis-sqlmap")
+  }
+  query pattern callExpr where callee.method == "selectOne"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution3 {
+  requires {
+    dependency("org.apache.ibatis:ibatis-sqlmap")
+  }
+  query pattern callExpr where callee.method == "selectAll"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution4 {
+  requires {
+    dependency("org.apache.ibatis:ibatis-sqlmap")
+  }
+  query pattern callExpr where callee.method == "insert"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution5 {
+  requires {
+    dependency("org.apache.ibatis:ibatis-sqlmap")
+  }
+  query pattern callExpr where callee.method == "update"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution6 {
+  requires {
+    dependency("org.apache.ibatis:ibatis-sqlmap")
+  }
+  query pattern callExpr where callee.method == "delete"
+  emit sink code.SqlExecution at args[0]
+}
+
+binding sqlExecution7 {
+  requires {
+    dependency("org.apache.ibatis:ibatis-sqlmap")
+  }
+  query pattern callExpr where callee.method == "query"
+  emit sink code.SqlExecution at args[0]
+}

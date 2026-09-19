@@ -1,0 +1,11 @@
+module vypr.validation;
+
+rule DnsInterfaceNewlineValidationMissing {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_20, CWE_74]
+    id: "VYQL-VAL-015"
+    severity: high
+  }
+  issue code.DnsInterfaceNewlineValidationMissing as config
+}

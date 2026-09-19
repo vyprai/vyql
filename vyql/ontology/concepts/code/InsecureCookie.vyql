@@ -1,0 +1,6 @@
+module code;
+
+concept InsecureCookie : issue {
+  cwe: [CWE_614]
+  vulnerableTo: [session.InsecureCookie]
+}

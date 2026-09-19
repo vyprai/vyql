@@ -1,0 +1,181 @@
+# Rank 1675 / CVE-2024-49761 (GHSA-2rxp-v6pw-ch6m): REXML's base parser
+# unescapes entity references in parsed XML with a static regex whose `0*`
+# prefix and whose first alternation branch `\\d+` can both consume the same
+# run of `0` characters, so the engine must retry every split of that run --
+# a ReDoS quadratic in the number of digits between `&#` and `x...;`
+# (CWE-1333 inefficient regular expression complexity, CWE-400).
+#
+# `Private::CHARACTER_REFERENCES` (lib/rexml/parsers/baseparser.rb:153 at the
+# fix parent) is `/&#0*((?:\\d+)|(?:x[a-fA-F0-9]+));/`, and
+# `BaseParser#unnormalize` applies it to the string it is handed with a
+# global `rv.gsub!(Private::CHARACTER_REFERENCES) { ... }` (baseparser.rb:571).
+# The string is parsed XML content, which is the input an XML parser exists to
+# accept, so the cost is entirely the attacker's; the advisory's trigger is
+# "many digits between &# and x...; in a hex numeric character reference", and
+# only Ruby 3.1's regexp engine is affected. The fixed revision removes the `0*`
+# prefix entirely: leading zeros before `x` are invalid XML character references
+# anyway (the added regression test asserts `&#x61;&#0x61;` unescapes to the
+# literal text `a&#0x61;`), and a digit run then has exactly one consumer --
+# `\\d+` alone -- instead of two overlapping ones.
+#
+# The pool row is correct in every field: ce59f2eb1aeb is a real, readable,
+# single-library-file commit plus its regression test ("parser: fix a bug that
+# &#0x...; is accepted as a character reference"), the vulnerable regex with
+# the `0*` prefix is present at its parent, the remediation (no `0*`, and the
+# simplified block that parses the `x` prefix explicitly) is present at the
+# commit itself, and the v3.3.9 release tag contains it.
+#
+# FIXED, 2nd pass. The 1st pass pinned an engine gap: the run-split's second
+# consumer sat inside an unquantified alternation group, invisible to
+# `regexSplitsOneCharRun`'s sibling-only scan (regexambig.go), so
+# `rubyRegexMayBacktrack` answered false and the literal lowered to a bare
+# `nir.Const` no binding could label. The classifier now descends into
+# unquantified group heads for the second consumer of a single-character run,
+# and the ruby frontend stamps each static literal the analysis flags as
+# `analysis.dos.catastrophic_regex` at the literal itself, which
+# `catastrophicRegex1704` (vyql/bindings/ruby/m5a48bf47.vyql) reports through
+# VYQL-DOS-003 -- the same definition-site route the java.util.regex and re.*
+# arms already take. Measured on the real checkout (`--cache off`, bounded):
+# 105 findings at both revisions before, 109 at the vulnerable and 108 at the
+# fixed tree after; the single discriminating row is the CVE's own literal at
+# baseparser.rb:153. The three rows the change adds at text.rb (:24
+# NUMERICENTITY, :379's inline gsub, :44 VALID_XML_CHARS) fire at both
+# revisions: ce59f2eb patched baseparser only, so text.rb still carries the
+# same `&#0*...` run-split today -- an upstream residual of this very
+# weakness, correctly still reported.
+#
+# The taint route (VYQL-DOS-002) stays closed for the hoisted-constant shape --
+# a regex supplied as a call argument lowers to an `__regex.match` node with no
+# link to the receiver it is applied to, the gap rank 1648 recorded -- so the
+# definition-site review is the route that answers this spelling. In the
+# `case value when /re/` shape, whose operand link the engine does build, the
+# newly classified spelling now reports DOS-002 as well, which is the third
+# block below: the two spellings of the run-split are one construct, and the
+# pair that discriminates is the `0*` prefix against its removal.
+#
+# verify_current_expected: fixed-engine-classifier, definition-site review.
+
+test "rank1675: the character-reference regex splits a zero run between the 0* prefix and the nested digit branch"
+  lang ruby
+  file lib/rexml/parsers/baseparser.rb
+  profile library
+  expect VYQL-DOS-003
+  reject VYQL-DOS-001
+  reject VYQL-DOS-002
+  code
+  ```
+  module REXML
+    module Parsers
+      class BaseParser
+        module Private
+          CHARACTER_REFERENCES = /&#0*((?:\d+)|(?:x[a-fA-F0-9]+));/
+        end
+        private_constant :Private
+
+        def unnormalize( string, entities=nil, filter=nil )
+          rv = string.dup
+          matches = rv.scan( REFERENCE_RE )
+          return rv if matches.size == 0
+          rv.gsub!( Private::CHARACTER_REFERENCES ) {
+            m=$1
+            m = "0#{m}" if m[0] == ?x
+            [Integer(m)].pack('U*')
+          }
+          rv
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1675: the fixed regex leaves one consumer for a digit run and the block parses the x prefix explicitly"
+  lang ruby
+  file lib/rexml/parsers/baseparser.rb
+  profile library
+  reject VYQL-DOS-001
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  module REXML
+    module Parsers
+      class BaseParser
+        module Private
+          CHARACTER_REFERENCES = /&#((?:\d+)|(?:x[a-fA-F0-9]+));/
+        end
+        private_constant :Private
+
+        def unnormalize( string, entities=nil, filter=nil )
+          rv = string.dup
+          matches = rv.scan( REFERENCE_RE )
+          return rv if matches.size == 0
+          rv.gsub!( Private::CHARACTER_REFERENCES ) {
+            m=$1
+            if m.start_with?("x")
+              code_point = Integer(m[1..-1], 16)
+            else
+              code_point = Integer(m, 10)
+            end
+            [code_point].pack('U*')
+          }
+          rv
+        end
+      end
+    end
+  end
+  ```
+
+test "rank1675 pair: the same run-split with the second consumer as a sibling single-char repeat is reported"
+  lang ruby
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  class CharRef
+    def call(value)
+      case value
+      when /&#0*0+;/
+        "a"
+      else
+        value
+      end
+    end
+  end
+  ```
+
+test "rank1675 pair: the CVE's spelling, the digit class inside the unquantified alternation group, is reported the same way"
+  lang ruby
+  profile library
+  expect VYQL-DOS-002
+  code
+  ```
+  class CharRef
+    def call(value)
+      case value
+      when /&#0*((?:\d+)|(?:x[a-fA-F0-9]+));/
+        "a"
+      else
+        value
+      end
+    end
+  end
+  ```
+
+test "rank1675 pair: the fixed spelling keeps the alternation and drops the 0* prefix"
+  lang ruby
+  profile library
+  reject VYQL-DOS-002
+  reject VYQL-DOS-003
+  code
+  ```
+  class CharRef
+    def call(value)
+      case value
+      when /&#((?:\d+)|(?:x[a-fA-F0-9]+));/
+        "a"
+      else
+        value
+      end
+    end
+  end
+  ```

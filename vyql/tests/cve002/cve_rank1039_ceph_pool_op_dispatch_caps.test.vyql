@@ -1,0 +1,272 @@
+# Rank 1039 / CVE-2018-10861: the Ceph monitor checked capabilities on one
+# branch of its pool-operation dispatch and on no other (CWE-287).
+# OSDMonitor::preprocess_pool_op sends POOL_OP_CREATE to
+# preprocess_pool_op_create, which calls session->is_capable("osd", MON_CAP_W),
+# and handles POOL_OP_DELETE, POOL_OP_CREATE_SNAP, POOL_OP_DELETE_SNAP,
+# POOL_OP_CREATE_UNMANAGED_SNAP, POOL_OP_DELETE_UNMANAGED_SNAP and
+# POOL_OP_AUID_CHANGE inline, with no capability check at all. Any authenticated
+# client could therefore create and delete unmanaged snapshots on pools it has
+# no write access to.
+#
+# The fixed revision hoists the check into a new enforce_pool_op_caps called at
+# the top of preprocess_pool_op, so every operation passes it, and adds
+# is_unmanaged_snap_op_permitted for the two unmanaged-snap operations, which
+# accepts either an explicit mon cap for the command or an OSD cap granting
+# write on the pool.
+#
+# ATTENTION, analysis gap, rechecked. Both revisions of src/mon scan to the
+# same shape: 563 findings at the vulnerable revision and 566 at the fixed one
+# (VYQL-MEM-006 548/551, VYQL-LIFE-001 7, VYQL-CRY-003 4, VYQL-AUTH-079 4),
+# stable over three --cache off runs each; the +3 is dereferences the fix
+# itself adds. Scanning OSDMonitor.cc alone gives 156 against 159, all
+# VYQL-MEM-006. The four VYQL-AUTH-079 rows are fsmap.promote(...) calls in
+# FSCommands.cc and MDSMonitor.cc, identical file/line on both revisions, so
+# the one authorization rule that fires on this subtree does not separate them
+# either. A whole-tree scan does not complete: it stops at the --max-ram 6GB
+# ceiling at 5.7 GiB resident after 61s.
+#
+# The guard is delegated at both revisions, which is what makes the pair hard.
+# The capability check never sits inside preprocess_pool_op: at the vulnerable
+# revision it is in preprocess_pool_op_create (OSDMonitor.cc:11803), reached
+# only from the POOL_OP_CREATE branch, and at the fixed revision it is in
+# enforce_pool_op_caps (OSDMonitor.cc:11827), reached from the top of the
+# dispatcher. From the dispatcher alone the two revisions are the same shape --
+# it calls a sibling function that holds a capability check -- and the
+# difference is only whether that call dominates every branch. Exhaustive grep
+# over src/mon at both revisions confirms the move: 9 is_capable sites in the
+# vulnerable OSDMonitor.cc, 10 in the fixed one, and the only pool-op change is
+# that one.
+#
+# There is no taint path here, so the route is a review concept, and the
+# concept is not the problem: code.AuthenticationRequiredOp with VYQL-AUTH-001
+# is exactly the judgement. What is missing is a way to state the condition.
+# No feature compares a guard across sibling branches of one dispatch or
+# across the handlers a dispatcher reaches, so no branch is wrong when read
+# alone. The concept's existing bindings are name-based, matching operation
+# names such as ChangePassword and ResetPassword, and no binding file for C or
+# C++ carries the concept at all, so reproducing that style here would mean
+# naming ceph's own POOL_OP_ constants, which detects this monitor rather than
+# the weakness. Binding MonSession::is_capable as core.AuthorizationCheck
+# changes nothing on its own: the review machinery's expected controls are
+# display-only (relatedChecks, internal/review/review.go), and no node at the
+# dispatch carries a target label for a rule to judge, so such a binding
+# produces no finding and no suppression. Only the fix's own helper name is
+# left as a discriminator, which is the fixing commit's layout.
+#
+# verify_current_expected: attention-analysis-gap
+
+test "rank1039: only the create branch of the pool op dispatch checks capabilities"
+  lang cpp
+  file src/mon/OSDMonitor.cc
+  reject VYQL-AUTH-001
+  code
+  ```
+  bool OSDMonitor::preprocess_pool_op(MonOpRequestRef op)
+  {
+    op->mark_osdmon_event(__func__);
+    MPoolOp *m = static_cast<MPoolOp*>(op->get_req());
+
+    if (m->fsid != mon->monmap->fsid) {
+      dout(0) << __func__ << " drop message on fsid " << m->fsid
+              << " != " << mon->monmap->fsid << " for " << *m << dendl;
+      _pool_op_reply(op, -EINVAL, osdmap.get_epoch());
+      return true;
+    }
+
+    if (m->op == POOL_OP_CREATE)
+      return preprocess_pool_op_create(op);
+
+    const pg_pool_t *p = osdmap.get_pg_pool(m->pool);
+    if (p == nullptr) {
+      dout(10) << "attempt to operate on non-existent pool id " << m->pool << dendl;
+      if (m->op == POOL_OP_DELETE) {
+        _pool_op_reply(op, 0, osdmap.get_epoch());
+      } else {
+        _pool_op_reply(op, -ENOENT, osdmap.get_epoch());
+      }
+      return true;
+    }
+
+    // check if the snap and snapname exist
+    bool snap_exists = false;
+    if (p->snap_exists(m->name.c_str()))
+      snap_exists = true;
+
+    switch (m->op) {
+    case POOL_OP_CREATE_SNAP:
+      if (p->is_unmanaged_snaps_mode() || p->is_tier()) {
+        _pool_op_reply(op, -EINVAL, osdmap.get_epoch());
+        return true;
+      }
+      if (snap_exists) {
+        _pool_op_reply(op, 0, osdmap.get_epoch());
+        return true;
+      }
+      return false;
+    case POOL_OP_CREATE_UNMANAGED_SNAP:
+      if (p->is_pool_snaps_mode()) {
+        _pool_op_reply(op, -EINVAL, osdmap.get_epoch());
+        return true;
+      }
+      return false;
+    case POOL_OP_DELETE_SNAP:
+      if (p->is_unmanaged_snaps_mode()) {
+        _pool_op_reply(op, -EINVAL, osdmap.get_epoch());
+        return true;
+      }
+      if (!snap_exists) {
+        _pool_op_reply(op, 0, osdmap.get_epoch());
+        return true;
+      }
+      return false;
+    case POOL_OP_DELETE_UNMANAGED_SNAP:
+      if (p->is_pool_snaps_mode()) {
+        _pool_op_reply(op, -EINVAL, osdmap.get_epoch());
+        return true;
+      }
+      if (p->is_removed_snap(m->snapid)) {
+        _pool_op_reply(op, 0, osdmap.get_epoch());
+        return true;
+      }
+      return false;
+    case POOL_OP_DELETE:
+      if (osdmap.lookup_pg_pool_name(m->name.c_str()) >= 0) {
+        _pool_op_reply(op, 0, osdmap.get_epoch());
+        return true;
+      }
+      return false;
+    case POOL_OP_AUID_CHANGE:
+      return false;
+    default:
+      ceph_abort();
+      break;
+    }
+
+    return false;
+  }
+
+  bool OSDMonitor::preprocess_pool_op_create(MonOpRequestRef op)
+  {
+    op->mark_osdmon_event(__func__);
+    MPoolOp *m = static_cast<MPoolOp*>(op->get_req());
+    MonSession *session = m->get_session();
+    if (!session) {
+      _pool_op_reply(op, -EPERM, osdmap.get_epoch());
+      return true;
+    }
+    if (!session->is_capable("osd", MON_CAP_W)) {
+      dout(5) << "attempt to create new pool without sufficient auid privileges!"
+              << "message: " << *m << std::endl
+              << "caps: " << session->caps << dendl;
+      _pool_op_reply(op, -EPERM, osdmap.get_epoch());
+      return true;
+    }
+
+    int64_t pool = osdmap.lookup_pg_pool_name(m->name.c_str());
+    if (pool >= 0) {
+      _pool_op_reply(op, 0, osdmap.get_epoch());
+      return true;
+    }
+
+    return false;
+  }
+  ```
+
+test "rank1039: fix runs a capability check ahead of every pool operation"
+  lang cpp
+  file src/mon/OSDMonitor.cc
+  reject VYQL-AUTH-001
+  code
+  ```
+  bool OSDMonitor::enforce_pool_op_caps(MonOpRequestRef op)
+  {
+    op->mark_osdmon_event(__func__);
+
+    MPoolOp *m = static_cast<MPoolOp*>(op->get_req());
+    MonSession *session = m->get_session();
+    if (!session) {
+      _pool_op_reply(op, -EPERM, osdmap.get_epoch());
+      return true;
+    }
+
+    switch (m->op) {
+    case POOL_OP_CREATE_UNMANAGED_SNAP:
+    case POOL_OP_DELETE_UNMANAGED_SNAP:
+      {
+        const std::string* pool_name = nullptr;
+        const pg_pool_t *pg_pool = osdmap.get_pg_pool(m->pool);
+        if (pg_pool != nullptr) {
+          pool_name = &osdmap.get_pool_name(m->pool);
+        }
+
+        if (!is_unmanaged_snap_op_permitted(cct, mon->key_server,
+                                            session->entity_name, session->caps,
+                                            pool_name)) {
+          dout(0) << "got unmanaged-snap pool op from entity with insufficient "
+                  << "privileges. message: " << *m  << std::endl
+                  << "caps: " << session->caps << dendl;
+          _pool_op_reply(op, -EPERM, osdmap.get_epoch());
+          return true;
+        }
+      }
+      break;
+    default:
+      if (!session->is_capable("osd", MON_CAP_W)) {
+        dout(0) << "got pool op from entity with insufficient privileges. "
+                << "message: " << *m  << std::endl
+                << "caps: " << session->caps << dendl;
+        _pool_op_reply(op, -EPERM, osdmap.get_epoch());
+        return true;
+      }
+      break;
+    }
+
+    return false;
+  }
+
+  bool OSDMonitor::preprocess_pool_op(MonOpRequestRef op)
+  {
+    op->mark_osdmon_event(__func__);
+    MPoolOp *m = static_cast<MPoolOp*>(op->get_req());
+
+    if (enforce_pool_op_caps(op)) {
+      return true;
+    }
+
+    if (m->fsid != mon->monmap->fsid) {
+      dout(0) << __func__ << " drop message on fsid " << m->fsid
+              << " != " << mon->monmap->fsid << " for " << *m << dendl;
+      _pool_op_reply(op, -EINVAL, osdmap.get_epoch());
+      return true;
+    }
+
+    if (m->op == POOL_OP_CREATE)
+      return preprocess_pool_op_create(op);
+
+    const pg_pool_t *p = osdmap.get_pg_pool(m->pool);
+    if (p == nullptr) {
+      if (m->op == POOL_OP_DELETE) {
+        _pool_op_reply(op, 0, osdmap.get_epoch());
+      } else {
+        _pool_op_reply(op, -ENOENT, osdmap.get_epoch());
+      }
+      return true;
+    }
+
+    return false;
+  }
+
+  bool OSDMonitor::preprocess_pool_op_create(MonOpRequestRef op)
+  {
+    op->mark_osdmon_event(__func__);
+    MPoolOp *m = static_cast<MPoolOp*>(op->get_req());
+
+    int64_t pool = osdmap.lookup_pg_pool_name(m->name.c_str());
+    if (pool >= 0) {
+      _pool_op_reply(op, 0, osdmap.get_epoch());
+      return true;
+    }
+
+    return false;
+  }
+  ```

@@ -1,0 +1,42 @@
+module bindings.ruby.oauth_error_response_redirect_uri_without_preauth;
+
+// An OAuth authorization server answers a malformed authorization request by
+// redirecting the browser back with the error in the query string, and the
+// request's own redirect_uri parameter decides where that redirect goes. The
+// value is only safe to echo once the server has matched it against the
+// client's registered redirect URIs; doorkeeper performs that match in the
+// PreAuthorization object the host controller exposes as `pre_auth`, whose
+// documented `valid?` predicate is the gate. An error handler that builds its
+// response from the raw parameter and redirects to it before that gate has
+// run lets whoever can trigger the error choose the destination, because the
+// error itself is what makes the validation fail.
+//
+// The two `field:` conjuncts carry the shape: a request parameter read placed
+// under a `redirect_uri` key (`field:redirect_uri=params[...`, the
+// authorization-request spelling of the pair) together with a `location:`
+// keyword (`field:location=...`, the Rails `render`/`redirect_to` spelling of
+// "set the Location header"). Both are AST-derived pair tokens and stay
+// confined to the function that carries them -- a sibling method constructing
+// an error response without the parameter, or rendering without the location
+// keyword, satisfies neither. The gate is the negation: doorkeeper's
+// `pre_auth.valid?`, the documented predicate that the redirect_uri was
+// validated against the registered client. A remediation keeps the same
+// construction and redirect, and only guards the construction with the gate,
+// so the negation is what separates them; the same predicate run elsewhere in
+// the file also silences the finding, because `call_path:` tokens at function
+// scope are file-wide in Ruby. That leak is a false-negative direction only:
+// it takes a validation call to silence, and prose cannot produce one.
+//
+// Residuals: a project that validates the redirect_uri under a different
+// spelling (`authorizable?`, a helper) keeps the finding, and a redirect that
+// spells the target positionally (`redirect_to params[:redirect_uri]`) is the
+// taint rule's `RedirectTargetSink` shape, not this one.
+
+binding oauthErrorResponseRedirectUriWithoutPreauth {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "ruby"
+    and node.context.field contains "field:redirect_uri=params["
+    and node.context.field contains "field:location="
+    and not (node.context.callPath contains "pre_auth.valid?")
+  emit issue code.OauthErrorResponseRedirectUriWithoutPreauth at node
+}

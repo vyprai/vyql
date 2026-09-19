@@ -1,0 +1,139 @@
+# Rank 1145 / CVE-2021-29439: Grav's admin plugin dispatched every admin
+# controller task after checking only a view blacklist and a CSRF nonce, with
+# no check anywhere that the requester was logged into the admin panel, so an
+# unauthenticated request carrying a valid nonce could invoke any admin task,
+# and one specific task, taskRemoveFileFromBlueprint, had no permission check
+# at all even after that (CWE-863).
+#
+# The dispatch entry point is what the fix secures -- `authorize()` before the
+# nonce -- so the pair pins the dispatcher. The per-task `authorizeTask()` gap
+# in taskRemoveFileFromBlueprint is the same weakness one level down and stays
+# unreported: at the vulnerable revision eight further task methods also carry
+# no `authorizeTask()` (keepAlive, getLevelListing, convertUrls, the deprecated
+# removeMedia among them), so "task handler without its own permission check"
+# scores eight false reviews for the one true one on this checkout alone.
+
+test "rank1145: execute() dispatches a request-named task after a nonce check only"
+  lang php
+  file AdminBaseController.php
+  expect VYQL-AUTH-176
+  code
+  ```
+  <?php
+  class AdminBaseController
+  {
+      public $view;
+      public $task;
+      public $blacklist_views = [];
+
+      public function execute()
+      {
+          if (in_array($this->view, $this->blacklist_views, true)) {
+              return false;
+          }
+
+          if (!$this->validateNonce()) {
+              return false;
+          }
+
+          $method = 'task' . ucfirst($this->task);
+          if (method_exists($this, $method)) {
+              return $this->{$method}();
+          }
+
+          return false;
+      }
+  }
+  ```
+
+test "rank1145: execute() authorizes the admin session before the nonce"
+  lang php
+  file AdminBaseController.php
+  reject VYQL-AUTH-176
+  code
+  ```
+  <?php
+  class AdminBaseController
+  {
+      public $view;
+      public $task;
+      public $blacklist_views = [];
+
+      public function execute()
+      {
+          if (in_array($this->view, $this->blacklist_views, true)) {
+              return false;
+          }
+
+          if (!$this->admin->authorize()) {
+              return false;
+          }
+
+          if (!$this->validateNonce()) {
+              return false;
+          }
+
+          $method = 'task' . ucfirst($this->task);
+          if (method_exists($this, $method)) {
+              return $this->{$method}();
+          }
+
+          return false;
+      }
+  }
+  ```
+
+test "rank1145: a dispatcher with no token check either is the forgery rules' case"
+  lang php
+  file AdminBaseController.php
+  reject VYQL-AUTH-176
+  code
+  ```
+  <?php
+  class AdminBaseController
+  {
+      public $view;
+      public $task;
+      public $blacklist_views = [];
+
+      public function execute()
+      {
+          if (in_array($this->view, $this->blacklist_views, true)) {
+              return false;
+          }
+
+          $method = 'task' . ucfirst($this->task);
+          if (method_exists($this, $method)) {
+              return $this->{$method}();
+          }
+
+          return false;
+      }
+  }
+  ```
+
+test "rank1145: a fixed handler name is not a dispatch to a chosen handler"
+  lang php
+  file AdminBaseController.php
+  reject VYQL-AUTH-176
+  code
+  ```
+  <?php
+  class AdminBaseController
+  {
+      public $task;
+
+      public function execute()
+      {
+          if (!$this->validateNonce()) {
+              return false;
+          }
+
+          if ($this->task === 'save') {
+              return $this->taskSave();
+          }
+
+          return false;
+      }
+  }
+  ```

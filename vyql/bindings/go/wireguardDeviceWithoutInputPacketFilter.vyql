@@ -1,0 +1,26 @@
+module bindings.go.wireguardDeviceWithoutInputPacketFilter;
+
+// github.com/siderolabs/siderolink's `wireguard.DeviceConfig` documents
+// `InputPacketFilters []tun.InputPacketFilter` as the field that "enables packet
+// filtering on the wireguard level", and `tun.InputPacketFilter` is documented as
+// "the function for filtering the packets going through the wireguard tunnel",
+// reading a decoded `PacketHeader` that carries both `SourceAddr` and
+// `DestinationAddr`. Leaving the field unset is the library's default: the device
+// accepts every packet a peer sends it.
+//
+// WireGuard itself only constrains the *source* address of an inbound packet, via
+// the peer's allowed IPs. Nothing in the protocol constrains the destination. So a
+// server that terminates tunnels from peers it does not control -- which is what
+// `ServerPrefix` marks, the address the device binds for the server end -- hands
+// every peer the ability to address any host reachable from the machine running
+// it: the server's own listening services when forwarding is off, and anything
+// routable behind it when forwarding is on (CWE-284). A filter that drops packets
+// whose destination is not the server's own address is what closes that, and
+// `tun.FilterAllExceptIP` is the constructor the library ships for it.
+//
+// The field set in the literal, or assigned onto the configuration afterwards,
+// both mean a filter exists, so neither form reports.
+binding goWireguardDeviceWithoutInputPacketFilter {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and node.context.callPath contains "wireguard.DeviceConfig" and node.context.field contains "ServerPrefix" and not (node.context.field contains "InputPacketFilters") and not (node.context.selector contains "InputPacketFilters")
+  emit issue code.NetworkFilteringDisabled at node
+}

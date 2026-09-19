@@ -1,0 +1,218 @@
+# Rank 1961 / CVE-2020-28037 (GHSA-h2pj-w259-mfcv): WordPress's
+# is_blog_installed() decides whether wp-admin/install.php may run a fresh
+# installation over an existing site -- install.php:214 reads
+# `if ( is_blog_installed() ) { die }`. When the cached siteurl check fails,
+# the function probes every core table with `DESCRIBE $table;` under
+# `$wpdb->suppress_errors()`. The probe's accessor is tri-state:
+# `$wpdb->get_results()` returns an array of rows when the query ran,
+# an empty array when it ran against a table that is not there, and null
+# when the query did not run at all -- the state a connection that never
+# became ready leaves the accessor in, because query() returns before the
+# result set is touched. The vulnerable test
+#
+#     if ( ! $wpdb->get_results( "DESCRIBE $table;" ) ) {
+#         continue;
+#     }
+#
+# coerces all three alike, so a probe that never ran reads as "table
+# absent". The loop completes, `wp_cache_set( 'is_blog_installed', false )`
+# runs and the function returns false, so a fresh installation over an
+# installed site is offered to whoever loads install.php. The assigned fix
+# 2ca15d1e5 ("Improve handling of ambiguous return values to determine if a
+# blog is installed", merged to trunk at r49386) captures the probe and
+# continues only on the definitive empty array:
+#
+#     $described_table = $wpdb->get_results( "DESCRIBE $table;" );
+#     if ( is_array( $described_table ) && count( $described_table ) === 0 ) {
+#         continue;
+#     }
+#
+# so null falls through to the dead_db() repair die instead of licensing a
+# reinstall. The remediation is present at the fixed revision and absent at
+# its parent (src/wp-includes/functions.php:1759 both revisions).
+#
+# Detection. The discriminator is not the fix's own vocabulary -- the third
+# block below remediates identically with `null === $described_table ||
+# array() !== $described_table`, which shares no token with the shipped
+# patch, and is equally unreported. What separates the revisions is
+# structural: the suppressed read and its truthiness test are one uncaptured
+# expression at the parent, and capture at the fix takes the call out of
+# every condition. suppressed_query_failure_read_as_empty labels the
+# function context on that shape (an AST-derived call to suppress_errors or
+# hide_errors plus a get_results/get_var/get_row call, and the same read
+# tested in place under !, if, elseif, while, && or ||), and
+# VYQL-VAL-039 judges it. No dataflow exists to judge -- the attacker
+# supplies no data on this path; `$table` comes from `$wpdb->tables()` and
+# the deciding input is a database failure state -- so the review route is
+# the layer, not a taint rule.
+#
+# Measured on the real checkout (src/wp-includes, 566 php files, timeout 180,
+# --max-ram 6GB, --cache off, three runs per side, identical every run):
+# 1547 findings at the vulnerable parent and 1546 at the fix, the difference
+# being exactly the one VYQL-VAL-039 row on is_blog_installed; the rule adds
+# two rows at the parent and one at the fix, the survivor being
+# install_blog() at ms-deprecated.php:616, a second instance of the same
+# probe under the same suppress_errors() that the upstream fix never
+# touched and that deprecated in 5.1.0 carries -- `if ( $wpdb->get_results(
+# "DESCRIBE {$wpdb->posts}" ) )` deciding whether to die "Already
+# Installed", the positive polarity of the same coercion. The wider
+# reachable set, grep-enumerated: 26 functions in the tree test one of the
+# four read accessors directly as a boolean, and exactly two of them do it
+# under suppressed errors. Collateral: ultimatemember and wp-statistics,
+# the two other wpdb consumers in reach, report 0 rows, and an older
+# WordPress tree reports the same two functions. The residuals are
+# measured, not assumed: a read captured into a variable that is then
+# itself coerced is equally ambiguous and does not match; a real read plus
+# a commented-out truthiness test does match (the condition clause reads
+# the compacted body); a read held on a handle other than $wpdb does not
+# match; get_col is excluded because it documents an array return with no
+# failure spelling, and query because its falsy zero-row return is the
+# ordinary reading of a write -- the tree holds no direct-boolean
+# `$wpdb->query(` at all, so the boundary costs nothing measured.
+
+test "rank1961: the suppressed DESCRIBE probe coerced by falsiness"
+  lang php
+  file src/wp-includes/functions.php
+  expect VYQL-VAL-039
+  expect_review code.SuppressedQueryFailureReadAsEmpty
+  code
+  ```
+  <?php
+
+  function is_blog_installed() {
+  	global $wpdb;
+
+  	$installed = ! empty( $installed );
+  	if ( $installed ) {
+  		return true;
+  	}
+
+  	$suppress = $wpdb->suppress_errors();
+
+  	$wp_tables = $wpdb->tables();
+  	foreach ( $wp_tables as $table ) {
+  		if ( defined( 'CUSTOM_USER_TABLE' ) && CUSTOM_USER_TABLE == $table ) {
+  			continue;
+  		}
+  		if ( defined( 'CUSTOM_USER_META_TABLE' ) && CUSTOM_USER_META_TABLE == $table ) {
+  			continue;
+  		}
+
+  		if ( ! $wpdb->get_results( "DESCRIBE $table;" ) ) {
+  			continue;
+  		}
+
+  		// One or more tables exist. We are insane.
+  		wp_load_translations_early();
+  		$wpdb->error = sprintf(
+  			__( 'One or more database tables are unavailable. The database may need to be <a href="%s">repaired</a>.' ),
+  			'maint/repair.php?referrer=is_blog_installed'
+  		);
+
+  		dead_db();
+  	}
+
+  	$wpdb->suppress_errors( $suppress );
+
+  	wp_cache_set( 'is_blog_installed', false );
+
+  	return false;
+  }
+  ```
+
+test "rank1961: the probe continued only on a definitively empty result set"
+  lang php
+  file src/wp-includes/functions.php
+  reject VYQL-VAL-039
+  code
+  ```
+  <?php
+
+  function is_blog_installed() {
+  	global $wpdb;
+
+  	$installed = ! empty( $installed );
+  	if ( $installed ) {
+  		return true;
+  	}
+
+  	$suppress = $wpdb->suppress_errors();
+
+  	$wp_tables = $wpdb->tables();
+  	foreach ( $wp_tables as $table ) {
+  		if ( defined( 'CUSTOM_USER_TABLE' ) && CUSTOM_USER_TABLE == $table ) {
+  			continue;
+  		}
+  		if ( defined( 'CUSTOM_USER_META_TABLE' ) && CUSTOM_USER_META_TABLE == $table ) {
+  			continue;
+  		}
+
+  		$described_table = $wpdb->get_results( "DESCRIBE $table;" );
+  		if ( is_array( $described_table ) && count( $described_table ) === 0 ) {
+  			continue;
+  		}
+
+  		// One or more tables exist. We are insane.
+  		wp_load_translations_early();
+  		$wpdb->error = sprintf(
+  			__( 'One or more database tables are unavailable. The database may need to be <a href="%s">repaired</a>.' ),
+  			'maint/repair.php?referrer=is_blog_installed'
+  		);
+
+  		dead_db();
+  	}
+
+  	$wpdb->suppress_errors( $suppress );
+
+  	wp_cache_set( 'is_blog_installed', false );
+
+  	return false;
+  }
+  ```
+
+test "rank1961: a tri-state spelling the fixed revision does not use remediates identically"
+  lang php
+  file src/wp-includes/functions-alt.php
+  reject VYQL-VAL-039
+  code
+  ```
+  <?php
+
+  function is_blog_installed() {
+  	global $wpdb;
+
+  	$installed = ! empty( $installed );
+  	if ( $installed ) {
+  		return true;
+  	}
+
+  	$suppress = $wpdb->suppress_errors();
+
+  	$wp_tables = $wpdb->tables();
+  	foreach ( $wp_tables as $table ) {
+  		if ( defined( 'CUSTOM_USER_TABLE' ) && CUSTOM_USER_TABLE == $table ) {
+  			continue;
+  		}
+  		if ( defined( 'CUSTOM_USER_META_TABLE' ) && CUSTOM_USER_META_TABLE == $table ) {
+  			continue;
+  		}
+
+  		$described_table = $wpdb->get_results( "DESCRIBE $table;" );
+  		if ( null === $described_table || array() !== $described_table ) {
+  			// an error-ambiguous probe or an existing table: refuse a
+  			// fresh installation rather than treat it as absent
+  			wp_load_translations_early();
+  			$wpdb->error = sprintf(
+  				__( 'One or more database tables are unavailable. The database may need to be <a href="%s">repaired</a>.' ),
+  				'maint/repair.php?referrer=is_blog_installed'
+  			);
+
+  			dead_db();
+  		}
+  	}
+
+  	$wpdb->suppress_errors( $suppress );
+
+  	return false;
+  }
+  ```

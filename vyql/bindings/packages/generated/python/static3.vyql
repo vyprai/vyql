@@ -1,0 +1,9 @@
+module bindings.python.generated.mf1ef58a3;
+
+binding filePathAccess0 {
+  requires {
+    dependency("static3")
+  }
+  query pattern callExpr where callee.method == "Cling.__init__"
+  emit sink code.FilePathAccess at args[0]
+}

@@ -1,0 +1,32 @@
+module bindings.ruby.dragonflyconvertsteprawarguments;
+
+// ImageMagick's convert command parses a leading dash as an option, so a value
+// spelled `-write /var/www/shell.rb` is one shell-safe token that convert reads
+// as an option, not a filename. Dragonfly's ImageMagick plugin exposes exactly
+// that surface: `Content#process!` / `Content#generate!` dispatch to a
+// registered job step by name, and the plugin's `:convert` step is the raw one
+// -- its argument string is interpolated into the convert command line verbatim
+// (`"#{convert_command} ... #{args} #{new_path}"`), after per-word shell
+// escaping that stops metacharacters and nothing else. Job steps are reachable
+// from the URL-driven job API, so the argument is request data whenever the
+// application runs the server without URL signatures.
+//
+// The remediated plugin keeps the command assembly but stops dispatching the
+// raw step: every remaining call site validates its parameters first
+// (ParamValidators, an option whitelist, or a geometry regex) and calls the
+// Commands module directly, so no value the URL controls reaches the convert
+// argument list unvalidated.
+//
+// The call itself carries the discrimination, so the binding is a callExpr:
+// `callee.method in [...]` compares the final segment only, and the argument
+// needle reads the step symbol. Residual, stated rather than hidden: the
+// needle is a substring over the argument literals, so a fixed string
+// mentioning "convert" would match too -- across every .rb file in the corpus
+// clones these two method names occur only in this plugin, so the shape has no
+// other caller to mislabel.
+
+binding dragonflyConvertStepRawArguments {
+  query pattern callExpr where callee.method in ["process!", "generate!"] and args.any.literal contains "convert"
+  emit sink code.CommandOptionInjectionSink at args[1]
+  emit issue code.CommandOptionInjection at call
+}

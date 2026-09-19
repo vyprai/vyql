@@ -1,0 +1,11 @@
+module code;
+
+concept PythonUnicodeEscapeWideUnderallocation : issue {
+  cwe: [CWE_787]
+  reviewAssumption: "a wide Unicode build can process attacker-influenced non-BMP code points and overflow the initially allocated representation buffer"
+  reviewCategory: memory
+  reviewCondition: "Python unicodeescape_string allocates six bytes per code point while wide Unicode escape output can write ten bytes per code point"
+  reviewConfidence: high
+  reviewEvidence: "unicodeescape_string context {pattern} allocates 2 + 6*size + 1 before writing \\U00xxxxxx escapes for ch >= 0x10000"
+  vulnerableTo: [memory.OobWrite]
+}

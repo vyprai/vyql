@@ -1,0 +1,11 @@
+module vypr.injection;
+
+rule JavaScriptUrlRedirectXss {
+  meta {
+    confidenceFloor: high
+    cwe: [CWE_79]
+    id: "VYQL-INJ-116"
+    severity: high
+  }
+  issue code.JavaScriptUrlRedirectXss as sink
+}

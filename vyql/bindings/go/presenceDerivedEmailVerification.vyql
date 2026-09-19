@@ -1,0 +1,39 @@
+module bindings.go.presenceDerivedEmailVerification;
+
+// OpenID Connect Core 5.1 defines `email_verified` as a claim the provider asserts
+// -- "True if the End-User's e-mail address has been verified; otherwise false" --
+// and 5.7 says a relying party must not key anything off `email` alone, because the
+// address is mutable and reassignable. Every provider that returns an address at all
+// documents its own attestation beside it: GitHub's and Discord's user endpoints ship
+// a `verified` boolean, GitLab's /user a `confirmed_at` timestamp that stays null
+// until the confirmation link is followed, Bitbucket's /user/emails an `is_confirmed`
+// flag per address, LinkedIn's and Microsoft Entra ID's userinfo the OIDC claim
+// itself. An adapter that instead writes `EmailVerified: profile.Email != ""` has
+// recorded that the endpoint returned a string, which every one of them does for an
+// unconfirmed address too -- so an account whose address was typed in and never
+// confirmed arrives at the relying party looking verified (CWE-287/CWE-290). Where
+// that flag decides whether a federated identity may be attached to a local account
+// matching the same address, it is an account takeover.
+//
+// Three facts are that shape. A struct field named for email verification being set
+// in the body; a `!= ""` comparison whose left side is email-named, which is the
+// presence test standing in for the attestation; and no read of any verification
+// field the provider actually supplies.
+//
+// That last clause is the neutraliser and is deliberately generous. It names the
+// documented claim spellings -- `EmailVerified`, `Verified`, `ConfirmedAt`,
+// `IsConfirmed` and their variants -- so an adapter that reads the provider's signal
+// is not reported however it then combines it, including GitLab's documented form
+// where the confirmation timestamp is conjoined with the presence test
+// (`Email != "" && ConfirmedAt != ""`). It also means an adapter that reads the
+// attestation and then falls back past it is not reported; that is the recall cost of
+// keeping the common correct form quiet, and the fallback shape is better described
+// by a control-flow fact than by a presence one.
+//
+// The email predicate is listed in both capitalisations because the engine matches
+// binary-expression operands case-sensitively, and Go spells the address either
+// `email` on a local or `Email` on a struct field.
+binding goPresenceDerivedEmailVerification {
+  query pattern presenceNode where node.scope == "function" and node.context.language == "go" and containsAny(node.context.field, ["EmailVerified", "email_verified", "EmailIsVerified", "IsEmailVerified", "EmailConfirmed", "email_confirmed", "VerifiedEmail", "verified_email"]) and containsAny(node.context.binary, ["Email!=\"\"", "email!=\"\""]) and not containsAny(node.context.selector, [".EmailVerified", ".IsEmailVerified", ".EmailIsVerified", ".VerifiedEmail", ".EmailConfirmed", ".EmailVerifiedAt", ".Verified", ".IsVerified", ".ConfirmedAt", ".IsConfirmed", ".ConfirmedEmail"])
+  emit issue code.PresenceDerivedEmailVerification at node
+}

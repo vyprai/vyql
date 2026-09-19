@@ -1,0 +1,9 @@
+module bindings.scala.generated.m107e7f8a;
+
+binding deserialization0 {
+  requires {
+    dependency("com.clearspring.analytics:stream")
+  }
+  query pattern callExpr where callee.method == "readExternal"
+  emit sink code.Deserialization at args[0]
+}

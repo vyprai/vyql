@@ -1,0 +1,12 @@
+module vypr.resource;
+
+rule OwnerFieldClearedBeforeFree {
+  meta {
+    confidenceFloor: low
+    cwe: [CWE_401]
+    id: "VYQL-RES-002"
+    severity: medium
+  }
+  issue code.OwnerFieldClear as clear
+  where dominates(clear, code.OwnerFree)
+}

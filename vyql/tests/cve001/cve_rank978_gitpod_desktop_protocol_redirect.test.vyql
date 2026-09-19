@@ -1,0 +1,53 @@
+# Rank 978 / CVE-2023-32766: Gitpod redirected arbitrary non-http(s)
+# desktop-link protocols through window.location.href.
+
+test "rank978: desktop IDE redirect allows every non-http protocol"
+  lang javascript
+  file components/dashboard/src/service/service.tsx
+  expect VYQL-RF-041
+  expect_review code.DesktopProtocolRedirectWithoutAllowlist
+  code
+  ```
+  export class IDEFrontendService {
+    openDesktopIDE(url) {
+      let redirect = false;
+      try {
+        const desktopLink = new URL(url);
+        redirect = desktopLink.protocol !== "http:" && desktopLink.protocol !== "https:";
+      } catch (e) {
+        console.error("invalid desktop link:", e);
+      }
+      if (redirect) {
+        window.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener");
+      }
+    }
+  }
+  ```
+
+test "rank978: desktop IDE redirect uses trusted protocol allowlist"
+  lang javascript
+  file components/dashboard/src/service/service.tsx
+  reject VYQL-RF-041
+  reject_review code.DesktopProtocolRedirectWithoutAllowlist
+  code
+  ```
+  export class IDEFrontendService {
+    openDesktopIDE(url) {
+      let redirect = false;
+      try {
+        const desktopLink = new URL(url);
+        const trustedProtocols = ["vscode:", "vscode-insiders:", "jetbrains-gateway:"];
+        redirect = trustedProtocols.includes(desktopLink.protocol);
+      } catch (e) {
+        console.error("invalid desktop link:", e);
+      }
+      if (redirect) {
+        window.location.href = url;
+      } else {
+        window.open(url, "_blank", "noopener");
+      }
+    }
+  }
+  ```

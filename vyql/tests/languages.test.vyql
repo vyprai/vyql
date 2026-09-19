@@ -1,0 +1,530 @@
+# Per-language frontend coverage: each language's real source idioms flow untrusted
+# input to a sink (SQLi INJ-001 / command INJ-002 / code INJ-003 / smart-contract
+# SC-00x), and the parameterized/escaped/constant form stays clean. Exercises the
+# language frontend + its adapter against the shipped ruleset.
+
+# --- C / C++ / Objective-C: command injection via system() ---
+test "c: getenv -> sprintf -> system is command injection"
+  lang c
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <stdlib.h>
+  void h() {
+    char *host = getenv("HOST");
+    char cmd[256];
+    sprintf(cmd, "ping %s", host);
+    system(cmd);
+  }
+  ```
+
+test "c: a constant command is clean"
+  lang c
+  reject VYQL-INJ-002
+  code
+  ```
+  void h() {
+    char cmd[256];
+    sprintf(cmd, "ping localhost");
+    system(cmd);
+  }
+  ```
+
+test "cpp: getenv -> string concat -> std::system is command injection"
+  lang cpp
+  expect VYQL-INJ-002
+  code
+  ```
+  #include <cstdlib>
+  #include <string>
+  void h() {
+    std::string host = getenv("HOST");
+    std::string cmd = "ping " + host;
+    std::system(cmd.c_str());
+  }
+  ```
+
+test "cpp: a constant command is clean"
+  lang cpp
+  reject VYQL-INJ-002
+  code
+  ```
+  #include <cstdlib>
+  void h() {
+    std::system("ping localhost");
+  }
+  ```
+
+test "objc: getenv -> stringWithFormat -> system is command injection"
+  lang objc
+  expect VYQL-INJ-002
+  code
+  ```
+  @implementation Foo
+  - (void)run {
+    char *name = getenv("NAME");
+    NSString *cmd = [NSString stringWithFormat:@"ping %s", name];
+    system([cmd UTF8String]);
+  }
+  @end
+  ```
+
+test "objc: a constant command is clean"
+  lang objc
+  reject VYQL-INJ-002
+  code
+  ```
+  @implementation Foo
+  - (void)run {
+    system("ping localhost");
+  }
+  @end
+  ```
+
+# --- Kotlin / Lua / Rust: command injection ---
+test "kotlin: @RequestParam -> Runtime.exec is command injection"
+  lang kotlin
+  expect VYQL-INJ-002
+  code
+  ```
+  @RestController
+  class Handler {
+    @GetMapping("/ping")
+    fun ping(@RequestParam host: String) {
+      Runtime.getRuntime().exec("ping " + host)
+    }
+  }
+  ```
+
+test "kotlin: a constant command is clean"
+  lang kotlin
+  reject VYQL-INJ-002
+  code
+  ```
+  @RestController
+  class Handler {
+    @GetMapping("/ping")
+    fun ping() {
+      Runtime.getRuntime().exec("ping localhost")
+    }
+  }
+  ```
+
+test "lua: ngx.var arg -> os.execute is command injection"
+  lang lua
+  expect VYQL-INJ-002
+  code
+  ```
+  local function handle()
+    local name = ngx.var.arg_name
+    os.execute("ping " .. name)
+  end
+  ```
+
+test "lua: a constant command is clean"
+  lang lua
+  reject VYQL-INJ-002
+  code
+  ```
+  local function handle()
+    os.execute("ping localhost")
+  end
+  ```
+
+test "rust: env::var -> format! -> Command.arg is command injection"
+  lang rust
+  expect VYQL-INJ-002
+  code
+  ```
+  fn h() {
+    let name = std::env::var("NAME").unwrap();
+    let cmd = format!("ping {}", name);
+    std::process::Command::new("sh").arg("-c").arg(cmd).output();
+  }
+  ```
+
+test "rust: constant args are clean"
+  lang rust
+  reject VYQL-INJ-002
+  code
+  ```
+  fn h() {
+    std::process::Command::new("ls").arg("-la").output();
+  }
+  ```
+
+# --- Bash / PowerShell / Perl: shell-script injections ---
+test "bash: $1 / $QUERY_STRING -> eval / bash -c is command+code injection"
+  lang bash
+  expect VYQL-INJ-002
+  expect VYQL-INJ-003
+  code
+  ```
+  #!/bin/bash
+  host=$1
+  cmd="ping $host"
+  eval "$cmd"
+  bash -c "$QUERY_STRING"
+  ```
+
+test "bash: constant commands are clean"
+  lang bash
+  reject VYQL-INJ-002
+  reject VYQL-INJ-003
+  code
+  ```
+  #!/bin/bash
+  eval "ping localhost"
+  bash -c "ls -la"
+  ```
+
+test "powershell: QUERY_STRING -> Invoke-Expression / Start-Process"
+  lang powershell
+  expect VYQL-INJ-003
+  expect VYQL-INJ-002
+  code
+  ```
+  param($target)
+  $n = $env:QUERY_STRING
+  Invoke-Expression "ping $n"
+  Start-Process "cmd.exe" $target
+  ```
+
+test "powershell: constant commands are clean"
+  lang powershell
+  reject VYQL-INJ-003
+  reject VYQL-INJ-002
+  code
+  ```
+  Invoke-Expression "ping localhost"
+  Start-Process "cmd.exe" "/c dir"
+  ```
+
+test "perl: CGI param -> system / DBI do is command+SQL injection"
+  lang perl
+  expect VYQL-INJ-002
+  expect VYQL-INJ-001
+  code
+  ```
+  sub handler {
+    my $name = $cgi->param('name');
+    system("ping " . $name);
+    my $q = "SELECT * FROM users WHERE name='$name'";
+    $dbh->do($q);
+  }
+  ```
+
+test "perl: constant commands are clean"
+  lang perl
+  reject VYQL-INJ-002
+  reject VYQL-INJ-001
+  code
+  ```
+  sub handler {
+    system("ping localhost");
+    $dbh->do("SELECT 1");
+  }
+  ```
+
+# --- Java / C# / Scala / PHP / Swift: SQLi (+ command) ---
+test "java: JDBC executeQuery with concatenated request param is SQLi"
+  lang java
+  expect VYQL-INJ-001
+  code
+  ```
+  public class Servlet {
+    public void doGet(HttpServletRequest request, Statement stmt) throws Exception {
+      String name = request.getParameter("name");
+      stmt.executeQuery("SELECT * FROM users WHERE name = '" + name + "'");
+    }
+  }
+  ```
+
+test "java: a parameterized PreparedStatement is clean"
+  lang java
+  reject VYQL-INJ-001
+  code
+  ```
+  public class Servlet {
+    public void doGet(HttpServletRequest request, Connection conn) throws Exception {
+      String name = request.getParameter("name");
+      PreparedStatement ps = conn.prepareStatement("SELECT * FROM users WHERE name = ?");
+      ps.setString(1, name);
+    }
+  }
+  ```
+
+test "csharp: SqlCommand concat + Process.Start is SQLi + command injection"
+  lang csharp
+  expect VYQL-INJ-001
+  expect VYQL-INJ-002
+  code
+  ```
+  using System.Data.SqlClient;
+  class Handler {
+    void Get(HttpRequest Request, SqlConnection conn) {
+      string name = Request.QueryString["name"];
+      var cmd = new SqlCommand("SELECT * FROM users WHERE name = '" + name + "'", conn);
+      cmd.ExecuteReader();
+      System.Diagnostics.Process.Start("ping " + name);
+    }
+  }
+  ```
+
+test "csharp: SQLi from a controller-action parameter (model-bound source)"
+  lang csharp
+  expect VYQL-INJ-001
+  code
+  ```
+  using Microsoft.AspNetCore.Mvc;
+  [ApiController]
+  [Route("[controller]")]
+  public class Sqli : ControllerBase {
+    [HttpGet("{id}")]
+    public string DoSqli(string id) {
+      using (SqlCommand cmd = new SqlCommand("SELECT * FROM users WHERE userId = '" + id + "'")) {
+        return cmd.ExecuteReader().ToString();
+      }
+    }
+  }
+  ```
+
+test "scala: getQueryString -> executeQuery + Process is SQLi + command injection"
+  lang scala
+  expect VYQL-INJ-001
+  expect VYQL-INJ-002
+  code
+  ```
+  object Handler {
+    def search(request: Request, stmt: Statement) = {
+      val name = request.getQueryString("name")
+      stmt.executeQuery("SELECT * FROM users WHERE name = '" + name + "'")
+      Process("ping " + name).!
+    }
+  }
+  ```
+
+test "php: mysqli_query concat + system is SQLi + command injection"
+  lang php
+  expect VYQL-INJ-001
+  expect VYQL-INJ-002
+  code
+  ```
+  <?php
+  function h($conn) {
+    $n = $_GET['name'];
+    mysqli_query($conn, "SELECT * FROM u WHERE n='" . $n . "'");
+    system("ping " . $_GET['host']);
+  }
+  ```
+
+test "php: mysqli_real_escape_string neutralizes the SQLi"
+  lang php
+  reject VYQL-INJ-001
+  code
+  ```
+  <?php
+  function h($conn) {
+    $n = mysqli_real_escape_string($conn, $_GET['name']);
+    mysqli_query($conn, "SELECT * FROM u WHERE n='" . $n . "'");
+  }
+  ```
+
+test "swift: CommandLine arg -> sqlite3_exec concat is SQLi"
+  lang swift
+  expect VYQL-INJ-001
+  code
+  ```
+  func h(db: OpaquePointer) {
+    let name = CommandLine.arguments[1]
+    sqlite3_exec(db, "SELECT * FROM users WHERE name = '" + name + "'", nil, nil, nil)
+  }
+  ```
+
+test "swift: a constant query is clean"
+  lang swift
+  reject VYQL-INJ-001
+  code
+  ```
+  func h(db: OpaquePointer) {
+    sqlite3_exec(db, "SELECT * FROM users", nil, nil, nil)
+  }
+  ```
+
+# --- JavaScript / Ruby: framework SQLi (concat + interpolation forms) ---
+test "js: Express req param -> db.query concat + template literal is SQLi"
+  lang javascript
+  expect VYQL-INJ-001
+  code
+  ```
+  const db = require('./db');
+  app.get('/search', (req, res) => {
+      const q = req.query.q;
+      db.query("SELECT * FROM products WHERE name = '" + q + "'");
+  });
+  app.get('/user', (req, res) => {
+      const id = req.params.id;
+      db.query(`SELECT * FROM users WHERE id = ${id}`);
+  });
+  ```
+
+test "js: a parameterized query is clean"
+  lang javascript
+  reject VYQL-INJ-001
+  code
+  ```
+  const db = require('./db');
+  app.get('/search', (req, res) => {
+      const q = req.query.q;
+      db.query("SELECT * FROM products WHERE name = $1", [q]);
+  });
+  ```
+
+test "ruby: Rails where concat + connection.execute interpolation is SQLi"
+  lang ruby
+  expect VYQL-INJ-001
+  code
+  ```
+  class UsersController
+    def search
+      name = params[:name]
+      User.where("name = '" + name + "'")
+    end
+
+    def lookup
+      id = params[:id]
+      ActiveRecord::Base.connection.execute("SELECT * FROM users WHERE id = #{id}")
+    end
+  end
+  ```
+
+test "ruby: a parameterized where is clean"
+  lang ruby
+  reject VYQL-INJ-001
+  code
+  ```
+  class UsersController
+    def search
+      name = params[:name]
+      User.where("name = ?", name)
+    end
+  end
+  ```
+
+# --- Python: interprocedural SQLi across two files ---
+test "python: request input crosses routes.py -> db.py into cursor.execute (SQLi)"
+  lang python
+  expect VYQL-INJ-001
+  file routes.py
+  ```
+  from db import run_query
+
+  def login():
+      name = request.form['name']
+      run_query(name)
+  ```
+  file db.py
+  ```
+  def run_query(value):
+      cursor.execute("SELECT * FROM users WHERE name = '" + value + "'")
+  ```
+
+test "python: a parameterized cross-file query is clean"
+  lang python
+  reject VYQL-INJ-001
+  file routes.py
+  ```
+  from db import run_query
+
+  def login():
+      name = request.form['name']
+      run_query(name)
+  ```
+  file db.py
+  ```
+  def run_query(value):
+      cursor.execute("SELECT * FROM users WHERE name = %s", (value,))
+  ```
+
+# --- Go: SQLi + type-constrained sink ---
+test "go: database/sql db.Query with concat is SQLi"
+  lang go
+  expect VYQL-INJ-001
+  code
+  ```
+  package app
+
+  import (
+  	"database/sql"
+  	"net/http"
+  )
+
+  func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+  	name := r.URL.Query().Get("name")
+  	db.Query("SELECT * FROM users WHERE name = '" + name + "'")
+  }
+  ```
+
+test "go: a parameterized db.Query is clean"
+  lang go
+  reject VYQL-INJ-001
+  code
+  ```
+  package app
+
+  import (
+  	"database/sql"
+  	"net/http"
+  )
+
+  func handler(w http.ResponseWriter, r *http.Request, db *sql.DB) {
+  	name := r.URL.Query().Get("name")
+  	db.Query("SELECT * FROM users WHERE name = $1", name)
+  }
+  ```
+
+test "go: a graphql client Query is not SQLi (type-constrained sink)"
+  lang go
+  reject VYQL-INJ-001
+  code
+  ```
+  package app
+
+  import "net/http"
+
+  func h(w http.ResponseWriter, r *http.Request) {
+  	name := r.URL.Query().Get("name")
+  	gql := graphql.NewClient("http://x")
+  	gql.Query("SELECT * FROM users WHERE name = '" + name + "'")
+  }
+  ```
+
+# --- Solidity: smart-contract external call + privileged selfdestruct ---
+test "solidity: tainted to.call is an arbitrary external call"
+  lang solidity
+  expect VYQL-SC-001
+  code
+  ```
+  contract Bank {
+    address owner;
+    function withdraw(address to, uint amt) public {
+      to.call{value: amt}("");
+    }
+    function kill(address target) public {
+      selfdestruct(target);
+    }
+  }
+  ```
+
+test "solidity: transfer to a state-var address is clean"
+  lang solidity
+  reject VYQL-SC-001
+  code
+  ```
+  contract Bank {
+    address owner;
+    function payout() public {
+      owner.transfer(1);
+    }
+  }
+  ```

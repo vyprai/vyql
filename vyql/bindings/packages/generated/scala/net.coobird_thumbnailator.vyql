@@ -1,0 +1,9 @@
+module bindings.scala.generated.m561f6fba;
+
+binding fileUse0 {
+  requires {
+    dependency("net.coobird:thumbnailator")
+  }
+  query pattern callExpr where callee.method == "write"
+  emit sink code.FileUseSink at args[0]
+}

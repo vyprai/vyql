@@ -1,0 +1,49 @@
+module bindings.javascript.generated.m66e9778b;
+
+binding filePathAccess0 {
+  requires {
+    dependency("detect-libc")
+  }
+  query pattern callExpr where callee.method == "family"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess1 {
+  requires {
+    dependency("detect-libc")
+  }
+  query pattern callExpr where callee.method == "familySync"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess2 {
+  requires {
+    dependency("detect-libc")
+  }
+  query pattern callExpr where callee.method == "isNonGlibcLinux"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess3 {
+  requires {
+    dependency("detect-libc")
+  }
+  query pattern callExpr where callee.method == "isNonGlibcLinuxSync"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess4 {
+  requires {
+    dependency("detect-libc")
+  }
+  query pattern callExpr where callee.method == "version"
+  emit sink code.FilePathAccess at args[0]
+}
+
+binding filePathAccess5 {
+  requires {
+    dependency("detect-libc")
+  }
+  query pattern callExpr where callee.method == "versionSync"
+  emit sink code.FilePathAccess at args[0]
+}

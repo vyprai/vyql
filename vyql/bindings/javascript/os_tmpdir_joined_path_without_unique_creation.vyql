@@ -1,0 +1,47 @@
+module bindings.javascript.osTmpdirJoinedPathWithoutUniqueCreation;
+
+// Node documents `os.tmpdir()` as "the operating system's default directory
+// for temporary files" -- a directory every local account can write to and
+// read -- and documents `fs.mkdtemp` as "creates a unique temporary
+// directory" and `crypto.randomUUID` as a random identifier, which is why
+// both are the recommended building blocks for anything placed there: the
+// name underneath the shared directory must not be guessable, or another
+// local user can pre-plant it, race its creation, or read what lands in it.
+//
+// So a function that joins further path segments onto `os.tmpdir()` and
+// generates no unique name is building a predictable path for executable or
+// readable content in a world-writable directory: a fixed segment, a hash of
+// known strings, a process id or a timestamp all stay guessable, while
+// `mkdtemp`/`mkdtempSync` and a `randomUUID` segment are the documented ways
+// out. The two positive conjuncts and the negation all read the function's
+// own `call:` tokens, which are exact per-callee entries: `in [...]` keeps
+// `tmpdir` from matching a callee like `tmpdirish`, and namespace,
+// aliased-namespace and bare-import spellings of the same call all appear
+// among the listed forms.
+//
+// The path is reported at the function that builds it, not at the `mkdir` or
+// `writeFile` that later creates it -- those regularly live in a different
+// function, and the joined path is the whole defect: whoever receives it
+// creates a directory the default umask leaves group- and world-readable.
+// The fix this shape wants -- placing the cache under the application's own
+// state directory with owner-only permissions -- removes the `tmpdir()` call
+// and stops the report without touching anything else.
+//
+// Residual costs, stated rather than hidden. The conjuncts combine by
+// co-occurrence, so a function that joins an unrelated path while separately
+// consulting the temp directory reports as well. A unique name from any
+// other generator still reports only when the generator is called outside
+// this function -- a helper returning `randomUUID()` one call away leaves
+// the joined form indistinguishable from a fixed one. And a `mkdtemp` or
+// `randomUUID` call anywhere in the function neutralises the report even for
+// an unrelated fixed-name join in the same body, the false-negative
+// direction. A base built by string concatenation or a template literal
+// rather than a path `join` is not read at all.
+binding osTmpdirJoinedPathWithoutUniqueCreation {
+  query pattern presenceNode where node.scope == "function"
+    and node.context.language == "javascript"
+    and node.context.call in ["tmpdir", "os.tmpdir", "node:os.tmpdir"]
+    and node.context.call in ["join", "path.join", "node:path.join", "posix.join"]
+    and not containsAny(node.context.call, ["mkdtemp", "randomUUID"])
+  emit issue code.InsecureTempFile at node
+}

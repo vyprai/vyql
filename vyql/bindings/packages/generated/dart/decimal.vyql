@@ -1,0 +1,17 @@
+module bindings.dart.generated.m9b6118ea;
+
+binding deserialization0 {
+  requires {
+    dependency("decimal")
+  }
+  query pattern callExpr where callee.method == "parse"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("decimal")
+  }
+  query pattern callExpr where callee.method == "tryParse"
+  emit sink code.Deserialization at args[0]
+}

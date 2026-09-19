@@ -1,0 +1,9 @@
+module bindings.cpp.generated.m986988d4;
+
+binding responseHeaderWrite0 {
+  requires {
+    dependency("azure-core-cpp")
+  }
+  query pattern callExpr where callee.method == "PropagateToHttpHeaders"
+  emit sink code.ResponseHeaderWrite at args[0]
+}

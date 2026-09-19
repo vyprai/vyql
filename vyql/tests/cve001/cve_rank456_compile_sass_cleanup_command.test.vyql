@@ -1,0 +1,91 @@
+# Rank 456 / CVE-2019-10799: compile-sass passed a caller-controlled CSS
+# cleanup path into a shell rm command. The advisory patch added a filesystem
+# preflight, but the shell command remained until the later fs.rmdir change.
+
+test "rank456: compile-sass cleanup path reaches shell rm without preflight"
+  lang javascript
+  profile library
+  expect VYQL-INJ-002
+  expect VYQL-INJ-095
+  expect_review code.CompileSassCleanupShellCommandWithoutPathCheck
+  code
+  ```
+  import { exec } from 'child_process';
+
+  let hasSetupCleanupOnExit = false;
+
+  export function setupCleanupOnExit(cssPath) {
+    if (!hasSetupCleanupOnExit) {
+      process.on('SIGINT', () => {
+        exec(`rm -r ${cssPath}`, function(error) {
+          if (error) {
+            process.exit(1);
+          }
+        });
+      });
+
+      hasSetupCleanupOnExit = true;
+    }
+  }
+  ```
+
+test "rank456: compile-sass cleanup path is checked before shell rm"
+  lang javascript
+  profile library
+  expect VYQL-INJ-002
+  reject VYQL-INJ-095
+  reject_review code.CompileSassCleanupShellCommandWithoutPathCheck
+  code
+  ```
+  import * as fs from 'fs';
+  import { exec } from 'child_process';
+
+  let hasSetupCleanupOnExit = false;
+
+  export function setupCleanupOnExit(cssPath) {
+    if (!hasSetupCleanupOnExit) {
+      process.on('SIGINT', () => {
+        fs.lstat(cssPath, (error, stats) => {
+          if (stats.isDirectory) {
+            exec(`rm -r ${cssPath}`, function(error) {
+              if (error) {
+                process.exit(1);
+              }
+            });
+          } else {
+            process.exit(1);
+          }
+        });
+
+        hasSetupCleanupOnExit = true;
+      });
+    }
+  }
+  ```
+
+test "rank456: compile-sass cleanup uses filesystem API without shell"
+  lang javascript
+  profile library
+  reject VYQL-INJ-002
+  reject VYQL-INJ-095
+  reject_review code.CompileSassCleanupShellCommandWithoutPathCheck
+  code
+  ```
+  import * as fs from 'fs';
+
+  let hasSetupCleanupOnExit = false;
+
+  export function setupCleanupOnExit(cssPath) {
+    if (!hasSetupCleanupOnExit) {
+      process.on('SIGINT', async () => {
+        fs.lstat(cssPath, async (error, stats) => {
+          if (!error && stats.isDirectory()) {
+            await fs.promises.rmdir(cssPath, { recursive: true });
+          }
+        });
+
+        hasSetupCleanupOnExit = true;
+      });
+    }
+  }
+  ```

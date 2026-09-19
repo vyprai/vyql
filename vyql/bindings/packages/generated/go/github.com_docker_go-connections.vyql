@@ -1,0 +1,25 @@
+module bindings.go.generated.m23ea9f82;
+
+binding deserialization0 {
+  requires {
+    dependency("github.com/docker/go-connections")
+  }
+  query pattern callExpr where callee.method == "ParsePort"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization1 {
+  requires {
+    dependency("github.com/docker/go-connections")
+  }
+  query pattern callExpr where callee.method == "ParsePortSpec"
+  emit sink code.Deserialization at args[0]
+}
+
+binding deserialization2 {
+  requires {
+    dependency("github.com/docker/go-connections")
+  }
+  query pattern callExpr where callee.method == "ParsePortRange"
+  emit sink code.Deserialization at args[0]
+}

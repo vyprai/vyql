@@ -1,0 +1,9 @@
+module bindings.javascript.generated.m2ac470c9;
+
+binding deserialization0 {
+  requires {
+    dependency("set-value")
+  }
+  query pattern callExpr where callee.method == "setValue"
+  emit sink code.Deserialization at args[0]
+}

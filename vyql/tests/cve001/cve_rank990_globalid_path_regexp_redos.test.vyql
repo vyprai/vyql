@@ -1,0 +1,60 @@
+# Rank 990 / CVE-2023-22799: GlobalID parsed model path segments with an
+# ambiguous optional-segment regex, allowing pathological path names to burn CPU.
+
+test "rank990: Ruby path parser uses ambiguous optional segment regex"
+  lang ruby
+  file lib/global_id/uri/gid.rb
+  expect VYQL-DOS-003
+  expect_review code.CatastrophicRegex
+  code
+  ```
+  module URI
+    class GID < Generic
+      PATH_REGEXP = %r(\A/([^/]+)/?([^/]+)?\z)
+
+      def set_model_components(path, validate = false)
+        _, model_name, model_id = path.match(PATH_REGEXP).to_a
+        model_id = CGI.unescape(model_id) if model_id
+
+        validate_component(model_name) && validate_model_id(model_id, model_name) if validate
+
+        @model_name = model_name
+        @model_id = model_id
+      end
+
+      def validate_model_id(model_id, model_name)
+        return model_id unless model_id.blank?
+
+        raise MissingModelIdError, "Unable to create a Global ID for #{model_name} without a model id."
+      end
+    end
+  end
+  ```
+
+test "rank990: Ruby path parser uses bounded split and slash validation"
+  lang ruby
+  file lib/global_id/uri/gid.rb
+  reject VYQL-DOS-003
+  reject_review code.CatastrophicRegex
+  code
+  ```
+  module URI
+    class GID < Generic
+      def set_model_components(path, validate = false)
+        _, model_name, model_id = path.split('/', 3)
+        validate_component(model_name) && validate_model_id(model_id, model_name) if validate
+
+        model_id = CGI.unescape(model_id) if model_id
+
+        @model_name = model_name
+        @model_id = model_id
+      end
+
+      def validate_model_id(model_id, model_name)
+        return model_id unless model_id.blank? || model_id.include?('/')
+
+        raise MissingModelIdError, "Unable to create a Global ID for #{model_name} without a model id."
+      end
+    end
+  end
+  ```

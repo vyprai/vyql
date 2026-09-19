@@ -1,0 +1,51 @@
+module bindings.kotlin.generated.m3c06c057;
+
+binding secretValue0 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "init"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue1 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "setPassword"
+  emit source code.SecretValue at call.result
+}
+
+binding secretValue2 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "toJwt"
+  emit source code.SecretValue at call.result
+}
+
+binding inputValidation3 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit check core.InputValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}
+
+binding certificateValidation4 {
+  requires {
+    dependency("com.twilio.sdk:twilio")
+  }
+  query pattern callExpr where callee.method == "validateSslCertificate"
+  emit check core.CertificateValidation at call {
+    covers path {
+      from: call
+      to: call
+    }
+  }
+}

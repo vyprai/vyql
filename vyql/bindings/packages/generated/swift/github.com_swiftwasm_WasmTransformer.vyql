@@ -1,0 +1,17 @@
+module bindings.swift.generated.mb5d88bf9;
+
+binding userControlledData0 {
+  requires {
+    dependency("github.com/swiftwasm/WasmTransformer")
+  }
+  query pattern callExpr where callee.method == "read"
+  emit source core.UserControlledData at call.result
+}
+
+binding userControlledData1 {
+  requires {
+    dependency("github.com/swiftwasm/WasmTransformer")
+  }
+  query pattern callExpr where callee.method == "readVarUInt32"
+  emit source core.UserControlledData at call.result
+}

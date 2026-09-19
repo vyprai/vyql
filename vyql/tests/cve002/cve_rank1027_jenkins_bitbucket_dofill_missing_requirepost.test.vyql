@@ -1,0 +1,92 @@
+# Rank 1027 / CVE-2022-20619 (SECURITY-2467): the Bitbucket branch source
+# plugin's doFillRepositoryItems form fill was reachable by GET. It resolves
+# stored Jenkins credentials for a caller-supplied serverUrl and then calls the
+# Bitbucket API with them, so a crafted page could make a victim's browser
+# drive a connection to an attacker's server carrying those credentials
+# (CWE-352). The fix adds a single @RequirePOST annotation.
+#
+# The method guards itself with hasPermission for Item.EXTENDED_READ and
+# CredentialsProvider.USE_ITEM, so the permission-missing Jenkins concepts do
+# not apply: permissions were never the problem, only the missing POST
+# requirement. VYQL-RF-043 (code.StateChangingOp) covers it — a doFill Stapler
+# form method with no checkPermission in scope and no @POST or @RequirePOST
+# annotation is reported for CSRF review — and hasPermission in the body does
+# not neutralise it, which is what separates this method from a permission
+# regression. The annotation is the neutraliser the fixed revision adds.
+
+test "rank1027: form fill resolving credentials with no POST requirement is CSRF-reachable"
+  lang java
+  file src/main/java/com/cloudbees/jenkins/plugins/bitbucket/BitbucketSCMSource.java
+  expect VYQL-RF-043
+  expect_review code.StateChangingOp
+  code
+  ```
+  public static class DescriptorImpl extends SCMSourceDescriptor {
+      @SuppressWarnings("unused") // used By stapler
+      public ListBoxModel doFillRepositoryItems(@AncestorInPath SCMSourceOwner context,
+                                                @QueryParameter String serverUrl,
+                                                @QueryParameter String credentialsId,
+                                                @QueryParameter String repoOwner)
+              throws IOException, InterruptedException {
+          if (context == null && !Jenkins.get().hasPermission(Jenkins.ADMINISTER) ||
+              context != null && !context.hasPermission(Item.EXTENDED_READ)) {
+              return new ListBoxModel();
+          }
+          if (context != null && !context.hasPermission(CredentialsProvider.USE_ITEM)) {
+              return new ListBoxModel();
+          }
+
+          StandardCredentials credentials = BitbucketCredentials.lookupCredentials(
+                  serverUrl, context, credentialsId, StandardCredentials.class);
+          BitbucketAuthenticator authenticator = AuthenticationTokens.convert(
+                  BitbucketAuthenticator.authenticationContext(serverUrl), credentials);
+
+          BitbucketApi bitbucket = BitbucketApiFactory.newInstance(serverUrl, authenticator, repoOwner, null);
+          BitbucketTeam team = bitbucket.getTeam();
+          ListBoxModel result = new ListBoxModel();
+          for (BitbucketRepository repo : bitbucket.getRepositories(null)) {
+              result.add(repo.getRepositoryName());
+          }
+          return result;
+      }
+  }
+  ```
+
+test "rank1027: fix requires POST on the same form fill"
+  lang java
+  file src/main/java/com/cloudbees/jenkins/plugins/bitbucket/BitbucketSCMSource.java
+  reject VYQL-RF-043
+  reject_review code.StateChangingOp
+  code
+  ```
+  public static class DescriptorImpl extends SCMSourceDescriptor {
+      @SuppressWarnings("unused") // used By stapler
+      @RequirePOST
+      public ListBoxModel doFillRepositoryItems(@AncestorInPath SCMSourceOwner context,
+                                                @QueryParameter String serverUrl,
+                                                @QueryParameter String credentialsId,
+                                                @QueryParameter String repoOwner)
+              throws IOException, InterruptedException {
+          if (context == null && !Jenkins.get().hasPermission(Jenkins.ADMINISTER) ||
+              context != null && !context.hasPermission(Item.EXTENDED_READ)) {
+              return new ListBoxModel();
+          }
+          if (context != null && !context.hasPermission(CredentialsProvider.USE_ITEM)) {
+              return new ListBoxModel();
+          }
+
+          StandardCredentials credentials = BitbucketCredentials.lookupCredentials(
+                  serverUrl, context, credentialsId, StandardCredentials.class);
+          BitbucketAuthenticator authenticator = AuthenticationTokens.convert(
+                  BitbucketAuthenticator.authenticationContext(serverUrl), credentials);
+
+          BitbucketApi bitbucket = BitbucketApiFactory.newInstance(serverUrl, authenticator, repoOwner, null);
+          BitbucketTeam team = bitbucket.getTeam();
+          ListBoxModel result = new ListBoxModel();
+          for (BitbucketRepository repo : bitbucket.getRepositories(null)) {
+              result.add(repo.getRepositoryName());
+          }
+          return result;
+      }
+  }
+  ```

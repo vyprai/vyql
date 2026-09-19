@@ -1,0 +1,7 @@
+module code;
+
+review code.ProtocolListAmplification {
+  category: resource
+  kind: attention
+  text: "review zero-sized protocol list readers for traversal-budget amplification checks"
+}

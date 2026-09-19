@@ -1,0 +1,17 @@
+module bindings.python.generated.me74e77bd;
+
+binding cliArgument0 {
+  requires {
+    dependency("jsonschema")
+  }
+  query pattern callExpr where callee.method == "run"
+  emit source code.CliArgument at call.result
+}
+
+binding deserialization1 {
+  requires {
+    dependency("jsonschema")
+  }
+  query pattern callExpr where callee.method == "validate"
+  emit sink code.Deserialization at args[0]
+}

@@ -1,0 +1,10 @@
+module vypr.injection;
+
+rule PackageInstallCodeExecution {
+  meta {
+    cwe: [CWE_94]
+    id: "VYQL-INJ-019"
+    severity: critical
+  }
+  issue code.PackageInstallExecution as sink
+}

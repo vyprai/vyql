@@ -1,0 +1,9 @@
+module bindings.php.generated.m42c40cf2;
+
+binding commandExecution0 {
+  requires {
+    dependency("liip/imagine-bundle")
+  }
+  query pattern callExpr where callee.method == "createProcess"
+  emit sink code.CommandExecution at args[0]
+}

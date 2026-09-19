@@ -1,0 +1,150 @@
+# Rank 1059 / CVE-2026-20613: apple/containerization's ArchiveReader bridges
+# libarchive and extracts by joining each entry's declared path onto the
+# destination directory and writing it there, so an entry named with leading
+# traversal escapes the directory (CWE-22, CWE-59). The vulnerable
+# extractContents holds, in Sources/ContainerizationArchive/Reader.swift,
+#
+#   for (entry, data) in self {
+#       guard let p = entry.path else { continue }
+#       let target = directory.appending(path: p)
+#       if entry.fileType == .directory {
+#           try fm.createDirectory(at: target, withIntermediateDirectories: true)
+#       } else {
+#           try data.write(to: target, options: .atomic)
+#       }
+#       chmod(target.path(), entry.permissions)
+#   }
+#
+# with no containment check and no no-follow open, so a symlink entry
+# extracted first also redirects the writes that follow. The fix (3e93416b9a)
+# adds FileDescriptor+SecurePath.swift and rewrites extraction to walk from a
+# root descriptor with mkdirSecure and openat carrying
+# O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW, returning the entry paths it rejects.
+#
+# Swift now reports the loop through code.ManualZipEntryFileWrite
+# (VYQL-PATH-014): the Swift member of the manual-extraction family whose PHP
+# and Go members already ship, bound file-wide because Swift emits one
+# module-context per file. The taint route (VYQL-PATH-004) still cannot fire
+# in Swift -- code.ArchiveEntryName has no Swift source binding, and the one
+# Swift code.ArchiveEntryWrite binding keys on a method name the fix itself
+# introduces -- so that miss stays pinned below.
+#
+# verify_current_expected: fixed-manual-extraction-review
+
+test "rank1059: the libarchive loop joins the member path and writes it by name"
+  lang swift
+  file Sources/ContainerizationArchive/Reader.swift
+  expect VYQL-PATH-014
+  code
+  ```
+  import Foundation
+
+  public final class ArchiveReader {
+      var underlying: OpaquePointer?
+
+      public func extractContents(to directory: URL) throws {
+          let fm = FileManager.default
+          var foundEntry = false
+          var entry = WriteEntry(archive: self)
+          while archive_read_next_header2(underlying, entry.underlying) == ARCHIVE_OK {
+              guard let p = entry.path else { continue }
+              foundEntry = true
+              let target = directory.appending(path: p)
+              switch entry.fileType {
+              case .directory:
+                  try fm.createDirectory(at: target, withIntermediateDirectories: true)
+              default:
+                  var buffer = [UInt8](repeating: 0, count: 4096)
+                  _ = archive_read_data(underlying, &buffer, buffer.count)
+                  let data = Data(buffer)
+                  try data.write(to: target, options: .atomic)
+              }
+              chmod(target.path(), entry.permissions)
+          }
+          guard foundEntry else {
+              throw ArchiveError.failedToExtractArchive("no entries found in archive")
+          }
+      }
+  }
+  ```
+
+test "rank1059: the fixed revision walks from a root descriptor with openat and O_NOFOLLOW"
+  lang swift
+  file Sources/ContainerizationArchive/ArchiveReader.swift
+  reject VYQL-PATH-014
+  code
+  ```
+  import Foundation
+  import SystemPackage
+
+  public final class ArchiveReader {
+      public func extractContents(to directory: URL) throws -> [String] {
+          let fm = FileManager.default
+          let rootFileDescriptor = try FileDescriptor.open(FilePath(directory.path), .readOnly)
+          defer { try? rootFileDescriptor.close() }
+
+          var rejectedPaths = [String]()
+          for (entry, dataReader) in self.makeStreamingIterator() {
+              guard let memberPath = entry.path.map({ FilePath($0) }) else { continue }
+              let extracted = try extractEntry(
+                  entry: entry,
+                  dataReader: dataReader,
+                  memberPath: memberPath,
+                  rootFileDescriptor: rootFileDescriptor
+              )
+              if !extracted { rejectedPaths.append(memberPath.string) }
+          }
+          return rejectedPaths
+      }
+
+      private func extractEntry(memberPath: FilePath, rootFileDescriptor: FileDescriptor, fileMode: mode_t) throws -> Bool {
+          guard let lastComponent = memberPath.lastComponent else { return false }
+          let relativePath = memberPath.removingLastComponent()
+          try rootFileDescriptor.mkdirSecure(relativePath, makeIntermediates: true) { fd in
+              try? fd.unlinkRecursiveSecure(filename: lastComponent)
+              let fileFd = openat(fd.rawValue, lastComponent.string, O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, fileMode)
+              guard fileFd >= 0 else { return false }
+              defer { close(fileFd) }
+          }
+          return true
+      }
+  }
+  ```
+
+test "rank1059: a join and write with no archive read is ordinary file-writing code"
+  lang swift
+  file Sources/ContainerizationExtras/Downloads.swift
+  reject VYQL-PATH-014
+  code
+  ```
+  import Foundation
+
+  func saveDownload(to directory: URL, name: String, data: Data) throws {
+      let target = directory.appendingPathComponent(name)
+      try data.write(to: target, options: .atomic)
+  }
+  ```
+
+test "rank1059: the taint rule still has no Swift source for an entry's own name"
+  lang swift
+  file Sources/ContainerizationArchive/Reader.swift
+  reject VYQL-PATH-004
+  code
+  ```
+  import Foundation
+
+  public final class ArchiveReader {
+      var underlying: OpaquePointer?
+
+      public func extractContents(to directory: URL) throws {
+          var entry = WriteEntry(archive: self)
+          while archive_read_next_header2(underlying, entry.underlying) == ARCHIVE_OK {
+              guard let p = entry.path else { continue }
+              let target = directory.appending(path: p)
+              var buffer = [UInt8](repeating: 0, count: 4096)
+              _ = archive_read_data(underlying, &buffer, buffer.count)
+              try Data(buffer).write(to: target, options: .atomic)
+          }
+      }
+  }
+  ```

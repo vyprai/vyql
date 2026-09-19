@@ -1,0 +1,17 @@
+module bindings.kotlin.generated.m290c7ca9;
+
+binding deserialization0 {
+  requires {
+    dependency("org.springframework.integration:spring-integration-core")
+  }
+  query pattern callExpr where callee.method == "decode"
+  emit sink code.Deserialization at args[0]
+}
+
+binding networkSend1 {
+  requires {
+    dependency("org.springframework.integration:spring-integration-core")
+  }
+  query pattern callExpr where callee.method == "send"
+  emit sink code.NetworkSend at args[0]
+}
