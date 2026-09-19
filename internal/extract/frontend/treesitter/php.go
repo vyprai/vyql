@@ -426,9 +426,14 @@ func (c *phConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		// `while ($row = db_fetch_row($res)) {…}` — the condition binds the variable the body
 		// reads, so its assignment is prepended to the body it dominates, the way
 		// foreach_statement above binds its loop variables. The condition itself is not part of
-		// a Loop, so only the assignment survives.
-		pre, _ := c.phpCondLower(c.field(n, "condition"))
-		return []nir.Stmt{nir.Loop{Body: append(pre, c.collectBlocks(n)...)}}
+		// a Loop, so the expression left after the hoist — the one being tested — is lowered at
+		// the head of that body too: a call written only in the condition (`while ($r->fetch_row())`,
+		// `for (; has_next($res); )`) keeps its node the way a call in an if condition does,
+		// while the expression phpCondLower returns names the hoisted assignment's variable, so
+		// the call that assignment performs is still lowered exactly once.
+		pre, cond := c.phpCondLower(c.field(n, "condition"))
+		body := append(pre, nir.ExprStmt{Value: cond})
+		return []nir.Stmt{nir.Loop{Body: append(body, c.collectBlocks(n)...)}}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
 	case "switch_statement":
