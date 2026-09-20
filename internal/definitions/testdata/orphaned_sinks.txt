@@ -86,7 +86,6 @@ injection.CodeInjection	ruby
 injection.CodeInjection	rust
 injection.CodeInjection	scala
 injection.CodeInjection	swift
-injection.CommandInjection	java
 injection.CommandInjection	solidity
 injection.CsvInjection	csharp
 injection.CsvInjection	go
@@ -144,7 +143,6 @@ request_forgery.Ssrf	csharp
 request_forgery.Ssrf	dart
 request_forgery.Ssrf	elixir
 request_forgery.Ssrf	groovy
-request_forgery.Ssrf	java
 request_forgery.Ssrf	kotlin
 request_forgery.Ssrf	lua
 request_forgery.Ssrf	objc
