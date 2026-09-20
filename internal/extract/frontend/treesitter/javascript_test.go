@@ -1436,6 +1436,81 @@ function addDebugLog(board: Board, value: string) {
 	t.Fatalf("global assignment parameter entry event does not flow to callback param")
 }
 
+func TestJavaScriptCallObjectPropertyLambdaParamEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "webApp.ts")
+	src := []byte(`
+telegramWebView.addMultipleEventsListeners({
+  iframe_ready: (result) => {
+    this.readyResult = result;
+  },
+  web_app_open_link: ({url}) => {
+    window.open(url, '_blank');
+  },
+  [evName]: (payload) => {
+    window.open(payload, '_blank');
+  },
+  on: { theme_changed: (theme) => { document.title = theme; } }
+});
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var eventID, paramID, nestedID string
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.parameter.entry" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if !strings.Contains(args, "entry_kind:call_property_lambda_param") ||
+			!strings.Contains(args, "call_path:telegramWebView.addMultipleEventsListeners") {
+			continue
+		}
+		switch {
+		case strings.Contains(args, "call_property:web_app_open_link") &&
+			strings.Contains(args, "param_name:url"):
+			eventID = n.ID
+		case strings.Contains(args, "call_property:on.theme_changed") &&
+			strings.Contains(args, "param_name:theme"):
+			nestedID = n.ID
+		}
+		if strings.Contains(args, "call_property:") && strings.Contains(args, "[evName]") {
+			t.Fatalf("computed key marked as a property channel: %q", args)
+		}
+	}
+	if eventID == "" || nestedID == "" {
+		t.Fatalf("missing call property lambda parameter entry events direct=%q nested=%q nodes=%#v", eventID, nestedID, nodes)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Param" && n.Prop("name") == "url" {
+			paramID = n.ID
+		}
+	}
+	if paramID == "" {
+		t.Fatalf("missing handler param")
+	}
+	outs, _ := g.OutEdges(eventID, "FLOWS")
+	for _, edge := range outs {
+		if edge.Dst == paramID {
+			return
+		}
+	}
+	t.Fatalf("call property lambda parameter entry event does not flow to handler param")
+}
+
 func TestJavaScriptModuleContextIsLowered(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "table.js")
