@@ -2261,3 +2261,193 @@ func uploads(router *httprouter.Router, fsys MkdirFS) {
 		}
 	}
 }
+
+// The decode-restore universe must span packages, because the shape the real
+// repositories use keeps the model struct in its own package (monetr's
+// server/models) and the handler dot-imports it. Directories walk in lexical
+// order, so the handler's package converts BEFORE the declaring package is
+// even buffered, and the only universe that package can state on its own is
+// the fields the handler's body touches -- exactly the set that omits the
+// fields the vulnerability is: the ones no restore re-establishes because the
+// body never names them at all. The scan-wide field index has to resolve the
+// declaring package on demand; the body-touched fields stay the universe only
+// for a type no package of the scan declares.
+func TestGoDecodeRestoreUniverseResolvesAcrossPackages(t *testing.T) {
+	dir := t.TempDir()
+	for _, sub := range []string{"api", "apiv2", "models"} {
+		if err := os.MkdirAll(filepath.Join(dir, sub), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	files := map[string]string{
+		"go.mod":                "module example.com/m\n\ngo 1.21\n",
+		"models/transaction.go": "package models\n\ntype Transaction struct {\n\tName      string\n\tSource    string\n\tCreatedAt string\n\tDeletedAt *string\n\tAmount    int64\n}\n",
+		"api/handler.go": `package api
+
+import . "example.com/m/models"
+
+type Ctx interface {
+	Bind(any) error
+	Update(string, any) error
+}
+
+func loadExisting() (*Transaction, error) { return nil, nil }
+
+func putVulnerable(ctx Ctx) error {
+	var transaction Transaction
+	if err := ctx.Bind(&transaction); err != nil {
+		return err
+	}
+	existing, err := loadExisting()
+	if err != nil {
+		return err
+	}
+	transaction.Name = existing.Name
+	return ctx.Update("id", &transaction)
+}
+
+func putFixed(ctx Ctx) error {
+	var transaction Transaction
+	if err := ctx.Bind(&transaction); err != nil {
+		return err
+	}
+	existing, err := loadExisting()
+	if err != nil {
+		return err
+	}
+	transaction.Name = existing.Name
+	transaction.Source = existing.Source
+	transaction.CreatedAt = existing.CreatedAt
+	transaction.DeletedAt = existing.DeletedAt
+	return ctx.Update("id", &transaction)
+}
+`,
+		"apiv2/handler.go": `package apiv2
+
+import "example.com/m/models"
+
+type Ctx interface {
+	Bind(any) error
+}
+
+type repo struct{}
+
+func (repo) UpdateTransaction(t any) error { return nil }
+
+func loadExisting() (*models.Transaction, error) { return nil, nil }
+
+func putDotted(r repo, ctx Ctx) error {
+	transaction := &models.Transaction{}
+	if err := ctx.Bind(transaction); err != nil {
+		return err
+	}
+	existing, err := loadExisting()
+	if err != nil {
+		return err
+	}
+	transaction.Name = existing.Name
+	return r.UpdateTransaction(transaction)
+}
+
+func putUnknown(ctx Ctx) error {
+	var widget Widget
+	if err := ctx.Bind(&widget); err != nil {
+		return err
+	}
+	widget.Name = "set"
+	return ctx.Update("id", &widget)
+}
+`,
+	}
+	for name, src := range files {
+		if err := os.WriteFile(filepath.Join(dir, filepath.FromSlash(name)), []byte(src), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	prog, err := gofrontend.ExtractDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var facts []string
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.go.decode_restore_before_persist" {
+			continue
+		}
+		facts = append(facts, n.Prop("str_args"))
+	}
+	factFor := func(fn, field string) string {
+		t.Helper()
+		for _, f := range facts {
+			if strings.Contains(f, "function_name:"+fn+"\x00") && strings.Contains(f, "field:"+field+"\x00") {
+				return f
+			}
+		}
+		t.Fatalf("no decode-restore fact for %s field %s among %q", fn, field, facts)
+		return ""
+	}
+	countFor := func(fn string) int {
+		t.Helper()
+		n := 0
+		for _, f := range facts {
+			if strings.Contains(f, "function_name:"+fn+"\x00") {
+				n++
+			}
+		}
+		return n
+	}
+	// One fact per field of the DECLARED struct per handler (five fields), in
+	// the handler package that dot-imports it and the one that spells the type
+	// dotted; the handler binding a type no package declares keeps the
+	// body-touched universe (one field).
+	if got := countFor("putVulnerable"); got != 5 {
+		t.Errorf("putVulnerable (dot-imported type): %d facts, want 5 (one per field of the declared models.Transaction -- the body names only Name); got %q", got, facts)
+	}
+	if got := countFor("putFixed"); got != 5 {
+		t.Errorf("putFixed (dot-imported type): %d facts, want 5; got %q", got, facts)
+	}
+	if got := countFor("putDotted"); got != 5 {
+		t.Errorf("putDotted (dotted declared type): %d facts, want 5; got %q", got, facts)
+	}
+	if got := countFor("putUnknown"); got != 1 {
+		t.Errorf("putUnknown (type declared by no package of the scan): %d facts, want 1 (the body-touched universe); got %q", got, facts)
+	}
+	// The vulnerable handler must state the exposure itself: every field no
+	// restore re-established, named by the body or not, carries restored:0 and
+	// no record -- the tokens a binding fires on. The fixed handler states the
+	// same fields restored:1 with the record, so the two revisions of one
+	// handler are told apart by their facts, not by their absence.
+	for _, fn := range []string{"putVulnerable", "putDotted"} {
+		for _, field := range []string{"Source", "CreatedAt", "DeletedAt", "Amount"} {
+			if f := factFor(fn, field); !strings.Contains(f, "restored:0") || strings.Contains(f, "record:") {
+				t.Errorf("%s %s fact %q: want restored:0 and no record (no restore re-established it)", fn, field, f)
+			}
+		}
+		if f := factFor(fn, "Name"); !strings.Contains(f, "restored:1") || !strings.Contains(f, "record:existing") {
+			t.Errorf("%s Name fact %q: want restored:1 + record:existing", fn, f)
+		}
+	}
+	for _, field := range []string{"Source", "CreatedAt", "DeletedAt"} {
+		if f := factFor("putFixed", field); !strings.Contains(f, "restored:1") || !strings.Contains(f, "record:existing") {
+			t.Errorf("putFixed %s fact %q: want restored:1 + record:existing", field, f)
+		}
+	}
+	if f := factFor("putFixed", "Amount"); !strings.Contains(f, "restored:0") {
+		t.Errorf("putFixed Amount fact %q: want restored:0 (the fix does not protect it)", f)
+	}
+	if f := factFor("putUnknown", "Name"); !strings.Contains(f, "restored:0") {
+		t.Errorf("putUnknown Name fact %q: want restored:0", f)
+	}
+	for _, f := range facts {
+		if strings.Contains(f, "function_name:putUnknown\x00") && strings.Contains(f, "field:Source") {
+			t.Errorf("putUnknown stated a field for a type no package declares: %q", f)
+		}
+	}
+}

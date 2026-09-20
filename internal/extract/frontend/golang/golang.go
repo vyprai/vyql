@@ -89,10 +89,185 @@ type packageConverter struct {
 	fset     *token.FileSet
 	byPkg    map[string]*nir.Module
 	modCache map[string]*modInfo
+	repo     *repoFieldIndex
 
 	pkgKey   string
 	files    []*ast.File
 	displays []string
+}
+
+// newPackageConverter wires the scan-wide field index to the converter's module
+// table, so a package converted before its model package was walked can still
+// resolve that model's fields (see repoFieldIndex).
+func newPackageConverter() *packageConverter {
+	p := &packageConverter{fset: token.NewFileSet(), byPkg: map[string]*nir.Module{}, modCache: map[string]*modInfo{}}
+	p.repo = &repoFieldIndex{fields: map[string]map[string][]string{}, mods: p.modCache}
+	return p
+}
+
+// repoFieldIndex is the scan-wide index of declared struct field sets, keyed by
+// the declaring package's import path. The walk converts one package at a time
+// and pkgFields sees only that package's declarations, so a struct ANOTHER
+// package declares -- the dot-imported model of the decode-then-persist shape
+// -- has no field list at the moment its importing package converts, which is
+// precisely when the decode-restore walk needs one: the fields a vulnerable
+// handler leaves client-set are the ones its body never names, so the
+// body-touched fallback cannot state them. Every flushed package notes its own
+// field sets here, and a reference that arrives before its declaring package
+// converts (directories walk in lexical order, so server/controller converts
+// before server/models) is resolved on demand by parsing just the declaring
+// package's files, located through the module table the walk has already
+// built. The index holds field NAMES only, never ASTs, so the scan's memory
+// stays bounded by the packages it converts.
+type repoFieldIndex struct {
+	fields map[string]map[string][]string // import path -> type name -> sorted fields
+	mods   map[string]*modInfo            // the converter's module table, shared
+}
+
+// note records one converted package's declared field sets. A package already
+// indexed by an earlier demand parse keeps that entry: both compute the same
+// field names from the same files.
+func (r *repoFieldIndex) note(pkgKey string, pkgFields map[string][]string) {
+	if r == nil || pkgKey == "" || len(pkgFields) == 0 || r.fields[pkgKey] != nil {
+		return
+	}
+	r.fields[pkgKey] = pkgFields
+}
+
+// fieldsOf returns the declared fields of typeName in the package importPath
+// names. The first ask for a package the walk has not converted yet parses that
+// package alone; an empty field set is cached too, so a type no package of the
+// scan declares costs one lookup, not one parse per handler.
+func (r *repoFieldIndex) fieldsOf(importPath, typeName string) []string {
+	if r == nil || importPath == "" || typeName == "" {
+		return nil
+	}
+	if set := r.fields[importPath]; set != nil {
+		return set[typeName]
+	}
+	set := r.parsePackage(importPath)
+	if r.fields == nil {
+		r.fields = map[string]map[string][]string{}
+	}
+	r.fields[importPath] = set
+	return set[typeName]
+}
+
+// parsePackage reads the declaring package's own .go files and returns its
+// type-name -> field-set map, or an empty map when the import path names no
+// package the module table can locate (the stdlib's, a dependency's).
+func (r *repoFieldIndex) parsePackage(importPath string) map[string][]string {
+	set := map[string][]string{}
+	dir := r.dirFor(importPath)
+	if dir == "" {
+		return set
+	}
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return set
+	}
+	scratch := &conv{}
+	var decls []ast.Decl
+	fset := token.NewFileSet() // positions of a demand parse never reach output
+	for _, e := range entries {
+		name := e.Name()
+		if e.IsDir() || !strings.HasSuffix(name, ".go") || strings.HasSuffix(name, "_test.go") || strings.HasPrefix(name, ".") {
+			continue
+		}
+		f, perr := parser.ParseFile(fset, filepath.Join(dir, name), nil, parser.SkipObjectResolution)
+		if perr != nil {
+			continue // skip unparseable files (robustness, docs/20)
+		}
+		decls = append(decls, f.Decls...)
+	}
+	return scratch.structFieldMap(decls)
+}
+
+// dirFor maps an import path to its directory through the module table: the
+// most specific module whose path is a prefix of the import names it (a nested
+// go.mod's module wins over the repository root's). An import outside every
+// known module has no directory here.
+func (r *repoFieldIndex) dirFor(importPath string) string {
+	best, bestLen := "", -1
+	for _, mi := range r.mods {
+		if mi == nil || mi.path == "" {
+			continue
+		}
+		if importPath != mi.path && !strings.HasPrefix(importPath, mi.path+"/") {
+			continue
+		}
+		if len(mi.path) > bestLen {
+			bestLen = len(mi.path)
+			best = filepath.Join(mi.dir, filepath.FromSlash(strings.TrimPrefix(importPath, mi.path)))
+		}
+	}
+	return best
+}
+
+// importNames maps a file's imports to the names the file's own code writes
+// them under: each import's local name -- its alias, else the package's own
+// name, which for a v2+ module path is the segment before the /vN suffix --
+// plus the paths of its dot-imports, whose names are all of them.
+func importNames(f *ast.File) (named map[string]string, dotted []string) {
+	for _, spec := range f.Imports {
+		path, err := strconv.Unquote(spec.Path.Value)
+		if err != nil || path == "" {
+			continue
+		}
+		if spec.Name != nil {
+			switch spec.Name.Name {
+			case ".":
+				dotted = append(dotted, path)
+				continue
+			case "_":
+				continue
+			}
+			if named == nil {
+				named = map[string]string{}
+			}
+			named[spec.Name.Name] = path
+			continue
+		}
+		seg := pathSegment(path)
+		if seg == "" {
+			continue
+		}
+		if named == nil {
+			named = map[string]string{}
+		}
+		named[seg] = path
+	}
+	return named, dotted
+}
+
+// pathSegment is the local name an unaliased import binds: the last path
+// segment, with a trailing major-version suffix dropped (echo/v4 binds as echo).
+func pathSegment(path string) string {
+	seg := ""
+	for i := len(path) - 1; i >= 0; i-- {
+		if path[i] == '/' {
+			seg = path[i+1:]
+			break
+		}
+	}
+	if seg == "" {
+		seg = path
+	}
+	if len(seg) > 1 && seg[0] == 'v' && allDigits(seg[1:]) {
+		if rest := path[:len(path)-len(seg)-1]; rest != "" {
+			return pathSegment(rest)
+		}
+	}
+	return seg
+}
+
+func allDigits(s string) bool {
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
+			return false
+		}
+	}
+	return len(s) > 0
 }
 
 // add parses one file and buffers it; a file of a different package flushes the
@@ -135,9 +310,11 @@ func (p *packageConverter) flush() {
 	pkgMethods := scratch.methodMap(allDecls)
 	pkgIfaces := scratch.interfaceMethodSets(allDecls)
 	pkgFields := scratch.structFieldMap(allDecls)
+	p.repo.note(p.pkgKey, pkgFields)
 	mod := p.byPkg[p.pkgKey]
 	for i, f := range p.files {
-		c := &conv{fset: p.fset, file: p.displays[i], pkgMethods: pkgMethods, pkgIfaces: pkgIfaces, pkgFields: pkgFields}
+		c := &conv{fset: p.fset, file: p.displays[i], pkgMethods: pkgMethods, pkgIfaces: pkgIfaces, pkgFields: pkgFields, repo: p.repo}
+		c.fileImports, c.dotImports = importNames(f)
 		mod.Imports = append(mod.Imports, c.imports(f)...)
 		mod.Body = append(mod.Body, c.decls(f.Decls)...)
 	}
@@ -151,7 +328,7 @@ func (p *packageConverter) flush() {
 // into modules by their Go import path (from the enclosing go.mod) so BOTH same-package and
 // cross-package (imported-helper) calls resolve interprocedurally.
 func ExtractDir(root string) (nir.Program, error) {
-	p := &packageConverter{fset: token.NewFileSet(), byPkg: map[string]*nir.Module{}, modCache: map[string]*modInfo{}}
+	p := newPackageConverter()
 
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
@@ -199,7 +376,7 @@ func Extract(files []string, root string) (nir.Program, error) {
 	sort.SliceStable(sorted, func(i, j int) bool {
 		return filepath.Dir(sorted[i]) < filepath.Dir(sorted[j])
 	})
-	p := &packageConverter{fset: token.NewFileSet(), byPkg: map[string]*nir.Module{}, modCache: map[string]*modInfo{}}
+	p := newPackageConverter()
 	for _, path := range sorted {
 		display := path
 		if root != "" {
@@ -261,9 +438,19 @@ type conv struct {
 	// never names, so a walk that only saw the touched fields could not state them. It
 	// is package-scoped like pkgMethods because a type's declaration is visible from
 	// every file of its package; a struct another package declares (a dot-imported
-	// model, the shape large monorepos use) is not here, and the walk falls back to the
-	// fields the body touches.
+	// model, the shape large monorepos use) resolves through repo instead, by the
+	// names fileImports/dotImports spell it under.
 	pkgFields map[string][]string
+	// repo is the scan-wide field index every package of the extraction shares: it
+	// carries the declared field sets of packages already converted and parses a not
+	// yet converted one on demand, so the universe of a cross-package bound type is
+	// available at the moment its importing package converts.
+	repo *repoFieldIndex
+	// fileImports/dotImports are this file's imports by the names its own code writes
+	// (alias -> import path, and the dot-imported paths): what turns a declared type
+	// name into the import path repo indexes the declaring package under.
+	fileImports map[string]string
+	dotImports  []string
 }
 
 // inPlaceFuncLit converts a func literal to a synthetic FuncDef emitted where the literal
@@ -964,11 +1151,12 @@ func (c *conv) goPublicUserListRouteMissingAuthObservations(name string, body *a
 // records nothing. The decode destination is a pointer, taken as `&v` over a
 // value or as a bare local whose own declaration made it a pointer (`new(T)`,
 // `&T{}`, `var v *T`) -- the spelling the taint side's out-param join already
-// takes for bind verbs. The field universe is the declared struct's when the
-// type is one this package declares (the fields a vulnerable handler leaves
-// client-set are precisely the ones its body never names); otherwise it is the
-// fields the body touches, which is all this file can state about another
-// package's type.
+// takes for bind verbs. The field universe is the declared struct's fields --
+// this package's declaration, else the declaring package's, resolved through
+// the file's imports against the scan-wide index (see structUniverse), because
+// the fields a vulnerable handler leaves client-set are precisely the ones its
+// body never names; the fields the body touches are the universe only for a
+// type no package of the scan declares.
 func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []nir.Stmt {
 	if body == nil {
 		return nil
@@ -1009,15 +1197,14 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 		}
 		return base.Name, sel.Sel.Name
 	}
-	// declaredTypeName is the same-package struct type of a freshly declared local: the
-	// valueless `var v T`, a `var v T = ...` with its type spelled, and the composite
-	// literal forms `v := T{}` / `v := &T{}`. A dotted name names another package's type,
-	// whose fields this file cannot state, so it stays unknown.
+	// declaredTypeName is the struct type of a freshly declared local, as the file
+	// spells it: the valueless `var v T`, a `var v T = ...` with its type spelled,
+	// and the composite literal forms `v := T{}` / `v := &T{}`. A dotted name names
+	// another package's type -- structUniverse resolves it through the file's
+	// imports, and only when no package of the scan declares it does it stay
+	// unknown.
 	declaredTypeName := func(e ast.Expr) string {
-		if t := c.typeName(e); t != "" && !strings.Contains(t, ".") {
-			return t
-		}
-		return ""
+		return c.typeName(e)
 	}
 	noteLocal := func(v string, e ast.Expr) {
 		if v == "" || v == "_" {
@@ -1164,10 +1351,7 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 				if !decoded {
 					continue
 				}
-				universe := c.pkgFields[varType[id.Name]]
-				if universe == nil {
-					universe = append(universe, sortedFields(touched[id.Name])...)
-				}
+				universe := c.structUniverse(varType[id.Name], touched[id.Name])
 				if len(universe) > 128 {
 					universe = universe[:128]
 				}
@@ -1201,6 +1385,40 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 		return true
 	})
 	return out
+}
+
+// structUniverse is the decode-restore walk's field universe for a bound
+// variable: its declared struct's fields. This package's declaration comes
+// first; a type another package of the scan declares resolves through the
+// file's imports -- a dotted `models.Transaction` by the name before the dot, a
+// dot-imported bare `Transaction` by each dot-imported path -- against the
+// scan-wide index, which parses the declaring package on demand when the walk
+// has not reached it yet. The fields the body touches remain the universe only
+// for a type no package of the scan declares (the stdlib's, a dependency's):
+// the declared list is the only honest one, because the fields a vulnerable
+// handler leaves client-set are precisely the ones its body never names.
+func (c *conv) structUniverse(typeName string, touched map[string]bool) []string {
+	if typeName != "" {
+		if fields := c.pkgFields[typeName]; len(fields) > 0 {
+			return fields
+		}
+		if c.repo != nil {
+			if i := strings.LastIndex(typeName, "."); i > 0 {
+				if path, ok := c.fileImports[typeName[:i]]; ok {
+					if fields := c.repo.fieldsOf(path, typeName[i+1:]); len(fields) > 0 {
+						return fields
+					}
+				}
+			} else {
+				for _, path := range c.dotImports {
+					if fields := c.repo.fieldsOf(path, typeName); len(fields) > 0 {
+						return fields
+					}
+				}
+			}
+		}
+	}
+	return sortedFields(touched)
 }
 
 // sortedFields returns a selector's field names in a stable order, so the fact set of
