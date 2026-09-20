@@ -146,6 +146,15 @@ type lowerer struct {
 	modOrder  map[string]int
 	modBranch map[string]int
 
+	// lexScope overrides the lexical scope nodes lowered inside it report, when that
+	// scope is not the region they sit in: a try's catch and finally clauses run in
+	// their own control region (an alternative arm of the try) while still being
+	// WRITTEN in the try statement, and a scope predicate read from one of their
+	// nodes — node.scopeCall, a rule's sameScope coverage — must see the try's own
+	// calls. Empty means no override: the node's region is its lexical scope. See
+	// inClauseScope/inFinallyScope.
+	lexScope string
+
 	// funcRoot is the region root of the function body being lowered — the region a
 	// `return` written at the top level of that body sits in. A return written anywhere
 	// deeper is a CONDITIONAL exit: the path it takes leaves the function without
@@ -287,6 +296,33 @@ func (l *lowerer) inRegion(seg string, f func()) {
 	l.region, l.branchCond = save+"/"+seg, ""
 	f()
 	l.region, l.branchCond = save, saveCond
+}
+
+// inClauseScope lowers a try's catch body in its own control region while keeping
+// the lexical scope the try statement gives it, and inFinallyScope does the same
+// for the finalizer in the region the statement itself sits in. Control region and
+// lexical scope are different facts: the handler is an alternative arm of the try
+// (its own region, so a rule can tell a statement that runs only when the body
+// succeeded from one that runs on the exception path), while the clause is still
+// WRITTEN in the try statement — the scope a `node.scopeCall` predicate reads and a
+// rule's sameScope coverage pairs on. Nodes lowered under the override carry it in
+// usg.Node.Scope; everything else leaves Scope empty and falls back to its region.
+func (l *lowerer) inClauseScope(lexicalScope, seg string, f func()) {
+	save := l.lexScope
+	l.lexScope = lexicalScope
+	l.inRegion(seg, f)
+	l.lexScope = save
+}
+
+// inFinallyScope runs f for the finalizer with the try's lexical scope overriding
+// the enclosing region's, for the same reason as inClauseScope: the clause is part
+// of the try statement, and a scope predicate read from it must see the try's
+// calls, not the whole region the statement happens to sit in.
+func (l *lowerer) inFinallyScope(lexicalScope string, f func()) {
+	save := l.lexScope
+	l.lexScope = lexicalScope
+	f()
+	l.lexScope = save
 }
 
 // nodeLoc returns a node's source location, empty when the id names nothing.
@@ -3382,7 +3418,7 @@ func (l *lowerer) nodeInlineWithID(id, kind, loc string, props map[string]string
 		extras = propsWithInline(extras, method, calleePath, strArgs, vkind)
 	}
 	l.noteStoreErr(l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Loc: loc, Region: l.region,
-		Order: int32(ord), HasOrder: true, Props: extras,
+		Order: int32(ord), HasOrder: true, Props: extras, Scope: l.lexScope,
 		Method: method, CalleePath: calleePath, StrArgs: strArgs, Vkind: vkind}))
 	return id
 }
@@ -4755,6 +4791,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		exn := l.nodeInline("Exception", st.Loc, nil, "exception", "analysis.exception", "", "")
 		l.tryExceptionTargets = append(l.tryExceptionTargets, exn)
 		jcMark := len(sc.jc)
+		tryRegion := l.branchRegion("try" + b)
+		// A try BODY is its own lexical scope the way it was under the frontends that
+		// flatten: whatever clause scope was open around this statement ends at its
+		// body, and the handler/finalizer scopes opened below restore it after.
+		outerLex := l.lexScope
+		l.lexScope = ""
 		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
 		l.tryExceptionTargets = l.tryExceptionTargets[:len(l.tryExceptionTargets)-1]
 		for i, h := range st.Handlers {
@@ -4764,7 +4806,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					sc.delCnst(name)
 				}
 			}
-			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
+			l.inClauseScope(tryRegion, "try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
 		}
 		// The body and every handler are control regions — either may be skipped or
 		// left partway, so a variable whose constant was written (or cleared) inside
@@ -4787,8 +4829,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// post-dominates nothing, so `lock(); try { … } finally { unlock(); }` reports a
 		// lock that is never released.
 		l.unwind++
-		l.block(st.Finally, sc)
+		l.inFinallyScope(tryRegion, func() { l.block(st.Finally, sc) })
 		l.unwind--
+		l.lexScope = outerLex
 		sc.clearIter()
 	}
 }

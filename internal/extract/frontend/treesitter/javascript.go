@@ -3299,10 +3299,7 @@ func (c *jsConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 	case "switch_statement":
 		return []nir.Stmt{c.switchStmt(n)}
 	case "try_statement":
-		// Loc reaches the lowering as the exception node's location: a loc-less
-		// analysis.exception node is dropped by the presence matcher's same-file
-		// guard, so a binding could not pair a call with its try's containment.
-		return []nir.Stmt{nir.Try{Body: c.collectStatementBlocks(n), Loc: L}}
+		return []nir.Stmt{c.tryStmt(n, L)}
 	case "statement_block":
 		return []nir.Stmt{nir.Block{Stmts: c.collectStatementBlocks(n)}}
 	case "export_statement":
@@ -3875,6 +3872,39 @@ func (c *jsConv) switchStmt(n *tree_sitter.Node) nir.Stmt {
 		}
 	}
 	return nir.Switch{Subject: c.expr(c.field(n, "value")), Cases: cases, Labels: labels, Default: deflt}
+}
+
+// tryStmt lowers a try_statement into nir.Try's separate control regions, the way
+// java.go's tryStmt and csharp.go's csTry already do: the guarded body, the catch
+// body as a Handler (the lowering gives it its own try<b>.h<i> region), and the
+// finalizer (which the lowering runs in the region the statement sits in, on every
+// path out). Flattening the clauses into Body via collectStatementBlocks collapsed
+// the try body and the exception handler into ONE control region, so no rule could
+// tell a statement that runs only when the try body succeeded from one that runs on
+// both paths — and the catch's statements flowed into the try's own exception node,
+// an exception none of them can be caught by.
+//
+// Loc reaches the lowering as the exception node's location: a loc-less
+// analysis.exception node is dropped by the presence matcher's same-file guard, so
+// a binding could not pair a call with its try's containment.
+//
+// HandlerParams is deliberately left empty. The lowering binds a handler parameter
+// to the try's exception node, which every guarded call's receiver, arguments and
+// result flow into — a handler answering with `e.message` would carry the guarded
+// body's taint out through the parameter. No shipped JavaScript rule consumes that
+// fact, and the specs pinned on this frontend treat a handler that echoes an error
+// message as silent, so the parameter stays unbound the way it was under the
+// flattening until a rule asks for it.
+func (c *jsConv) tryStmt(n *tree_sitter.Node, L string) nir.Try {
+	tr := nir.Try{Loc: L}
+	tr.Body = c.branchBody(c.field(n, "body"))
+	if h := c.field(n, "handler"); h != nil {
+		tr.Handlers = [][]nir.Stmt{c.branchBody(c.field(h, "body"))}
+	}
+	if f := c.field(n, "finalizer"); f != nil {
+		tr.Finally = c.branchBody(c.field(f, "body"))
+	}
+	return tr
 }
 
 // collectStatementBlocks gathers statements from nested statement_blocks and

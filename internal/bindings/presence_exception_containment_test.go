@@ -10,11 +10,14 @@ import (
 	"github.com/vyprai/vyql/internal/usg"
 )
 
-// A call inside a try flows into the try's analysis.exception node, which is how a
+// A call inside a try BODY flows into the try's analysis.exception node, which is how a
 // binding states exception containment. The walk that decides this is same-file
 // bounded, and a loc-less node fails that bound, so the exception node the lowering
 // builds from the try statement's NIR location is load-bearing: without it the fact
-// is unreachable and `node.flowTo.path == "analysis.exception"` matches nothing.
+// is unreachable and `node.flowTo.path == "analysis.exception"` matches nothing. A
+// call in the catch clause does NOT flow into it — the handler is an alternative arm
+// of the try (its own region), and an exception raised there is not caught by the try
+// that spawned the handler.
 func TestPresenceFlowToExceptionLabelsCallsInsideTry(t *testing.T) {
 	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.test;
@@ -63,8 +66,11 @@ binding containedCall {
 	for _, m := range spec.presenceApplicator().Apply(store) {
 		marked[byID[m.NodeID].Prop("callee_path")] = true
 	}
-	if !marked["doWork"] || !marked["cleanup"] {
-		t.Fatalf("calls inside the try were not labelled as exception-contained: %v", marked)
+	if !marked["doWork"] {
+		t.Fatalf("calls inside the try body were not labelled as exception-contained: %v", marked)
+	}
+	if marked["cleanup"] {
+		t.Fatalf("call inside the catch clause was labelled as exception-contained: %v", marked)
 	}
 	if marked["unrelated"] {
 		t.Fatalf("call outside the try was labelled as exception-contained: %v", marked)
