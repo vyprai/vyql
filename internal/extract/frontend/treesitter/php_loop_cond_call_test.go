@@ -66,3 +66,37 @@ function dump($res) {
 		t.Fatalf("$res does not reach cmp_sink: the condition assignment binds nothing")
 	}
 }
+
+// A for clause may be empty — `for (;;)`, `for ($i = 0; ; $i++)` — and there is no tested
+// expression to lower. Lowering the absent condition anyway emitted the nil-expression
+// sentinel, a Const at "?:0" with no file or line, as a node inside every such loop: a fact
+// about nothing, in the one loop shape PHP leaves conditionless. The body lowers alone.
+func TestPHPConditionlessForEmitsNoSentinelNode(t *testing.T) {
+	g := phpLowerFile(t, "NoCondFor.php", `<?php
+function spin($res) {
+  for (;;) {
+    step($res);
+  }
+  for ($i = 0; ; $i++) {
+    body_sink($i);
+  }
+}`)
+
+	all, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, n := range all {
+		// A Phi the lowering adds at a loop join is locationless by design; the sentinel is
+		// specifically a Const — an expression the file never contained.
+		if n.Type == "code.Const" && n.Prop("loc") == "?:0" {
+			t.Fatalf("node %s is a Const at the nil-expression location ?:0; the absent condition lowered to a sentinel", n.ID)
+		}
+	}
+	counts := countCalls(t, g)
+	for _, callee := range []string{"step", "body_sink"} {
+		if counts[callee] != 1 {
+			t.Fatalf("body call %s lowered %d times, want exactly 1 (%v)", callee, counts[callee], counts)
+		}
+	}
+}

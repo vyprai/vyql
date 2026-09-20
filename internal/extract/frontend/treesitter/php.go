@@ -430,9 +430,16 @@ func (c *phConv) stmtOne(n *tree_sitter.Node) []nir.Stmt {
 		// the head of that body too: a call written only in the condition (`while ($r->fetch_row())`,
 		// `for (; has_next($res); )`) keeps its node the way a call in an if condition does,
 		// while the expression phpCondLower returns names the hoisted assignment's variable, so
-		// the call that assignment performs is still lowered exactly once.
-		pre, cond := c.phpCondLower(c.field(n, "condition"))
-		body := append(pre, nir.ExprStmt{Value: cond})
+		// the call that assignment performs is still lowered exactly once. A for clause may be
+		// empty — `for (;;)`, `for ($i = 0; ; $i++)` — and an absent condition has no expression
+		// to lower: nothing is emitted for it, because the nil-expression sentinel a missing node
+		// lowers to is a locationless Const, not a fact about the program.
+		condNode := c.field(n, "condition")
+		pre, cond := c.phpCondLower(condNode)
+		body := pre
+		if condNode != nil {
+			body = append(body, nir.ExprStmt{Value: cond})
+		}
 		return []nir.Stmt{nir.Loop{Body: append(body, c.collectBlocks(n)...)}}
 	case "try_statement":
 		return []nir.Stmt{nir.Try{Body: c.collectBlocks(n)}}
