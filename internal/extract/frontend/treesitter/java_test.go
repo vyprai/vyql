@@ -1202,6 +1202,64 @@ public class VaultBuildWrapper extends SimpleBuildWrapper {
 	}
 }
 
+// A real-sized class spends the class-context token budget on its first methods'
+// evidence (each method contributes its text, params and returns as tokens), so the
+// declared name of a method at the bottom of the class is the one fact a class-scope
+// binding cannot lose: a serialized-form replacement declared against its readObject
+// rejection has to pair two member declarations of the SAME class, and nothing else
+// in the data layer carries a declaration name. The names must ride the event past
+// the token cap, together.
+func TestJavaClassContextCarriesLateMemberNamesOnRealSizedClass(t *testing.T) {
+	const fillers = 60
+	var src strings.Builder
+	src.WriteString("package com.example;\n\nclass GiantSerialForm implements java.io.Serializable {\n")
+	for i := 0; i < fillers; i++ {
+		src.WriteString("  public void helper" + strconv.Itoa(i) +
+			"(int left" + strconv.Itoa(i) + ", String right" + strconv.Itoa(i) + ")" +
+			" { helper" + strconv.Itoa(i) + "(0, null); }\n")
+	}
+	src.WriteString("  public void readObject(java.io.ObjectInputStream in) { throw new java.io.NotSerializableException(); }\n")
+	src.WriteString("  private Object writeReplace() { return this; }\n")
+	src.WriteString("}\n")
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "GiantSerialForm.java")
+	if err := os.WriteFile(path, []byte(src.String()), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJava([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := ""
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "analysis.class.context" &&
+			strings.Contains(n.Prop("str_args"), "class_name:GiantSerialForm") {
+			args = n.Prop("str_args")
+		}
+	}
+	if args == "" {
+		t.Fatal("no class-context event for GiantSerialForm")
+	}
+	for _, want := range []string{
+		"function_name:helper0",      // below the cap: unchanged
+		"function_name:readObject",   // late member: past the cap
+		"function_name:writeReplace", // last member: past the cap
+	} {
+		if !strings.Contains(args, want) {
+			t.Errorf("GiantSerialForm class context lost the declaration name %q: %q", want, args)
+		}
+	}
+}
+
 // A value parked on an object by a setter and handed back by a getter has to survive the two
 // call boundaries between them: the write is in one method body, the read in another, and only
 // the receiver at the call sites ties them together. Java also has to MODEL the write at all —
