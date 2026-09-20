@@ -68,6 +68,7 @@ type controlSpec struct {
 	ByMethod        bool     // match the call's `method` prop (receiver-agnostic, e.g. .close())
 	Receiver        bool     // label the call receiver node instead of the call result
 	Exact           bool     // exact path match instead of segment-prefix path matching
+	Constraint      string   // optional receiver-type constraint: skip when recv_type is known and conflicts
 	ArgTarget       bool     // label call arguments instead of the matched call node
 	ArgIndex        int      // which argument position is targeted when ArgTarget is true; -1 means args.any
 	Kwarg           string   // non-empty: target the argument slot named by this keyword (`args[NAME]`)
@@ -589,29 +590,29 @@ func specFromBindingSet(d *Set) bindingSpec {
 			s.Sinks = append(s.Sinks, sinkSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "check":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
-				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
+				Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: bindingMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "check_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
-				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
+				ByMethod: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: bindingMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "check_arg":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact,
-				ArgTarget: true, ArgIndex: mp.ArgIndex, Kwarg: mp.Kwarg, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
+				Constraint: mp.Constraint, ArgTarget: true, ArgIndex: mp.ArgIndex, Kwarg: mp.Kwarg, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
 				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: bindingMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "check_method_arg":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
-				ByMethod: true, ArgTarget: true, ArgIndex: mp.ArgIndex, Kwarg: mp.Kwarg, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
+				ByMethod: true, Constraint: mp.Constraint, ArgTarget: true, ArgIndex: mp.ArgIndex, Kwarg: mp.Kwarg, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
 				ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: bindingMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "check_receiver_method":
 			s.Controls = append(s.Controls, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
-				ByMethod: true, Receiver: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
+				ByMethod: true, Receiver: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: bindingMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "sink_node":
@@ -641,7 +642,7 @@ func specFromBindingSet(d *Set) bindingSpec {
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: bindingMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "issue":
-			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: bindingMappingDetail(mp), Fidelity: mp.Fidelity, Confidence: mp.Confidence})
+			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds, ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: bindingMappingDetail(mp), Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "issue_arg":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern, Exact: mp.Exact,
 				ArgTarget: true, ArgIndex: mp.ArgIndex, Kwarg: mp.Kwarg, Collection: mp.Collection, CollectionFirst: mp.CollectionFirst, CollectionIndex: mp.CollectionIndex,
@@ -650,7 +651,7 @@ func specFromBindingSet(d *Set) bindingSpec {
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "issue_method":
 			s.Marks = append(s.Marks, controlSpec{Concept: mp.Concept, NodeType: mp.NodeType, Pattern: mp.Pattern,
-				ByMethod: true, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
+				ByMethod: true, Constraint: mp.Constraint, ValMatches: mp.ValMatches, ValAbsents: mp.ValAbsents, ScopePreds: scopePreds,
 				ArgCountSet: mp.ArgCountSet, ArgCountMin: mp.ArgCountMin, ArgCountMax: mp.ArgCountMax, Packages: mp.Packages, Requirement: mp.Requirement, Detail: bindingMappingDetail(mp),
 				Fidelity: mp.Fidelity, Confidence: mp.Confidence})
 		case "issue_method_arg":
