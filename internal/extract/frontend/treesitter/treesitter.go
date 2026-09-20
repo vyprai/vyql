@@ -15,10 +15,16 @@ var skipDirs = map[string]bool{
 	"venv": true, "testdata": true,
 }
 
+// scanHiddenDirs are the hidden directories a project ships source in. The
+// default is to skip a dot-directory (VCS metadata, editor and tool caches);
+// each entry here is a layout whose files are the repository's own — CI
+// workflows, and the skill scripts under .claude that a fix can land in — so a
+// whole-repository scan has to read them.
 var scanHiddenDirs = map[string]bool{
 	".github":    true,
 	".circleci":  true,
 	".buildkite": true,
+	".claude":    true,
 }
 
 const largeTestResourceMaxBytes = 512 * 1024
