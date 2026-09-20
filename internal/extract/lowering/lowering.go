@@ -1807,11 +1807,30 @@ func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []strin
 	l.nodeInline("Call", loc, nil, analysisFunctionContext.method, analysisFunctionContext.path, strings.Join(contextTokens, "\x00"), "")
 }
 
+// classContextTokenCap bounds the member EVIDENCE a class-context event carries: the
+// tokens a real class accumulates (a method's text, its params, its returns) are wide,
+// so the budget exists to keep one giant class from swelling the payload. A member's
+// DECLARATION name is not evidence of that kind — it is one short token per member —
+// and it is the only place a member's declared name reaches the data layer, so a fact
+// that has to name a late-declared member (a serialized-form replacement declared
+// against its readObject rejection) is unmatchable once the cap eats it. Declaration
+// names are therefore exempt from the cap on both sides of the event.
+const classContextTokenCap = 512
+
+// classMemberDeclarationNameToken reports whether a member context token carries a
+// declaration's own name, the `function_name:` a method declaration lowers to.
+func classMemberDeclarationNameToken(tok string) bool {
+	return strings.HasPrefix(tok, "function_name:")
+}
+
 func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, memberTokens []string) {
 	var tokens []string
 	seen := map[string]bool{}
 	add := func(tok string) {
-		if tok == "" || seen[tok] || len(tokens) >= 512 {
+		if tok == "" || seen[tok] {
+			return
+		}
+		if len(tokens) >= classContextTokenCap && !classMemberDeclarationNameToken(tok) {
 			return
 		}
 		seen[tok] = true
@@ -1837,21 +1856,34 @@ func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, me
 
 func (l *lowerer) classMemberContextTokens(stmts []nir.Stmt) []string {
 	var tokens []string
+	// Past the cap only declaration names are kept (see classContextTokenCap), so the
+	// walk never stops early: a member declared after the budget is spent still
+	// contributes its name, which is the whole point of walking past it.
+	add := func(tok string) {
+		if tok == "" {
+			return
+		}
+		if len(tokens) >= classContextTokenCap && !classMemberDeclarationNameToken(tok) {
+			return
+		}
+		tokens = append(tokens, tok)
+	}
 	var walk func([]nir.Stmt)
 	walk = func(stmts []nir.Stmt) {
 		for _, s := range stmts {
-			if len(tokens) >= 512 {
-				return
-			}
 			switch st := s.(type) {
 			case nir.BodyRef:
 				if st.Summarized {
-					tokens = append(tokens, st.Summary.ContextTokens...)
+					for _, tok := range st.Summary.ContextTokens {
+						add(tok)
+					}
 				} else {
 					l.eachDeferred(st, walk)
 				}
 			case nir.FuncDef:
-				tokens = append(tokens, st.ContextTokens...)
+				for _, tok := range st.ContextTokens {
+					add(tok)
+				}
 				walk(st.Body)
 			case nir.ClassDef:
 				// Nested classes get their own class-context event; do not smear their
@@ -1861,7 +1893,9 @@ func (l *lowerer) classMemberContextTokens(stmts []nir.Stmt) []string {
 				// carrying @Extension/@Symbol, and without this the annotation is reachable
 				// only from code written inside the Descriptor -- never from the class it
 				// describes. Record the nested class's own annotations and nothing else.
-				tokens = append(tokens, nir.NestedClassContextTokens(st)...)
+				for _, tok := range nir.NestedClassContextTokens(st) {
+					add(tok)
+				}
 			case nir.Block:
 				walk(st.Stmts)
 			case nir.If:
@@ -1885,9 +1919,6 @@ func (l *lowerer) classMemberContextTokens(stmts []nir.Stmt) []string {
 		}
 	}
 	walk(stmts)
-	if len(tokens) > 512 {
-		return tokens[:512]
-	}
 	return tokens
 }
 
@@ -4147,8 +4178,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			for name, id := range info.params {
 				inner.setNode(name, id)
 				if typ := info.paramTypes[name]; typ != "" {
-					if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-						inner.setTyp(name, [2]string{cm, typ})
+					if pair, ok := l.resolveTypeName(typ, l.importTables[l.curModule]); ok {
+						inner.setTyp(name, pair)
 					}
 				}
 			}
@@ -4208,8 +4239,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		for _, cls := range classScopes {
 			for fld, typ := range l.classFields[l.curModule+"::"+cls] {
-				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-					inner.setTyp(fld, [2]string{cm, typ})
+				if pair, ok := l.resolveTypeName(typ, l.importTables[l.curModule]); ok {
+					inner.setTyp(fld, pair)
 				}
 			}
 		}
@@ -4252,8 +4283,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		if !hasTyp && st.Type != "" { // declared type (no/foreign RHS), e.g. Spring DI field
-			if cm, ok := l.classModule(st.Type, l.importTables[l.curModule]); ok {
-				typ, hasTyp = [2]string{cm, st.Type}, true
+			if pair, ok := l.resolveTypeName(st.Type, l.importTables[l.curModule]); ok {
+				typ, hasTyp = pair, true
 			} else {
 				// External/library declared types are still useful for binding receiver
 				// constraints even when there is no project class body to resolve.
@@ -5078,8 +5109,8 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			paramByName[p] = pn
 			inner.setNode(p, pn)
 			if typ := ex.ParamTypes[p]; typ != "" {
-				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-					inner.setTyp(p, [2]string{cm, typ})
+				if pair, ok := l.resolveTypeName(typ, l.importTables[l.curModule]); ok {
+					inner.setTyp(p, pair)
 				}
 			}
 			paramNodes = append(paramNodes, pn)
@@ -7151,8 +7182,8 @@ func (l *lowerer) callResultClass(call nir.Call, sc *scope) ([2]string, bool) {
 	if name == "" {
 		return [2]string{}, false
 	}
-	if cm, ok := l.classModule(name, l.importTables[l.curModule]); ok {
-		return [2]string{cm, name}, true
+	if pair, ok := l.resolveTypeName(name, l.importTables[l.curModule]); ok {
+		return pair, true
 	}
 	return [2]string{}, false
 }
@@ -7603,6 +7634,35 @@ func (l *lowerer) classModule(name string, imports map[string]importEntry) (stri
 		}
 	}
 	return "", false
+}
+
+// resolveTypeName resolves a DECLARED type name to the module that declares the
+// class and the class's own (short) name. A name spelled with its package
+// qualifier -- Go's `repository.Repository`, how every imported type is declared --
+// resolves by splitting the qualifier off and routing it through the import
+// table, the same way resolveCtor resolves a qualified constructor call. The
+// short name is what every downstream key uses (funcQual's "mod::Class.method",
+// the derived-children walk, struct field slots), so a dotted name that resolved
+// to no class left its variable untyped and every method call on it unresolved
+// ("callee not traced"). A dotted name no import declares resolves to nothing --
+// it can never be a class's own name -- and an undotted name keeps classModule's
+// routes untouched.
+func (l *lowerer) resolveTypeName(name string, imports map[string]importEntry) ([2]string, bool) {
+	if i := strings.LastIndexByte(name, '.'); i > 0 && i < len(name)-1 {
+		imp, ok := imports[name[:i]]
+		if !ok || imp.kind != "mod" {
+			return [2]string{}, false
+		}
+		short := name[i+1:]
+		if l.classQual[imp.module+"::"+short] {
+			return [2]string{imp.module, short}, true
+		}
+		return [2]string{}, false
+	}
+	if cm, ok := l.classModule(name, imports); ok {
+		return [2]string{cm, name}, true
+	}
+	return [2]string{}, false
 }
 
 func (l *lowerer) resolveCtor(callee nir.Expr) ([2]string, bool) {
