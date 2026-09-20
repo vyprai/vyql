@@ -420,6 +420,72 @@ A malformed baseline, an unknown verdict or a missing file is an error, and not
 an empty baseline. It is better to fail with a message than to silently suppress
 everything, or nothing.
 
+#### Drift: a verdict is anchored to the taint path it was made against
+
+Findings are identified by fingerprint — rule, sink location, concept — which
+is deliberately stable under edits elsewhere in the file. But the *reason* a
+finding was triaged often lives along the taint path: the source end, the hops
+in between. An entry can therefore carry the finding's **path signature** — a
+digest of the concepts and call paths along the witness — recorded when it was
+triaged:
+
+```json
+{ "fp": "0e902274e5a45a50", "verdict": "false-positive",
+  "sig": ["dcd5ebdb2ca23efd"],
+  "reason": "q is validated upstream in the gateway",
+  "rule": "VYQL-INJ-001", "loc": "app.py:11" }
+```
+
+Such an entry suppresses only while the finding's path still hashes to one of
+its signatures. The same fingerprint on a new path — the source swapped, a hop
+added or removed — is **drifted**: the finding is reported again and the scan
+names it, because the recorded verdict may no longer describe what the finding
+is about:
+
+```
+warning: 1 triaged finding(s) re-reported: the taint path under them changed
+         the recorded verdict may no longer describe them; re-triage to record the new path:
+           0e902274e5a45a50  vyql triage add -fp 0e902274e5a50 ...
+```
+
+Signatures survive line shifts, formatting and edits elsewhere in the file; a
+renamed intermediate call changes its callee path and re-fires once. Entries
+recorded without `sig` (every entry written before this existed, and
+`-baseline-write` ones rolled forward from them) keep the old behaviour: the
+verdict is anchored to the finding alone and never drifts.
+
+In `-format graph-json`, the document carries what the baseline did, so a
+consumer does not parse stderr:
+
+```json
+"baseline": { "applied": 3, "covered": ["0e90…"],
+              "drifted": ["0e90…"], "stale": ["27d5…"] }
+```
+
+`drifted` is the part findings alone cannot tell you: those findings' verdicts
+exist and must be re-verified, they are not first-time findings.
+
+#### `vyql triage`: recording verdicts without a scan
+
+`-baseline-write` records everything at once. `triage` records one verdict at
+a time, against a fingerprint copied from a report:
+
+```sh
+vyql scan -format graph-json -fail-on none . > scan.json
+vyql triage add -fp 0e902274e5a50 -baseline .vyql-baseline.json \
+  -from scan.json -verdict false-positive -reason "q is validated upstream"
+vyql triage list   -baseline .vyql-baseline.json
+vyql triage remove -fp 0e902274e5a50 -baseline .vyql-baseline.json
+```
+
+`-from` attaches the scan's path signature (and rule and location, for the
+human reading the file later); without it the entry is fingerprint-only and
+never drifts. Re-adding after a drift joins the new path's signature to the
+entry instead of replacing the old one, so path churn that is not a semantic
+change costs one re-triage, not one per scan. `triage` never loads the data
+directory, and the file it writes is the file `-baseline-write` writes — same
+version, same shape — so both can be mixed freely.
+
 ### Skipping files
 
 `-exclude` takes one pattern and may be repeated. One rule decides what a
@@ -671,6 +737,35 @@ vyql scan -rules vyql/packs/injection -profile api -cache off -stats .
 `-flags` selects the mode and the three `-flag-*` flags filter it. Setting a
 filter while `-flags` is `off` is a usage error, because the filter could not
 reach the output.
+
+### `triage`
+
+Records verdicts into a baseline without running a scan. The platform does
+this in its database and materializes the file; this is the same workflow for
+a checkout.
+
+```sh
+vyql triage add -fp <fp> -baseline .vyql-baseline.json \
+  [-verdict false-positive|accepted] [-reason "…"] [-from scan.graph.json]
+vyql triage list   -baseline .vyql-baseline.json [-from scan.graph.json]
+vyql triage remove -fp <fp> -baseline .vyql-baseline.json
+vyql triage remove -stale    -baseline .vyql-baseline.json -from scan.graph.json
+```
+
+`-fp` is the fingerprint printed by reports (`fp=` in text, `fp` in JSON,
+SARIF `partialFingerprints`, graph-json). `-from` is a scan's graph-json
+output of the same finding, from which the path signature, rule and location
+are recorded; see [Drift](#drift-a-verdict-is-anchored-to-the-taint-path-it-was-made-against)
+for what the signature does to later scans. `triage` does not need the data
+directory.
+
+With `-from`, `list` also marks each entry against that scan: `covered`
+(still suppressed), `drifted` (re-fired; re-triage it), `reported` (its
+fingerprint fires but that scan applied no baseline for it) or `stale` (the
+code it excused is gone), and suggests the cleanup. `remove -stale` drops
+every stale entry in one pass — the same thing a rolled baseline does on its
+own, on demand — and refuses to run without `-from`, because stale is a fact
+about a scan, not about the file.
 
 ### `trace`
 

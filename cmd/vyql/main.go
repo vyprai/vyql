@@ -17,6 +17,9 @@
 //	  -baseline  triaged findings to exclude from the report and the gate
 //	  -coverage  report what was parsed, excluded and left unanalysed
 //
+//	vyql triage add|remove|list     # record verdicts into a baseline, one
+//	                                 # finding at a time, without a scan
+//
 //	vyql explain | trace | query | match | resolve | graph | diff | definitions
 //
 // Exit codes are the same on every command: 0 the command run successfully, 1 vyql could
@@ -165,6 +168,7 @@ func vyqlMain() (code int) {
 // reachable without being discoverable.
 var commands = map[string]func([]string) error{
 	"scan":        cmdScan,
+	"triage":      cmdTriage,
 	"trace":       cmdTrace,
 	"explain":     cmdExplain,
 	"match":       cmdMatch,
@@ -359,10 +363,11 @@ func applyScanCache(v string) func() {
 }
 
 // applyMaxRAM honors --max-ram: it partitions the budget across the pools a scan provisions,
-// applies the heap ceiling, and routes the graph through the disk-backed BadgerGraph store so
-// node detail can leave RAM. (A target that goes over the one-graph limit is partitioned
-// instead, and each partition is small enough to hold in RAM — see scanPartitionsCollect for
-// why the disk store is bypassed there.) Returns a cleanup func that removes the graph db.
+// applies the heap ceiling, and arms the disk-backed BadgerGraph store so node detail can
+// leave RAM — a graph the ceiling cannot hold is built there (see holdOneGraphInRAM for when
+// one that it can holds RAM instead). A target that goes over the one-graph limit is
+// partitioned, and each partition is small enough to hold in RAM — see scanPartitionsCollect
+// for why the disk store is bypassed there. Returns a cleanup func that removes the graph db.
 // Overrides the auto-80% default; an invalid value is reported and ignored.
 func applyMaxRAM(v string) func() {
 	noop := func() {}
@@ -490,6 +495,33 @@ func sourceBudgetBytes(ceiling int64) int64 {
 
 // minPartitionBytes is the smallest partition worth building a graph for.
 const minPartitionBytes = 2 << 20
+
+// holdOneGraphInRAM decides the store for a scan building ONE resident graph under a RAM
+// ceiling, and returns the func that undoes its decision.
+//
+// The disk-backed store is that graph's bound when the ceiling cannot hold it. For a target
+// the ceiling comfortably holds, the store costs more than the graph it spares: its detail
+// buffer, write path and caches sit resident alongside a structural core that never leaves
+// RAM in either store, so a multi-package target that lowers to a million-odd nodes peaks
+// several times its in-RAM footprint — measured on such a repository, 4626MiB through the
+// disk store against 1220MiB through the in-RAM one — and the safety stop ends the scan
+// before the first rule has run: an empty report from a ceiling the scan easily afforded.
+// The partition planner's own measure decides which case this is: a target PlanPartitions
+// leaves unpartitioned is a target one graph holds, and the int-indexed in-RAM store is the
+// cheaper way to hold it (the same store a partitioned scan already builds per partition).
+// Over the limit the scan is partitioned, or — for a run that must serialise one graph —
+// the disk-backed store remains the bound, so it is returned untouched there.
+func holdOneGraphInRAM(paths []string, excludes extract.Excludes) func() {
+	if lowering.DiskStorePath == "" || scanSourceLimit <= 0 {
+		return func() {}
+	}
+	if extract.PlanPartitions(paths, excludes, scanSourceLimit, scanSourceBudget) != nil {
+		return func() {}
+	}
+	prev := lowering.UseIntStore
+	lowering.UseIntStore = true
+	return func() { lowering.UseIntStore = prev }
+}
 
 func goHeapMemoryLimit(processLimit int64) int64 {
 	limit := memoryStopThreshold(processLimit) - cgoReserve(processLimit)
@@ -715,7 +747,12 @@ func scanPathsWithProfileDemand(paths []string, ruleSources []parser.V2Definitio
 	}
 	build.BindingConcepts = bindingConcepts
 	build.Sync = syncCollector
+	// The store choice is per build: a partitioned scan sets UseIntStore around its whole
+	// loop, and a run that must serialise one graph too big for the ceiling keeps the
+	// disk-backed store this scan was armed with.
+	restoreStore := holdOneGraphInRAM(paths, build.Excludes)
 	g, stats, err := extract.BuildGraph(paths, extract.SharedDeltaCache(), build)
+	restoreStore()
 	if err != nil {
 		return nil, stats, nil, err
 	}
@@ -988,8 +1025,9 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 	// what is new rather than on what someone already looked at.
 	var covered []*findings.Finding
 	var staleBaseline []baselineEntry
+	var driftedBaseline []string
 	if opts.BaselinePath != "" {
-		all, covered, staleBaseline = applyBaseline(all, opts.Baseline)
+		all, covered, staleBaseline, driftedBaseline = applyBaseline(all, opts.Baseline)
 		// The partitioned codemap document was built per partition, before the
 		// baseline was applied; what it reports has to be what the run reports.
 		if codemap != nil {
@@ -1029,6 +1067,12 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 		case graph != nil:
 			doc = graphjson.Build(graph, all, sarifRulesMeta(ruleSources), root, version)
 		}
+		// Attached after assembly so both document paths (partitioned codemap and
+		// whole-graph) carry what the baseline did. The platform reads this to
+		// split reported findings into first-time versus re-verify (adr/0004 §5).
+		if opts.BaselinePath != "" {
+			doc.Baseline = baselineSection(len(opts.Baseline), covered, staleBaseline, driftedBaseline)
+		}
 		b, _ := json.MarshalIndent(doc, "", "  ")
 		fmt.Println(string(b))
 	case "json":
@@ -1053,7 +1097,7 @@ func run(paths []string, rulesPath, format, profileName string, opts scanRunOpti
 		}
 		printSummaryWithFlags(stats, len(all), len(flags), wantsFlags)
 		if opts.BaselinePath != "" {
-			printBaselineSummary(opts.BaselinePath, covered, staleBaseline)
+			printBaselineSummary(opts.BaselinePath, covered, staleBaseline, driftedBaseline)
 		}
 	}
 	// Diagnostics go to stderr in every format. stdout carries exactly one

@@ -1754,6 +1754,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 		if len(params) == 0 {
 			params, paramTypes = c.paramsFromSignatureText(c.text(n))
 		}
+		params = c.ccWithVariadicTailParam(params, decl, n, c.field(n, "body"))
 		name := c.declName(decl)
 		c.inFunc++
 		bodyStmts := c.block(c.field(n, "body"))
@@ -1830,6 +1831,7 @@ func (c *ccConv) stmt(n *tree_sitter.Node) []nir.Stmt {
 			bodyStmts = append(bodyStmts, c.ccPrefixOffsetObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccCursorLoopMissingEndSentinelObservations(n, params)...)
 			bodyStmts = append(bodyStmts, c.ccCursorLoopMissingExitCheckObservations(n)...)
+			bodyStmts = append(bodyStmts, c.ccStringScanMissingLengthBoundObservations(n, params)...)
 			bodyStmts = append(bodyStmts, c.ccStackFallbackStrideUnderallocObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowDeclaredBoundsCheckObservations(n)...)
 			bodyStmts = append(bodyStmts, c.ccNarrowingCastBoundsCheckObservations(n)...)
@@ -2073,6 +2075,34 @@ func (c *ccConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 			if idx, ok := cReaders[name]; ok && idx < len(args) {
 				if dst := c.destName(args[idx]); dst != "" {
 					return []nir.Stmt{nir.Assign{Targets: []string{dst}, Value: c.expr(inner)}}
+				}
+			}
+			// va_start opens the variadic tail into its list, and va_copy re-opens one
+			// list onto another. Both are writes the call performs on its first argument,
+			// and the value written is what the tail carries: bind the list onto the
+			// synthetic tail parameter (va_start) or onto the source list (va_copy), so a
+			// read of the list — the v-formatted call it is handed to, a va_arg — sees the
+			// tail arguments the enclosing wrapper was called with. The call itself stays,
+			// both because its own arguments are real reads and because a wrapper that
+			// opens a va_list is evidence bindings match on.
+			switch name {
+			case "va_start", "__builtin_va_start":
+				if dst := c.destName(args[0]); dst != "" {
+					return []nir.Stmt{
+						nir.Assign{Targets: []string{dst}, Value: nir.Name{ID: nir.CVarargsParam, Loc: c.loc(args[0])}},
+						nir.ExprStmt{Value: c.expr(inner)},
+					}
+				}
+			case "va_copy", "__builtin_va_copy", "__va_copy":
+				if len(args) > 1 {
+					if dst := c.destName(args[0]); dst != "" {
+						if c.kind(args[1]) == "identifier" {
+							return []nir.Stmt{
+								nir.Assign{Targets: []string{dst}, Value: nir.Name{ID: c.text(args[1]), Loc: c.loc(args[1])}},
+								nir.ExprStmt{Value: c.expr(inner)},
+							}
+						}
+					}
 				}
 			}
 		}
@@ -2545,6 +2575,83 @@ func (c *ccConv) paramList(decl *tree_sitter.Node) *tree_sitter.Node {
 		}
 	}
 	return nil
+}
+
+// ccWithVariadicTailParam appends the synthetic variadic-tail parameter to a
+// definition's parameter list when the definition declares `...` and its body
+// opens a va_list over that tail — the printf-style wrapper shape. The tail
+// arguments a call passes beyond the named parameters bind to it (see the
+// lowering's arg mapping), and va_start binds the list onto it, so what a
+// caller hands the wrapper reaches the wrapper's own body. A variadic body
+// that opens no list reads nothing from its tail, and keeps exactly the
+// parameter list it had.
+func (c *ccConv) ccWithVariadicTailParam(params []string, decl, fn, body *tree_sitter.Node) []string {
+	if body == nil {
+		return params
+	}
+	// The parameter list decides before the body is walked: a definition that declares
+	// no `...` — nearly all of them — must not pay the full-body traversal below, which
+	// otherwise ran for every function in every file.
+	pl := c.paramList(decl)
+	if pl == nil {
+		pl = c.paramList(fn)
+	}
+	variadic := false
+	// Named children only, and only C's variadic_parameter. tree-sitter-cpp
+	// spells the same tail an anonymous "..." token, and its staying
+	// unrecognized is the specified behaviour rather than an oversight: the
+	// corpus rejects the traced route for a .cpp wrapper (rank 1082's varargs
+	// pair), so the C++ tail stays dark at the call boundary until the
+	// definitions move that expectation. cpp_variadic_tail_test.go pins this.
+	for _, ch := range c.namedChildren(pl) {
+		if c.kind(ch) == "variadic_parameter" {
+			variadic = true
+			break
+		}
+	}
+	// The signature-text fallback spells the tail as a parameter literally named
+	// "..."; it stands for the same tail, so it takes the same binding.
+	fallback := len(params) > 0 && params[len(params)-1] == "..."
+	if !variadic && !fallback {
+		return params
+	}
+	if !c.ccBodyOpensVaList(body) {
+		return params
+	}
+	if variadic {
+		return append(params, nir.CVarargsParam)
+	}
+	out := append([]string{}, params[:len(params)-1]...)
+	return append(out, nir.CVarargsParam)
+}
+
+// ccVaStartNames are the spellings that open a va_list. stdarg.h macros them
+// onto the compiler builtin, and freestanding code writes the builtin itself.
+var ccVaStartNames = map[string]bool{
+	"va_start": true, "__builtin_va_start": true,
+}
+
+// ccBodyOpensVaList reports whether a function body opens a va_list, which is
+// the only way C reads a variadic tail.
+func (c *ccConv) ccBodyOpensVaList(body *tree_sitter.Node) bool {
+	found := false
+	var walk func(*tree_sitter.Node)
+	walk = func(n *tree_sitter.Node) {
+		if n == nil || found {
+			return
+		}
+		if c.kind(n) == "call_expression" {
+			if name := lastSeg(c.dotted(c.field(n, "function"))); ccVaStartNames[name] {
+				found = true
+				return
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			walk(ch)
+		}
+	}
+	walk(body)
+	return found
 }
 
 // A strings.Replacer builds a lookup trie on first use, so constructing one inside the
@@ -5545,6 +5652,295 @@ func (c *ccConv) ccCursorLoopMissingExitCheckObservations(fn *tree_sitter.Node) 
 	}
 	walkBlocks(body)
 	return out
+}
+
+// ccStringScanMissingLengthBoundObservations reports a NUL/delimiter-terminated
+// string scan -- strspn(3) or strcspn(3), whose only stop condition is a byte
+// value and never a count -- applied to a buffer this same function bounds by
+// a separate length. The pairing is read from the tree, never from names: a
+// relational comparison of a cursor against `buffer+length` states that the
+// buffer's real end is that sum, so the length is the buffer's bound and not a
+// terminator contract. A scan on a cursor derived from such a buffer (the
+// cursor itself, or anything assigned from it by a plain `=`) then runs past
+// that bound whenever the terminator is not there to stop it, and the
+// comparison that names the end runs only on the scan's result, after the
+// unbounded read has already happened. The fix shape -- a walk whose own
+// condition is `cursor < buffer+length` -- keeps the pairing and loses the
+// scan, so it reports nothing here.
+//
+// The strspn/strcspn call on a true NUL-terminated string is the ordinary safe
+// C idiom and stays unreported: `line[strcspn(line, "\n")] = 0` names no
+// length anywhere, so no pairing exists to fire on. Only a buffer the function
+// itself bounds by a separate length parameter or local is a subject, and only
+// while no terminating NUL is established within that length first: a write of
+// one at the bound (`buffer[length] = 0`) or a memchr asked to find one inside
+// the length both read as establishing the terminator the scan needs, and
+// clear the observation -- for a scan they precede. Each scan is judged
+// against the source up to its own call, so a terminator written or located
+// after a scan has already run stops nothing and that scan still reports. A
+// length that is itself the scan's own result cannot bound the buffer it was
+// measured from and is not treated as one.
+//
+// Residuals, all false-negative: the pairing is intra-function, so a bound a
+// helper maintains is invisible; a cursor re-expressed as `buffer+i` at the
+// scan (`strcspn(buf+i, ...)`) is not a bare identifier and does not pair; a
+// length kept in a struct field rather than a bare local does not pair; and
+// the NUL-establishment spellings recognized are the direct write at the bound
+// and memchr, so an indirect establishment through a helper clears nothing.
+func (c *ccConv) ccStringScanMissingLengthBoundObservations(fn *tree_sitter.Node, params []string) []nir.Stmt {
+	body := c.field(fn, "body")
+	if body == nil {
+		return nil
+	}
+	text := compactCExprText(c.text(body))
+	if !strings.Contains(text, "strspn(") && !strings.Contains(text, "strcspn(") {
+		return nil
+	}
+
+	// The function's own variables: its parameters plus everything it declares,
+	// so a bound named by a constant macro or a foreign name does not pair.
+	vars := map[string]bool{}
+	for _, p := range params {
+		vars[p] = true
+	}
+	// assignedFrom records the plain-`=` aliasings: x = y makes y an origin of
+	// x. An advancing `x += ...` is not an origin change and leaves no edge.
+	assignedFrom := map[string][]string{}
+	// scanMeasured holds the identifiers ever set from a strspn/strcspn result:
+	// the scan's own measurement cannot bound the buffer it measured.
+	scanMeasured := map[string]bool{}
+	type strScan struct {
+		callee string
+		cursor string
+		call   *tree_sitter.Node
+	}
+	var scans []strScan
+	var collect func(*tree_sitter.Node)
+	collect = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		switch c.kind(n) {
+		case "declaration":
+			for _, ch := range c.namedChildren(n) {
+				switch c.kind(ch) {
+				case "init_declarator", "pointer_declarator", "array_declarator", "identifier", "function_declarator":
+					if name := c.declName(ch); name != "" {
+						vars[name] = true
+					}
+				}
+				if c.kind(ch) != "init_declarator" {
+					continue
+				}
+				name := c.declName(ch)
+				value := c.field(ch, "value")
+				if from := ccIdentifierText(c, value); from != "" && from != name {
+					assignedFrom[name] = ccAppendUnique(assignedFrom[name], from)
+				}
+				if name != "" && c.ccExprCallsStringScan(value) {
+					scanMeasured[name] = true
+				}
+			}
+		case "assignment_expression":
+			left, right := c.field(n, "left"), c.field(n, "right")
+			if c.text(c.field(n, "operator")) != "=" {
+				break
+			}
+			if name := ccIdentifierText(c, left); name != "" {
+				if from := ccIdentifierText(c, right); from != "" && from != name {
+					assignedFrom[name] = ccAppendUnique(assignedFrom[name], from)
+				}
+				if c.ccExprCallsStringScan(right) {
+					scanMeasured[name] = true
+				}
+			}
+		case "call_expression":
+			callee := ccIdentifierText(c, c.field(n, "function"))
+			if callee == "strspn" || callee == "strcspn" {
+				if args := c.namedChildren(c.field(n, "arguments")); len(args) > 0 {
+					if cursor := ccIdentifierText(c, args[0]); cursor != "" {
+						scans = append(scans, strScan{callee: callee, cursor: cursor, call: n})
+					}
+				}
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			collect(ch)
+		}
+	}
+	collect(body)
+	if len(scans) == 0 {
+		return nil
+	}
+
+	// origins returns the identifiers a name can be holding: itself plus
+	// everything it is ever alias-assigned from, transitively.
+	origins := func(name string) map[string]bool {
+		out := map[string]bool{name: true}
+		var expand func(string)
+		expand = func(x string) {
+			for _, from := range assignedFrom[x] {
+				if !out[from] {
+					out[from] = true
+					expand(from)
+				}
+			}
+		}
+		expand(name)
+		return out
+	}
+
+	// lengthsFor holds, per buffer, the separate lengths this function states
+	// as that buffer's end: a relational comparison whose one side sums two
+	// bare identifiers and whose other side names a cursor derived from the
+	// summed buffer.
+	lengthsFor := map[string][]string{}
+	var findPairs func(*tree_sitter.Node)
+	findPairs = func(n *tree_sitter.Node) {
+		if n == nil {
+			return
+		}
+		if c.kind(n) == "binary_expression" {
+			switch c.text(c.field(n, "operator")) {
+			case "<", ">", "<=", ">=":
+				c.ccRecordStringScanBoundPair(c.field(n, "left"), c.field(n, "right"), origins, lengthsFor)
+				c.ccRecordStringScanBoundPair(c.field(n, "right"), c.field(n, "left"), origins, lengthsFor)
+			}
+		}
+		for _, ch := range c.namedChildren(n) {
+			findPairs(ch)
+		}
+	}
+	findPairs(body)
+
+	seen := map[string]bool{}
+	var out []nir.Stmt
+	for _, s := range scans {
+		// An establishment counts only for a scan it precedes: a terminator
+		// written or located after the call stops nothing, because the read
+		// has already run past the bound by then. The text handed to the
+		// exclusion is therefore the body up to the call, not the whole body.
+		before := compactCExprText(c.textBefore(body, s.call))
+		originSet := origins(s.cursor)
+		buffers := make([]string, 0, len(originSet))
+		for name := range originSet {
+			buffers = append(buffers, name)
+		}
+		sort.Strings(buffers)
+		for _, buffer := range buffers {
+			if !vars[buffer] {
+				continue
+			}
+			for _, length := range lengthsFor[buffer] {
+				if length == buffer || !vars[length] || scanMeasured[length] {
+					continue
+				}
+				key := s.callee + "/" + s.cursor + "/" + buffer + "/" + length
+				if seen[key] {
+					continue
+				}
+				seen[key] = true
+				if ccStringScanNulEstablished(before, buffer, length) {
+					continue
+				}
+				loc := c.loc(s.call)
+				path := "analysis.string_scan.missing_length_bound"
+				out = append(out, nir.ExprStmt{Value: nir.Call{
+					Callee: nir.Name{ID: path, Loc: loc},
+					Args: []nir.Expr{
+						nir.Const{Loc: loc, Value: "scan=" + s.callee},
+						nir.Const{Loc: loc, Value: "cursor=" + s.cursor},
+						nir.Const{Loc: loc, Value: "buffer=" + buffer},
+						nir.Const{Loc: loc, Value: "length=" + length},
+						nir.Const{Loc: loc, Value: "termination=not_established_within_length"},
+					},
+					Path:   path,
+					Method: "missing_length_bound",
+					Loc:    loc,
+				}})
+			}
+		}
+	}
+	return out
+}
+
+// ccExprCallsStringScan reports whether the expression's subtree contains a
+// strspn or strcspn call, so a value set from the scan's own result can be
+// kept out of the lengths that bound the scanned buffer.
+func (c *ccConv) ccExprCallsStringScan(n *tree_sitter.Node) bool {
+	if n == nil {
+		return false
+	}
+	if c.kind(n) == "call_expression" {
+		switch ccIdentifierText(c, c.field(n, "function")) {
+		case "strspn", "strcspn":
+			return true
+		}
+	}
+	for _, ch := range c.namedChildren(n) {
+		if c.ccExprCallsStringScan(ch) {
+			return true
+		}
+	}
+	return false
+}
+
+// ccRecordStringScanBoundPair reads one side of a relational comparison as a
+// candidate `buffer+length` sum and records the pairing when the comparison's
+// other side names a cursor derived from the summed buffer: `ptr >= buf+len`
+// and `p < len+buf` both state that buf's end is that sum, while `w1+w2 > 3`
+// states nothing about any buffer. Each summand is validated in its own
+// direction, so the pointer and the length are recognised in either order.
+func (c *ccConv) ccRecordStringScanBoundPair(sumSide, otherSide *tree_sitter.Node, origins func(string) map[string]bool, lengthsFor map[string][]string) {
+	sum := ccUnwrapCExpr(sumSide)
+	if sum == nil || c.kind(sum) != "binary_expression" || c.text(c.field(sum, "operator")) != "+" {
+		return
+	}
+	a, b := ccIdentifierText(c, c.field(sum, "left")), ccIdentifierText(c, c.field(sum, "right"))
+	if a == "" || b == "" || a == b {
+		return
+	}
+	mentioned := c.ccPointerReadNames(otherSide)
+	for _, pair := range [][2]string{{a, b}, {b, a}} {
+		summand, length := pair[0], pair[1]
+		for name := range mentioned {
+			if !origins(name)[summand] {
+				continue
+			}
+			lengthsFor[summand] = ccAppendUnique(lengthsFor[summand], length)
+			break
+		}
+	}
+}
+
+// ccStringScanNulEstablished reports whether the compacted text preceding a
+// scan call establishes a terminating NUL within the bound the buffer and
+// length name before the scan needs one: a write of zero at the bound itself,
+// in either the subscript or the dereferenced-sum spelling, or a memchr asked
+// to locate the NUL inside that length, which asks its byte argument and only
+// a literal zero answers -- a memchr for any other byte, or for a variable
+// one, says nothing about where the NUL is and establishes nothing. The text
+// is the body up to the scan's call, so an establishment that follows the call
+// is absent from it by construction. Runtime-built patterns stay out of ccRe,
+// per its cache policy.
+func ccStringScanNulEstablished(text, buffer, length string) bool {
+	zero := `(?:0|'\\0'|'\\x00')`
+	b, l := regexp.QuoteMeta(buffer), regexp.QuoteMeta(length)
+	if regexp.MustCompile(`\b` + b + `\[` + l + `\]=` + zero).MatchString(text) {
+		return true
+	}
+	if regexp.MustCompile(`\*\(` + b + `\+` + l + `\)=` + zero).MatchString(text) {
+		return true
+	}
+	for _, m := range ccRe(`\bmemchr\(([^,]*),([^,]*),([^)]*)\)`).FindAllStringSubmatch(text, -1) {
+		if !ccRe(`^(?:0|'\\0'|'\\x00')$`).MatchString(m[2]) {
+			continue
+		}
+		if ccContainsWord(m[1], buffer) && ccContainsWord(m[3], length) {
+			return true
+		}
+	}
+	return false
 }
 
 // ccLoopExitCheckFacts reports one loop against the statements that follow it

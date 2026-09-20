@@ -554,7 +554,6 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 		nir.Const{Loc: loc, Value: "name=" + name},
 		nir.Const{Loc: loc, Value: bodyText},
 		nir.Const{Loc: loc, Value: pyContextCompactUnbounded(bodyText)},
-		nir.Const{Loc: loc, Value: c.moduleContext},
 	}
 	localEndArgs := []nir.Expr{
 		nir.Const{Loc: loc, Value: "lang=python"},
@@ -589,8 +588,26 @@ func (c *pyConv) pyFunctionContext(fn *tree_sitter.Node, decorators []string) []
 	sinkArgs := append([]nir.Expr{nir.Name{ID: tmp, Loc: loc}}, args...)
 	endLoc := c.endLoc(body)
 	endArgs := append([]nir.Expr(nil), args...)
-	for _, tok := range c.moduleTokens {
-		endArgs = append(endArgs, nir.Const{Loc: endLoc, Value: "module_" + tok})
+	// The module's whole literal context and structured tokens ride on every
+	// function's .end call ALONE, not on the four calls every function also mints —
+	// and the tokens as ONE joined literal (module_ prefixed, \x00 separated) rather
+	// than one literal per token. Every reader sees the same facts either way: value
+	// matching reads the call's str_args, which is the same joined string, the
+	// Const-walking presence predicates split what they read on the same \x00, and the
+	// bindings that ask for module facts anchor on callee.analysis ==
+	// "function.context.end". Riding the other calls cost a fresh str_args join of
+	// the module's literal mass per call per FUNCTION — a many-function module's
+	// literal context grows with its functions, so the re-carriage grew with
+	// functions x module literals, a term quadratic in the module that pushed dense
+	// multi-package Python past a whole-repository scan's memory safety stop.
+	if c.moduleContext != "" {
+		endArgs = append(endArgs, nir.Const{Loc: endLoc, Value: c.moduleContext})
+	}
+	if len(c.moduleTokens) > 0 {
+		endArgs = append(endArgs, nir.Const{
+			Loc:   endLoc,
+			Value: "module_" + strings.Join(c.moduleTokens, "\x00module_"),
+		})
 	}
 	return []nir.Stmt{
 		nir.Assign{Targets: []string{tmp}, Value: nir.Call{
@@ -1844,15 +1861,25 @@ func (c *pyConv) pyClassContext(n *tree_sitter.Node, name string, bases []string
 	return out
 }
 
+// pyModuleLiteralContext joins the module's string literals into the one blob
+// that rides on every function's .end call, so a function-anchored query can see
+// the module's literal mass. The join is bounded at pyModuleLiteralMaxBytes: the
+// blob is re-joined into each function's end-call str_args and scanned by every
+// value matcher over it, so an unbounded join made a many-function module's
+// graph and match cost grow with functions x module literals. The bound keeps a
+// source-order prefix; every module smaller than it is joined whole.
 func (c *pyConv) pyModuleLiteralContext(root *tree_sitter.Node) string {
 	var toks []string
+	kept := 0
 	var walk func(n *tree_sitter.Node)
 	walk = func(n *tree_sitter.Node) {
-		if n == nil {
+		if n == nil || kept >= pyModuleLiteralMaxBytes {
 			return
 		}
 		if c.kind(n) == "string" || c.kind(n) == "concatenated_string" {
-			toks = append(toks, c.text(n))
+			text := c.text(n)
+			kept += len(text) + 1
+			toks = append(toks, text)
 			return
 		}
 		for _, ch := range c.namedChildren(n) {

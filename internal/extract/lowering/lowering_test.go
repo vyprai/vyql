@@ -1098,6 +1098,98 @@ func TestLowerClassContextKeepsNestedClassMemberTokensSeparate(t *testing.T) {
 	}
 }
 
+func classContextArgs(t *testing.T, g usg.Store, className string) string {
+	t.Helper()
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") == "analysis.class.context" &&
+			strings.Contains(n.Prop("str_args"), "class_name:"+className) {
+			return n.Prop("str_args")
+		}
+	}
+	t.Fatalf("class context analysis event for %s not found", className)
+	return ""
+}
+
+// A real-sized class spends the class-context token budget on its first members'
+// evidence (a Java method contributes its text, params and returns as tokens), so a
+// member declared after the budget is gone would lose the one token that carries its
+// declared name. A class-scope fact that has to pair two member declarations -- a
+// serialized-form replacement declared against its readObject rejection -- is then
+// unmatchable. Declaration names must survive past the cap; other evidence must not.
+func TestLowerClassContextCarriesLateMemberDeclarationNames(t *testing.T) {
+	const fillers = 40
+	const fillerTokens = 16 // fillers × fillerTokens > classContextTokenCap
+	body := make([]nir.Stmt, 0, fillers+1)
+	for i := 0; i < fillers; i++ {
+		toks := make([]string, 0, fillerTokens)
+		toks = append(toks, "function_name:helper"+strconv.Itoa(i))
+		for j := 1; j < fillerTokens; j++ {
+			toks = append(toks, "call:fill"+strconv.Itoa(i)+"_"+strconv.Itoa(j))
+		}
+		body = append(body, nir.FuncDef{Name: "helper" + strconv.Itoa(i), Loc: "C.java:3", ContextTokens: toks})
+	}
+	body = append(body, nir.FuncDef{Name: "writeReplace", Loc: "C.java:99", ContextTokens: []string{
+		"function_name:writeReplace",
+		"return_type:Object",
+	}})
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "C.java",
+		Body: []nir.Stmt{nir.ClassDef{Name: "Widget", Loc: "C.java:1", Body: body}},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	args := classContextArgs(t, g, "Widget")
+	if !strings.Contains(args, "function_name:writeReplace") {
+		t.Fatalf("class context dropped the declaration name of a member declared past the token cap: %q", args)
+	}
+	// The cap still bounds member evidence: an early member's token stays, the late
+	// member's non-name token does not.
+	if !strings.Contains(args, "call:fill0_1") {
+		t.Fatalf("class context lost an early member's evidence below the cap: %q", args)
+	}
+	if strings.Contains(args, "return_type:Object") {
+		t.Fatalf("class context carried late member evidence past the cap: %q", args)
+	}
+}
+
+// The deferred-body path must agree: a summarized body reference flattens its member
+// tokens, and a declaration name late in that flat list reaches the event the same
+// way it would from a resident body.
+func TestLowerClassContextCarriesLateDeclarationNamesFromDeferredBody(t *testing.T) {
+	const fillers = 600
+	toks := make([]string, 0, fillers+1)
+	for i := 0; i < fillers; i++ {
+		toks = append(toks, "call:fill"+strconv.Itoa(i))
+	}
+	toks = append(toks, "function_name:readObject")
+	prog := nir.Program{Modules: []nir.Module{{
+		Key:  "app",
+		File: "C.rb",
+		Body: []nir.Stmt{nir.ClassDef{Name: "Blob", Loc: "C.rb:1", Body: []nir.Stmt{
+			nir.BodyRef{Summarized: true, Summary: nir.BodySummary{ContextTokens: toks}},
+		}}},
+	}}}
+	g, err := Lower(prog, true)
+	if err != nil {
+		t.Fatalf("lower: %v", err)
+	}
+	args := classContextArgs(t, g, "Blob")
+	if !strings.Contains(args, "function_name:readObject") {
+		t.Fatalf("class context dropped a declaration name from a deferred body past the token cap: %q", args)
+	}
+	if !strings.Contains(args, "call:fill0") {
+		t.Fatalf("class context lost deferred-body evidence below the cap: %q", args)
+	}
+	if strings.Contains(args, "call:fill"+strconv.Itoa(fillers-1)) {
+		t.Fatalf("class context carried deferred-body evidence past the cap: %q", args)
+	}
+}
+
 func TestLowerResultEntryCreatesControlEventFlow(t *testing.T) {
 	prog := nir.Program{Modules: []nir.Module{{
 		Key:  "app",

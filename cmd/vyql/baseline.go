@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/vyprai/vyql/internal/findings"
+	"github.com/vyprai/vyql/internal/graphjson"
 	"github.com/vyprai/vyql/internal/resultpolicy"
 )
 
@@ -32,8 +33,14 @@ type baselineEntry struct {
 	FP      string `json:"fp"`
 	Verdict string `json:"verdict"`
 	Reason  string `json:"reason,omitempty"`
-	// Rule and Loc are for the human reading the file. Matching is on FP alone,
-	// so these going stale costs nothing.
+	// Sig lists the path signatures this entry was triaged against (adr/0004).
+	// An entry with sigs suppresses only a finding whose witness still hashes
+	// to one of them; the same fingerprint on a new path re-fires as drifted
+	// and goes back to verification. Empty means legacy behaviour: the verdict
+	// is anchored to the finding alone and never drifts.
+	Sig []string `json:"sig,omitempty"`
+	// Rule and Loc are for the human reading the file. Matching is on FP (and
+	// Sig when present), so these going stale costs nothing.
 	Rule string `json:"rule,omitempty"`
 	Loc  string `json:"loc,omitempty"`
 }
@@ -79,6 +86,12 @@ func loadBaseline(path string) (map[string]baselineEntry, error) {
 		if !validVerdict(e.Verdict) {
 			return nil, fmt.Errorf("baseline %s: entry %s has verdict %q; use %s",
 				path, e.FP, e.Verdict, strings.Join(baselineVerdicts, " | "))
+		}
+		for _, sig := range e.Sig {
+			if !validSignature(sig) {
+				return nil, fmt.Errorf("baseline %s: entry %s has malformed path signature %q; "+
+					"signatures are 16 hex characters copied from a scan's graph-json sig field", path, e.FP, sig)
+			}
 		}
 		out[e.FP] = e
 	}
@@ -129,37 +142,92 @@ func validVerdict(v string) bool {
 	return false
 }
 
+// validSignature accepts exactly the shape resultpolicy.PathSignature emits:
+// 16 lowercase hex characters, like the fingerprint itself. Anything else in
+// a hand-edited file is a typo that would silently never match — the wall of
+// findings that follows is worse than refusing to run.
+func validSignature(sig string) bool {
+	if len(sig) != 16 {
+		return false
+	}
+	for _, r := range sig {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 // applyBaseline splits findings into those still to report and those a verdict
-// already covers, and names baseline entries that matched nothing.
+// already covers, names baseline entries that matched nothing, and names the
+// findings whose fingerprint matched but whose path did not.
 //
 // The stale list is the part that keeps a baseline honest. A suppression that
 // outlives the code it excused is how these files become dangerous: the code
-// moved, the excuse did not, and nobody looked again.
-func applyBaseline(all []*findings.Finding, base map[string]baselineEntry) (report []*findings.Finding, covered []*findings.Finding, stale []baselineEntry) {
-	seen := map[string]bool{}
+// moved, the excuse did not, and nobody looked again. Drifted is the other
+// half of that honesty, pointed the other way: the code under the finding
+// changed enough that the recorded verdict may no longer describe it, so the
+// finding is reported again and the entry's fingerprint is returned for the
+// re-verify list.
+func applyBaseline(all []*findings.Finding, base map[string]baselineEntry) (report []*findings.Finding, covered []*findings.Finding, stale []baselineEntry, drifted []string) {
+	matched := map[string]bool{}
 	for _, f := range all {
 		fp := resultpolicy.Fingerprint(f)
-		if _, ok := base[fp]; ok {
-			seen[fp] = true
+		e, ok := base[fp]
+		if ok && entryCovers(e, f) {
+			matched[fp] = true
 			covered = append(covered, f)
 			continue
+		}
+		if ok {
+			matched[fp] = true
+			drifted = append(drifted, fp)
 		}
 		report = append(report, f)
 	}
 	for fp, e := range base {
-		if !seen[fp] {
+		if !matched[fp] {
 			stale = append(stale, e)
 		}
 	}
+	sort.Strings(drifted)
 	sort.Slice(stale, func(i, j int) bool { return stale[i].FP < stale[j].FP })
-	return report, covered, stale
+	return report, covered, stale, drifted
+}
+
+// entryCovers is the whole suppression rule: the fingerprint must match, and
+// if the entry carries path signatures the finding's must be one of them. A
+// sig-carrying entry never covers a finding without a signature — that is a
+// different witness under the same fingerprint, which is drift, not cover.
+func entryCovers(e baselineEntry, f *findings.Finding) bool {
+	if len(e.Sig) == 0 {
+		return true
+	}
+	for _, sig := range e.Sig {
+		if sig != "" && sig == f.Sig {
+			return true
+		}
+	}
+	return false
 }
 
 // printBaselineSummary states what the baseline did. A run that quietly drops
 // findings is indistinguishable from a run that found nothing.
-func printBaselineSummary(path string, covered []*findings.Finding, stale []baselineEntry) {
+func printBaselineSummary(path string, covered []*findings.Finding, stale []baselineEntry, drifted []string) {
 	if len(covered) > 0 {
 		fmt.Printf("baseline %s: %d finding(s) already triaged and not reported\n", path, len(covered))
+	}
+	if len(drifted) > 0 {
+		fmt.Fprintf(os.Stderr, "warning: %d triaged finding(s) re-reported: the taint path under them changed\n",
+			len(drifted))
+		fmt.Fprintln(os.Stderr, "         the recorded verdict may no longer describe them; re-triage to record the new path:")
+		for i, fp := range drifted {
+			if i == 5 {
+				fmt.Fprintf(os.Stderr, "         ... and %d more\n", len(drifted)-5)
+				break
+			}
+			fmt.Fprintf(os.Stderr, "           %s  vyql triage add -fp %s ...\n", fp, fp)
+		}
 	}
 	if len(stale) == 0 {
 		return
@@ -187,6 +255,32 @@ func plural(n int, one, many string) string {
 	return many
 }
 
+// baselineSection is the machine-readable form of printBaselineSummary: what a
+// consumer of graph-json needs to keep triage records alive (covered), archive
+// them (stale) and re-verify them (drifted) without parsing stderr (adr/0004 §5).
+func baselineSection(applied int, covered []*findings.Finding, stale []baselineEntry, drifted []string) *graphjson.BaselineSection {
+	cov := make([]string, 0, len(covered))
+	for _, f := range covered {
+		cov = append(cov, resultpolicy.Fingerprint(f))
+	}
+	sort.Strings(cov)
+	st := make([]string, 0, len(stale))
+	for _, e := range stale {
+		st = append(st, e.FP)
+	}
+	// already sorted by applyBaseline
+	if drifted == nil {
+		drifted = []string{}
+	}
+	if cov == nil {
+		cov = []string{}
+	}
+	if st == nil {
+		st = []string{}
+	}
+	return &graphjson.BaselineSection{Applied: applied, Covered: cov, Drifted: drifted, Stale: st}
+}
+
 // writeBaseline records the findings a run is prepared to carry forward, which
 // is how a team adopts the scanner on a codebase that already has findings: take
 // the backlog as given, and fail only on what comes next. Reasons are left empty
@@ -212,8 +306,14 @@ func writeBaseline(path string, all []*findings.Finding, prior map[string]baseli
 			loc = f.Bindings[len(f.Bindings)-1].Loc
 		}
 		e := baselineEntry{FP: fp, Verdict: verdictAccepted, Rule: f.RuleID, Loc: loc}
+		if f.Sig != "" {
+			// Record the path the acceptance was made against, so the acceptance
+			// drifts like a triaged verdict would: still honoured while the path
+			// holds, re-reported when it changes.
+			e.Sig = []string{f.Sig}
+		}
 		if p, ok := prior[fp]; ok {
-			e.Verdict, e.Reason = p.Verdict, p.Reason
+			e.Verdict, e.Reason, e.Sig = p.Verdict, p.Reason, p.Sig
 		} else if failOnRank > 0 && severityRank(f.Severity) >= failOnRank {
 			continue
 		}
