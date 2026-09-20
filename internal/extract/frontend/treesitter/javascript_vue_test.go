@@ -236,6 +236,121 @@ func TestVueTemplateSkipsCommentedAndQuotedDirectives(t *testing.T) {
 	}
 }
 
+// vueDirectiveBounds returns every lowered directive as its bound callee and
+// the line the directive sits on.
+func vueDirectiveBounds(prog nir.Program) []vueDirectiveBound {
+	var out []vueDirectiveBound
+	for _, mod := range prog.Modules {
+		for _, st := range mod.Body {
+			s, ok := st.(nir.ExprStmt)
+			if !ok {
+				continue
+			}
+			c, ok := s.Value.(nir.Call)
+			if !ok || c.Path != "createElement" {
+				continue
+			}
+			data, ok := c.Args[1].(nir.Seq)
+			if !ok || len(data.Parts) != 1 {
+				continue
+			}
+			dp, ok := data.Parts[0].(nir.Pair)
+			if !ok || dp.Key != "domProps" {
+				continue
+			}
+			ih, ok := dp.Value.(nir.Seq)
+			if !ok || len(ih.Parts) != 1 {
+				continue
+			}
+			p, ok := ih.Parts[0].(nir.Pair)
+			if !ok || p.Key != "innerHTML" {
+				continue
+			}
+			if b, ok := p.Value.(nir.Call); ok {
+				out = append(out, vueDirectiveBound{callee: b.Path, loc: c.Loc})
+			}
+		}
+	}
+	return out
+}
+
+type vueDirectiveBound struct {
+	callee string
+	loc    string
+}
+
+// The shapes a real template writes the directive in: a TypeScript component's
+// expression, Windows rows, single-quoted attributes, self-closing elements and
+// capitalised attribute names all carry the same write, and a bare v-html —
+// nothing bound — lowers nothing without taking the valued directives beside it
+// down with it.
+func TestVueTemplateLowersTheDirectiveInEverySpelling(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []vueDirectiveBound
+	}{
+		{
+			name: "typescript component expression",
+			src:  "<template>\n    <td v-html=\"getRowContent(row[column.index] as any)\"></td>\n</template>\n<script lang=\"ts\">\n    export default { methods: { getRowContent: function (c: any) { return c } } }\n</script>\n",
+			want: []vueDirectiveBound{{callee: "getRowContent", loc: "c.vue:2"}},
+		},
+		{
+			name: "windows rows",
+			src:  "<template>\r\n    <td v-html=\"fmt('x')\"></td>\r\n</template>\r\n",
+			want: []vueDirectiveBound{{callee: "fmt", loc: "c.vue:2"}},
+		},
+		{
+			name: "single-quoted attribute",
+			src:  "<template>\n    <td v-html='fmt(\"x\")'></td>\n</template>\n",
+			want: []vueDirectiveBound{{callee: "fmt", loc: "c.vue:2"}},
+		},
+		{
+			name: "self-closing element",
+			src:  "<template>\n    <td v-html=\"one()\" />\n</template>\n",
+			want: []vueDirectiveBound{{callee: "one", loc: "c.vue:2"}},
+		},
+		{
+			name: "capitalised attribute",
+			src:  "<template>\n    <td V-HTML=\"cap()\"></td>\n</template>\n",
+			want: []vueDirectiveBound{{callee: "cap", loc: "c.vue:2"}},
+		},
+		{
+			name: "bare directive beside valued ones",
+			src:  "<template>\n    <td v-html></td>\n    <td v-html=\"after()\"></td>\n</template>\n",
+			want: []vueDirectiveBound{{callee: "after", loc: "c.vue:3"}},
+		},
+		{
+			name: "three directives on one row",
+			src:  "<template>\n    <i v-html=\"p()\"></i><i v-html=\"q()\"></i><i v-html=\"r()\"></i>\n</template>\n",
+			want: []vueDirectiveBound{
+				{callee: "p", loc: "c.vue:2"},
+				{callee: "q", loc: "c.vue:2"},
+				{callee: "r", loc: "c.vue:2"},
+			},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeVueComponent(t, "c.vue", tc.src)
+
+			prog, err := treesitter.ExtractJavaScript([]string{path}, filepath.Dir(path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := vueDirectiveBounds(prog)
+			if len(got) != len(tc.want) {
+				t.Fatalf("directives lowered = %v, want %v", got, tc.want)
+			}
+			for i, g := range got {
+				if g != tc.want[i] {
+					t.Fatalf("directive %d = {%s %s}, want {%s %s}", i, g.callee, g.loc, tc.want[i].callee, tc.want[i].loc)
+				}
+			}
+		})
+	}
+}
+
 // Two directives on one row are separate statements in the blanked buffer only
 // because of the separator the blanking writes between them, and a value that
 // spans rows keeps mapping to its own lines.
