@@ -1166,9 +1166,7 @@ func (c *conv) goDecodeRestoreObservations(name string, body *ast.BlockStmt) []n
 				}
 				universe := c.pkgFields[varType[id.Name]]
 				if universe == nil {
-					for _, f := range sortedFields(touched[id.Name]) {
-						universe = append(universe, f)
-					}
+					universe = append(universe, sortedFields(touched[id.Name])...)
 				}
 				if len(universe) > 128 {
 					universe = universe[:128]
