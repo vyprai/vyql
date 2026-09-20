@@ -23,10 +23,15 @@ func TestTypeScriptAssertedObjectMethodsAreLowered(t *testing.T) {
 		name   string
 		ext    string
 		method string
+		param  string
 		call   string
-		src    string
+		// The sink the graph assertion looks for, when it is not `call` itself:
+		// funcBodyHasCall walks statements, so a sink only reachable inside a
+		// callback the handler hands to another call is asserted on the graph.
+		graphCall string
+		src       string
 	}{
-		{"export_default_as", "ts", "GET", "query", `
+		{"export_default_as", "ts", "GET", "req", "query", "", `
 export default {
   GET(req) {
     db.query(req.url);
@@ -36,26 +41,40 @@ export default {
   },
 } as RouteHandlers;
 `},
-		{"export_default_parenthesized_as", "ts", "GET", "query", `
+		{"export_default_parenthesized_as", "ts", "GET", "req", "query", "", `
 export default ({
   GET(req) {
     db.query(req.url);
   },
 }) as RouteHandlers;
 `},
-		{"declarator_satisfies", "ts", "run", "exec", `
+		{"declarator_satisfies", "ts", "run", "cmd", "exec", "", `
 const handlers = {
   run(cmd) {
     exec(cmd);
   },
 } satisfies HandlerMap;
 `},
-		{"export_default_as_tsx", "tsx", "GET", "query", `
+		{"export_default_as_tsx", "tsx", "GET", "req", "query", "", `
 export default {
   GET(req) {
     db.query(req.url);
   },
 } as RouteHandlers;
+`},
+		// The spelling rank 2792 is blocked on: a route worker's default export,
+		// `satisfies` rather than `as`, and a generic type argument on the asserted
+		// type. The export path is otherwise covered only by the `as` spelling.
+		{"export_default_satisfies_generic", "ts", "fetch", "request",
+			"runWithCloudflareRequestContext", "fetch", `
+export default {
+  async fetch(request, env, ctx) {
+    return runWithCloudflareRequestContext(request, env, ctx, async () => {
+      const imageUrl = new URL(request.url).pathname.slice(1);
+      return fetch(imageUrl, { cf: { cacheEverything: true } });
+    });
+  },
+} satisfies ExportedHandler<CloudflareEnv>;
 `},
 	}
 	for _, tc := range cases {
@@ -87,13 +106,26 @@ export default {
 				t.Fatal(err)
 			}
 			seen := false
+			param := false
+			sink := tc.graphCall
+			if sink == "" {
+				sink = tc.call
+			}
 			for _, n := range nodes {
-				if n.Type == "code.Call" && strings.Contains(n.Prop("callee_path"), tc.call) {
+				if n.Type == "code.Call" && strings.Contains(n.Prop("callee_path"), sink) {
 					seen = true
+				}
+				// What the handler reads is the node a source binding labels; without
+				// it the extraction is a body with nothing to reach into.
+				if n.Type == "code.Param" && strings.Contains(n.ID, tc.method+"#param#"+tc.param) {
+					param = true
 				}
 			}
 			if !seen {
-				t.Fatalf("call inside an asserted object method never reached the graph; nodes=%#v", nodes)
+				t.Fatalf("call %q inside an asserted object method never reached the graph; nodes=%#v", sink, nodes)
+			}
+			if !param {
+				t.Fatalf("asserted object method %s parameter %s never reached the graph; nodes=%#v", tc.method, tc.param, nodes)
 			}
 		})
 	}
