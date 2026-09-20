@@ -403,3 +403,268 @@ func TestVueTemplateDirectivesOnOneRowAndAcrossRows(t *testing.T) {
 		t.Fatalf("directive locs = %v, want both on the row they sit on", locs)
 	}
 }
+
+// vueForBindings returns every v-for binding a template lowered, as the alias
+// it binds, the callee path of the collection it reads, and the line the
+// directive sits on.
+func vueForBindings(prog nir.Program) []vueForBinding {
+	var out []vueForBinding
+	for _, mod := range prog.Modules {
+		for _, st := range mod.Body {
+			a, ok := st.(nir.Assign)
+			if !ok || len(a.Targets) != 1 {
+				continue
+			}
+			idx, ok := a.Value.(nir.Index)
+			if !ok {
+				continue
+			}
+			out = append(out, vueForBinding{alias: a.Targets[0], path: vueBindingPath(idx.Base), loc: a.Loc})
+		}
+	}
+	return out
+}
+
+type vueForBinding struct {
+	alias, path, loc string
+}
+
+// vueBindingPath names the collection a binding reads: the this-call a bare
+// identifier became, or the dotted path of the expression kept as written.
+func vueBindingPath(e nir.Expr) string {
+	switch b := e.(type) {
+	case nir.Call:
+		return b.Path
+	case nir.Attr:
+		return b.Path
+	case nir.Name:
+		return b.ID
+	}
+	return "?"
+}
+
+// A v-html directive's bound expression reads the aliases of the v-fors it sits
+// under, and Vue's own compiler lowers each of those to the binding of its
+// alias over an element of the iterated collection. krayin's table-body is the
+// shape that matters: two nested v-fors around the directive, both collections
+// computed properties, so each alias binds to a this-call's element at the
+// v-for's own line — and the bindings come before the directive that reads
+// them.
+func TestVueTemplateVForBindsTheEnclosingAliases(t *testing.T) {
+	src := `<template>
+    <tbody>
+        <tr v-for="(row, collectionIndex) in dataCollection">
+            <template v-for="(column, rowIndex) in columns">
+                <td v-html="getRowContent(row[column.index])"></td>
+            </template>
+        </tr>
+    </tbody>
+</template>
+
+<script>
+    export default {
+        computed: {
+            columns: function () {
+                return this.tableData.columns;
+            },
+
+            dataCollection: function () {
+                return this.tableData.records.data;
+            },
+        },
+
+        methods: {
+            getRowContent: function (content) {
+                return content || (content === 0 ? content : '--')
+            },
+        }
+    }
+</script>
+`
+	path := writeVueComponent(t, "table-body.vue", src)
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := vueForBindings(prog)
+	want := []vueForBinding{
+		{alias: "row", path: "this.dataCollection", loc: "table-body.vue:3"},
+		{alias: "column", path: "this.columns", loc: "table-body.vue:4"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("v-for bindings = %v, want %v", got, want)
+	}
+	for i, g := range got {
+		if g != want[i] {
+			t.Fatalf("binding %d = {%s %s %s}, want {%s %s %s}", i, g.alias, g.path, g.loc, want[i].alias, want[i].path, want[i].loc)
+		}
+	}
+	// The bindings precede the directive's own statement in the module body:
+	// the alias is bound before the expression that reads it.
+	bindAt := map[string]int{}
+	renderAt := -1
+	for _, mod := range prog.Modules {
+		for si, st := range mod.Body {
+			if a, ok := st.(nir.Assign); ok && len(a.Targets) == 1 {
+				if _, isIdx := a.Value.(nir.Index); isIdx {
+					bindAt[a.Targets[0]] = si
+				}
+				continue
+			}
+			if s, ok := st.(nir.ExprStmt); ok {
+				if c, ok := s.Value.(nir.Call); ok && c.Path == "createElement" && renderAt < 0 {
+					renderAt = si
+				}
+			}
+		}
+	}
+	for _, alias := range []string{"row", "column"} {
+		at, ok := bindAt[alias]
+		if !ok {
+			t.Fatalf("alias %s has no binding statement", alias)
+		}
+		if at > renderAt {
+			t.Fatalf("binding for %s at body index %d came after the directive statement at %d", alias, at, renderAt)
+		}
+	}
+}
+
+// A v-for nothing is rendered under lowers nothing, and a v-for beside the
+// directive — after it on a later sibling element, or around other markup —
+// binds no alias the directive could read: only the enclosing chain is scope.
+func TestVueTemplateVForOutsideTheDirectiveLowersNothing(t *testing.T) {
+	src := `<template>
+    <div>
+        <p v-html="h(item)"></p>
+        <span v-for="item in closedEarly"><i v-text="x(item)"></i></span>
+        <ol v-for="later in tainted"><li v-html="g(later)"></li></ol>
+    </div>
+</template>
+<script>
+    export default {}
+</script>
+`
+	path := writeVueComponent(t, "c.vue", src)
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := vueForBindings(prog)
+	want := []vueForBinding{{alias: "later", path: "this.tainted", loc: "c.vue:5"}}
+	if len(got) != len(want) || got[0] != want[0] {
+		t.Fatalf("v-for bindings = %v, want only the enclosing %v", got, want)
+	}
+
+	// A template with no v-html at all lowers nothing, v-fors included: there
+	// is no directive whose scope could be needed.
+	only := `<template>
+    <li v-for="x in xs"></li>
+</template>
+`
+	path = writeVueComponent(t, "only.vue", only)
+	prog, err = treesitter.ExtractJavaScript([]string{path}, filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(prog.Modules) != 0 {
+		t.Fatalf("template-only .vue with no v-html yielded modules; program=%#v", prog)
+	}
+}
+
+// An enclosing v-for's alias shadows the component property of the same name:
+// the inner collection reads the alias, not this, and the binding keeps the
+// expression as written.
+func TestVueTemplateVForAliasShadowsTheComponentProperty(t *testing.T) {
+	src := `<template>
+    <div v-for="row in rows">
+        <span v-for="c in row.cols"><i v-html="f(c.x)"></i></span>
+    </div>
+</template>
+<script>
+    export default {}
+</script>
+`
+	path := writeVueComponent(t, "c.vue", src)
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, filepath.Dir(path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := vueForBindings(prog)
+	want := []vueForBinding{
+		{alias: "row", path: "this.rows", loc: "c.vue:2"},
+		{alias: "c", path: "row.cols", loc: "c.vue:3"},
+	}
+	if len(got) != len(want) {
+		t.Fatalf("v-for bindings = %v, want %v", got, want)
+	}
+	for i, g := range got {
+		if g != want[i] {
+			t.Fatalf("binding %d = {%s %s %s}, want {%s %s %s}", i, g.alias, g.path, g.loc, want[i].alias, want[i].path, want[i].loc)
+		}
+	}
+}
+
+// The spellings a template writes a v-for in: the alias alone, the of
+// separator, the index beside the value (only the value binds), and a
+// destructuring pattern, which has no single name to bind — its directive
+// still lowers, its alias stays free.
+func TestVueTemplateVForSpellings(t *testing.T) {
+	cases := []struct {
+		name string
+		src  string
+		want []vueForBinding
+	}{
+		{
+			name: "alias alone",
+			src:  "<template>\n    <li v-for=\"item in items\"><i v-html=\"g(item)\"></i></li>\n</template>\n",
+			want: []vueForBinding{{alias: "item", path: "this.items", loc: "c.vue:2"}},
+		},
+		{
+			name: "of separator",
+			src:  "<template>\n    <li v-for=\"x of xs\"><i v-html=\"h(x)\"></i></li>\n</template>\n",
+			want: []vueForBinding{{alias: "x", path: "this.xs", loc: "c.vue:2"}},
+		},
+		{
+			name: "value with index and key",
+			src:  "<template>\n    <li v-for=\"(v, k) in obj\"><i v-html=\"i(v)\"></i></li>\n</template>\n",
+			want: []vueForBinding{{alias: "v", path: "this.obj", loc: "c.vue:2"}},
+		},
+		{
+			name: "same element as the directive",
+			src:  "<template>\n    <td v-html=\"f(c)\" v-for=\"c in cols\"></td>\n</template>\n",
+			want: []vueForBinding{{alias: "c", path: "this.cols", loc: "c.vue:2"}},
+		},
+		{
+			name: "destructuring pattern binds nothing",
+			src:  "<template>\n    <li v-for=\"{id} in users\"><i v-html=\"j(id)\"></i></li>\n</template>\n",
+			want: nil,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			path := writeVueComponent(t, "c.vue", tc.src)
+
+			prog, err := treesitter.ExtractJavaScript([]string{path}, filepath.Dir(path))
+			if err != nil {
+				t.Fatal(err)
+			}
+			got := vueForBindings(prog)
+			if len(got) != len(tc.want) {
+				t.Fatalf("v-for bindings = %v, want %v", got, tc.want)
+			}
+			for i, g := range got {
+				if g != tc.want[i] {
+					t.Fatalf("binding %d = {%s %s %s}, want {%s %s %s}", i, g.alias, g.path, g.loc, tc.want[i].alias, tc.want[i].path, tc.want[i].loc)
+				}
+			}
+			// The directive inside lowers whatever the alias situation: the
+			// v-for is scope, not a gate.
+			if _, ok := vueCreateElementCall(prog); !ok {
+				t.Fatalf("directive inside the v-for did not lower; program=%#v", prog)
+			}
+		})
+	}
+}

@@ -43,11 +43,53 @@ const vueComponentWithTaintedGetter = `<template>
 </script>
 `
 
+// vueComponentWithIteratedGetter is krayin's component unreduced: the
+// collection the template iterates is a computed getter over the store read,
+// and the directive's expression reads it through the v-for's alias.
+const vueComponentWithIteratedGetter = `<template>
+    <tr v-for="(row, collectionIndex) in dataCollection">
+        <td v-html="getRowContent(row[column.index])"></td>
+    </tr>
+</template>
+<script>
+    export default {
+        computed: {
+            dataCollection: function () {
+                return this.tableData.records.data
+            }
+        },
+        methods: {
+            getRowContent: function (content) {
+                return content || '--'
+            }
+        }
+    }
+</script>
+`
+
 func vueLoweredComponent(t *testing.T) usg.Store {
 	t.Helper()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "table-body.vue")
 	if err := os.WriteFile(path, []byte(vueComponentWithTaintedGetter), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return g
+}
+
+func vueLoweredIteratedComponent(t *testing.T) usg.Store {
+	t.Helper()
+	dir := t.TempDir()
+	path := filepath.Join(dir, "table-body.vue")
+	if err := os.WriteFile(path, []byte(vueComponentWithIteratedGetter), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
@@ -142,6 +184,60 @@ func TestVueTemplateVHTMLSinkReceivesTheBoundExpression(t *testing.T) {
 		if !reach[node] {
 			n, _, _ := g.GetNode(node)
 			t.Fatalf("sink at %s (%s) is not reachable from the directive's bound expression", n.Prop("loc"), n.Type)
+		}
+	}
+}
+
+// The collection a v-for iterates reaches the sink its directive anchors: the
+// getter the template reads is invoked at the binding, its return flows into
+// the alias the bound expression subscript reads, and that arrives at the
+// labelled markup write. Before the frontend lowered the v-for, the directive's
+// expression read an alias nothing ever bound — the sink was labelled and the
+// path stopped one hop short, which is the half of the gap a sink alone could
+// never close.
+func TestVueTemplateVHTMLSinkReceivesTheIteratedCollection(t *testing.T) {
+	g := vueLoweredIteratedComponent(t)
+	got := labelsByNode(vueHTMLRenderSinkApplicator(t).Apply(g))
+	if len(got) == 0 {
+		t.Fatal("no HtmlRender sink on the .vue component's v-html directive")
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	// The v-for's own statement: the this-call the collection lowered to, at
+	// the v-for's line.
+	var callID string
+	for _, n := range nodes {
+		if n.Type == "code.Call" && n.Prop("callee_path") == "this.dataCollection" && n.Prop("loc") == "table-body.vue:2" {
+			callID = n.ID
+			break
+		}
+	}
+	if callID == "" {
+		t.Fatal("the v-for's this.dataCollection() binding is not in the graph")
+	}
+	reach := map[string]bool{callID: true}
+	frontier := []string{callID}
+	for len(frontier) > 0 {
+		cur := frontier[0]
+		frontier = frontier[1:]
+		edges, err := g.OutEdges(cur, "FLOWS")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, e := range edges {
+			if reach[e.Dst] {
+				continue
+			}
+			reach[e.Dst] = true
+			frontier = append(frontier, e.Dst)
+		}
+	}
+	for node := range got {
+		if !reach[node] {
+			n, _, _ := g.GetNode(node)
+			t.Fatalf("sink at %s (%s) is not reachable from the v-for's iterated collection", n.Prop("loc"), n.Type)
 		}
 	}
 }

@@ -177,24 +177,51 @@ type vueHTMLDirective struct {
 	exprStart, exprEnd int
 }
 
-// vueHTMLDirectives finds the v-html attributes a .vue template's elements
-// carry. The scan is structural — a directive is an attribute NAME inside an
+// vueForDirective is one v-for attribute of a .vue template: the attribute's
+// own offset, the iteration alias it binds, and the byte range of the
+// collection expression it iterates.
+type vueForDirective struct {
+	attrStart          int
+	alias              string
+	exprStart, exprEnd int
+}
+
+// vueTemplateScan is one pass over a .vue file's markup: the v-html and v-for
+// attributes its elements carry, and the elements themselves, so a directive's
+// enclosing v-fors — the aliases its bound expression reads in scope — are
+// known.
+type vueTemplateScan struct {
+	html     []vueHTMLDirective
+	fors     []vueForDirective
+	elements []vueElement
+}
+
+// scanVueTemplate finds the v-html and v-for attributes a .vue template's
+// elements carry. The scan is structural — a directive is an attribute NAME inside an
 // element's open tag — so a v-html spelled inside another attribute's value
 // (`title="v-html='evil()'"`) is text, and one inside an HTML comment or a
 // script/style block is markup the component does not render.
-func vueHTMLDirectives(src []byte) []vueHTMLDirective {
+func scanVueTemplate(src []byte) vueTemplateScan {
 	lower := strings.ToLower(string(src))
-	skip := htmlCommentRanges(lower)
-	skip = append(skip, vueBlockRanges(lower, "<script")...)
-	skip = append(skip, vueBlockRanges(lower, "<style")...)
-	var out []vueHTMLDirective
+	skip := vueSkipRanges(lower)
+	var s vueTemplateScan
 	for _, r := range vueOpenTagRanges(lower) {
 		if inAnyRange(r[0], skip) {
 			continue
 		}
-		out = append(out, vueOpenTagDirectives(lower, r)...)
+		h, f := vueOpenTagDirectives(lower, r)
+		s.html = append(s.html, h...)
+		s.fors = append(s.fors, f...)
 	}
-	return out
+	s.elements = vueElements(lower, skip)
+	return s
+}
+
+func vueSkipRanges(lower string) [][2]int {
+	skip := htmlCommentRanges(lower)
+	skip = append(skip, vueBlockRanges(lower, "<script")...)
+	skip = append(skip, vueBlockRanges(lower, "<style")...)
+	return skip
 }
 
 // vueOpenTagRanges returns the [start, end) range of every element open tag,
@@ -231,18 +258,19 @@ func vueOpenTagRanges(lower string) [][2]int {
 
 // vueOpenTagDirectives walks one open tag's attribute list — names at
 // attribute positions, values skipped to their closing quote — and returns the
-// v-html directives it carries.
-func vueOpenTagDirectives(lower string, tagRange [2]int) []vueHTMLDirective {
+// v-html and v-for directives it carries.
+func vueOpenTagDirectives(lower string, tagRange [2]int) ([]vueHTMLDirective, []vueForDirective) {
 	end := tagRange[1]
 	i := tagRange[0] + 1
 	if i >= end || !isVueTagStart(lower[i]) {
-		return nil
+		return nil, nil
 	}
 	for i < end && isVueNameByte(lower[i]) {
 		i++
 	}
 	name := lower[tagRange[0]+1 : i]
-	var out []vueHTMLDirective
+	var html []vueHTMLDirective
+	var fors []vueForDirective
 	for i < end {
 		for i < end && isVueSpace(lower[i]) {
 			i++
@@ -277,21 +305,145 @@ func vueOpenTagDirectives(lower string, tagRange [2]int) []vueHTMLDirective {
 				valStart, valEnd = v0, i
 			}
 		}
-		if attr == "v-html" && valStart >= 0 {
+		if valStart >= 0 {
 			// The bound expression is the value trimmed of the whitespace a
 			// template may carry inside its quotes.
-			for valStart < valEnd && isVueSpace(lower[valStart]) {
-				valStart++
+			vs, ve := valStart, valEnd
+			for vs < ve && isVueSpace(lower[vs]) {
+				vs++
 			}
-			for valEnd > valStart && isVueSpace(lower[valEnd-1]) {
-				valEnd--
+			for ve > vs && isVueSpace(lower[ve-1]) {
+				ve--
 			}
-			if valStart < valEnd {
-				out = append(out, vueHTMLDirective{tag: name, attrStart: attrStart, exprStart: valStart, exprEnd: valEnd})
+			if vs >= ve {
+				continue
+			}
+			switch attr {
+			case "v-html":
+				html = append(html, vueHTMLDirective{tag: name, attrStart: attrStart, exprStart: vs, exprEnd: ve})
+			case "v-for":
+				if alias, es, ee, ok := vueForParts(lower, vs, ve); ok {
+					fors = append(fors, vueForDirective{attrStart: attrStart, alias: alias, exprStart: es, exprEnd: ee})
+				}
 			}
 		}
 	}
-	return out
+	return html, fors
+}
+
+// vueForParts splits a v-for value into the alias it binds and the byte range
+// of the collection expression it iterates: `(row, i) in dataCollection` binds
+// row from dataCollection. The separator is the LAST top-level `in`/`of` — the
+// keyword sits between the aliases and the collection — and only a
+// plain-identifier first alias binds, because the later aliases are the index
+// and key and a destructuring pattern has no one name to give the elements.
+func vueForParts(lower string, valStart, valEnd int) (alias string, exprStart, exprEnd int, ok bool) {
+	sep := -1 // just past the last top-level in/of keyword
+	depth, quote := 0, byte(0)
+	for i := valStart; i < valEnd; i++ {
+		b := lower[i]
+		if quote != 0 {
+			if b == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch b {
+		case '\'', '"', '`':
+			quote = b
+			continue
+		case '(', '[', '{':
+			depth++
+			continue
+		case ')', ']', '}':
+			depth--
+			continue
+		}
+		if depth != 0 || (b != 'i' && b != 'o') || i+2 > valEnd {
+			continue
+		}
+		if kw := lower[i : i+2]; (kw == "in" || kw == "of") &&
+			i > valStart && isVueSpace(lower[i-1]) &&
+			i+2 < valEnd && isVueSpace(lower[i+2]) {
+			sep = i + 2
+			i++
+		}
+	}
+	if sep < 0 {
+		return "", 0, 0, false
+	}
+	left := strings.TrimSpace(lower[valStart : sep-2])
+	if strings.HasPrefix(left, "(") && strings.HasSuffix(left, ")") {
+		// `(item)` is a parenthesised alias; `(item, index)` carries the index
+		// or key beside it, and only the value alias binds.
+		inner := strings.TrimSpace(left[1 : len(left)-1])
+		if c := vueTopLevelComma(inner); c >= 0 {
+			inner = strings.TrimSpace(inner[:c])
+		}
+		left = inner
+	}
+	if !isVueIdentifier(left) {
+		return "", 0, 0, false
+	}
+	exprStart = sep
+	for exprStart < valEnd && isVueSpace(lower[exprStart]) {
+		exprStart++
+	}
+	exprEnd = valEnd
+	for exprEnd > exprStart && isVueSpace(lower[exprEnd-1]) {
+		exprEnd--
+	}
+	if exprStart >= exprEnd {
+		return "", 0, 0, false
+	}
+	return left, exprStart, exprEnd, true
+}
+
+// vueTopLevelComma returns the offset of s's first comma outside any bracket
+// or quote, or -1 when there is none.
+func vueTopLevelComma(s string) int {
+	depth, quote := 0, byte(0)
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		if quote != 0 {
+			if b == quote {
+				quote = 0
+			}
+			continue
+		}
+		switch b {
+		case '\'', '"', '`':
+			quote = b
+		case '(', '[', '{':
+			depth++
+		case ')', ']', '}':
+			depth--
+		case ',':
+			if depth == 0 {
+				return i
+			}
+		}
+	}
+	return -1
+}
+
+func isVueIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		b := s[i]
+		switch {
+		case b >= 'a' && b <= 'z', b >= 'A' && b <= 'Z', b == '_', b == '$':
+		case b >= '0' && b <= '9':
+			if i == 0 {
+				return false
+			}
+		default:
+			return false
+		}
+	}
+	return true
 }
 
 // vueBlockRanges returns the [start, end) range of every element named by
@@ -322,6 +474,124 @@ func vueBlockRanges(lower, open string) [][2]int {
 	}
 }
 
+// vueElement is one element of a .vue template: its open tag's range, and the
+// end of its matching close tag — the extent a v-for on it binds its alias
+// over.
+type vueElement struct {
+	name           string
+	start, openEnd int
+	end            int
+}
+
+// vueElements returns every element of a template with its extent, a stack
+// walk over the same structural open tags the directive scan reads —
+// quote-aware, and skipping the comments and script/style blocks that are not
+// markup. An element with no matching close tag (a void element, or markup
+// that is not well formed) extends only over its own open tag, so nothing
+// after it is mistaken for its content.
+func vueElements(lower string, skip [][2]int) []vueElement {
+	var out []vueElement
+	var stack []int
+	for i := 0; i < len(lower); {
+		if lower[i] != '<' {
+			i++
+			continue
+		}
+		if inAnyRange(i, skip) {
+			i++
+			continue
+		}
+		if strings.HasPrefix(lower[i:], "</") {
+			j := i + 2
+			for j < len(lower) && isVueNameByte(lower[j]) {
+				j++
+			}
+			if name := lower[i+2 : j]; name != "" && j < len(lower) && (lower[j] == '>' || isVueSpace(lower[j])) {
+				end := len(lower)
+				if rel := strings.IndexByte(lower[j:], '>'); rel >= 0 {
+					end = j + rel + 1
+				}
+				for k := len(stack) - 1; k >= 0; k-- {
+					if out[stack[k]].name == name {
+						for _, idx := range stack[k:] {
+							out[idx].end = end
+						}
+						stack = stack[:k]
+						break
+					}
+				}
+				i = end
+				continue
+			}
+			i++
+			continue
+		}
+		if i+1 < len(lower) && isVueTagStart(lower[i+1]) {
+			quote := byte(0)
+			j := i + 1
+			for ; j < len(lower); j++ {
+				ch := lower[j]
+				if quote != 0 {
+					if ch == quote {
+						quote = 0
+					}
+					continue
+				}
+				if ch == '"' || ch == '\'' {
+					quote = ch
+					continue
+				}
+				if ch == '>' {
+					break
+				}
+			}
+			if j >= len(lower) {
+				break
+			}
+			openEnd := j + 1
+			nameEnd := i + 1
+			for nameEnd < openEnd && isVueNameByte(lower[nameEnd]) {
+				nameEnd++
+			}
+			idx := len(out)
+			out = append(out, vueElement{name: lower[i+1 : nameEnd], start: i, openEnd: openEnd, end: openEnd})
+			if !(openEnd >= 2 && lower[openEnd-2] == '/') {
+				stack = append(stack, idx)
+			}
+			i = openEnd
+			continue
+		}
+		i++
+	}
+	return out
+}
+
+// elementAt returns the element whose open tag carries offset — the element an
+// attribute at that offset belongs to.
+func (s vueTemplateScan) elementAt(off int) *vueElement {
+	for i := range s.elements {
+		if s.elements[i].start <= off && off < s.elements[i].openEnd {
+			return &s.elements[i]
+		}
+	}
+	return nil
+}
+
+// forChain returns the indices of the v-for directives whose elements enclose
+// the v-html directive html[hi] — outermost first, which is document order —
+// the aliases its bound expression reads in scope.
+func (s vueTemplateScan) forChain(hi int) []int {
+	var chain []int
+	off := s.html[hi].attrStart
+	for fi := range s.fors {
+		own := s.elementAt(s.fors[fi].attrStart)
+		if own != nil && own.start <= off && off < own.end {
+			chain = append(chain, fi)
+		}
+	}
+	return chain
+}
+
 func isVueTagStart(b byte) bool {
 	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
 }
@@ -335,10 +605,11 @@ func isVueSpace(b byte) bool {
 	return b == ' ' || b == '\t' || b == '\n' || b == '\r' || b == '\f'
 }
 
-// vueTemplateSource blanks every byte of a .vue file except the v-html
-// directives' bound expressions, so parsing the buffer yields one expression
-// per directive at the offset it occupies in the file.
-func vueTemplateSource(src []byte, dirs []vueHTMLDirective) []byte {
+// vueTemplateSource blanks every byte of a .vue file except the directives'
+// bound expressions — each v-html's expression and each v-for's collection —
+// so parsing the buffer yields one expression per directive at the offset it
+// occupies in the file.
+func vueTemplateSource(src []byte, scan vueTemplateScan) []byte {
 	out := make([]byte, len(src))
 	for i, b := range src {
 		switch b {
@@ -348,25 +619,35 @@ func vueTemplateSource(src []byte, dirs []vueHTMLDirective) []byte {
 			out[i] = ' '
 		}
 	}
-	for _, d := range dirs {
-		copy(out[d.exprStart:d.exprEnd], src[d.exprStart:d.exprEnd])
-		// Two directives on one row need a separator for automatic semicolon
-		// insertion; a newline already is one, and the blanking leaves nothing
-		// else for the guard to collide with.
-		if d.exprEnd < len(out) && out[d.exprEnd] == ' ' {
-			out[d.exprEnd] = ';'
+	keep := func(start, end int) {
+		copy(out[start:end], src[start:end])
+		// Two kept expressions on one row need a separator for automatic
+		// semicolon insertion; a newline already is one, and the blanking
+		// leaves nothing else for the guard to collide with.
+		if end < len(out) && out[end] == ' ' {
+			out[end] = ';'
 		}
+	}
+	for _, d := range scan.html {
+		keep(d.exprStart, d.exprEnd)
+	}
+	for _, d := range scan.fors {
+		keep(d.exprStart, d.exprEnd)
 	}
 	return out
 }
 
-// vueTemplateStatements lowers a .vue template's v-html directives. Vue's own
-// compiler lowers each directive to the data object of a createElement call —
-// the bound expression under domProps.innerHTML — so that is the shape the
-// frontend produces for it, and a binding can anchor a sink on the directive.
+// vueTemplateStatements lowers a .vue template's v-html directives together
+// with the v-for scope their expressions are read in. Vue's own compiler
+// lowers each v-html to the data object of a createElement call — the bound
+// expression under domProps.innerHTML — and each enclosing v-for to the
+// binding of its alias over an element of the iterated collection, so those
+// are the shapes the frontend produces: a binding can anchor a sink on the
+// directive, and the alias the bound expression reads carries the collection's
+// taint to it. A v-for no v-html sits under lowers nothing.
 func vueTemplateStatements(src []byte, root, abs, rel, lang string) []nir.Stmt {
-	dirs := vueHTMLDirectives(src)
-	if len(dirs) == 0 {
+	scan := scanVueTemplate(src)
+	if len(scan.html) == 0 {
 		return nil
 	}
 	parserFactory := jsParserFor(tsjs.Language())
@@ -377,7 +658,7 @@ func vueTemplateStatements(src []byte, root, abs, rel, lang string) []nir.Stmt {
 		parserFactory = jsParserFor(tstypescript.LanguageTSX())
 	}
 	parser := parserFactory()
-	tmpl := vueTemplateSource(src, dirs)
+	tmpl := vueTemplateSource(src, scan)
 	tree := parser.Parse(tmpl, nil)
 	if tree == nil {
 		parser.Close()
@@ -388,8 +669,50 @@ func vueTemplateStatements(src []byte, root, abs, rel, lang string) []nir.Stmt {
 	c.exported = c.exportedNames(root0)
 	c.siblings = c.jsSiblingFunctionBodies(root0)
 	c.calleeFacts = map[string][]string{}
-	done := make([]bool, len(dirs))
+	htmlSpans := make([][2]int, len(scan.html))
+	for i, d := range scan.html {
+		htmlSpans[i] = [2]int{d.exprStart, d.exprEnd}
+	}
+	forSpans := make([][2]int, len(scan.fors))
+	for i, d := range scan.fors {
+		forSpans[i] = [2]int{d.exprStart, d.exprEnd}
+	}
+	htmlExpr, htmlOK := c.vueTemplateExprs(root0, htmlSpans)
+	forExpr, forOK := c.vueTemplateExprs(root0, forSpans)
 	var out []nir.Stmt
+	bound := make(map[int]bool, len(scan.fors))
+	for hi := range scan.html {
+		if !htmlOK[hi] {
+			continue
+		}
+		// The v-for bindings come before the directive that reads them; the
+		// chain is outermost first, so an alias the collection itself reads is
+		// bound before the v-for that reads it.
+		chain := scan.forChain(hi)
+		for k, fi := range chain {
+			if bound[fi] || !forOK[fi] {
+				continue
+			}
+			bound[fi] = true
+			shadowed := make(map[string]bool, k)
+			for _, outer := range chain[:k] {
+				shadowed[scan.fors[outer].alias] = true
+			}
+			out = append(out, c.vueForBinding(scan.fors[fi], forExpr[fi], shadowed))
+		}
+		out = append(out, nir.ExprStmt{Value: c.vueVHTMLRender(scan.html[hi], htmlExpr[hi])})
+	}
+	tree.Close()
+	parser.Close()
+	return out
+}
+
+// vueTemplateExprs matches the buffer's parsed expression statements to the
+// directive spans they sit in, so each directive's bound expression keeps the
+// offsets that map it to its own place in the file.
+func (c *jsConv) vueTemplateExprs(root0 *tree_sitter.Node, spans [][2]int) ([]nir.Expr, []bool) {
+	exprs := make([]nir.Expr, len(spans))
+	seen := make([]bool, len(spans))
 	for _, n := range c.namedChildren(root0) {
 		if c.kind(n) != "expression_statement" {
 			continue
@@ -401,18 +724,61 @@ func vueTemplateStatements(src []byte, root, abs, rel, lang string) []nir.Stmt {
 		// The statement node swallows the `;` separator, so the range matched
 		// against the directive is the expression's own.
 		start, end := int(kids[0].StartByte()), int(kids[0].EndByte())
-		for di, d := range dirs {
-			if done[di] || start < d.exprStart || end > d.exprEnd {
+		for di, sp := range spans {
+			if seen[di] || start < sp[0] || end > sp[1] {
 				continue
 			}
-			done[di] = true
-			out = append(out, nir.ExprStmt{Value: c.vueVHTMLRender(d, c.expr(kids[0]))})
+			seen[di] = true
+			exprs[di] = c.expr(kids[0])
 			break
 		}
 	}
-	tree.Close()
-	parser.Close()
-	return out
+	return exprs, seen
+}
+
+// vueForBinding builds the statement a v-for directive lowers to: the alias
+// names an element of the iterated collection. A template reads component
+// state, and a bare identifier in it is a component property — a computed's
+// value is its getter's return, which the graph spells as a call on this —
+// unless an enclosing v-for's alias shadows the name.
+func (c *jsConv) vueForBinding(d vueForDirective, coll nir.Expr, shadowed map[string]bool) nir.Stmt {
+	L := c.locAt(d.attrStart)
+	if name, ok := coll.(nir.Name); ok && name.ID != "this" && !shadowed[name.ID] {
+		p := "this." + name.ID
+		coll = nir.Call{
+			Callee: nir.Attr{Base: nir.Name{ID: "this", Loc: L}, Attr: name.ID, Path: p, Loc: L},
+			Path:   p,
+			Method: name.ID,
+			Loc:    L,
+		}
+	}
+	return nir.Assign{
+		Targets: []string{d.alias},
+		Value: nir.Index{
+			Base: coll,
+			Key:  nir.Const{Loc: L, Value: "0"},
+			Path: vueDottedPath(coll),
+			Loc:  L,
+		},
+		Decl: true,
+		Loc:  L,
+	}
+}
+
+// vueDottedPath is the callee path a subscript over expr carries — the same
+// spelling the parser's own subscript lowering derives from its base.
+func vueDottedPath(e nir.Expr) string {
+	switch b := e.(type) {
+	case nir.Name:
+		return b.ID
+	case nir.Attr:
+		return b.Path
+	case nir.Call:
+		return b.Path
+	case nir.Index:
+		return b.Path + "[]"
+	}
+	return "?"
 }
 
 // vueVHTMLRender builds the call a v-html directive compiles to: the element's
