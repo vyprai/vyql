@@ -2487,3 +2487,35 @@ export async function pulse(cmd: string) {
 		}
 	}
 }
+
+// `(new Function(body))()` runs attacker-shaped text as code: the Function
+// constructor is a real call site whose argument must reach an Arg slot, the
+// same slot a `Function(body)` assignment produces. The parentheses put the
+// constructor call behind the parenthesized-expression chain, so the lowering
+// has to see through it to lower the inner call.
+func TestJavaScriptInvokedConstructorArgGetsArgSlot(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "eval.js")
+	src := []byte("module.exports = function handler(req) {\n" +
+		"  (new Function(req.query.expr))();\n" +
+		"};\n")
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") == "Function" && n.Prop("arg0") != "" {
+			return
+		}
+	}
+	t.Fatalf("no code.Call for the Function constructor with an arg0 slot; nodes=%d", len(ids))
+}
