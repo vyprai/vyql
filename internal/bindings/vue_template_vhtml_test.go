@@ -61,7 +61,7 @@ func vueLoweredComponent(t *testing.T) usg.Store {
 	return g
 }
 
-func vueHtmlRenderSinkApplicator(t *testing.T) Applicator {
+func vueHTMLRenderSinkApplicator(t *testing.T) Applicator {
 	t.Helper()
 	sets, err := compileV2BindingsForTest(vueRenderDomPropsInnerHTML)
 	if err != nil {
@@ -75,7 +75,7 @@ func vueHtmlRenderSinkApplicator(t *testing.T) Applicator {
 // v-html directive into, at the directive's own line.
 func TestVueTemplateVHTMLDirectiveCarriesTheRenderSink(t *testing.T) {
 	g := vueLoweredComponent(t)
-	got := labelsByNode(vueHtmlRenderSinkApplicator(t).Apply(g))
+	got := labelsByNode(vueHTMLRenderSinkApplicator(t).Apply(g))
 	if len(got) == 0 {
 		t.Fatal("no HtmlRender sink on the .vue component's v-html directive")
 	}
@@ -102,7 +102,7 @@ func TestVueTemplateVHTMLDirectiveCarriesTheRenderSink(t *testing.T) {
 // into the template existed at all.
 func TestVueTemplateVHTMLSinkReceivesTheBoundExpression(t *testing.T) {
 	g := vueLoweredComponent(t)
-	got := labelsByNode(vueHtmlRenderSinkApplicator(t).Apply(g))
+	got := labelsByNode(vueHTMLRenderSinkApplicator(t).Apply(g))
 	if len(got) == 0 {
 		t.Fatal("no HtmlRender sink on the .vue component's v-html directive")
 	}

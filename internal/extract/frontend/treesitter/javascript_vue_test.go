@@ -190,7 +190,8 @@ func TestVueTemplateOnlyComponentLowersTheDirective(t *testing.T) {
 
 // A commented-out element is markup the component does not render, and a
 // directive quoted inside another attribute's value is text, not a directive.
-func TestVueTemplateSkipsCommentedAndQuotedDirectives(t *testing.T) {	src := `<template>
+func TestVueTemplateSkipsCommentedAndQuotedDirectives(t *testing.T) {
+	src := `<template>
     <div title="v-html='evil()'">
         <!-- <td v-html="evil()"></td> -->
         <td v-html="keep()"></td>
