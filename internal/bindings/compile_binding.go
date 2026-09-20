@@ -304,7 +304,7 @@ func lowerV2Binding(b *parser.V2BindingDecl, names parser.V2Names, patterns v2Pa
 				if err != nil {
 					return nil, fmt.Errorf("binding %s: %w", b.Name, err)
 				}
-				m := shape.mapping(Action{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Coverage: action.Covers[0].Mode, CoverageDetail: lowerV2CoverageDetail(action.Covers[0]), ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
+				m := shape.mapping(Action{Kind: kind, Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Constraint: shape.Constraint, Coverage: action.Covers[0].Mode, CoverageDetail: lowerV2CoverageDetail(action.Covers[0]), ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 				if hasArgTarget {
 					if shape.Field == "callee.method" {
 						m.Kind = "check_method_arg"
@@ -319,7 +319,7 @@ func lowerV2Binding(b *parser.V2BindingDecl, names parser.V2Names, patterns v2Pa
 				}
 				out = appendV2BindingAction(out, m, b.Attrs)
 			case action.Kind == "emit issue":
-				m := shape.mapping(Action{Kind: shape.issueKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
+				m := shape.mapping(Action{Kind: shape.issueKind(), Pattern: shape.Pattern, Exact: shape.Exact, Concept: action.Concept, Constraint: shape.Constraint, ValMatches: shape.ValMatches, ValAbsents: shape.ValAbsents, Packages: pkgs, Requirement: req})
 				out = appendV2BindingAction(out, m, b.Attrs)
 			case action.Kind == "emit fact":
 				m, err := lowerV2FactEmit(b.Name, shape, action, pkgs, req)
@@ -552,6 +552,7 @@ func lowerV2GlobalCheck(binding string, shape v2CallShape, action parser.V2Bindi
 		Pattern:        shape.Pattern,
 		Exact:          shape.Exact,
 		Concept:        action.Concept,
+		Constraint:     shape.Constraint,
 		Coverage:       "global",
 		CoverageDetail: lowerV2CoverageDetail(action.Covers[0]),
 		ValMatches:     shape.ValMatches,
@@ -588,6 +589,7 @@ func lowerV2AdvisoryCheck(binding string, shape v2CallShape, action parser.V2Bin
 		Pattern:        shape.Pattern,
 		Exact:          shape.Exact,
 		Concept:        action.Concept,
+		Constraint:     shape.Constraint,
 		About:          action.About,
 		Advisory:       true,
 		Coverage:       action.Covers[0].Mode,
