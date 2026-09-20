@@ -4178,8 +4178,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			for name, id := range info.params {
 				inner.setNode(name, id)
 				if typ := info.paramTypes[name]; typ != "" {
-					if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-						inner.setTyp(name, [2]string{cm, typ})
+					if pair, ok := l.resolveTypeName(typ, l.importTables[l.curModule]); ok {
+						inner.setTyp(name, pair)
 					}
 				}
 			}
@@ -4239,8 +4239,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		for _, cls := range classScopes {
 			for fld, typ := range l.classFields[l.curModule+"::"+cls] {
-				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-					inner.setTyp(fld, [2]string{cm, typ})
+				if pair, ok := l.resolveTypeName(typ, l.importTables[l.curModule]); ok {
+					inner.setTyp(fld, pair)
 				}
 			}
 		}
@@ -4283,8 +4283,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		if !hasTyp && st.Type != "" { // declared type (no/foreign RHS), e.g. Spring DI field
-			if cm, ok := l.classModule(st.Type, l.importTables[l.curModule]); ok {
-				typ, hasTyp = [2]string{cm, st.Type}, true
+			if pair, ok := l.resolveTypeName(st.Type, l.importTables[l.curModule]); ok {
+				typ, hasTyp = pair, true
 			} else {
 				// External/library declared types are still useful for binding receiver
 				// constraints even when there is no project class body to resolve.
@@ -5109,8 +5109,8 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			paramByName[p] = pn
 			inner.setNode(p, pn)
 			if typ := ex.ParamTypes[p]; typ != "" {
-				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-					inner.setTyp(p, [2]string{cm, typ})
+				if pair, ok := l.resolveTypeName(typ, l.importTables[l.curModule]); ok {
+					inner.setTyp(p, pair)
 				}
 			}
 			paramNodes = append(paramNodes, pn)
@@ -7182,8 +7182,8 @@ func (l *lowerer) callResultClass(call nir.Call, sc *scope) ([2]string, bool) {
 	if name == "" {
 		return [2]string{}, false
 	}
-	if cm, ok := l.classModule(name, l.importTables[l.curModule]); ok {
-		return [2]string{cm, name}, true
+	if pair, ok := l.resolveTypeName(name, l.importTables[l.curModule]); ok {
+		return pair, true
 	}
 	return [2]string{}, false
 }
@@ -7634,6 +7634,35 @@ func (l *lowerer) classModule(name string, imports map[string]importEntry) (stri
 		}
 	}
 	return "", false
+}
+
+// resolveTypeName resolves a DECLARED type name to the module that declares the
+// class and the class's own (short) name. A name spelled with its package
+// qualifier -- Go's `repository.Repository`, how every imported type is declared --
+// resolves by splitting the qualifier off and routing it through the import
+// table, the same way resolveCtor resolves a qualified constructor call. The
+// short name is what every downstream key uses (funcQual's "mod::Class.method",
+// the derived-children walk, struct field slots), so a dotted name that resolved
+// to no class left its variable untyped and every method call on it unresolved
+// ("callee not traced"). A dotted name no import declares resolves to nothing --
+// it can never be a class's own name -- and an undotted name keeps classModule's
+// routes untouched.
+func (l *lowerer) resolveTypeName(name string, imports map[string]importEntry) ([2]string, bool) {
+	if i := strings.LastIndexByte(name, '.'); i > 0 && i < len(name)-1 {
+		imp, ok := imports[name[:i]]
+		if !ok || imp.kind != "mod" {
+			return [2]string{}, false
+		}
+		short := name[i+1:]
+		if l.classQual[imp.module+"::"+short] {
+			return [2]string{imp.module, short}, true
+		}
+		return [2]string{}, false
+	}
+	if cm, ok := l.classModule(name, imports); ok {
+		return [2]string{cm, name}, true
+	}
+	return [2]string{}, false
 }
 
 func (l *lowerer) resolveCtor(callee nir.Expr) ([2]string, bool) {
