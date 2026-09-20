@@ -35,14 +35,42 @@ func parseModules(
 	newParser func() *tree_sitter.Parser,
 	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
 ) []nir.Module {
-	return parseModulesPreprocess(files, root, newParser, nil, build)
+	return parseModulesBounded(files, root, newParser, nil, nil, build)
 }
 
+// parseModulesPreprocess is parseModules with a source-rewriting pass in front
+// of the parse; the content key covers the rewritten bytes, exactly what was
+// parsed.
 func parseModulesPreprocess(
 	files []string,
 	root string,
 	newParser func() *tree_sitter.Parser,
 	preprocess func([]byte) []byte,
+	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
+) []nir.Module {
+	return parseModulesBounded(files, root, newParser, preprocess, nil, build)
+}
+
+// parseBound arms a resident-memory bound on one parse of p and returns the
+// func that disarms it, reporting whether the bound is what halted the parse.
+// It is the hook a frontend whose grammar can outrun the file it reads passes
+// to parseModulesBounded; every other frontend leaves it nil and its parses
+// are untouched.
+type parseBound func(p *tree_sitter.Parser) (disarm func() bool)
+
+// parseModulesBounded is the one loop the wrappers above feed: parse files
+// concurrently, optionally rewriting each file's bytes (preprocess) and
+// bounding each parse (bound). A bound parse that is halted returns no tree
+// and the file is skipped — the same outcome as a file that cannot be read —
+// after the parser is reset, because a halted parse leaves the parser
+// mid-document and the next file's parse would resume it instead of starting
+// fresh.
+func parseModulesBounded(
+	files []string,
+	root string,
+	newParser func() *tree_sitter.Parser,
+	preprocess func([]byte) []byte,
+	bound parseBound,
 	build func(src []byte, abs, rel string, tree *tree_sitter.Tree) (nir.Module, bool),
 ) []nir.Module {
 	n := len(files)
@@ -110,8 +138,24 @@ func parseModulesPreprocess(
 						continue
 					}
 				}
+				disarm := func() bool { return false }
+				if bound != nil {
+					disarm = bound(p)
+				}
 				tree := p.Parse(src, nil)
+				halted := disarm()
 				if tree == nil {
+					// A halted or errored parse leaves the parser holding the
+					// partial document; without this the next file's parse
+					// would resume it rather than start fresh.
+					p.Reset()
+					if halted {
+						// The halt freed a tree the scan's budget had already
+						// paid for; hand those pages back before the next
+						// parse, or the resident set stays at this parse's
+						// peak for the rest of the scan.
+						trimResidentAlloc()
+					}
 					continue
 				}
 				m, good := build(src, files[i], relPath(root, files[i]), tree)
