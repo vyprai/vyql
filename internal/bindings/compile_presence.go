@@ -445,6 +445,12 @@ func v2PresenceValuePrefix(field string) string {
 		return "call_arg_const_at:"
 	case "callMethod":
 		return "call_method:"
+	// The property of an object-literal call argument a handler was registered
+	// under (`webView.addListeners({web_app_open_link: ({url}) => …})`), so a
+	// binding can label the one dispatch channel it means and not every
+	// property the call takes.
+	case "callProperty":
+		return "call_property:"
 	// The facts of a sibling helper the function calls, attributed one hop by
 	// the frontend. One prefix with the fact's own key inside it, so a
 	// delegated fact can never satisfy a predicate over what the function

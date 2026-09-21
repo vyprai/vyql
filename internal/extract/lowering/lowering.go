@@ -146,6 +146,15 @@ type lowerer struct {
 	modOrder  map[string]int
 	modBranch map[string]int
 
+	// lexScope overrides the lexical scope nodes lowered inside it report, when that
+	// scope is not the region they sit in: a try's catch and finally clauses run in
+	// their own control region (an alternative arm of the try) while still being
+	// WRITTEN in the try statement, and a scope predicate read from one of their
+	// nodes — node.scopeCall, a rule's sameScope coverage — must see the try's own
+	// calls. Empty means no override: the node's region is its lexical scope. See
+	// inClauseScope/inFinallyScope.
+	lexScope string
+
 	// funcRoot is the region root of the function body being lowered — the region a
 	// `return` written at the top level of that body sits in. A return written anywhere
 	// deeper is a CONDITIONAL exit: the path it takes leaves the function without
@@ -287,6 +296,33 @@ func (l *lowerer) inRegion(seg string, f func()) {
 	l.region, l.branchCond = save+"/"+seg, ""
 	f()
 	l.region, l.branchCond = save, saveCond
+}
+
+// inClauseScope lowers a try's catch body in its own control region while keeping
+// the lexical scope the try statement gives it, and inFinallyScope does the same
+// for the finalizer in the region the statement itself sits in. Control region and
+// lexical scope are different facts: the handler is an alternative arm of the try
+// (its own region, so a rule can tell a statement that runs only when the body
+// succeeded from one that runs on the exception path), while the clause is still
+// WRITTEN in the try statement — the scope a `node.scopeCall` predicate reads and a
+// rule's sameScope coverage pairs on. Nodes lowered under the override carry it in
+// usg.Node.Scope; everything else leaves Scope empty and falls back to its region.
+func (l *lowerer) inClauseScope(lexicalScope, seg string, f func()) {
+	save := l.lexScope
+	l.lexScope = lexicalScope
+	l.inRegion(seg, f)
+	l.lexScope = save
+}
+
+// inFinallyScope runs f for the finalizer with the try's lexical scope overriding
+// the enclosing region's, for the same reason as inClauseScope: the clause is part
+// of the try statement, and a scope predicate read from it must see the try's
+// calls, not the whole region the statement happens to sit in.
+func (l *lowerer) inFinallyScope(lexicalScope string, f func()) {
+	save := l.lexScope
+	l.lexScope = lexicalScope
+	f()
+	l.lexScope = save
 }
 
 // nodeLoc returns a node's source location, empty when the id names nothing.
@@ -1807,11 +1843,30 @@ func (l *lowerer) functionContextAnalysisEvent(loc string, contextTokens []strin
 	l.nodeInline("Call", loc, nil, analysisFunctionContext.method, analysisFunctionContext.path, strings.Join(contextTokens, "\x00"), "")
 }
 
+// classContextTokenCap bounds the member EVIDENCE a class-context event carries: the
+// tokens a real class accumulates (a method's text, its params, its returns) are wide,
+// so the budget exists to keep one giant class from swelling the payload. A member's
+// DECLARATION name is not evidence of that kind — it is one short token per member —
+// and it is the only place a member's declared name reaches the data layer, so a fact
+// that has to name a late-declared member (a serialized-form replacement declared
+// against its readObject rejection) is unmatchable once the cap eats it. Declaration
+// names are therefore exempt from the cap on both sides of the event.
+const classContextTokenCap = 512
+
+// classMemberDeclarationNameToken reports whether a member context token carries a
+// declaration's own name, the `function_name:` a method declaration lowers to.
+func classMemberDeclarationNameToken(tok string) bool {
+	return strings.HasPrefix(tok, "function_name:")
+}
+
 func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, memberTokens []string) {
 	var tokens []string
 	seen := map[string]bool{}
 	add := func(tok string) {
-		if tok == "" || seen[tok] || len(tokens) >= 512 {
+		if tok == "" || seen[tok] {
+			return
+		}
+		if len(tokens) >= classContextTokenCap && !classMemberDeclarationNameToken(tok) {
 			return
 		}
 		seen[tok] = true
@@ -1837,21 +1892,34 @@ func (l *lowerer) classContextAnalysisEvent(loc, name string, bases []string, me
 
 func (l *lowerer) classMemberContextTokens(stmts []nir.Stmt) []string {
 	var tokens []string
+	// Past the cap only declaration names are kept (see classContextTokenCap), so the
+	// walk never stops early: a member declared after the budget is spent still
+	// contributes its name, which is the whole point of walking past it.
+	add := func(tok string) {
+		if tok == "" {
+			return
+		}
+		if len(tokens) >= classContextTokenCap && !classMemberDeclarationNameToken(tok) {
+			return
+		}
+		tokens = append(tokens, tok)
+	}
 	var walk func([]nir.Stmt)
 	walk = func(stmts []nir.Stmt) {
 		for _, s := range stmts {
-			if len(tokens) >= 512 {
-				return
-			}
 			switch st := s.(type) {
 			case nir.BodyRef:
 				if st.Summarized {
-					tokens = append(tokens, st.Summary.ContextTokens...)
+					for _, tok := range st.Summary.ContextTokens {
+						add(tok)
+					}
 				} else {
 					l.eachDeferred(st, walk)
 				}
 			case nir.FuncDef:
-				tokens = append(tokens, st.ContextTokens...)
+				for _, tok := range st.ContextTokens {
+					add(tok)
+				}
 				walk(st.Body)
 			case nir.ClassDef:
 				// Nested classes get their own class-context event; do not smear their
@@ -1861,7 +1929,9 @@ func (l *lowerer) classMemberContextTokens(stmts []nir.Stmt) []string {
 				// carrying @Extension/@Symbol, and without this the annotation is reachable
 				// only from code written inside the Descriptor -- never from the class it
 				// describes. Record the nested class's own annotations and nothing else.
-				tokens = append(tokens, nir.NestedClassContextTokens(st)...)
+				for _, tok := range nir.NestedClassContextTokens(st) {
+					add(tok)
+				}
 			case nir.Block:
 				walk(st.Stmts)
 			case nir.If:
@@ -1885,9 +1955,6 @@ func (l *lowerer) classMemberContextTokens(stmts []nir.Stmt) []string {
 		}
 	}
 	walk(stmts)
-	if len(tokens) > 512 {
-		return tokens[:512]
-	}
 	return tokens
 }
 
@@ -3351,7 +3418,7 @@ func (l *lowerer) nodeInlineWithID(id, kind, loc string, props map[string]string
 		extras = propsWithInline(extras, method, calleePath, strArgs, vkind)
 	}
 	l.noteStoreErr(l.g.AddNode(usg.Node{ID: id, Type: "code." + kind, Loc: loc, Region: l.region,
-		Order: int32(ord), HasOrder: true, Props: extras,
+		Order: int32(ord), HasOrder: true, Props: extras, Scope: l.lexScope,
 		Method: method, CalleePath: calleePath, StrArgs: strArgs, Vkind: vkind}))
 	return id
 }
@@ -4147,8 +4214,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			for name, id := range info.params {
 				inner.setNode(name, id)
 				if typ := info.paramTypes[name]; typ != "" {
-					if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-						inner.setTyp(name, [2]string{cm, typ})
+					if pair, ok := l.resolveTypeName(typ, l.importTables[l.curModule]); ok {
+						inner.setTyp(name, pair)
 					}
 				}
 			}
@@ -4214,8 +4281,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		}
 		for _, cls := range classScopes {
 			for fld, typ := range l.classFields[l.curModule+"::"+cls] {
-				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-					inner.setTyp(fld, [2]string{cm, typ})
+				if pair, ok := l.resolveTypeName(typ, l.importTables[l.curModule]); ok {
+					inner.setTyp(fld, pair)
 				}
 			}
 		}
@@ -4258,8 +4325,8 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 			}
 		}
 		if !hasTyp && st.Type != "" { // declared type (no/foreign RHS), e.g. Spring DI field
-			if cm, ok := l.classModule(st.Type, l.importTables[l.curModule]); ok {
-				typ, hasTyp = [2]string{cm, st.Type}, true
+			if pair, ok := l.resolveTypeName(st.Type, l.importTables[l.curModule]); ok {
+				typ, hasTyp = pair, true
 			} else {
 				// External/library declared types are still useful for binding receiver
 				// constraints even when there is no project class body to resolve.
@@ -4730,6 +4797,12 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		exn := l.nodeInline("Exception", st.Loc, nil, "exception", "analysis.exception", "", "")
 		l.tryExceptionTargets = append(l.tryExceptionTargets, exn)
 		jcMark := len(sc.jc)
+		tryRegion := l.branchRegion("try" + b)
+		// A try BODY is its own lexical scope the way it was under the frontends that
+		// flatten: whatever clause scope was open around this statement ends at its
+		// body, and the handler/finalizer scopes opened below restore it after.
+		outerLex := l.lexScope
+		l.lexScope = ""
 		l.inRegion("try"+b, func() { l.block(st.Body, sc) })
 		l.tryExceptionTargets = l.tryExceptionTargets[:len(l.tryExceptionTargets)-1]
 		for i, h := range st.Handlers {
@@ -4739,7 +4812,7 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 					sc.delCnst(name)
 				}
 			}
-			l.inRegion("try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
+			l.inClauseScope(tryRegion, "try"+b+".h"+strconv.Itoa(i), func() { l.block(h, sc) })
 		}
 		// The body and every handler are control regions — either may be skipped or
 		// left partway, so a variable whose constant was written (or cleared) inside
@@ -4762,8 +4835,9 @@ func (l *lowerer) stmt(s nir.Stmt, sc *scope) {
 		// post-dominates nothing, so `lock(); try { … } finally { unlock(); }` reports a
 		// lock that is never released.
 		l.unwind++
-		l.block(st.Finally, sc)
+		l.inFinallyScope(tryRegion, func() { l.block(st.Finally, sc) })
 		l.unwind--
+		l.lexScope = outerLex
 		sc.clearIter()
 	}
 }
@@ -5084,8 +5158,8 @@ func (l *lowerer) eval(e nir.Expr, sc *scope) string {
 			paramByName[p] = pn
 			inner.setNode(p, pn)
 			if typ := ex.ParamTypes[p]; typ != "" {
-				if cm, ok := l.classModule(typ, l.importTables[l.curModule]); ok {
-					inner.setTyp(p, [2]string{cm, typ})
+				if pair, ok := l.resolveTypeName(typ, l.importTables[l.curModule]); ok {
+					inner.setTyp(p, pair)
 				}
 			}
 			paramNodes = append(paramNodes, pn)
@@ -5123,6 +5197,23 @@ func calleeLambda(e nir.Expr) (nir.Lambda, bool) {
 			return v, true
 		default:
 			return nir.Lambda{}, false
+		}
+	}
+}
+
+// calleeCall reports whether a call's callee expression is itself a call,
+// unwrapping the parenthesized-expression chain around it: the immediately-invoked
+// constructor `(new Function(body))()` puts the constructor call behind that chain,
+// exactly where `(function () { ... })()` puts the invoked body.
+func calleeCall(e nir.Expr) (nir.Call, bool) {
+	for {
+		switch v := e.(type) {
+		case nir.Thru:
+			e = v.Inner
+		case nir.Call:
+			return v, true
+		default:
+			return nir.Call{}, false
 		}
 	}
 }
@@ -5776,8 +5867,10 @@ func (l *lowerer) evalCall(call nir.Call, sc *scope) string {
 	// immediate-invocation form — still contains a real call site for the
 	// inner call: lower it so its arguments get Arg slots like the
 	// assignment-equivalent form. Only the inner node is created; the outer
-	// call's result does not flow from it.
-	if inner, ok := call.Callee.(nir.Call); ok {
+	// call's result does not flow from it. The inner call reaches the callee
+	// slot either directly or wrapped in the parenthesized-expression chain —
+	// `(new Function(body))()` — so unwrap that first.
+	if inner, ok := calleeCall(call.Callee); ok {
 		l.evalCall(inner, sc)
 	}
 	// A call whose callee is a function expression is the immediately-invoked
@@ -7179,8 +7272,8 @@ func (l *lowerer) callResultClass(call nir.Call, sc *scope) ([2]string, bool) {
 	if name == "" {
 		return [2]string{}, false
 	}
-	if cm, ok := l.classModule(name, l.importTables[l.curModule]); ok {
-		return [2]string{cm, name}, true
+	if pair, ok := l.resolveTypeName(name, l.importTables[l.curModule]); ok {
+		return pair, true
 	}
 	return [2]string{}, false
 }
@@ -7631,6 +7724,35 @@ func (l *lowerer) classModule(name string, imports map[string]importEntry) (stri
 		}
 	}
 	return "", false
+}
+
+// resolveTypeName resolves a DECLARED type name to the module that declares the
+// class and the class's own (short) name. A name spelled with its package
+// qualifier -- Go's `repository.Repository`, how every imported type is declared --
+// resolves by splitting the qualifier off and routing it through the import
+// table, the same way resolveCtor resolves a qualified constructor call. The
+// short name is what every downstream key uses (funcQual's "mod::Class.method",
+// the derived-children walk, struct field slots), so a dotted name that resolved
+// to no class left its variable untyped and every method call on it unresolved
+// ("callee not traced"). A dotted name no import declares resolves to nothing --
+// it can never be a class's own name -- and an undotted name keeps classModule's
+// routes untouched.
+func (l *lowerer) resolveTypeName(name string, imports map[string]importEntry) ([2]string, bool) {
+	if i := strings.LastIndexByte(name, '.'); i > 0 && i < len(name)-1 {
+		imp, ok := imports[name[:i]]
+		if !ok || imp.kind != "mod" {
+			return [2]string{}, false
+		}
+		short := name[i+1:]
+		if l.classQual[imp.module+"::"+short] {
+			return [2]string{imp.module, short}, true
+		}
+		return [2]string{}, false
+	}
+	if cm, ok := l.classModule(name, imports); ok {
+		return [2]string{cm, name}, true
+	}
+	return [2]string{}, false
 }
 
 func (l *lowerer) resolveCtor(callee nir.Expr) ([2]string, bool) {

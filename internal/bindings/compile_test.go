@@ -582,6 +582,53 @@ binding controllerParam {
 	}
 }
 
+func TestV2AnalysisCallPropertyContextLowering(t *testing.T) {
+	sets, err := compileV2BindingsForTest(`
+module bindings.javascript.webapp;
+binding eventHandlerInput {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.entryKind contains "call_property_lambda_param" and args.any.context.callPath contains "addMultipleEventsListeners" and args.any.context.callProperty contains "web_app_open_link"
+  emit source code.HttpInput at call.result
+}
+binding nestedEventHandlerInput {
+  query pattern callExpr where callee.analysis ~= "parameter.entry" and args.any.context.entryKind contains "call_property_lambda_param" and args.any.context.callProperty contains "on.theme_changed"
+  emit source code.HttpInput at call.result
+}
+`)
+	if err != nil {
+		t.Fatalf("parser.ParseV2Definitions: %v", err)
+	}
+	adapter := firstBindingSetForTest(t, sets)
+	if adapter.Name != "javascript" || len(adapter.Mappings) != 2 {
+		t.Fatalf("adapter lowering wrong: %+v", adapter)
+	}
+	got := adapter.Mappings[0]
+	if got.Kind != "source" || got.Pattern != "analysis.parameter.entry" {
+		t.Fatalf("analysis alias lowering wrong: %+v", got)
+	}
+	for _, want := range []string{
+		"entry_kind:call_property_lambda_param",
+		"call_path:addMultipleEventsListeners",
+		"call_property:web_app_open_link",
+	} {
+		found := false
+		for _, m := range got.ValMatches {
+			if m == want {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("analysis call property lowering missing %q: %+v", want, got)
+		}
+	}
+	nested := adapter.Mappings[1]
+	for _, m := range nested.ValMatches {
+		if m == "call_property:on.theme_changed" {
+			return
+		}
+	}
+	t.Fatalf("nested property lowering missing its dotted channel: %+v", nested)
+}
+
 func TestV2MemberAccessPatternLowering(t *testing.T) {
 	sets, err := compileV2BindingsForTest(`
 module bindings.javascript.dom;

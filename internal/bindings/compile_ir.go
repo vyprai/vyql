@@ -21,7 +21,7 @@ type Action struct {
 	NodeType         string   // optional USG node type filter, e.g. code.Attr for memberAccess
 	Pattern          string   // the callee path / method token (a string literal or dotted name)
 	Concept          string   // the concept it maps to (qualified); for "type", the type name
-	Constraint       string   // optional `on <type>` receiver-type constraint for sinks
+	Constraint       string   // optional `on <type>` receiver-type constraint for sinks, checks and issues
 	ArgIndex         int      // which argument position is targeted (default 0; `arg N`)
 	Kwarg            string   // keyword-argument target (`args[NAME]`): the slot named NAME, not a position
 	ArgCountSet      bool     // true when ArgCountMin/ArgCountMax constrain call arity

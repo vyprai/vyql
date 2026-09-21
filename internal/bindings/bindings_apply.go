@@ -232,6 +232,21 @@ func sourceReceiverType(n usg.Node) string {
 	return n.Prop("recv_may_type")
 }
 
+// receiverTypeAllows reports whether a receiver-type-constrained control or
+// issue may label this call: a known recv_type must satisfy the constraint,
+// an unresolved one keeps the label. The withholding the constraint performs
+// needs the authoritative type, so recv_may_type is not read — "built by this
+// constructor on every path this merge joins" is not the proof skipping a
+// label requires. Checks and issues follow the contract their sink sibling
+// documents above sinkApplicator.
+func receiverTypeAllows(n usg.Node, constraint string) bool {
+	if constraint == "" {
+		return true
+	}
+	recvType := n.Prop("recv_type")
+	return recvType == "" || constraintAllows(constraint, recvType)
+}
+
 // withReceiverAnchor records the receiver node a receiver-anchored sink consumes,
 // so a flow solver can require THAT node to be tainted rather than accepting any
 // taint that reaches the call node (docs/08). An empty recv leaves the detail
@@ -840,6 +855,9 @@ func (spec bindingSpec) checkApplicator() Applicator {
 					if hit && c.ByMethod && !receiverScopeSatisfied(n.Prop("recv_package"), path, c.Packages, scopePolicy) {
 						hit = false
 					}
+					if hit && !receiverTypeAllows(n, c.Constraint) {
+						hit = false
+					}
 					if hit && !callArgCountMatches(n, c.ArgCountSet, c.ArgCountMin, c.ArgCountMax) {
 						hit = false
 					}
@@ -1218,6 +1236,9 @@ func (spec bindingSpec) matchPresenceApplicator() Applicator {
 						hit = false
 					}
 					if !hit {
+						continue
+					}
+					if !receiverTypeAllows(n, m.Constraint) {
 						continue
 					}
 					if !callArgCountMatches(n, m.ArgCountSet, m.ArgCountMin, m.ArgCountMax) {

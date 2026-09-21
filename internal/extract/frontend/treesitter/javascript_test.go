@@ -88,6 +88,55 @@ func TestJavaScriptCommandRegexRejectGuardObservation(t *testing.T) {
 	}
 }
 
+// A try statement lowers to an analysis.exception node whose loc is the statement's.
+// The loc is not decoration: the presence matcher's same-file guard drops a loc-less
+// node from a flow_to walk, so without it no binding could pair a call inside the try
+// with the try's exception-containment fact. The one walker serves .js and .ts alike.
+func TestJavaScriptTryStatementExceptionNodeCarriesLocation(t *testing.T) {
+	for _, file := range []string{"app.js", "app.ts"} {
+		t.Run(file, func(t *testing.T) {
+			dir := t.TempDir()
+			path := filepath.Join(dir, file)
+			src := []byte("function run(cmd) {\n" +
+				"  try {\n" +
+				"    doWork(cmd);\n" +
+				"  } catch (e) {\n" +
+				"    cleanup(e);\n" +
+				"  }\n" +
+				"  unrelated(cmd);\n" +
+				"}\n")
+			if err := os.WriteFile(path, src, 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+			if err != nil {
+				t.Fatal(err)
+			}
+			graph, err := lowering.Lower(prog, true)
+			if err != nil {
+				t.Fatal(err)
+			}
+			nodes, err := graph.AllNodes()
+			if err != nil {
+				t.Fatal(err)
+			}
+			var exceptions []string
+			for _, n := range nodes {
+				if n.Type == "code.Exception" && n.Prop("callee_path") == "analysis.exception" {
+					exceptions = append(exceptions, n.Prop("loc"))
+				}
+			}
+			if len(exceptions) != 1 {
+				t.Fatalf("expected exactly one exception node from the try, got %d (%v)", len(exceptions), exceptions)
+			}
+			if want := file + ":2"; exceptions[0] != want {
+				t.Fatalf("exception node loc = %q, want the try statement's %q", exceptions[0], want)
+			}
+		})
+	}
+}
+
 func TestTypeScriptObjectGeneratorMethodsAreExtracted(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "login.ts")
@@ -1387,6 +1436,81 @@ function addDebugLog(board: Board, value: string) {
 	t.Fatalf("global assignment parameter entry event does not flow to callback param")
 }
 
+func TestJavaScriptCallObjectPropertyLambdaParamEntry(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "webApp.ts")
+	src := []byte(`
+telegramWebView.addMultipleEventsListeners({
+  iframe_ready: (result) => {
+    this.readyResult = result;
+  },
+  web_app_open_link: ({url}) => {
+    window.open(url, '_blank');
+  },
+  [evName]: (payload) => {
+    window.open(payload, '_blank');
+  },
+  on: { theme_changed: (theme) => { document.title = theme; } }
+});
+`)
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	nodes, err := g.AllNodes()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var eventID, paramID, nestedID string
+	for _, n := range nodes {
+		if n.Type != "code.Call" || n.Prop("callee_path") != "analysis.parameter.entry" {
+			continue
+		}
+		args := n.Prop("str_args")
+		if !strings.Contains(args, "entry_kind:call_property_lambda_param") ||
+			!strings.Contains(args, "call_path:telegramWebView.addMultipleEventsListeners") {
+			continue
+		}
+		switch {
+		case strings.Contains(args, "call_property:web_app_open_link") &&
+			strings.Contains(args, "param_name:url"):
+			eventID = n.ID
+		case strings.Contains(args, "call_property:on.theme_changed") &&
+			strings.Contains(args, "param_name:theme"):
+			nestedID = n.ID
+		}
+		if strings.Contains(args, "call_property:") && strings.Contains(args, "[evName]") {
+			t.Fatalf("computed key marked as a property channel: %q", args)
+		}
+	}
+	if eventID == "" || nestedID == "" {
+		t.Fatalf("missing call property lambda parameter entry events direct=%q nested=%q nodes=%#v", eventID, nestedID, nodes)
+	}
+	for _, n := range nodes {
+		if n.Type == "code.Param" && n.Prop("name") == "url" {
+			paramID = n.ID
+		}
+	}
+	if paramID == "" {
+		t.Fatalf("missing handler param")
+	}
+	outs, _ := g.OutEdges(eventID, "FLOWS")
+	for _, edge := range outs {
+		if edge.Dst == paramID {
+			return
+		}
+	}
+	t.Fatalf("call property lambda parameter entry event does not flow to handler param")
+}
+
 func TestJavaScriptModuleContextIsLowered(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "table.js")
@@ -2362,4 +2486,36 @@ export async function pulse(cmd: string) {
 			t.Errorf("callee_path at %s = %q, want %q", loc, got[loc], w)
 		}
 	}
+}
+
+// `(new Function(body))()` runs attacker-shaped text as code: the Function
+// constructor is a real call site whose argument must reach an Arg slot, the
+// same slot a `Function(body)` assignment produces. The parentheses put the
+// constructor call behind the parenthesized-expression chain, so the lowering
+// has to see through it to lower the inner call.
+func TestJavaScriptInvokedConstructorArgGetsArgSlot(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "eval.js")
+	src := []byte("module.exports = function handler(req) {\n" +
+		"  (new Function(req.query.expr))();\n" +
+		"};\n")
+	if err := os.WriteFile(path, src, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	prog, err := treesitter.ExtractJavaScript([]string{path}, dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	g, err := lowering.Lower(prog, true)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ids, _ := g.NodesOfType("code.Call")
+	for _, id := range ids {
+		n, _, _ := g.GetNode(id)
+		if n.Prop("callee_path") == "Function" && n.Prop("arg0") != "" {
+			return
+		}
+	}
+	t.Fatalf("no code.Call for the Function constructor with an arg0 slot; nodes=%d", len(ids))
 }
