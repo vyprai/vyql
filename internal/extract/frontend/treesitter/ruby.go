@@ -1843,6 +1843,25 @@ func (c *rbConv) call(n *tree_sitter.Node, L string) nir.Expr {
 	return c.callAsWritten(n, L)
 }
 
+// rbReceiver lowers the receiver of a member call. A bare identifier stays a name
+// read here even when the scope binds no local of that name — the one position
+// where the paren-less-call lowering (see expr) does not apply. The engine keys
+// its receiver routes on the root's shape: a name root with no recorded type
+// still reaches the unique-method-name fallback, while a call-result receiver
+// deliberately does not (a measured Java cost). The attr_reader spelling has no
+// `def` anywhere, so its call resolves to nothing and no result type exists —
+// lowering `coder.decode(x)` with a call receiver would strand the dispatch on a
+// route that refuses to guess, where the name receiver resolved `decode` through
+// the one method of that name. The value a paren-less call returns still flows at
+// every site that reads it as a value; the receiver root is the one place the
+// name is the machinery the callee is looked up by, not a value being consumed.
+func (c *rbConv) rbReceiver(recv *tree_sitter.Node) nir.Expr {
+	if recv != nil && c.kind(recv) == "identifier" {
+		return nir.Name{ID: c.text(recv), Loc: c.loc(recv)}
+	}
+	return c.expr(recv)
+}
+
 // callAsWritten lowers the call exactly as the source spells it.
 func (c *rbConv) callAsWritten(n *tree_sitter.Node, L string) nir.Expr {
 	recv := c.field(n, "receiver")
@@ -1852,7 +1871,7 @@ func (c *rbConv) callAsWritten(n *tree_sitter.Node, L string) nir.Expr {
 	if recv == nil {
 		callee = nir.Name{ID: orQ(method), Loc: L}
 	} else {
-		callee = nir.Attr{Base: c.expr(recv), Attr: orQ(method), Path: path, Loc: L}
+		callee = nir.Attr{Base: c.rbReceiver(recv), Attr: orQ(method), Path: path, Loc: L}
 	}
 	var args []nir.Expr
 	if al := c.field(n, "arguments"); al != nil {
@@ -1926,7 +1945,7 @@ func (c *rbConv) rbDirectDispatch(n *tree_sitter.Node, L string) (nir.Call, bool
 	path := name
 	if recv := c.field(n, "receiver"); recv != nil {
 		path = c.dotted(recv) + "." + name
-		callee = nir.Attr{Base: c.expr(recv), Attr: name, Path: path, Loc: L}
+		callee = nir.Attr{Base: c.rbReceiver(recv), Attr: name, Path: path, Loc: L}
 	} else {
 		callee = nir.Name{ID: name, Loc: L}
 	}

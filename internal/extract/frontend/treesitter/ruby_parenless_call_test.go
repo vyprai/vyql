@@ -121,8 +121,8 @@ end
 	}
 }
 
-// A paren-less call nested inside another expression — here the receiver of a method
-// call and the interpolated value of a string — is the same call, not a name read.
+// A paren-less call nested inside another expression — a binary operand, the
+// interpolated value of a string — is the same call, not a name read.
 func TestRubyReceiverlessParenlessCallInNestedExpressionPosition(t *testing.T) {
 	src := `class Handler
   def path_info
@@ -130,7 +130,7 @@ func TestRubyReceiverlessParenlessCallInNestedExpressionPosition(t *testing.T) {
   end
 
   def publish
-    Log.emit("was " + path_info.upcase + " #{path_info}")
+    Log.emit("was " + path_info + " #{path_info}")
   end
 end
 `
@@ -140,7 +140,37 @@ end
 		t.Fatal(err)
 	}
 	if !reachable[rubyNodeID(t, g, "code.Arg", "loc", "handler.rb:"+rubyLineOf(t, src, "Log.emit"))] {
-		t.Fatal("a paren-less call used as a receiver or interpolated did not carry its value out")
+		t.Fatal("a paren-less call used as an operand or interpolated did not carry its value out")
+	}
+}
+
+// A member call whose receiver is the attr_reader spelling — a bare identifier with
+// no `def` of that name anywhere, so no local and no resolvable call — keeps the
+// resolution a name receiver always had. The engine's receiver routes key on the
+// root's shape: a name root with no recorded type still reaches the
+// unique-method-name fallback, a call-result receiver deliberately does not.
+// Lowering this receiver as the call expr() would produce strands the dispatch on
+// the refusing route, and the argument never reaches the one method of that name
+// (cve_rank1643: `coder.decode(cookie_data)` stopped reporting the deserialization).
+func TestRubyMemberCallOnAttrReaderReceiverKeepsItsResolution(t *testing.T) {
+	src := `class Coder
+  def decode(str)
+    Marshal.load(str)
+  end
+end
+
+class Session
+  attr_reader :coder
+
+  def unpacked(request)
+    cookie = request.cookies["rack.session"]
+    coder.decode(cookie)
+  end
+end
+`
+	if !rubyParamReachesSink(t, src, "session.rb", "unpacked", "request", "Marshal.load(str)") {
+		t.Fatal("a member call on an attr_reader receiver stopped resolving: the argument " +
+			"never reached the unique method of that name")
 	}
 }
 
