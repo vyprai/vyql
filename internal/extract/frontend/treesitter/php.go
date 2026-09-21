@@ -513,6 +513,19 @@ func (c *phConv) exprStmt(inner *tree_sitter.Node) []nir.Stmt {
 				return []nir.Stmt{write}
 			}
 		}
+		// list destructuring (`[$a, $b] = f()`, `list($a, $b) = f()`, `["k" => $a] = f()`) —
+		// bind every destructured name conservatively to the whole RHS, the way foreach binds
+		// its loop variables: which element a name receives is not knowable without a model of
+		// the callee, and taint crossing the destructuring is the fact a rule needs. One Assign
+		// carries all the names so the RHS is lowered — and its call reported — exactly once.
+		// Without this the statement fell through to the bare expression below, which lowered
+		// the RHS but let its value flow nowhere, leaving every downstream read of $a/$b
+		// unbound and every sink after the destructuring unreachable.
+		if left != nil && c.kind(left) == "list_literal" && c.kind(inner) == "assignment_expression" {
+			var names []string
+			c.foreachVarNames(left, &names)
+			return []nir.Stmt{nir.Assign{Targets: names, Value: right, Loc: c.loc(inner)}}
+		}
 		return []nir.Stmt{nir.ExprStmt{Value: right}}
 	case "include_expression", "include_once_expression", "require_expression", "require_once_expression":
 		// model include/require as a file-inclusion sink call
@@ -2192,6 +2205,8 @@ func (c *phConv) phpParamEntries(name string, params []string, ptypes map[string
 
 // foreachVarNames collects the bare variable names bound by a foreach value-spec —
 // `$v` (variable_name), `&$v` (by_ref), `[$a,$b]` (list_literal), or `$k => $v` (pair).
+// The same shapes spell a destructuring assignment's list_literal left side, so the list
+// arm of exprStmt collects its targets with this too.
 func (c *phConv) foreachVarNames(n *tree_sitter.Node, out *[]string) {
 	if n == nil {
 		return
