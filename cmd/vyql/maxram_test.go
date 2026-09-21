@@ -8,7 +8,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/vyprai/vyql/internal/extract"
 	"github.com/vyprai/vyql/internal/extract/lowering"
+	"github.com/vyprai/vyql/internal/usg"
 )
 
 // cacheHome points os.UserCacheDir at a directory the test owns, on both the
@@ -106,6 +108,70 @@ func TestApplyMaxRAMPutsTheGraphOutsideTMPDIR(t *testing.T) {
 	}
 	if _, err := os.Stat(dir); err != nil {
 		t.Errorf("graph store not created: %v", err)
+	}
+}
+
+// A scan under a ceiling builds ONE resident graph for a target the ceiling holds, and that
+// graph belongs in RAM: the disk-backed store the same ceiling arms costs more than the
+// graph it spares. Its detail buffer, write path and caches sit resident alongside a
+// structural core that never leaves RAM in either store, so a multi-package target that
+// lowers to a million-odd nodes peaks several times its in-RAM footprint and the memory
+// safety stop ends the scan before a finding is emitted — measured on such a repository,
+// 4626MiB through the disk store against 1220MiB in RAM, under a 4GB ceiling whose safety
+// threshold sits at 3.3GiB.
+func TestBoundedOneGraphScanHoldsItsGraphInRAM(t *testing.T) {
+	cacheHome(t)
+	prev := debug.SetMemoryLimit(-1)
+	t.Cleanup(func() { debug.SetMemoryLimit(prev) })
+	t.Cleanup(applyMaxRAM("8GB"))
+
+	dir := partitionFixture(t, 3)
+	rules, err := loadRules("")
+	if err != nil {
+		t.Fatalf("loadRules: %v", err)
+	}
+	_, _, g, err := scanPathsWithProfileDemand([]string{dir}, rules, "", true, extract.Options{})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if g == nil {
+		t.Fatal("no graph was built from the fixture")
+	}
+	t.Cleanup(func() { _ = usg.Close(g) })
+	if _, disk := g.(*usg.BadgerGraph); disk {
+		t.Errorf("a target inside the one-graph limit was scanned on the disk-backed store;" +
+			" its overhead crosses the safety threshold a target this size never touches")
+	}
+}
+
+// The bound the disk-backed store exists to provide stays where it belongs: a target over
+// the one-graph limit for its ceiling still spills, so a run that must serialise one graph
+// is not handed a graph RAM cannot hold.
+func TestBoundedScanSpillsAGraphTheCeilingCannotHold(t *testing.T) {
+	cacheHome(t)
+	prev := debug.SetMemoryLimit(-1)
+	t.Cleanup(func() { debug.SetMemoryLimit(prev) })
+	t.Cleanup(applyMaxRAM("8GB"))
+
+	prevLimit, prevBudget := scanSourceLimit, scanSourceBudget
+	t.Cleanup(func() { scanSourceLimit, scanSourceBudget = prevLimit, prevBudget })
+	scanSourceLimit, scanSourceBudget = 1, 1 // every target is over the limit
+
+	dir := partitionFixture(t, 3)
+	rules, err := loadRules("")
+	if err != nil {
+		t.Fatalf("loadRules: %v", err)
+	}
+	_, _, g, err := scanPathsWithProfileDemand([]string{dir}, rules, "", true, extract.Options{})
+	if err != nil {
+		t.Fatalf("scan: %v", err)
+	}
+	if g == nil {
+		t.Fatal("no graph was built from the fixture")
+	}
+	t.Cleanup(func() { _ = usg.Close(g) })
+	if _, disk := g.(*usg.BadgerGraph); !disk {
+		t.Error("a target over the one-graph limit was held in RAM; the disk-backed store is its bound")
 	}
 }
 

@@ -15,6 +15,13 @@ const (
 	pyContextUsesPerOperationLimit    = 16
 	pyContextComparisonsPerGuardLimit = 8
 	pyContextEvidenceFieldLimit       = 160
+	// pyModuleLiteralMaxBytes bounds the module literal context (see
+	// pyModuleLiteralContext): the module's string literals joined into one blob
+	// that rides on every function's .end call, whose val matching scans it.
+	// Literal mass over this stays a source-order prefix — every ordinary module
+	// (the largest in the wild measured 55KB) keeps all of its literals, while a
+	// generated data table's join cannot make each function's end call carry it.
+	pyModuleLiteralMaxBytes = 64 << 10
 )
 
 type pyControlContextFacts struct {
